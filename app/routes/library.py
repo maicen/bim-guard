@@ -1,21 +1,203 @@
-from fasthtml.common import Br, Div, P, Span, Style, Title, UploadFile
+from datetime import datetime, timezone
+import hashlib
+from pathlib import Path
+import uuid
+
+from fasthtml.common import (
+    A,
+    Br,
+    Div,
+    P,
+    RedirectResponse,
+    Span,
+    Style,
+    Tbody,
+    Td,
+    Th,
+    Thead,
+    Title,
+    Tr,
+    UploadFile,
+)
+from fastlite import database
 from app.components.layout import DashboardLayout
+from app.modules.module1_doc_reader import Module1_DocReader
 from monsterui.all import (
     Alert,
+    AlertT,
     Button,
     Card,
     CardBody,
     CardHeader,
     CardTitle,
+    Container,
+    DivLAligned,
     Form,
+    ButtonT,
     H1,
     H3,
     Input,
     Label,
     Subtitle,
+    Table,
+    TextArea,
+    FormLabel,
     UkIcon,
 )
 import asyncio
+
+
+DB_DIR = Path("data")
+DB_DIR.mkdir(exist_ok=True)
+DB_PATH = DB_DIR / "bimguard.sqlite"
+
+UPLOAD_DIR = DB_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+_db = database(str(DB_PATH))
+_documents = _db["documents"]
+_documents.create(
+    {
+        "id": int,
+        "md5_hash": str,
+        "filename": str,
+        "file_path": str,
+        "extracted_text": str,
+        "upload_date": str,
+    },
+    pk="id",
+    if_not_exists=True,
+)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _find_document_by_md5(md5_hash: str):
+    for row in _documents.rows:
+        if row.get("md5_hash") == md5_hash:
+            return row
+    return None
+
+
+def _documents_table_rows():
+    rows = sorted(list(_documents.rows), key=lambda r: r["id"], reverse=True)
+    if not rows:
+        return [
+            Tr(
+                Td(
+                    "No documents uploaded yet.",
+                    colspan="5",
+                    cls="text-center text-muted-foreground",
+                )
+            )
+        ]
+
+    rendered = []
+    for row in rows:
+        extracted_text = (row.get("extracted_text") or "").strip()
+        preview = extracted_text[:140] + ("..." if len(extracted_text) > 140 else "")
+        rendered.append(
+            Tr(
+                Td(row.get("filename", "-")),
+                Td(row.get("md5_hash", "-"), cls="font-mono text-xs"),
+                Td(row.get("upload_date", "-")),
+                Td(preview or "No text extracted", cls="text-muted-foreground text-sm"),
+                Td(
+                    DivLAligned(
+                        A(
+                            Button("View", cls=ButtonT.secondary),
+                            href=f"/library/documents/{row['id']}",
+                        ),
+                        A(
+                            Button("Edit", cls=ButtonT.secondary),
+                            href=f"/library/documents/{row['id']}/edit",
+                        ),
+                        Form(
+                            Button("Delete", cls=ButtonT.destructive),
+                            method="post",
+                            action=f"/library/documents/{row['id']}/delete",
+                        ),
+                        cls="gap-2",
+                    )
+                ),
+            )
+        )
+    return rendered
+
+
+def _documents_table_card():
+    return Card(
+        CardHeader(CardTitle("Stored Documents")),
+        Div(
+            Table(
+                Thead(
+                    Tr(
+                        Th("Filename"),
+                        Th("MD5"),
+                        Th("Uploaded"),
+                        Th("Preview"),
+                        Th("Actions"),
+                    )
+                ),
+                Tbody(*_documents_table_rows()),
+                cls="min-w-[900px]",
+            ),
+            cls="w-full overflow-x-auto",
+        ),
+        cls="w-full max-w-full overflow-hidden",
+    )
+
+
+def _documents_panel(message: str | None = None, level: str = "success"):
+    alert = ()
+    if message:
+        cls = AlertT.success if level == "success" else AlertT.warning
+        alert = (Alert(message, cls=cls),)
+
+    return Div(*alert, _documents_table_card(), id="documents-panel", cls="space-y-4")
+
+
+def _document_edit_form(document: dict):
+    return Card(
+        CardHeader(CardTitle(f"Edit: {document.get('filename', 'Document')}")),
+        CardBody(
+            Form(
+                DivLAligned(
+                    Button("Save Changes", cls=ButtonT.primary),
+                    A(
+                        Button("Cancel", cls=ButtonT.secondary),
+                        href="/library/documents",
+                    ),
+                    cls="gap-2",
+                ),
+                Div(
+                    FormLabel("Filename", fr="filename"),
+                    Input(
+                        id="filename",
+                        name="filename",
+                        value=document.get("filename", ""),
+                        required=True,
+                    ),
+                    cls="space-y-1",
+                ),
+                Div(
+                    FormLabel("Extracted Text", fr="extracted_text"),
+                    TextArea(
+                        document.get("extracted_text", ""),
+                        id="extracted_text",
+                        name="extracted_text",
+                        rows="12",
+                    ),
+                    cls="space-y-1",
+                ),
+                method="post",
+                action=f"/library/documents/{document['id']}/update",
+                cls="space-y-4",
+            )
+        ),
+    )
 
 
 def RuleCard(rule):
@@ -40,24 +222,191 @@ def setup_routes(rt):
     @rt("/library/documents")
     def documents():
         return Title("Documents - BIM Guard"), DashboardLayout(
-            Div(
-                H1("Documents", cls="text-3xl font-bold mb-4 tracking-tight"),
+            Container(
+                H1("Documents", cls="text-3xl font-bold tracking-tight"),
                 P(
-                    "Document library placeholder. This area will manage uploaded standards, BEPs, and reference files.",
-                    cls="text-muted-foreground mb-6",
+                    "Upload PDF references, extract their text, and manage your document library.",
+                    cls="text-muted-foreground",
                 ),
                 Card(
-                    CardHeader(CardTitle("Coming Soon")),
+                    CardHeader(CardTitle("Upload PDF")),
                     CardBody(
-                        P(
-                            "Add document upload, versioning, and categorization here.",
-                            cls="text-sm text-muted-foreground",
+                        Form(
+                            Div(
+                                FormLabel("PDF Document", fr="document"),
+                                Input(
+                                    id="document",
+                                    type="file",
+                                    name="document",
+                                    accept=".pdf",
+                                    required=True,
+                                ),
+                                cls="space-y-1",
+                            ),
+                            Button("Upload Document", cls=ButtonT.primary),
+                            Div(
+                                UkIcon("loader-2", cls="w-5 h-5 animate-spin"),
+                                Span("Processing document...", cls="ml-2 text-sm"),
+                                id="documents-upload-spinner",
+                                cls="htmx-indicator hidden items-center",
+                            ),
+                            Style(
+                                ".htmx-indicator.htmx-request { display: flex !important; }"
+                            ),
+                            hx_post="/api/documents/upload",
+                            hx_target="#documents-panel",
+                            hx_indicator="#documents-upload-spinner",
+                            enctype="multipart/form-data",
+                            cls="space-y-4",
                         )
                     ),
                 ),
-                cls="container mx-auto py-6",
+                _documents_panel(),
+                cls="space-y-4",
             )
         )
+
+    @rt("/api/documents/upload", methods=["POST"])
+    async def documents_upload(document: UploadFile):
+        filename = Path(document.filename or "").name
+        if not filename.lower().endswith(".pdf"):
+            return _documents_panel("Only PDF files are supported.", level="warning")
+
+        file_content = await document.read()
+        if not file_content:
+            return _documents_panel("Uploaded file is empty.", level="warning")
+
+        md5_hash = hashlib.md5(file_content).hexdigest()
+        existing = _find_document_by_md5(md5_hash)
+        if existing is not None:
+            return _documents_panel(
+                f"Document already exists: {existing.get('filename', filename)}",
+                level="warning",
+            )
+
+        stored_name = f"{uuid.uuid4().hex}_{filename}"
+        stored_path = UPLOAD_DIR / stored_name
+        stored_path.write_bytes(file_content)
+
+        reader = Module1_DocReader()
+        extracted_text = reader.parse_pdf(file_content)
+
+        _documents.insert(
+            {
+                "md5_hash": md5_hash,
+                "filename": filename,
+                "file_path": str(stored_path),
+                "extracted_text": extracted_text,
+                "upload_date": _now_iso(),
+            }
+        )
+
+        return _documents_panel(f"Uploaded and stored: {filename}", level="success")
+
+    @rt("/library/documents/{document_id}")
+    def document_details(document_id: int):
+        document = _documents.get(document_id)
+        if document is None:
+            return Title("Document Not Found - BIM Guard"), DashboardLayout(
+                Container(
+                    Alert("Document not found.", cls=AlertT.warning),
+                    A(
+                        Button("Back to Documents", cls=ButtonT.secondary),
+                        href="/library/documents",
+                    ),
+                    cls="space-y-4",
+                )
+            )
+
+        extracted_text = (document.get("extracted_text") or "").strip()
+        return Title(
+            f"{document.get('filename', 'Document')} - BIM Guard"
+        ), DashboardLayout(
+            Container(
+                H1(document.get("filename", "Document")),
+                DivLAligned(
+                    P(
+                        f"MD5: {document.get('md5_hash', '-')}",
+                        cls="font-mono text-xs text-muted-foreground",
+                    ),
+                    P(
+                        f"Uploaded: {document.get('upload_date', '-')}",
+                        cls="text-sm text-muted-foreground",
+                    ),
+                    A(
+                        Button("Edit", cls=ButtonT.primary),
+                        href=f"/library/documents/{document_id}/edit",
+                    ),
+                    A(Button("Back", cls=ButtonT.secondary), href="/library/documents"),
+                    cls="gap-2",
+                ),
+                Card(
+                    CardHeader(CardTitle("Extracted Text")),
+                    CardBody(
+                        P(
+                            extracted_text or "No text extracted for this document.",
+                            cls="whitespace-pre-wrap text-sm",
+                        ),
+                        cls="max-h-[60vh] overflow-y-auto",
+                    ),
+                ),
+                cls="space-y-4",
+            )
+        )
+
+    @rt("/library/documents/{document_id}/edit")
+    def document_edit(document_id: int):
+        document = _documents.get(document_id)
+        if document is None:
+            return Title("Document Not Found - BIM Guard"), DashboardLayout(
+                Container(
+                    Alert("Document not found.", cls=AlertT.warning),
+                    A(
+                        Button("Back to Documents", cls=ButtonT.secondary),
+                        href="/library/documents",
+                    ),
+                    cls="space-y-4",
+                )
+            )
+
+        return Title("Edit Document - BIM Guard"), DashboardLayout(
+            Container(
+                _document_edit_form(document),
+                cls="space-y-4",
+            )
+        )
+
+    @rt("/library/documents/{document_id}/update", methods=["POST"])
+    def document_update(document_id: int, filename: str, extracted_text: str = ""):
+        document = _documents.get(document_id)
+        if document is None:
+            return RedirectResponse("/library/documents", status_code=303)
+
+        _documents.update(
+            updates={
+                "filename": Path(filename).name.strip()
+                or document.get("filename", "document.pdf"),
+                "extracted_text": extracted_text,
+            },
+            pk_values=document_id,
+        )
+        return RedirectResponse(f"/library/documents/{document_id}", status_code=303)
+
+    @rt("/library/documents/{document_id}/delete", methods=["POST"])
+    def document_delete(document_id: int):
+        document = _documents.get(document_id)
+        if document is not None:
+            file_path = document.get("file_path")
+            if file_path:
+                try:
+                    path = Path(file_path)
+                    if path.exists():
+                        path.unlink()
+                except OSError:
+                    pass
+            _documents.delete(document_id)
+
+        return RedirectResponse("/library/documents", status_code=303)
 
     @rt("/library/rules")
     def get():

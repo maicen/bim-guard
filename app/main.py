@@ -1,15 +1,40 @@
 from fasthtml.common import A, FileResponse, Link, Style, Title, fast_app
-from monsterui.all import Button, ButtonT, Container, DivLAligned, H1, Subtitle, Theme
+from monsterui.all import (
+    Button,
+    ButtonT,
+    Container,
+    DivLAligned,
+    H1,
+    Subtitle,
+    Theme,
+    ThemeFont,
+    ThemeRadii,
+    ThemeShadows,
+)
 from app.routes import analyze, dashboard, library, projects, viewer
 from app.components.layout import DashboardLayout
 
-# Initialize FastHTML app with MonsterUI theme headers
-app, rt = fast_app(
-    hdrs=(
-        *Theme.neutral.headers(),
+hdrs = Theme.gray.headers(
+    radii=ThemeRadii.lg,
+    shadows=ThemeShadows.lg,
+    font=ThemeFont.default,
+)
+
+"""
+(
+        *Theme.neutral.headers(
+            radii=ThemeRadii.lg,
+            shadows=ThemeShadows.lg,
+            font=ThemeFont.default,
+        ),
         Style("body { margin: 0; padding: 0; overflow: hidden; }"),
         Link(rel="stylesheet", href="/static/css/styles.css"),
     ),
+"""
+
+# Initialize FastHTML app with MonsterUI theme headers
+app, rt = fast_app(
+    hdrs=hdrs,
     # Uvicorn reload is already used in development; disabling FastHTML's
     # websocket-based live reload avoids disconnect exceptions in the logs.
     live=False,
