@@ -13,7 +13,7 @@ from monsterui.all import (
 
 NAV_ICONS = {
     "Dashboard": "layout-dashboard",
-    "New Project": "folder-plus",
+    "Projects": "folder-open",
     "Viewer": "scan-eye",
     "Run Analysis": "cpu",
     "Reports": "file-text",
@@ -52,14 +52,16 @@ def AppSidebar():
             "Platform",
             [
                 ("Dashboard", "/dashboard"),
-                ("New Project", "/projects/new"),
+                ("Projects", "/projects"),
                 ("Viewer", "/viewer"),
             ],
         ),
         ("Analysis", [("Run Analysis", "/analysis/run"), ("Reports", "/reports")]),
         ("Library", [("Documents", "/library/documents"), ("Rules", "/library/rules")]),
     ]
-    nav_items = [frag for s in nav_sections for frag in (NavDividerLi(), *NavSection(*s))]
+    nav_items = [
+        frag for s in nav_sections for frag in (NavDividerLi(), *NavSection(*s))
+    ]
 
     return Div(
         Div(H2("BIM Guard"), cls="pb-2"),

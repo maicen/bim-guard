@@ -1,9 +1,9 @@
-from datetime import datetime
 from pathlib import Path
 
 from fasthtml.common import (
     A,
     Div,
+    FileResponse,
     Option,
     RedirectResponse,
     Tbody,
@@ -12,6 +12,7 @@ from fasthtml.common import (
     Thead,
     Title,
     Tr,
+    UploadFile,
 )
 from fastlite import database
 from monsterui.all import (
@@ -35,14 +36,20 @@ from monsterui.all import (
     Table,
     TableT,
     TextArea,
+    UkIcon,
 )
 
 from app.components.layout import DashboardLayout
+from app.components.ui import IconLinkButton, IconPostButton
+from app.utils import md5_hex, now_iso_utc, safe_upload_name, store_upload_bytes
 
 
 DB_DIR = Path("data")
 DB_DIR.mkdir(exist_ok=True)
 DB_PATH = DB_DIR / "bimguard.sqlite"
+
+IFC_UPLOAD_DIR = DB_DIR / "uploads" / "ifc"
+IFC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 _db = database(str(DB_PATH))
 _projects = _db["projects"]
@@ -52,20 +59,41 @@ _projects.create(
         "name": str,
         "description": str,
         "status": str,
+        "ifc_file_path": str,
+        "ifc_md5_hash": str,
         "created_at": str,
         "updated_at": str,
     },
     pk="id",
     if_not_exists=True,
 )
+# Add ifc_file_path to existing tables that predate this column
+if "ifc_file_path" not in _projects.columns_dict:
+    _projects.add_column("ifc_file_path", str)
+if "ifc_md5_hash" not in _projects.columns_dict:
+    _projects.add_column("ifc_md5_hash", str)
 
 
-def _now_iso() -> str:
-    return datetime.utcnow().isoformat(timespec="seconds")
-
-
-def _project_form(title: str, action: str, project: dict | None = None):
+def _project_form(
+    title: str, action: str, project: dict | None = None, include_ifc: bool = False
+):
     project = project or {}
+    ifc_field = (
+        (
+            DivVStacked(
+                FormLabel("IFC Model", fr="ifc_file"),
+                Input(
+                    id="ifc_file",
+                    name="ifc_file",
+                    type="file",
+                    accept=".ifc",
+                ),
+                cls="space-y-1",
+            ),
+        )
+        if include_ifc
+        else ()
+    )
     return Card(
         Form(
             DivVStacked(
@@ -113,13 +141,15 @@ def _project_form(title: str, action: str, project: dict | None = None):
                 ),
                 cls="space-y-1",
             ),
+            *ifc_field,
             DivLAligned(
                 Button("Save Project", cls=ButtonT.primary),
-                A(Button("Cancel", cls=ButtonT.ghost), href="/projects"),
+                A(Button("Cancel", cls=ButtonT.secondary), href="/projects"),
                 cls="gap-2",
             ),
             method="post",
             action=action,
+            enctype="multipart/form-data" if include_ifc else None,
             cls="space-y-4",
         ),
         header=Div(H2(title), Subtitle("Manage your BIM compliance projects.")),
@@ -133,7 +163,7 @@ def _projects_table_rows():
             Tr(
                 Td(
                     "No projects yet. Create your first one.",
-                    colspan="6",
+                    colspan="7",
                     cls="text-center text-muted-foreground",
                 )
             )
@@ -146,20 +176,39 @@ def _projects_table_rows():
                 Td(str(row["id"])),
                 Td(row["name"]),
                 Td(row.get("status", "Draft")),
+                Td(
+                    UkIcon("file-check", height=15, width=15, cls="text-success")
+                    if row.get("ifc_file_path")
+                    else UkIcon(
+                        "file-x", height=15, width=15, cls="text-muted-foreground"
+                    )
+                ),
                 Td(row.get("created_at", "-")),
                 Td(row.get("updated_at", "-")),
                 Td(
                     DivLAligned(
-                        A(
-                            Button("Edit", cls=ButtonT.ghost),
+                        *(
+                            [
+                                IconLinkButton(
+                                    "eye",
+                                    href=f"/viewer?project_id={row['id']}",
+                                    title="Open IFC in Viewer",
+                                )
+                            ]
+                            if row.get("ifc_file_path")
+                            else []
+                        ),
+                        IconLinkButton(
+                            "pencil",
                             href=f"/projects/{row['id']}/edit",
+                            title="Edit",
                         ),
-                        Form(
-                            Button("Delete", cls=ButtonT.destructive),
-                            method="post",
+                        IconPostButton(
+                            "trash-2",
                             action=f"/projects/{row['id']}/delete",
+                            title="Delete",
                         ),
-                        cls="gap-2",
+                        cls="gap-1",
                     )
                 ),
             )
@@ -189,6 +238,7 @@ def _projects_page(message: str | None = None):
                             Th("ID"),
                             Th("Name"),
                             Th("Status"),
+                            Th("IFC"),
                             Th("Created"),
                             Th("Updated"),
                             Th("Actions"),
@@ -212,17 +262,36 @@ def setup_routes(rt):
     @rt("/projects/new")
     def projects_new():
         return Title("New Project - BIM Guard"), DashboardLayout(
-            Container(_project_form("Create Project", "/projects/create"))
+            Container(
+                _project_form("Create Project", "/projects/create", include_ifc=True)
+            )
         )
 
     @rt("/projects/create", methods=["POST"])
-    def projects_create(name: str, description: str = "", status: str = "Draft"):
-        now = _now_iso()
+    async def projects_create(
+        name: str,
+        description: str = "",
+        status: str = "Draft",
+        ifc_file: UploadFile = None,
+    ):
+        ifc_path = ""
+        ifc_md5_hash = ""
+        if ifc_file and ifc_file.filename:
+            filename = safe_upload_name(ifc_file.filename)
+            if filename.lower().endswith(".ifc"):
+                content = await ifc_file.read()
+                if content:
+                    ifc_md5_hash = md5_hex(content)
+                    stored_path = store_upload_bytes(filename, content, IFC_UPLOAD_DIR)
+                    ifc_path = str(stored_path)
+        now = now_iso_utc()
         _projects.insert(
             {
                 "name": name.strip(),
                 "description": description.strip(),
                 "status": status,
+                "ifc_file_path": ifc_path,
+                "ifc_md5_hash": ifc_md5_hash,
                 "created_at": now,
                 "updated_at": now,
             }
@@ -247,7 +316,7 @@ def setup_routes(rt):
                 "name": name.strip(),
                 "description": description.strip(),
                 "status": status,
-                "updated_at": _now_iso(),
+                "updated_at": now_iso_utc(),
             },
             pk_values=project_id,
         )
@@ -257,3 +326,21 @@ def setup_routes(rt):
     def projects_delete(project_id: int):
         _projects.delete(project_id)
         return RedirectResponse("/projects", status_code=303)
+
+    @rt("/projects/{project_id}/ifc")
+    def project_ifc_file(project_id: int):
+        project = _projects.get(project_id)
+        if project is None:
+            return RedirectResponse("/projects", status_code=303)
+
+        ifc_file_path = project.get("ifc_file_path") or ""
+        if not ifc_file_path:
+            return RedirectResponse("/projects", status_code=303)
+
+        file_path = Path(ifc_file_path)
+        if not file_path.exists() or not file_path.is_file():
+            return RedirectResponse("/projects", status_code=303)
+
+        return FileResponse(
+            file_path, media_type="application/octet-stream", filename=file_path.name
+        )

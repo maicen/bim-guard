@@ -133,7 +133,7 @@ Card(
         ),
         DivLAligned(
             Button("Save", cls=ButtonT.primary),
-            A(Button("Cancel", cls=ButtonT.ghost), href="/back"),
+            A(Button("Cancel", cls=ButtonT.secondary), href="/back"),
             cls="gap-2",
         ),
         method="post",

@@ -1,10 +1,6 @@
-from datetime import datetime, timezone
-import hashlib
 from pathlib import Path
-import uuid
 
 from fasthtml.common import (
-    A,
     Br,
     Div,
     P,
@@ -21,7 +17,9 @@ from fasthtml.common import (
 )
 from fastlite import database
 from app.components.layout import DashboardLayout
+from app.components.ui import IconLinkButton, IconPostButton
 from app.modules.module1_doc_reader import Module1_DocReader
+from app.utils import md5_hex, now_iso_utc, safe_upload_name, store_upload_bytes
 from monsterui.all import (
     Alert,
     AlertT,
@@ -70,10 +68,6 @@ _documents.create(
 )
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
 def _find_document_by_md5(md5_hash: str):
     for row in _documents.rows:
         if row.get("md5_hash") == md5_hash:
@@ -106,20 +100,22 @@ def _documents_table_rows():
                 Td(preview or "No text extracted", cls="text-muted-foreground text-sm"),
                 Td(
                     DivLAligned(
-                        A(
-                            Button("View", cls=ButtonT.secondary),
+                        IconLinkButton(
+                            "eye",
                             href=f"/library/documents/{row['id']}",
+                            title="View",
                         ),
-                        A(
-                            Button("Edit", cls=ButtonT.secondary),
+                        IconLinkButton(
+                            "pencil",
                             href=f"/library/documents/{row['id']}/edit",
+                            title="Edit",
                         ),
-                        Form(
-                            Button("Delete", cls=ButtonT.destructive),
-                            method="post",
+                        IconPostButton(
+                            "trash-2",
                             action=f"/library/documents/{row['id']}/delete",
+                            title="Delete",
                         ),
-                        cls="gap-2",
+                        cls="gap-1",
                     )
                 ),
             )
@@ -268,7 +264,7 @@ def setup_routes(rt):
 
     @rt("/api/documents/upload", methods=["POST"])
     async def documents_upload(document: UploadFile):
-        filename = Path(document.filename or "").name
+        filename = safe_upload_name(document.filename)
         if not filename.lower().endswith(".pdf"):
             return _documents_panel("Only PDF files are supported.", level="warning")
 
@@ -276,7 +272,7 @@ def setup_routes(rt):
         if not file_content:
             return _documents_panel("Uploaded file is empty.", level="warning")
 
-        md5_hash = hashlib.md5(file_content).hexdigest()
+        md5_hash = md5_hex(file_content)
         existing = _find_document_by_md5(md5_hash)
         if existing is not None:
             return _documents_panel(
@@ -284,9 +280,7 @@ def setup_routes(rt):
                 level="warning",
             )
 
-        stored_name = f"{uuid.uuid4().hex}_{filename}"
-        stored_path = UPLOAD_DIR / stored_name
-        stored_path.write_bytes(file_content)
+        stored_path = store_upload_bytes(filename, file_content, UPLOAD_DIR)
 
         reader = Module1_DocReader()
         extracted_text = reader.parse_pdf(file_content)
@@ -297,7 +291,7 @@ def setup_routes(rt):
                 "filename": filename,
                 "file_path": str(stored_path),
                 "extracted_text": extracted_text,
-                "upload_date": _now_iso(),
+                "upload_date": now_iso_utc(),
             }
         )
 

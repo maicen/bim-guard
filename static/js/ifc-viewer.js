@@ -1,4 +1,3 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.175.0/+esm';
 import * as OBC from 'https://cdn.jsdelivr.net/npm/@thatopen/components@3.3.3/+esm';
 
 export async function initViewer(containerId) {
@@ -18,7 +17,7 @@ export async function initViewer(containerId) {
     world.scene = new OBC.SimpleScene(components);
     world.renderer = new OBC.SimpleRenderer(components, container);
     world.camera = new OBC.SimpleCamera(components);
-    
+
     // 3. Initialize the viewer
     components.init();
     world.scene.setup();
@@ -26,7 +25,7 @@ export async function initViewer(containerId) {
 
     // Set camera LookAt like in useBIMViewer
     world.camera.controls.setLookAt(74, 16, 0.2, 30, -4, 27);
-    
+
     // 4. Add Grids
     const grids = components.get(OBC.Grids);
     grids.create(world);
@@ -39,12 +38,13 @@ export async function initViewer(containerId) {
     fragments.init(workerUrl);
 
     const fragmentIfcLoader = components.get(OBC.IfcLoader);
-    await fragmentIfcLoader.setup();
-
-    fragmentIfcLoader.settings.wasm = {
-        path: "https://cdn.jsdelivr.net/npm/web-ifc@0.0.75/",
-        absolute: true
-    };
+    await fragmentIfcLoader.setup({
+        autoSetWasm: false,
+        wasm: {
+            path: 'https://unpkg.com/web-ifc@0.0.74/',
+            absolute: true
+        }
+    });
 
     // 6. Connect auto-resize
     const resizeObserver = new ResizeObserver(() => {
@@ -59,7 +59,7 @@ export async function initViewer(containerId) {
             console.log("Loading IFC file:", file.name, "...");
             const data = await file.arrayBuffer();
             const buffer = new Uint8Array(data);
-            
+
             // Generate fragments
             const model = await fragmentIfcLoader.load(buffer);
             world.scene.three.add(model);

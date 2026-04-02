@@ -74,7 +74,10 @@ def setup_routes(rt):
                                 H3("Recent Activity"),
                                 Subtitle("Recent transactions and system updates."),
                             ),
-                            A(Button("View All", cls=ButtonT.ghost), href="/reports"),
+                            A(
+                                Button("View All", cls=ButtonT.secondary),
+                                href="/reports",
+                            ),
                         ),
                     ),
                     Card(

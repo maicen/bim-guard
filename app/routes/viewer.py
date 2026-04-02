@@ -1,29 +1,42 @@
-from fasthtml.common import Div, Input, Script, Title
+import json
+from pathlib import Path
+
+from fasthtml.common import Div, Script, Title
 from app.components.layout import DashboardLayout
+from fastlite import database
 from monsterui.all import Button, H2
+
+
+DB_PATH = Path("data") / "bimguard.sqlite"
+_db = database(str(DB_PATH))
+_projects = _db["projects"]
 
 
 def setup_routes(rt):
     @rt("/viewer")
-    def get():
+    def get(project_id: int | None = None):
+        project = _projects.get(project_id) if project_id is not None else None
+        ifc_url = ""
+        if project and project.get("ifc_file_path"):
+            ifc_url = f"/projects/{project_id}/ifc"
+        viewer_title = "3D Viewer"
+        if project is not None:
+            viewer_title = f"3D Viewer - {project.get('name', 'Project')}"
+        preload_ifc_url = json.dumps(ifc_url)
+
         return Title("Viewer - BIM Guard"), DashboardLayout(
             Div(
                 # Toolbar
                 Div(
                     H2(
-                        "3D Viewer",
+                        viewer_title,
                         cls="text-primary-foreground bg-primary px-4 py-2 rounded-md font-semibold",
                     ),
                     Div(
                         Button(
-                            "Import IFC",
-                            onclick="document.getElementById('ifc-file-input').click()",
-                        ),
-                        Input(
-                            type="file",
-                            id="ifc-file-input",
-                            accept=".ifc",
-                            cls="hidden",
+                            "Back",
+                            cls="uk-btn uk-btn-default",
+                            onclick="window.history.back()",
                         ),
                         cls="flex gap-2",
                     ),
@@ -42,10 +55,20 @@ import { initViewer } from '/static/js/ifc-viewer.js';
 window.addEventListener('DOMContentLoaded', async () => {
     const viewerAPI = await initViewer('viewer-container');
     if (viewerAPI) {
-        viewerAPI.setupFileLoader('ifc-file-input');
+        const ifcUrl = IFC_URL_PLACEHOLDER;
+        if (ifcUrl) {
+            const response = await fetch(ifcUrl);
+            if (response.ok) {
+                const blob = await response.blob();
+                const file = new File([blob], ifcUrl.split('/').pop() || 'project.ifc', {
+                    type: 'application/octet-stream'
+                });
+                await viewerAPI.loadIfc(file);
+            }
+        }
     }
 });
-                """,
+                """.replace("IFC_URL_PLACEHOLDER", preload_ifc_url),
                     type="module",
                 ),
                 cls="h-full flex flex-col p-4 bg-muted/30 rounded-xl",
