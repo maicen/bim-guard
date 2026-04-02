@@ -1,89 +1,97 @@
-from fasthtml.common import *
+from fasthtml.common import A, Div, Li, P, Title, Ul
+from pathlib import Path
+from fastlite import database
+from monsterui.all import (
+    Button,
+    ButtonT,
+    Card,
+    CardT,
+    Container,
+    DivFullySpaced,
+    Grid,
+    H1,
+    H3,
+    NavContainer,
+    Subtitle,
+)
 from app.components.layout import DashboardLayout
-from shad4fast import Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Lucide
 
-def StatsCard(title, value, description, icon):
+
+DB_DIR = Path("data")
+DB_DIR.mkdir(exist_ok=True)
+DB_PATH = DB_DIR / "bimguard.sqlite"
+
+_db = database(str(DB_PATH))
+_projects = _db["projects"]
+
+
+def _total_projects() -> int:
+    # The projects table may not exist on first boot if routes initialize out of order.
+    try:
+        return len(list(_projects.rows))
+    except Exception:
+        return 0
+
+
+def StatsCard(title, value, description):
     return Card(
-        CardHeader(
-            CardTitle(title, cls="text-sm font-medium leading-none tracking-tight"),
-            Lucide(icon, cls="h-4 w-4 text-muted-foreground"),
-            cls="flex flex-row items-center justify-between space-y-0 pb-2"
-        ),
-        CardContent(
-            Div(value, cls="text-2xl font-bold"),
-            P(description, cls="text-xs text-muted-foreground"),
-        )
+        H3(title),
+        P(value, cls="text-3xl"),
+        Subtitle(description),
+        cls=CardT.default,
     )
+
 
 def setup_routes(rt):
     @rt("/dashboard")
     def get():
+        total_projects = _total_projects()
         return Title("Dashboard - BIM Guard"), DashboardLayout(
-            Div(
-                # Header Section
-                Div(
-                    H1("Dashboard", cls="text-2xl font-bold tracking-tight"),
-                    Div(
-                        A(
-                            Button(
-                                Lucide("plus-circle", cls="h-3.5 w-3.5 mr-2"),
-                                "New Compliance Check",
-                                size="sm"
-                            ),
-                            href="/projects/new"
-                        ),
-                        cls="flex items-center gap-2"
+            Container(
+                DivFullySpaced(
+                    H1("Dashboard"),
+                    A(
+                        Button("New Compliance Check", cls=ButtonT.primary),
+                        href="/projects/new",
                     ),
-                    cls="flex items-center justify-between"
                 ),
-
-                # Stats Panel
-                Div(
-                    StatsCard("Total Projects", "12", "+2 from last month", "folder"),
-                    StatsCard("Active Checks", "5", "3 require attention", "activity"),
-                    StatsCard("Compliance Rate", "94%", "+2.1% improvement", "check-circle"),
-                    StatsCard("Issues Found", "34", "-12 from last week", "alert-circle"),
-                    cls="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4"
+                Grid(
+                    StatsCard(
+                        "Total Projects", str(total_projects), "From project registry"
+                    ),
+                    StatsCard("Active Checks", "5", "3 require attention"),
+                    StatsCard("Compliance Rate", "94%", "+2.1% improvement"),
+                    StatsCard("Issues Found", "34", "-12 from last week"),
+                    cols=1,
+                    cols_md=2,
+                    cols_lg=4,
                 ),
-
-                # Content Grid
-                Div(
-                    # Recent Activity
+                Grid(
                     Card(
-                        CardHeader(
+                        P("No recent activity found."),
+                        header=DivFullySpaced(
                             Div(
-                                CardTitle("Recent Activity"),
-                                CardDescription("Recent transactions and system updates."),
-                                cls="grid gap-2"
+                                H3("Recent Activity"),
+                                Subtitle("Recent transactions and system updates."),
                             ),
-                            A(
-                                Button("View All", variant="outline", size="sm"),
-                                href="/reports",
-                                cls="ml-auto"
-                            ),
-                            cls="flex flex-row items-center"
+                            A(Button("View All", cls=ButtonT.ghost), href="/reports"),
                         ),
-                        CardContent(
-                            P("No recent activity found.", cls="text-sm text-muted-foreground text-center py-4"),
-                        ),
-                        cls="xl:col-span-2"
                     ),
-                    
-                    # Quick Actions
                     Card(
-                        CardHeader(
-                            CardTitle("Quick Actions"),
+                        H3("Quick Actions"),
+                        NavContainer(
+                            Ul(
+                                Li(A("Upload IFC Model", href="/viewer")),
+                                Li(A("Upload BEP Document", href="#")),
+                                Li(A("Review Flagged Issues", href="#")),
+                                Li(A("Generate Weekly Report", href="#")),
+                            ),
                         ),
-                        CardContent(
-                            A(Button("Upload IFC Model", variant="outline", cls="w-full justify-start font-normal mb-2"), href="/viewer"),
-                            Button("Upload BEP Document", variant="outline", cls="w-full justify-start font-normal mb-2"),
-                            Button("Review Flagged Issues", variant="outline", cls="w-full justify-start font-normal mb-2"),
-                            Button("Generate Weekly Report", variant="outline", cls="w-full justify-start font-normal"),
-                            cls="grid gap-2"
-                        )
                     ),
-                    cls="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3 mt-4"
+                    cols=1,
+                    cols_lg=3,
+                    cls="gap-4",
                 ),
-                cls="flex flex-col gap-4"
+                cls="space-y-4",
             )
         )

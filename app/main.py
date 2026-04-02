@@ -1,43 +1,55 @@
-from fasthtml.common import *
-from app.routes import viewer
+from fasthtml.common import A, FileResponse, Link, Style, Title, fast_app
+from monsterui.all import Button, ButtonT, Container, DivLAligned, H1, Subtitle, Theme
+from app.routes import analyze, dashboard, library, projects, viewer
 from app.components.layout import DashboardLayout
 
-from shad4fast import ShadHead
-
-# Initialize FastHTML app with Shadcn UI headers
+# Initialize FastHTML app with MonsterUI theme headers
 app, rt = fast_app(
-    pico=False,
     hdrs=(
-        ShadHead(tw_cdn=True),
+        *Theme.neutral.headers(),
         Style("body { margin: 0; padding: 0; overflow: hidden; }"),
-        Script(src="https://unpkg.com/lucide@latest"),
-        Link(rel="stylesheet", href="/static/css/styles.css")
+        Link(rel="stylesheet", href="/static/css/styles.css"),
     ),
-    live=True
+    # Uvicorn reload is already used in development; disabling FastHTML's
+    # websocket-based live reload avoids disconnect exceptions in the logs.
+    live=False,
 )
+
 
 # Serve static files
 @rt("/static/{path:path}")
 def serve_static(path: str):
     return FileResponse(f"static/{path}")
 
+
+# Compatibility endpoint for stale browser tabs that still attempt FastHTML's
+# old live-reload websocket. We keep Uvicorn reload as the actual dev reload
+# mechanism and simply accept these connections to avoid repeated 403 noise.
+@app.ws("/live-reload")
+async def live_reload_compat(msg: str, send):
+    return None
+
+
 # Setup routes
 viewer.setup_routes(rt)
-from app.routes import dashboard
+analyze.setup_routes(rt)
 dashboard.setup_routes(rt)
-from app.routes import library
 library.setup_routes(rt)
+projects.setup_routes(rt)
+
 
 @rt("/")
 def get():
     return Title("BIM Guard"), DashboardLayout(
-        Div(
-            H1("Welcome to BIM Guard", cls="text-2xl font-bold mb-4 tracking-tight"),
-            A(Button("Go to Viewer"), href="/viewer"),
-            cls="max-w-4xl mx-auto"
+        Container(
+            H1("Welcome to BIM Guard"),
+            Subtitle("Open the IFC viewer to start a new compliance workflow."),
+            DivLAligned(A(Button("Go to Viewer", cls=ButtonT.primary), href="/viewer")),
         )
     )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import uvicorn
-    uvicorn.run('app.main:app', host='0.0.0.0', port=5001, reload=True)
+
+    uvicorn.run("app.main:app", host="0.0.0.0", reload=True)
