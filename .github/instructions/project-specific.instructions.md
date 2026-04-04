@@ -11,6 +11,8 @@ applyTo: "app/**"
 
 **Tech stack:** FastHTML · MonsterUI · FastLite (SQLite) · IfcOpenShell · HTMX
 
+**IfcOpenShell** is the server-side IFC parsing library (used in `app/modules/module2_ifc_read.py`). It is not yet integrated — module stubs await implementation. Do not import it in route files; all IFC processing goes through the orchestrator.
+
 ---
 
 ## Getting Started
@@ -22,7 +24,11 @@ uv sync
 # Run the app
 uv run uvicorn main:app --reload
 
+# Run on a specific host/port
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+There are no automated tests or lint commands. Use manual browser verification.
 
 ## UI / Frontend Rules (highest priority)
 
@@ -52,6 +58,17 @@ When a UI pattern appears more than once, or is likely to be reused, extract it 
 - Reuse existing shared components before creating new inline `Button(...)`, `A(...)`, `Form(...)`, or icon combinations in route files
 - Keep route files focused on composition and page structure; move repeated UI implementation details into `app/components/`
 - If a component is only slightly different from an existing one, extend the existing component with parameters rather than creating a parallel copy
+
+**Existing action button components** (from `app/components/ui.py`) — always prefer these over ad hoc icon buttons:
+
+```python
+from app.components.ui import ViewAction, EditAction, CreateAction, BackAction
+
+ViewAction(href=f"/projects/{id}")       # eye icon link
+EditAction(href=f"/projects/{id}/edit")  # pencil icon link
+CreateAction(href="/projects/new")       # plus icon link
+BackAction(href="/projects")             # arrow-left icon link
+```
 
 ### 2. Always wrap pages in DashboardLayout with Title
 
@@ -353,7 +370,24 @@ def _now_iso() -> str:
 
 **Never use `datetime.utcnow()`** — deprecated in Python 3.12+. Always use `datetime.now(timezone.utc)`.
 
-Note: route-level DB initialization is currently acceptable for this codebase, but prefer a shared `app/db.py` accessor for new work to avoid duplicated path/bootstrap logic.
+**Prefer a shared DB accessor for new work.** Route-level DB initialization is currently scattered across service files, but new work should use a shared accessor to avoid duplicated path/bootstrap logic:
+
+```python
+# app/db.py (create if it doesn't exist)
+from pathlib import Path
+from fastlite import database
+
+_DB_PATH = Path("data") / "bimguard.sqlite"
+_DB_PATH.parent.mkdir(exist_ok=True)
+
+db = database(str(_DB_PATH))
+```
+
+Then import in service files:
+```python
+from app.db import db
+_projects = db["projects"]
+```
 
 ---
 
