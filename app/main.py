@@ -1,7 +1,5 @@
-from fasthtml.common import A, FileResponse, Link, Style, Title, fast_app
+from fasthtml.common import FileResponse, Link, Style, Title, fast_app
 from monsterui.all import (
-    Button,
-    ButtonT,
     Container,
     DivLAligned,
     H1,
@@ -11,6 +9,7 @@ from monsterui.all import (
     ThemeRadii,
     ThemeShadows,
 )
+from app.components.ui import ViewAction
 from app.routes import analyze, dashboard, library, projects, viewer
 from app.components.layout import DashboardLayout
 
@@ -69,7 +68,7 @@ def get():
         Container(
             H1("Welcome to BIM Guard"),
             Subtitle("Open the IFC viewer to start a new compliance workflow."),
-            DivLAligned(A(Button("Go to Viewer", cls=ButtonT.primary), href="/viewer")),
+            DivLAligned(ViewAction(href="/viewer", title="Go to Viewer")),
         )
     )
 

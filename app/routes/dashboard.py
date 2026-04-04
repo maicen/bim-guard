@@ -15,6 +15,7 @@ from monsterui.all import (
     Subtitle,
 )
 from app.components.layout import DashboardLayout
+from app.components.ui import CreateAction, ViewAction
 
 
 DB_DIR = Path("data")
@@ -50,10 +51,7 @@ def setup_routes(rt):
             Container(
                 DivFullySpaced(
                     H1("Dashboard"),
-                    A(
-                        Button("New Compliance Check", cls=ButtonT.primary),
-                        href="/projects/new",
-                    ),
+                    CreateAction(href="/projects/new", title="New Compliance Check"),
                 ),
                 Grid(
                     StatsCard(
@@ -74,9 +72,10 @@ def setup_routes(rt):
                                 H3("Recent Activity"),
                                 Subtitle("Recent transactions and system updates."),
                             ),
-                            A(
-                                Button("View All", cls=ButtonT.secondary),
+                            ViewAction(
                                 href="/reports",
+                                title="View All",
+                                cls=ButtonT.secondary,
                             ),
                         ),
                     ),

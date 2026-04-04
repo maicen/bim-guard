@@ -44,6 +44,15 @@ Note: this import exposes names like `Input`, `Form`, and `Link`. Use them inten
 
 Available layout helpers from MonsterUI: `DivFullySpaced`, `DivVStacked`, `DivLAligned`, `Container`.
 
+### 1.1 Prefer reusable components over ad hoc UI
+
+When a UI pattern appears more than once, or is likely to be reused, extract it into a shared component instead of duplicating route-level markup.
+
+- Prefer adding or extending reusable helpers in `app/components/ui.py` for buttons, action controls, repeated form elements, and small presentational patterns
+- Reuse existing shared components before creating new inline `Button(...)`, `A(...)`, `Form(...)`, or icon combinations in route files
+- Keep route files focused on composition and page structure; move repeated UI implementation details into `app/components/`
+- If a component is only slightly different from an existing one, extend the existing component with parameters rather than creating a parallel copy
+
 ### 2. Always wrap pages in DashboardLayout with Title
 
 Every route that renders a full page **must** return a tuple:

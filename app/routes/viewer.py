@@ -3,8 +3,9 @@ from pathlib import Path
 
 from fasthtml.common import Div, Script, Title
 from app.components.layout import DashboardLayout
+from app.components.ui import BackAction
 from fastlite import database
-from monsterui.all import Button, H2
+from monsterui.all import H2
 
 
 DB_PATH = Path("data") / "bimguard.sqlite"
@@ -33,11 +34,7 @@ def setup_routes(rt):
                         cls="text-primary-foreground bg-primary px-4 py-2 rounded-md font-semibold",
                     ),
                     Div(
-                        Button(
-                            "Back",
-                            cls="uk-btn uk-btn-default",
-                            onclick="window.history.back()",
-                        ),
+                        BackAction(href="javascript:history.back()", title="Back"),
                         cls="flex gap-2",
                     ),
                     cls="flex justify-between items-center mb-4",

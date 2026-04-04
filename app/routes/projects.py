@@ -40,7 +40,7 @@ from monsterui.all import (
 )
 
 from app.components.layout import DashboardLayout
-from app.components.ui import IconLinkButton, IconPostButton
+from app.components.ui import CreateAction, DeleteAction, EditAction, ViewAction
 from app.utils import md5_hex, now_iso_utc, safe_upload_name, store_upload_bytes
 
 
@@ -189,8 +189,7 @@ def _projects_table_rows():
                     DivLAligned(
                         *(
                             [
-                                IconLinkButton(
-                                    "eye",
+                                ViewAction(
                                     href=f"/viewer?project_id={row['id']}",
                                     title="Open IFC in Viewer",
                                 )
@@ -198,16 +197,8 @@ def _projects_table_rows():
                             if row.get("ifc_file_path")
                             else []
                         ),
-                        IconLinkButton(
-                            "pencil",
-                            href=f"/projects/{row['id']}/edit",
-                            title="Edit",
-                        ),
-                        IconPostButton(
-                            "trash-2",
-                            action=f"/projects/{row['id']}/delete",
-                            title="Delete",
-                        ),
+                        EditAction(href=f"/projects/{row['id']}/edit"),
+                        DeleteAction(action=f"/projects/{row['id']}/delete"),
                         cls="gap-1",
                     )
                 ),
@@ -228,7 +219,7 @@ def _projects_page(message: str | None = None):
                     H1("Projects"),
                     Subtitle("Create, track, and update your project records."),
                 ),
-                A(Button("New Project", cls=ButtonT.primary), href="/projects/new"),
+                CreateAction(href="/projects/new", title="New Project"),
             ),
             *msg_block,
             Card(

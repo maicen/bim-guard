@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fasthtml.common import (
+    A,
     Br,
     Div,
     P,
@@ -17,7 +18,7 @@ from fasthtml.common import (
 )
 from fastlite import database
 from app.components.layout import DashboardLayout
-from app.components.ui import IconLinkButton, IconPostButton
+from app.components.ui import BackAction, DeleteAction, EditAction, ViewAction
 from app.modules.module1_doc_reader import Module1_DocReader
 from app.utils import md5_hex, now_iso_utc, safe_upload_name, store_upload_bytes
 from monsterui.all import (
@@ -100,21 +101,9 @@ def _documents_table_rows():
                 Td(preview or "No text extracted", cls="text-muted-foreground text-sm"),
                 Td(
                     DivLAligned(
-                        IconLinkButton(
-                            "eye",
-                            href=f"/library/documents/{row['id']}",
-                            title="View",
-                        ),
-                        IconLinkButton(
-                            "pencil",
-                            href=f"/library/documents/{row['id']}/edit",
-                            title="Edit",
-                        ),
-                        IconPostButton(
-                            "trash-2",
-                            action=f"/library/documents/{row['id']}/delete",
-                            title="Delete",
-                        ),
+                        ViewAction(href=f"/library/documents/{row['id']}"),
+                        EditAction(href=f"/library/documents/{row['id']}/edit"),
+                        DeleteAction(action=f"/library/documents/{row['id']}/delete"),
                         cls="gap-1",
                     )
                 ),
@@ -221,20 +210,20 @@ def setup_routes(rt):
             Container(
                 H1("Documents", cls="text-3xl font-bold tracking-tight"),
                 P(
-                    "Upload PDF references, extract their text, and manage your document library.",
+                    "Upload PDF, Markdown, or text references, extract their text, and manage your document library.",
                     cls="text-muted-foreground",
                 ),
                 Card(
-                    CardHeader(CardTitle("Upload PDF")),
+                    CardHeader(CardTitle("Upload Document")),
                     CardBody(
                         Form(
                             Div(
-                                FormLabel("PDF Document", fr="document"),
+                                FormLabel("Document (.pdf, .md, .txt)", fr="document"),
                                 Input(
                                     id="document",
                                     type="file",
                                     name="document",
-                                    accept=".pdf",
+                                    accept=".pdf,.md,.txt",
                                     required=True,
                                 ),
                                 cls="space-y-1",
@@ -265,8 +254,12 @@ def setup_routes(rt):
     @rt("/api/documents/upload", methods=["POST"])
     async def documents_upload(document: UploadFile):
         filename = safe_upload_name(document.filename)
-        if not filename.lower().endswith(".pdf"):
-            return _documents_panel("Only PDF files are supported.", level="warning")
+        suffix = Path(filename).suffix.lower()
+        if suffix not in {".pdf", ".md", ".txt"}:
+            return _documents_panel(
+                "Only PDF, Markdown (.md), and text (.txt) files are supported.",
+                level="warning",
+            )
 
         file_content = await document.read()
         if not file_content:
@@ -283,7 +276,10 @@ def setup_routes(rt):
         stored_path = store_upload_bytes(filename, file_content, UPLOAD_DIR)
 
         reader = Module1_DocReader()
-        extracted_text = reader.parse_pdf(file_content)
+        if suffix == ".pdf":
+            extracted_text = reader.parse_pdf(file_content)
+        else:
+            extracted_text = file_content.decode("utf-8", errors="replace").strip()
 
         _documents.insert(
             {
@@ -304,10 +300,7 @@ def setup_routes(rt):
             return Title("Document Not Found - BIM Guard"), DashboardLayout(
                 Container(
                     Alert("Document not found.", cls=AlertT.warning),
-                    A(
-                        Button("Back to Documents", cls=ButtonT.secondary),
-                        href="/library/documents",
-                    ),
+                    BackAction(href="/library/documents", title="Back to Documents"),
                     cls="space-y-4",
                 )
             )
@@ -327,11 +320,11 @@ def setup_routes(rt):
                         f"Uploaded: {document.get('upload_date', '-')}",
                         cls="text-sm text-muted-foreground",
                     ),
-                    A(
-                        Button("Edit", cls=ButtonT.primary),
+                    EditAction(
                         href=f"/library/documents/{document_id}/edit",
+                        cls=ButtonT.primary,
                     ),
-                    A(Button("Back", cls=ButtonT.secondary), href="/library/documents"),
+                    BackAction(href="/library/documents", title="Back to Documents"),
                     cls="gap-2",
                 ),
                 Card(
@@ -355,10 +348,7 @@ def setup_routes(rt):
             return Title("Document Not Found - BIM Guard"), DashboardLayout(
                 Container(
                     Alert("Document not found.", cls=AlertT.warning),
-                    A(
-                        Button("Back to Documents", cls=ButtonT.secondary),
-                        href="/library/documents",
-                    ),
+                    BackAction(href="/library/documents", title="Back to Documents"),
                     cls="space-y-4",
                 )
             )
