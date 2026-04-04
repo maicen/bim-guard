@@ -1,22 +1,22 @@
 import json
-from pathlib import Path
 
 from fasthtml.common import Div, Script, Title
 from app.components.layout import DashboardLayout
 from app.components.ui import BackAction
-from fastlite import database
+from app.services.projects_service import ProjectsService
 from monsterui.all import H2
 
-
-DB_PATH = Path("data") / "bimguard.sqlite"
-_db = database(str(DB_PATH))
-_projects = _db["projects"]
+_projects_service = ProjectsService()
 
 
 def setup_routes(rt):
     @rt("/viewer")
-    def get(project_id: int | None = None):
-        project = _projects.get(project_id) if project_id is not None else None
+    def viewer_page(project_id: int | None = None):
+        project = (
+            _projects_service.get_project(project_id)
+            if project_id is not None
+            else None
+        )
         ifc_url = ""
         if project and project.get("ifc_file_path"):
             ifc_url = f"/projects/{project_id}/ifc"

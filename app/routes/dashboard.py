@@ -1,8 +1,5 @@
 from fasthtml.common import A, Div, Li, P, Title, Ul
-from pathlib import Path
-from fastlite import database
 from monsterui.all import (
-    Button,
     ButtonT,
     Card,
     CardT,
@@ -16,22 +13,9 @@ from monsterui.all import (
 )
 from app.components.layout import DashboardLayout
 from app.components.ui import CreateAction, ViewAction
+from app.services.projects_service import ProjectsService
 
-
-DB_DIR = Path("data")
-DB_DIR.mkdir(exist_ok=True)
-DB_PATH = DB_DIR / "bimguard.sqlite"
-
-_db = database(str(DB_PATH))
-_projects = _db["projects"]
-
-
-def _total_projects() -> int:
-    # The projects table may not exist on first boot if routes initialize out of order.
-    try:
-        return len(list(_projects.rows))
-    except Exception:
-        return 0
+_projects_service = ProjectsService()
 
 
 def StatsCard(title, value, description):
@@ -45,8 +29,8 @@ def StatsCard(title, value, description):
 
 def setup_routes(rt):
     @rt("/dashboard")
-    def get():
-        total_projects = _total_projects()
+    def dashboard_page():
+        total_projects = _projects_service.total_projects()
         return Title("Dashboard - BIM Guard"), DashboardLayout(
             Container(
                 DivFullySpaced(
