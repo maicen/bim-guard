@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from fasthtml.common import (
-    Br,
     Div,
     P,
+    Span,
     Style,
     Title,
     UploadFile,
@@ -45,11 +45,9 @@ from monsterui.all import (
     Form,
     ButtonT,
     H1,
-    H3,
     Input,
-    Subtitle,
-    TextArea,
     FormLabel,
+    UkIcon,
 )
 
 _document_service = DocumentService()
