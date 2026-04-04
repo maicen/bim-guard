@@ -391,6 +391,49 @@ _projects = db["projects"]
 
 ---
 
+## IFC Viewer (Frontend)
+
+The viewer is at `app/routes/viewer.py` + `static/js/ifc-viewer.js`. It renders inside `#viewer-container` using a pure CDN ESM setup — no bundler.
+
+### Working CDN stack (do not change without good reason)
+
+```javascript
+import * as THREE from 'https://esm.sh/three@0.160.0';
+import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls';
+import { IFCLoader } from 'https://esm.sh/web-ifc-three@0.0.126?deps=three@0.160.0,web-ifc@0.0.68';
+```
+
+WASM path inside `initViewer`:
+```javascript
+await ifcLoader.ifcManager.setWasmPath('https://unpkg.com/web-ifc@0.0.68/');
+```
+
+**Why esm.sh:** `web-ifc-three` has many internal bare specifiers (`"three"`, `"web-ifc"`, `"three/examples/..."`) that browsers cannot resolve directly. esm.sh rewrites all of them to absolute URLs at their end. The `?deps=` parameter pins exact versions so all packages share the same `three` and `web-ifc` instances — preventing duplicate module errors.
+
+**Do not use:** jsDelivr `+esm`, unpkg direct imports, or import maps for this package — all were tried and failed due to bare specifier rewriting or version mismatches across the dependency tree.
+
+### Viewer API contract
+
+`ifc-viewer.js` exports one function:
+
+```javascript
+export async function initViewer(containerId: string): Promise<{
+    scene: THREE.Scene,
+    camera: THREE.PerspectiveCamera,
+    renderer: THREE.WebGLRenderer,
+    controls: OrbitControls,
+    loadIfc: (urlOrFile: string | File) => Promise<void>
+}>
+```
+
+`loadIfc` accepts either a URL string (preferred — avoids a round-trip) or a `File` object. `viewer.py` passes the URL directly: `await viewerAPI.loadIfc(ifcUrl)`.
+
+### IFC file serving
+
+`/projects/{project_id}/ifc` in `app/routes/projects.py` serves the raw IFC bytes via `FileResponse`. The viewer fetches from this endpoint.
+
+---
+
 ## Module Architecture (BIM Workflow)
 
 The 5-module pipeline processes BIM compliance:

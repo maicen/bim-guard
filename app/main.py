@@ -1,4 +1,4 @@
-from fasthtml.common import FileResponse, Link, Style, Title, fast_app
+from fasthtml.common import FileResponse, Title, fast_app
 from monsterui.all import (
     Container,
     DivLAligned,
@@ -18,18 +18,6 @@ hdrs = Theme.gray.headers(
     shadows=ThemeShadows.lg,
     font=ThemeFont.default,
 )
-
-"""
-(
-        *Theme.neutral.headers(
-            radii=ThemeRadii.lg,
-            shadows=ThemeShadows.lg,
-            font=ThemeFont.default,
-        ),
-        Style("body { margin: 0; padding: 0; overflow: hidden; }"),
-        Link(rel="stylesheet", href="/static/css/styles.css"),
-    ),
-"""
 
 # Initialize FastHTML app with MonsterUI theme headers
 app, rt = fast_app(

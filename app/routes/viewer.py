@@ -4,7 +4,7 @@ from fasthtml.common import Div, Script, Title
 from app.components.layout import DashboardLayout
 from app.components.ui import BackAction
 from app.services.projects_service import ProjectsService
-from monsterui.all import H2
+from monsterui.all import Alert, AlertT, Container, H2
 
 _projects_service = ProjectsService()
 
@@ -17,6 +17,12 @@ def setup_routes(rt):
             if project_id is not None
             else None
         )
+
+        if project_id is not None and project is None:
+            return Title("Not Found — BIM Guard"), DashboardLayout(
+                Container(Alert("Project not found.", cls=AlertT.danger))
+            )
+
         ifc_url = ""
         if project and project.get("ifc_file_path"):
             ifc_url = f"/projects/{project_id}/ifc"
@@ -54,14 +60,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (viewerAPI) {
         const ifcUrl = IFC_URL_PLACEHOLDER;
         if (ifcUrl) {
-            const response = await fetch(ifcUrl);
-            if (response.ok) {
-                const blob = await response.blob();
-                const file = new File([blob], ifcUrl.split('/').pop() || 'project.ifc', {
-                    type: 'application/octet-stream'
-                });
-                await viewerAPI.loadIfc(file);
-            }
+            await viewerAPI.loadIfc(ifcUrl);
         }
     }
 });

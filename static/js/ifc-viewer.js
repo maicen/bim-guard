@@ -1,91 +1,98 @@
-import * as OBC from 'https://cdn.jsdelivr.net/npm/@thatopen/components@3.3.3/+esm';
+import * as THREE from 'https://esm.sh/three@0.160.0';
+import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls';
+import { IFCLoader } from 'https://esm.sh/web-ifc-three@0.0.126?deps=three@0.160.0,web-ifc@0.0.68';
 
 export async function initViewer(containerId) {
     const container = document.getElementById(containerId);
     if (!container) {
-        console.error(`Container with id ${containerId} not found.`);
+        console.error(`Container #${containerId} not found.`);
         return null;
     }
 
-    // 1. Initialize core components
-    const components = new OBC.Components();
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1a);
 
-    // 2. Set up the World (Scene, Renderer, Camera)
-    const worlds = components.get(OBC.Worlds);
-    const world = worlds.create();
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
 
-    world.scene = new OBC.SimpleScene(components);
-    world.renderer = new OBC.SimpleRenderer(components, container);
-    world.camera = new OBC.SimpleCamera(components);
+    // Camera
+    const camera = new THREE.PerspectiveCamera(
+        45,
+        container.clientWidth / container.clientHeight,
+        0.01,
+        5000
+    );
+    camera.position.set(50, 50, 50);
 
-    // 3. Initialize the viewer
-    components.init();
-    world.scene.setup();
-    world.scene.three.background = null; // transparent background
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
 
-    // Set camera LookAt like in useBIMViewer
-    world.camera.controls.setLookAt(74, 16, 0.2, 30, -4, 27);
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(50, 100, 50);
+    scene.add(sun);
 
-    // 4. Add Grids
-    const grids = components.get(OBC.Grids);
-    grids.create(world);
+    // Grid
+    scene.add(new THREE.GridHelper(100, 20, 0x444444, 0x333333));
 
-    // 5. Setup Fragments and IFC Loader
-    const fragments = components.get(OBC.FragmentsManager);
-    const workerFile = await fetch("https://thatopen.github.io/engine_fragment/resources/worker.mjs");
-    const workerBlob = await workerFile.blob();
-    const workerUrl = URL.createObjectURL(workerBlob);
-    fragments.init(workerUrl);
+    // IFC loader
+    const ifcLoader = new IFCLoader();
+    await ifcLoader.ifcManager.setWasmPath('https://unpkg.com/web-ifc@0.0.68/');
 
-    const fragmentIfcLoader = components.get(OBC.IfcLoader);
-    await fragmentIfcLoader.setup({
-        autoSetWasm: false,
-        wasm: {
-            path: 'https://unpkg.com/web-ifc@0.0.74/',
-            absolute: true
+    // Render loop
+    (function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    })();
+
+    // Resize handling
+    new ResizeObserver(() => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    }).observe(container);
+
+    async function loadIfc(urlOrFile) {
+        let url;
+        let created = false;
+        if (typeof urlOrFile === 'string') {
+            url = urlOrFile;
+        } else {
+            url = URL.createObjectURL(urlOrFile);
+            created = true;
         }
-    });
-
-    // 6. Connect auto-resize
-    const resizeObserver = new ResizeObserver(() => {
-        if (world.renderer) world.renderer.resize();
-        if (world.camera) world.camera.updateAspect();
-    });
-    resizeObserver.observe(container);
-
-    // 7. Handle File Loading
-    async function loadIfc(file) {
         try {
-            console.log("Loading IFC file:", file.name, "...");
-            const data = await file.arrayBuffer();
-            const buffer = new Uint8Array(data);
+            console.log('Loading IFC…');
+            const model = await ifcLoader.loadAsync(url);
+            scene.add(model);
 
-            // Generate fragments
-            const model = await fragmentIfcLoader.load(buffer);
-            world.scene.three.add(model);
-            console.log("IFC Model loaded successfully", model);
-        } catch (error) {
-            console.error("Error loading IFC File", error);
+            // Fit camera to model bounds
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            camera.position.set(
+                center.x + maxDim * 1.5,
+                center.y + maxDim,
+                center.z + maxDim * 1.5
+            );
+            controls.target.copy(center);
+            controls.update();
+            console.log('IFC loaded successfully.');
+        } catch (err) {
+            console.error('Error loading IFC:', err);
+        } finally {
+            if (created) URL.revokeObjectURL(url);
         }
     }
 
-    // 8. Global listener setup for file inputs
-    function setupFileLoader(inputId) {
-        const input = document.getElementById(inputId);
-        if (input) {
-            input.addEventListener('change', async (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    await loadIfc(file);
-                }
-            });
-        }
-    }
-
-    return {
-        components,
-        world,
-        loadIfc,
-        setupFileLoader
-    };
+    return { scene, camera, renderer, controls, loadIfc };
 }

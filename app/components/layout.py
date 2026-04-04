@@ -7,6 +7,7 @@ from monsterui.all import (
     NavHeaderLi,
     NavT,
     TextT,
+    ThemePicker,
     UkIcon,
 )
 
@@ -72,7 +73,33 @@ def AppSidebar():
         Div(
             NavContainer(
                 NavDividerLi(),
-                NavItem("Settings", "#"),
+                Li(
+                    Div(
+                        # Trigger
+                        A(
+                            DivLAligned(
+                                UkIcon(
+                                    "settings",
+                                    height=16,
+                                    width=16,
+                                    cls="text-muted-foreground",
+                                ),
+                                Span("Settings"),
+                                cls="gap-2 justify-start w-full",
+                            ),
+                            href="#",
+                            cls=f"{TextT.sm} hover:underline block w-full text-left",
+                        ),
+                        # Drop panel — opens upward, aligned to left edge of trigger
+                        Div(
+                            ThemePicker(),
+                            data_uk_drop="mode: click; pos: top-left; shift: false; flip: false",
+                            cls="uk-drop border rounded-lg shadow-lg bg-background",
+                        ),
+                        cls="relative",
+                    ),
+                    cls="px-1 py-0.5 w-full",
+                ),
                 cls=(NavT.primary, "w-full text-left"),
             ),
             cls="mt-auto pt-3",
