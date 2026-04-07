@@ -1,4 +1,4 @@
-# BIM-Guard#1
+# BIM-Guard
 
 ## Project Overview
 
