@@ -1,25 +1,24 @@
 # app/routes/dashboard.py
 
-from fasthtml.common import A, Div, Li, P, Title, Ul
+from fasthtml.common import Div, P, Title
 from monsterui.all import (
     DivFullySpaced,
     Grid,
     H1,
-    NavContainer,
 )
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteStyles
 from app.components.ui import BentoBox, LinkButton
-from app.services.projects_service import ProjectsService
+from app.modules.orchestrator import BIMGuard_App
 
-# Initialize service
-_projects_service = ProjectsService()
+# Initialize orchestrator (provides run_dashboard stats)
+_bim_guard_app = BIMGuard_App()
 
 
 def setup_routes(rt):
     @rt("/dashboard")
     def dashboard_page():
-        total_projects = _projects_service.total_projects()
+        stats = _bim_guard_app.run_dashboard()
 
         return Title("Dashboard - BIM Guard"), DashboardLayout(
             # Page Header
@@ -36,17 +35,19 @@ def setup_routes(rt):
                 ),
             ),
             # Bento Stats Grid
-            Grid(cols=1, cols_md=2, cols_lg=4, cls="gap-6")(
+            Grid(cols=2, cols_md=2, cols_lg=4, cls="gap-6")(
                 BentoBox(
-                    "Total Projects", str(total_projects), "Active in project registry"
+                    "Total Projects",
+                    str(stats["total_projects"]),
+                    "Active in project registry",
                 ),
                 BentoBox(
-                    "Active Checks (demo)",
-                    "5",
-                    "3 require attention",
+                    "Documents",
+                    str(stats["total_documents"]),
+                    "Uploaded specification documents",
                 ),
                 BentoBox(
-                    "Compliance Rate (demo)", "94%", "+2.1% improvement this month"
+                    "Rules", str(stats["total_rules"]), "Compliance rules defined"
                 ),
                 BentoBox("Issues Found (demo)", "34", "-12 from last week"),
             ),

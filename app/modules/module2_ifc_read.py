@@ -1,6 +1,12 @@
-import ifcopenshell
-import ifcopenshell.util.element
 from pathlib import Path
+
+try:
+    import ifcopenshell
+    import ifcopenshell.util.element
+
+    _IFCOPENSHELL_AVAILABLE = True
+except ImportError:
+    _IFCOPENSHELL_AVAILABLE = False
 
 
 class Module2_IFCRead:
@@ -11,12 +17,14 @@ class Module2_IFCRead:
 
     def __init__(self, file_path: Path | str | None = None):
         self.file_path = Path(file_path) if file_path else None
-        self.ifc_file: ifcopenshell.file | None = None
+        self.ifc_file = None
         if self.file_path:
             self.load_ifc_file()
 
-    def load_ifc_file(self) -> ifcopenshell.file:
+    def load_ifc_file(self):
         """Open and load the IFC file from disk."""
+        if not _IFCOPENSHELL_AVAILABLE:
+            raise ImportError("ifcopenshell is not installed. Run: uv add ifcopenshell")
         if not self.file_path or not self.file_path.exists():
             raise FileNotFoundError(f"IFC file not found: {self.file_path}")
         self.ifc_file = ifcopenshell.open(str(self.file_path))
@@ -38,9 +46,11 @@ class Module2_IFCRead:
             raise ValueError("No IFC file loaded.")
         results = []
         for element in self.ifc_file.by_type("IfcBuildingElement"):
-            results.append({
-                "id": element.id(),
-                "type": element.is_a(),
-                "properties": self.extract_properties(element),
-            })
+            results.append(
+                {
+                    "id": element.id(),
+                    "type": element.is_a(),
+                    "properties": self.extract_properties(element),
+                }
+            )
         return results

@@ -85,6 +85,12 @@ from .sidebar import (
     SidebarSeparator,
     SidebarTrigger,
 )
+from .checkbox import Checkbox
+from .toggle import Toggle
+from .switch import Switch
+from .toggle_group import ToggleGroup
+from .label import Label
+from .tooltip import Tooltip, TooltipProvider
 
 __all__ = [
     "AlertSpec",
@@ -159,6 +165,13 @@ __all__ = [
     "SidebarMenu",
     "SidebarMenuItem",
     "SidebarMenuButton",
+    "Checkbox",
+    "Toggle",
+    "Switch",
+    "ToggleGroup",
+    "Label",
+    "Tooltip",
+    "TooltipProvider",
 ]
 
 
