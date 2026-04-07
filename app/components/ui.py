@@ -4,9 +4,11 @@ from monsterui.all import Button, ButtonT, Form, UkIcon
 
 def IconLinkButton(icon_name: str, href: str, title: str, cls=ButtonT.icon):
     return A(
-        Button(UkIcon(icon_name, height=15, width=15), cls=cls),
+        UkIcon(icon_name, height=15, width=15),
         href=href,
         title=title,
+        cls=cls,
+        aria_label=title,
     )
 
 
@@ -22,6 +24,7 @@ def IconPostButton(
         type=button_type,
         title=title,
         cls=cls,
+        aria_label=title,
     )
     if action is None:
         return button
