@@ -1,26 +1,24 @@
-from fasthtml.common import Div, Option, Tbody, Td, Th, Thead, Tr
+from fasthtml.common import Div, Tbody, Td, Th, Thead, Tr
 from app.components.ui import (
-    CancelAction,
-    DeleteAction,
-    EditAction,
-    SaveAction,
-    ViewAction,
-)
-from monsterui.all import (
-    Alert,
-    AlertT,
+    ActionRow,
+    AlertSpec,
     Card,
-    CardBody,
+    CardContent,
     CardHeader,
     CardTitle,
-    DivLAligned,
-    Form,
-    FormLabel,
-    Input,
-    Select,
-    Table,
-    TextArea,
+    CancelAction,
+    FieldSpec,
+    MessageAlert,
+    SaveAction,
+    SelectField,
+    SelectOptionSpec,
+    TableActionsMenu,
+    TableSpec,
+    TextAreaField,
+    TextInputField,
+    build_table_rows,
 )
+from monsterui.all import Form, Table
 
 
 IFC_CLASS_OPTIONS = [
@@ -43,67 +41,56 @@ IFC_CLASS_OPTIONS = [
 
 
 def rules_table_rows(rows: list[dict]):
-    if not rows:
-        return [
-            Tr(
-                Td(
-                    "No rules available yet.",
-                    colspan="6",
-                    cls="text-center text-muted-foreground",
+    def _build_row(row: dict):
+        return Tr(
+            Td(row.get("reference", "-")),
+            Td(row.get("rule_type", "Required")),
+            Td(row.get("target_ifc_class", "-")),
+            Td(row.get("updated_at", "-"), cls="text-sm text-muted-foreground"),
+            Td(
+                (row.get("description") or "")[:120]
+                + ("..." if len(row.get("description") or "") > 120 else ""),
+                cls="text-sm text-muted-foreground",
+            ),
+            Td(
+                TableActionsMenu(
+                    edit_href=f"/library/rules/{row['id']}/edit",
+                    delete_action=f"/library/rules/{row['id']}/delete",
+                    view_href=f"/library/rules/{row['id']}",
                 )
-            )
-        ]
-
-    rendered = []
-    for row in rows:
-        rendered.append(
-            Tr(
-                Td(row.get("reference", "-")),
-                Td(row.get("rule_type", "Required")),
-                Td(row.get("target_ifc_class", "-")),
-                Td(row.get("updated_at", "-"), cls="text-sm text-muted-foreground"),
-                Td(
-                    (row.get("description") or "")[:120]
-                    + ("..." if len(row.get("description") or "") > 120 else ""),
-                    cls="text-sm text-muted-foreground",
-                ),
-                Td(
-                    DivLAligned(
-                        ViewAction(href=f"/library/rules/{row['id']}"),
-                        EditAction(href=f"/library/rules/{row['id']}/edit"),
-                        DeleteAction(action=f"/library/rules/{row['id']}/delete"),
-                        cls="gap-1",
-                    )
-                ),
-            )
+            ),
         )
-    return rendered
+
+    return build_table_rows(
+        rows,
+        _build_row,
+        TableSpec(empty_message="No rules available yet.", empty_colspan=6),
+    )
 
 
 def rules_panel(rows: list[dict], message: str | None = None, level: str = "success"):
-    alert = ()
-    if message:
-        cls = AlertT.success if level == "success" else AlertT.warning
-        alert = (Alert(message, cls=cls),)
+    alert = MessageAlert(AlertSpec(message=message, level=level))
 
     return Div(
         *alert,
         Card(
-            Table(
-                Thead(
-                    Tr(
-                        Th("Reference"),
-                        Th("Type"),
-                        Th("Target Class"),
-                        Th("Updated"),
-                        Th("Description"),
-                        Th("Actions"),
-                    )
-                ),
-                Tbody(*rules_table_rows(rows)),
-                cls="min-w-[980px]",
+            CardHeader(CardTitle("Rule Library")),
+            CardContent(
+                Table(
+                    Thead(
+                        Tr(
+                            Th("Reference"),
+                            Th("Type"),
+                            Th("Target Class"),
+                            Th("Updated"),
+                            Th("Description"),
+                            Th("Actions"),
+                        )
+                    ),
+                    Tbody(*rules_table_rows(rows)),
+                    cls="min-w-[980px]",
+                )
             ),
-            header=CardHeader(CardTitle("Rule Library")),
         ),
         cls="space-y-4",
     )
@@ -113,8 +100,8 @@ def rule_form(title: str, action: str, rule: dict | None = None):
     rule = rule or {}
     selected_ifc_class = rule.get("target_ifc_class", "")
     ifc_options = [
-        Option(
-            ifc_class,
+        SelectOptionSpec(
+            label=ifc_class,
             value=ifc_class,
             selected=selected_ifc_class == ifc_class,
         )
@@ -123,8 +110,8 @@ def rule_form(title: str, action: str, rule: dict | None = None):
     if selected_ifc_class and selected_ifc_class not in IFC_CLASS_OPTIONS:
         ifc_options.insert(
             0,
-            Option(
-                selected_ifc_class,
+            SelectOptionSpec(
+                label=selected_ifc_class,
                 value=selected_ifc_class,
                 selected=True,
             ),
@@ -132,64 +119,59 @@ def rule_form(title: str, action: str, rule: dict | None = None):
 
     return Card(
         CardHeader(CardTitle(title)),
-        CardBody(
+        CardContent(
             Form(
-                DivLAligned(
+                ActionRow(
                     SaveAction("Save Rule"),
                     CancelAction(href="/library/rules"),
                     cls="gap-2",
                 ),
-                Div(
-                    FormLabel("Reference", fr="reference"),
-                    Input(
-                        id="reference",
+                TextInputField(
+                    FieldSpec(
+                        label="Reference",
+                        field_id="reference",
                         name="reference",
                         value=rule.get("reference", ""),
                         placeholder="e.g. REQ-ISO-001",
                         required=True,
-                    ),
-                    cls="space-y-1",
+                    )
                 ),
-                Div(
-                    FormLabel("Rule Type", fr="rule_type"),
-                    Input(
-                        id="rule_type",
+                TextInputField(
+                    FieldSpec(
+                        label="Rule Type",
+                        field_id="rule_type",
                         name="rule_type",
                         value=rule.get("rule_type", "Required"),
                         required=True,
-                    ),
-                    cls="space-y-1",
+                    )
                 ),
-                Div(
-                    FormLabel("Target IFC Class", fr="target_ifc_class"),
-                    Select(
-                        *ifc_options,
-                        id="target_ifc_class",
+                SelectField(
+                    FieldSpec(
+                        label="Target IFC Class",
+                        field_id="target_ifc_class",
                         name="target_ifc_class",
                         required=True,
                     ),
-                    cls="space-y-1",
+                    ifc_options,
                 ),
-                Div(
-                    FormLabel("Description", fr="description"),
-                    TextArea(
-                        rule.get("description", ""),
-                        id="description",
+                TextAreaField(
+                    FieldSpec(
+                        label="Description",
+                        field_id="description",
                         name="description",
-                        rows="5",
+                        value=rule.get("description", ""),
                         required=True,
                     ),
-                    cls="space-y-1",
+                    rows=5,
                 ),
-                Div(
-                    FormLabel("Parameters (JSON or text)", fr="parameters"),
-                    TextArea(
-                        rule.get("parameters", "{}"),
-                        id="parameters",
+                TextAreaField(
+                    FieldSpec(
+                        label="Parameters (JSON or text)",
+                        field_id="parameters",
                         name="parameters",
-                        rows="6",
+                        value=rule.get("parameters", "{}"),
                     ),
-                    cls="space-y-1",
+                    rows=6,
                 ),
                 method="post",
                 action=action,

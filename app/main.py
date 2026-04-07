@@ -4,27 +4,18 @@ from monsterui.all import (
     DivLAligned,
     H1,
     Subtitle,
-    Theme,
-    ThemeFont,
-    ThemeRadii,
-    ThemeShadows,
 )
+from app.components.layout import DashboardLayout
+from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
 from app.routes import analyze, dashboard, library, projects, viewer
-from app.components.layout import DashboardLayout
 
-hdrs = Theme.gray.headers(
-    radii=ThemeRadii.lg,
-    shadows=ThemeShadows.lg,
-    font=ThemeFont.default,
-)
 
-# Initialize FastHTML app with MonsterUI theme headers
+APP_HEADERS = SiteTheme()
+
 app, rt = fast_app(
-    hdrs=hdrs,
-    # Uvicorn reload is already used in development; disabling FastHTML's
-    # websocket-based live reload avoids disconnect exceptions in the logs.
-    live=False,
+    hdrs=APP_HEADERS,
+    cls="antialiased",
 )
 
 
@@ -42,12 +33,15 @@ async def live_reload_compat(msg: str, send):
     return None
 
 
-# Setup routes
-viewer.setup_routes(rt)
-analyze.setup_routes(rt)
-dashboard.setup_routes(rt)
-library.setup_routes(rt)
-projects.setup_routes(rt)
+def _setup_routes() -> None:
+    viewer.setup_routes(rt)
+    analyze.setup_routes(rt)
+    dashboard.setup_routes(rt)
+    library.setup_routes(rt)
+    projects.setup_routes(rt)
+
+
+_setup_routes()
 
 
 @rt("/")

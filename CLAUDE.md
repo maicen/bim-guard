@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Instructions Files Map
+
+| File | Who reads it | What it defines |
+| --- | --- | --- |
+| README.md | Humans | What the project is |
+| AGENTS.md, CLAUDE.md, .github\instructions\project-specific.instructions.md | Coding agents | How to build the project |
+| DESIGN.md | Design agents | How the project should look and feel |
+
 ## Commands
 
 ```bash
@@ -9,10 +17,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv sync
 
 # Run development server
-uv run uvicorn main:app --reload
+uv run uvicorn main:app
 
 # Run with specific host/port
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 There are no automated tests or lint commands configured.
@@ -23,7 +31,7 @@ BIM-Guard is a FastHTML + MonsterUI web application for BIM (Building Informatio
 
 ### Layer Structure
 
-```
+```text
 Routes (app/routes/)       → HTTP handlers, HTMX responses
 Services (app/services/)   → Business logic, SQLite persistence
 Components (app/components/) → Reusable FastHTML UI elements
@@ -47,6 +55,7 @@ Modules (app/modules/)     → 5-step compliance pipeline
 ### Database
 
 SQLite at `data/bim_guard.db`. Three tables:
+
 - `projects` — IFC project metadata + file paths
 - `documents` — Uploaded PDFs with extracted text
 - `rules` — Compliance rules with JSON `parameters` field
@@ -54,6 +63,7 @@ SQLite at `data/bim_guard.db`. Three tables:
 ### Compliance Pipeline (app/modules/)
 
 Five sequential modules — most are stubs awaiting implementation:
+
 1. **Module1_DocReader** — PDF text extraction (implemented via pypdf)
 2. **Module2_IFCRead** — IFC file parsing (stub)
 3. **Module3_RuleBuilder** — NLP → structured rules (stub, AI integration point)

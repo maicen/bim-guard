@@ -5,6 +5,16 @@ applyTo: "app/**"
 
 # BIM Guard — Project-Specific Coding Guidelines
 
+
+## Instructions Files Map
+
+| File | Who reads it | What it defines |
+| --- | --- | --- |
+| README.md | Humans | What the project is |
+| AGENTS.md, CLAUDE.md, .github\instructions\project-specific.instructions.md | Coding agents | How to build the project |
+| DESIGN.md | Design agents | How the project should look and feel |
+
+
 ## Project Overview
 
 **BIM Guard** is a BIM compliance application built with FastHTML (Python) and MonsterUI. It lets users upload IFC models, define compliance rules from documents, and generate reports.
@@ -22,10 +32,10 @@ applyTo: "app/**"
 uv sync
 
 # Run the app
-uv run uvicorn main:app --reload
+uv run uvicorn main:app
 
 # Run on a specific host/port
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 There are no automated tests or lint commands. Use manual browser verification.
@@ -472,7 +482,7 @@ result = workflow.orchestrate_workflow()
 
 ## Testing Conventions
 
-There are no automated tests currently. Use manual verification via the running Uvicorn server (`uv run uvicorn main:app --reload`). When writing new functionality:
+There are no automated tests currently. Use manual verification via the running Uvicorn server (`uv run uvicorn main:app`). When writing new functionality:
 
 - Verify happy path in the browser
 - Verify empty-state rendering (no DB records)
@@ -484,7 +494,6 @@ Automated tests are not currently required. Use manual browser verification by d
 
 ## General Python Conventions
 
-- **No class-based views** — use plain functions everywhere
 - **No type annotation required** on return types, but annotate parameters
 - Use Python 3.10+ union syntax: `dict | None` not `Optional[dict]`
 - Database path via `pathlib.Path` — never hardcode strings
@@ -502,7 +511,6 @@ Never use any of the following:
 | `from sqlalchemy import ...` | `from fastlite import database` |
 | `from pydantic import BaseModel` | plain `dict` or FastLite schema |
 | `from flask import ...` / `@app.route(...)` | FastHTML `@rt(...)` inside `setup_routes(rt)` |
-| `class MyView(View):` | plain `def` functions |
 | `from typing import Optional` | `X | None` (Python 3.10+ union syntax) |
 | Returning raw HTML strings | Return FastHTML component trees |
 | `raise HTTPException(...)` | Return component with `Alert(cls=AlertT.danger)` |

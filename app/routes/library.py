@@ -3,8 +3,6 @@ from pathlib import Path
 from fasthtml.common import (
     Div,
     P,
-    Span,
-    Style,
     Title,
     UploadFile,
 )
@@ -18,9 +16,16 @@ from app.components.rule_extraction_ui import (
 from app.components.rules_ui import rule_form, rules_panel
 from app.components.ui import (
     BackAction,
+    Card as UICard,
+    CardContent as UICardContent,
+    CardHeader as UICardHeader,
+    CardTitle as UICardTitle,
     CreateAction,
     EditAction,
-    ViewAction,
+    HtmxSpinner,
+    LinkButton,
+    NotFoundBlock,
+    SubmitButton,
 )
 from app.modules.module1_doc_reader import Module1_DocReader
 from app.services.documents_service import DocumentService
@@ -33,9 +38,6 @@ from app.utils import (
     store_upload_bytes,
 )
 from monsterui.all import (
-    Alert,
-    AlertT,
-    Button,
     Card,
     CardBody,
     CardHeader,
@@ -43,11 +45,9 @@ from monsterui.all import (
     Container,
     DivLAligned,
     Form,
-    ButtonT,
     H1,
     Input,
     FormLabel,
-    UkIcon,
 )
 
 _document_service = DocumentService()
@@ -57,17 +57,17 @@ _rule_extraction_service = RuleExtractionService()
 
 def _not_found_page(entity: str, back_href: str, back_title: str):
     return Title(f"{entity} Not Found - BIM Guard"), DashboardLayout(
-        Container(
-            Alert(f"{entity} not found.", cls=AlertT.warning),
-            BackAction(href=back_href, title=back_title),
-            cls="space-y-4",
-        )
+        Container(NotFoundBlock(entity, back_href, back_title))
     )
 
 
 def setup_routes(rt):
     @rt("/library/documents")
     def documents():
+        upload_spinner, upload_spinner_style = HtmxSpinner(
+            "documents-upload-spinner", "Processing document..."
+        )
+
         return Title("Documents - BIM Guard"), DashboardLayout(
             Container(
                 H1("Documents", cls="text-3xl font-bold tracking-tight"),
@@ -75,9 +75,9 @@ def setup_routes(rt):
                     "Upload PDF, Markdown, or text references, extract their text, and manage your document library.",
                     cls="text-muted-foreground",
                 ),
-                Card(
-                    CardHeader(CardTitle("Upload Document")),
-                    CardBody(
+                UICard(
+                    UICardHeader(UICardTitle("Upload Document")),
+                    UICardContent(
                         Form(
                             Div(
                                 FormLabel("Document (.pdf, .md, .txt)", fr="document"),
@@ -90,16 +90,9 @@ def setup_routes(rt):
                                 ),
                                 cls="space-y-1",
                             ),
-                            Button("Upload Document", cls=ButtonT.primary),
-                            Div(
-                                UkIcon("loader-2", cls="w-5 h-5 animate-spin"),
-                                Span("Processing document...", cls="ml-2 text-sm"),
-                                id="documents-upload-spinner",
-                                cls="htmx-indicator hidden items-center",
-                            ),
-                            Style(
-                                ".htmx-indicator.htmx-request { display: flex !important; }"
-                            ),
+                            SubmitButton("Upload Document", variant="primary"),
+                            upload_spinner,
+                            upload_spinner_style,
                             hx_post="/api/documents/upload",
                             hx_target="#documents-panel",
                             hx_indicator="#documents-upload-spinner",
@@ -187,10 +180,7 @@ def setup_routes(rt):
                         f"Uploaded: {document.get('upload_date', '-')}",
                         cls="text-sm text-muted-foreground",
                     ),
-                    EditAction(
-                        href=f"/library/documents/{document_id}/edit",
-                        cls=ButtonT.primary,
-                    ),
+                    EditAction(href=f"/library/documents/{document_id}/edit"),
                     BackAction(href="/library/documents", title="Back to Documents"),
                     cls="gap-2",
                 ),
@@ -257,10 +247,10 @@ def setup_routes(rt):
                     cls="text-muted-foreground",
                 ),
                 DivLAligned(
-                    ViewAction(
+                    LinkButton(
+                        "Open Extraction Studio",
                         href="/library/rules/extract",
-                        title="Open Extraction Studio",
-                        cls=ButtonT.secondary,
+                        variant="secondary",
                     ),
                     cls="justify-end",
                 ),
@@ -304,9 +294,7 @@ def setup_routes(rt):
             Container(
                 DivLAligned(
                     H1(rule.get("reference", "Rule")),
-                    EditAction(
-                        href=f"/library/rules/{rule_id}/edit", cls=ButtonT.primary
-                    ),
+                    EditAction(href=f"/library/rules/{rule_id}/edit"),
                     cls="justify-between",
                 ),
                 Card(

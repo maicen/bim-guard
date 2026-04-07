@@ -12,3 +12,4 @@ tmp_sig_check.sqlite
 data/bimguard.sqlite-shm
 data/bimguard.sqlite-wal
 docs\MonsterUI\
+.playwright-mcp/

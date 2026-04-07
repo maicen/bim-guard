@@ -1,32 +1,37 @@
-from fasthtml.common import Div, Option, Tbody, Td, Th, Thead, Tr
+from fasthtml.common import Div, Tbody, Td, Th, Thead, Tr
 from app.components.layout import DashboardLayout
 from app.components.ui import (
+    ActionRow,
+    AlertSpec,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
     CancelAction,
     CreateAction,
-    DeleteAction,
-    EditAction,
+    FieldSpec,
+    MessageAlert,
     SaveAction,
-    ViewAction,
+    SelectField,
+    SelectOptionSpec,
+    TableActionsMenu,
+    TableSpec,
+    TextAreaField,
+    TextInputField,
+    build_table_rows,
 )
 from monsterui.all import (
-    Alert,
-    AlertT,
-    Card,
     Container,
     DivFullySpaced,
-    DivLAligned,
     DivVStacked,
     Form,
     FormLabel,
     H1,
     H2,
-    H3,
     Input,
-    Select,
     Subtitle,
     Table,
     TableT,
-    TextArea,
     UkIcon,
 )
 
@@ -52,121 +57,105 @@ def project_form(
         else ()
     )
     return Card(
-        Form(
-            DivVStacked(
-                FormLabel("Project Name", fr="name"),
-                Input(
-                    id="name",
-                    name="name",
-                    value=project.get("name", ""),
-                    placeholder="e.g. Airport Terminal A",
-                    required=True,
-                ),
-                cls="space-y-1",
-            ),
-            DivVStacked(
-                FormLabel("Description", fr="description"),
-                TextArea(
-                    project.get("description", ""),
-                    id="description",
-                    name="description",
-                    placeholder="Scope, goals, and notes",
-                    rows="5",
-                ),
-                cls="space-y-1",
-            ),
-            DivVStacked(
-                FormLabel("Status", fr="status"),
-                Select(
-                    Option(
-                        "Draft",
-                        value="Draft",
-                        selected=project.get("status") == "Draft",
-                    ),
-                    Option(
-                        "Active",
-                        value="Active",
-                        selected=project.get("status") == "Active",
-                    ),
-                    Option(
-                        "Archived",
-                        value="Archived",
-                        selected=project.get("status") == "Archived",
-                    ),
-                    id="status",
-                    name="status",
-                ),
-                cls="space-y-1",
-            ),
-            *ifc_field,
-            DivLAligned(
-                SaveAction("Save Project"),
-                CancelAction(href="/projects"),
-                cls="gap-2",
-            ),
-            method="post",
-            action=action,
-            enctype="multipart/form-data" if include_ifc else None,
-            cls="space-y-4",
+        CardHeader(
+            CardTitle(H2(title)),
+            Subtitle("Manage your BIM compliance projects."),
         ),
-        header=Div(H2(title), Subtitle("Manage your BIM compliance projects.")),
+        CardContent(
+            Form(
+                TextInputField(
+                    FieldSpec(
+                        label="Project Name",
+                        field_id="name",
+                        name="name",
+                        value=project.get("name", ""),
+                        placeholder="e.g. Airport Terminal A",
+                        required=True,
+                    )
+                ),
+                TextAreaField(
+                    FieldSpec(
+                        label="Description",
+                        field_id="description",
+                        name="description",
+                        value=project.get("description", ""),
+                        placeholder="Scope, goals, and notes",
+                    ),
+                    rows=5,
+                ),
+                SelectField(
+                    FieldSpec(label="Status", field_id="status", name="status"),
+                    [
+                        SelectOptionSpec(
+                            "Draft",
+                            "Draft",
+                            selected=project.get("status") == "Draft",
+                        ),
+                        SelectOptionSpec(
+                            "Active",
+                            "Active",
+                            selected=project.get("status") == "Active",
+                        ),
+                        SelectOptionSpec(
+                            "Archived",
+                            "Archived",
+                            selected=project.get("status") == "Archived",
+                        ),
+                    ],
+                ),
+                *ifc_field,
+                ActionRow(
+                    SaveAction("Save Project"),
+                    CancelAction(href="/projects"),
+                    cls="gap-2",
+                ),
+                method="post",
+                action=action,
+                enctype="multipart/form-data" if include_ifc else None,
+                cls="space-y-4",
+            )
+        ),
     )
 
 
 def projects_table_rows(rows: list[dict]):
-    if not rows:
-        return [
-            Tr(
-                Td(
-                    "No projects yet. Create your first one.",
-                    colspan="7",
-                    cls="text-center text-muted-foreground",
-                )
-            )
-        ]
-
-    rendered = []
-    for row in rows:
-        rendered.append(
-            Tr(
-                Td(str(row["id"])),
-                Td(row["name"]),
-                Td(row.get("status", "Draft")),
-                Td(
-                    UkIcon("file-check", height=15, width=15, cls="text-success")
-                    if row.get("ifc_file_path")
-                    else UkIcon(
-                        "file-x", height=15, width=15, cls="text-muted-foreground"
-                    )
-                ),
-                Td(row.get("created_at", "-")),
-                Td(row.get("updated_at", "-")),
-                Td(
-                    DivLAligned(
-                        *(
-                            [
-                                ViewAction(
-                                    href=f"/viewer?project_id={row['id']}",
-                                    title="Open IFC in Viewer",
-                                )
-                            ]
-                            if row.get("ifc_file_path")
-                            else []
-                        ),
-                        EditAction(href=f"/projects/{row['id']}/edit"),
-                        DeleteAction(action=f"/projects/{row['id']}/delete"),
-                        cls="gap-1",
-                    )
-                ),
-            )
+    def _actions_menu(row: dict):
+        return TableActionsMenu(
+            edit_href=f"/projects/{row['id']}/edit",
+            delete_action=f"/projects/{row['id']}/delete",
+            view_href=(
+                f"/viewer?project_id={row['id']}" if row.get("ifc_file_path") else None
+            ),
+            view_label="Open IFC in Viewer",
         )
-    return rendered
+
+    def _build_row(row: dict):
+        return Tr(
+            Td(str(row["id"])),
+            Td(row["name"]),
+            Td(row.get("status", "Draft")),
+            Td(
+                UkIcon("file-check", height=15, width=15, cls="text-success")
+                if row.get("ifc_file_path")
+                else UkIcon("file-x", height=15, width=15, cls="text-muted-foreground")
+            ),
+            Td(row.get("created_at", "-")),
+            Td(row.get("updated_at", "-")),
+            Td(_actions_menu(row)),
+        )
+
+    return build_table_rows(
+        rows,
+        _build_row,
+        TableSpec(
+            empty_message="No projects yet. Create your first one.",
+            empty_colspan=7,
+        ),
+    )
 
 
 def projects_page(rows: list[dict], message: str | None = None):
-    msg_block = ()
-    if message:
-        msg_block = (Alert(message, cls=AlertT.success),)
+    msg_block = MessageAlert(AlertSpec(message=message, level="success"))
 
     return DashboardLayout(
         Container(
@@ -179,22 +168,24 @@ def projects_page(rows: list[dict], message: str | None = None):
             ),
             *msg_block,
             Card(
-                Table(
-                    Thead(
-                        Tr(
-                            Th("ID"),
-                            Th("Name"),
-                            Th("Status"),
-                            Th("IFC"),
-                            Th("Created"),
-                            Th("Updated"),
-                            Th("Actions"),
-                        )
-                    ),
-                    Tbody(*projects_table_rows(rows)),
-                    cls=TableT.hover,
+                CardHeader(CardTitle("Project Registry")),
+                CardContent(
+                    Table(
+                        Thead(
+                            Tr(
+                                Th("ID"),
+                                Th("Name"),
+                                Th("Status"),
+                                Th("IFC"),
+                                Th("Created"),
+                                Th("Updated"),
+                                Th("Actions"),
+                            )
+                        ),
+                        Tbody(*projects_table_rows(rows)),
+                        cls=TableT.hover,
+                    )
                 ),
-                header=H3("Project Registry"),
             ),
             cls="space-y-4",
         )

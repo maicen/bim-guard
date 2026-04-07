@@ -1,17 +1,24 @@
-from fasthtml.common import A, Div, H2, H3, Li, Small, Span
-from monsterui.all import (
-    DivFullySpaced,
-    DivLAligned,
-    NavContainer,
-    NavDividerLi,
-    NavHeaderLi,
-    NavT,
-    TextT,
-    ThemePicker,
-    UkIcon,
+# app\components\layout.py
+from fasthtml.common import Div, H2, Main, Span
+from monsterui.all import DivLAligned, TextT, UkIcon
+from app.components.themed_ui import SiteStyles
+from app.components.ui import (
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarInset,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarProvider,
+    SidebarRail,
+    SidebarTrigger,
 )
 
-
+# Standardized Apple-style icons for the sidebar
 NAV_ICONS = {
     "Dashboard": "layout-dashboard",
     "Projects": "folder-open",
@@ -25,29 +32,36 @@ NAV_ICONS = {
 
 
 def NavItem(title, url):
+    """Sidebar menu item using shared sidebar primitives."""
     icon = NAV_ICONS.get(title, "circle")
-    return Li(
-        A(
+    return SidebarMenuItem(
+        SidebarMenuButton(
             DivLAligned(
-                UkIcon(icon, height=16, width=16, cls="text-muted-foreground"),
-                Span(title),
-                cls="gap-2 justify-start w-full",
+                UkIcon(icon, height=16, width=16, cls="opacity-70 shrink-0"),
+                Span(
+                    title,
+                    cls="group-data-[sidebar-state=collapsed]/sidebar-wrapper:hidden",
+                ),
+                cls="gap-3 justify-start w-full",
             ),
             href=url,
-            cls=f"{TextT.sm} hover:underline block w-full text-left",
+            cls=f"{TextT.sm} font-medium rounded-lg hover:bg-muted",
         ),
-        cls="px-1 py-0.5 w-full",
     )
 
 
 def NavSection(title, items):
-    return [
-        NavHeaderLi(H3(title, cls="text-left w-full")),
-        *[NavItem(label, href) for label, href in items],
-    ]
+    """Section group using shared sidebar primitives."""
+    return SidebarGroup(
+        SidebarGroupLabel(title, cls=SiteStyles.caption + " px-3 mb-2 mt-2"),
+        SidebarGroupContent(
+            SidebarMenu(*[NavItem(label, href) for label, href in items])
+        ),
+    )
 
 
 def AppSidebar():
+    """Sidebar built from reusable UI sidebar components."""
     nav_sections = [
         (
             "Platform",
@@ -60,68 +74,60 @@ def AppSidebar():
         ("Analysis", [("Run Analysis", "/analysis/run"), ("Reports", "/reports")]),
         ("Library", [("Documents", "/library/documents"), ("Rules", "/library/rules")]),
     ]
-    nav_items = [
-        frag for s in nav_sections for frag in (NavDividerLi(), *NavSection(*s))
+
+    # Flatten sections into a list of MonsterUI nav components
+    nav_groups = [
+        NavSection(section_title, items) for section_title, items in nav_sections
     ]
 
-    return Div(
-        Div(H2("BIM Guard"), cls="pb-2"),
-        NavContainer(
-            *nav_items,
-            cls=(NavT.primary, "w-full text-left"),
-        ),
-        Div(
-            NavContainer(
-                NavDividerLi(),
-                Li(
-                    Div(
-                        # Trigger
-                        A(
+    return Sidebar(cls="apple-blur bg-sidebar border-r border-border h-svh")(
+        SidebarTrigger(cls="self-end mb-1 border-border bg-background hover:bg-muted"),
+        SidebarInset(
+            SidebarContent(
+                H2(
+                    "BIM Guard",
+                    cls="font-bold tracking-tighter text-2xl px-3 pb-2 group-data-[sidebar-state=collapsed]/sidebar-wrapper:hidden",
+                ),
+                *nav_groups,
+                cls="px-2",
+            ),
+            SidebarFooter(
+                SidebarMenu(
+                    SidebarMenuItem(
+                        SidebarMenuButton(
                             DivLAligned(
                                 UkIcon(
                                     "settings",
                                     height=16,
                                     width=16,
-                                    cls="text-muted-foreground",
+                                    cls="opacity-70 shrink-0",
                                 ),
-                                Span("Settings"),
-                                cls="gap-2 justify-start w-full",
+                                Span(
+                                    "Settings",
+                                    cls="group-data-[sidebar-state=collapsed]/sidebar-wrapper:hidden",
+                                ),
+                                cls="gap-3 justify-start w-full",
                             ),
-                            href="#",
-                            cls=f"{TextT.sm} hover:underline block w-full text-left",
-                        ),
-                        # Drop panel — opens upward, aligned to left edge of trigger
-                        Div(
-                            ThemePicker(),
-                            data_uk_drop="mode: click; pos: top-left; shift: false; flip: false",
-                            cls="uk-drop border rounded-lg shadow-lg bg-background",
-                        ),
-                        cls="relative",
-                    ),
-                    cls="px-1 py-0.5 w-full",
+                            href="/settings",
+                            cls="text-sm font-medium text-muted-foreground hover:text-foreground",
+                        )
+                    )
                 ),
-                cls=(NavT.primary, "w-full text-left"),
+                cls="border-t border-border pt-3",
             ),
-            cls="mt-auto pt-3",
+            cls="flex h-full flex-col",
         ),
-        cls="border-r h-screen flex flex-col gap-4 p-4 bg-background",
-    )
-
-
-def AppHeader():
-    return Div(
-        DivFullySpaced(H2("Compliance Dashboard"), Small("v1.0.0")),
-        cls="sticky top-0 z-10 min-h-14 px-4 border-b bg-background",
+        SidebarRail(),
     )
 
 
 def DashboardLayout(*content):
-    return Div(
+    """
+    Standard layout for dashboard pages with collapsible sidebar primitives.
+    """
+    return SidebarProvider(cls=SiteStyles.bg)(
         AppSidebar(),
-        Div(
-            AppHeader(),
-            Div(*content, cls="flex-1 w-full p-6 overflow-auto"),
-            cls="flex-1 flex flex-col h-screen overflow-hidden gap-0",
+        SidebarInset(
+            Main(cls="flex-1")(Div(cls="p-10 max-w-6xl mx-auto space-y-10")(*content))
         ),
-        cls="flex min-h-screen w-full",
     )

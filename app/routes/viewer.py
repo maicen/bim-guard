@@ -2,9 +2,9 @@ import json
 
 from fasthtml.common import Div, Script, Title
 from app.components.layout import DashboardLayout
-from app.components.ui import BackAction
+from app.components.ui import BackAction, NotFoundBlock
 from app.services.projects_service import ProjectsService
-from monsterui.all import Alert, AlertT, Container, H2
+from monsterui.all import Container, H2
 
 _projects_service = ProjectsService()
 
@@ -20,7 +20,7 @@ def setup_routes(rt):
 
         if project_id is not None and project is None:
             return Title("Not Found — BIM Guard"), DashboardLayout(
-                Container(Alert("Project not found.", cls=AlertT.danger))
+                Container(NotFoundBlock("Project", "/projects", "Back to Projects"))
             )
 
         ifc_url = ""
@@ -48,7 +48,8 @@ def setup_routes(rt):
                 # Viewer Container
                 Div(
                     id="viewer-container",
-                    cls="w-full h-full min-h-[75vh] bg-black bg-opacity-95 rounded-xl shadow-xl overflow-hidden border border-gray-800 relative z-10",
+                    cls="w-full h-full min-h-[75vh] rounded-xl shadow-xl overflow-hidden border border-border relative z-10",
+                    style="background-color: hsl(var(--foreground) / 0.95);",
                 ),
                 # Initialization Script
                 Script(

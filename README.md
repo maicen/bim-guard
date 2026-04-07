@@ -13,21 +13,6 @@
 uv sync
 
 # Run the app
-uv run uvicorn main:app --reload
+uv run uvicorn main:app
 
 ```
-
-## UI Theme
-
-ThemePicker(color=True, radii=True, shadows=True, font=True, mode=True, cls='p-4', custom_themes=[])
-
-## IFC JS Dependencies
-
-<https://cdn.jsdelivr.net/npm/@thatopen/fragments@3.3.6/+esm>
-<https://cdn.jsdelivr.net/npm/@thatopen/components@3.3.3/+esm>
-
-<https://cdn.jsdelivr.net/npm/@thatopen/ui@3.3.3/+esm>
-<https://cdn.jsdelivr.net/npm/@thatopen/ui@3.3.3/dist/index.min.js>
-<https://cdn.jsdelivr.net/npm/@thatopen/ui-obc@3.3.3/+esm>
-<https://cdn.jsdelivr.net/npm/web-ifc@0.0.77/+esm>
-<https://cdn.jsdelivr.net/npm/web-ifc@0.0.77/web-ifc-api-node.min.js>

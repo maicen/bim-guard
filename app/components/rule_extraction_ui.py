@@ -1,8 +1,20 @@
-from fasthtml.common import Div, P, Span, Style
-from monsterui.all import Alert, Button, Form, H1, H3, Input, Label, UkIcon
+from fasthtml.common import Div, P, Span
+from app.components.ui import (
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    HtmxSpinner,
+    SubmitButton,
+)
+from monsterui.all import Alert, Form, FormLabel, H1, H3, Input, UkIcon
 
 
 def rule_extraction_page_content():
+    spinner, spinner_style = HtmxSpinner(
+        "extract-spinner", "Scanning document and building rules via AI..."
+    )
+
     return Div(
         Div(
             Div(
@@ -19,40 +31,44 @@ def rule_extraction_page_content():
         ),
         Div(
             Div(
-                Form(
-                    Label("Upload BEP Document (PDF)", cls="mb-2"),
-                    Input(
-                        type="file",
-                        name="document",
-                        accept=".pdf",
-                        cls="mb-4 mt-2",
+                Card(
+                    CardHeader(CardTitle("Upload BEP Document")),
+                    CardContent(
+                        Form(
+                            Div(
+                                FormLabel(
+                                    "Upload BEP Document (PDF)", fr="extract-document"
+                                ),
+                                Input(
+                                    id="extract-document",
+                                    type="file",
+                                    name="document",
+                                    accept=".pdf",
+                                    required=True,
+                                    cls="mt-2",
+                                ),
+                                cls="space-y-1",
+                            ),
+                            SubmitButton(
+                                "Extract Rules", variant="primary", cls="mt-2"
+                            ),
+                            spinner,
+                            spinner_style,
+                            hx_post="/api/rules/extract",
+                            hx_target="#extracted-rules-container",
+                            hx_indicator="#extract-spinner",
+                            enctype="multipart/form-data",
+                            cls="space-y-4",
+                        )
                     ),
-                    Button("Extract Rules", type="submit", cls="mt-2"),
-                    hx_post="/api/rules/extract",
-                    hx_target="#extracted-rules-container",
-                    hx_indicator="#extract-spinner",
-                    enctype="multipart/form-data",
-                    cls="bg-background p-6 rounded-lg shadow-sm border",
                 ),
                 cls="flex-1 bg-muted/30 p-6 overflow-auto",
             ),
-            Div(style="width:1px; background:#e5e7eb;"),
+            Div(cls="w-px bg-border"),
             Div(
                 H3(
                     "Extracted Rules",
                     cls="text-lg font-semibold mb-4 px-6 pt-6",
-                ),
-                Div(
-                    UkIcon("loader-2", cls="w-6 h-6 animate-spin text-primary"),
-                    Span(
-                        "Scanning document and building rules via AI...",
-                        cls="ml-2 text-sm text-muted-foreground",
-                    ),
-                    id="extract-spinner",
-                    cls="htmx-indicator flex items-center justify-center p-6 hidden",
-                ),
-                Style(
-                    ".htmx-indicator.hidden { display: none; } .htmx-request .htmx-indicator { display: flex !important; } .htmx-request.htmx-indicator { display: flex !important; }"
                 ),
                 Div(
                     P(
@@ -74,18 +90,24 @@ def rule_extraction_results(rules: list[dict], filename: str | None):
     fragments = []
     for rule in rules:
         fragments.append(
-            Div(
-                Div(
-                    Span(rule.get("ref", "REQ"), cls="font-semibold text-sm"),
-                    Label("New"),
-                    cls="flex justify-between items-center mb-1",
+            Card(
+                CardContent(
+                    Div(
+                        Span(rule.get("ref", "REQ"), cls="font-semibold text-sm"),
+                        Span(
+                            "New",
+                            cls="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs",
+                        ),
+                        cls="flex justify-between items-center mb-1",
+                    ),
+                    P(rule.get("desc", ""), cls="text-sm text-muted-foreground mb-2"),
+                    Div(
+                        f"Target: {rule.get('target', '-')}",
+                        cls="font-mono text-xs bg-muted p-1.5 rounded",
+                    ),
+                    cls="space-y-2",
                 ),
-                P(rule.get("desc", ""), cls="text-sm text-muted-foreground mb-2"),
-                Div(
-                    f"Target: {rule.get('target', '-')}",
-                    cls="font-mono text-xs bg-muted p-1.5 rounded",
-                ),
-                cls="p-4 border rounded-md shadow-sm mb-4",
+                cls="mb-4",
             )
         )
 
