@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from fasthtml.common import (
     Div,
     P,
@@ -15,6 +13,8 @@ from app.components.rule_extraction_ui import (
 )
 from app.components.rules_ui import rule_form, rules_panel
 from app.components.ui import (
+    Alert,
+    AlertT,
     BackAction,
     Card as UICard,
     CardContent as UICardContent,
@@ -36,6 +36,7 @@ from app.utils import (
     redirect_see_other,
     safe_upload_name,
     store_upload_bytes,
+    validate_document_upload,
 )
 from monsterui.all import (
     Card,
@@ -109,19 +110,16 @@ def setup_routes(rt):
     @rt("/api/documents/upload", methods=["POST"])
     async def documents_upload(document: UploadFile):
         filename = safe_upload_name(document.filename)
-        suffix = Path(filename).suffix.lower()
-        if suffix not in {".pdf", ".md", ".txt"}:
-            return documents_panel(
-                _document_service.list_documents(),
-                "Only PDF, Markdown (.md), and text (.txt) files are supported.",
-                level="warning",
-            )
-
         file_content = await document.read()
-        if not file_content:
+        validation_error = validate_document_upload(
+            filename,
+            document.content_type,
+            file_content,
+        )
+        if validation_error:
             return documents_panel(
                 _document_service.list_documents(),
-                "Uploaded file is empty.",
+                validation_error,
                 level="warning",
             )
 
@@ -139,7 +137,7 @@ def setup_routes(rt):
         )
 
         reader = Module1_DocReader()
-        if suffix == ".pdf":
+        if filename.lower().endswith(".pdf"):
             extracted_text = reader.parse_pdf(file_content)
         else:
             extracted_text = file_content.decode("utf-8", errors="replace").strip()
@@ -372,5 +370,9 @@ def setup_routes(rt):
         if not file_content:
             return rule_extraction_empty_file_result()
 
-        rules = await _rule_extraction_service.extract_rules(file_content)
+        try:
+            rules = await _rule_extraction_service.extract_rules(file_content)
+        except Exception as exc:
+            return Alert(f"Rule extraction failed: {exc}", cls=AlertT.error)
+
         return rule_extraction_results(rules, document.filename)

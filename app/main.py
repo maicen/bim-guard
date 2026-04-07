@@ -8,6 +8,10 @@ from monsterui.all import (
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
+from app.utils import load_env_file
+
+load_env_file()
+
 from app.routes import analyze, dashboard, library, projects, viewer
 
 
