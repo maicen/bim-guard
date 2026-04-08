@@ -3,6 +3,13 @@
         "/^uv run uvicorn main:app$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "gh": true,
+        "/^gh issue list --repo maicen/bim-guard --state open --limit 100 --json number,title \\| python -c \"import json,sys; data=json\\.load\\(sys\\.stdin\\); print\\('\\\\n'\\.join\\(f'\\{i\\[\\\\'number\\\\'\\]\\} \\{i\\[\\\\'title\\\\'\\]\\}' for i in data\\)\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "ConvertFrom-Json": true,
+        "ForEach-Object": true
     }
 }
