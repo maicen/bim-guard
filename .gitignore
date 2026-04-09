@@ -13,3 +13,4 @@ data/bimguard.sqlite-shm
 data/bimguard.sqlite-wal
 docs\MonsterUI\
 .playwright-mcp/
+.sesskey

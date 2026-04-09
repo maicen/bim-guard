@@ -17,10 +17,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv sync
 
 # Run development server
-uv run uvicorn main:app
+uv run uvicorn main:app --reload
 
 # Run with specific host/port
-uv run uvicorn main:app --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 There are no automated tests or lint commands configured.

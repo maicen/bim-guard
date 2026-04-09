@@ -1,6 +1,6 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "/^uv run uvicorn main:app$/": {
+        "/^uv run uvicorn main:app --reload$/": {
             "approve": true,
             "matchCommandLine": true
         },

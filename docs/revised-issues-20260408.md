@@ -68,7 +68,7 @@ Body: Capture a short demo that shows upload, compliance check, results review, 
 
 ## 32 — Document the BIM Guard repo setup and architecture ([#32](https://github.com/maicen/bim-guard/issues/32))
 
-Body: Replace the external Lovable.ai setup task with a repo-focused task: document the actual FastHTML/MonsterUI full-stack architecture, routes, modules, and environment setup. Include how the app is launched with `uv run uvicorn main:app` and how FastHTML serves both UI and backend routes.
+Body: Replace the external Lovable.ai setup task with a repo-focused task: document the actual FastHTML/MonsterUI full-stack architecture, routes, modules, and environment setup. Include how the app is launched with `uv run uvicorn main:app --reload` and how FastHTML serves both UI and backend routes.
 
 - Work reference: repo architecture documentation.
 

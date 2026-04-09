@@ -3,7 +3,7 @@
 ## Setup commands
 
 - Install deps: `uv sunc`
-- Start server: `uv run uvicorn main:app`
+- Start server: `uv run uvicorn main:app --reload`
 
 ## Instructions Files Map
 

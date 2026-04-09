@@ -11,6 +11,8 @@ from app.components.ui import (
     Label,
     Select,
     SubmitButton,
+    CountTableItemSpec,
+    ItemsCountDataTable,
 )
 from monsterui.all import Container, H1
 
@@ -88,6 +90,56 @@ def setup_routes(rt):
                                         ),
                                     ),
                                     Div(
+                                        FormLabel("Count Options"),
+                                        Div(
+                                            Div(
+                                                Checkbox(
+                                                    id="include_openings",
+                                                    name="include_openings",
+                                                    value="1",
+                                                    checked=True,
+                                                    cls="mr-2",
+                                                ),
+                                                Label(
+                                                    "Include openings (IfcOpeningElement)",
+                                                    for_="include_openings",
+                                                    cls="text-sm cursor-pointer",
+                                                ),
+                                                cls="flex items-center gap-1",
+                                            ),
+                                            Div(
+                                                Checkbox(
+                                                    id="include_spaces",
+                                                    name="include_spaces",
+                                                    value="1",
+                                                    checked=True,
+                                                    cls="mr-2",
+                                                ),
+                                                Label(
+                                                    "Include spaces (IfcSpace)",
+                                                    for_="include_spaces",
+                                                    cls="text-sm cursor-pointer",
+                                                ),
+                                                cls="flex items-center gap-1",
+                                            ),
+                                            Div(
+                                                Checkbox(
+                                                    id="include_type_definitions",
+                                                    name="include_type_definitions",
+                                                    value="1",
+                                                    cls="mr-2",
+                                                ),
+                                                Label(
+                                                    "Include type definitions (IfcElementType)",
+                                                    for_="include_type_definitions",
+                                                    cls="text-sm cursor-pointer",
+                                                ),
+                                                cls="flex items-center gap-1",
+                                            ),
+                                            cls="space-y-2 border rounded-md p-3 bg-muted/30",
+                                        ),
+                                    ),
+                                    Div(
                                         SubmitButton(
                                             "Run Analysis",
                                             variant="primary",
@@ -128,7 +180,16 @@ def setup_routes(rt):
             return Alert("Invalid project selection.", cls=AlertT.error)
 
         doc_ids = [int(v) for v in form.getlist("document_ids") if v]
-        result = _bim_guard_app.orchestrate_workflow(project_id, doc_ids)
+        include_openings = bool(form.get("include_openings"))
+        include_spaces = bool(form.get("include_spaces"))
+        include_type_definitions = bool(form.get("include_type_definitions"))
+        result = _bim_guard_app.orchestrate_workflow(
+            project_id,
+            doc_ids,
+            include_openings=include_openings,
+            include_spaces=include_spaces,
+            include_type_definitions=include_type_definitions,
+        )
 
         if "error" in result:
             return Alert(result["error"], cls=AlertT.error)
@@ -136,6 +197,7 @@ def setup_routes(rt):
         project = result["project"]
         ifc_count = result["ifc_element_count"]
         ifc_type_counts = result.get("ifc_type_counts") or {}
+        ifc_totals = result.get("ifc_totals") or {}
         ifc_error = result["ifc_error"]
 
         # IFC summary card
@@ -149,22 +211,46 @@ def setup_routes(rt):
                 cls="text-sm text-muted-foreground",
             )
         else:
-            type_lines = [
-                P(f"{element_type}: {count}", cls="text-sm text-muted-foreground")
-                for element_type, count in sorted(ifc_type_counts.items())
-            ]
-            ifc_detail = Div(
-                P(f"Total building elements: {ifc_count}", cls="text-sm font-medium"),
-                *(
-                    type_lines
-                    if type_lines
-                    else [
-                        P(
-                            "No IFC element types found.",
-                            cls="text-sm text-muted-foreground",
-                        )
-                    ]
+            filters = ifc_totals.get("filters") or {}
+            deltas = ifc_totals.get("excluded_or_added") or {}
+            counts_table = ItemsCountDataTable(
+                [
+                    CountTableItemSpec(
+                        label="Built Elements",
+                        total=int(ifc_totals.get("built_elements", ifc_count)),
+                        subtotal=int(ifc_totals.get("built_elements", ifc_count)),
+                        note="Schema-aware building entities",
+                    ),
+                    CountTableItemSpec(
+                        label="All Physical Elements",
+                        total=int(ifc_totals.get("all_physical_elements", 0)),
+                        subtotal=int(
+                            ifc_totals.get("adjusted_physical_elements", ifc_count)
+                        ),
+                        note="Based on IfcElement",
+                    ),
+                    CountTableItemSpec(
+                        label="All Products",
+                        total=int(ifc_totals.get("all_products", 0)),
+                        subtotal=int(ifc_totals.get("adjusted_products", 0)),
+                        note="Based on IfcProduct",
+                    ),
+                ],
+                caption="Built, physical, and product item counts",
+                options_summary=(
+                    "Options: "
+                    f"openings={'on' if filters.get('include_openings', True) else 'off'} "
+                    f"(count: {deltas.get('openings', 0)}), "
+                    f"spaces={'on' if filters.get('include_spaces', True) else 'off'} "
+                    f"(count: {deltas.get('spaces', 0)}), "
+                    f"type defs={'on' if filters.get('include_type_definitions', False) else 'off'} "
+                    f"(count: {deltas.get('type_definitions', 0)})."
                 ),
+                built_type_breakdown=ifc_type_counts,
+            )
+
+            ifc_detail = Div(
+                counts_table,
                 cls="space-y-1",
             )
 

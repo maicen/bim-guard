@@ -32,10 +32,10 @@ applyTo: "app/**"
 uv sync
 
 # Run the app
-uv run uvicorn main:app
+uv run uvicorn main:app --reload
 
 # Run on a specific host/port
-uv run uvicorn main:app --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 There are no automated tests or lint commands. Use manual browser verification.
@@ -482,7 +482,7 @@ result = workflow.orchestrate_workflow()
 
 ## Testing Conventions
 
-There are no automated tests currently. Use manual verification via the running Uvicorn server (`uv run uvicorn main:app`). When writing new functionality:
+There are no automated tests currently. Use manual verification via the running Uvicorn server (`uv run uvicorn main:app --reload`). When writing new functionality:
 
 - Verify happy path in the browser
 - Verify empty-state rendering (no DB records)

@@ -91,12 +91,14 @@ from .switch import Switch
 from .toggle_group import ToggleGroup
 from .label import Label
 from .tooltip import Tooltip, TooltipProvider
+from .collapsible import Collapsible, CollapsibleContent, CollapsibleTrigger
 
 __all__ = [
     "AlertSpec",
     "TableSpec",
     "SelectOptionSpec",
     "FieldSpec",
+    "CountTableItemSpec",
     "ActionRow",
     "MessageAlert",
     "build_select_options",
@@ -105,6 +107,7 @@ __all__ = [
     "TextAreaField",
     "SelectField",
     "HtmxSpinner",
+    "ItemsCountDataTable",
     "NotFoundBlock",
     "IconLinkButton",
     "IconPostButton",
@@ -172,6 +175,9 @@ __all__ = [
     "Label",
     "Tooltip",
     "TooltipProvider",
+    "Collapsible",
+    "CollapsibleTrigger",
+    "CollapsibleContent",
 ]
 
 
@@ -202,6 +208,14 @@ class FieldSpec:
     value: str = ""
     placeholder: str = ""
     required: bool = False
+
+
+@dataclass(frozen=True)
+class CountTableItemSpec:
+    label: str
+    total: int
+    subtotal: int | None = None
+    note: str = ""
 
 
 def ActionRow(*actions, cls: str = "gap-1"):
@@ -292,6 +306,121 @@ def HtmxSpinner(spinner_id: str, message: str):
             cls="htmx-indicator hidden items-center",
         ),
         Style(".htmx-indicator.htmx-request { display: flex !important; }"),
+    )
+
+
+def ItemsCountDataTable(
+    items: list[CountTableItemSpec],
+    caption: str = "Item counts summary",
+    options_summary: str = "",
+    built_type_breakdown: dict[str, int] | None = None,
+):
+    totals_sum = sum(item.total for item in items)
+    subtotals_sum = sum(
+        item.subtotal if item.subtotal is not None else item.total for item in items
+    )
+
+    body_rows = []
+    for item in items:
+        subtotal_value = item.subtotal if item.subtotal is not None else item.total
+        body_rows.append(
+            TableRow(
+                TableCell(item.label, cls="font-medium"),
+                TableCell(str(item.total), cls="text-right tabular-nums"),
+                TableCell(str(subtotal_value), cls="text-right tabular-nums"),
+                TableCell(item.note, cls="text-muted-foreground text-xs"),
+            )
+        )
+
+    if options_summary:
+        body_rows.append(
+            TableRow(
+                TableCell(
+                    options_summary,
+                    colspan="4",
+                    cls="text-xs text-muted-foreground border-t",
+                )
+            )
+        )
+
+    if built_type_breakdown:
+        breakdown_lines = [
+            Div(
+                Span(element_type, cls="font-medium text-sm"),
+                Span(str(count), cls="text-sm tabular-nums"),
+                cls="flex items-center justify-between rounded-sm px-1 py-0.5",
+            )
+            for element_type, count in sorted(built_type_breakdown.items())
+        ]
+
+        body_rows.append(
+            TableRow(
+                TableCell(
+                    Collapsible(
+                        CollapsibleTrigger(
+                            Span("Built element type breakdown"),
+                            Span(
+                                f"{len(built_type_breakdown)} types",
+                                cls="text-xs text-muted-foreground",
+                            ),
+                        ),
+                        CollapsibleContent(
+                            Div(*breakdown_lines, cls="space-y-1"),
+                        ),
+                        cls="border-0 rounded-none",
+                    ),
+                    colspan="4",
+                    cls="p-0 border-t",
+                )
+            )
+        )
+
+    return Div(
+        Table(
+            TableCaption(caption),
+            TableHeader(
+                TableRow(
+                    TableHead("Category"),
+                    TableHead("Total", cls="text-right"),
+                    TableHead("Subtotal", cls="text-right"),
+                    TableHead("Notes"),
+                )
+            ),
+            TableBody(*body_rows),
+            TableFooter(
+                TableRow(
+                    TableCell("Totals", colspan="2", cls="font-semibold"),
+                    TableCell(
+                        str(totals_sum), cls="text-right tabular-nums font-semibold"
+                    ),
+                    TableCell(
+                        "Sum of base totals", cls="text-xs text-muted-foreground"
+                    ),
+                ),
+                TableRow(
+                    TableCell("Subtotals", colspan="2", cls="font-semibold"),
+                    TableCell(
+                        str(subtotals_sum), cls="text-right tabular-nums font-semibold"
+                    ),
+                    TableCell(
+                        "Sum after applied options",
+                        cls="text-xs text-muted-foreground",
+                    ),
+                ),
+                TableRow(
+                    TableCell("Grand Total", colspan="2", cls="font-bold"),
+                    TableCell(
+                        str(subtotals_sum),
+                        cls="text-right tabular-nums text-base font-bold",
+                    ),
+                    TableCell(
+                        "Final aggregate used for comparison",
+                        cls="text-xs text-muted-foreground",
+                    ),
+                ),
+            ),
+        ),
+        cls="overflow-hidden rounded-md border",
     )
 
 

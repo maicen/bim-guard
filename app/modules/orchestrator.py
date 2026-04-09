@@ -32,7 +32,14 @@ class BIMGuard_App:
             "total_rules": len(self._rules_service.list_rules()),
         }
 
-    def orchestrate_workflow(self, project_id: int, document_ids: list) -> dict:
+    def orchestrate_workflow(
+        self,
+        project_id: int,
+        document_ids: list,
+        include_openings: bool = True,
+        include_spaces: bool = True,
+        include_type_definitions: bool = False,
+    ) -> dict:
         """Orchestrate the validation workflow across modules."""
         try:
             project = self._projects_service.get_project(project_id)
@@ -44,11 +51,17 @@ class BIMGuard_App:
         # Module 2: IFC parsing
         ifc_elements = []
         ifc_error = None
+        ifc_totals = {}
         ifc_path = self._projects_service.resolve_ifc_file(project_id)
         if ifc_path:
             try:
                 ifc_reader = Module2_IFCRead(ifc_path)
                 ifc_elements = ifc_reader.extract_geometry()
+                ifc_totals = ifc_reader.extract_summary_counts(
+                    include_openings=include_openings,
+                    include_spaces=include_spaces,
+                    include_type_definitions=include_type_definitions,
+                )
             except Exception as exc:
                 ifc_error = str(exc)
 
@@ -88,6 +101,7 @@ class BIMGuard_App:
             "documents": documents,
             "ifc_element_count": len(ifc_elements),
             "ifc_type_counts": ifc_type_counts,
+            "ifc_totals": ifc_totals,
             "ifc_error": ifc_error,
             "rules": rules or [],
             "violations": violations or [],

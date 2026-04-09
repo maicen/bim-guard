@@ -21,7 +21,7 @@
 uv sync
 
 # Run the app
-uv run uvicorn main:app
+uv run uvicorn main:app --reload
 
 ```
 
