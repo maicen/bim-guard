@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fasthtml.common import (
     Div,
     P,

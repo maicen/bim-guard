@@ -20,6 +20,29 @@ MAICEN-1125-M10 · Final Master's Project · Group 5 · Zigurat Global Institute
 | AGENTS.md, CLAUDE.md, .github\instructions\project-specific.instructions.md | Coding agents | How to build the project |
 | DESIGN.md | Design agents | How the project should look and feel |
 
+## Repository Structure
+
+- `app/` - main application package
+  - `main.py` - FastHTML app and route initialization
+  - `routes/` - HTTP route handlers for dashboard, library, projects, analysis, viewer
+  - `components/` - reusable UI components and page layout helpers
+  - `services/` - business logic, persistence, IFC parsing, rule extraction, and document handling
+  - `modules/` - pipeline modules for document reading, IFC parsing, rule building, comparison, and reporting
+  - `views/` - shared view components for layouts and page rendering
+- `data/` - runtime data storage
+  - `uploads/` - uploaded files and stored documents
+- `docs/` - supporting documentation, enhancement plans, and resources
+- `engines/` - experimental or domain-specific engine scripts and demo data
+- `IFC-Sample-Test-Files/` - sample IFC models for testing and exploration
+- `modules/` - additional BIM-related utilities, report generators, and integration helpers
+- `rulesets/` - predefined compliance rule set JSON files
+- `static/` - static web assets (CSS, JavaScript, viewer scripts)
+- root files
+  - `main.py` - app entrypoint used by uvicorn
+  - `pyproject.toml` - Python project metadata and dependencies
+  - `example.env` - environment variable template
+  - `README.md` - project overview and usage guide
+
 ## Getting Started
 
 ```bash
