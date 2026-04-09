@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BIMGUARD AI — Compliance Workflow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#071525;
+  --navy2:#0d1f35;
+  --navy3:#122640;
+  --navy4:#1a3355;
+  --border:#1e3d60;
+  --text:#c8daf0;
+  --muted:#5a7a99;
+  --bright:#e8f4ff;
+  --c1:#0ea882;--c1d:#08604a;--c1l:#b6f0e0;
+  --c2:#2d8fe0;--c2d:#1b5c96;--c2l:#b8dbf8;
+  --c3:#7c5fd4;--c3d:#4a3a8a;--c3l:#d4c9f8;
+  --c4:#d4523a;--c4d:#8a3220;--c4l:#f8c8be;
+  --c5:#c88a20;--c5d:#7a5210;--c5l:#f8e0a8;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--navy);
+  color:var(--text);
+  font-family:'Outfit',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── grid bg texture ── */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px;
+  opacity:.18;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── header ── */
+header{
+  position:relative;z-index:10;
+  padding:2.5rem 2rem 0;
+  display:flex;flex-direction:column;gap:.4rem;
+  border-bottom:1px solid var(--border);
+  padding-bottom:2rem;
+}
+.header-top{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.brand{display:flex;flex-direction:column;gap:.25rem}
+.brand-mark{
+  font-family:'DM Mono',monospace;
+  font-size:.7rem;letter-spacing:.2em;
+  color:var(--c1);text-transform:uppercase;
+}
+h1{
+  font-size:clamp(1.6rem,4vw,2.4rem);
+  font-weight:700;color:var(--bright);
+  line-height:1.1;letter-spacing:-.02em;
+}
+h1 span{color:var(--c1)}
+.subtitle{
+  font-size:.85rem;color:var(--muted);
+  font-family:'DM Mono',monospace;letter-spacing:.04em;
+}
+.badges{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.badge{
+  font-family:'DM Mono',monospace;font-size:.65rem;
+  padding:.25rem .6rem;border-radius:3px;letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.badge-teal{background:rgba(14,168,130,.15);color:var(--c1);border:1px solid rgba(14,168,130,.3)}
+.badge-blue{background:rgba(45,143,224,.15);color:var(--c2);border:1px solid rgba(45,143,224,.3)}
+.badge-gray{background:rgba(90,122,153,.1);color:var(--muted);border:1px solid var(--border)}
+.hint{
+  font-size:.75rem;color:var(--muted);font-style:italic;
+  display:flex;align-items:center;gap:.4rem;
+  padding:.5rem 0 0;
+}
+.hint::before{content:'';display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--c1);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── main layout ── */
+main{
+  position:relative;z-index:10;
+  display:grid;
+  grid-template-columns:420px 1fr;
+  min-height:calc(100vh - 140px);
+}
+@media(max-width:860px){
+  main{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+}
+
+/* ── pipeline panel ── */
+.pipeline{
+  border-right:1px solid var(--border);
+  padding:2rem 2rem 2rem 2rem;
+  display:flex;flex-direction:column;gap:0;
+  position:relative;
+}
+.pipeline-inner{position:relative;display:flex;flex-direction:column;gap:0}
+
+/* vertical spine */
+.spine{
+  position:absolute;left:22px;top:28px;
+  width:2px;
+  background:linear-gradient(to bottom,var(--c1),var(--c2),var(--c3),var(--c4),var(--c5));
+  opacity:.35;
+  pointer-events:none;
+}
+
+/* phase row */
+.phase{
+  display:flex;align-items:flex-start;gap:1rem;
+  padding:1rem .75rem 1rem 0;
+  cursor:pointer;
+  border-radius:8px;
+  transition:background .2s;
+  position:relative;
+  user-select:none;
+}
+.phase:hover{background:rgba(255,255,255,.03)}
+.phase.active{background:rgba(255,255,255,.05)}
+
+/* node circle */
+.node{
+  flex-shrink:0;
+  width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Mono',monospace;font-size:.8rem;font-weight:500;
+  border:2px solid;
+  transition:all .25s;
+  position:relative;z-index:2;
+  background:var(--navy);
+}
+.phase:hover .node,.phase.active .node{
+  box-shadow:0 0 0 4px rgba(255,255,255,.06);
+}
+.ph1 .node{border-color:var(--c1);color:var(--c1)}
+.ph2 .node{border-color:var(--c2);color:var(--c2)}
+.ph3 .node{border-color:var(--c3);color:var(--c3)}
+.ph4 .node{border-color:var(--c4);color:var(--c4)}
+.ph5 .node{border-color:var(--c5);color:var(--c5)}
+.phase.active .node{
+  color:var(--navy)!important;
+}
+.ph1.active .node{background:var(--c1);border-color:var(--c1)}
+.ph2.active .node{background:var(--c2);border-color:var(--c2)}
+.ph3.active .node{background:var(--c3);border-color:var(--c3)}
+.ph4.active .node{background:var(--c4);border-color:var(--c4)}
+.ph5.active .node{background:var(--c5);border-color:var(--c5)}
+
+.phase-meta{flex:1;min-width:0;padding-top:4px}
+.phase-num{
+  font-family:'DM Mono',monospace;font-size:.62rem;
+  letter-spacing:.15em;text-transform:uppercase;
+  margin-bottom:.2rem;opacity:.6;
+}
+.phase-title{
+  font-size:.95rem;font-weight:600;
+  color:var(--bright);line-height:1.3;
+  margin-bottom:.2rem;
+}
+.phase-weeks{
+  font-family:'DM Mono',monospace;font-size:.68rem;
+  color:var(--muted);letter-spacing:.06em;
+}
+.phase-arrow{
+  font-size:.75rem;color:var(--muted);
+  padding-top:6px;transition:transform .2s,color .2s;
+  flex-shrink:0;
+}
+.phase.active .phase-arrow,.phase:hover .phase-arrow{
+  transform:translateX(3px);color:var(--bright);
+}
+
+/* connector ticks */
+.connector{
+  width:2px;height:20px;margin:0 0 0 21px;
+  opacity:.25;
+}
+.ph1~.connector{background:var(--c1)}
+.ph2~.connector{background:var(--c2)}
+.ph3~.connector{background:var(--c3)}
+.ph4~.connector{background:var(--c4)}
+
+/* ── detail panel ── */
+.detail{
+  padding:2rem 2.5rem;
+  overflow-y:auto;
+  max-height:calc(100vh - 140px);
+}
+@media(max-width:860px){.detail{max-height:none;padding:1.5rem}}
+
+.detail-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:1.5rem;padding:4rem 2rem;text-align:center;
+  opacity:.5;
+}
+.detail-empty svg{opacity:.3}
+.detail-empty p{font-family:'DM Mono',monospace;font-size:.8rem;letter-spacing:.08em;color:var(--muted)}
+
+.detail-content{display:none;animation:fadeUp .3s ease}
+.detail-content.show{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* detail accent bar */
+.detail-accent{
+  height:3px;border-radius:2px;margin-bottom:1.75rem;
+}
+
+.detail-tag{
+  font-family:'DM Mono',monospace;font-size:.65rem;
+  letter-spacing:.15em;text-transform:uppercase;
+  margin-bottom:.5rem;
+}
+.detail-title{
+  font-size:clamp(1.2rem,2.5vw,1.7rem);
+  font-weight:700;color:var(--bright);
+  line-height:1.2;letter-spacing:-.01em;
+  margin-bottom:.35rem;
+}
+.detail-duration{
+  font-family:'DM Mono',monospace;font-size:.72rem;
+  color:var(--muted);letter-spacing:.06em;
+  margin-bottom:1.75rem;
+  display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+}
+.detail-duration span{
+  display:flex;align-items:center;gap:.3rem;
+}
+.detail-duration span::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%}
+
+/* sections */
+.section{margin-bottom:1.75rem}
+.section-label{
+  font-family:'DM Mono',monospace;font-size:.65rem;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:.6rem;
+  display:flex;align-items:center;gap:.5rem;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.goal-text{
+  font-size:.95rem;line-height:1.75;
+  color:var(--text);
+  padding:.9rem 1rem;
+  background:rgba(255,255,255,.03);
+  border-radius:6px;
+  border-left:3px solid;
+}
+
+.tools-grid{
+  display:flex;flex-wrap:wrap;gap:.4rem;
+}
+.tool-chip{
+  font-family:'DM Mono',monospace;font-size:.68rem;
+  padding:.25rem .6rem;border-radius:4px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:var(--text);letter-spacing:.04em;
+  transition:background .15s;
+}
+.tool-chip:hover{background:rgba(255,255,255,.08)}
+
+.tasks-list{
+  display:flex;flex-direction:column;gap:.5rem;
+  list-style:none;
+  counter-reset:task;
+}
+.tasks-list li{
+  display:flex;gap:.75rem;align-items:flex-start;
+  font-size:.875rem;line-height:1.6;
+  padding:.5rem .75rem;
+  background:rgba(255,255,255,.02);
+  border-radius:5px;
+  border:1px solid transparent;
+  transition:border-color .2s,background .2s;
+  counter-increment:task;
+}
+.tasks-list li:hover{
+  background:rgba(255,255,255,.04);
+  border-color:var(--border);
+}
+.tasks-list li::before{
+  content:counter(task,'0'counter(task));
+  font-family:'DM Mono',monospace;font-size:.65rem;
+  flex-shrink:0;margin-top:3px;opacity:.5;
+  letter-spacing:.04em;
+}
+.task-text{flex:1}
+.task-std{
+  font-family:'DM Mono',monospace;font-size:.6rem;
+  padding:.1rem .35rem;border-radius:3px;
+  white-space:nowrap;align-self:flex-start;
+  margin-top:3px;flex-shrink:0;opacity:.8;
+}
+
+.deliverables-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.5rem;
+}
+.deliverable-card{
+  padding:.6rem .75rem;
+  background:rgba(255,255,255,.03);
+  border-radius:5px;border:1px solid var(--border);
+  font-size:.78rem;line-height:1.4;
+  font-family:'DM Mono',monospace;
+}
+.deliverable-card strong{display:block;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.2rem;opacity:.6}
+
+.standards-list{
+  display:flex;flex-direction:column;gap:.35rem;
+}
+.std-row{
+  display:flex;gap:.75rem;align-items:baseline;
+  font-size:.8rem;padding:.35rem 0;
+  border-bottom:1px solid rgba(255,255,255,.04);
+}
+.std-ref{
+  font-family:'DM Mono',monospace;font-size:.68rem;
+  flex-shrink:0;min-width:140px;
+}
+.std-desc{color:var(--muted);font-size:.78rem;line-height:1.4}
+
+.benchmark-bar{
+  display:flex;align-items:center;gap:.75rem;
+  font-size:.8rem;padding:.5rem 0;
+}
+.benchmark-label{font-family:'DM Mono',monospace;font-size:.68rem;min-width:80px;opacity:.7}
+.benchmark-track{flex:1;height:4px;background:var(--navy3);border-radius:2px;overflow:hidden}
+.benchmark-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.benchmark-val{font-family:'DM Mono',monospace;font-size:.65rem;opacity:.7;min-width:35px;text-align:right}
+
+/* ── innovation flag ── */
+.innovation{
+  margin-top:.5rem;
+  padding:.6rem .9rem;
+  border-radius:5px;
+  font-size:.78rem;line-height:1.5;
+  display:flex;gap:.6rem;align-items:flex-start;
+}
+.innovation-icon{flex-shrink:0;font-size:1rem;line-height:1}
+
+/* ── footer ── */
+footer{
+  position:relative;z-index:10;
+  border-top:1px solid var(--border);
+  padding:1rem 2rem;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;
+}
+footer p{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);letter-spacing:.06em}
+.progress-dots{display:flex;gap:.4rem;align-items:center}
+.dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--border);transition:background .3s,transform .2s;cursor:pointer;
+}
+.dot.active{transform:scale(1.4)}
+.dot.d1.active{background:var(--c1)}
+.dot.d2.active{background:var(--c2)}
+.dot.d3.active{background:var(--c3)}
+.dot.d4.active{background:var(--c4)}
+.dot.d5.active{background:var(--c5)}
+
+/* ── responsive ── */
+@media(max-width:860px){
+  header{padding:1.5rem 1rem 1rem}
+  .pipeline{padding:1.25rem 1rem;border-right:none;border-bottom:1px solid var(--border)}
+  .detail{padding:1.25rem 1rem}
+  .deliverables-grid{grid-template-columns:1fr 1fr}
+  footer{padding:.75rem 1rem}
+}
+@media(max-width:480px){
+  .deliverables-grid{grid-template-columns:1fr}
+  .std-ref{min-width:100px}
+}
+
+/* colour helpers */
+.col-c1{color:var(--c1)}.col-c2{color:var(--c2)}.col-c3{color:var(--c3)}.col-c4{color:var(--c4)}.col-c5{color:var(--c5)}
+.bg-c1{background:rgba(14,168,130,.12);border-color:rgba(14,168,130,.25);color:var(--c1l)}
+.bg-c2{background:rgba(45,143,224,.12);border-color:rgba(45,143,224,.25);color:var(--c2l)}
+.bg-c3{background:rgba(124,95,212,.12);border-color:rgba(124,95,212,.25);color:var(--c3l)}
+.bg-c4{background:rgba(212,82,58,.12);border-color:rgba(212,82,58,.25);color:var(--c4l)}
+.bg-c5{background:rgba(200,138,32,.12);border-color:rgba(200,138,32,.25);color:var(--c5l)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="brand">
+      <div class="brand-mark">MAICEN-1125-M10 &nbsp;·&nbsp; Final Master's Project &nbsp;·&nbsp; Group 5</div>
+      <h1>BIM<span>GUARD</span> AI &mdash; Code Compliance Workflow</h1>
+      <div class="subtitle">Automated BIM Corrosion Compliance · 5-Phase Implementation Workflow</div>
+    </div>
+    <div class="badges">
+      <span class="badge badge-teal">OpenBIM</span>
+      <span class="badge badge-blue">IFC ISO 16739-1</span>
+      <span class="badge badge-blue">BCF 2.1</span>
+      <span class="badge badge-gray">Zigurat GIT</span>
+    </div>
+  </div>
+  <div class="hint">Select a phase below to explore its goal, tools, tasks, and deliverables</div>
+</header>
+
+<main>
+
+  <!-- ── PIPELINE ── -->
+  <nav class="pipeline" aria-label="Implementation phases">
+    <div class="pipeline-inner" id="pipeline">
+
+      <div class="phase ph1" data-phase="1" role="button" tabindex="0" aria-label="Phase 1 — OpenBIM data ingestion">
+        <div class="node">01</div>
+        <div class="phase-meta">
+          <div class="phase-num">Phase 01</div>
+          <div class="phase-title">OpenBIM data ingestion</div>
+          <div class="phase-weeks">Weeks 1–3 · Foundation</div>
+        </div>
+        <div class="phase-arrow">›</div>
+      </div>
+
+      <div class="connector" style="background:var(--c1)"></div>
+
+      <div class="phase ph2" data-phase="2" role="button" tabindex="0" aria-label="Phase 2 — Corrosion compliance engines">
+        <div class="node">02</div>
+        <div class="phase-meta">
+          <div class="phase-num">Phase 02</div>
+          <div class="phase-title">Corrosion compliance engines</div>
+          <div class="phase-weeks">Weeks 4–6 · Rule engine</div>
+        </div>
+        <div class="phase-arrow">›</div>
+      </div>
+
+      <div class="connector" style="background:var(--c2)"></div>
+
+      <div class="phase ph3" data-phase="3" role="button" tabindex="0" aria-label="Phase 3 — LLM rule translation">
+        <div class="node">03</div>
+        <div class="phase-meta">
+          <div class="phase-num">Phase 03</div>
+          <div class="phase-title">LLM rule translation &amp; AI interface</div>
+          <div class="phase-weeks">Weeks 7–9 · AI layer</div>
+        </div>
+        <div class="phase-arrow">›</div>
+      </div>
+
+      <div class="connector" style="background:var(--c3)"></div>
+
+      <div class="phase ph4" data-phase="4" role="button" tabindex="0" aria-label="Phase 4 — Integration and BCF output">
+        <div class="node">04</div>
+        <div class="phase-meta">
+          <div class="phase-num">Phase 04</div>
+          <div class="phase-title">Integration &amp; BCF output</div>
+          <div class="phase-weeks">Weeks 10–13 · Full system</div>
+        </div>
+        <div class="phase-arrow">›</div>
+      </div>
+
+      <div class="connector" style="background:var(--c4)"></div>
+
+      <div class="phase ph5" data-phase="5" role="button" tabindex="0" aria-label="Phase 5 — Evaluation and extension modules">
+        <div class="node">05</div>
+        <div class="phase-meta">
+          <div class="phase-num">Phase 05</div>
+          <div class="phase-title">Evaluation &amp; extension modules</div>
+          <div class="phase-weeks">Weeks 14–16 · Extension</div>
+        </div>
+        <div class="phase-arrow">›</div>
+      </div>
+
+    </div>
+  </nav>
+
+  <!-- ── DETAIL PANEL ── -->
+  <section class="detail" id="detail-panel" aria-live="polite">
+
+    <div class="detail-empty" id="empty-state">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="30" stroke="#2d4a6a" stroke-width="2"/>
+        <circle cx="32" cy="32" r="6" fill="#2d4a6a"/>
+        <line x1="32" y1="10" x2="32" y2="22" stroke="#2d4a6a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="32" y1="42" x2="32" y2="54" stroke="#2d4a6a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="10" y1="32" x2="22" y2="32" stroke="#2d4a6a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="42" y1="32" x2="54" y2="32" stroke="#2d4a6a" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p>select a phase to view details</p>
+    </div>
+
+    <!-- PHASE 1 -->
+    <div class="detail-content" id="detail-1">
+      <div class="detail-accent" style="background:linear-gradient(90deg,var(--c1),transparent)"></div>
+      <div class="detail-tag col-c1">Phase 01 — Foundation</div>
+      <div class="detail-title">OpenBIM data ingestion</div>
+      <div class="detail-duration">
+        <span style="color:var(--c1)" class="before-c1">Weeks 1–3 &nbsp;·&nbsp; ~40 hrs</span>
+        <span>ifcopenshell</span>
+        <span>laspy</span>
+        <span>open3d</span>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Primary goal</div>
+        <div class="goal-text" style="border-color:var(--c1)">
+          Build a working OpenBIM data ingestion pipeline that reads MEP element data from <strong>any</strong> IFC 2×3 or IFC4 file and loads point cloud data from .las / .laz / .e57 formats — without touching any proprietary file format. Achieve &gt;95% material normalisation accuracy across exports from Revit, ArchiCAD, Tekla, and Vectorworks.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tools &amp; stack</div>
+        <div class="tools-grid">
+          <span class="tool-chip">Python 3.11+</span><span class="tool-chip">ifcopenshell</span>
+          <span class="tool-chip">laspy (.las/.laz)</span><span class="tool-chip">open3d (.e57)</span>
+          <span class="tool-chip">pandas</span><span class="tool-chip">numpy</span>
+          <span class="tool-chip">VS Code</span><span class="tool-chip">IFC 2×3 / IFC4</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tasks</div>
+        <ul class="tasks-list">
+          <li><span class="task-text">Export 3–5 IFC models from Revit, ArchiCAD, and Tekla to IFC2×3 and IFC4 format for cross-tool validation</span><span class="task-std bg-c1">ISO 16739-1</span></li>
+          <li><span class="task-text">Write <code>ifc_parser.py</code> to extract element GUID, IFC type, material, system, floor/zone, XYZ centroid, and joint type via <code>IfcRelAssociatesMaterial</code></span><span class="task-std bg-c1">ISO 19650</span></li>
+          <li><span class="task-text">Build 22-material normalisation lookup table mapping all IFC label variants (e.g. "SS316L", "316 Stainless") to canonical BIMGUARD keys</span></li>
+          <li><span class="task-text">Classify environment from <code>IfcSpace</code> zone names to T0–T5 wetting classes per EN ISO 15329 (e.g. "pool plant" → T5)</span><span class="task-std bg-c1">EN ISO 15329</span></li>
+          <li><span class="task-text">Write <code>point_cloud_loader.py</code>: .las/.laz via laspy, .e57 via open3d; KD-tree nearest-neighbour deviation query against IFC centroids</span></li>
+          <li><span class="task-text">Build 25-element synthetic demo dataset with known risk outcomes including the critical SS316/pool-plant test case (0.00 galvanic / 0.89 crevice)</span></li>
+          <li><span class="task-text">Validate parser output against manually reviewed IFC files; document false matches and unknown material flags</span></li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Deliverables</div>
+        <div class="deliverables-grid">
+          <div class="deliverable-card"><strong>Module</strong>ifc_parser.py</div>
+          <div class="deliverable-card"><strong>Module</strong>point_cloud_loader.py</div>
+          <div class="deliverable-card"><strong>Data</strong>synthetic_demo.py (25 elements)</div>
+          <div class="deliverable-card"><strong>Config</strong>material_normalisation.json</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Standards referenced</div>
+        <div class="standards-list">
+          <div class="std-row"><span class="std-ref col-c1">ISO 16739-1</span><span class="std-desc">IFC open standard — primary model exchange format</span></div>
+          <div class="std-row"><span class="std-ref col-c1">ISO 19650</span><span class="std-desc">BIM information management, property set naming</span></div>
+          <div class="std-row"><span class="std-ref col-c1">EN ISO 15329</span><span class="std-desc">Wetting classes T0–T5, environment classification</span></div>
+          <div class="std-row"><span class="std-ref col-c1">ASPRS LAS 1.4</span><span class="std-desc">Open point cloud format (.las/.laz)</span></div>
+          <div class="std-row"><span class="std-ref col-c1">ASTM E2807</span><span class="std-desc">E57 point cloud format specification</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Accuracy benchmark</div>
+        <div class="benchmark-bar"><span class="benchmark-label">Normalisation</span><div class="benchmark-track"><div class="benchmark-fill" style="width:95%;background:var(--c1)"></div></div><span class="benchmark-val col-c1">&gt;95%</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">Env. class</span><div class="benchmark-track"><div class="benchmark-fill" style="width:90%;background:var(--c1)"></div></div><span class="benchmark-val col-c1">&gt;90%</span></div>
+      </div>
+
+      <div class="innovation bg-c1" style="border:1px solid rgba(14,168,130,.3);border-radius:6px">
+        <span class="innovation-icon">◈</span>
+        <span><strong>OpenBIM argument:</strong> ifc_parser.py processes IFC from any authoring tool with identical logic. The compliance result for an ArchiCAD export and a Revit export of the same model should be the same — if it isn't, the difference is a finding about IFC data quality, not a limitation of BIMGUARD AI.</span>
+      </div>
+    </div>
+
+    <!-- PHASE 2 -->
+    <div class="detail-content" id="detail-2">
+      <div class="detail-accent" style="background:linear-gradient(90deg,var(--c2),transparent)"></div>
+      <div class="detail-tag col-c2">Phase 02 — Rule Engine</div>
+      <div class="detail-title">Corrosion compliance engines</div>
+      <div class="detail-duration">
+        <span style="color:var(--c2)">Weeks 4–6 &nbsp;·&nbsp; ~35 hrs</span>
+        <span>GC-001</span>
+        <span>CC-001</span>
+        <span>JSON rulesets</span>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Primary goal</div>
+        <div class="goal-text" style="border-color:var(--c2)">
+          Build two independent compliance engines — GC-001 (galvanic corrosion) and CC-001 (crevice corrosion) — producing continuous risk scores 0–1 with four risk bands. Both engines run independently and in combination via <code>combined_risk_assessment()</code>. All 15 CLI validation scenarios must match known engineering outcomes.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tools &amp; stack</div>
+        <div class="tools-grid">
+          <span class="tool-chip">Python</span><span class="tool-chip">pandas</span>
+          <span class="tool-chip">numpy</span><span class="tool-chip">JSON (rulesets)</span>
+          <span class="tool-chip">NASA-STD-6012</span><span class="tool-chip">ASTM G48</span>
+          <span class="tool-chip">EN ISO 15329</span><span class="tool-chip">CIRIA C692</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tasks</div>
+        <ul class="tasks-list">
+          <li><span class="task-text">GC-001: implement 22-material galvanic potential table, voltage threshold logic (0.15 V harsh / 0.25 V normal / 0.50 V controlled), 5-band area ratio classification, PREN adequacy checks</span><span class="task-std bg-c2">NASA-STD-6012</span></li>
+          <li><span class="task-text">GC-001 scoring: weighted composite (0.50 × voltage risk) + (0.30 × area ratio) + (0.20 × environment multiplier)</span></li>
+          <li><span class="task-text">CC-001: implement CCT table (SS304=−5°C through Titanium=120°C), 14-type joint library (JT-001 to JT-014), 7 environment severity classes</span><span class="task-std bg-c2">ASTM G48</span></li>
+          <li><span class="task-text">CC-001 scoring: weighted composite (0.35 × geometry) + (0.40 × CCT adequacy) + (0.25 × environment severity)</span><span class="task-std bg-c2">CIRIA C692</span></li>
+          <li><span class="task-text">Version-control both JSON rulesets: galvanic_corrosion_ruleset.json and crevice_corrosion_ruleset.json at v1.0.0</span></li>
+          <li><span class="task-text">Validate critical finding: SS316 flanges in pool plant room must score 0.00 galvanic / 0.89 crevice — proving dual-engine necessity</span></li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Risk band thresholds</div>
+        <div class="benchmark-bar"><span class="benchmark-label">Low</span><div class="benchmark-track"><div class="benchmark-fill" style="width:35%;background:#3a9a6a"></div></div><span class="benchmark-val" style="color:#3a9a6a">&lt; 0.35</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">Medium</span><div class="benchmark-track"><div class="benchmark-fill" style="width:55%;background:var(--c2)"></div></div><span class="benchmark-val col-c2">0.35–0.55</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">High</span><div class="benchmark-track"><div class="benchmark-fill" style="width:80%;background:var(--c5)"></div></div><span class="benchmark-val col-c5">0.55–0.80</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">Critical</span><div class="benchmark-track"><div class="benchmark-fill" style="width:100%;background:var(--c4)"></div></div><span class="benchmark-val col-c4">&gt; 0.80</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Deliverables</div>
+        <div class="deliverables-grid">
+          <div class="deliverable-card"><strong>Engine</strong>bimguard_corrosion_engine.py</div>
+          <div class="deliverable-card"><strong>Engine</strong>bimguard_crevice_engine.py</div>
+          <div class="deliverable-card"><strong>Ruleset</strong>galvanic_corrosion_ruleset.json</div>
+          <div class="deliverable-card"><strong>Ruleset</strong>crevice_corrosion_ruleset.json</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Standards referenced</div>
+        <div class="standards-list">
+          <div class="std-row"><span class="std-ref col-c2">NASA-STD-6012</span><span class="std-desc">Galvanic voltage thresholds by environment class</span></div>
+          <div class="std-row"><span class="std-ref col-c2">ASTM G48 Method B</span><span class="std-desc">Critical Crevice Corrosion Temperature (CCT) by grade</span></div>
+          <div class="std-row"><span class="std-ref col-c2">EN ISO 15329:2007</span><span class="std-desc">Crevice testing, wetting class severity classification</span></div>
+          <div class="std-row"><span class="std-ref col-c2">CIRIA C692</span><span class="std-desc">Stainless steel in construction, joint geometry guidance</span></div>
+          <div class="std-row"><span class="std-ref col-c2">IMOA Design Manual</span><span class="std-desc">PREN formula and stainless steel grade selection</span></div>
+        </div>
+      </div>
+
+      <div class="innovation bg-c2" style="border:1px solid rgba(45,143,224,.3);border-radius:6px">
+        <span class="innovation-icon">◈</span>
+        <span><strong>Key innovation — dual mechanism detection:</strong> SS316 flanges in a pool plant room score 0.00 galvanic (no risk) but 0.89 crevice (Critical). A single-mechanism checker would miss this failure mode entirely. Two engines are required.</span>
+      </div>
+    </div>
+
+    <!-- PHASE 3 -->
+    <div class="detail-content" id="detail-3">
+      <div class="detail-accent" style="background:linear-gradient(90deg,var(--c3),transparent)"></div>
+      <div class="detail-tag col-c3">Phase 03 — AI Layer</div>
+      <div class="detail-title">LLM rule translation &amp; AI interface</div>
+      <div class="detail-duration">
+        <span style="color:var(--c3)">Weeks 7–9 &nbsp;·&nbsp; ~30 hrs</span>
+        <span>Claude API</span>
+        <span>JSON/SHACL</span>
+        <span>Halo volumes</span>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Primary goal</div>
+        <div class="goal-text" style="border-color:var(--c3)">
+          Use Claude API as a rule <em>translation</em> layer that converts building codes and engineering standards from natural language into machine-readable JSON/SHACL compliance rules. All generated rules pass human review before deployment. Build Halo clearance volumes for spatial proximity compliance. The LLM never makes risk decisions — White Box Architecture is preserved.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tools &amp; stack</div>
+        <div class="tools-grid">
+          <span class="tool-chip">Python</span><span class="tool-chip">Anthropic Claude API</span>
+          <span class="tool-chip">JSON schema</span><span class="tool-chip">SHACL</span>
+          <span class="tool-chip">n8n (optional RAG)</span><span class="tool-chip">ISO 19650 PSets</span>
+          <span class="tool-chip">Building Safety Act 2022</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tasks</div>
+        <ul class="tasks-list">
+          <li><span class="task-text">Extract 10–15 applicable code clauses from ISO 19650, BS 8539, CIBSE Guide G, and Building Safety Act 2022 as source text</span></li>
+          <li><span class="task-text">Build structured prompt template that converts code text to BIMGUARD rule JSON with: rule_id, conditions[], thresholds{}, standard_ref, risk_weight, human_reviewed fields</span><span class="task-std bg-c3">White Box</span></li>
+          <li><span class="task-text">Send clause text to Claude API, receive structured JSON, compare against manually coded rules — document divergence rate and root causes</span></li>
+          <li><span class="task-text">Implement human review gate: all rules start as human_reviewed=false; a named reviewer must approve before promotion to production ruleset</span><span class="task-std bg-c3">BSA 2022</span></li>
+          <li><span class="task-text">Build Halo clearance volume geometry: AABB expansion around IFC element centroids by minimum clearance per material pair (50–100 mm depending on pair)</span></li>
+          <li><span class="task-text">Build NL explanation generator: Claude produces a 2–3 sentence BCF violation description per element for the markup.Description field</span></li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Deliverables</div>
+        <div class="deliverables-grid">
+          <div class="deliverable-card"><strong>Module</strong>llm_rule_translator.py</div>
+          <div class="deliverable-card"><strong>Module</strong>halo_volume.py</div>
+          <div class="deliverable-card"><strong>Log</strong>rule_review_log.json</div>
+          <div class="deliverable-card"><strong>Templates</strong>NL explanation prompts</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Standards referenced</div>
+        <div class="standards-list">
+          <div class="std-row"><span class="std-ref col-c3">ISO 19650</span><span class="std-desc">BIM information management, Golden Thread provenance</span></div>
+          <div class="std-row"><span class="std-ref col-c3">Building Safety Act 2022</span><span class="std-desc">Audit trail requirement for higher-risk buildings</span></div>
+          <div class="std-row"><span class="std-ref col-c3">BS 8539</span><span class="std-desc">Fixings in construction, bi-metallic assembly rules</span></div>
+          <div class="std-row"><span class="std-ref col-c3">CIBSE Guide G</span><span class="std-desc">MEP crevice corrosion guidance, pipe clearances</span></div>
+        </div>
+      </div>
+
+      <div class="innovation bg-c3" style="border:1px solid rgba(124,95,212,.3);border-radius:6px">
+        <span class="innovation-icon">◈</span>
+        <span><strong>Halo clearance volumes — key innovation:</strong> BIMGUARD AI generates spatial bounding volumes around each IFC element to check minimum clearance between dissimilar-metal assemblies. This enables <em>spatial</em> compliance checking that goes beyond point-to-point material pair analysis.</span>
+      </div>
+    </div>
+
+    <!-- PHASE 4 -->
+    <div class="detail-content" id="detail-4">
+      <div class="detail-accent" style="background:linear-gradient(90deg,var(--c4),transparent)"></div>
+      <div class="detail-tag col-c4">Phase 04 — Full System</div>
+      <div class="detail-title">Integration &amp; BCF output</div>
+      <div class="detail-duration">
+        <span style="color:var(--c4)">Weeks 10–13 &nbsp;·&nbsp; ~45 hrs</span>
+        <span>Streamlit</span>
+        <span>BCF 2.1</span>
+        <span>plotly</span>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Primary goal</div>
+        <div class="goal-text" style="border-color:var(--c4)">
+          Build the complete 6-page Streamlit web application integrating all modules, and generate BCF 2.1 compliant issue exports with viewpoints, GUID linkages, engineer assignments, and schedule/cost impact data. Achieve &lt;30 s processing time for a 100-element model. Run on the 25-element demo: target 9 Critical, 7 High, 9 Medium.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tools &amp; stack</div>
+        <div class="tools-grid">
+          <span class="tool-chip">Streamlit</span><span class="tool-chip">plotly</span>
+          <span class="tool-chip">pandas</span><span class="tool-chip">BCF 2.1 (buildingSMART)</span>
+          <span class="tool-chip">ifcopenshell</span><span class="tool-chip">zipfile</span>
+          <span class="tool-chip">ReportLab</span><span class="tool-chip">python-docx</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">6 application pages</div>
+        <ul class="tasks-list">
+          <li><span class="task-text"><strong>Data ingestion:</strong> upload IFC file OR load 25-element demo; upload point cloud OR auto-generate synthetic; single button to run compliance check</span></li>
+          <li><span class="task-text"><strong>Model overview:</strong> all extracted MEP elements, filterable table, material inventory bar chart</span></li>
+          <li><span class="task-text"><strong>Corrosion compliance:</strong> risk distribution pie chart, environment breakdown, 3D spatial risk map (plotly), full results table, CSV export</span></li>
+          <li><span class="task-text"><strong>Point cloud comparison:</strong> IFC element centroids overlaid on point cloud in 3D coordinate space; deviation colouring</span></li>
+          <li><span class="task-text"><strong>BCF issue manager:</strong> issues by band, engineer assignment chart, expandable issue cards, BCF 2.1 ZIP download</span></li>
+          <li><span class="task-text"><strong>Schedule &amp; cost impact:</strong> Gantt chart (baseline vs delayed), cost by band, delay by mechanism, issue-level breakdown</span></li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Demo run outcomes (25 elements)</div>
+        <div class="benchmark-bar"><span class="benchmark-label">Critical</span><div class="benchmark-track"><div class="benchmark-fill" style="width:36%;background:var(--c4)"></div></div><span class="benchmark-val col-c4">9 issues</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">High</span><div class="benchmark-track"><div class="benchmark-fill" style="width:28%;background:var(--c5)"></div></div><span class="benchmark-val col-c5">7 issues</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">Medium</span><div class="benchmark-track"><div class="benchmark-fill" style="width:36%;background:var(--c2)"></div></div><span class="benchmark-val col-c2">9 issues</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">Cost impact</span><div class="benchmark-track"><div class="benchmark-fill" style="width:85%;background:var(--c1)"></div></div><span class="benchmark-val col-c1">£170,600</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">Delay</span><div class="benchmark-track"><div class="benchmark-fill" style="width:70%;background:var(--c1)"></div></div><span class="benchmark-val col-c1">162 days</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Deliverables</div>
+        <div class="deliverables-grid">
+          <div class="deliverable-card"><strong>App</strong>app.py (Streamlit, 6 pages)</div>
+          <div class="deliverable-card"><strong>Module</strong>compliance_runner.py</div>
+          <div class="deliverable-card"><strong>Module</strong>bcf_generator.py</div>
+          <div class="deliverable-card"><strong>Module</strong>schedule_impact.py</div>
+          <div class="deliverable-card"><strong>Output</strong>BCF 2.1 ZIP archive</div>
+          <div class="deliverable-card"><strong>Output</strong>CSV asset register</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Standards referenced</div>
+        <div class="standards-list">
+          <div class="std-row"><span class="std-ref col-c4">BCF 2.1</span><span class="std-desc">buildingSMART issue tracking — viewpoints, GUID, history</span></div>
+          <div class="std-row"><span class="std-ref col-c4">ISO 16739-1</span><span class="std-desc">IFC Pset write-back: Pset_CorrosionRisk, Pset_CreviceCorrosionRisk</span></div>
+          <div class="std-row"><span class="std-ref col-c4">ISO 19650</span><span class="std-desc">Asset register format, information delivery specification</span></div>
+        </div>
+      </div>
+
+      <div class="innovation bg-c4" style="border:1px solid rgba(212,82,58,.3);border-radius:6px">
+        <span class="innovation-icon">◈</span>
+        <span><strong>BCF 2.1 vendor neutrality:</strong> Every issue exports with a buildingSMART-compliant viewpoint and GUID. The ZIP is importable into BIMcollab, Solibri, Navisworks, Tekla BIMsight, and any other BCF-capable platform — no proprietary viewer required.</span>
+      </div>
+    </div>
+
+    <!-- PHASE 5 -->
+    <div class="detail-content" id="detail-5">
+      <div class="detail-accent" style="background:linear-gradient(90deg,var(--c5),transparent)"></div>
+      <div class="detail-tag col-c5">Phase 05 — Extension</div>
+      <div class="detail-title">Evaluation &amp; extension modules</div>
+      <div class="detail-duration">
+        <span style="color:var(--c5)">Weeks 14–16 &nbsp;·&nbsp; ~35 hrs</span>
+        <span>MC-001 MIC</span>
+        <span>scikit-learn</span>
+        <span>Fire module</span>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Primary goal</div>
+        <div class="goal-text" style="border-color:var(--c5)">
+          Validate BIMGUARD AI against real IFC models with known corrosion failure history (precision ≥0.85, recall ≥0.80, F1 ≥0.82). Build MC-001 — Microbially Influenced Corrosion engine — as the third compliance module. Begin fire compartmentation module. Compile the master thesis document.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tools &amp; stack</div>
+        <div class="tools-grid">
+          <span class="tool-chip">Python</span><span class="tool-chip">scikit-learn</span>
+          <span class="tool-chip">matplotlib / seaborn</span><span class="tool-chip">pandas</span>
+          <span class="tool-chip">PyTorch Geometric (GNN opt.)</span><span class="tool-chip">NetworkX</span>
+          <span class="tool-chip">python-docx</span><span class="tool-chip">pptxgenjs</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tasks</div>
+        <ul class="tasks-list">
+          <li><span class="task-text">Test against 5+ real-world IFC models; calculate precision, recall, F1-score, confusion matrix per mechanism (GC-001 vs CC-001 separately)</span></li>
+          <li><span class="task-text">Benchmark: BIMGUARD AI vs manual review vs Solibri — record time-to-detect, false positive rate, and missed issues</span></li>
+          <li><span class="task-text"><strong>MC-001 MIC engine:</strong> dead-leg detection, stagnant water zone identification, under-insulation temperature modelling, SRB/IOB risk scoring for DN15+ pipework</span></li>
+          <li><span class="task-text">Fire compartmentation module: IfcFireSuppressionTerminal checking, penetration seal compliance, cavity barrier clearance verification</span></li>
+          <li><span class="task-text"><strong>Optional GNN:</strong> convert IFC spatial graph to NetworkX (rooms = nodes, adjacencies = edges), train on material proximity pairs to catch edge cases</span></li>
+          <li><span class="task-text">Compile master thesis: merge Ch1–11 .docx files, unified formatting, abstract, executive summary, bibliography, table of contents</span></li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Evaluation targets</div>
+        <div class="benchmark-bar"><span class="benchmark-label">Precision</span><div class="benchmark-track"><div class="benchmark-fill" style="width:85%;background:var(--c5)"></div></div><span class="benchmark-val col-c5">≥ 0.85</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">Recall</span><div class="benchmark-track"><div class="benchmark-fill" style="width:80%;background:var(--c5)"></div></div><span class="benchmark-val col-c5">≥ 0.80</span></div>
+        <div class="benchmark-bar"><span class="benchmark-label">F1-score</span><div class="benchmark-track"><div class="benchmark-fill" style="width:82%;background:var(--c5)"></div></div><span class="benchmark-val col-c5">≥ 0.82</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Deliverables</div>
+        <div class="deliverables-grid">
+          <div class="deliverable-card"><strong>Engine</strong>mc001_mic_engine.py</div>
+          <div class="deliverable-card"><strong>Module</strong>fire_compartmentation.py</div>
+          <div class="deliverable-card"><strong>Report</strong>evaluation_report.py</div>
+          <div class="deliverable-card"><strong>Thesis</strong>master_thesis.docx</div>
+          <div class="deliverable-card"><strong>Deck</strong>FMP_presentation.pptx</div>
+          <div class="deliverable-card"><strong>Optional</strong>GNN spatial engine</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">MC-001 scope — MIC mechanism</div>
+        <div class="standards-list">
+          <div class="std-row"><span class="std-ref col-c5">Dead-leg detection</span><span class="std-desc">Flow velocity &lt;0.1 m/s in warm pipework (&gt;20°C) — primary SRB risk</span></div>
+          <div class="std-row"><span class="std-ref col-c5">Under-insulation</span><span class="std-desc">Trapped moisture beneath insulation on carbon steel — IOB and SRB</span></div>
+          <div class="std-row"><span class="std-ref col-c5">Stagnant zones</span><span class="std-desc">DN15+ pipe branches not on active circuits — Legionella crossover risk</span></div>
+        </div>
+      </div>
+
+      <div class="innovation bg-c5" style="border:1px solid rgba(200,138,32,.3);border-radius:6px">
+        <span class="innovation-icon">◈</span>
+        <span><strong>Three-mechanism coverage:</strong> GC-001 + CC-001 + MC-001 covers galvanic, crevice, and microbial failure modes — the three most common MEP corrosion mechanisms in UK commercial buildings. No existing OpenBIM tool covers all three in a single auditable pipeline.</span>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<footer>
+  <p>BIMGUARD AI · MAICEN-1125 · Group 5 · Zigurat Global Institute of Technology</p>
+  <div class="progress-dots" id="dots">
+    <div class="dot d1" data-phase="1" title="Phase 1"></div>
+    <div class="dot d2" data-phase="2" title="Phase 2"></div>
+    <div class="dot d3" data-phase="3" title="Phase 3"></div>
+    <div class="dot d4" data-phase="4" title="Phase 4"></div>
+    <div class="dot d5" data-phase="5" title="Phase 5"></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const phases = document.querySelectorAll('.phase');
+  const contents = document.querySelectorAll('.detail-content');
+  const empty = document.getElementById('empty-state');
+  const dots = document.querySelectorAll('.dot');
+  let current = null;
+
+  function activate(n){
+    if(current === n){ deactivate(); return; }
+    current = n;
+    phases.forEach(p => p.classList.toggle('active', p.dataset.phase === String(n)));
+    contents.forEach(c => { c.classList.remove('show'); });
+    empty.style.display = 'none';
+    const target = document.getElementById('detail-'+n);
+    if(target){ target.classList.add('show'); }
+    dots.forEach(d => d.classList.toggle('active', d.dataset.phase === String(n)));
+    // scroll detail panel to top on mobile
+    const panel = document.getElementById('detail-panel');
+    if(window.innerWidth <= 860){ panel.scrollIntoView({behavior:'smooth',block:'start'}); }
+  }
+
+  function deactivate(){
+    current = null;
+    phases.forEach(p => p.classList.remove('active'));
+    contents.forEach(c => c.classList.remove('show'));
+    empty.style.display = 'flex';
+    dots.forEach(d => d.classList.remove('active'));
+  }
+
+  phases.forEach(p => {
+    p.addEventListener('click', () => activate(+p.dataset.phase));
+    p.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(+p.dataset.phase); }});
+  });
+
+  dots.forEach(d => {
+    d.addEventListener('click', () => activate(+d.dataset.phase));
+  });
+
+  // keyboard navigation: left/right arrows move between phases
+  document.addEventListener('keydown', e => {
+    if(e.key==='ArrowDown'||e.key==='ArrowRight'){
+      e.preventDefault();
+      activate(current ? Math.min(current+1, 5) : 1);
+    }
+    if(e.key==='ArrowUp'||e.key==='ArrowLeft'){
+      e.preventDefault();
+      activate(current ? Math.max(current-1, 1) : 5);
+    }
+    if(e.key==='Escape') deactivate();
+  });
+
+  // open phase 1 by default after a short delay
+  setTimeout(() => activate(1), 380);
+})();
+</script>
+</body>
+</html>
