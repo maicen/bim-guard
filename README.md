@@ -1,5 +1,11 @@
 # BIM-Guard
 
+## 🔗 Live Demo
+
+👉 **[View the BIMGUARD AI Interactive Pipeline](https://maicen.github.io/bim-guard/)**
+
+MAICEN-1125-M10 · Final Master's Project · Group 5 · Zigurat Global Institute of Technology
+
 ## Project Overview
 
 **BIM Guard** is a BIM compliance application built with FastHTML (Python) and MonsterUI. It lets users upload IFC models, define compliance rules from documents, and generate reports.
