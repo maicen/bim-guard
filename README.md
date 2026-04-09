@@ -17,42 +17,103 @@ MAICEN-1125-M10 · Final Master's Project · Group 5 · Zigurat Global Institute
 | File | Who reads it | What it defines |
 | --- | --- | --- |
 | README.md | Humans | What the project is |
-| AGENTS.md, CLAUDE.md, .github\instructions\project-specific.instructions.md | Coding agents | How to build the project |
+| AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
 | DESIGN.md | Design agents | How the project should look and feel |
 
 ## Repository Structure
 
-- `app/` - main application package
-  - `main.py` - FastHTML app and route initialization
-  - `routes/` - HTTP route handlers for dashboard, library, projects, analysis, viewer
-  - `components/` - reusable UI components and page layout helpers
-  - `services/` - business logic, persistence, IFC parsing, rule extraction, and document handling
-  - `modules/` - pipeline modules for document reading, IFC parsing, rule building, comparison, and reporting
-  - `views/` - shared view components for layouts and page rendering
-- `data/` - runtime data storage
-  - `uploads/` - uploaded files and stored documents
-- `docs/` - supporting documentation, enhancement plans, and resources
-- `engines/` - experimental or domain-specific engine scripts and demo data
-- `IFC-Sample-Test-Files/` - sample IFC models for testing and exploration
-- `modules/` - additional BIM-related utilities, report generators, and integration helpers
-- `rulesets/` - predefined compliance rule set JSON files
-- `static/` - static web assets (CSS, JavaScript, viewer scripts)
-- root files
-  - `main.py` - app entrypoint used by uvicorn
-  - `pyproject.toml` - Python project metadata and dependencies
-  - `example.env` - environment variable template
-  - `README.md` - project overview and usage guide
+```
+bim-guard/
+├── app/                        # Main application package
+│   ├── main.py                 # FastHTML app init and route mounting
+│   ├── utils.py                # Shared utilities (env loading, helpers)
+│   ├── components/             # Reusable FastHTML UI elements
+│   │   ├── layout.py           # DashboardLayout, AppSidebar, AppHeader
+│   │   ├── documents_ui.py
+│   │   ├── projects_ui.py
+│   │   ├── rules_ui.py
+│   │   ├── rule_extraction_ui.py
+│   │   ├── themed_ui.py
+│   │   └── ui/                 # Low-level component primitives
+│   │       ├── button.py, card.py, table.py, sidebar.py, ...
+│   ├── routes/                 # HTTP handlers and HTMX responses
+│   │   ├── dashboard.py
+│   │   ├── library.py
+│   │   ├── projects.py
+│   │   ├── analyze.py
+│   │   └── viewer.py           # In-browser IFC 3D viewer
+│   ├── services/               # Business logic and persistence
+│   │   ├── persistence.py      # SQLite schema via fastlite
+│   │   ├── documents_service.py
+│   │   ├── projects_service.py
+│   │   ├── rules_service.py
+│   │   ├── rule_extraction_service.py
+│   │   ├── gemini_rule_extractor.py
+│   │   └── ifc_parser.py
+│   ├── modules/                # 5-step compliance pipeline
+│   │   ├── module1_doc_reader.py
+│   │   ├── module2_ifc_read.py
+│   │   ├── module3_rule_builder.py
+│   │   ├── module4_comparator.py
+│   │   ├── module5_reporter.py
+│   │   └── orchestrator.py
+│   └── views/
+│       └── layout.py
+├── data/                       # Runtime data (SQLite DB + uploads)
+│   └── uploads/
+│       └── ifc/
+├── docs/                       # Supporting documentation and resources
+├── static/                     # CSS, JS, and IFC viewer assets
+│   ├── css/
+│   ├── js/
+│   └── lib/
+├── Shane/                      # Experimental domain-specific modules
+│   ├── engines/                # Corrosion and compliance engines
+│   ├── modules/                # BCF, reporting, cost model utilities
+│   ├── rulesets/               # Predefined compliance rule sets (JSON)
+│   └── NotebookLM/             # NotebookLM prompts and setup guides
+├── IFC-Sample-Test-Files/      # Sample IFC models for testing
+├── main.py                     # Uvicorn entrypoint
+├── pyproject.toml              # Python project metadata and dependencies
+└── example.env                 # Environment variable template
+```
 
 ## Getting Started
 
+### 1. Clone the repository
+
 ```bash
-# Install dependencies
-uv sync
-
-# Run the app
-uv run uvicorn main:app --reload
-
+git clone https://github.com/maicen/bim-guard.git
+cd bim-guard
 ```
+
+### 2. Install uv
+
+[uv](https://docs.astral.sh/uv/) is the package manager used by this project. Install it with:
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### 3. Install dependencies
+
+```bash
+uv sync
+```
+
+This creates a `.venv` and installs all dependencies declared in `pyproject.toml`. Python 3.12 or later is required.
+
+### 4. Run the app
+
+```bash
+uv run uvicorn main:app --reload
+```
+
+The app will be available at `http://127.0.0.1:8000`.
 
 ## Environment Setup
 
