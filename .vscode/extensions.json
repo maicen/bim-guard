@@ -1,6 +1,7 @@
 {
     "recommendations": [
         "github.vscode-pull-request-github",
-        "shd101wyy.markdown-preview-enhanced"
+        "shd101wyy.markdown-preview-enhanced",
+        "anthropic.claude-code"
     ]
 }

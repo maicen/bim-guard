@@ -67,11 +67,6 @@ bim-guard/
 │   ├── css/
 │   ├── js/
 │   └── lib/
-├── Shane/                      # Experimental domain-specific modules
-│   ├── engines/                # Corrosion and compliance engines
-│   ├── modules/                # BCF, reporting, cost model utilities
-│   ├── rulesets/               # Predefined compliance rule sets (JSON)
-│   └── NotebookLM/             # NotebookLM prompts and setup guides
 ├── IFC-Sample-Test-Files/      # Sample IFC models for testing
 ├── main.py                     # Uvicorn entrypoint
 ├── pyproject.toml              # Python project metadata and dependencies
@@ -124,6 +119,8 @@ Create a local `.env` from `example.env` and configure Gemini credentials:
 Copy-Item example.env .env
 ```
 
+Get Gemini [API Key](https://aistudio.google.com/api-keys)
+
 Required variables:
 
 - `GEMINI_API_KEY` (or `GOOGLE_API_KEY`)
@@ -142,6 +139,13 @@ Current flow:
 3. Text is normalized and chunked for long documents.
 4. `RuleExtractionService` sends each chunk to Gemini through LiteLLM.
 5. Extracted rules are normalized and de-duplicated.
+
+## Next Development Steps
+
+- Verify the reported issues.
+- Verify the BCF exported.
+- Malak to migrate her moudles to the repo.
+
 
 Output rule fields:
 
