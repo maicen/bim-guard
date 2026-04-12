@@ -96,37 +96,49 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ### 3. Install dependencies
 
+**Step 3a — core app dependencies** (FastHTML, MonsterUI, pypdf, etc.):
+
 ```bash
 uv sync
 ```
 
 This creates a `.venv` and installs all dependencies declared in `pyproject.toml`. Python 3.12 or later is required.
 
-### 4. Run the app
+**Step 3b — ML pipeline dependencies** (Docling, spaCy, scikit-learn, PyTorch, etc.):
+
+```bash
+uv pip install -r app/modules/requirements.txt
+```
+
+> This installs the heavier ML libraries used by the Module 1 document parser pipeline (docling, spacy + English model, torch, transformers, scikit-learn). First run will download model weights — allow a few minutes.
+
+### 4. Configure environment variables (required for AI features)
+
+Create a `.env` file from the template:
+
+```bash
+# PowerShell
+Copy-Item example.env .env
+
+# macOS / Linux
+cp example.env .env
+```
+
+Open `.env` and set your Gemini API key — get one free at [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys):
+
+```
+GEMINI_API_KEY=your_key_here
+```
+
+> Without this key the **Rule Extraction Studio** (`/library/rules/extract`) will show an error. Basic document upload and text extraction (pypdf) work without a key.
+
+### 5. Run the app
 
 ```bash
 uv run uvicorn main:app --reload
 ```
 
 The app will be available at `http://127.0.0.1:8000`.
-
-## Environment Setup
-
-Create a local `.env` from `example.env` and configure Gemini credentials:
-
-```bash
-# PowerShell
-Copy-Item example.env .env
-```
-
-Get Gemini [API Key](https://aistudio.google.com/api-keys)
-
-Required variables:
-
-- `GEMINI_API_KEY` (or `GOOGLE_API_KEY`)
-- `BIM_GUARD_RULE_MODEL` (optional, defaults to `gemini/gemini-1.5-flash`)
-
-The app loads `.env` at startup using `python-dotenv`.
 
 ## Rule Extraction (AI)
 
@@ -144,7 +156,7 @@ Current flow:
 
 - Verify the reported issues.
 - Verify the BCF exported.
-- Malak to migrate her moudles to the repo.
+
 
 
 Output rule fields:

@@ -36,19 +36,12 @@ Usage:
     result = run_pipeline("data/input_docs/OBC_Part9.pdf")
 """
 
+import os
 import sys
 from pathlib import Path
 
-from config import DB_PATH, OPENAI_API_KEY
-
-from modules.module1_doc_parser.docling_extractor  import DoclingExtractor
-from modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
-from modules.module1_doc_parser.section_chunker    import SectionChunker
-from modules.module1_doc_parser.keyword_filter     import KeywordFilter
-
-from modules.module3_rule_builder.rule_store       import RuleStore
-from modules.module3_rule_builder.rule_generator   import RuleGenerator
-from modules.module3_rule_builder.obc_seed_rules   import seed_rules
+DB_PATH = Path("data") / "bimguard.sqlite"
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # ── SWITCH HERE ───────────────────────────────────────────────────────────────
 # False = regex (free, no API key, works offline)
@@ -56,10 +49,21 @@ from modules.module3_rule_builder.obc_seed_rules   import seed_rules
 USE_GPT4O = False
 # ─────────────────────────────────────────────────────────────────────────────
 
-if USE_GPT4O:
-    from modules.module3_rule_builder.rule_converter import RuleConverter
-else:
-    from modules.module3_rule_builder.regex_rule_converter import RegexRuleConverter as RuleConverter
+try:
+    from .module1_doc_parser.docling_extractor  import DoclingExtractor
+    from .module1_doc_parser.table_rule_builder import TableRuleBuilder
+    from .module1_doc_parser.section_chunker    import SectionChunker
+    from .module1_doc_parser.keyword_filter     import KeywordFilter
+    from .module3_rule_builder.rule_store       import RuleStore
+    from .module3_rule_builder.rule_generator   import RuleGenerator
+    from .module3_rule_builder.obc_seed_rules   import seed_rules
+    if USE_GPT4O:
+        from .module3_rule_builder.rule_converter import RuleConverter
+    else:
+        from .module3_rule_builder.regex_rule_converter import RegexRuleConverter as RuleConverter
+    _PIPELINE_AVAILABLE = True
+except ImportError:
+    _PIPELINE_AVAILABLE = False
 
 
 def run_pipeline(
@@ -185,6 +189,162 @@ def run_pipeline(
         "sections_run":   len(filtered_chunks),
         "db_summary":     db_summary,
     }
+
+
+class BIMGuard_App:
+    """
+    Application-level orchestrator used by the web routes.
+    Provides run_dashboard() for stats and orchestrate_workflow() for
+    full IFC + compliance analysis.
+    """
+
+    def run_dashboard(self) -> dict:
+        """Return summary counts for the dashboard page."""
+        from app.services.projects_service import ProjectsService
+        from app.services.documents_service import DocumentService
+        from app.services.persistence import PersistenceService
+
+        projects_svc = ProjectsService()
+        documents_svc = DocumentService()
+
+        db = PersistenceService.get_db()
+        rules_table = db.t.get("rules")
+        total_rules = len(list(rules_table.rows)) if rules_table is not None else 0
+
+        return {
+            "total_projects":  projects_svc.total_projects(),
+            "total_documents": len(documents_svc.list_documents()),
+            "total_rules":     total_rules,
+        }
+
+    def orchestrate_workflow(
+        self,
+        project_id: int,
+        doc_ids: list[int],
+        include_openings: bool = True,
+        include_spaces: bool = True,
+        include_type_definitions: bool = False,
+    ) -> dict:
+        """
+        Run the full analysis pipeline for a project:
+        1. Load project + documents from DB
+        2. Parse the IFC file (or use synthetic demo data)
+        3. Run corrosion compliance checks
+        4. Return a unified result dict consumed by the analyze route
+        """
+        from app.services.projects_service import ProjectsService
+        from app.services.documents_service import DocumentService
+        from .ifc_parser import parse_ifc, generate_synthetic_elements
+        from .compliance_runner import run_compliance_checks
+
+        projects_svc = ProjectsService()
+        documents_svc = DocumentService()
+
+        project = projects_svc.get_project(project_id)
+        if project is None:
+            return {"error": f"Project {project_id} not found."}
+
+        # ── Documents ────────────────────────────────────────────────────────
+        documents = []
+        for doc_id in doc_ids:
+            doc = documents_svc.get_document(doc_id)
+            if doc is None:
+                continue
+            text = doc.get("extracted_text") or ""
+            documents.append({
+                "filename":      doc.get("filename", ""),
+                "section_count": len([l for l in text.splitlines() if l.strip()]),
+            })
+
+        # ── IFC parsing ──────────────────────────────────────────────────────
+        ifc_path = projects_svc.resolve_ifc_file(project_id)
+        ifc_error = None
+        elements = []
+        ifc_type_counts: dict = {}
+        ifc_totals: dict = {}
+        is_demo = False
+
+        if ifc_path:
+            try:
+                elements = parse_ifc(str(ifc_path))
+
+                # Count by IFC type
+                for el in elements:
+                    ifc_type_counts[el.ifc_type] = ifc_type_counts.get(el.ifc_type, 0) + 1
+
+                n = len(elements)
+                ifc_totals = {
+                    "built_elements":            n,
+                    "all_physical_elements":     n,
+                    "adjusted_physical_elements": n,
+                    "all_products":              n,
+                    "adjusted_products":         n,
+                    "filters": {
+                        "include_openings":          include_openings,
+                        "include_spaces":            include_spaces,
+                        "include_type_definitions":  include_type_definitions,
+                    },
+                    "excluded_or_added": {"openings": 0, "spaces": 0, "type_definitions": 0},
+                }
+            except Exception as exc:
+                ifc_error = str(exc)
+        else:
+            # No IFC file — run on synthetic demo data so the UI still renders
+            elements = generate_synthetic_elements(25)
+            is_demo = True
+            ifc_totals = {
+                "built_elements": len(elements),
+                "all_physical_elements": len(elements),
+                "adjusted_physical_elements": len(elements),
+                "all_products": len(elements),
+                "adjusted_products": len(elements),
+                "filters": {
+                    "include_openings": include_openings,
+                    "include_spaces": include_spaces,
+                    "include_type_definitions": include_type_definitions,
+                },
+                "excluded_or_added": {"openings": 0, "spaces": 0, "type_definitions": 0},
+            }
+            for el in elements:
+                ifc_type_counts[el.ifc_type] = ifc_type_counts.get(el.ifc_type, 0) + 1
+
+        # ── Compliance checks ─────────────────────────────────────────────────
+        compliance_results = []
+        compliance_error = None
+        cost_impact = None
+        issue_stats: dict = {}
+
+        try:
+            raw_results = run_compliance_checks(elements)
+            # Normalise band names to Title case for the UI
+            band_map = {"LOW": "Low", "MEDIUM": "Medium", "HIGH": "High", "CRITICAL": "Critical"}
+            for r in raw_results:
+                r["risk_band"] = band_map.get(r.get("overall_band", "Low"), "Low")
+            compliance_results = raw_results
+
+            bands = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+            for r in compliance_results:
+                b = r.get("risk_band", "Low")
+                if b in bands:
+                    bands[b] += 1
+            issue_stats = bands
+        except Exception as exc:
+            compliance_error = str(exc)
+
+        return {
+            "project":             project,
+            "ifc_element_count":   len(elements),
+            "ifc_type_counts":     ifc_type_counts,
+            "ifc_totals":          ifc_totals,
+            "ifc_error":           ifc_error,
+            "documents":           documents,
+            "compliance_results":  compliance_results,
+            "cost_impact":         cost_impact,
+            "issue_stats":         issue_stats,
+            "compliance_is_demo":  is_demo,
+            "bcf_project_id":      project_id,
+            "compliance_error":    compliance_error,
+        }
 
 
 # ── CLI entry point ───────────────────────────────────────────────────────────

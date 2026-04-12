@@ -374,6 +374,14 @@ def setup_routes(rt):
 
         try:
             rules = await _rule_extraction_service.extract_rules(file_content)
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "api key" in msg.lower() or "gemini" in msg.lower():
+                msg = (
+                    "Gemini API key not configured. "
+                    "Copy example.env to .env and set GEMINI_API_KEY, then restart the server."
+                )
+            return Alert(msg, cls=AlertT.error)
         except Exception as exc:
             return Alert(f"Rule extraction failed: {exc}", cls=AlertT.error)
 

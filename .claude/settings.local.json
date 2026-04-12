@@ -9,7 +9,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(curl -s https://cdn.jsdelivr.net/npm/@thatopen/fragments@3.3.0/package.json)",
       "WebFetch(domain:unpkg.com)",
-      "WebFetch(domain:app.unpkg.com)"
+      "WebFetch(domain:app.unpkg.com)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"irm https://astral.sh/uv/install.ps1 | iex\")",
+      "Bash(\"/c/Users/Malak/.local/bin/uv\" --version)"
     ]
   }
 }
