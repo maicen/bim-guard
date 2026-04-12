@@ -1,189 +1,203 @@
-import os
+"""
+orchestrator.py
+----------------
+Runs the full BIMGuard Module 1 + Module 3 pipeline end to end.
+This is the single entry point — call run_pipeline() with a PDF path.
 
-from .module1_doc_reader import Module1_DocReader
-from .module2_ifc_read import Module2_IFCRead
-from .module3_rule_builder import Module3_RuleBuilder
-from .module4_comparator import Module4_Comparator
-from .module5_reporter import Module5_Reporter
-from .ifc_parser import parse_ifc, generate_synthetic_elements
-from .compliance_runner import run_compliance_checks
-from .bcf_generator import issues_from_results, generate_bcf
-from .cost_model import CostModel
-from .issue_tracker import IssueTracker
-from app.services.documents_service import DocumentService
-from app.services.projects_service import ProjectsService
-from app.services.rules_service import RuleService
+Pipeline flow:
+    PDF file
+        ↓  Module 1 — Step 1
+    DoclingExtractor          → prose text + table DataFrames
+        ↓  Module 1 — Step 2
+    TableRuleBuilder          → tables → rules.db directly (no LLM)
+        ↓  Module 1 — Step 3
+    SectionChunker            → 13 OBC section chunks
+        ↓  Module 1 — Step 4
+    KeywordFilter             → scored + confidence-labelled paragraphs
+        ↓  Handoff M1 → M3
+    RuleConverter             → Regex (default) or GPT-4o → structured rule dicts
+        ↓  Module 3
+    RuleGenerator             → validate + enrich entity types
+        ↓
+    RuleStore                 → save to rules.db
+        ↓
+    Return summary dict       → back to caller (CLI or future API)
 
-# Resolved at import time: app/modules/../../.. → repo root / data/
-_DATA_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-)
+SWITCHING BETWEEN REGEX AND GPT-4o:
+    Set USE_GPT4O = False  → uses regex (free, no API key needed)
+    Set USE_GPT4O = True   → uses GPT-4o (accurate, costs per call)
+
+Usage:
+    # Run from project root
+    python orchestrator.py data/input_docs/OBC_Part9.pdf
+
+    # Or import and call:
+    from orchestrator import run_pipeline
+    result = run_pipeline("data/input_docs/OBC_Part9.pdf")
+"""
+
+import sys
+from pathlib import Path
+
+from config import DB_PATH, OPENAI_API_KEY
+
+from modules.module1_doc_parser.docling_extractor  import DoclingExtractor
+from modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
+from modules.module1_doc_parser.section_chunker    import SectionChunker
+from modules.module1_doc_parser.keyword_filter     import KeywordFilter
+
+from modules.module3_rule_builder.rule_store       import RuleStore
+from modules.module3_rule_builder.rule_generator   import RuleGenerator
+from modules.module3_rule_builder.obc_seed_rules   import seed_rules
+
+# ── SWITCH HERE ───────────────────────────────────────────────────────────────
+# False = regex (free, no API key, works offline)
+# True  = GPT-4o (more accurate, costs per API call)
+USE_GPT4O = False
+# ─────────────────────────────────────────────────────────────────────────────
+
+if USE_GPT4O:
+    from modules.module3_rule_builder.rule_converter import RuleConverter
+else:
+    from modules.module3_rule_builder.regex_rule_converter import RegexRuleConverter as RuleConverter
 
 
-def _normalise_results(raw: list) -> list:
-    """Add field aliases expected by cost_model, bcf_generator, issue_tracker, and report_generator."""
-    band_map = {"LOW": "Low", "MEDIUM": "Medium", "HIGH": "High", "CRITICAL": "Critical"}
-    mech_map = {"galvanic": "GC", "crevice": "CC"}
-    for r in raw:
-        r["risk_band"]              = band_map.get(r.get("overall_band", "LOW"), "Low")
-        r["composite_score"]        = r.get("overall_score", 0.0)
-        r["global_id"]              = r.get("guid", "")
-        r["mechanism"]              = mech_map.get(r.get("dominant_mechanism", "galvanic"), "GC")
-        r["material_label"]         = r.get("material_a", "Unknown")
-        r["recommended_mitigation"] = r.get("mitigation", "")
-        r["element_type"]           = r.get("ifc_type", "")
-        r["system_type"]            = r.get("system", "")
-    return raw
-
-
-class BIMGuard_App:
+def run_pipeline(
+    pdf_path:      str | Path,
+    run_sections:  str | list = "all",
+    seed_db_first: bool       = True,
+) -> dict:
     """
-    Workflow Orchestrator
-    Manages the overall workflow connecting frontend requests to backend modules.
+    Run the full Module 1 → Module 3 pipeline on an OBC PDF.
+
+    Args:
+        pdf_path      (str | Path): path to the OBC PDF file
+        run_sections  (str | list): "all" or list e.g. ["4", "6"]
+                                    Use a single section to test first.
+        seed_db_first (bool):       seed 25 pre-built OBC rules before processing
+
+    Returns:
+        dict: {
+            pdf_file        (str),
+            converter_used  (str),   "regex" or "gpt-4o"
+            table_rules     (int),   rules from tables (no LLM/regex)
+            prose_rules     (int),   rules from converter
+            total_rules     (int),   total in DB after run
+            sections_run    (int),
+            db_summary      (dict),
+        }
     """
+    pdf_path       = Path(pdf_path)
+    converter_name = "gpt-4o" if USE_GPT4O else "regex"
 
-    def __init__(self):
-        self.doc_reader = Module1_DocReader()
-        self.ifc_reader = Module2_IFCRead()
-        self.rule_builder = Module3_RuleBuilder()
-        self.comparator = Module4_Comparator()
-        self.reporter = Module5_Reporter()
-        self._projects_service = ProjectsService()
-        self._documents_service = DocumentService()
-        self._rules_service = RuleService()
+    print(f"\n{'='*60}")
+    print(f"  BIMGuard AI — Module 1 + 3 Pipeline")
+    print(f"  PDF       : {pdf_path.name}")
+    print(f"  Converter : {converter_name.upper()}")
+    print(f"  Sections  : {run_sections}")
+    print(f"  DB        : {DB_PATH}")
+    print(f"{'='*60}\n")
 
-    def run_dashboard(self) -> dict:
-        """Return live counts for the dashboard stats."""
-        return {
-            "total_projects": self._projects_service.total_projects(),
-            "total_documents": len(self._documents_service.list_documents()),
-            "total_rules": len(self._rules_service.list_rules()),
-        }
+    # ── Initialise ────────────────────────────────────────────────────────────
+    store     = RuleStore(DB_PATH)
+    generator = RuleGenerator(store)
 
-    def orchestrate_workflow(
-        self,
-        project_id: int,
-        document_ids: list,
-        include_openings: bool = True,
-        include_spaces: bool = True,
-        include_type_definitions: bool = False,
-    ) -> dict:
-        """Orchestrate the validation workflow across modules."""
-        try:
-            project = self._projects_service.get_project(project_id)
-        except Exception:
-            project = None
-        if project is None:
-            return {"error": f"Project {project_id} not found."}
+    if USE_GPT4O:
+        converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
+    else:
+        converter = RuleConverter()   # regex needs no arguments
 
-        # Module 2: IFC parsing
-        ifc_elements = []
-        ifc_error = None
-        ifc_totals = {}
-        ifc_path = self._projects_service.resolve_ifc_file(project_id)
-        if ifc_path:
-            try:
-                ifc_reader = Module2_IFCRead(ifc_path)
-                ifc_elements = ifc_reader.extract_geometry()
-                ifc_totals = ifc_reader.extract_summary_counts(
-                    include_openings=include_openings,
-                    include_spaces=include_spaces,
-                    include_type_definitions=include_type_definitions,
-                )
-            except Exception as exc:
-                ifc_error = str(exc)
+    # ── Seed pre-built rules ──────────────────────────────────────────────────
+    if seed_db_first:
+        print("── SEEDING DB WITH PRE-BUILT OBC RULES ──")
+        seed_rules(store, generator)
 
-        ifc_type_counts = {}
-        for element in ifc_elements:
-            element_type = element.get("type") or "Unknown"
-            ifc_type_counts[element_type] = ifc_type_counts.get(element_type, 0) + 1
+    rules_before = store.count()
 
-        # Module 1: Document text extraction from stored text in DB
-        documents = []
-        for doc_id in document_ids:
-            try:
-                doc = self._documents_service.get_document(int(doc_id))
-            except Exception:
-                continue
-            extracted_text = doc.get("extracted_text") or ""
-            sections = self.doc_reader.extract_text_sections(extracted_text)
-            documents.append(
-                {
-                    "filename": doc.get("filename", ""),
-                    "sections": sections,
-                    "section_count": len(sections),
-                }
-            )
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 1 — STEP 1: Docling extraction
+    # ─────────────────────────────────────────────────────────────────────────
+    print("\n── MODULE 1 / STEP 1: DOCLING EXTRACTION ──")
+    extractor    = DoclingExtractor()
+    text, tables = extractor.extract(pdf_path)
 
-        # Module 3: Rule builder (stub — returns [])
-        rules = self.rule_builder.generate_regex_from_text()
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 1 — STEP 2: Table → Direct Rules (no converter needed)
+    # ─────────────────────────────────────────────────────────────────────────
+    print("\n── MODULE 1 / STEP 2: TABLE RULE BUILDER ──")
+    table_builder = TableRuleBuilder(store)
+    table_rules   = table_builder.process_all_tables(tables, generator)
 
-        # Module 4: Comparator (stub — returns [])
-        violations = self.comparator.validate_metadata()
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 1 — STEP 3: Section Chunker
+    # ─────────────────────────────────────────────────────────────────────────
+    print("\n── MODULE 1 / STEP 3: SECTION CHUNKER ──")
+    chunks = SectionChunker().chunk(text)
 
-        # Module 5: Reporter (stub — returns "")
-        report = self.reporter.render_visual_report()
+    # Filter to requested sections only
+    if run_sections != "all":
+        chunks = [c for c in chunks if c["section_number"] in run_sections]
+        print(f"  Running sections: {run_sections}")
 
-        # ── Corrosion Compliance Pipeline ─────────────────────────────────────
-        # Uses ifc_parser → compliance_runner (GC-001 + CC-001) → BCF + cost model + issue tracker
-        compliance_results = []
-        bcf_path = None
-        cost_impact = None
-        issue_stats = {}
-        compliance_error = None
-        compliance_is_demo = False
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 1 — STEP 4: Keyword Filter
+    # ─────────────────────────────────────────────────────────────────────────
+    print("\n── MODULE 1 / STEP 4: KEYWORD FILTER ──")
+    filtered_chunks = KeywordFilter().score_chunks(chunks)
 
-        try:
-            if ifc_path and not ifc_error:
-                # Parse service elements from the real IFC file
-                service_elements = parse_ifc(ifc_path)
-            else:
-                # No IFC file — run on synthetic demo elements so the UI stays useful
-                service_elements = generate_synthetic_elements(25)
-                compliance_is_demo = True
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 3: Converter → RuleGenerator → RuleStore
+    # ─────────────────────────────────────────────────────────────────────────
+    print(f"\n── MODULE 3: {converter_name.upper()} CONVERTER ──")
+    prose_rules = 0
 
-            if service_elements:
-                raw_results = run_compliance_checks(service_elements)
-                compliance_results = _normalise_results(raw_results)
+    for chunk in filtered_chunks:
+        section = chunk["section_number"]
+        name    = chunk["section_name"]
+        print(f"\n  Section {section}: {name}")
 
-                # BCF 2.1 generation (Medium and above only)
-                bcf_issues = issues_from_results(compliance_results)
-                if bcf_issues:
-                    bcf_bytes = generate_bcf(bcf_issues)
-                    os.makedirs(_DATA_DIR, exist_ok=True)
-                    bcf_path = os.path.join(
-                        _DATA_DIR, f"compliance_project_{project_id}.bcf"
-                    )
-                    with open(bcf_path, "wb") as fh:
-                        fh.write(bcf_bytes)
+        raw_rules = converter.extract_rules(chunk)
+        print(f"    Extracted : {len(raw_rules)} rules")
 
-                # Cost and schedule impact
-                cost_impact = CostModel().calculate_impact(compliance_results)
+        if raw_rules:
+            saved_ids   = generator.save_batch(raw_rules)
+            prose_rules += len(saved_ids)
+            print(f"    Saved     : {len(saved_ids)} rules")
 
-                # Persist issue history across runs
-                os.makedirs(_DATA_DIR, exist_ok=True)
-                history_file = os.path.join(_DATA_DIR, "bimguard_issue_history.json")
-                tracker = IssueTracker(history_file)
-                issue_stats = tracker.record_run(compliance_results)
+    # ── Summary ───────────────────────────────────────────────────────────────
+    total_rules = store.count()
+    db_summary  = store.summary()
 
-        except Exception as exc:
-            compliance_error = str(exc)
+    print(f"\n{'='*60}")
+    print(f"  PIPELINE COMPLETE")
+    print(f"  Converter used               : {converter_name}")
+    print(f"  Table rules (no converter)   : {table_rules}")
+    print(f"  Prose rules ({converter_name})  : {prose_rules}")
+    print(f"  Total rules in DB            : {total_rules}")
+    print(f"{'='*60}\n")
 
-        return {
-            "project": project,
-            "documents": documents,
-            "ifc_element_count": len(ifc_elements),
-            "ifc_type_counts": ifc_type_counts,
-            "ifc_totals": ifc_totals,
-            "ifc_error": ifc_error,
-            "rules": rules or [],
-            "violations": violations or [],
-            "report": report or "",
-            # Corrosion compliance
-            "compliance_results": compliance_results,
-            "compliance_error": compliance_error,
-            "compliance_is_demo": compliance_is_demo,
-            "bcf_project_id": project_id if bcf_path else None,
-            "cost_impact": cost_impact,
-            "issue_stats": issue_stats,
-        }
+    return {
+        "pdf_file":       str(pdf_path),
+        "converter_used": converter_name,
+        "table_rules":    table_rules,
+        "prose_rules":    prose_rules,
+        "total_rules":    total_rules,
+        "sections_run":   len(filtered_chunks),
+        "db_summary":     db_summary,
+    }
+
+
+# ── CLI entry point ───────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python orchestrator.py <path_to_obc_pdf>")
+        print("Example: python orchestrator.py data/input_docs/OBC_Part9.pdf")
+        print(f"\nCurrent converter: {'GPT-4o' if USE_GPT4O else 'Regex'}")
+        print("To switch: change USE_GPT4O = True/False at top of file")
+        sys.exit(1)
+
+    run_pipeline(
+        pdf_path      = sys.argv[1],
+        run_sections  = "all",
+        seed_db_first = True,
+    )
