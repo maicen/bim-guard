@@ -37,6 +37,26 @@ async def live_reload_compat(msg: str, send):
     return None
 
 
+def _seed_library() -> None:
+    """Populate the rule library with OBC baseline rules if it is empty."""
+    try:
+        from app.services.rules_service import RuleService
+        from app.modules.module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
+        svc = RuleService()
+        if svc.list_rules():
+            return  # already has rules — don't overwrite
+        for rule in OBC_SEED_RULES:
+            svc.create_rule(
+                reference=rule.get("section_ref", "OBC"),
+                rule_type=rule.get("rule_type", "json_check"),
+                description=rule.get("description", ""),
+                target_ifc_class=rule.get("entity_type", "Unspecified"),
+                parameters="{}",
+            )
+    except Exception:
+        pass  # never crash startup over seeding
+
+
 def _setup_routes() -> None:
     viewer.setup_routes(rt)
     analyze.setup_routes(rt)
@@ -45,6 +65,7 @@ def _setup_routes() -> None:
     projects.setup_routes(rt)
 
 
+_seed_library()
 _setup_routes()
 
 

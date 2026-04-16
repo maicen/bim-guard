@@ -1,6 +1,6 @@
 import os
 
-from fasthtml.common import A, Div, Form, Option, P, Request, Span, Table, Tbody, Td, Th, Thead, Title, Tr
+from fasthtml.common import A, Div, Form, H3, Option, P, Request, Span, Table, Tbody, Td, Th, Thead, Title, Tr
 from app.components.ui import (
     Alert,
     AlertT,
@@ -169,6 +169,100 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
             tracker_line,
             results_table,
             bcf_btn,
+        ),
+    )
+
+
+def _rule_validation_card(rule_validations: list[dict]):
+    """Build the Module 3 rule validation card for the analysis results page."""
+    if not rule_validations:
+        return Card(
+            CardHeader(CardTitle("Rule Validation — Module 3")),
+            CardContent(
+                P(
+                    "No rules found in the library. "
+                    "Go to Library → Rule Extraction Studio to extract and save rules first.",
+                    cls="text-sm text-muted-foreground",
+                )
+            ),
+        )
+
+    present = sum(1 for r in rule_validations if r["status"] == "present")
+    not_found = len(rule_validations) - present
+
+    summary = Div(
+        Div(
+            Span(str(len(rule_validations)), cls="text-2xl font-bold"),
+            Span(" rules checked", cls="text-sm text-muted-foreground ml-1"),
+            cls="flex items-baseline",
+        ),
+        Div(
+            Span(
+                f"{present} matched",
+                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800 mr-2",
+            ),
+            Span(
+                f"{not_found} no elements",
+                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-800",
+            ),
+            cls="mt-1",
+        ),
+        cls="mb-4",
+    )
+
+    header_cells = [
+        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+        for h in ("Reference", "Description", "Target IFC Class", "Elements in Model", "Status")
+    ]
+
+    def _status_badge(status: str, count: int):
+        if status == "present":
+            return Span(
+                f"✓ {count} found",
+                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800",
+            )
+        return Span(
+            "No elements",
+            cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-800",
+        )
+
+    data_rows = []
+    for r in rule_validations:
+        data_rows.append(
+            Tr(
+                Td(r.get("reference", "—"), cls="px-3 py-2 text-xs font-mono"),
+                Td(
+                    r.get("description", "")[:80] + ("…" if len(r.get("description", "")) > 80 else ""),
+                    cls="px-3 py-2 text-sm",
+                ),
+                Td(r.get("target_ifc_class", "—"), cls="px-3 py-2 text-xs font-mono text-blue-700"),
+                Td(str(r.get("element_count", 0)), cls="px-3 py-2 text-sm text-center"),
+                Td(_status_badge(r["status"], r["element_count"]), cls="px-3 py-2"),
+                cls="border-b border-muted last:border-0",
+            )
+        )
+
+    return Card(
+        CardHeader(
+            Div(
+                CardTitle("Rule Validation — Module 3"),
+                P(
+                    "Each library rule is checked against the IFC model. "
+                    "'No elements' means that IFC class is absent from this model.",
+                    cls="text-xs text-muted-foreground mt-0.5",
+                ),
+            )
+        ),
+        CardContent(
+            summary,
+            Div(
+                Table(
+                    Thead(Tr(*header_cells)),
+                    Tbody(*data_rows),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md",
+            ),
         ),
     )
 
@@ -424,12 +518,11 @@ def setup_routes(rt):
             error=result.get("compliance_error"),
         )
 
-        pipeline_section = compliance_card or Alert(
-            "Rule validation (Module 3–5) is not yet implemented — results will appear here once integrated.",
-            cls=AlertT.info if hasattr(AlertT, "info") else "",
+        rule_validation_card = _rule_validation_card(
+            result.get("rule_validations", [])
         )
 
-        return Div(
+        sections = [
             Card(
                 CardHeader(CardTitle(project.get("name", "Project"))),
                 CardContent(ifc_detail),
@@ -438,9 +531,12 @@ def setup_routes(rt):
                 doc_cards
                 or [P("No documents selected.", cls="text-sm text-muted-foreground")]
             ),
-            pipeline_section,
-            cls="space-y-4",
-        )
+            rule_validation_card,
+        ]
+        if compliance_card:
+            sections.append(compliance_card)
+
+        return Div(*sections, cls="space-y-4")
 
     @rt("/reports/bcf/{project_id}")
     def bcf_download(project_id: int):

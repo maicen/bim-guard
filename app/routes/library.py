@@ -3,6 +3,8 @@ from pathlib import Path
 from fasthtml.common import (
     Div,
     P,
+    Request,
+    Span,
     Title,
     UploadFile,
 )
@@ -29,7 +31,7 @@ from app.components.ui import (
     NotFoundBlock,
     SubmitButton,
 )
-from app.modules.module1_doc_reader import Module1_DocReader
+from app.modules.module1_doc_parser import Module1_DocReader
 from app.services.documents_service import DocumentService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rules_service import RuleService
@@ -284,6 +286,13 @@ def setup_routes(rt):
         )
         return redirect_see_other("/library/rules")
 
+    @rt("/library/rules/extract")
+    def rules_extract_page():
+        return (
+            Title("Rule Extraction - BIM Guard"),
+            DashboardLayout(rule_extraction_page_content()),
+        )
+
     @rt("/library/rules/{rule_id}")
     def rules_details(rule_id: int):
         rule = _rule_service.get_rule(rule_id)
@@ -359,11 +368,91 @@ def setup_routes(rt):
             _rule_service.delete_rule(rule_id)
         return redirect_see_other("/library/rules")
 
-    @rt("/library/rules/extract")
-    def rules_extract_page():
-        return (
-            Title("Rule Extraction - BIM Guard"),
-            DashboardLayout(rule_extraction_page_content()),
+    @rt("/api/rules/save-extracted", methods=["POST"])
+    async def rules_save_extracted(req: Request):
+        import json as _json
+        form = await req.form()
+        rule_json = form.get("rule_json", "{}")
+        try:
+            rule = _json.loads(rule_json)
+        except Exception:
+            rule = {}
+
+        _rule_service.create_rule(
+            reference=str(rule.get("ref") or "REQ-AI").strip(),
+            rule_type=str(rule.get("rule_type") or "numeric_range"),
+            description=str(rule.get("desc") or ""),
+            target_ifc_class=str(rule.get("target") or "Unspecified"),
+            source_text=str(rule.get("source_text") or ""),
+            property_set=str(rule.get("property_set") or ""),
+            property_name=str(rule.get("property_name") or ""),
+            fallback_property=str(rule.get("fallback_property") or ""),
+            operator=str(rule.get("operator") or ""),
+            check_value=rule.get("value"),
+            value_min=rule.get("value_min"),
+            value_max=rule.get("value_max"),
+            unit=str(rule.get("unit") or ""),
+            applies_when=rule.get("applies_when") or {},
+            severity=str(rule.get("severity") or "mandatory"),
+            keyword=str(rule.get("keyword") or ""),
+            compliance_type=str(rule.get("compliance_type") or ""),
+            exceptions=rule.get("exceptions") or [],
+            related_refs=rule.get("related_refs") or [],
+            confidence=float(rule.get("confidence") or 0.8),
+            extraction_method="llm",
+            needs_review=bool(rule.get("needs_review", False)),
+        )
+        return Span(
+            "Saved \u2713",
+            cls="text-xs px-3 py-1 rounded bg-muted text-muted-foreground cursor-default",
+        )
+
+    @rt("/api/rules/save-all-extracted", methods=["POST"])
+    async def rules_save_all_extracted(req: Request):
+        import json as _json
+        form = await req.form()
+        rules_json = form.get("rules_json", "[]")
+        try:
+            rules = _json.loads(rules_json)
+        except Exception:
+            rules = []
+
+        saved = 0
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+            desc = str(rule.get("desc") or "").strip()
+            if not desc:
+                continue
+            _rule_service.create_rule(
+                reference=str(rule.get("ref") or "REQ-AI").strip(),
+                rule_type=str(rule.get("rule_type") or "numeric_range"),
+                description=desc,
+                target_ifc_class=str(rule.get("target") or "Unspecified").strip(),
+                source_text=str(rule.get("source_text") or ""),
+                property_set=str(rule.get("property_set") or ""),
+                property_name=str(rule.get("property_name") or ""),
+                fallback_property=str(rule.get("fallback_property") or ""),
+                operator=str(rule.get("operator") or ""),
+                check_value=rule.get("value"),
+                value_min=rule.get("value_min"),
+                value_max=rule.get("value_max"),
+                unit=str(rule.get("unit") or ""),
+                applies_when=rule.get("applies_when") or {},
+                severity=str(rule.get("severity") or "mandatory"),
+                keyword=str(rule.get("keyword") or ""),
+                compliance_type=str(rule.get("compliance_type") or ""),
+                exceptions=rule.get("exceptions") or [],
+                related_refs=rule.get("related_refs") or [],
+                confidence=float(rule.get("confidence") or 0.8),
+                extraction_method="llm",
+                needs_review=bool(rule.get("needs_review", False)),
+            )
+            saved += 1
+
+        return Span(
+            f"Saved {saved} rules \u2713",
+            cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium cursor-default",
         )
 
     @rt("/api/rules/extract", methods=["POST"])

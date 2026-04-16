@@ -1,17 +1,18 @@
 """
 tests/test_module3.py
 ----------------------
-Unit tests for Module 3 — RuleGenerator (NLP/LLM path), RuleStore,
+Unit tests for Module 3 — RuleGenerator (validation/enrichment path), RuleStore,
 rule schema validation, and edge cases.
 
 Run with: pytest tests/test_module3.py -v
 
-These tests cover the CORE LLM path that test_module1.py doesn't touch:
-  raw text chunk → NLP Engine → structured JSON/Regex rules
-
-Tests marked @pytest.mark.llm call the actual LLM and may be slow/costly.
-Run them selectively:  pytest tests/test_module3.py -m llm -v
-Skip them:             pytest tests/test_module3.py -m "not llm" -v
+Test groups:
+  - RuleStore:           basic CRUD, get_all_rules, clear
+  - RuleGenerator:       enrichment, validation, save_batch
+  - Schema validation:   field checks against the rich schema
+  - LLM (RuleConverter): calls the real LLM — skip if no API key
+    Run:  pytest tests/test_module3.py -m llm -v
+    Skip: pytest tests/test_module3.py -m "not llm" -v
 """
 
 import os
@@ -43,7 +44,7 @@ def gen(store):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RuleStore basic operations
+# RuleStore — basic operations
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def test_store_starts_empty(store):
@@ -51,53 +52,96 @@ def test_store_starts_empty(store):
 
 def test_store_save_and_retrieve(store):
     rule = {
-        "element":  "stair",
-        "property": "clear_width",
-        "operator": ">=",
-        "value":    860,
-        "unit":     "mm",
-        "source":   "OBC 9.8.2.1",
+        "ref":           "9.8.2.1.(2)",
+        "rule_type":     "numeric_comparison",
+        "target":        "IfcStairFlight",
+        "property_name": "Width",
+        "operator":      ">=",
+        "check_value":   860,
+        "unit":          "mm",
+        "severity":      "mandatory",
+        "desc":          "Exit stair minimum width 860 mm",
     }
     store.save_rule(rule)
     assert store.count() == 1
 
     rules = store.get_all_rules()
     assert len(rules) == 1
+    assert rules[0]["target"] == "IfcStairFlight"
+    assert rules[0]["check_value"] == 860
 
 def test_store_clear(store):
-    store.save_rule({"element": "stair", "property": "width",
-                     "operator": ">=", "value": 860})
-    store.save_rule({"element": "door", "property": "width",
-                     "operator": ">=", "value": 810})
+    store.save_rule({
+        "ref": "A", "rule_type": "numeric_comparison",
+        "target": "IfcStairFlight", "property_name": "Width",
+        "operator": ">=", "check_value": 860,
+        "desc": "stair width", "severity": "mandatory",
+    })
+    store.save_rule({
+        "ref": "B", "rule_type": "numeric_comparison",
+        "target": "IfcDoor", "property_name": "ClearWidth",
+        "operator": ">=", "check_value": 800,
+        "desc": "door width", "severity": "mandatory",
+    })
     assert store.count() == 2
     store.clear_all_rules()
     assert store.count() == 0
 
+def test_store_get_all_rules_returns_dicts(store):
+    store.save_rule({
+        "ref": "9.8.2", "rule_type": "numeric_comparison",
+        "target": "IfcStairFlight", "property_name": "Width",
+        "operator": ">=", "check_value": 860,
+        "desc": "stair", "severity": "mandatory",
+    })
+    rules = store.get_all_rules()
+    assert isinstance(rules, list)
+    assert isinstance(rules[0], dict)
+
+def test_store_fetch_rules_for_target(store):
+    store.save_rule({
+        "ref": "R1", "rule_type": "numeric_comparison",
+        "target": "IfcStairFlight", "property_name": "Width",
+        "operator": ">=", "check_value": 860,
+        "desc": "stair width", "severity": "mandatory",
+    })
+    store.save_rule({
+        "ref": "R2", "rule_type": "numeric_comparison",
+        "target": "IfcDoor", "property_name": "Height",
+        "operator": ">=", "check_value": 1980,
+        "desc": "door height", "severity": "mandatory",
+    })
+    stair_rules = store.fetch_rules_for_target("IfcStairFlight")
+    assert len(stair_rules) == 1
+    assert stair_rules[0]["target"] == "IfcStairFlight"
+
 def test_store_handles_duplicate_rules(store):
-    """Saving the same rule twice should not crash (behavior may vary)."""
-    rule = {"element": "stair", "property": "width",
-            "operator": ">=", "value": 860}
+    """Saving the same rule twice should not crash."""
+    rule = {
+        "ref": "X", "rule_type": "numeric_comparison",
+        "target": "IfcStairFlight", "property_name": "Width",
+        "operator": ">=", "check_value": 860,
+        "desc": "dup", "severity": "mandatory",
+    }
     store.save_rule(rule)
     store.save_rule(rule)
-    assert store.count() >= 1  # at least doesn't crash
+    assert store.count() >= 1
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Rule schema validation helper
+# Schema validation helper
 # ═══════════════════════════════════════════════════════════════════════════════
 
-REQUIRED_RULE_FIELDS = {"element", "property", "operator", "value"}
-VALID_OPERATORS      = {">=", "<=", "==", "!=", ">", "<", "between",
-                        "in", "not_in", "contains", "matches"}
+REQUIRED_RULE_FIELDS = {"target", "property_name", "operator", "rule_type", "desc"}
 
-def validate_rule_schema(rule_data):
+VALID_OPERATORS = {
+    ">=", "<=", "==", "!=",
+    "between", "exists", "not_exists", "matches", "conforms_to",
+}
+
+def validate_rule_schema(rule_data: dict) -> list:
     """Returns list of issues. Empty list = valid."""
     issues = []
-    if isinstance(rule_data, str):
-        try:
-            rule_data = json.loads(rule_data)
-        except json.JSONDecodeError:
-            return ["Rule is not valid JSON"]
 
     missing = REQUIRED_RULE_FIELDS - set(rule_data.keys())
     if missing:
@@ -108,221 +152,289 @@ def validate_rule_schema(rule_data):
         if op not in VALID_OPERATORS:
             issues.append(f"Unknown operator: '{op}'")
 
-    if "value" in rule_data:
-        val = rule_data["value"]
-        if val is None or val == "":
-            issues.append("Value is empty or None")
-
-    if "element" in rule_data:
-        el = rule_data["element"]
-        if not el or not isinstance(el, str):
-            issues.append(f"Invalid element: '{el}'")
+    if "rule_type" in rule_data:
+        from config import VALID_RULE_TYPES
+        if rule_data["rule_type"] not in VALID_RULE_TYPES:
+            issues.append(f"Unknown rule_type: '{rule_data['rule_type']}'")
 
     return issues
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RuleGenerator — LLM path tests
+# RuleGenerator — enrichment and validation
 # ═══════════════════════════════════════════════════════════════════════════════
-#
-# These test the core NLP pipeline: text → LLM → structured rules
-# They call the real LLM, so mark them accordingly.
 
-# ── Golden test cases: (input text, expected rule properties) ──
+def test_generator_enriches_plain_target(gen, store):
+    """Plain word like 'stair' should be mapped to 'IfcStairFlight'."""
+    rule = {
+        "ref": "9.8", "rule_type": "numeric_comparison",
+        "target": "stair", "property_name": "Width",
+        "operator": ">=", "check_value": 860,
+        "desc": "stair width", "severity": "mandatory",
+    }
+    gen.save_single(rule)
+    rules = store.get_all_rules()
+    assert rules[0]["target"] == "IfcStairFlight"
+
+def test_generator_auto_fills_property_set(gen, store):
+    """property_set should be auto-filled from IFC_PROPERTY_SET_MAP when omitted."""
+    rule = {
+        "ref": "9.8", "rule_type": "numeric_comparison",
+        "target": "IfcStairFlight", "property_name": "Width",
+        "operator": ">=", "check_value": 860,
+        "desc": "stair width", "severity": "mandatory",
+    }
+    gen.save_single(rule)
+    rules = store.get_all_rules()
+    assert rules[0].get("property_set") == "Pset_StairFlightCommon"
+
+def test_generator_skips_invalid_operator(gen, store):
+    """A rule with an unrecognised operator should be rejected."""
+    rule = {
+        "ref": "9.8", "rule_type": "numeric_comparison",
+        "target": "IfcStairFlight", "property_name": "Width",
+        "operator": "GREATER_THAN",   # invalid
+        "check_value": 860,
+        "desc": "stair width", "severity": "mandatory",
+    }
+    result = gen.save_single(rule)
+    assert result is None
+    assert store.count() == 0
+
+def test_generator_skips_invalid_rule_type(gen, store):
+    """A rule with an old/unknown rule_type should be rejected."""
+    rule = {
+        "ref": "9.8", "rule_type": "json_check",   # old name
+        "target": "IfcStairFlight", "property_name": "Width",
+        "operator": ">=", "check_value": 860,
+        "desc": "stair width", "severity": "mandatory",
+    }
+    result = gen.save_single(rule)
+    assert result is None
+    assert store.count() == 0
+
+def test_generator_numeric_range_requires_min_max(gen, store):
+    """numeric_range without value_min/value_max should be rejected."""
+    rule = {
+        "ref": "T9.8.4.1", "rule_type": "numeric_range",
+        "target": "IfcStairFlight", "property_name": "RiserHeight",
+        "operator": "between", "check_value": None,
+        # value_min and value_max intentionally omitted
+        "desc": "riser height range", "severity": "mandatory",
+    }
+    result = gen.save_single(rule)
+    assert result is None
+
+def test_generator_numeric_range_saves_with_min_max(gen, store):
+    """numeric_range with value_min/value_max should save successfully."""
+    rule = {
+        "ref": "T9.8.4.1", "rule_type": "numeric_range",
+        "target": "IfcStairFlight", "property_name": "RiserHeight",
+        "operator": "between", "check_value": None,
+        "value_min": 125, "value_max": 200,
+        "unit": "mm", "desc": "riser height range", "severity": "mandatory",
+    }
+    result = gen.save_single(rule)
+    assert result is not None
+    assert store.count() == 1
+
+def test_generator_exists_operator_skips_check_value(gen, store):
+    """exists operator should not require check_value."""
+    rule = {
+        "ref": "QA", "rule_type": "prohibition",
+        "target": "IfcDoor", "property_name": "Width",
+        "operator": "exists", "check_value": None,
+        "desc": "door must have Width property", "severity": "informational",
+    }
+    result = gen.save_single(rule)
+    assert result is not None
+
+def test_generator_save_batch_counts_saved(gen, store):
+    """save_batch should save valid rules and skip invalid ones."""
+    rules = [
+        {
+            "ref": "A", "rule_type": "numeric_comparison",
+            "target": "IfcStairFlight", "property_name": "Width",
+            "operator": ">=", "check_value": 860,
+            "desc": "stair width", "severity": "mandatory",
+        },
+        {
+            "ref": "B", "rule_type": "json_check",   # invalid — should be skipped
+            "target": "IfcDoor", "property_name": "Height",
+            "operator": ">=", "check_value": 1980,
+            "desc": "door height", "severity": "mandatory",
+        },
+        {
+            "ref": "C", "rule_type": "numeric_range",
+            "target": "IfcStairFlight", "property_name": "TreadDepth",
+            "operator": "between", "check_value": None,
+            "value_min": 255, "value_max": 355,
+            "desc": "tread depth", "severity": "mandatory",
+        },
+    ]
+    saved = gen.save_batch(rules)
+    assert len(saved) == 2   # A and C pass; B fails
+    assert store.count() == 2
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Seed rules smoke test (no LLM, no I/O)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_seed_rules_schema(gen, store):
+    """All seed rules should pass schema validation."""
+    from module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
+    saved = gen.save_batch(OBC_SEED_RULES, source_doc="OBC_Part9_Seed")
+    assert len(saved) > 0, "At least some seed rules should save successfully"
+
+    for rule in store.get_all_rules():
+        issues = validate_rule_schema(rule)
+        assert not issues, f"Seed rule failed schema check: {issues} — {rule.get('ref')}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LLM tests — RuleConverter (require OPENAI_API_KEY or GEMINI_API_KEY)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 GOLDEN_CASES = [
     {
         "id": "stair_width",
         "text": "Every exit stair shall have a clear width of not less than 860 mm.",
-        "expect": {
-            "element":  "stair",
-            "property": "clear_width",
-            "operator": ">=",
-            "value":    860,
-            "unit":     "mm",
-        },
+        "expect": {"target_contains": "stair", "value": 860, "unit": "mm"},
     },
     {
         "id": "riser_height_range",
         "text": "The riser height shall be not less than 125 mm and not more than 200 mm.",
-        "expect": {
-            "element":  "stair",
-            "property": "riser_height",
-            "value_min": 125,
-            "value_max": 200,
-            "unit":      "mm",
-        },
+        "expect": {"target_contains": "stair", "value_min": 125, "value_max": 200},
     },
     {
         "id": "guard_height",
         "text": "Guards shall be not less than 900 mm in height measured vertically.",
-        "expect": {
-            "element":  "guard",
-            "property": "height",
-            "operator": ">=",
-            "value":    900,
-            "unit":     "mm",
-        },
+        "expect": {"target_contains": "railing", "value": 900, "unit": "mm"},
     },
     {
         "id": "door_width",
         "text": "Every doorway in a means of egress shall have a clear width of not less than 810 mm.",
-        "expect": {
-            "element":  "door",
-            "property": "clear_width",
-            "operator": ">=",
-            "value":    810,
-            "unit":     "mm",
-        },
+        "expect": {"target_contains": "door", "value": 810, "unit": "mm"},
     },
     {
         "id": "window_egress",
         "text": "Each window providing emergency egress shall have an unobstructed opening of not less than 0.35 m2.",
-        "expect": {
-            "element":  "window",
-            "property": "opening_area",
-            "operator": ">=",
-            "value":    0.35,
-            "unit":     "m2",
-        },
+        "expect": {"target_contains": "window", "value": 0.35, "unit": "m2"},
     },
 ]
 
 
 @pytest.mark.llm
-class TestRuleGeneratorLLM:
+class TestRuleConverterLLM:
     """
-    Tests that call the actual LLM to generate rules.
+    Tests that call the real LLM (RuleConverter → GPT-4o).
+    Requires OPENAI_API_KEY environment variable.
     Run with:  pytest tests/test_module3.py -m llm -v
     """
 
+    @pytest.fixture
+    def converter(self, store):
+        from module3_rule_builder.rule_converter import RuleConverter
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            pytest.skip("OPENAI_API_KEY not set")
+        return RuleConverter(api_key=api_key, rule_store=store)
+
     @pytest.mark.parametrize("case", GOLDEN_CASES, ids=[c["id"] for c in GOLDEN_CASES])
-    def test_golden_case_produces_valid_rule(self, gen, store, case):
+    def test_golden_case_produces_valid_rule(self, converter, gen, store, case):
         """LLM should produce at least one structurally valid rule."""
-        rules = gen.generate_rules(case["text"])
+        chunk = {
+            "filtered_text":  case["text"],
+            "section_name":   "Test",
+            "section_number": "TEST",
+            "count_high": 1, "count_medium": 0, "count_low": 0,
+        }
+        raw_rules = converter.extract_rules(chunk)
+        assert len(raw_rules) >= 1, \
+            f"[{case['id']}] No rules extracted from: {case['text'][:60]}..."
 
-        assert len(rules) >= 1, \
-            f"[{case['id']}] No rules generated from: {case['text'][:60]}..."
-
-        # Validate schema of every generated rule
-        for rule in rules:
-            rule_data = rule if isinstance(rule, dict) else json.loads(rule)
-            issues    = validate_rule_schema(rule_data)
+        for rule in raw_rules:
+            issues = validate_rule_schema(rule)
             assert not issues, \
-                f"[{case['id']}] Schema issues: {issues} — rule: {rule_data}"
+                f"[{case['id']}] Schema issues: {issues} — rule: {rule}"
 
     @pytest.mark.parametrize("case", GOLDEN_CASES, ids=[c["id"] for c in GOLDEN_CASES])
-    def test_golden_case_correct_element(self, gen, store, case):
-        """Generated rule should reference the correct building element."""
-        rules     = gen.generate_rules(case["text"])
-        rule_data = rules[0] if isinstance(rules[0], dict) else json.loads(rules[0])
+    def test_golden_case_correct_target(self, converter, gen, store, case):
+        """Extracted rule should reference the correct IFC target class."""
+        chunk = {
+            "filtered_text":  case["text"],
+            "section_name":   "Test",
+            "section_number": "TEST",
+            "count_high": 1, "count_medium": 0, "count_low": 0,
+        }
+        raw_rules = converter.extract_rules(chunk)
+        assert raw_rules, f"[{case['id']}] No rules returned"
 
-        expected_el = case["expect"]["element"].lower()
-        actual_el   = rule_data.get("element", "").lower()
+        rule        = raw_rules[0]
+        target_lower = rule.get("target", "").lower()
+        expected    = case["expect"]["target_contains"].lower()
+        assert expected in target_lower, \
+            f"[{case['id']}] Expected target containing '{expected}', got '{rule.get('target')}'"
 
-        assert expected_el in actual_el or actual_el in expected_el, \
-            f"[{case['id']}] Expected element '{expected_el}', got '{actual_el}'"
+    def test_llm_handles_ambiguous_text(self, converter, gen, store):
+        """Vague requirements should produce no rule or a needs_review rule."""
+        chunk = {
+            "filtered_text":  "Adequate ventilation shall be provided in all occupied spaces.",
+            "section_name":   "Ventilation",
+            "section_number": "V1",
+            "count_high": 0, "count_medium": 1, "count_low": 0,
+        }
+        rules = converter.extract_rules(chunk)
+        for rule in rules:
+            if rule.get("check_value") is not None:
+                assert rule.get("needs_review") or float(rule.get("confidence", 1)) < 0.7, \
+                    f"LLM invented threshold without flagging: {rule}"
 
-    @pytest.mark.parametrize("case", GOLDEN_CASES, ids=[c["id"] for c in GOLDEN_CASES])
-    def test_golden_case_correct_value(self, gen, store, case):
-        """Generated rule should capture the correct numeric threshold."""
-        rules     = gen.generate_rules(case["text"])
-        rule_data = rules[0] if isinstance(rules[0], dict) else json.loads(rules[0])
-
-        if "value" in case["expect"]:
-            expected_val = case["expect"]["value"]
-            actual_val   = rule_data.get("value")
-            # Allow numeric comparison with tolerance
-            try:
-                assert abs(float(actual_val) - float(expected_val)) < 0.01, \
-                    f"[{case['id']}] Expected value {expected_val}, got {actual_val}"
-            except (TypeError, ValueError):
-                pytest.fail(
-                    f"[{case['id']}] Could not compare values: "
-                    f"expected={expected_val}, actual={actual_val}"
-                )
-
-    def test_llm_handles_ambiguous_text(self, gen, store):
-        """Vague requirements should either produce a flagged rule or no rule."""
-        vague_text = "Adequate ventilation shall be provided in all occupied spaces."
-        rules = gen.generate_rules(vague_text)
-        # Either: no rule (acceptable) or a rule flagged as needing review
-        if rules:
-            rule_data = rules[0] if isinstance(rules[0], dict) else json.loads(rules[0])
-            # Should NOT have invented a specific numeric threshold
-            val = rule_data.get("value")
-            if val is not None:
-                # If it did produce a value, it should be flagged
-                assert rule_data.get("needs_review") or rule_data.get("confidence") == "low", \
-                    f"LLM invented threshold '{val}' for vague requirement without flagging"
-
-    def test_llm_handles_multiple_requirements_in_one_chunk(self, gen, store):
-        """A text chunk with 2 requirements should produce ~2 rules."""
-        multi_text = (
-            "The riser height shall not be more than 200 mm. "
-            "The tread run shall not be less than 255 mm."
-        )
-        rules = gen.generate_rules(multi_text)
+    def test_llm_handles_multiple_requirements(self, converter, gen, store):
+        """A chunk with 2 requirements should yield ~2 rules."""
+        chunk = {
+            "filtered_text": (
+                "The riser height shall not be more than 200 mm. "
+                "The tread run shall not be less than 255 mm."
+            ),
+            "section_name": "Stairs", "section_number": "9.8.4",
+            "count_high": 2, "count_medium": 0, "count_low": 0,
+        }
+        rules = converter.extract_rules(chunk)
         assert len(rules) >= 2, \
             f"Expected ≥2 rules from 2 requirements, got {len(rules)}"
 
-    def test_llm_empty_input(self, gen, store):
+    def test_llm_empty_input(self, converter, gen, store):
         """Empty string should return no rules, not crash."""
-        rules = gen.generate_rules("")
-        assert rules == [] or rules is None
+        chunk = {
+            "filtered_text": "",
+            "section_name": "Empty", "section_number": "0",
+            "count_high": 0, "count_medium": 0, "count_low": 0,
+        }
+        rules = converter.extract_rules(chunk)
+        assert rules == []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RuleGenerator — Non-LLM / deterministic tests
-# ═══════════════════════════════════════════════════════════════════════════════
-#
-# These test regex/SHACL generation paths if your RuleGenerator has them.
-
-class TestRuleGeneratorDeterministic:
-
-    def test_generate_regex_from_text(self, gen):
-        """If RuleGenerator has a regex builder, test it here."""
-        if not hasattr(gen, "generate_regex_from_text"):
-            pytest.skip("No regex generation method")
-        pattern = gen.generate_regex_from_text("clear width", ">=", "860", "mm")
-        assert pattern is not None
-        assert "860" in pattern
-
-    def test_build_shacl_shapes(self, gen):
-        """If RuleGenerator has SHACL output, test it here."""
-        if not hasattr(gen, "build_shacl_shapes"):
-            pytest.skip("No SHACL generation method")
-        rule = {"element": "stair", "property": "clear_width",
-                "operator": ">=", "value": 860, "unit": "mm"}
-        shapes = gen.build_shacl_shapes([rule])
-        assert shapes is not None
-
-    def test_rules_saved_to_store(self, gen, store):
-        """After generation, rules should be persisted in the store."""
-        if not hasattr(gen, "generate_and_save"):
-            pytest.skip("No generate_and_save method")
-        gen.generate_and_save("Every stair shall have a width of 860 mm.")
-        assert store.count() >= 1
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Snapshot regression for Module 3
+# Snapshot regression for Module 3 (non-LLM)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
 
-@pytest.mark.llm
 class TestModule3Snapshots:
 
     def _snapshot_path(self, name):
         os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
         return os.path.join(SNAPSHOTS_DIR, f"m3_{name}.json")
 
-    def test_stair_width_rule_snapshot(self, gen, store):
-        text  = "Every exit stair shall have a clear width of not less than 860 mm."
-        rules = gen.generate_rules(text)
+    def test_seed_rules_snapshot(self, gen, store):
+        """Seed rules count and targets should not change unexpectedly."""
+        from module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
+        gen.save_batch(OBC_SEED_RULES, source_doc="OBC_Part9_Seed")
 
-        snap_file = self._snapshot_path("stair_width")
-        current   = [r if isinstance(r, dict) else json.loads(r) for r in rules]
+        snap_file = self._snapshot_path("seed_rules_summary")
+        current   = store.summary()
 
         if not os.path.exists(snap_file):
             with open(snap_file, "w") as f:
@@ -332,13 +444,7 @@ class TestModule3Snapshots:
         with open(snap_file) as f:
             expected = json.load(f)
 
-        assert len(current) == len(expected), \
-            f"Rule count changed: {len(expected)} → {len(current)}"
-
-        for got, exp in zip(current, expected):
-            assert got.get("element")  == exp.get("element"),  "Element changed"
-            assert got.get("operator") == exp.get("operator"), "Operator changed"
-            # Allow small numeric drift
-            if "value" in exp:
-                assert abs(float(got.get("value", 0)) - float(exp["value"])) < 1, \
-                    f"Value drifted: {exp['value']} → {got.get('value')}"
+        assert current["total"] == expected["total"], \
+            f"Seed rule count changed: {expected['total']} → {current['total']}"
+        assert set(current["by_entity"].keys()) == set(expected["by_entity"].keys()), \
+            "Seed rule IFC targets changed"

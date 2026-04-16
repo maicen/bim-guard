@@ -2,7 +2,7 @@
 module1_doc_parser/table_rule_builder.py
 ------------------------------------------
 Step 2 — Converts Docling table DataFrames directly into rules.db entries.
-No LLM required for tables — Min/Max columns map directly to range_check rules.
+No LLM required for tables — Min/Max columns map directly to numeric_range rules.
 
 Usage:
     from module1_doc_parser.table_rule_builder import TableRuleBuilder
@@ -11,12 +11,15 @@ Usage:
 """
 
 TABLE_ENTITY_MAP = {
-    "stair": "IfcStairFlight", "riser": "IfcStairFlight",
-    "tread": "IfcStairFlight", "rise":  "IfcStairFlight",
-    "run":   "IfcStairFlight", "door":  "IfcDoor",
-    "window":"IfcWindow",       "ramp":  "IfcRamp",
-    "guard": "IfcRailing",      "landing":"IfcSlab",
-    "wall":  "IfcWall",
+    "stair":   "IfcStairFlight", "riser":   "IfcStairFlight",
+    "tread":   "IfcStairFlight", "rise":    "IfcStairFlight",
+    "run":     "IfcStairFlight", "nosing":  "IfcStairFlight",
+    "door":    "IfcDoor",        "doorway": "IfcDoor",
+    "window":  "IfcWindow",      "glazing": "IfcWindow",
+    "ramp":    "IfcRamp",        "slope":   "IfcRamp",
+    "guard":   "IfcRailing",     "handrail":"IfcRailing",
+    "landing": "IfcSlab",        "floor":   "IfcSlab",
+    "wall":    "IfcWall",
 }
 
 MIN_VARIANTS = {"min", "minimum", "min (mm)", "min. (mm)", "min.", "minimum (mm)"}
@@ -28,7 +31,7 @@ class TableRuleBuilder:
     def __init__(self, rule_store):
         self.store = rule_store
 
-    def _detect_entity(self, text: str) -> str:
+    def _detect_target(self, text: str) -> str:
         text_lower = str(text).lower()
         for kw, ifc in TABLE_ENTITY_MAP.items():
             if kw in text_lower:
@@ -37,13 +40,15 @@ class TableRuleBuilder:
 
     def _detect_unit(self, text: str) -> str:
         t = str(text).lower()
-        if "m2" in t or "area" in t: return "m2"
-        if "deg" in t or "angle" in t: return "deg"
+        if "m2" in t or "area" in t:
+            return "m2"
+        if "deg" in t or "angle" in t:
+            return "deg"
         return "mm"
 
     def _extract_from_table(self, table_dict: dict, generator) -> int:
-        df    = table_dict["dataframe"].copy()
-        idx   = table_dict["table_index"]
+        df  = table_dict["dataframe"].copy()
+        idx = table_dict["table_index"]
         df.columns = [str(c).strip().lower() for c in df.columns]
 
         min_col = next((c for c in df.columns if c in MIN_VARIANTS), None)
@@ -64,16 +69,21 @@ class TableRuleBuilder:
             except (ValueError, TypeError):
                 continue
 
+            prop_name = name.replace(" ", "_").title()
+            target    = self._detect_target(name)
+
             rules.append({
-                "section_ref":   f"OBC_Table_{idx + 1}",
-                "rule_type":     "range_check",
-                "entity_type":   self._detect_entity(name),
-                "property_name": name.replace(" ", "_").title(),
+                "ref":           f"OBC_Table_{idx + 1}",
+                "rule_type":     "numeric_range",
+                "target":        target,
+                "property_name": prop_name,
                 "operator":      "between",
-                "value":         [min_val, max_val],
+                "check_value":   None,
+                "value_min":     min_val,
+                "value_max":     max_val,
                 "unit":          self._detect_unit(name),
-                "priority":      1,
-                "description":   f"{name} must be between {min_val} and {max_val}",
+                "severity":      "mandatory",
+                "desc":          f"{name} must be between {min_val} and {max_val}",
             })
 
         if rules:

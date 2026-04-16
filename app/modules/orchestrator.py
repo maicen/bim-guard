@@ -331,6 +331,27 @@ class BIMGuard_App:
         except Exception as exc:
             compliance_error = str(exc)
 
+        # ── Module 3: Rule validation against IFC model ───────────────────────
+        # Fetches every rule saved in the library and checks whether the model
+        # contains elements of the required IFC class (basic Module 4 check).
+        rule_validations: list[dict] = []
+        try:
+            from app.services.rules_service import RuleService
+            library_rules = RuleService().list_rules()
+            for rule in library_rules:
+                target = rule.get("target_ifc_class", "")
+                count = ifc_type_counts.get(target, 0)
+                rule_validations.append({
+                    "reference":       rule.get("reference", "—"),
+                    "description":     rule.get("description", ""),
+                    "rule_type":       rule.get("rule_type", ""),
+                    "target_ifc_class": target,
+                    "element_count":   count,
+                    "status":          "present" if count > 0 else "not_found",
+                })
+        except Exception:
+            pass
+
         return {
             "project":             project,
             "ifc_element_count":   len(elements),
@@ -344,6 +365,7 @@ class BIMGuard_App:
             "compliance_is_demo":  is_demo,
             "bcf_project_id":      project_id,
             "compliance_error":    compliance_error,
+            "rule_validations":    rule_validations,
         }
 
 

@@ -291,7 +291,7 @@ def test_table_builder_rule_schema(store_and_gen):
     builder.process_all_tables(tables, gen)
 
     rules = store.get_all_rules()
-    required_fields = {"element", "property", "operator", "value"}
+    required_fields = {"target", "property_name", "operator", "rule_type", "desc"}
     for rule in rules:
         rule_data = rule if isinstance(rule, dict) else json.loads(rule)
         missing   = required_fields - set(rule_data.keys())

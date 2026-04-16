@@ -23,12 +23,16 @@ Usage:
 
 import json
 import openai
-from config import OPENAI_API_KEY, OPENAI_MODEL
+
+try:
+    from config import OPENAI_API_KEY, OPENAI_MODEL
+except ImportError:
+    from app.modules.config import OPENAI_API_KEY, OPENAI_MODEL
 
 
 # ── SYSTEM PROMPT ─────────────────────────────────────────────────────────────
-# RAG-guided: includes existing entity types and real example rules
-# so the LLM always outputs your exact schema — not a guessed version.
+# RAG-guided: includes existing IFC targets and real example rules
+# so the LLM always outputs the exact schema — not a guessed version.
 
 RAG_SYSTEM_PROMPT = """\
 You are a BIM compliance rule extraction engine for the Ontario Building Code (OBC) Part 9.
@@ -37,23 +41,62 @@ Extract every discrete checkable requirement as a JSON rule object.
 
 SCHEMA — every rule must have ALL these fields:
 {{
-  "section_ref":   "OBC section number e.g. 9.8.2.1.(2)",
-  "rule_type":     "json_check" | "range_check" | "regex" | "exists_check",
-  "entity_type":   "IfcStairFlight" | "IfcDoor" | "IfcWindow" | "IfcSpace" | "IfcWall" | "IfcRailing" | "IfcSlab" | "IfcRamp" | "IfcZone" | "IfcColumn" | "IfcFooting",
-  "property_name": "exact IFC property name",
-  "operator":      ">=" | "<=" | "==" | "!=" | "between" | "regex_match" | "exists",
-  "value":         number | string | [min, max] for between | null for exists,
-  "unit":          "mm" | "m" | "m2" | "deg" | "ratio" | null,
-  "priority":      1 if critical, 0 otherwise,
-  "description":   "plain English explanation of what is being checked"
+  "ref":               "OBC section number e.g. 9.8.2.1.(2), or empty string",
+  "desc":              "short plain-English rule description",
+  "source_text":       "exact quote or close paraphrase from the regulation",
+
+  "target":            "IFC class e.g. IfcStairFlight | IfcDoor | IfcWindow | IfcRailing | IfcSlab | IfcWall | IfcRamp | IfcSpace | IfcZone | IfcColumn | IfcFooting | IfcBeam",
+  "property_set":      "Pset name e.g. Pset_StairFlightCommon, or null",
+  "property_name":     "exact IFC property name e.g. TreadLength, or null",
+  "fallback_property": "alternative property name if primary missing, or null",
+
+  "rule_type":         "numeric_comparison | numeric_range | prohibition | standard_conformance | deemed_to_comply | table_lookup | spatial_clearance | tiered",
+  "operator":          ">= | <= | == | != | between | exists | not_exists | matches | conforms_to",
+  "check_value":       860,
+  "value_min":         null,
+  "value_max":         null,
+  "unit":              "mm | m | m2 | deg | ratio | null",
+
+  "applies_when": {{
+    "building_use":  "residential | commercial | any",
+    "max_storeys":   null,
+    "location":      "exit | interior | exterior | any"
+  }},
+
+  "severity":          "mandatory | recommended | informational",
+  "keyword":           "shall | must | should | may",
+  "compliance_type":   "prescriptive | performance | descriptive",
+
+  "exceptions":        ["list of exception strings, or empty array"],
+  "related_refs":      ["related section numbers, or empty array"],
+  "overridden_by":     null,
+
+  "confidence":        0.9,
+  "extraction_method": "llm",
+  "needs_review":      false
 }}
+
+RULE TYPE GUIDANCE:
+- numeric_comparison  — single threshold check  e.g. Width >= 860 mm
+- numeric_range       — band check using value_min/value_max  e.g. RiserHeight between 125–200 mm
+- prohibition         — element or material must NOT be used  e.g. glass blocks as load-bearing
+- standard_conformance— must conform to a referenced standard  e.g. ASTM C62 for masonry
+- deemed_to_comply    — alternative compliance path  e.g. sprinklers in lieu of fire separation
+- table_lookup        — value determined by a referenced table
+- spatial_clearance   — clearance or headroom check  e.g. headroom >= 1950 mm
+- tiered              — context-dependent thresholds  e.g. different widths per occupancy
+
+OPERATOR GUIDANCE:
+- Use "between" + value_min + value_max for min-and-max requirements; set check_value to null.
+- Use "exists" + check_value null for property presence checks.
+- Use "not_exists" for prohibitions where an element type must be absent.
+- Use "conforms_to" for standard_conformance rules.
 
 OUTPUT RULES:
 - Output ONLY a valid JSON array. No markdown. No prose. No code fences.
-- For min AND max requirements use operator "between" and value [min, max].
-- Skip requirements that cannot be expressed as a discrete checkable rule.
-- Paragraphs marked [LOW_CONFIDENCE] may or may not contain rules — extract carefully.
-- Do NOT duplicate rules for these already-known entity types: {existing_entities}
+- Skip commentary, examples, definitions, and duplicate rules.
+- Do NOT duplicate rules for these already-known targets: {existing_targets}
+- Set confidence < 0.7 and needs_review true when text is ambiguous.
 
 EXAMPLE RULES FROM DATABASE (match this format exactly):
 {rag_examples}
@@ -76,53 +119,39 @@ class RuleConverter:
             rule_store (RuleStore): RuleStore instance for RAG example retrieval
             model      (str):       OpenAI model name (defaults to config.OPENAI_MODEL)
         """
-        self.client     = openai.OpenAI(api_key=api_key or OPENAI_API_KEY)
-        self.store      = rule_store
-        self.model      = model or OPENAI_MODEL
+        self.client = openai.OpenAI(api_key=api_key or OPENAI_API_KEY)
+        self.store  = rule_store
+        self.model  = model or OPENAI_MODEL
 
     # ── PRIVATE ───────────────────────────────────────────────────────────────
 
     def _build_system_prompt(self, chunk: dict) -> str:
         """
         Build a RAG-guided system prompt for this specific section chunk.
-        Retrieves existing entity types and example rules from the DB
+        Retrieves existing IFC targets and example rules from the DB
         so the LLM never guesses the schema.
-
-        Args:
-            chunk (dict): scored section chunk from keyword_filter.py
-
-        Returns:
-            str: formatted system prompt
         """
-        existing_entities = []
-        rag_examples      = []
+        existing_targets = []
+        rag_examples     = []
 
         if self.store:
-            existing_entities = self.store.get_existing_entity_types()
-            rag_examples      = self.store.get_rules_sample(limit=3)
+            existing_targets = self.store.get_existing_entity_types()
+            rag_examples     = self.store.get_rules_sample(limit=3)
 
         return RAG_SYSTEM_PROMPT.format(
-            existing_entities = ", ".join(existing_entities) if existing_entities else "None yet",
-            rag_examples      = json.dumps(rag_examples, indent=2) if rag_examples else "None yet",
-            section_name      = chunk.get("section_name", "Unknown"),
-            high              = chunk.get("count_high", 0),
-            medium            = chunk.get("count_medium", 0),
-            low               = chunk.get("count_low", 0),
+            existing_targets = ", ".join(existing_targets) if existing_targets else "None yet",
+            rag_examples     = json.dumps(rag_examples, indent=2) if rag_examples else "None yet",
+            section_name     = chunk.get("section_name", "Unknown"),
+            high             = chunk.get("count_high", 0),
+            medium           = chunk.get("count_medium", 0),
+            low              = chunk.get("count_low", 0),
         )
 
     def _parse_response(self, raw: str, section_number: str) -> list:
         """
         Parse the LLM response string into a list of rule dicts.
         Strips markdown code fences if the LLM added them.
-
-        Args:
-            raw            (str): raw LLM response text
-            section_number (str): section number for error logging
-
-        Returns:
-            list[dict]: list of rule dicts, or [] on parse error
         """
-        # Strip markdown code fences if LLM added them despite instructions
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -130,7 +159,12 @@ class RuleConverter:
         raw = raw.strip()
 
         try:
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return parsed
+            if isinstance(parsed, dict):
+                return parsed.get("rules", [parsed])
+            return []
         except json.JSONDecodeError as e:
             print(f"  [RuleConverter] JSON parse error for section {section_number}: {e}")
             print(f"  Raw response preview: {raw[:300]}")
@@ -166,7 +200,7 @@ class RuleConverter:
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": f"Extract all rules from this OBC section:\n\n{text}"},
             ],
-            temperature=0.1,   # low temperature = more deterministic, less hallucination
+            temperature=0.1,
         )
 
         raw   = response.choices[0].message.content.strip()

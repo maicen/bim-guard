@@ -18,11 +18,18 @@ Usage:
 """
 
 import re
-from module1_doc_parser.keywords.keyword_master import (
-    ALL_SINGLE_KEYWORDS,
-    BIGRAM_PHRASES,
-    KEYWORD_WEIGHTS,
-)
+try:
+    from module1_doc_parser.keywords.keyword_master import (
+        ALL_SINGLE_KEYWORDS,
+        BIGRAM_PHRASES,
+        KEYWORD_WEIGHTS,
+    )
+except ImportError:
+    from app.modules.module1_doc_parser.keywords.keyword_master import (
+        ALL_SINGLE_KEYWORDS,
+        BIGRAM_PHRASES,
+        KEYWORD_WEIGHTS,
+    )
 
 CONFIDENCE_HIGH   = 10
 CONFIDENCE_MEDIUM = 1
