@@ -1,4 +1,9 @@
-You are an expert Python full-stack developer specializing in FastHTML, HTMX, and modern web architectures.
+> **⚠️ Historical document — archived 2026-04-20.**
+> The Next.js → FastHTML migration described here is complete.
+> For current architecture see [`docs/architecture.md`](../architecture.md).
+> Retained for traceability only. Do not follow these instructions.
+
+> You are an expert Python full-stack developer specializing in FastHTML, HTMX, and modern web architectures.
 
 Your task is to migrate our existing application, \*\*BIM Guard\*\*, from a split Next.js/FastAPI monorepo into a single, cohesive \*\*FastHTML\*\* application.
 
