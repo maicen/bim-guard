@@ -68,13 +68,13 @@ Body: Capture a short demo that shows upload, compliance check, results review, 
 
 ## 32 — Document the BIM Guard repo setup and architecture ([#32](https://github.com/maicen/bim-guard/issues/32))
 
-Body: Replace the external Lovable.ai setup task with a repo-focused task: document the actual FastHTML/MonsterUI full-stack architecture, routes, modules, and environment setup. Include how the app is launched with `uv run uvicorn main:app --reload` and how FastHTML serves both UI and backend routes.
+Body: Document the FastHTML/MonsterUI full-stack architecture, routes, modules, and environment setup. Include how the app is launched with `uv run uvicorn main:app --reload` and how FastHTML serves both UI and backend routes from a single ASGI app.
 
 - Work reference: repo architecture documentation.
 
 ## 33 — Align backlog with the actual BIM Guard implementation ([#33](https://github.com/maicen/bim-guard/issues/33))
 
-Body: Remove references to Lovable.ai export workflow and replace with real repo onboarding work for `maicen/bim-guard`. Emphasize that this repo is a FastHTML full-stack Python app, not a separate React frontend.
+Body: Document real repo onboarding for `maicen/bim-guard` as a FastHTML full-stack Python app where UI and backend routes are served together from a single ASGI process launched with `uv run uvicorn main:app`.
 
 - Work reference: backlog cleanup and task alignment.
 
@@ -88,7 +88,7 @@ Body: Publish the app to a production host and confirm the full workflow is oper
 
 Body: Update the app so the FastHTML upload form and results views call real backend endpoints instead of placeholder mock data. Confirm the UI receives real compliance results from the backend.
 
-- Work reference: FastHTML frontend/backend integration.
+- Work reference: wiring FastHTML routes to live backend services.
 
 ## 36 — Record a full demo video of the completed workflow ([#36](https://github.com/maicen/bim-guard/issues/36))
 
@@ -118,25 +118,25 @@ Body: Add form fields for project name and environment class selection to the up
 
 ## 40 — Connect the upload screen to the Python Gemini backend ([#40](https://github.com/maicen/bim-guard/issues/40))
 
-Body: Replace the old client-side Claude integration with the repository's Python backend flow. The FastHTML upload form should submit to a backend route and trigger `app/modules/orchestrator.py` and `app/modules/module3_rule_builder.py` to parse IFC, extract rules via Gemini, and render results. Avoid React/Claude frontend calls.
+Body: The FastHTML upload form submits to a backend route that triggers `app/modules/orchestrator.py` and `app/modules/module3_rule_builder.py` to parse IFC, extract rules via Gemini, and render results server-side.
 
 - Work reference: FastHTML route wiring, Gemini integration, backend compliance workflow.
 
 ## 41 — Use HTMX loading state for compliance check processing ([#41](https://github.com/maicen/bim-guard/issues/41))
 
-Body: Implement the loading experience using HTMX indicators on the FastHTML upload form. While the backend processes IFC parsing and Gemini extraction, show an animated spinner or progress state with `hx-indicator` instead of React state.
+Body: Implement the loading experience using HTMX indicators on the FastHTML upload form. While the backend processes IFC parsing and Gemini extraction, show an animated spinner or progress state with `hx-indicator`.
 
 - Work reference: HTMX loading UX for Python-backed processing.
 
 ## 42 — Build summary cards row using FastHTML components ([#42](https://github.com/maicen/bim-guard/issues/42))
 
-Body: Render summary cards for total issues and risk counts (High / Medium / Low) in the FastHTML results page. Use the project’s existing FastHTML/MonsterUI components, not React.
+Body: Render summary cards for total issues and risk counts (High / Medium / Low) in the FastHTML results page. Use the project's existing FastHTML/MonsterUI components.
 
 - Work reference: server-side result dashboard UI.
 
 ## 43 — Build the compliance issues table using FastHTML ([#43](https://github.com/maicen/bim-guard/issues/43))
 
-Body: Render validation findings in a FastHTML-generated table and make rows interactive. Use HTMX and server-rendered HTML for row actions, rather than React state management.
+Body: Render validation findings in a FastHTML-generated table and make rows interactive. Use HTMX and server-rendered HTML for row actions.
 
 - Work reference: FastHTML issue list display and HTMX interactions.
 
@@ -160,7 +160,7 @@ Body: Add a results page header showing the project name and a `New Check` actio
 
 ## 47 — Build issue detail side panel with HTMX partial swaps ([#47](https://github.com/maicen/bim-guard/issues/47))
 
-Body: Show issue details in a side panel loaded via HTMX when a row is clicked. Include rule name, violation details, risk score, and recommended action. Avoid React state and use Python-rendered HTML.
+Body: Show issue details in a side panel loaded via HTMX when a row is clicked. Include rule name, violation details, risk score, and recommended action. Render with Python-generated HTML swapped into the page via HTMX.
 
 - Work reference: HTMX issue detail panel.
 
@@ -184,7 +184,7 @@ Body: Add buttons to the results page that call backend routes to download BCF a
 
 ## 51 — Test the full FastHTML/HTMX/Gemini workflow with a sample IFC file ([#51](https://github.com/maicen/bim-guard/issues/51))
 
-Body: Validate the complete BIM Guard workflow using the repository's actual architecture. Confirm IFC upload, Gemini-based rule extraction, HTMX-rendered results, and downloadable BCF/PDF output work correctly. Use the vanilla JS viewer in `static/js/ifc-viewer.js` rather than React or `@thatopen/components`.
+Body: Validate the complete BIM Guard workflow using the repository's actual architecture. Confirm IFC upload, Gemini-based rule extraction, HTMX-rendered results, and downloadable BCF/PDF output work correctly. Use the vanilla JS viewer in `static/js/ifc-viewer.js`.
 
 - Work reference: end-to-end FastHTML/Gemini validation.
 
