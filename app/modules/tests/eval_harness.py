@@ -20,10 +20,10 @@ The harness:
   4. Prints a summary table
 """
 
+import argparse
+import json
 import os
 import sys
-import json
-import argparse
 from datetime import datetime
 
 # ── Configure your LLM provider here ──────────────────────────────────────────
@@ -250,8 +250,8 @@ def parse_judge_response(raw):
 
 def generate_rule_from_text(text):
     """Run Module 3 on a text chunk and return the first generated rule."""
-    from module3_rule_builder.rule_store import RuleStore
     from module3_rule_builder.rule_generator import RuleGenerator
+    from module3_rule_builder.rule_store import RuleStore
 
     db_path = "tests/test_rules_eval_temp.db"
     store = RuleStore(db_path)

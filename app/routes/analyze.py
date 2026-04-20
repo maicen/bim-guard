@@ -1,10 +1,11 @@
+"""Analysis routes for orchestrating compliance checks and rendering results."""
+
 import os
 
 from fasthtml.common import (
     A,
     Div,
     Form,
-    H3,
     Option,
     P,
     Request,
@@ -17,6 +18,9 @@ from fasthtml.common import (
     Title,
     Tr,
 )
+from monsterui.all import H1, Container
+
+from app.components.layout import DashboardLayout
 from app.components.ui import (
     Alert,
     AlertT,
@@ -25,16 +29,13 @@ from app.components.ui import (
     CardHeader,
     CardTitle,
     Checkbox,
+    CountTableItemSpec,
     FormLabel,
+    ItemsCountDataTable,
     Label,
     Select,
     SubmitButton,
-    CountTableItemSpec,
-    ItemsCountDataTable,
 )
-from monsterui.all import Container, H1
-
-from app.components.layout import DashboardLayout
 from app.modules.orchestrator import BIMGuard_App
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
@@ -283,6 +284,8 @@ def _rule_validation_card(rule_validations: list[dict]):
 
 
 def setup_routes(rt):
+    """Register analysis workflow routes."""
+
     @rt("/analysis/run")
     def analysis_run():
         projects = _projects_service.list_projects()

@@ -5,13 +5,13 @@ Standard: ISO 16739-1
 Library:  ifcopenshell (open source)
 """
 
+import uuid
+from dataclasses import dataclass
+from typing import Optional
+
 import ifcopenshell
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
-import numpy as np
-from dataclasses import dataclass, field
-from typing import Optional
-import uuid
 
 
 @dataclass

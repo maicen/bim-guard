@@ -1,13 +1,7 @@
-"""
-app/services/ruleset_seeder.py
---------------------------------
-Seeds the three built-in BIMGuard engine rulesets (GC-001, CC-001, MC-001)
-from their canonical JSON files into the shared rules table.
+"""Seed built-in BIMGuard engine rulesets into the shared rules table.
 
-Each seeder is idempotent: it checks whether the ruleset_id already exists
-before inserting any rows, so repeated startup calls are safe.
-
-Entry point: seed_engine_rulesets(svc)
+The seeding operations are idempotent: each routine checks whether its
+``ruleset_id`` already exists before inserting rows.
 """
 
 import json
@@ -365,6 +359,7 @@ def _seed_mc001(svc: RuleService) -> int:
 def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
     """
     Seed GC-001, CC-001, and MC-001 from their JSON files.
+
     Idempotent: skips any ruleset already present in the DB.
     Returns a dict of {ruleset_id: rows_inserted}.
     """

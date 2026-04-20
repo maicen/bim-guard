@@ -1,10 +1,11 @@
 from fasthtml.common import FileResponse, Title, fast_app
 from monsterui.all import (
+    H1,
     Container,
     DivLAligned,
-    H1,
     Subtitle,
 )
+
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
@@ -13,7 +14,6 @@ from app.utils import load_env_file
 load_env_file()
 
 from app.routes import analyze, dashboard, library, projects, viewer
-
 
 APP_HEADERS = SiteTheme()
 
@@ -54,9 +54,9 @@ def _backfill_obc_metadata(svc) -> None:
 def _seed_library() -> None:
     """Populate the rule library with OBC baseline rules and engine rulesets."""
     try:
+        from app.modules.module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
         from app.services.rules_service import RuleService
         from app.services.ruleset_seeder import seed_engine_rulesets
-        from app.modules.module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
 
         svc = RuleService()
 

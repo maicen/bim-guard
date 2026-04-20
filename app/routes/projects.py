@@ -1,4 +1,4 @@
-from pathlib import Path
+"""Project management routes for creating and maintaining IFC projects."""
 
 from fasthtml.common import (
     FileResponse,
@@ -7,8 +7,8 @@ from fasthtml.common import (
 )
 from monsterui.all import Container
 
-from app.components.projects_ui import project_form, projects_page
 from app.components.layout import DashboardLayout
+from app.components.projects_ui import project_form, projects_page
 from app.services.projects_service import ProjectsService
 from app.utils import redirect_see_other
 
@@ -16,6 +16,8 @@ _projects_service = ProjectsService()
 
 
 def setup_routes(rt):
+    """Register project CRUD and IFC download routes."""
+
     @rt("/projects")
     def projects_list():
         return Title("Projects - BIM Guard"), projects_page(_projects_service.list_projects())

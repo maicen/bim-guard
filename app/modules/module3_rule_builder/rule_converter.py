@@ -14,20 +14,21 @@ Responsibilities:
 Usage:
     from module3_rule_builder.rule_converter import RuleConverter
     from module3_rule_builder.rule_store import RuleStore
-    from config import DB_PATH, OPENAI_API_KEY
+    from config import DB_PATH, GEMINI_API_KEY
 
     store     = RuleStore(DB_PATH)
-    converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
+    converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
     rules     = converter.extract_rules(chunk)
 """
 
 import json
+
 import openai
 
-try:
-    from config import OPENAI_API_KEY, OPENAI_MODEL
-except ImportError:
-    from app.modules.config import OPENAI_API_KEY, OPENAI_MODEL
+try:GEMINI
+    from config import GEMINI_API_KEY, OGEMINI_MODEL
+except ImportError:GEMINI
+    from app.modules.config import GEMINI_API_KEY, GEMINI_MODEL
 
 
 # ── SYSTEM PROMPT ─────────────────────────────────────────────────────────────
@@ -114,13 +115,13 @@ class RuleConverter:
 
     def __init__(self, api_key: str = None, rule_store=None, model: str = None):
         """
-        Args:
+        Args:GEMINI
             api_key    (str):       OpenAI API key (defaults to config.OPENAI_API_KEY)
-            rule_store (RuleStore): RuleStore instance for RAG example retrieval
+            rule_store (RuleStore): RuleStore instance for RAG example retGEMINI
             model      (str):       OpenAI model name (defaults to config.OPENAI_MODEL)
-        """
+        """GEMINI
         self.client = openai.OpenAI(api_key=api_key or OPENAI_API_KEY)
-        self.store = rule_store
+        self.store = rule_storGEMINI
         self.model = model or OPENAI_MODEL
 
     # ── PRIVATE ───────────────────────────────────────────────────────────────

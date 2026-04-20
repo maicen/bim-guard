@@ -171,3 +171,31 @@ Output rule fields:
 
 - If `.env` is not loaded (for custom scripts/tests), call `load_env_file()` from `app.utils` before creating AI extraction services.
 - Document upload validation includes extension, MIME type, and content checks.
+
+## Python Docstrings and API Docs
+
+This repository follows [PEP 257](https://peps.python.org/pep-0257/) docstring conventions and uses Python's built-in [pydoc](https://docs.python.org/3/library/pydoc.html) for API documentation.
+
+Lint docstring style (PEP 257) with Ruff:
+
+```bash
+uv run ruff check .
+```
+
+Generate terminal docs for a module:
+
+```bash
+uv run python -m pydoc app.modules.orchestrator
+```
+
+Generate HTML docs for a module:
+
+```bash
+uv run python -m pydoc -w app.modules.orchestrator
+```
+
+Docstring policy for contributors:
+
+- Add docstrings for new public modules, classes, and functions.
+- Keep docstrings imperative and concise (PEP 257).
+- Include parameters/return behavior when it improves clarity.

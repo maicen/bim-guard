@@ -1,8 +1,9 @@
 """Toggle group component adapted from shadcn/ui."""
 
 from fasthtml.common import Div
-from .utils import cn
+
 from .toggle import Toggle
+from .utils import cn
 
 
 def ToggleGroup(

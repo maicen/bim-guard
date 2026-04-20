@@ -1,5 +1,6 @@
 """
-BIMGUARD AI — Word / PDF Report Generator
+BIMGUARD AI — Word / PDF Report Generator.
+
 modules/report_generator.py
 
 Generates a formatted Word (.docx) compliance report from a completed
@@ -21,11 +22,11 @@ from typing import Optional
 
 try:
     from docx import Document as DocxDocument
-    from docx.shared import Pt, RGBColor, Inches, Cm
+    from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
     from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
-    from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Cm, Inches, Pt, RGBColor
 
     DOCX_AVAILABLE = True
 except ImportError:

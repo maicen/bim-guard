@@ -52,7 +52,6 @@ from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
 from typing import Any, Literal, Optional
 
-
 SCHEMA_VERSION = "1.0.0"
 
 

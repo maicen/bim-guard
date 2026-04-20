@@ -1,3 +1,5 @@
+"""Dashboard page routes and high-level compliance stats view."""
+
 # app/routes/dashboard.py
 
 from fasthtml.common import Div, P, Title
@@ -17,6 +19,8 @@ _bim_guard_app = BIMGuard_App()
 
 
 def setup_routes(rt):
+    """Register dashboard page routes."""
+
     @rt("/dashboard")
     def dashboard_page():
         stats = _bim_guard_app.run_dashboard()

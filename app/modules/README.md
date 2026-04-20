@@ -66,7 +66,7 @@ uv sync --group ml-pipeline
 ```bash
 cp .env.example .env
 # Edit .env and add your OpenAI API key
-OPENAI_API_KEY=sk-your-key-here
+GEMINI_API_KEY=sk-your-key-here
 ```
 
 ---

@@ -1,3 +1,5 @@
+"""Gemini-based rule extraction provider used by the rule extraction pipeline."""
+
 import json
 import os
 from typing import Protocol
@@ -6,9 +8,13 @@ from litellm import acompletion
 
 
 class RuleExtractionProvider(Protocol):
+    """Protocol for asynchronous rule extraction providers."""
+
     async def extract_rules_from_text(
         self, text: str, *, chunk_index: int, total_chunks: int
-    ) -> list[dict]: ...
+    ) -> list[dict]:
+        """Extract structured rule dictionaries from a text chunk."""
+        ...
 
 
 _SYSTEM_PROMPT = """\
@@ -67,12 +73,14 @@ class LiteLLMGeminiRuleExtractor:
     """Extracts structured compliance rules from text chunks using Gemini."""
 
     def __init__(self, *, model: str | None = None, temperature: float = 0):
+        """Create a Gemini extractor with optional model and temperature overrides."""
         self._model = model or os.getenv("BIM_GUARD_RULE_MODEL", "gemini/gemini-2.0-flash")
         self._temperature = temperature
 
     async def extract_rules_from_text(
         self, text: str, *, chunk_index: int, total_chunks: int
     ) -> list[dict]:
+        """Call Gemini and normalize extracted rules for a single text chunk."""
         if not text.strip():
             return []
 

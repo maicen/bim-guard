@@ -6,7 +6,6 @@ Imported by rule_generator.py, rule_converter.py, and obc_seed_rules.py.
 """
 
 import os
-from pathlib import Path
 
 from app.services.persistence import PersistenceService
 
@@ -15,8 +14,8 @@ DB_PATH = PersistenceService.DB_PATH
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
-
+GEMINI_MODEL = os.environ.get("OPGEMINIODEL", "gpt-4o")
+GEMINIGEMINI
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "OBC_Part9_PDF"
 SOURCE_DOC_SEED = "OBC_Part9_Seed"

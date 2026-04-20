@@ -47,7 +47,6 @@ Usage:
 
 from pathlib import Path
 
-
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
 # Labels for classification
@@ -106,8 +105,8 @@ class BERTClassifier:
     def _check_dependencies(self):
         """Check that required libraries are installed."""
         try:
-            import transformers
             import torch
+            import transformers
         except ImportError:
             raise ImportError(
                 "BERT dependencies not installed.\nRun: pip install transformers torch datasets"
@@ -140,8 +139,8 @@ class BERTClassifier:
             model_path (Path): path to saved model directory
         """
         from transformers import (
-            AutoTokenizer,
             AutoModelForSequenceClassification,
+            AutoTokenizer,
             pipeline,
         )
 
@@ -178,15 +177,13 @@ class BERTClassifier:
             use_codeaccord (bool): if True, download CODE-ACCORD from HuggingFace
                                    if False, expects local data at data/codeaccord/
         """
-        from transformers import (
-            AutoTokenizer,
-            AutoModelForSequenceClassification,
-            TrainingArguments,
-            Trainer,
-        )
         from datasets import Dataset
-        import torch
-        import numpy as np
+        from transformers import (
+            AutoModelForSequenceClassification,
+            AutoTokenizer,
+            Trainer,
+            TrainingArguments,
+        )
 
         output_path = Path(output_path or self.model_path)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -264,7 +261,7 @@ class BERTClassifier:
         try:
             from datasets import load_dataset
 
-            print(f"[BERTClassifier] Downloading CODE-ACCORD from HuggingFace...")
+            print("[BERTClassifier] Downloading CODE-ACCORD from HuggingFace...")
             dataset = load_dataset(CODEACCORD_HF)
 
             def format_row(row):
@@ -440,7 +437,7 @@ class BERTClassifier:
             enhanced.append({**chunk, "scored_paragraphs": enhanced_paras})
 
         total = rule_count + not_rule_count
-        print(f"[BERTClassifier] Done")
+        print("[BERTClassifier] Done")
         print(f"  RULE     : {rule_count:>5} ({100 * rule_count / total:.1f}%)")
         print(f"  NOT_RULE : {not_rule_count:>5} ({100 * not_rule_count / total:.1f}%)")
 

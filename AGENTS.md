@@ -16,6 +16,18 @@ All Python dependencies must be managed via `uv` and declared in `pyproject.toml
 
 The app is available at `http://127.0.0.1:8000`.
 
+## Docstring and API Documentation Rule
+
+- Follow [PEP 257](https://peps.python.org/pep-0257/) for Python docstrings.
+- Use Python [pydoc](https://docs.python.org/3/library/pydoc.html) when validating or generating API docs.
+- For new public modules/classes/functions, add or update docstrings as part of the same change.
+
+Useful commands:
+
+- `uv run ruff check .`
+- `uv run python -m pydoc app.modules.orchestrator`
+- `uv run python -m pydoc -w app.modules.orchestrator`
+
 ## Instructions Files Map
 
 | File | Who reads it | What it defines |

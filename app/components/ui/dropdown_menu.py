@@ -1,4 +1,4 @@
-from fasthtml.common import Details, Div, Hr, Input, Label, Summary, Span
+from fasthtml.common import Details, Div, Hr, Input, Label, Span, Summary
 
 from .utils import cn
 

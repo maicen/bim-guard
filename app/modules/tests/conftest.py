@@ -5,8 +5,8 @@ Shared fixtures and pytest configuration for all BIMGuard tests.
 """
 
 import os
-import pytest
 
+import pytest
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Register custom markers so pytest doesn't warn about them

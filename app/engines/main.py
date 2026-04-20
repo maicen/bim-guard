@@ -11,16 +11,20 @@ Run:
   python main.py
 """
 
-import json, os, sys, uuid, zipfile, io
-from pathlib import Path
+import io
+import sys
+import uuid
+import zipfile
 from datetime import datetime
+from pathlib import Path
+
 from fasthtml.common import *
 from monsterui.all import *
 
 # ── ENGINE IMPORTS ────────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from demo_data import run_demo_compliance, get_summary, DEMO_ELEMENTS
+    from demo_data import DEMO_ELEMENTS, get_summary, run_demo_compliance
 
     DEMO_AVAILABLE = True
 except ImportError:
@@ -457,7 +461,7 @@ def get(filter: str = "all"):
             A(
                 f,
                 href=f"/results?filter={f.lower()}",
-                cls=f"px-3 py-1 rounded text-sm font-semibold mr-2 "
+                cls="px-3 py-1 rounded text-sm font-semibold mr-2 "
                 + (
                     "bg-blue-900 text-white"
                     if filter == f.lower() or (filter == "all" and f == "All")
@@ -1037,10 +1041,9 @@ def _get_flow_velocity(model, el) -> float:
 
 def _run_engines_on_ifc(elements: list) -> list:
     """Run all three engines on IFC-parsed elements."""
-    from demo_data import run_demo_compliance
-
     # Temporarily replace demo elements with IFC elements
     import demo_data as dd
+    from demo_data import run_demo_compliance
 
     original = dd.DEMO_ELEMENTS
     dd.DEMO_ELEMENTS = elements

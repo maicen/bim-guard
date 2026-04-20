@@ -7,10 +7,8 @@ commercial building plant room and distribution system.
 Used when no IFC file is uploaded.
 """
 
-import uuid
-import math
-import sys
 import os
+import sys
 
 # Add parent directory to path for engine imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

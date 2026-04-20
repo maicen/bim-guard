@@ -35,22 +35,22 @@ USAGE:
 import sys
 from pathlib import Path
 
-from config import DB_PATH, OPENAI_API_KEY
+from config import DB_PATH, GEMINI_API_KEY
+from module1_doc_parser.confidence_scorer import ConfidenceScorer
+from module1_doc_parser.dependency_parser import DependencyParser
 
 # Module 1
 from module1_doc_parser.docling_extractor import DoclingExtractor
-from module1_doc_parser.table_rule_builder import TableRuleBuilder
-from module1_doc_parser.section_chunker import SectionChunker
 from module1_doc_parser.keyword_filter import KeywordFilter
+from module1_doc_parser.section_chunker import SectionChunker
+from module1_doc_parser.table_rule_builder import TableRuleBuilder
 from module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
-from module1_doc_parser.dependency_parser import DependencyParser
-from module1_doc_parser.confidence_scorer import ConfidenceScorer
+from module3_rule_builder.obc_seed_rules import seed_rules
+from module3_rule_builder.rule_converter import RuleConverter
+from module3_rule_builder.rule_generator import RuleGenerator
 
 # Module 3
 from module3_rule_builder.rule_store import RuleStore
-from module3_rule_builder.rule_generator import RuleGenerator
-from module3_rule_builder.rule_converter import RuleConverter
-from module3_rule_builder.obc_seed_rules import seed_rules
 
 
 def run_enhanced_pipeline(
@@ -79,7 +79,7 @@ def run_enhanced_pipeline(
     """
     pdf_path = Path(pdf_path)
     print(f"\n{'=' * 65}")
-    print(f"  BIMGuard AI — Enhanced Module 1 + 3 Pipeline")
+    print("  BIMGuard AI — Enhanced Module 1 + 3 Pipeline")
     print(f"  PDF         : {pdf_path.name}")
     print(f"  BERT        : {'ON (' + bert_mode + ')' if use_bert else 'OFF'}")
     print(f"  Discovery   : {'ON' if discover_keywords else 'OFF'}")
@@ -88,7 +88,7 @@ def run_enhanced_pipeline(
     # ── Initialise stores ─────────────────────────────────────────────────────
     store = RuleStore(DB_PATH)
     generator = RuleGenerator(store)
-    converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
+    converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
 
     if seed_db_first:
         seed_rules(store, generator)
@@ -197,7 +197,7 @@ def run_enhanced_pipeline(
     skipped_total = sum(c.get("count_skip", 0) for c in final_chunks)
 
     print(f"\n{'=' * 65}")
-    print(f"  ENHANCED PIPELINE COMPLETE")
+    print("  ENHANCED PIPELINE COMPLETE")
     print(f"  Table rules (no LLM)         : {table_rules}")
     print(f"  Prose rules (LLM)            : {prose_rules}")
     print(f"  Paragraphs SKIPPED (no cost) : {skipped_total}")

@@ -11,15 +11,15 @@ SETUP:
   e.g.  tests/fixtures/sample_obc_stairs.pdf
 """
 
-import os
 import json
-import pytest
-import pandas as pd
+import os
 
-from module1_doc_parser.section_chunker import SectionChunker
+import pandas as pd
+import pytest
 from module1_doc_parser.keyword_filter import KeywordFilter
+from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS, BIGRAM_PHRASES, KEYWORD_WEIGHTS
+from module1_doc_parser.section_chunker import SectionChunker
 from module1_doc_parser.table_rule_builder import TableRuleBuilder
-from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS, KEYWORD_WEIGHTS, BIGRAM_PHRASES
 
 TEST_DB = "tests/test_rules_m1.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -269,8 +269,9 @@ def test_keyword_filter_no_keywords(kf):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 import os
-from module3_rule_builder.rule_store import RuleStore
+
 from module3_rule_builder.rule_generator import RuleGenerator
+from module3_rule_builder.rule_store import RuleStore
 
 
 @pytest.fixture

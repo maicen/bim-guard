@@ -1,6 +1,7 @@
 # app\components\layout.py
-from fasthtml.common import Div, H2, Main, Span
+from fasthtml.common import H2, Div, Main, Span
 from monsterui.all import DivLAligned, TextT, UkIcon
+
 from app.components.themed_ui import SiteStyles
 from app.components.ui import (
     Sidebar,

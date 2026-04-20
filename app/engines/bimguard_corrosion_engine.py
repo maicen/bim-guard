@@ -25,14 +25,11 @@ Risk bands:
 """
 
 import csv
-import io
-import json
-import math
+import os
 import uuid
 import zipfile
-import os
+from dataclasses import dataclass
 from datetime import datetime
-from dataclasses import dataclass, field
 from typing import Optional
 
 # ── VERSION ───────────────────────────────────────────────────────────────────
@@ -693,7 +690,7 @@ def export_gc_asset_register(results: list, output_path: str) -> None:
 def run_validation_demo():
     """5 validation scenarios demonstrating the GC-001 engine."""
     print("=" * 72)
-    print(f"BIMGUARD AI — GC-001 Galvanic Corrosion Validation Suite")
+    print("BIMGUARD AI — GC-001 Galvanic Corrosion Validation Suite")
     print(f"Ruleset: {RULESET_VERSION}")
     print(f"Date: {ASSESSMENT_DATE}")
     print("=" * 72)
@@ -800,7 +797,7 @@ def run_validation_demo():
     bcf_count = generate_gc_bcf(results, "output/bimguard_gc001_validation.bcf.zip")
     export_gc_asset_register(results, "output/bimguard_gc001_asset_register.csv")
     print(f"\nBCF issues: {bcf_count} → output/bimguard_gc001_validation.bcf.zip")
-    print(f"Asset register → output/bimguard_gc001_asset_register.csv")
+    print("Asset register → output/bimguard_gc001_asset_register.csv")
     print(f"\nRuleset: {RULESET_VERSION}")
     print("=" * 72)
     return results

@@ -14,12 +14,11 @@ Usage in Streamlit:
 """
 
 import json
-import uuid
 import os
+import uuid
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from dataclasses import dataclass, asdict, field
 from typing import Optional
-
 
 HISTORY_FILE = "bimguard_issue_history.json"
 ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"

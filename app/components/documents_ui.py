@@ -1,12 +1,14 @@
 from fasthtml.common import Div, Tbody, Td, Th, Thead, Tr
+from monsterui.all import Form, Table
+
 from app.components.ui import (
     ActionRow,
     AlertSpec,
+    CancelAction,
     Card,
     CardContent,
     CardHeader,
     CardTitle,
-    CancelAction,
     FieldSpec,
     MessageAlert,
     SaveAction,
@@ -16,7 +18,6 @@ from app.components.ui import (
     TextInputField,
     build_table_rows,
 )
-from monsterui.all import Form, Table
 
 
 def documents_table_rows(rows: list[dict]):

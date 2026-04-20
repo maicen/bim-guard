@@ -1,4 +1,4 @@
-from fasthtml.common import Div, H3, P
+from fasthtml.common import H3, Div, P
 
 
 def _cx(*parts: str | None) -> str:

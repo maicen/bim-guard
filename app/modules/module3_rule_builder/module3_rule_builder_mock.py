@@ -1,6 +1,7 @@
 import re
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 from uuid import uuid4
+
 from ...models.rule_models import RuleType
 
 

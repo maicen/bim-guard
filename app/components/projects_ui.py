@@ -1,13 +1,28 @@
 from fasthtml.common import Div, Tbody, Td, Th, Thead, Tr
+from monsterui.all import (
+    H1,
+    H2,
+    Container,
+    DivFullySpaced,
+    DivVStacked,
+    Form,
+    FormLabel,
+    Input,
+    Subtitle,
+    Table,
+    TableT,
+    UkIcon,
+)
+
 from app.components.layout import DashboardLayout
 from app.components.ui import (
     ActionRow,
     AlertSpec,
+    CancelAction,
     Card,
     CardContent,
     CardHeader,
     CardTitle,
-    CancelAction,
     CreateAction,
     FieldSpec,
     MessageAlert,
@@ -19,20 +34,6 @@ from app.components.ui import (
     TextAreaField,
     TextInputField,
     build_table_rows,
-)
-from monsterui.all import (
-    Container,
-    DivFullySpaced,
-    DivVStacked,
-    Form,
-    FormLabel,
-    H1,
-    H2,
-    Input,
-    Subtitle,
-    Table,
-    TableT,
-    UkIcon,
 )
 
 

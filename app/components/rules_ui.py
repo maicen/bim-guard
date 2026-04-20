@@ -1,12 +1,14 @@
 from fasthtml.common import Div, Span, Tbody, Td, Th, Thead, Tr
+from monsterui.all import Form, Table
+
 from app.components.ui import (
     ActionRow,
     AlertSpec,
+    CancelAction,
     Card,
     CardContent,
     CardHeader,
     CardTitle,
-    CancelAction,
     FieldSpec,
     LinkButton,
     MessageAlert,
@@ -19,8 +21,6 @@ from app.components.ui import (
     TextInputField,
     build_table_rows,
 )
-from monsterui.all import Form, Table
-
 
 IFC_CLASS_OPTIONS = [
     "IfcProject",

@@ -1,3 +1,5 @@
+"""Document and rule library routes, including extraction/import endpoints."""
+
 from pathlib import Path
 
 from fasthtml.common import (
@@ -76,6 +78,8 @@ def _not_found_page(entity: str, back_href: str, back_title: str):
 
 
 def setup_routes(rt):
+    """Register document and rule library routes."""
+
     @rt("/library/documents")
     def documents():
         upload_spinner, upload_spinner_style = HtmxSpinner(

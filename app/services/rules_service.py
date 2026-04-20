@@ -1,3 +1,5 @@
+"""Rule persistence service for CRUD, lookup, and ruleset import operations."""
+
 import json
 
 from app.services.persistence import PersistenceService
@@ -62,6 +64,7 @@ class RuleService:
     """
 
     def __init__(self):
+        """Initialize the rules table with required schema columns."""
         all_required = {**_RICH_COLUMNS, **_META_COLUMNS}
         self._rules = PersistenceService.get_table(
             "rules",
@@ -81,9 +84,11 @@ class RuleService:
     # ── Web CRUD ──────────────────────────────────────────────────────────────
 
     def list_rules(self) -> list[dict]:
+        """Return all rules ordered by newest first."""
         return rows_desc_by_id(self._rules)
 
     def get_rule(self, rule_id: int) -> dict | None:
+        """Return a single rule by primary key."""
         return self._rules.get(rule_id)
 
     def create_rule(
@@ -118,6 +123,7 @@ class RuleService:
         ruleset_id: str = "",
         rule_category: str = "property_check",
     ):
+        """Insert a rule row into the rules table."""
         now = now_iso_utc()
         return self._rules.insert(
             {
@@ -162,6 +168,7 @@ class RuleService:
         target_ifc_class: str,
         parameters: str = "{}",
     ):
+        """Update editable fields for an existing rule."""
         self._rules.update(
             updates={
                 "reference": reference.strip(),
@@ -175,6 +182,7 @@ class RuleService:
         )
 
     def delete_rule(self, rule_id: int):
+        """Delete a rule by primary key."""
         self._rules.delete(rule_id)
 
     # ── Classification queries ────────────────────────────────────────────────
@@ -184,32 +192,41 @@ class RuleService:
         return len(list(self._rules.rows_where("ruleset_id = ?", [ruleset_id], limit=1))) > 0
 
     def list_by_mechanism(self, mechanism: str) -> list[dict]:
+        """Return all rules for a corrosion or code-check mechanism."""
         return list(self._rules.rows_where("mechanism = ?", [mechanism]))
 
     def list_by_ruleset(self, ruleset_id: str) -> list[dict]:
+        """Return all rules that belong to a ruleset identifier."""
         return list(self._rules.rows_where("ruleset_id = ?", [ruleset_id]))
 
     def list_by_category(self, rule_category: str) -> list[dict]:
+        """Return all rules matching the provided rule category."""
         return list(self._rules.rows_where("rule_category = ?", [rule_category]))
 
     # ── Pipeline query methods (used by RuleStore adapter) ────────────────────
 
     def count(self) -> int:
+        """Return the total number of rules in storage."""
         return len(list(self._rules.rows))
 
     def fetch_rules_for_target(self, target_ifc_class: str) -> list[dict]:
+        """Return rules targeting a specific IFC class."""
         return list(self._rules.rows_where("target_ifc_class = ?", [target_ifc_class]))
 
     def fetch_mandatory_rules(self) -> list[dict]:
+        """Return rules marked with mandatory severity."""
         return list(self._rules.rows_where("severity = 'mandatory'"))
 
     def fetch_rules_by_ref(self, ref: str) -> list[dict]:
+        """Return rules whose reference contains the provided token."""
         return list(self._rules.rows_where("reference LIKE ?", [f"%{ref}%"]))
 
     def fetch_needs_review(self) -> list[dict]:
+        """Return rules flagged for manual review."""
         return list(self._rules.rows_where("needs_review = 1"))
 
     def get_existing_entity_types(self) -> list[str]:
+        """Return distinct target IFC classes present in stored rules."""
         seen: set[str] = set()
         result: list[str] = []
         for r in self._rules.rows:
@@ -220,9 +237,11 @@ class RuleService:
         return result
 
     def get_rules_sample(self, limit: int = 3) -> list[dict]:
+        """Return a small sample of mandatory rules for previews."""
         return list(self._rules.rows_where("severity = 'mandatory'", limit=limit))
 
     def summary(self) -> dict:
+        """Return aggregate counts of rules by entity, source, and mechanism."""
         rules = list(self._rules.rows)
         by_entity: dict[str, int] = {}
         by_source: dict[str, int] = {}
@@ -328,6 +347,7 @@ class RuleService:
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _norm_json(self, value: str) -> str:
+        """Normalize JSON strings to a compact canonical representation."""
         raw = (value or "").strip()
         if not raw:
             return "{}"

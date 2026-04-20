@@ -44,7 +44,6 @@ Usage:
 
 import re
 
-
 # ── SIGNAL WORD SETS ──────────────────────────────────────────────────────────
 
 MODAL_VERBS = {
@@ -332,6 +331,6 @@ class DependencyParser:
                 }
             )
 
-        print(f"[DependencyParser] Done")
+        print("[DependencyParser] Done")
         print(f"  Paragraphs upgraded from LOW → MEDIUM/HIGH: {upgraded_total}")
         return enhanced

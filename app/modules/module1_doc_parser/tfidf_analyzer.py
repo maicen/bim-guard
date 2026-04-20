@@ -30,13 +30,11 @@ OR import and call:
     analyzer.print_report(new_keywords)
 """
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import LabelEncoder
-import numpy as np
 import re
 
+import numpy as np
 from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
-
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Words to always ignore — structural words with no compliance value
 STOP_WORDS = {
@@ -308,8 +306,8 @@ class TFIDFAnalyzer:
                 f"{c['suggestion']}"
             )
 
-        print(f"\n  Add high-scoring words to:")
-        print(f"  module1_doc_parser/keywords/keyword_master.py")
+        print("\n  Add high-scoring words to:")
+        print("  module1_doc_parser/keywords/keyword_master.py")
         print("=" * 65)
 
     def export_to_keyword_master(self, candidates: list, threshold: float = 0.01) -> list:

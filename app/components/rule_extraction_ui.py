@@ -1,5 +1,8 @@
 import json
+
 from fasthtml.common import Button, Div, P, Span
+from monsterui.all import H1, H3, Alert, Form, FormLabel, Input, UkIcon
+
 from app.components.ui import (
     Card,
     CardContent,
@@ -8,7 +11,6 @@ from app.components.ui import (
     HtmxSpinner,
     SubmitButton,
 )
-from monsterui.all import Alert, Form, FormLabel, H1, H3, Input, UkIcon
 
 
 def rule_extraction_page_content():

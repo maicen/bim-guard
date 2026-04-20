@@ -32,6 +32,20 @@ There are no automated tests or lint commands configured.
 
 All Python dependencies must be managed via uv and declared in pyproject.toml (including optional dependency groups). Do not add or maintain separate requirements.txt files.
 
+## Docstring and API Documentation Rule
+
+- Follow [PEP 257](https://peps.python.org/pep-0257/) for Python docstrings.
+- Use Python [pydoc](https://docs.python.org/3/library/pydoc.html) to inspect and generate API docs.
+- For new public modules/classes/functions, add or update docstrings in the same change.
+
+Useful commands:
+
+```bash
+uv run ruff check .
+uv run python -m pydoc app.modules.orchestrator
+uv run python -m pydoc -w app.modules.orchestrator
+```
+
 ## Architecture
 
 BIM-Guard is a FastHTML + MonsterUI web application for BIM (Building Information Modeling) compliance checking. Users upload IFC models and specification documents, extract compliance rules, and generate compliance reports.

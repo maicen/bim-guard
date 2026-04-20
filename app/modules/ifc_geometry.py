@@ -15,8 +15,8 @@ Usage:
   area = extractor.get_external_surface_area(element)
 """
 
-import math
 import logging
+import math
 from typing import Optional
 
 logger = logging.getLogger("bimguard.geometry")

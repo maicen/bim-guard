@@ -1,6 +1,8 @@
 """Switch (toggle switch) component adapted from shadcn/ui."""
 
-from fasthtml.common import Div, Input, Label as HtmlLabel
+from fasthtml.common import Div, Input
+from fasthtml.common import Label as HtmlLabel
+
 from .utils import cn
 
 

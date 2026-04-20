@@ -24,21 +24,21 @@ Usage:
 
 try:
     from config import (
-        OBC_TO_IFC_MAP,
         IFC_PROPERTY_SET_MAP,
-        VALID_OPERATORS,
-        VALID_RULE_TYPES,
+        OBC_TO_IFC_MAP,
         RULE_TYPE_REQUIRED_FIELDS,
         SOURCE_DOC_PDF,
+        VALID_OPERATORS,
+        VALID_RULE_TYPES,
     )
 except ImportError:
     from app.modules.config import (
-        OBC_TO_IFC_MAP,
         IFC_PROPERTY_SET_MAP,
-        VALID_OPERATORS,
-        VALID_RULE_TYPES,
+        OBC_TO_IFC_MAP,
         RULE_TYPE_REQUIRED_FIELDS,
         SOURCE_DOC_PDF,
+        VALID_OPERATORS,
+        VALID_RULE_TYPES,
     )
 
 # Fields that must always be present with non-empty values regardless of rule type

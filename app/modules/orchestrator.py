@@ -43,7 +43,7 @@ from pathlib import Path
 from app.services.persistence import PersistenceService
 
 DB_PATH = PersistenceService.DB_PATH
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # ── SWITCH HERE ───────────────────────────────────────────────────────────────
 # False = regex (free, no API key, works offline)
@@ -53,12 +53,12 @@ USE_GPT4O = False
 
 try:
     from .module1_doc_parser.docling_extractor import DoclingExtractor
-    from .module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from .module1_doc_parser.section_chunker import SectionChunker
     from .module1_doc_parser.keyword_filter import KeywordFilter
-    from .module3_rule_builder.rule_store import RuleStore
-    from .module3_rule_builder.rule_generator import RuleGenerator
+    from .module1_doc_parser.section_chunker import SectionChunker
+    from .module1_doc_parser.table_rule_builder import TableRuleBuilder
     from .module3_rule_builder.obc_seed_rules import seed_rules
+    from .module3_rule_builder.rule_generator import RuleGenerator
+    from .module3_rule_builder.rule_store import RuleStore
 
     if USE_GPT4O:
         from .module3_rule_builder.rule_converter import RuleConverter
@@ -98,7 +98,7 @@ def run_pipeline(
     converter_name = "gpt-4o" if USE_GPT4O else "regex"
 
     print(f"\n{'=' * 60}")
-    print(f"  BIMGuard AI — Module 1 + 3 Pipeline")
+    print("  BIMGuard AI — Module 1 + 3 Pipeline")
     print(f"  PDF       : {pdf_path.name}")
     print(f"  Converter : {converter_name.upper()}")
     print(f"  Sections  : {run_sections}")
@@ -110,7 +110,7 @@ def run_pipeline(
     generator = RuleGenerator(store)
 
     if USE_GPT4O:
-        converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
+        converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
     else:
         converter = RuleConverter()  # regex needs no arguments
 
@@ -176,7 +176,7 @@ def run_pipeline(
     db_summary = store.summary()
 
     print(f"\n{'=' * 60}")
-    print(f"  PIPELINE COMPLETE")
+    print("  PIPELINE COMPLETE")
     print(f"  Converter used               : {converter_name}")
     print(f"  Table rules (no converter)   : {table_rules}")
     print(f"  Prose rules ({converter_name})  : {prose_rules}")
@@ -203,8 +203,8 @@ class BIMGuard_App:
 
     def run_dashboard(self) -> dict:
         """Return summary counts for the dashboard page."""
-        from app.services.projects_service import ProjectsService
         from app.services.documents_service import DocumentService
+        from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
 
         projects_svc = ProjectsService()
@@ -232,10 +232,11 @@ class BIMGuard_App:
         3. Run corrosion compliance checks
         4. Return a unified result dict consumed by the analyze route
         """
-        from app.services.projects_service import ProjectsService
         from app.services.documents_service import DocumentService
-        from .ifc_parser import parse_ifc, generate_synthetic_elements
+        from app.services.projects_service import ProjectsService
+
         from .compliance_runner import run_compliance_checks
+        from .ifc_parser import generate_synthetic_elements, parse_ifc
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()

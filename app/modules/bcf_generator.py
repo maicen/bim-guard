@@ -4,12 +4,11 @@ Standard: BIM Collaboration Format (BCF) 2.1 — buildingSMART International
 Output: BCF-ZIP file containing XML topics, viewpoints, and snapshots
 """
 
+import datetime
+import io
 import uuid
 import zipfile
-import io
-import datetime
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass

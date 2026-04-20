@@ -1,4 +1,5 @@
-from fasthtml.common import A, Button as HtmlButton, Div, Hr, Li, Span, Ul
+from fasthtml.common import A, Div, Hr, Li, Span, Ul
+from fasthtml.common import Button as HtmlButton
 from monsterui.all import UkIcon
 
 

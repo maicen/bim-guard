@@ -25,20 +25,22 @@ Risk bands:
 """
 
 import csv
+import os
 import uuid
 import zipfile
-import os
+from dataclasses import dataclass
 from datetime import datetime
-from dataclasses import dataclass, field
 from typing import Optional
 
 # Import GC-001 engine for combined assessment
 try:
     from bimguard_corrosion_engine import (
+        RULESET_VERSION as GC_RULESET_VERSION,
+    )
+    from bimguard_corrosion_engine import (
         GCElement,
         GCResult,
         assess_galvanic_risk,
-        RULESET_VERSION as GC_RULESET_VERSION,
     )
 
     GC_AVAILABLE = True
@@ -761,7 +763,7 @@ def export_cc_asset_register(results: list, output_path: str) -> None:
 def run_validation_demo():
     """10 validation scenarios demonstrating the CC-001 engine."""
     print("=" * 72)
-    print(f"BIMGUARD AI — CC-001 Crevice Corrosion Validation Suite")
+    print("BIMGUARD AI — CC-001 Crevice Corrosion Validation Suite")
     print(f"Ruleset: {RULESET_VERSION}")
     print(f"Date: {ASSESSMENT_DATE}")
     print("=" * 72)
@@ -936,7 +938,7 @@ def run_validation_demo():
     bcf_count = generate_cc_bcf(results, "output/bimguard_cc001_validation.bcf.zip")
     export_cc_asset_register(results, "output/bimguard_cc001_asset_register.csv")
     print(f"\nBCF issues: {bcf_count} → output/bimguard_cc001_validation.bcf.zip")
-    print(f"Asset register → output/bimguard_cc001_asset_register.csv")
+    print("Asset register → output/bimguard_cc001_asset_register.csv")
     print(f"\nRuleset: {RULESET_VERSION}")
     print("=" * 72)
     return results

@@ -1,6 +1,7 @@
 """Toggle button component adapted from shadcn/ui."""
 
 from fasthtml.common import Button as HtmlButton
+
 from .utils import cn
 
 

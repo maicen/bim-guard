@@ -1,3 +1,5 @@
+"""Persistence bootstrap utilities for SQLite tables and upload directories."""
+
 from pathlib import Path
 
 from fastlite import database
@@ -13,6 +15,7 @@ class PersistenceService:
 
     @classmethod
     def get_db(cls):
+        """Return a singleton FastLite database connection."""
         cls.DATA_DIR.mkdir(exist_ok=True)
         if cls._db is None:
             cls._db = database(str(cls.DB_PATH))
@@ -26,6 +29,7 @@ class PersistenceService:
         pk: str = "id",
         required_columns: dict | None = None,
     ):
+        """Create or migrate a table, then return the table handle."""
         table = cls.get_db()[table_name]
         table.create(schema, pk=pk, if_not_exists=True)
 
@@ -37,6 +41,7 @@ class PersistenceService:
 
     @classmethod
     def uploads_dir(cls, *parts: str) -> Path:
+        """Return an uploads subdirectory, creating it when missing."""
         path = cls.UPLOADS_DIR.joinpath(*parts)
         path.mkdir(parents=True, exist_ok=True)
         return path

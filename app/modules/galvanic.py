@@ -67,7 +67,6 @@ from ..piping_schema import (
     PipingElement,
 )
 
-
 MECHANISM = "GC-001 galvanic"
 RULE_REF_PREFIX = "GC-001"
 

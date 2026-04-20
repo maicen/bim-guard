@@ -1,12 +1,28 @@
 from fasthtml.common import (
     Caption as HtmlCaption,
+)
+from fasthtml.common import (
     Div,
+)
+from fasthtml.common import (
     Table as HtmlTable,
+)
+from fasthtml.common import (
     Tbody as HtmlTbody,
+)
+from fasthtml.common import (
     Td as HtmlTd,
+)
+from fasthtml.common import (
     Tfoot as HtmlTfoot,
+)
+from fasthtml.common import (
     Th as HtmlTh,
+)
+from fasthtml.common import (
     Thead as HtmlThead,
+)
+from fasthtml.common import (
     Tr as HtmlTr,
 )
 

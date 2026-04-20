@@ -28,13 +28,13 @@ Field names match the rich rule schema:
 """
 
 try:
-    from module3_rule_builder.rule_store import RuleStore
-    from module3_rule_builder.rule_generator import RuleGenerator
     from config import DB_PATH, SOURCE_DOC_SEED
+    from module3_rule_builder.rule_generator import RuleGenerator
+    from module3_rule_builder.rule_store import RuleStore
 except ImportError:
-    from app.modules.module3_rule_builder.rule_store import RuleStore
-    from app.modules.module3_rule_builder.rule_generator import RuleGenerator
     from app.modules.config import DB_PATH, SOURCE_DOC_SEED
+    from app.modules.module3_rule_builder.rule_generator import RuleGenerator
+    from app.modules.module3_rule_builder.rule_store import RuleStore
 
 
 # ── PRE-BUILT OBC PART 9 RULES ────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+"""Project service for IFC-backed project CRUD and file handling."""
+
 from pathlib import Path
 
 from app.services.persistence import PersistenceService
@@ -14,6 +16,7 @@ class ProjectsService:
     """Encapsulates projects persistence and IFC file operations."""
 
     def __init__(self):
+        """Initialize project storage and ensure required table columns exist."""
         self._ifc_upload_dir = PersistenceService.uploads_dir("ifc")
         self._projects = PersistenceService.get_table(
             "projects",
@@ -31,15 +34,19 @@ class ProjectsService:
         )
 
     def list_projects(self):
+        """Return all projects ordered by newest first."""
         return rows_desc_by_id(self._projects)
 
     def total_projects(self) -> int:
+        """Return the number of stored projects."""
         return len(self.list_projects())
 
     def get_project(self, project_id: int):
+        """Return a single project by primary key."""
         return self._projects.get(project_id)
 
     async def prepare_ifc_upload(self, ifc_file) -> tuple[str, str]:
+        """Validate and persist an uploaded IFC file, returning path and MD5 hash."""
         if not ifc_file or not getattr(ifc_file, "filename", None):
             return "", ""
 
@@ -63,6 +70,7 @@ class ProjectsService:
         ifc_file_path: str = "",
         ifc_md5_hash: str = "",
     ):
+        """Insert a new project record into the database."""
         now = now_iso_utc()
         return self._projects.insert(
             {
@@ -79,6 +87,7 @@ class ProjectsService:
     def update_project(
         self, project_id: int, name: str, description: str = "", status: str = "Draft"
     ):
+        """Update editable fields for an existing project."""
         self._projects.update(
             updates={
                 "name": name.strip(),
@@ -90,9 +99,11 @@ class ProjectsService:
         )
 
     def delete_project(self, project_id: int):
+        """Delete a project row by primary key."""
         self._projects.delete(project_id)
 
     def resolve_ifc_file(self, project_id: int) -> Path | None:
+        """Return an existing IFC file path for a project, if present."""
         project = self.get_project(project_id)
         if project is None:
             return None

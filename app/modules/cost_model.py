@@ -18,9 +18,9 @@ Usage in Streamlit:
 
 import csv
 import io
-import pandas as pd
 from dataclasses import dataclass, field
-from typing import Optional
+
+import pandas as pd
 
 # ── BUILT-IN DEFAULT RATES ────────────────────────────────────────────────────
 # Based on UK commercial MEP remediation unit rates, 2025

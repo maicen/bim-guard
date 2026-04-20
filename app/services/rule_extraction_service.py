@@ -27,10 +27,12 @@ class RuleExtractionService:
         doc_reader: Module1_DocReader | None = None,
         provider: RuleExtractionProvider | None = None,
     ):
+        """Initialize document parser and extraction provider dependencies."""
         self._doc_reader = doc_reader or Module1_DocReader()
         self._provider = provider or LiteLLMGeminiRuleExtractor()
 
     async def extract_rules(self, file_content: bytes) -> list[dict]:
+        """Extract, normalize, and deduplicate rules from uploaded PDF bytes."""
         # ── Module 1 Step 1: PDF text extraction ─────────────────────────────
         if not file_content:
             return []

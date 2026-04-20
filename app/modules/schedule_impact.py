@@ -5,9 +5,8 @@ Outputs: delay days, cost impact, Gantt-ready data.
 """
 
 import datetime
-import pandas as pd
-from dataclasses import dataclass
 
+import pandas as pd
 
 # Default cost and duration model per risk band and mechanism
 # These are configurable — can be loaded from a project-specific CSV

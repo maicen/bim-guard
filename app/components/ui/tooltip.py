@@ -1,6 +1,7 @@
 """Tooltip component adapted from shadcn/ui."""
 
 from fasthtml.common import Div
+
 from .utils import cn
 
 

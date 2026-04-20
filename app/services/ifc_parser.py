@@ -1,12 +1,13 @@
-import ifcopenshell
-import tempfile
+"""Lightweight IFC parsing helpers used by upload and validation flows."""
+
 import os
+import tempfile
+
+import ifcopenshell
 
 
 def count_walls(file_content: bytes) -> int:
-    """
-    Parses an IFC file from bytes and counts the number of IfcWall entities.
-    """
+    """Parse IFC bytes and return the number of ``IfcWall`` entities."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=".ifc") as tmp:
         tmp.write(file_content)
         tmp_path = tmp.name

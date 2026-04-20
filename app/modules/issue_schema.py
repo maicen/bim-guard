@@ -25,7 +25,6 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal, Optional
 
-
 SCHEMA_VERSION = "1.0.0"
 
 

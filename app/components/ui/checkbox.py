@@ -1,6 +1,7 @@
 """Checkbox component adapted from shadcn/ui."""
 
 from fasthtml.common import Input
+
 from .utils import cn
 
 

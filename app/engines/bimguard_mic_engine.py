@@ -25,15 +25,12 @@ Risk bands:
   Critical > 0.75
 """
 
-import json
-import math
-import uuid
 import csv
-import zipfile
-import io
 import os
+import uuid
+import zipfile
+from dataclasses import dataclass
 from datetime import datetime
-from dataclasses import dataclass, field
 from typing import Optional
 
 # ── VERSION ───────────────────────────────────────────────────────────────────
@@ -693,7 +690,7 @@ def run_validation_demo():
     Scenarios cover the range of expected real-world MIC conditions.
     """
     print("=" * 72)
-    print(f"BIMGUARD AI — MC-001 MIC Validation Suite")
+    print("BIMGUARD AI — MC-001 MIC Validation Suite")
     print(f"Ruleset: {RULESET_VERSION}")
     print(f"Date: {ASSESSMENT_DATE}")
     print("=" * 72)

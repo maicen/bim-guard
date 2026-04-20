@@ -12,16 +12,16 @@ SETUP:
   Place your test PDFs in tests/fixtures/ and update INTEGRATION_CASES below.
 """
 
-import os
 import json
+import os
 import time
-import pytest
 
-from module1_doc_parser.section_chunker import SectionChunker
+import pytest
 from module1_doc_parser.keyword_filter import KeywordFilter
+from module1_doc_parser.section_chunker import SectionChunker
 from module1_doc_parser.table_rule_builder import TableRuleBuilder
-from module3_rule_builder.rule_store import RuleStore
 from module3_rule_builder.rule_generator import RuleGenerator
+from module3_rule_builder.rule_store import RuleStore
 
 TEST_DB = "tests/test_rules_integration.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")

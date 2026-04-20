@@ -1,16 +1,18 @@
+"""BCF export helpers for serializing compliance issues to XML."""
+
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from uuid import uuid4
 from typing import List
+from uuid import uuid4
+
 from app.models.compliance_models import ComplianceIssue
 
 
 class BCFExporter:
-    """
-    Service to export compliance issues as BCF 2.1 (BIM Collaboration Format).
-    """
+    """Export compliance issues as BCF 2.1 XML markup."""
 
     def generate_bcf_xml(self, issues: List[ComplianceIssue]) -> str:
+        """Build and return a BCF Markup XML string for a list of issues."""
         # Simplified BCF XML generation (Markup.bcf)
         # In a real app, this would be a zip file with multiple components (Viewpoints, Snapshots)
 

@@ -1,15 +1,20 @@
+"""IFC model viewer routes and preload wiring for project model files."""
+
 import json
 
 from fasthtml.common import Div, Script, Title
+from monsterui.all import H2, Container
+
 from app.components.layout import DashboardLayout
 from app.components.ui import BackAction, NotFoundBlock
 from app.services.projects_service import ProjectsService
-from monsterui.all import Container, H2
 
 _projects_service = ProjectsService()
 
 
 def setup_routes(rt):
+    """Register 3D viewer page routes."""
+
     @rt("/viewer")
     def viewer_page(project_id: int | None = None):
         project = _projects_service.get_project(project_id) if project_id is not None else None

@@ -1,6 +1,7 @@
 """Label component adapted from shadcn/ui."""
 
 from fasthtml.common import Label as HtmlLabel
+
 from .utils import cn
 
 

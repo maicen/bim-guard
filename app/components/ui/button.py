@@ -1,4 +1,5 @@
-from fasthtml.common import A, Button as HtmlButton
+from fasthtml.common import A
+from fasthtml.common import Button as HtmlButton
 from monsterui.all import Form, UkIcon
 
 ACTION_ICON_CLS = (

@@ -15,12 +15,12 @@ Test groups:
     Skip: pytest tests/test_module3.py -m "not llm" -v
 """
 
-import os
 import json
-import pytest
+import os
 
-from module3_rule_builder.rule_store import RuleStore
+import pytest
 from module3_rule_builder.rule_generator import RuleGenerator
+from module3_rule_builder.rule_store import RuleStore
 
 TEST_DB = "tests/test_rules_m3.db"
 
@@ -322,7 +322,7 @@ def test_generator_numeric_range_saves_with_min_max(gen, store):
 
 
 def test_generator_exists_operator_skips_check_value(gen, store):
-    """exists operator should not require check_value."""
+    """Exists operator should not require check_value."""
     rule = {
         "ref": "QA",
         "rule_type": "prohibition",
@@ -396,7 +396,7 @@ def test_seed_rules_schema(gen, store):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# LLM tests — RuleConverter (require OPENAI_API_KEY or GEMINI_API_KEY)
+# LLM tests — RuleConverter (require GEMINI_API_KEY or GEMINI_API_KEY)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 GOLDEN_CASES = [
@@ -432,7 +432,7 @@ GOLDEN_CASES = [
 class TestRuleConverterLLM:
     """
     Tests that call the real LLM (RuleConverter → GPT-4o).
-    Requires OPENAI_API_KEY environment variable.
+    Requires GEMINI_API_KEY environment variable.
     Run with:  pytest tests/test_module3.py -m llm -v
     """
 
@@ -440,9 +440,9 @@ class TestRuleConverterLLM:
     def converter(self, store):
         from module3_rule_builder.rule_converter import RuleConverter
 
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            pytest.skip("OPENAI_API_KEY not set")
+            pytest.skip("GEMINI_API_KEY not set")
         return RuleConverter(api_key=api_key, rule_store=store)
 
     @pytest.mark.parametrize("case", GOLDEN_CASES, ids=[c["id"] for c in GOLDEN_CASES])
