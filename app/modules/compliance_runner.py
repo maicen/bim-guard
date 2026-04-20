@@ -4,10 +4,7 @@ Connects IFC service elements to GC-001 and CC-001 engines.
 Returns unified results ready for BCF generation and dashboard.
 """
 
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
-from modules.ifc_parser import ServiceElement
+from .ifc_parser import ServiceElement
 
 # ── Galvanic potential table ────────────────────────────────────────────────
 GP = {

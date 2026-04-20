@@ -6,6 +6,9 @@ dist/
 wheels/
 *.egg-info
 
+# Environment variables (contains secrets — never commit)
+.env
+
 # Virtual environments
 .venv
 tmp_sig_check.sqlite

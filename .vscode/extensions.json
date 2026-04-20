@@ -3,6 +3,8 @@
         "github.vscode-pull-request-github",
         "ms-python.python",
         "charliermarsh.ruff",
-        "qwtel.sqlite-viewer"
+        "qwtel.sqlite-viewer",
+        "shd101wyy.markdown-preview-enhanced",
+        "anthropic.claude-code"
     ]
 }

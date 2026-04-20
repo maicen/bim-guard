@@ -2,7 +2,7 @@
 
 ## Sources
 
-- [Components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui)
+- [Components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui) _(visual reference only — implemented as MonsterUI Python FT components, not React/shadcn)_
 - [This Design](https://raw.githubusercontent.com/VoltAgent/awesome-design-md/refs/heads/main/design-md/apple/DESIGN.md)
 - [What is DESIGN.md?](https://stitch.withgoogle.com/docs/design-md/overview)
 - [MonsterUI](https://monsterui.answer.ai/)

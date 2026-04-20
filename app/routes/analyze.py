@@ -1,4 +1,6 @@
-from fasthtml.common import Div, Form, Option, P, Request, Title
+import os
+
+from fasthtml.common import A, Div, Form, H3, Option, P, Request, Span, Table, Tbody, Td, Th, Thead, Title, Tr
 from app.components.ui import (
     Alert,
     AlertT,
@@ -24,6 +26,245 @@ from app.services.projects_service import ProjectsService
 _bim_guard_app = BIMGuard_App()
 _projects_service = ProjectsService()
 _documents_service = DocumentService()
+
+_DATA_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
+)
+
+
+def _band_badge(band: str):
+    colours = {
+        "Critical": "bg-red-600 text-white",
+        "High":     "bg-orange-500 text-white",
+        "Medium":   "bg-yellow-400 text-black",
+        "Low":      "bg-green-600 text-white",
+    }
+    return Span(
+        band,
+        cls=f"inline-block px-2 py-0.5 rounded text-xs font-semibold {colours.get(band, 'bg-gray-400 text-white')}",
+    )
+
+
+def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, error):
+    """Build the corrosion compliance results card for the analysis results page."""
+    if error:
+        return Card(
+            CardHeader(CardTitle("Corrosion Compliance — GC-001 / CC-001")),
+            CardContent(P(f"Compliance engine error: {error}", cls="text-sm text-destructive")),
+        )
+
+    if not results:
+        return None
+
+    bands = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+    for r in results:
+        b = r.get("risk_band", "Low")
+        if b in bands:
+            bands[b] += 1
+
+    badge_row = Div(
+        *[
+            Div(
+                _band_badge(b),
+                Span(f" {bands[b]}", cls="text-sm font-medium ml-1"),
+                cls="flex items-center",
+            )
+            for b in ("Critical", "High", "Medium", "Low")
+        ],
+        cls="flex items-center gap-4 flex-wrap",
+    )
+
+    cost_line = (
+        P(
+            f"Estimated remediation: £{cost_impact.total_cost_gbp:,.0f}  |  "
+            f"Programme impact: {cost_impact.total_days} days",
+            cls="text-sm text-muted-foreground mt-2",
+        )
+        if cost_impact
+        else ""
+    )
+
+    tracker_line = (
+        P(
+            f"Issue history: {issue_stats.get('new', 0)} new, "
+            f"{issue_stats.get('updated', 0)} updated, "
+            f"{issue_stats.get('resolved', 0)} resolved.",
+            cls="text-xs text-muted-foreground mt-1",
+        )
+        if issue_stats
+        else ""
+    )
+
+    demo_notice = (
+        Alert(
+            "No IFC file found — showing synthetic demo data (25 representative MEP elements).",
+            cls=AlertT.info if hasattr(AlertT, "info") else "",
+        )
+        if is_demo
+        else ""
+    )
+
+    flagged = [r for r in results if r.get("risk_band", "Low") != "Low"]
+
+    if flagged:
+        header_cells = [
+            Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+            for h in ("Element", "Floor", "Material", "Band", "Score", "Required Action")
+        ]
+        data_rows = []
+        for r in flagged[:20]:
+            data_rows.append(
+                Tr(
+                    Td(r.get("name", "—")[:40], cls="px-3 py-2 text-sm"),
+                    Td(r.get("floor", "—"), cls="px-3 py-2 text-sm"),
+                    Td(r.get("material_a", "—")[:22], cls="px-3 py-2 text-sm"),
+                    Td(_band_badge(r.get("risk_band", "Low")), cls="px-3 py-2"),
+                    Td(f"{r.get('overall_score', 0):.3f}", cls="px-3 py-2 text-sm font-mono"),
+                    Td(r.get("action", "—")[:70], cls="px-3 py-2 text-xs"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        if len(flagged) > 20:
+            data_rows.append(
+                Tr(
+                    Td(
+                        f"… and {len(flagged) - 20} more flagged elements",
+                        cls="px-3 py-2 text-xs text-muted-foreground italic",
+                        colspan="6",
+                    )
+                )
+            )
+        results_table = Div(
+            Table(
+                Thead(Tr(*header_cells)),
+                Tbody(*data_rows),
+                cls="w-full text-sm",
+            ),
+            cls="overflow-auto mt-4 border rounded-md",
+        )
+    else:
+        results_table = P(
+            "No elements flagged at Medium risk or above.",
+            cls="text-sm text-muted-foreground mt-3",
+        )
+
+    bcf_btn = (
+        Div(
+            A(
+                "Download BCF Report",
+                href=f"/reports/bcf/{project_id}",
+                cls="inline-block mt-4 px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:opacity-90",
+            ),
+        )
+        if project_id
+        else ""
+    )
+
+    return Card(
+        CardHeader(CardTitle("Corrosion Compliance — GC-001 / CC-001")),
+        CardContent(
+            demo_notice,
+            badge_row,
+            cost_line,
+            tracker_line,
+            results_table,
+            bcf_btn,
+        ),
+    )
+
+
+def _rule_validation_card(rule_validations: list[dict]):
+    """Build the Module 3 rule validation card for the analysis results page."""
+    if not rule_validations:
+        return Card(
+            CardHeader(CardTitle("Rule Validation — Module 3")),
+            CardContent(
+                P(
+                    "No rules found in the library. "
+                    "Go to Library → Rule Extraction Studio to extract and save rules first.",
+                    cls="text-sm text-muted-foreground",
+                )
+            ),
+        )
+
+    present = sum(1 for r in rule_validations if r["status"] == "present")
+    not_found = len(rule_validations) - present
+
+    summary = Div(
+        Div(
+            Span(str(len(rule_validations)), cls="text-2xl font-bold"),
+            Span(" rules checked", cls="text-sm text-muted-foreground ml-1"),
+            cls="flex items-baseline",
+        ),
+        Div(
+            Span(
+                f"{present} matched",
+                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800 mr-2",
+            ),
+            Span(
+                f"{not_found} no elements",
+                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-800",
+            ),
+            cls="mt-1",
+        ),
+        cls="mb-4",
+    )
+
+    header_cells = [
+        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+        for h in ("Reference", "Description", "Target IFC Class", "Elements in Model", "Status")
+    ]
+
+    def _status_badge(status: str, count: int):
+        if status == "present":
+            return Span(
+                f"✓ {count} found",
+                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800",
+            )
+        return Span(
+            "No elements",
+            cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-800",
+        )
+
+    data_rows = []
+    for r in rule_validations:
+        data_rows.append(
+            Tr(
+                Td(r.get("reference", "—"), cls="px-3 py-2 text-xs font-mono"),
+                Td(
+                    r.get("description", "")[:80] + ("…" if len(r.get("description", "")) > 80 else ""),
+                    cls="px-3 py-2 text-sm",
+                ),
+                Td(r.get("target_ifc_class", "—"), cls="px-3 py-2 text-xs font-mono text-blue-700"),
+                Td(str(r.get("element_count", 0)), cls="px-3 py-2 text-sm text-center"),
+                Td(_status_badge(r["status"], r["element_count"]), cls="px-3 py-2"),
+                cls="border-b border-muted last:border-0",
+            )
+        )
+
+    return Card(
+        CardHeader(
+            Div(
+                CardTitle("Rule Validation — Module 3"),
+                P(
+                    "Each library rule is checked against the IFC model. "
+                    "'No elements' means that IFC class is absent from this model.",
+                    cls="text-xs text-muted-foreground mt-0.5",
+                ),
+            )
+        ),
+        CardContent(
+            summary,
+            Div(
+                Table(
+                    Thead(Tr(*header_cells)),
+                    Tbody(*data_rows),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md",
+            ),
+        ),
+    )
 
 
 def setup_routes(rt):
@@ -268,12 +509,20 @@ def setup_routes(rt):
                 )
             )
 
-        stub_notice = Alert(
-            "Rule validation (Module 3–5) is not yet implemented — results will appear here once integrated.",
-            cls=AlertT.info if hasattr(AlertT, "info") else "",
+        compliance_card = _compliance_card(
+            results=result.get("compliance_results", []),
+            cost_impact=result.get("cost_impact"),
+            issue_stats=result.get("issue_stats", {}),
+            is_demo=result.get("compliance_is_demo", False),
+            project_id=result.get("bcf_project_id"),
+            error=result.get("compliance_error"),
         )
 
-        return Div(
+        rule_validation_card = _rule_validation_card(
+            result.get("rule_validations", [])
+        )
+
+        sections = [
             Card(
                 CardHeader(CardTitle(project.get("name", "Project"))),
                 CardContent(ifc_detail),
@@ -282,8 +531,33 @@ def setup_routes(rt):
                 doc_cards
                 or [P("No documents selected.", cls="text-sm text-muted-foreground")]
             ),
-            stub_notice,
-            cls="space-y-4",
+            rule_validation_card,
+        ]
+        if compliance_card:
+            sections.append(compliance_card)
+
+        return Div(*sections, cls="space-y-4")
+
+    @rt("/reports/bcf/{project_id}")
+    def bcf_download(project_id: int):
+        from starlette.responses import Response as StarletteResponse
+
+        bcf_file = os.path.join(_DATA_DIR, f"compliance_project_{project_id}.bcf")
+        if not os.path.exists(bcf_file):
+            return Alert(
+                "BCF file not found. Run the analysis first to generate the report.",
+                cls=AlertT.error,
+            )
+        with open(bcf_file, "rb") as fh:
+            bcf_bytes = fh.read()
+        return StarletteResponse(
+            content=bcf_bytes,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="compliance_project_{project_id}.bcf"'
+                )
+            },
         )
 
     @rt("/reports")

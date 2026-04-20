@@ -1,4 +1,17 @@
-from app.modules.module1_doc_reader import Module1_DocReader
+"""
+Rule extraction pipeline wiring Module 1 → Module 3 (Gemini) → web app DB.
+
+Pipeline:
+    PDF bytes
+        ↓  Module1_DocReader.parse_pdf()       — pypdf text extraction
+        ↓  SectionChunker.chunk()              — split into OBC-structured sections
+        ↓  LiteLLMGeminiRuleExtractor          — Gemini extracts rules per section
+        ↓  _deduplicate_rules()                — remove duplicates
+        → list[dict] returned to route for display + "Save to Library" per rule
+"""
+
+from app.modules.module1_doc_parser import Module1_DocReader
+from app.modules.module1_doc_parser.section_chunker import SectionChunker
 from app.services.gemini_rule_extractor import (
     LiteLLMGeminiRuleExtractor,
     RuleExtractionProvider,
@@ -6,7 +19,7 @@ from app.services.gemini_rule_extractor import (
 
 
 class RuleExtractionService:
-    """Encapsulates rule extraction workflow from uploaded documents."""
+    """Encapsulates the Module 1 → Module 3 rule extraction pipeline."""
 
     def __init__(
         self,
@@ -18,23 +31,58 @@ class RuleExtractionService:
         self._provider = provider or LiteLLMGeminiRuleExtractor()
 
     async def extract_rules(self, file_content: bytes) -> list[dict]:
+        # ── Module 1 Step 1: PDF text extraction ─────────────────────────────
         if not file_content:
             return []
 
-        raw_text = self._doc_reader.parse_pdf(file_content)
+        try:
+            raw_text = self._doc_reader.parse_pdf(file_content)
+        except Exception as exc:
+            raise RuntimeError(f"PDF parsing failed: {exc}") from exc
+
         if not raw_text.strip():
-            return []
+            raise RuntimeError(
+                "No text could be extracted from this PDF. "
+                "The file may be scanned (image-only) or encrypted. "
+                "Please upload a text-based PDF."
+            )
 
-        chunks = self._doc_reader.extract_text_sections(raw_text)
-        if not chunks:
-            return []
+        # ── Module 1 Step 3: Section chunking ────────────────────────────────
+        # SectionChunker detects OBC Part 9 section headings (1–13).
+        # If it finds sections, each is sent to Gemini individually so the LLM
+        # has focused context per topic (stairs, doors, windows, etc.).
+        # For non-OBC documents with no recognized headings, fall back to
+        # the generic size-based chunker built into Module1_DocReader.
+        obc_chunks = SectionChunker().chunk(raw_text)
 
-        extracted_rules = []
-        for index, chunk in enumerate(chunks, start=1):
+        if obc_chunks:
+            text_chunks = [
+                (c["section_name"], c["text"]) for c in obc_chunks if c.get("text", "").strip()
+            ]
+        else:
+            # Fall back: generic size-bounded chunking
+            generic_chunks = self._doc_reader.extract_text_sections(raw_text)
+            text_chunks = [(f"Section {i + 1}", t) for i, t in enumerate(generic_chunks)]
+
+        if not text_chunks:
+            raise RuntimeError(
+                "Could not split the document into processable sections. "
+                "Make sure the document contains readable text."
+            )
+
+        # ── Module 3 (Gemini): extract rules per section ──────────────────────
+        # Gemini acts as the rule converter — equivalent to module3's RuleConverter
+        # but using the configured Gemini key instead of OpenAI.
+        extracted_rules: list[dict] = []
+        total = len(text_chunks)
+
+        for index, (section_name, section_text) in enumerate(text_chunks, start=1):
+            if not section_text.strip():
+                continue
             chunk_rules = await self._provider.extract_rules_from_text(
-                chunk,
+                section_text,
                 chunk_index=index,
-                total_chunks=len(chunks),
+                total_chunks=total,
             )
             extracted_rules.extend(chunk_rules)
 
@@ -42,7 +90,7 @@ class RuleExtractionService:
 
     def _deduplicate_rules(self, rules: list[dict]) -> list[dict]:
         deduplicated = []
-        seen = set()
+        seen: set[tuple] = set()
 
         for rule in rules:
             desc = str(rule.get("desc") or "").strip()
