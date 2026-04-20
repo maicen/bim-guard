@@ -8,6 +8,19 @@ from fasthtml.common import (
     Title,
     UploadFile,
 )
+from monsterui.all import (
+    H1,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Container,
+    DivLAligned,
+    Form,
+    FormLabel,
+    Input,
+)
+
 from app.components.documents_ui import document_edit_form, documents_panel
 from app.components.layout import DashboardLayout
 from app.components.rule_extraction_ui import (
@@ -20,16 +33,24 @@ from app.components.ui import (
     Alert,
     AlertT,
     BackAction,
-    Card as UICard,
-    CardContent as UICardContent,
-    CardHeader as UICardHeader,
-    CardTitle as UICardTitle,
     CreateAction,
     EditAction,
     HtmxSpinner,
     LinkButton,
     NotFoundBlock,
     SubmitButton,
+)
+from app.components.ui import (
+    Card as UICard,
+)
+from app.components.ui import (
+    CardContent as UICardContent,
+)
+from app.components.ui import (
+    CardHeader as UICardHeader,
+)
+from app.components.ui import (
+    CardTitle as UICardTitle,
 )
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.services.documents_service import DocumentService
@@ -41,18 +62,6 @@ from app.utils import (
     safe_upload_name,
     store_upload_bytes,
     validate_document_upload,
-)
-from monsterui.all import (
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    Container,
-    DivLAligned,
-    Form,
-    H1,
-    Input,
-    FormLabel,
 )
 
 _document_service = DocumentService()
@@ -136,9 +145,7 @@ def setup_routes(rt):
                 level="warning",
             )
 
-        stored_path = store_upload_bytes(
-            filename, file_content, _document_service.upload_dir
-        )
+        stored_path = store_upload_bytes(filename, file_content, _document_service.upload_dir)
 
         reader = Module1_DocReader()
         if filename.lower().endswith(".pdf"):
@@ -163,14 +170,10 @@ def setup_routes(rt):
     def document_details(document_id: int):
         document = _document_service.get_document(document_id)
         if document is None:
-            return _not_found_page(
-                "Document", "/library/documents", "Back to Documents"
-            )
+            return _not_found_page("Document", "/library/documents", "Back to Documents")
 
         extracted_text = (document.get("extracted_text") or "").strip()
-        return Title(
-            f"{document.get('filename', 'Document')} - BIM Guard"
-        ), DashboardLayout(
+        return Title(f"{document.get('filename', 'Document')} - BIM Guard"), DashboardLayout(
             Container(
                 H1(document.get("filename", "Document")),
                 DivLAligned(
@@ -204,9 +207,7 @@ def setup_routes(rt):
     def document_edit(document_id: int):
         document = _document_service.get_document(document_id)
         if document is None:
-            return _not_found_page(
-                "Document", "/library/documents", "Back to Documents"
-            )
+            return _not_found_page("Document", "/library/documents", "Back to Documents")
 
         return Title("Edit Document - BIM Guard"), DashboardLayout(
             Container(
@@ -223,8 +224,7 @@ def setup_routes(rt):
 
         _document_service.update_document(
             document_id=document_id,
-            filename=Path(filename).name.strip()
-            or document.get("filename", "document.pdf"),
+            filename=Path(filename).name.strip() or document.get("filename", "document.pdf"),
             extracted_text=extracted_text,
         )
         return redirect_see_other(f"/library/documents/{document_id}")
@@ -264,9 +264,7 @@ def setup_routes(rt):
     @rt("/library/rules/new")
     def rules_new():
         return Title("Create Rule - BIM Guard"), DashboardLayout(
-            Container(
-                rule_form("Create Rule", "/library/rules/create"), cls="space-y-4"
-            )
+            Container(rule_form("Create Rule", "/library/rules/create"), cls="space-y-4")
         )
 
     @rt("/library/rules/create", methods=["POST"])
@@ -291,6 +289,43 @@ def setup_routes(rt):
         return (
             Title("Rule Extraction - BIM Guard"),
             DashboardLayout(rule_extraction_page_content()),
+        )
+
+    @rt("/library/rules/import-json")
+    def rules_import_json_page():
+        return Title("Import JSON Ruleset - BIM Guard"), DashboardLayout(
+            Container(
+                H1("Import JSON Ruleset", cls="text-3xl font-bold tracking-tight"),
+                P(
+                    "Upload a JSON ruleset file. The file must have a 'ruleset_id' field and a 'rules' array.",
+                    cls="text-muted-foreground",
+                ),
+                UICard(
+                    UICardHeader(UICardTitle("Upload Ruleset JSON")),
+                    UICardContent(
+                        Form(
+                            Div(
+                                FormLabel("Ruleset JSON file (.json)", fr="ruleset_file"),
+                                Input(
+                                    id="ruleset_file",
+                                    type="file",
+                                    name="ruleset_file",
+                                    accept=".json",
+                                    required=True,
+                                ),
+                                cls="space-y-1",
+                            ),
+                            SubmitButton("Import Ruleset", variant="primary"),
+                            hx_post="/api/rules/import-json",
+                            hx_target="#import-result",
+                            enctype="multipart/form-data",
+                            cls="space-y-4",
+                        ),
+                        Div(id="import-result"),
+                    ),
+                ),
+                cls="space-y-4",
+            )
         )
 
     @rt("/library/rules/{rule_id}")
@@ -371,6 +406,7 @@ def setup_routes(rt):
     @rt("/api/rules/save-extracted", methods=["POST"])
     async def rules_save_extracted(req: Request):
         import json as _json
+
         form = await req.form()
         rule_json = form.get("rule_json", "{}")
         try:
@@ -410,6 +446,7 @@ def setup_routes(rt):
     @rt("/api/rules/save-all-extracted", methods=["POST"])
     async def rules_save_all_extracted(req: Request):
         import json as _json
+
         form = await req.form()
         rules_json = form.get("rules_json", "[]")
         try:
@@ -455,46 +492,10 @@ def setup_routes(rt):
             cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium cursor-default",
         )
 
-    @rt("/library/rules/import-json")
-    def rules_import_json_page():
-        return Title("Import JSON Ruleset - BIM Guard"), DashboardLayout(
-            Container(
-                H1("Import JSON Ruleset", cls="text-3xl font-bold tracking-tight"),
-                P(
-                    "Upload a JSON ruleset file. The file must have a 'ruleset_id' field and a 'rules' array.",
-                    cls="text-muted-foreground",
-                ),
-                UICard(
-                    UICardHeader(UICardTitle("Upload Ruleset JSON")),
-                    UICardContent(
-                        Form(
-                            Div(
-                                FormLabel("Ruleset JSON file (.json)", fr="ruleset_file"),
-                                Input(
-                                    id="ruleset_file",
-                                    type="file",
-                                    name="ruleset_file",
-                                    accept=".json",
-                                    required=True,
-                                ),
-                                cls="space-y-1",
-                            ),
-                            SubmitButton("Import Ruleset", variant="primary"),
-                            hx_post="/api/rules/import-json",
-                            hx_target="#import-result",
-                            enctype="multipart/form-data",
-                            cls="space-y-4",
-                        ),
-                        Div(id="import-result"),
-                    ),
-                ),
-                cls="space-y-4",
-            )
-        )
-
     @rt("/api/rules/import-json", methods=["POST"])
     async def rules_import_json_api(ruleset_file: UploadFile):
         import json as _json
+
         file_content = await ruleset_file.read()
         if not file_content:
             return Alert("No file received.", cls=AlertT.error)

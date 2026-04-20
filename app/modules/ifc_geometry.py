@@ -25,6 +25,7 @@ try:
     import ifcopenshell
     import ifcopenshell.geom
     import ifcopenshell.util.shape
+
     IFCOS_AVAILABLE = True
 except ImportError:
     IFCOS_AVAILABLE = False
@@ -79,9 +80,9 @@ class IFCGeometryExtractor:
         if self._settings is not None and element is not None:
             try:
                 shape = ifcopenshell.geom.create_shape(self._settings, element)
-                verts  = shape.geometry.verts
-                faces  = shape.geometry.faces
-                area   = self._calculate_mesh_area(verts, faces)
+                verts = shape.geometry.verts
+                faces = shape.geometry.faces
+                area = self._calculate_mesh_area(verts, faces)
                 if area and area > 0:
                     result["area_m2"] = area
                     result["method"] = "geometry"
@@ -125,19 +126,19 @@ class IFCGeometryExtractor:
             total = 0.0
             n_faces = len(faces) // 3
             for f in range(n_faces):
-                i0 = faces[f * 3]     * 3
+                i0 = faces[f * 3] * 3
                 i1 = faces[f * 3 + 1] * 3
                 i2 = faces[f * 3 + 2] * 3
-                v0 = verts[i0:i0 + 3]
-                v1 = verts[i1:i1 + 3]
-                v2 = verts[i2:i2 + 3]
+                v0 = verts[i0 : i0 + 3]
+                v1 = verts[i1 : i1 + 3]
+                v2 = verts[i2 : i2 + 3]
                 # Cross product magnitude / 2 = triangle area
                 ab = [v1[j] - v0[j] for j in range(3)]
                 ac = [v2[j] - v0[j] for j in range(3)]
                 cross = [
-                    ab[1]*ac[2] - ab[2]*ac[1],
-                    ab[2]*ac[0] - ab[0]*ac[2],
-                    ab[0]*ac[1] - ab[1]*ac[0],
+                    ab[1] * ac[2] - ab[2] * ac[1],
+                    ab[2] * ac[0] - ab[0] * ac[2],
+                    ab[0] * ac[1] - ab[1] * ac[0],
                 ]
                 total += math.sqrt(sum(c**2 for c in cross)) / 2
             return total
@@ -190,9 +191,9 @@ class IFCGeometryExtractor:
             n = len(verts) // 3
             if n == 0:
                 return (0.0, 0.0, 0.0)
-            x = sum(verts[i*3]     for i in range(n)) / n
-            y = sum(verts[i*3 + 1] for i in range(n)) / n
-            z = sum(verts[i*3 + 2] for i in range(n)) / n
+            x = sum(verts[i * 3] for i in range(n)) / n
+            y = sum(verts[i * 3 + 1] for i in range(n)) / n
+            z = sum(verts[i * 3 + 2] for i in range(n)) / n
             return (round(x, 4), round(y, 4), round(z, 4))
         except Exception:
             return (0.0, 0.0, 0.0)
@@ -232,6 +233,7 @@ class IFCGeometryExtractor:
 
 # ── ESTIMATION UTILITIES (no IFC model required) ──────────────────────────────
 
+
 def estimate_surface_area(
     nominal_diameter_m: float,
     length_m: float,
@@ -259,12 +261,30 @@ def nps_to_od_m(nps_inch: float) -> float:
     Handles NPS 0.125 through NPS 24.
     """
     NPS_OD_TABLE = {
-        0.125: 0.01080, 0.25: 0.01350, 0.375: 0.01730, 0.5: 0.02130,
-        0.75: 0.02670, 1.0: 0.03340, 1.25: 0.04220, 1.5: 0.04830,
-        2.0: 0.06030, 2.5: 0.07300, 3.0: 0.08890, 3.5: 0.10160,
-        4.0: 0.11430, 5.0: 0.14130, 6.0: 0.16830, 8.0: 0.21910,
-        10.0: 0.27305, 12.0: 0.32385, 14.0: 0.35560, 16.0: 0.40640,
-        18.0: 0.45720, 20.0: 0.50800, 22.0: 0.55880, 24.0: 0.60960,
+        0.125: 0.01080,
+        0.25: 0.01350,
+        0.375: 0.01730,
+        0.5: 0.02130,
+        0.75: 0.02670,
+        1.0: 0.03340,
+        1.25: 0.04220,
+        1.5: 0.04830,
+        2.0: 0.06030,
+        2.5: 0.07300,
+        3.0: 0.08890,
+        3.5: 0.10160,
+        4.0: 0.11430,
+        5.0: 0.14130,
+        6.0: 0.16830,
+        8.0: 0.21910,
+        10.0: 0.27305,
+        12.0: 0.32385,
+        14.0: 0.35560,
+        16.0: 0.40640,
+        18.0: 0.45720,
+        20.0: 0.50800,
+        22.0: 0.55880,
+        24.0: 0.60960,
     }
     # Exact match
     if nps_inch in NPS_OD_TABLE:
@@ -287,12 +307,29 @@ def dn_to_od_m(dn: int) -> float:
     DN values follow ASME-equivalent ODs for interchangeability.
     """
     DN_OD_TABLE = {
-        6: 0.01080, 8: 0.01350, 10: 0.01730, 15: 0.02130,
-        20: 0.02670, 25: 0.03340, 32: 0.04220, 40: 0.04830,
-        50: 0.06030, 65: 0.07300, 80: 0.08890, 90: 0.10160,
-        100: 0.11430, 125: 0.14130, 150: 0.16830, 200: 0.21910,
-        250: 0.27305, 300: 0.32385, 350: 0.35560, 400: 0.40640,
-        450: 0.45720, 500: 0.50800, 600: 0.60960,
+        6: 0.01080,
+        8: 0.01350,
+        10: 0.01730,
+        15: 0.02130,
+        20: 0.02670,
+        25: 0.03340,
+        32: 0.04220,
+        40: 0.04830,
+        50: 0.06030,
+        65: 0.07300,
+        80: 0.08890,
+        90: 0.10160,
+        100: 0.11430,
+        125: 0.14130,
+        150: 0.16830,
+        200: 0.21910,
+        250: 0.27305,
+        300: 0.32385,
+        350: 0.35560,
+        400: 0.40640,
+        450: 0.45720,
+        500: 0.50800,
+        600: 0.60960,
     }
     if dn in DN_OD_TABLE:
         return DN_OD_TABLE[dn]

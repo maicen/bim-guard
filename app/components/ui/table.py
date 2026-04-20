@@ -75,6 +75,4 @@ def TableCell(*children, cls: str | None = None, **kwargs):
 
 
 def TableCaption(*children, cls: str | None = None, **kwargs):
-    return HtmlCaption(
-        *children, cls=cn("mt-4 text-sm text-muted-foreground", cls), **kwargs
-    )
+    return HtmlCaption(*children, cls=cn("mt-4 text-sm text-muted-foreground", cls), **kwargs)

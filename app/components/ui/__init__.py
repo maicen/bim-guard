@@ -232,14 +232,11 @@ def MessageAlert(spec: AlertSpec):
 
 def build_select_options(options: list[SelectOptionSpec]) -> list:
     return [
-        Option(option.label, value=option.value, selected=option.selected)
-        for option in options
+        Option(option.label, value=option.value, selected=option.selected) for option in options
     ]
 
 
-def build_table_rows(
-    rows: list[dict], row_builder: Callable[[dict], object], spec: TableSpec
-):
+def build_table_rows(rows: list[dict], row_builder: Callable[[dict], object], spec: TableSpec):
     if not rows:
         return [
             Tr(
@@ -390,18 +387,12 @@ def ItemsCountDataTable(
             TableFooter(
                 TableRow(
                     TableCell("Totals", colspan="2", cls="font-semibold"),
-                    TableCell(
-                        str(totals_sum), cls="text-right tabular-nums font-semibold"
-                    ),
-                    TableCell(
-                        "Sum of base totals", cls="text-xs text-muted-foreground"
-                    ),
+                    TableCell(str(totals_sum), cls="text-right tabular-nums font-semibold"),
+                    TableCell("Sum of base totals", cls="text-xs text-muted-foreground"),
                 ),
                 TableRow(
                     TableCell("Subtotals", colspan="2", cls="font-semibold"),
-                    TableCell(
-                        str(subtotals_sum), cls="text-right tabular-nums font-semibold"
-                    ),
+                    TableCell(str(subtotals_sum), cls="text-right tabular-nums font-semibold"),
                     TableCell(
                         "Sum after applied options",
                         cls="text-xs text-muted-foreground",

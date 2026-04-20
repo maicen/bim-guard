@@ -33,6 +33,7 @@ SCHEMA_VERSION = "1.0.0"
 # Risk banding
 # ---------------------------------------------------------------------------
 
+
 class RiskBand(str, Enum):
     CRITICAL = "critical"
     HIGH = "high"
@@ -47,6 +48,7 @@ IssueStatus = Literal["open", "assigned", "in_review", "closed"]
 # Issue dataclass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Issue:
     """
@@ -56,27 +58,27 @@ class Issue:
     """
 
     # --- Identity ---
-    id: str                              # human-readable, e.g. "BGR-0007"
-    element_id: str                      # FK to PipingElement.id (IFC GUID)
-    rule_id: str                         # FK to rules table, or rule ref like "GC-001.03"
+    id: str  # human-readable, e.g. "BGR-0007"
+    element_id: str  # FK to PipingElement.id (IFC GUID)
+    rule_id: str  # FK to rules table, or rule ref like "GC-001.03"
 
     # --- Summary ---
-    title: str                           # short headline shown in lists
-    description: Optional[str] = None    # longer prose description
+    title: str  # short headline shown in lists
+    description: Optional[str] = None  # longer prose description
 
     # --- Classification ---
     band: RiskBand = RiskBand.LOW
-    score: float = 0.0                   # 0.0 – 1.0 composite
-    mechanism: str = ""                  # "GC-001 galvanic", "CC-001 crevice", …
+    score: float = 0.0  # 0.0 – 1.0 composite
+    mechanism: str = ""  # "GC-001 galvanic", "CC-001 crevice", …
 
     # --- Remediation guidance ---
-    mitigation: str = ""                 # recommended remediation
-    assignee_role: str = "Unassigned"    # "Mechanical engineer", "Fire engineer", …
+    mitigation: str = ""  # recommended remediation
+    assignee_role: str = "Unassigned"  # "Mechanical engineer", "Fire engineer", …
 
     # --- Workflow state ---
     status: IssueStatus = "open"
-    created_at: str = ""                 # ISO 8601 UTC
-    updated_at: str = ""                 # ISO 8601 UTC
+    created_at: str = ""  # ISO 8601 UTC
+    updated_at: str = ""  # ISO 8601 UTC
 
     # --- Mechanism-specific extras ---
     # For galvanic: {"anode_material": "GalvanisedSteel", "cathode_material": "SS316",
@@ -98,11 +100,10 @@ class Issue:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def now_iso() -> str:
     """UTC timestamp in ISO 8601 (trailing Z), second precision."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-        "+00:00", "Z"
-    )
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def band_from_score(
@@ -215,10 +216,16 @@ if __name__ == "__main__":
             "environment_class": "T3_chloride",
         },
         citations=[
-            {"standard": "NASA-STD-6012", "clause": "Table 2",
-             "reason": "voltage gap 0.74V exceeds 0.15V threshold for harsh environment"},
-            {"standard": "EN 1993-1-4", "clause": "§A.4",
-             "reason": "guidance on dissimilar metal connections"},
+            {
+                "standard": "NASA-STD-6012",
+                "clause": "Table 2",
+                "reason": "voltage gap 0.74V exceeds 0.15V threshold for harsh environment",
+            },
+            {
+                "standard": "EN 1993-1-4",
+                "clause": "§A.4",
+                "reason": "guidance on dissimilar metal connections",
+            },
         ],
     )
     print(f"issue_schema.py v{SCHEMA_VERSION} — example validates")

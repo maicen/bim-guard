@@ -6,34 +6,34 @@ from app.utils import now_iso_utc, rows_desc_by_id
 # ── Schema columns ────────────────────────────────────────────────────────────
 
 _RICH_COLUMNS = {
-    "source_text":        str,
-    "property_set":       str,
-    "property_name":      str,
-    "fallback_property":  str,
-    "operator":           str,
-    "check_value":        str,   # JSON-encoded scalar / null
-    "value_min":          str,
-    "value_max":          str,
-    "unit":               str,
-    "applies_when":       str,   # JSON object string
-    "severity":           str,
-    "keyword":            str,
-    "compliance_type":    str,
-    "exceptions":         str,   # JSON array string
-    "related_refs":       str,   # JSON array string
-    "overridden_by":      str,
-    "confidence":         str,
-    "extraction_method":  str,
-    "needs_review":       int,
+    "source_text": str,
+    "property_set": str,
+    "property_name": str,
+    "fallback_property": str,
+    "operator": str,
+    "check_value": str,  # JSON-encoded scalar / null
+    "value_min": str,
+    "value_max": str,
+    "unit": str,
+    "applies_when": str,  # JSON object string
+    "severity": str,
+    "keyword": str,
+    "compliance_type": str,
+    "exceptions": str,  # JSON array string
+    "related_refs": str,  # JSON array string
+    "overridden_by": str,
+    "confidence": str,
+    "extraction_method": str,
+    "needs_review": int,
 }
 
 # Columns that classify a rule within the broader multi-mechanism schema.
 # Added via required_columns so existing DBs migrate automatically.
 _META_COLUMNS = {
-    "mechanism":     str,   # "OBC" | "GC-001" | "CC-001" | "MC-001"
-    "ruleset_id":    str,   # "OBC-PART9" | "BIMGUARD-GC-001" | …
-    "rule_category": str,   # "property_check" | "threshold_band" | "material_property"
-                            # | "scoring_model" | "mitigation" | "reference_config"
+    "mechanism": str,  # "OBC" | "GC-001" | "CC-001" | "MC-001"
+    "ruleset_id": str,  # "OBC-PART9" | "BIMGUARD-GC-001" | …
+    "rule_category": str,  # "property_check" | "threshold_band" | "material_property"
+    # | "scoring_model" | "mitigation" | "reference_config"
 }
 
 # ── Valid controlled vocabulary ───────────────────────────────────────────────
@@ -41,12 +41,12 @@ _META_COLUMNS = {
 MECHANISMS = {"OBC", "GC-001", "CC-001", "MC-001", "IFC"}
 
 RULE_CATEGORIES = {
-    "property_check",   # IFC element property assertion (OBC, building code)
-    "scoring_model",    # Composite score formula + weights
-    "threshold_band",   # Classification band with risk score
-    "material_property",# Material-level data (galvanic potential, CCT, MIC susceptibility)
-    "reference_config", # Named lookup entry (environment class, joint type, etc.)
-    "mitigation",       # Remediation action catalogue entry
+    "property_check",  # IFC element property assertion (OBC, building code)
+    "scoring_model",  # Composite score formula + weights
+    "threshold_band",  # Classification band with risk score
+    "material_property",  # Material-level data (galvanic potential, CCT, MIC susceptibility)
+    "reference_config",  # Named lookup entry (environment class, joint type, etc.)
+    "mitigation",  # Remediation action catalogue entry
 }
 
 
@@ -66,14 +66,14 @@ class RuleService:
         self._rules = PersistenceService.get_table(
             "rules",
             {
-                "id":               int,
-                "reference":        str,
-                "rule_type":        str,
-                "description":      str,
+                "id": int,
+                "reference": str,
+                "rule_type": str,
+                "description": str,
                 "target_ifc_class": str,
-                "parameters":       str,   # kept for backward-compat / engine data
-                "created_at":       str,
-                "updated_at":       str,
+                "parameters": str,  # kept for backward-compat / engine data
+                "created_at": str,
+                "updated_at": str,
             },
             required_columns=all_required,
         )
@@ -121,35 +121,35 @@ class RuleService:
         now = now_iso_utc()
         return self._rules.insert(
             {
-                "reference":          reference.strip(),
-                "rule_type":          rule_type.strip() or "numeric_comparison",
-                "description":        description.strip(),
-                "target_ifc_class":   target_ifc_class.strip(),
-                "parameters":         self._norm_json(parameters),
-                "source_text":        source_text or "",
-                "property_set":       property_set or "",
-                "property_name":      property_name or "",
-                "fallback_property":  fallback_property or "",
-                "operator":           operator or "",
-                "check_value":        json.dumps(check_value),
-                "value_min":          json.dumps(value_min),
-                "value_max":          json.dumps(value_max),
-                "unit":               unit or "",
-                "applies_when":       json.dumps(applies_when or {}),
-                "severity":           severity or "mandatory",
-                "keyword":            keyword or "",
-                "compliance_type":    compliance_type or "",
-                "exceptions":         json.dumps(exceptions or []),
-                "related_refs":       json.dumps(related_refs or []),
-                "overridden_by":      overridden_by or "",
-                "confidence":         str(confidence) if confidence is not None else "",
-                "extraction_method":  extraction_method or "manual",
-                "needs_review":       int(needs_review),
-                "mechanism":          mechanism or "",
-                "ruleset_id":         ruleset_id or "",
-                "rule_category":      rule_category or "property_check",
-                "created_at":         now,
-                "updated_at":         now,
+                "reference": reference.strip(),
+                "rule_type": rule_type.strip() or "numeric_comparison",
+                "description": description.strip(),
+                "target_ifc_class": target_ifc_class.strip(),
+                "parameters": self._norm_json(parameters),
+                "source_text": source_text or "",
+                "property_set": property_set or "",
+                "property_name": property_name or "",
+                "fallback_property": fallback_property or "",
+                "operator": operator or "",
+                "check_value": json.dumps(check_value),
+                "value_min": json.dumps(value_min),
+                "value_max": json.dumps(value_max),
+                "unit": unit or "",
+                "applies_when": json.dumps(applies_when or {}),
+                "severity": severity or "mandatory",
+                "keyword": keyword or "",
+                "compliance_type": compliance_type or "",
+                "exceptions": json.dumps(exceptions or []),
+                "related_refs": json.dumps(related_refs or []),
+                "overridden_by": overridden_by or "",
+                "confidence": str(confidence) if confidence is not None else "",
+                "extraction_method": extraction_method or "manual",
+                "needs_review": int(needs_review),
+                "mechanism": mechanism or "",
+                "ruleset_id": ruleset_id or "",
+                "rule_category": rule_category or "property_check",
+                "created_at": now,
+                "updated_at": now,
             }
         )
 
@@ -164,12 +164,12 @@ class RuleService:
     ):
         self._rules.update(
             updates={
-                "reference":        reference.strip(),
-                "rule_type":        rule_type.strip() or "numeric_comparison",
-                "description":      description.strip(),
+                "reference": reference.strip(),
+                "rule_type": rule_type.strip() or "numeric_comparison",
+                "description": description.strip(),
                 "target_ifc_class": target_ifc_class.strip(),
-                "parameters":       self._norm_json(parameters),
-                "updated_at":       now_iso_utc(),
+                "parameters": self._norm_json(parameters),
+                "updated_at": now_iso_utc(),
             },
             pk_values=rule_id,
         )
@@ -238,11 +238,11 @@ class RuleService:
             if r.get("severity") == "mandatory":
                 mandatory_count += 1
         return {
-            "total":           len(rules),
+            "total": len(rules),
             "mandatory_count": mandatory_count,
-            "by_entity":       by_entity,
-            "by_source":       by_source,
-            "by_mechanism":    by_mechanism,
+            "by_entity": by_entity,
+            "by_source": by_source,
+            "by_mechanism": by_mechanism,
         }
 
     # ── JSON ruleset import ───────────────────────────────────────────────────
@@ -284,9 +284,7 @@ class RuleService:
         for rule in rules:
             if not isinstance(rule, dict):
                 continue
-            desc = str(
-                rule.get("desc") or rule.get("description") or ""
-            ).strip()
+            desc = str(rule.get("desc") or rule.get("description") or "").strip()
             if not desc:
                 continue
             self.create_rule(
@@ -302,9 +300,7 @@ class RuleService:
                 fallback_property=str(rule.get("fallback_property") or ""),
                 operator=str(rule.get("operator") or ""),
                 check_value=(
-                    rule.get("check_value")
-                    if "check_value" in rule
-                    else rule.get("value")
+                    rule.get("check_value") if "check_value" in rule else rule.get("value")
                 ),
                 value_min=rule.get("value_min"),
                 value_max=rule.get("value_max"),

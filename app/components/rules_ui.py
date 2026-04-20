@@ -51,29 +51,29 @@ IFC_CLASS_OPTIONS = [
 ]
 
 MECHANISM_OPTIONS = [
-    SelectOptionSpec(label="— Any —",  value=""),
-    SelectOptionSpec(label="OBC",      value="OBC"),
-    SelectOptionSpec(label="GC-001",   value="GC-001"),
-    SelectOptionSpec(label="CC-001",   value="CC-001"),
-    SelectOptionSpec(label="MC-001",   value="MC-001"),
-    SelectOptionSpec(label="IFC",      value="IFC"),
+    SelectOptionSpec(label="— Any —", value=""),
+    SelectOptionSpec(label="OBC", value="OBC"),
+    SelectOptionSpec(label="GC-001", value="GC-001"),
+    SelectOptionSpec(label="CC-001", value="CC-001"),
+    SelectOptionSpec(label="MC-001", value="MC-001"),
+    SelectOptionSpec(label="IFC", value="IFC"),
 ]
 
 RULE_CATEGORY_OPTIONS = [
-    SelectOptionSpec(label="property_check",   value="property_check"),
-    SelectOptionSpec(label="scoring_model",    value="scoring_model"),
-    SelectOptionSpec(label="threshold_band",   value="threshold_band"),
-    SelectOptionSpec(label="material_property",value="material_property"),
+    SelectOptionSpec(label="property_check", value="property_check"),
+    SelectOptionSpec(label="scoring_model", value="scoring_model"),
+    SelectOptionSpec(label="threshold_band", value="threshold_band"),
+    SelectOptionSpec(label="material_property", value="material_property"),
     SelectOptionSpec(label="reference_config", value="reference_config"),
-    SelectOptionSpec(label="mitigation",       value="mitigation"),
+    SelectOptionSpec(label="mitigation", value="mitigation"),
 ]
 
 _MECHANISM_BADGE = {
-    "OBC":    "bg-blue-100 text-blue-800",
+    "OBC": "bg-blue-100 text-blue-800",
     "GC-001": "bg-amber-100 text-amber-800",
     "CC-001": "bg-rose-100 text-rose-800",
     "MC-001": "bg-green-100 text-green-800",
-    "IFC":    "bg-purple-100 text-purple-800",
+    "IFC": "bg-purple-100 text-purple-800",
 }
 
 

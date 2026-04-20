@@ -51,7 +51,7 @@ from pathlib import Path
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
 # Labels for classification
-LABEL_RULE     = "RULE"
+LABEL_RULE = "RULE"
 LABEL_NOT_RULE = "NOT_RULE"
 
 # Model to use for zero-shot or as base for fine-tuning
@@ -81,11 +81,11 @@ class BERTClassifier:
             model_path (str): path to a saved fine-tuned model
                               (required if mode="fine_tuned" and not training)
         """
-        self.mode       = mode
+        self.mode = mode
         self.model_path = Path(model_path) if model_path else DEFAULT_MODEL_PATH
-        self.pipeline   = None
-        self.model      = None
-        self.tokenizer  = None
+        self.pipeline = None
+        self.model = None
+        self.tokenizer = None
 
         self._check_dependencies()
 
@@ -110,8 +110,7 @@ class BERTClassifier:
             import torch
         except ImportError:
             raise ImportError(
-                "BERT dependencies not installed.\n"
-                "Run: pip install transformers torch datasets"
+                "BERT dependencies not installed.\nRun: pip install transformers torch datasets"
             )
 
     # ── MODEL LOADING ─────────────────────────────────────────────────────────
@@ -148,13 +147,11 @@ class BERTClassifier:
 
         print(f"[BERTClassifier] Loading fine-tuned model from {model_path}...")
         self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
-        self.model     = AutoModelForSequenceClassification.from_pretrained(
-            str(model_path)
-        )
+        self.model = AutoModelForSequenceClassification.from_pretrained(str(model_path))
         self.pipeline = pipeline(
             "text-classification",
-            model     = self.model,
-            tokenizer = self.tokenizer,
+            model=self.model,
+            tokenizer=self.tokenizer,
         )
         print("[BERTClassifier] Fine-tuned model ready")
 
@@ -162,9 +159,9 @@ class BERTClassifier:
 
     def train(
         self,
-        output_path:   str  = None,
-        epochs:        int  = 3,
-        batch_size:    int  = 16,
+        output_path: str = None,
+        epochs: int = 3,
+        batch_size: int = 16,
         use_codeaccord: bool = True,
     ):
         """
@@ -211,38 +208,38 @@ class BERTClassifier:
         def tokenize(batch):
             return tokenizer(
                 batch["text"],
-                truncation = True,
-                padding    = "max_length",
-                max_length = 128,
+                truncation=True,
+                padding="max_length",
+                max_length=128,
             )
 
         train_dataset = Dataset.from_list(train_data).map(tokenize, batched=True)
-        eval_dataset  = Dataset.from_list(eval_data).map(tokenize, batched=True)
+        eval_dataset = Dataset.from_list(eval_data).map(tokenize, batched=True)
 
         # ── Model ─────────────────────────────────────────────────────────────
         model = AutoModelForSequenceClassification.from_pretrained(
             BASE_MODEL,
-            num_labels = 2,   # 0 = NOT_RULE, 1 = RULE
+            num_labels=2,  # 0 = NOT_RULE, 1 = RULE
         )
 
         # ── Training arguments ────────────────────────────────────────────────
         training_args = TrainingArguments(
-            output_dir         = str(output_path),
-            num_train_epochs   = epochs,
-            per_device_train_batch_size = batch_size,
-            per_device_eval_batch_size  = batch_size,
-            evaluation_strategy = "epoch",
-            save_strategy       = "epoch",
-            load_best_model_at_end = True,
-            logging_steps       = 10,
+            output_dir=str(output_path),
+            num_train_epochs=epochs,
+            per_device_train_batch_size=batch_size,
+            per_device_eval_batch_size=batch_size,
+            evaluation_strategy="epoch",
+            save_strategy="epoch",
+            load_best_model_at_end=True,
+            logging_steps=10,
         )
 
         trainer = Trainer(
-            model           = model,
-            args            = training_args,
-            train_dataset   = train_dataset,
-            eval_dataset    = eval_dataset,
-            compute_metrics = self._compute_metrics,
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            compute_metrics=self._compute_metrics,
         )
 
         # ── Train ─────────────────────────────────────────────────────────────
@@ -266,6 +263,7 @@ class BERTClassifier:
         """
         try:
             from datasets import load_dataset
+
             print(f"[BERTClassifier] Downloading CODE-ACCORD from HuggingFace...")
             dataset = load_dataset(CODEACCORD_HF)
 
@@ -273,7 +271,7 @@ class BERTClassifier:
                 # TODO: map CODE-ACCORD label field names to text/label
                 # Check actual field names at: https://huggingface.co/datasets/Accord-Project/CODE-ACCORD
                 return {
-                    "text":  row.get("sentence", row.get("text", "")),
+                    "text": row.get("sentence", row.get("text", "")),
                     "label": 1 if row.get("is_rule", row.get("label")) else 0,
                 }
 
@@ -294,8 +292,9 @@ class BERTClassifier:
         Each line: {"text": "...", "label": 0 or 1}
         """
         import json
+
         train_path = Path("data/codeaccord/train.jsonl")
-        eval_path  = Path("data/codeaccord/eval.jsonl")
+        eval_path = Path("data/codeaccord/eval.jsonl")
 
         if not train_path.exists():
             raise FileNotFoundError(
@@ -304,8 +303,11 @@ class BERTClassifier:
             )
 
         train = [json.loads(l) for l in train_path.read_text().splitlines() if l]
-        eval_ = [json.loads(l) for l in eval_path.read_text().splitlines() if l] \
-                if eval_path.exists() else train[-50:]
+        eval_ = (
+            [json.loads(l) for l in eval_path.read_text().splitlines() if l]
+            if eval_path.exists()
+            else train[-50:]
+        )
 
         return train, eval_
 
@@ -338,10 +340,10 @@ class BERTClassifier:
         ]
 
         import random
-        data = (
-            [{"text": t, "label": 1} for t in rules] +
-            [{"text": t, "label": 0} for t in not_rules]
-        )
+
+        data = [{"text": t, "label": 1} for t in rules] + [
+            {"text": t, "label": 0} for t in not_rules
+        ]
         random.shuffle(data)
         split = int(len(data) * 0.8)
         return data[:split], data[split:]
@@ -349,6 +351,7 @@ class BERTClassifier:
     def _compute_metrics(self, eval_pred):
         """Compute accuracy for training evaluation."""
         import numpy as np
+
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
         accuracy = (predictions == labels).mean()
@@ -375,24 +378,27 @@ class BERTClassifier:
         if self.mode == "zero_shot":
             result = self.pipeline(
                 sentence,
-                candidate_labels = ["compliance rule", "general information"],
+                candidate_labels=["compliance rule", "general information"],
             )
             # "compliance rule" is the first candidate
-            prob     = result["scores"][0] if result["labels"][0] == "compliance rule" \
-                       else 1 - result["scores"][0]
-            is_rule  = prob >= RULE_THRESHOLD
-            label    = LABEL_RULE if is_rule else LABEL_NOT_RULE
+            prob = (
+                result["scores"][0]
+                if result["labels"][0] == "compliance rule"
+                else 1 - result["scores"][0]
+            )
+            is_rule = prob >= RULE_THRESHOLD
+            label = LABEL_RULE if is_rule else LABEL_NOT_RULE
 
         else:  # fine_tuned
-            result  = self.pipeline(sentence[:512])[0]  # truncate long sentences
-            is_rule = result["label"] == "LABEL_1"      # 1 = RULE
-            prob    = result["score"] if is_rule else 1 - result["score"]
-            label   = LABEL_RULE if is_rule else LABEL_NOT_RULE
+            result = self.pipeline(sentence[:512])[0]  # truncate long sentences
+            is_rule = result["label"] == "LABEL_1"  # 1 = RULE
+            prob = result["score"] if is_rule else 1 - result["score"]
+            label = LABEL_RULE if is_rule else LABEL_NOT_RULE
 
         return {
-            "is_rule":     is_rule,
+            "is_rule": is_rule,
             "probability": round(prob, 3),
-            "label":       label,
+            "label": label,
         }
 
     def classify_chunks(self, filtered_chunks: list) -> list:
@@ -408,9 +414,9 @@ class BERTClassifier:
         """
         print(f"[BERTClassifier] Classifying paragraphs (mode: {self.mode})...")
 
-        rule_count     = 0
+        rule_count = 0
         not_rule_count = 0
-        enhanced       = []
+        enhanced = []
 
         for chunk in filtered_chunks:
             enhanced_paras = []
@@ -422,19 +428,21 @@ class BERTClassifier:
                 else:
                     not_rule_count += 1
 
-                enhanced_paras.append({
-                    **para,
-                    "bert_probability": result["probability"],
-                    "bert_label":       result["label"],
-                    "bert_is_rule":     result["is_rule"],
-                })
+                enhanced_paras.append(
+                    {
+                        **para,
+                        "bert_probability": result["probability"],
+                        "bert_label": result["label"],
+                        "bert_is_rule": result["is_rule"],
+                    }
+                )
 
             enhanced.append({**chunk, "scored_paragraphs": enhanced_paras})
 
         total = rule_count + not_rule_count
         print(f"[BERTClassifier] Done")
-        print(f"  RULE     : {rule_count:>5} ({100*rule_count/total:.1f}%)")
-        print(f"  NOT_RULE : {not_rule_count:>5} ({100*not_rule_count/total:.1f}%)")
+        print(f"  RULE     : {rule_count:>5} ({100 * rule_count / total:.1f}%)")
+        print(f"  NOT_RULE : {not_rule_count:>5} ({100 * not_rule_count / total:.1f}%)")
 
         return enhanced
 

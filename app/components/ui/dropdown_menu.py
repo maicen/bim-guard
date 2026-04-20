@@ -163,9 +163,7 @@ def DropdownMenuRadioItem(
     cls: str | None = None,
     **kwargs,
 ):
-    hidden_control = Input(
-        type="radio", value=value, name=name, checked=checked, cls="sr-only"
-    )
+    hidden_control = Input(type="radio", value=value, name=name, checked=checked, cls="sr-only")
     return Label(
         hidden_control,
         Span(

@@ -38,29 +38,29 @@ from pathlib import Path
 from config import DB_PATH, OPENAI_API_KEY
 
 # Module 1
-from module1_doc_parser.docling_extractor  import DoclingExtractor
+from module1_doc_parser.docling_extractor import DoclingExtractor
 from module1_doc_parser.table_rule_builder import TableRuleBuilder
-from module1_doc_parser.section_chunker    import SectionChunker
-from module1_doc_parser.keyword_filter     import KeywordFilter
-from module1_doc_parser.tfidf_analyzer     import TFIDFAnalyzer
-from module1_doc_parser.dependency_parser  import DependencyParser
-from module1_doc_parser.confidence_scorer  import ConfidenceScorer
+from module1_doc_parser.section_chunker import SectionChunker
+from module1_doc_parser.keyword_filter import KeywordFilter
+from module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
+from module1_doc_parser.dependency_parser import DependencyParser
+from module1_doc_parser.confidence_scorer import ConfidenceScorer
 
 # Module 3
-from module3_rule_builder.rule_store      import RuleStore
-from module3_rule_builder.rule_generator  import RuleGenerator
-from module3_rule_builder.rule_converter  import RuleConverter
-from module3_rule_builder.obc_seed_rules  import seed_rules
+from module3_rule_builder.rule_store import RuleStore
+from module3_rule_builder.rule_generator import RuleGenerator
+from module3_rule_builder.rule_converter import RuleConverter
+from module3_rule_builder.obc_seed_rules import seed_rules
 
 
 def run_enhanced_pipeline(
-    pdf_path:          str,
-    run_sections:      str | list = "all",
-    seed_db_first:     bool       = True,
-    use_bert:          bool       = False,
-    bert_mode:         str        = "zero_shot",
-    bert_model_path:   str        = None,
-    discover_keywords: bool       = True,
+    pdf_path: str,
+    run_sections: str | list = "all",
+    seed_db_first: bool = True,
+    use_bert: bool = False,
+    bert_mode: str = "zero_shot",
+    bert_model_path: str = None,
+    discover_keywords: bool = True,
 ) -> dict:
     """
     Run the full enhanced Module 1 + 3 pipeline.
@@ -78,15 +78,15 @@ def run_enhanced_pipeline(
         dict: pipeline summary
     """
     pdf_path = Path(pdf_path)
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print(f"  BIMGuard AI — Enhanced Module 1 + 3 Pipeline")
     print(f"  PDF         : {pdf_path.name}")
     print(f"  BERT        : {'ON (' + bert_mode + ')' if use_bert else 'OFF'}")
     print(f"  Discovery   : {'ON' if discover_keywords else 'OFF'}")
-    print(f"{'='*65}\n")
+    print(f"{'=' * 65}\n")
 
     # ── Initialise stores ─────────────────────────────────────────────────────
-    store     = RuleStore(DB_PATH)
+    store = RuleStore(DB_PATH)
     generator = RuleGenerator(store)
     converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
 
@@ -99,7 +99,7 @@ def run_enhanced_pipeline(
     # STEP 1 — Docling extraction
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── STEP 1: DOCLING EXTRACTION ──")
-    extractor    = DoclingExtractor()
+    extractor = DoclingExtractor()
     text, tables = extractor.extract(pdf_path)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ def run_enhanced_pipeline(
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── STEP 2: TABLE RULE BUILDER ──")
     table_builder = TableRuleBuilder(store)
-    table_rules   = table_builder.process_all_tables(tables, generator)
+    table_rules = table_builder.process_all_tables(tables, generator)
 
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 3 — Section chunker
@@ -130,16 +130,16 @@ def run_enhanced_pipeline(
     # ─────────────────────────────────────────────────────────────────────────
     if discover_keywords:
         print("\n── IMPROVEMENT 1: TF-IDF KEYWORD DISCOVERY ──")
-        analyzer   = TFIDFAnalyzer(top_n=30)
-        new_kws    = analyzer.discover(filtered_chunks)
+        analyzer = TFIDFAnalyzer(top_n=30)
+        new_kws = analyzer.discover(filtered_chunks)
         analyzer.print_report(new_kws)
 
     # ─────────────────────────────────────────────────────────────────────────
     # IMPROVEMENT 2 — Dependency parsing
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── IMPROVEMENT 2: DEPENDENCY PARSER ──")
-    dep_parser  = DependencyParser()
-    dep_chunks  = dep_parser.analyse_chunks(filtered_chunks)
+    dep_parser = DependencyParser()
+    dep_chunks = dep_parser.analyse_chunks(filtered_chunks)
 
     # ─────────────────────────────────────────────────────────────────────────
     # IMPROVEMENT 3 — BERT classifier (optional)
@@ -148,6 +148,7 @@ def run_enhanced_pipeline(
     if use_bert:
         print("\n── IMPROVEMENT 3: BERT CLASSIFIER ──")
         from module1_doc_parser.bert_classifier import BERTClassifier
+
         bert = BERTClassifier(mode=bert_mode, model_path=bert_model_path)
         bert_chunks = bert.classify_chunks(filtered_chunks)
     else:
@@ -159,11 +160,11 @@ def run_enhanced_pipeline(
     # IMPROVEMENT 4 — Combined confidence scoring
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── IMPROVEMENT 4: CONFIDENCE SCORER ──")
-    scorer         = ConfidenceScorer()
-    final_chunks   = scorer.combine(
-        filtered_chunks = filtered_chunks,
-        dep_chunks      = dep_chunks,
-        bert_chunks     = bert_chunks,
+    scorer = ConfidenceScorer()
+    final_chunks = scorer.combine(
+        filtered_chunks=filtered_chunks,
+        dep_chunks=dep_chunks,
+        bert_chunks=bert_chunks,
     )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -176,9 +177,9 @@ def run_enhanced_pipeline(
 
     for chunk in final_chunks:
         section = chunk["section_number"]
-        name    = chunk["section_name"]
+        name = chunk["section_name"]
         skipped = chunk.get("count_skip", 0)
-        sent    = chunk.get("count_send", chunk.get("total_paragraphs", 0))
+        sent = chunk.get("count_send", chunk.get("total_paragraphs", 0))
 
         print(f"\n  Section {section}: {name}")
         print(f"    Sending: {sent} paragraphs | Skipping: {skipped}")
@@ -192,25 +193,25 @@ def run_enhanced_pipeline(
 
     # ── Summary ───────────────────────────────────────────────────────────────
     total_rules = store.count()
-    db_summary  = store.summary()
+    db_summary = store.summary()
     skipped_total = sum(c.get("count_skip", 0) for c in final_chunks)
 
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print(f"  ENHANCED PIPELINE COMPLETE")
     print(f"  Table rules (no LLM)         : {table_rules}")
     print(f"  Prose rules (LLM)            : {prose_rules}")
     print(f"  Paragraphs SKIPPED (no cost) : {skipped_total}")
     print(f"  Total rules in DB            : {total_rules}")
-    print(f"{'='*65}\n")
+    print(f"{'=' * 65}\n")
 
     return {
-        "pdf_file":       str(pdf_path),
-        "table_rules":    table_rules,
-        "prose_rules":    prose_rules,
-        "total_rules":    total_rules,
-        "skipped_paras":  skipped_total,
-        "sections_run":   len(final_chunks),
-        "db_summary":     db_summary,
+        "pdf_file": str(pdf_path),
+        "table_rules": table_rules,
+        "prose_rules": prose_rules,
+        "total_rules": total_rules,
+        "skipped_paras": skipped_total,
+        "sections_run": len(final_chunks),
+        "db_summary": db_summary,
     }
 
 
@@ -222,9 +223,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     run_enhanced_pipeline(
-        pdf_path          = sys.argv[1],
-        run_sections      = "all",
-        seed_db_first     = True,
-        use_bert          = False,    # set True after: pip install transformers torch
-        discover_keywords = True,
+        pdf_path=sys.argv[1],
+        run_sections="all",
+        seed_db_first=True,
+        use_bert=False,  # set True after: pip install transformers torch
+        discover_keywords=True,
     )

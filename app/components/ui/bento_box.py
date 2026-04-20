@@ -2,12 +2,9 @@ from fasthtml.common import Div, P
 from monsterui.all import H3
 
 DEFAULT_CARD_CLS = (
-    "bg-muted border border-border rounded-[2rem] "
-    "transition-all duration-300 hover:scale-[1.01]"
+    "bg-muted border border-border rounded-[2rem] transition-all duration-300 hover:scale-[1.01]"
 )
-DEFAULT_CAPTION_CLS = (
-    "text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground"
-)
+DEFAULT_CAPTION_CLS = "text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground"
 
 
 def BentoBox(
@@ -29,7 +26,5 @@ def BentoBox(
             P(title, cls=caption_cls),
             H3(value, cls=f"text-3xl font-bold {txt_main}"),
         ),
-        P(description, cls=f"text-sm font-medium mt-2 {txt_sec}")
-        if description
-        else None,
+        P(description, cls=f"text-sm font-medium mt-2 {txt_sec}") if description else None,
     )

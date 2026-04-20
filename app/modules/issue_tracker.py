@@ -32,9 +32,10 @@ def _now() -> str:
 @dataclass
 class IssueEvent:
     """A single event in an issue's history."""
+
     event_id: str
     timestamp: str
-    event_type: str          # raised | updated | resolved | reopened | note
+    event_type: str  # raised | updated | resolved | reopened | note
     risk_band: str
     composite_score: float
     author: str
@@ -44,13 +45,14 @@ class IssueEvent:
 @dataclass
 class IssueRecord:
     """Full history record for one element GlobalID."""
+
     global_id: str
     element_type: str
     system_type: str
     material: str
     first_seen: str
     last_seen: str
-    current_status: str      # open | resolved | monitoring
+    current_status: str  # open | resolved | monitoring
     current_band: str
     events: list = field(default_factory=list)
 
@@ -121,11 +123,11 @@ class IssueTracker:
                 continue
             seen_gids.add(gid)
 
-            band  = d.get("risk_band", "Low")
+            band = d.get("risk_band", "Low")
             score = float(d.get("composite_score", d.get("GC001_score", 0.0)))
             etype = d.get("element_type", "IfcPipeSegment")
             stype = d.get("system_type", d.get("service_type", "Unknown"))
-            mat   = d.get("material_label", d.get("material", "Unknown"))
+            mat = d.get("material_label", d.get("material", "Unknown"))
 
             event = IssueEvent(
                 event_id=str(uuid.uuid4())[:8],
@@ -170,15 +172,17 @@ class IssueTracker:
         for gid, rec in self._records.items():
             if gid not in seen_gids and rec.current_status == "open":
                 rec.current_status = "resolved"
-                rec.events.append(IssueEvent(
-                    event_id=str(uuid.uuid4())[:8],
-                    timestamp=now,
-                    event_type="resolved",
-                    risk_band=rec.current_band,
-                    composite_score=0.0,
-                    author=author,
-                    comment="Element no longer flagged in compliance run — marked resolved",
-                ))
+                rec.events.append(
+                    IssueEvent(
+                        event_id=str(uuid.uuid4())[:8],
+                        timestamp=now,
+                        event_type="resolved",
+                        risk_band=rec.current_band,
+                        composite_score=0.0,
+                        author=author,
+                        comment="Element no longer flagged in compliance run — marked resolved",
+                    )
+                )
                 summary["resolved"] += 1
 
         self._save()
@@ -213,15 +217,17 @@ class IssueTracker:
         if global_id not in self._records:
             return False
         rec = self._records[global_id]
-        rec.events.append(IssueEvent(
-            event_id=str(uuid.uuid4())[:8],
-            timestamp=_now(),
-            event_type="note",
-            risk_band=rec.current_band,
-            composite_score=0.0,
-            author=author,
-            comment=note,
-        ))
+        rec.events.append(
+            IssueEvent(
+                event_id=str(uuid.uuid4())[:8],
+                timestamp=_now(),
+                event_type="note",
+                risk_band=rec.current_band,
+                composite_score=0.0,
+                author=author,
+                comment=note,
+            )
+        )
         self._save()
         return True
 
@@ -236,15 +242,17 @@ class IssueTracker:
             return False
         rec = self._records[global_id]
         rec.current_status = "resolved"
-        rec.events.append(IssueEvent(
-            event_id=str(uuid.uuid4())[:8],
-            timestamp=_now(),
-            event_type="resolved",
-            risk_band=rec.current_band,
-            composite_score=0.0,
-            author=author,
-            comment=comment or "Manually resolved",
-        ))
+        rec.events.append(
+            IssueEvent(
+                event_id=str(uuid.uuid4())[:8],
+                timestamp=_now(),
+                event_type="resolved",
+                risk_band=rec.current_band,
+                composite_score=0.0,
+                author=author,
+                comment=comment or "Manually resolved",
+            )
+        )
         self._save()
         return True
 
@@ -252,15 +260,15 @@ class IssueTracker:
         """Return summary statistics across all tracked issues."""
         all_records = list(self._records.values())
         return {
-            "total_tracked":   len(all_records),
-            "open":            sum(1 for r in all_records if r.current_status == "open"),
-            "resolved":        sum(1 for r in all_records if r.current_status == "resolved"),
-            "monitoring":      sum(1 for r in all_records if r.current_status == "monitoring"),
+            "total_tracked": len(all_records),
+            "open": sum(1 for r in all_records if r.current_status == "open"),
+            "resolved": sum(1 for r in all_records if r.current_status == "resolved"),
+            "monitoring": sum(1 for r in all_records if r.current_status == "monitoring"),
             "by_band": {
                 "Critical": sum(1 for r in all_records if r.current_band == "Critical"),
-                "High":     sum(1 for r in all_records if r.current_band == "High"),
-                "Medium":   sum(1 for r in all_records if r.current_band == "Medium"),
-                "Low":      sum(1 for r in all_records if r.current_band == "Low"),
+                "High": sum(1 for r in all_records if r.current_band == "High"),
+                "Medium": sum(1 for r in all_records if r.current_band == "Medium"),
+                "Low": sum(1 for r in all_records if r.current_band == "Low"),
             },
         }
 
@@ -272,7 +280,7 @@ class IssueTracker:
 
 
 # ── STREAMLIT INTEGRATION SNIPPET ────────────────────────────────────────────
-STREAMLIT_SNIPPET = '''
+STREAMLIT_SNIPPET = """
 # Add to Streamlit app — BCF Issue Manager page
 # ─────────────────────────────────────────────────────────────────────────────
 import streamlit as st
@@ -347,4 +355,4 @@ if records:
         if st.button("Mark resolved"):
             tracker.mark_resolved(selected_gid, author="User")
             st.success("Issue marked resolved.")
-'''
+"""

@@ -18,6 +18,7 @@ Usage:
 """
 
 import re
+
 try:
     from module1_doc_parser.keywords.keyword_master import (
         ALL_SINGLE_KEYWORDS,
@@ -31,15 +32,15 @@ except ImportError:
         KEYWORD_WEIGHTS,
     )
 
-CONFIDENCE_HIGH   = 10
+CONFIDENCE_HIGH = 10
 CONFIDENCE_MEDIUM = 1
 
 
 class KeywordFilter:
-
     def __init__(self):
         try:
             import spacy
+
             self.nlp = spacy.load("en_core_web_sm")
             print("[KeywordFilter] spaCy model loaded")
         except ImportError:
@@ -93,16 +94,18 @@ class KeywordFilter:
                 if len(para) < 20:
                     continue
                 score, matched, confidence = self._score(para)
-                scored.append({
-                    "text":       para,
-                    "score":      score,
-                    "matched":    matched,
-                    "confidence": confidence,
-                })
+                scored.append(
+                    {
+                        "text": para,
+                        "score": score,
+                        "matched": matched,
+                        "confidence": confidence,
+                    }
+                )
 
-            count_high   = sum(1 for p in scored if p["confidence"] == "HIGH")
+            count_high = sum(1 for p in scored if p["confidence"] == "HIGH")
             count_medium = sum(1 for p in scored if p["confidence"] == "MEDIUM")
-            count_low    = sum(1 for p in scored if p["confidence"] == "LOW_CONFIDENCE")
+            count_low = sum(1 for p in scored if p["confidence"] == "LOW_CONFIDENCE")
 
             parts = []
             for p in scored:
@@ -113,19 +116,21 @@ class KeywordFilter:
 
             filtered_text = "\n\n".join(parts)
 
-            filtered.append({
-                **chunk,
-                "scored_paragraphs": scored,
-                "filtered_text":     filtered_text,
-                "count_high":        count_high,
-                "count_medium":      count_medium,
-                "count_low":         count_low,
-                "total_paragraphs":  len(scored),
-            })
+            filtered.append(
+                {
+                    **chunk,
+                    "scored_paragraphs": scored,
+                    "filtered_text": filtered_text,
+                    "count_high": count_high,
+                    "count_medium": count_medium,
+                    "count_low": count_low,
+                    "total_paragraphs": len(scored),
+                }
+            )
 
         # Summary
         print(f"  {'#':<4} {'Section':<35} {'Total':>6} {'HIGH':>6} {'MED':>6} {'LOW':>6}")
-        print(f"  {'-'*63}")
+        print(f"  {'-' * 63}")
         for c in filtered:
             print(
                 f"  {c['section_number']:<4} {c['section_name']:<35} "

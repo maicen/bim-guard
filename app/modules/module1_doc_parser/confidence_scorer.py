@@ -41,22 +41,22 @@ Usage:
 # ── DECISION THRESHOLDS ───────────────────────────────────────────────────────
 
 # Weights for each source signal
-WEIGHT_KEYWORD = 0.40    # keyword filter score (normalised)
-WEIGHT_DEP     = 0.35    # dependency parser confidence
-WEIGHT_BERT    = 0.25    # BERT classifier probability
+WEIGHT_KEYWORD = 0.40  # keyword filter score (normalised)
+WEIGHT_DEP = 0.35  # dependency parser confidence
+WEIGHT_BERT = 0.25  # BERT classifier probability
 
 # Final score thresholds for send/skip decision
-THRESHOLD_HIGH   = 0.70   # combined score >= 0.70 → SEND_HIGH
-THRESHOLD_MEDIUM = 0.40   # combined score >= 0.40 → SEND_MEDIUM
-THRESHOLD_LOW    = 0.15   # combined score >= 0.15 → SEND_LOW (flagged)
-                           # combined score <  0.15 → SKIP
+THRESHOLD_HIGH = 0.70  # combined score >= 0.70 → SEND_HIGH
+THRESHOLD_MEDIUM = 0.40  # combined score >= 0.40 → SEND_MEDIUM
+THRESHOLD_LOW = 0.15  # combined score >= 0.15 → SEND_LOW (flagged)
+# combined score <  0.15 → SKIP
 
 # Map confidence string to numeric value
 CONFIDENCE_NUMERIC = {
-    "HIGH":           1.0,
-    "MEDIUM":         0.5,
+    "HIGH": 1.0,
+    "MEDIUM": 0.5,
     "LOW_CONFIDENCE": 0.1,
-    "LOW":            0.1,
+    "LOW": 0.1,
 }
 
 
@@ -69,8 +69,8 @@ class ConfidenceScorer:
     def __init__(
         self,
         weight_keyword: float = WEIGHT_KEYWORD,
-        weight_dep:     float = WEIGHT_DEP,
-        weight_bert:    float = WEIGHT_BERT,
+        weight_dep: float = WEIGHT_DEP,
+        weight_bert: float = WEIGHT_BERT,
     ):
         """
         Args:
@@ -81,8 +81,8 @@ class ConfidenceScorer:
         # Normalise weights to sum to 1.0
         total = weight_keyword + weight_dep + weight_bert
         self.w_keyword = weight_keyword / total
-        self.w_dep     = weight_dep     / total
-        self.w_bert    = weight_bert    / total
+        self.w_dep = weight_dep / total
+        self.w_bert = weight_bert / total
 
     # ── PRIVATE ───────────────────────────────────────────────────────────────
 
@@ -92,8 +92,8 @@ class ConfidenceScorer:
 
     def _combine_scores(
         self,
-        keyword_score:    int,
-        dep_confidence:   str,
+        keyword_score: int,
+        dep_confidence: str,
         bert_probability: float = None,
     ) -> tuple:
         """
@@ -107,19 +107,17 @@ class ConfidenceScorer:
         Returns:
             tuple: (combined_score: float, decision: str, breakdown: dict)
         """
-        kw_norm  = self._normalise_keyword_score(keyword_score)
+        kw_norm = self._normalise_keyword_score(keyword_score)
         dep_norm = CONFIDENCE_NUMERIC.get(dep_confidence, 0.1)
 
         if bert_probability is not None:
             combined = (
-                self.w_keyword * kw_norm  +
-                self.w_dep     * dep_norm +
-                self.w_bert    * bert_probability
+                self.w_keyword * kw_norm + self.w_dep * dep_norm + self.w_bert * bert_probability
             )
         else:
             # BERT not available — redistribute its weight
-            w_kw  = self.w_keyword / (self.w_keyword + self.w_dep)
-            w_dep = self.w_dep     / (self.w_keyword + self.w_dep)
+            w_kw = self.w_keyword / (self.w_keyword + self.w_dep)
+            w_dep = self.w_dep / (self.w_keyword + self.w_dep)
             combined = w_kw * kw_norm + w_dep * dep_norm
 
         # Decision
@@ -133,10 +131,10 @@ class ConfidenceScorer:
             decision = "SKIP"
 
         breakdown = {
-            "keyword_norm":    round(kw_norm, 3),
-            "dep_norm":        round(dep_norm, 3),
+            "keyword_norm": round(kw_norm, 3),
+            "dep_norm": round(dep_norm, 3),
             "bert_probability": round(bert_probability, 3) if bert_probability else None,
-            "combined":        round(combined, 3),
+            "combined": round(combined, 3),
         }
 
         return combined, decision, breakdown
@@ -146,8 +144,8 @@ class ConfidenceScorer:
     def combine(
         self,
         filtered_chunks: list,
-        dep_chunks:      list = None,
-        bert_chunks:     list = None,
+        dep_chunks: list = None,
+        bert_chunks: list = None,
     ) -> list:
         """
         Combine all available signals into final send/skip decisions.
@@ -161,7 +159,7 @@ class ConfidenceScorer:
             list: chunks with final_decision and combined_score added per paragraph
         """
         # Build lookup dicts keyed by section_number + paragraph text
-        dep_lookup  = {}
+        dep_lookup = {}
         bert_lookup = {}
 
         if dep_chunks:
@@ -183,13 +181,13 @@ class ConfidenceScorer:
 
         for chunk in filtered_chunks:
             enhanced_paras = []
-            send_parts     = []
+            send_parts = []
 
             for para in chunk.get("scored_paragraphs", []):
                 key = (chunk["section_number"], para["text"][:80])
 
                 # Get dep confidence
-                dep_info       = dep_lookup.get(key, {})
+                dep_info = dep_lookup.get(key, {})
                 dep_confidence = dep_info.get("dep_confidence", para.get("confidence", "LOW"))
 
                 # Get BERT probability
@@ -197,44 +195,48 @@ class ConfidenceScorer:
 
                 # Combine
                 combined_score, decision, breakdown = self._combine_scores(
-                    keyword_score    = para.get("score", 0),
-                    dep_confidence   = dep_confidence,
-                    bert_probability = bert_prob,
+                    keyword_score=para.get("score", 0),
+                    dep_confidence=dep_confidence,
+                    bert_probability=bert_prob,
                 )
 
                 stats[decision] = stats.get(decision, 0) + 1
 
-                enhanced_paras.append({
-                    **para,
-                    "final_decision":  decision,
-                    "combined_score":  combined_score,
-                    "score_breakdown": breakdown,
-                })
+                enhanced_paras.append(
+                    {
+                        **para,
+                        "final_decision": decision,
+                        "combined_score": combined_score,
+                        "score_breakdown": breakdown,
+                    }
+                )
 
                 # Build filtered text based on final decision
                 if decision == "SKIP":
-                    continue   # do not send to LLM
+                    continue  # do not send to LLM
                 elif decision == "SEND_LOW":
                     send_parts.append(f"[LOW_CONFIDENCE] {para['text']}")
                 else:
                     send_parts.append(para["text"])
 
-            combined_chunks.append({
-                **chunk,
-                "scored_paragraphs": enhanced_paras,
-                "filtered_text":     "\n\n".join(send_parts),
-                "count_skip":        sum(1 for p in enhanced_paras if p["final_decision"] == "SKIP"),
-                "count_send":        sum(1 for p in enhanced_paras if p["final_decision"] != "SKIP"),
-            })
+            combined_chunks.append(
+                {
+                    **chunk,
+                    "scored_paragraphs": enhanced_paras,
+                    "filtered_text": "\n\n".join(send_parts),
+                    "count_skip": sum(1 for p in enhanced_paras if p["final_decision"] == "SKIP"),
+                    "count_send": sum(1 for p in enhanced_paras if p["final_decision"] != "SKIP"),
+                }
+            )
 
         # Summary
         total = sum(stats.values())
         print(f"  {'Decision':<15} {'Count':>6}  {'%':>6}")
-        print(f"  {'-'*30}")
+        print(f"  {'-' * 30}")
         for decision, count in stats.items():
-            pct = f"{100*count/total:.1f}%" if total else "0%"
+            pct = f"{100 * count / total:.1f}%" if total else "0%"
             print(f"  {decision:<15} {count:>6}  {pct:>6}")
-        print(f"\n  SKIP saves ~{stats.get('SKIP',0)} LLM calls vs keyword-only filter")
+        print(f"\n  SKIP saves ~{stats.get('SKIP', 0)} LLM calls vs keyword-only filter")
 
         return combined_chunks
 

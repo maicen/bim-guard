@@ -25,12 +25,11 @@ class DoclingExtractor:
     def __init__(self):
         try:
             from docling.document_converter import DocumentConverter
+
             self.converter = DocumentConverter()
             print("[DoclingExtractor] Ready")
         except ImportError:
-            raise ImportError(
-                "Docling not installed. Run: pip install docling"
-            )
+            raise ImportError("Docling not installed. Run: pip install docling")
 
     def extract(self, pdf_path: str) -> tuple:
         """
@@ -58,12 +57,14 @@ class DoclingExtractor:
         tables = []
         for i, table in enumerate(result.document.tables):
             df = table.export_to_dataframe()
-            tables.append({
-                "table_index": i,
-                "dataframe":   df,
-                "row_count":   len(df),
-                "col_count":   len(df.columns),
-            })
+            tables.append(
+                {
+                    "table_index": i,
+                    "dataframe": df,
+                    "row_count": len(df),
+                    "col_count": len(df.columns),
+                }
+            )
 
         print(f"[DoclingExtractor] Done — {len(text):,} chars, {len(tables)} tables")
         return text, tables

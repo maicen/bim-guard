@@ -8,6 +8,7 @@ from app.services.rule_evaluators.naming import NamingEvaluator
 from app.services.rule_evaluators.metadata import MetadataEvaluator
 from app.services.rule_evaluators.geometric import GeometricEvaluator
 
+
 class ComplianceEngine:
     def __init__(self):
         self.evaluators = {
@@ -19,7 +20,7 @@ class ComplianceEngine:
     def run_check(self, ifc_path: Path, rules: List[Rule]) -> ComplianceCheck:
         ifc_file = ifcopenshell.open(str(ifc_path))
         all_issues = []
-        
+
         for rule in rules:
             evaluator = self.evaluators.get(rule.type)
             if evaluator:
@@ -30,7 +31,7 @@ class ComplianceEngine:
         summary = ComplianceSummary(
             critical=len([i for i in all_issues if "VIOLATION" in i.type]),
             warnings=len([i for i in all_issues if "MISSING" in i.type]),
-            passed=0 # Needs actual element count logic for accuracy
+            passed=0,  # Needs actual element count logic for accuracy
         )
 
         from uuid import uuid4
@@ -42,5 +43,5 @@ class ComplianceEngine:
             created_at=datetime.now(),
             completed_at=datetime.now(),
             summary=summary,
-            issues=all_issues
+            issues=all_issues,
         )

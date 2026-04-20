@@ -27,36 +27,178 @@ from typing import Optional
 # Mechanism codes: GC = galvanic, CC = crevice, MC = MIC
 DEFAULT_RATES = [
     # risk_band, mechanism, material_group, cost_gbp, days, description, contractor
-    ("Critical", "GC", "copper_steel",     8500,  5, "Isolate, replace dissimilar metal joint, install dielectric coupling", "Mechanical"),
-    ("Critical", "GC", "ss_carbon",        9200,  6, "Material substitution or full-isolation system", "Mechanical"),
-    ("Critical", "GC", "galv_copper",      7800,  4, "Replace galvanised fittings, install isolation gaskets", "Mechanical"),
-    ("Critical", "GC", "default",          8800,  5, "Galvanic isolation — material investigation required", "Mechanical"),
-    ("Critical", "CC", "ss304_pool",      12400,  8, "Upgrade to Duplex 2205 or Super Duplex 2507 — full joint replacement", "Mechanical"),
-    ("Critical", "CC", "ss316_chloride",  10800,  7, "Upgrade flange specification and gasket material", "Mechanical"),
-    ("Critical", "CC", "default",         11000,  7, "Crevice mitigation — material and joint geometry review", "Mechanical"),
-    ("Critical", "MC", "fire_supp",        6200,  4, "Flush, biocide treatment, install auto-flush device", "Public Health"),
-    ("Critical", "MC", "hot_water_deadleg",7400,  5, "Eliminate dead-leg, reconfigure to through-flow", "Public Health"),
-    ("Critical", "MC", "default",          7000,  5, "MIC remediation — dead-leg elimination or auto-flush", "Public Health"),
-    ("High",     "GC", "default",          4800,  3, "Galvanic isolation gaskets and non-conductive spacers", "Mechanical"),
-    ("High",     "CC", "default",          5600,  4, "Joint specification upgrade and environment barrier", "Mechanical"),
-    ("High",     "MC", "default",          3800,  3, "Flushing regime, monitoring programme implementation", "Public Health"),
-    ("Medium",   "GC", "default",          2200,  2, "Protective coating and monitoring — low priority", "Mechanical"),
-    ("Medium",   "CC", "default",          2800,  2, "Sealing and monitoring programme", "Mechanical"),
-    ("Medium",   "MC", "default",          1800,  1, "Microbiological monitoring and periodic flushing", "Public Health"),
-    ("Low",      "GC", "default",           400,  0, "Record in asset register — no immediate action", "Mechanical"),
-    ("Low",      "CC", "default",           400,  0, "Record in asset register — no immediate action", "Mechanical"),
-    ("Low",      "MC", "default",           400,  0, "Record in asset register — monitoring only", "Public Health"),
+    (
+        "Critical",
+        "GC",
+        "copper_steel",
+        8500,
+        5,
+        "Isolate, replace dissimilar metal joint, install dielectric coupling",
+        "Mechanical",
+    ),
+    (
+        "Critical",
+        "GC",
+        "ss_carbon",
+        9200,
+        6,
+        "Material substitution or full-isolation system",
+        "Mechanical",
+    ),
+    (
+        "Critical",
+        "GC",
+        "galv_copper",
+        7800,
+        4,
+        "Replace galvanised fittings, install isolation gaskets",
+        "Mechanical",
+    ),
+    (
+        "Critical",
+        "GC",
+        "default",
+        8800,
+        5,
+        "Galvanic isolation — material investigation required",
+        "Mechanical",
+    ),
+    (
+        "Critical",
+        "CC",
+        "ss304_pool",
+        12400,
+        8,
+        "Upgrade to Duplex 2205 or Super Duplex 2507 — full joint replacement",
+        "Mechanical",
+    ),
+    (
+        "Critical",
+        "CC",
+        "ss316_chloride",
+        10800,
+        7,
+        "Upgrade flange specification and gasket material",
+        "Mechanical",
+    ),
+    (
+        "Critical",
+        "CC",
+        "default",
+        11000,
+        7,
+        "Crevice mitigation — material and joint geometry review",
+        "Mechanical",
+    ),
+    (
+        "Critical",
+        "MC",
+        "fire_supp",
+        6200,
+        4,
+        "Flush, biocide treatment, install auto-flush device",
+        "Public Health",
+    ),
+    (
+        "Critical",
+        "MC",
+        "hot_water_deadleg",
+        7400,
+        5,
+        "Eliminate dead-leg, reconfigure to through-flow",
+        "Public Health",
+    ),
+    (
+        "Critical",
+        "MC",
+        "default",
+        7000,
+        5,
+        "MIC remediation — dead-leg elimination or auto-flush",
+        "Public Health",
+    ),
+    (
+        "High",
+        "GC",
+        "default",
+        4800,
+        3,
+        "Galvanic isolation gaskets and non-conductive spacers",
+        "Mechanical",
+    ),
+    (
+        "High",
+        "CC",
+        "default",
+        5600,
+        4,
+        "Joint specification upgrade and environment barrier",
+        "Mechanical",
+    ),
+    (
+        "High",
+        "MC",
+        "default",
+        3800,
+        3,
+        "Flushing regime, monitoring programme implementation",
+        "Public Health",
+    ),
+    (
+        "Medium",
+        "GC",
+        "default",
+        2200,
+        2,
+        "Protective coating and monitoring — low priority",
+        "Mechanical",
+    ),
+    ("Medium", "CC", "default", 2800, 2, "Sealing and monitoring programme", "Mechanical"),
+    (
+        "Medium",
+        "MC",
+        "default",
+        1800,
+        1,
+        "Microbiological monitoring and periodic flushing",
+        "Public Health",
+    ),
+    (
+        "Low",
+        "GC",
+        "default",
+        400,
+        0,
+        "Record in asset register — no immediate action",
+        "Mechanical",
+    ),
+    (
+        "Low",
+        "CC",
+        "default",
+        400,
+        0,
+        "Record in asset register — no immediate action",
+        "Mechanical",
+    ),
+    ("Low", "MC", "default", 400, 0, "Record in asset register — monitoring only", "Public Health"),
 ]
 
 COLUMN_HEADERS = [
-    "risk_band", "mechanism", "material_group",
-    "cost_per_item_gbp", "duration_days",
-    "remediation_description", "contractor_type"
+    "risk_band",
+    "mechanism",
+    "material_group",
+    "cost_per_item_gbp",
+    "duration_days",
+    "remediation_description",
+    "contractor_type",
 ]
+
 
 @dataclass
 class ImpactSummary:
     """Aggregated cost and schedule impact across all flagged elements."""
+
     total_cost_gbp: float = 0.0
     total_days: int = 0
     issues_by_band: dict = field(default_factory=dict)
@@ -189,33 +331,41 @@ class CostModel:
             summary.total_days += days
 
             # Band breakdown
-            summary.issues_by_band[band] = summary.issues_by_band.get(band, {"count": 0, "cost": 0.0, "days": 0})
+            summary.issues_by_band[band] = summary.issues_by_band.get(
+                band, {"count": 0, "cost": 0.0, "days": 0}
+            )
             summary.issues_by_band[band]["count"] += 1
             summary.issues_by_band[band]["cost"] += cost
             summary.issues_by_band[band]["days"] += days
 
             # Mechanism breakdown
-            summary.issues_by_mechanism[mech] = summary.issues_by_mechanism.get(mech, {"count": 0, "cost": 0.0, "days": 0})
+            summary.issues_by_mechanism[mech] = summary.issues_by_mechanism.get(
+                mech, {"count": 0, "cost": 0.0, "days": 0}
+            )
             summary.issues_by_mechanism[mech]["count"] += 1
             summary.issues_by_mechanism[mech]["cost"] += cost
             summary.issues_by_mechanism[mech]["days"] += days
 
             # Contractor breakdown
-            summary.issues_by_contractor[contractor] = summary.issues_by_contractor.get(contractor, {"count": 0, "cost": 0.0})
+            summary.issues_by_contractor[contractor] = summary.issues_by_contractor.get(
+                contractor, {"count": 0, "cost": 0.0}
+            )
             summary.issues_by_contractor[contractor]["count"] += 1
             summary.issues_by_contractor[contractor]["cost"] += cost
 
             # Line item
-            summary.line_items.append({
-                "risk_band": band,
-                "mechanism": mech,
-                "material": material,
-                "cost_gbp": cost,
-                "duration_days": days,
-                "remediation": desc,
-                "contractor": contractor,
-                "element_id": r.get("global_id", r.get("GlobalID", "Unknown")),
-            })
+            summary.line_items.append(
+                {
+                    "risk_band": band,
+                    "mechanism": mech,
+                    "material": material,
+                    "cost_gbp": cost,
+                    "duration_days": days,
+                    "remediation": desc,
+                    "contractor": contractor,
+                    "element_id": r.get("global_id", r.get("GlobalID", "Unknown")),
+                }
+            )
 
         return summary
 
@@ -230,12 +380,20 @@ class CostModel:
         writer.writerow(COLUMN_HEADERS)
         # Write a few example rows
         examples = [
-            ["Critical", "GC", "copper_steel",    9000, 5, "Replace dissimilar metal joint", "Mechanical"],
-            ["Critical", "CC", "ss316_chloride", 11000, 7, "Upgrade to Duplex 2205",         "Mechanical"],
-            ["Critical", "MC", "hot_water_deadleg", 7500, 5, "Eliminate dead-leg",            "Public Health"],
-            ["High",     "GC", "default",          5000, 3, "Install dielectric isolation",   "Mechanical"],
-            ["Medium",   "MC", "default",           2000, 1, "Monitoring programme",           "Public Health"],
-            ["Low",      "GC", "default",            400, 0, "Asset register only",            "Mechanical"],
+            [
+                "Critical",
+                "GC",
+                "copper_steel",
+                9000,
+                5,
+                "Replace dissimilar metal joint",
+                "Mechanical",
+            ],
+            ["Critical", "CC", "ss316_chloride", 11000, 7, "Upgrade to Duplex 2205", "Mechanical"],
+            ["Critical", "MC", "hot_water_deadleg", 7500, 5, "Eliminate dead-leg", "Public Health"],
+            ["High", "GC", "default", 5000, 3, "Install dielectric isolation", "Mechanical"],
+            ["Medium", "MC", "default", 2000, 1, "Monitoring programme", "Public Health"],
+            ["Low", "GC", "default", 400, 0, "Asset register only", "Mechanical"],
         ]
         for row in examples:
             writer.writerow(row)
@@ -245,17 +403,12 @@ class CostModel:
         """Return the current rate table as a Pandas DataFrame for display."""
         rows = []
         for (band, mech, mat), data in self._rates.items():
-            rows.append({
-                "risk_band": band,
-                "mechanism": mech,
-                "material_group": mat,
-                **data
-            })
+            rows.append({"risk_band": band, "mechanism": mech, "material_group": mat, **data})
         return pd.DataFrame(rows)
 
 
 # ── STREAMLIT INTEGRATION SNIPPET ────────────────────────────────────────────
-STREAMLIT_SNIPPET = '''
+STREAMLIT_SNIPPET = """
 # Add to your Streamlit app — Schedule & Cost Impact page
 # ─────────────────────────────────────────────────────────────────────────────
 import streamlit as st
@@ -303,4 +456,4 @@ if st.session_state.get("compliance_results"):
     c1.metric("Total remediation cost", f"£{impact.total_cost_gbp:,.0f}")
     c2.metric("Total programme delay", f"{impact.total_days} days")
     c3.metric("Issues costed", str(len(impact.line_items)))
-'''
+"""

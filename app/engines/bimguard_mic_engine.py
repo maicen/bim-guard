@@ -44,13 +44,44 @@ ASSESSMENT_DATE = datetime.utcnow().isoformat() + "Z"
 # Based on CIBSE TM13:2013 and HSE HSG274
 # Stagnation is the primary enabler of biofilm formation
 FLOW_VELOCITY_CLASSES = {
-    "FV0_STAGNANT":   {"label": "Stagnant / dead-leg",        "threshold_ms": 0.0,  "risk": 1.00, "mic_risk": "Critical — biofilm establishment certain"},
-    "FV1_VERY_LOW":   {"label": "Very low flow < 0.1 m/s",    "threshold_ms": 0.1,  "risk": 0.80, "mic_risk": "High — insufficient flushing velocity"},
-    "FV2_LOW":        {"label": "Low flow 0.1–0.3 m/s",       "threshold_ms": 0.3,  "risk": 0.55, "mic_risk": "Moderate — marginal flushing"},
-    "FV3_ACCEPTABLE": {"label": "Acceptable 0.3–0.6 m/s",     "threshold_ms": 0.6,  "risk": 0.25, "mic_risk": "Low — adequate flushing for most services"},
-    "FV4_GOOD":       {"label": "Good flow 0.6–1.5 m/s",      "threshold_ms": 1.5,  "risk": 0.10, "mic_risk": "Very low — self-cleaning velocity"},
-    "FV5_TURBULENT":  {"label": "Turbulent > 1.5 m/s",        "threshold_ms": 999,  "risk": 0.02, "mic_risk": "Negligible — turbulent regime inhibits biofilm"},
+    "FV0_STAGNANT": {
+        "label": "Stagnant / dead-leg",
+        "threshold_ms": 0.0,
+        "risk": 1.00,
+        "mic_risk": "Critical — biofilm establishment certain",
+    },
+    "FV1_VERY_LOW": {
+        "label": "Very low flow < 0.1 m/s",
+        "threshold_ms": 0.1,
+        "risk": 0.80,
+        "mic_risk": "High — insufficient flushing velocity",
+    },
+    "FV2_LOW": {
+        "label": "Low flow 0.1–0.3 m/s",
+        "threshold_ms": 0.3,
+        "risk": 0.55,
+        "mic_risk": "Moderate — marginal flushing",
+    },
+    "FV3_ACCEPTABLE": {
+        "label": "Acceptable 0.3–0.6 m/s",
+        "threshold_ms": 0.6,
+        "risk": 0.25,
+        "mic_risk": "Low — adequate flushing for most services",
+    },
+    "FV4_GOOD": {
+        "label": "Good flow 0.6–1.5 m/s",
+        "threshold_ms": 1.5,
+        "risk": 0.10,
+        "mic_risk": "Very low — self-cleaning velocity",
+    },
+    "FV5_TURBULENT": {
+        "label": "Turbulent > 1.5 m/s",
+        "threshold_ms": 999,
+        "risk": 0.02,
+        "mic_risk": "Negligible — turbulent regime inhibits biofilm",
+    },
 }
+
 
 def classify_flow_velocity(velocity_ms: float) -> tuple[str, dict]:
     """Classify flow velocity and return risk class and metadata."""
@@ -67,19 +98,57 @@ def classify_flow_velocity(velocity_ms: float) -> tuple[str, dict]:
     else:
         return "FV5_TURBULENT", FLOW_VELOCITY_CLASSES["FV5_TURBULENT"]
 
+
 # ── TEMPERATURE CLASSES ───────────────────────────────────────────────────────
 # Based on WHO Guidelines and CIBSE TM13:2013
 # Legionella pneumophila growth optimum: 35–46°C
 # SRB optimum: 25–35°C (mesophilic), some to 65°C (thermophilic)
 # APB range: 15–45°C
 TEMPERATURE_CLASSES = {
-    "T0_COLD":      {"range": "<20°C",      "t_min": 0,   "t_max": 20,  "risk": 0.15, "organisms": "SRB low activity, minimal Legionella risk (WHO cold water <20°C)"},
-    "T1_MARGINAL":  {"range": "20–25°C",    "t_min": 20,  "t_max": 25,  "risk": 0.35, "organisms": "SRB active, Legionella survival zone begins"},
-    "T2_DANGER":    {"range": "25–45°C",    "t_min": 25,  "t_max": 45,  "risk": 1.00, "organisms": "CRITICAL — Legionella proliferation zone. SRB + APB optimal. CIBSE TM13 danger zone"},
-    "T3_TOLERABLE": {"range": "45–55°C",    "t_min": 45,  "t_max": 55,  "risk": 0.45, "organisms": "Legionella above optimum but survives to 55°C. Thermophilic SRB active"},
-    "T4_SAFE_HOT":  {"range": ">55°C",      "t_min": 55,  "t_max": 999, "risk": 0.05, "organisms": "Legionella destroyed above 60°C (CIBSE TM13). SRB inhibited"},
-    "T5_UNKNOWN":   {"range": "Unknown",    "t_min": -1,  "t_max": -1,  "risk": 0.65, "organisms": "Temperature unknown — conservative risk applied (default ambient 20°C applied)"},
+    "T0_COLD": {
+        "range": "<20°C",
+        "t_min": 0,
+        "t_max": 20,
+        "risk": 0.15,
+        "organisms": "SRB low activity, minimal Legionella risk (WHO cold water <20°C)",
+    },
+    "T1_MARGINAL": {
+        "range": "20–25°C",
+        "t_min": 20,
+        "t_max": 25,
+        "risk": 0.35,
+        "organisms": "SRB active, Legionella survival zone begins",
+    },
+    "T2_DANGER": {
+        "range": "25–45°C",
+        "t_min": 25,
+        "t_max": 45,
+        "risk": 1.00,
+        "organisms": "CRITICAL — Legionella proliferation zone. SRB + APB optimal. CIBSE TM13 danger zone",
+    },
+    "T3_TOLERABLE": {
+        "range": "45–55°C",
+        "t_min": 45,
+        "t_max": 55,
+        "risk": 0.45,
+        "organisms": "Legionella above optimum but survives to 55°C. Thermophilic SRB active",
+    },
+    "T4_SAFE_HOT": {
+        "range": ">55°C",
+        "t_min": 55,
+        "t_max": 999,
+        "risk": 0.05,
+        "organisms": "Legionella destroyed above 60°C (CIBSE TM13). SRB inhibited",
+    },
+    "T5_UNKNOWN": {
+        "range": "Unknown",
+        "t_min": -1,
+        "t_max": -1,
+        "risk": 0.65,
+        "organisms": "Temperature unknown — conservative risk applied (default ambient 20°C applied)",
+    },
 }
+
 
 def classify_temperature(temp_c: Optional[float]) -> tuple[str, dict]:
     """Classify operating temperature and return risk class."""
@@ -92,18 +161,50 @@ def classify_temperature(temp_c: Optional[float]) -> tuple[str, dict]:
             return key, data
     return "T4_SAFE_HOT", TEMPERATURE_CLASSES["T4_SAFE_HOT"]
 
+
 # ── DEAD-LEG CLASSIFICATION ───────────────────────────────────────────────────
 # Based on HSE HSG274 Part 2 and CIBSE Guide G
 # Dead-leg length ratio = dead-leg length / supply pipe diameter
 # A dead-leg length > 3× diameter is the standard HSE threshold
 DEAD_LEG_CLASSES = {
-    "DL0_THROUGH":    {"label": "Through-flow (no dead-leg)",     "risk": 0.05, "ratio_threshold": 0,   "description": "Active flow path — no stagnation geometry"},
-    "DL1_SHORT":      {"label": "Short dead-leg (< 3D)",          "risk": 0.30, "ratio_threshold": 3,   "description": "Below HSE HSG274 threshold — low stagnation risk"},
-    "DL2_MODERATE":   {"label": "Moderate dead-leg (3D – 10D)",   "risk": 0.65, "ratio_threshold": 10,  "description": "Exceeds HSE threshold — flushing regime required"},
-    "DL3_LONG":       {"label": "Long dead-leg (10D – 20D)",      "risk": 0.85, "ratio_threshold": 20,  "description": "High stagnation — consider elimination or auto-flush"},
-    "DL4_CRITICAL":   {"label": "Critical dead-leg (> 20D)",      "risk": 1.00, "ratio_threshold": 999, "description": "Critical stagnation geometry — eliminate or install auto-flush"},
-    "DL5_UNKNOWN":    {"label": "Dead-leg unknown",                "risk": 0.50, "ratio_threshold": -1,  "description": "Topology not determinable from IFC — conservative default"},
+    "DL0_THROUGH": {
+        "label": "Through-flow (no dead-leg)",
+        "risk": 0.05,
+        "ratio_threshold": 0,
+        "description": "Active flow path — no stagnation geometry",
+    },
+    "DL1_SHORT": {
+        "label": "Short dead-leg (< 3D)",
+        "risk": 0.30,
+        "ratio_threshold": 3,
+        "description": "Below HSE HSG274 threshold — low stagnation risk",
+    },
+    "DL2_MODERATE": {
+        "label": "Moderate dead-leg (3D – 10D)",
+        "risk": 0.65,
+        "ratio_threshold": 10,
+        "description": "Exceeds HSE threshold — flushing regime required",
+    },
+    "DL3_LONG": {
+        "label": "Long dead-leg (10D – 20D)",
+        "risk": 0.85,
+        "ratio_threshold": 20,
+        "description": "High stagnation — consider elimination or auto-flush",
+    },
+    "DL4_CRITICAL": {
+        "label": "Critical dead-leg (> 20D)",
+        "risk": 1.00,
+        "ratio_threshold": 999,
+        "description": "Critical stagnation geometry — eliminate or install auto-flush",
+    },
+    "DL5_UNKNOWN": {
+        "label": "Dead-leg unknown",
+        "risk": 0.50,
+        "ratio_threshold": -1,
+        "description": "Topology not determinable from IFC — conservative default",
+    },
 }
+
 
 def classify_dead_leg(length_m: Optional[float], diameter_m: Optional[float]) -> tuple[str, dict]:
     """
@@ -124,72 +225,134 @@ def classify_dead_leg(length_m: Optional[float], diameter_m: Optional[float]) ->
     else:
         return "DL4_CRITICAL", DEAD_LEG_CLASSES["DL4_CRITICAL"]
 
+
 # ── MATERIAL SUSCEPTIBILITY ───────────────────────────────────────────────────
 # Based on ASTM G-187 and NACCE TPC 11
 # MIC susceptibility differs from galvanic/crevice — copper and some alloys
 # have antimicrobial properties; carbon steel and cast iron are highly susceptible
 MATERIAL_SUSCEPTIBILITY = {
     # key: (susceptibility_score, label, notes)
-    "carbon_steel":      (1.00, "Carbon / mild steel",     "Highly susceptible — iron provides nutrient for IOB and SRB. Pitting under biofilm common"),
-    "cast_iron":         (0.90, "Cast iron",               "High susceptibility — large surface area, graphitic corrosion under biofilm"),
-    "galv_steel":        (0.75, "Galvanised steel",        "Moderate-high — zinc coating inhibits initially but SRB attack underlying steel when depleted"),
-    "ss304":             (0.30, "Stainless steel 304",     "Low susceptibility — passive film resists MIC. Risk increases under biofilm in stagnant conditions"),
-    "ss316":             (0.20, "Stainless steel 316",     "Low — Mo addition improves resistance. Still at risk from SRB pitting in anaerobic stagnant zones"),
-    "duplex2205":        (0.10, "Duplex 2205",             "Very low — high Cr+Mo content provides strong MIC resistance"),
-    "copper":            (0.15, "Copper",                  "Low — antimicrobial properties inhibit biofilm. Risk from APB in acidic conditions (dezincification)"),
-    "brass":             (0.25, "Brass (70/30)",           "Low-moderate — antimicrobial but susceptible to dealloying under biofilm"),
-    "bronze":            (0.20, "Bronze",                  "Low — similar to copper; antimicrobial properties effective"),
-    "cpvc":              (0.05, "CPVC",                    "Negligible — non-metallic; biofilm substrate only, no metallic corrosion"),
-    "pvc":               (0.05, "PVC",                     "Negligible — non-metallic; biofilm can form but no MIC of pipe material"),
-    "hdpe":              (0.05, "HDPE",                    "Negligible — non-metallic; inert to MIC"),
-    "titanium":          (0.05, "Titanium",                "Negligible — exceptional MIC resistance; used in aggressive MIC environments"),
-    "aluminium":         (0.50, "Aluminium",               "Moderate — susceptible to pitting under biofilm, particularly in chloride environments"),
-    "unknown":           (0.60, "Unknown material",        "Conservative default — material not identified in IFC model"),
+    "carbon_steel": (
+        1.00,
+        "Carbon / mild steel",
+        "Highly susceptible — iron provides nutrient for IOB and SRB. Pitting under biofilm common",
+    ),
+    "cast_iron": (
+        0.90,
+        "Cast iron",
+        "High susceptibility — large surface area, graphitic corrosion under biofilm",
+    ),
+    "galv_steel": (
+        0.75,
+        "Galvanised steel",
+        "Moderate-high — zinc coating inhibits initially but SRB attack underlying steel when depleted",
+    ),
+    "ss304": (
+        0.30,
+        "Stainless steel 304",
+        "Low susceptibility — passive film resists MIC. Risk increases under biofilm in stagnant conditions",
+    ),
+    "ss316": (
+        0.20,
+        "Stainless steel 316",
+        "Low — Mo addition improves resistance. Still at risk from SRB pitting in anaerobic stagnant zones",
+    ),
+    "duplex2205": (
+        0.10,
+        "Duplex 2205",
+        "Very low — high Cr+Mo content provides strong MIC resistance",
+    ),
+    "copper": (
+        0.15,
+        "Copper",
+        "Low — antimicrobial properties inhibit biofilm. Risk from APB in acidic conditions (dezincification)",
+    ),
+    "brass": (
+        0.25,
+        "Brass (70/30)",
+        "Low-moderate — antimicrobial but susceptible to dealloying under biofilm",
+    ),
+    "bronze": (0.20, "Bronze", "Low — similar to copper; antimicrobial properties effective"),
+    "cpvc": (
+        0.05,
+        "CPVC",
+        "Negligible — non-metallic; biofilm substrate only, no metallic corrosion",
+    ),
+    "pvc": (0.05, "PVC", "Negligible — non-metallic; biofilm can form but no MIC of pipe material"),
+    "hdpe": (0.05, "HDPE", "Negligible — non-metallic; inert to MIC"),
+    "titanium": (
+        0.05,
+        "Titanium",
+        "Negligible — exceptional MIC resistance; used in aggressive MIC environments",
+    ),
+    "aluminium": (
+        0.50,
+        "Aluminium",
+        "Moderate — susceptible to pitting under biofilm, particularly in chloride environments",
+    ),
+    "unknown": (
+        0.60,
+        "Unknown material",
+        "Conservative default — material not identified in IFC model",
+    ),
 }
+
 
 def get_material_susceptibility(material_key: str) -> tuple[float, str, str]:
     """Return (score, label, notes) for a material key."""
     key = material_key.lower().replace(" ", "_").replace("-", "_")
     # Normalise common variants
     aliases = {
-        "carbon steel": "carbon_steel", "mild steel": "carbon_steel",
-        "cs": "carbon_steel", "ms": "carbon_steel",
-        "galvanised": "galv_steel", "galvanized": "galv_steel",
-        "ss 304": "ss304", "304": "ss304", "1.4301": "ss304",
-        "ss 316": "ss316", "316": "ss316", "316l": "ss316", "1.4401": "ss316",
-        "2205": "duplex2205", "duplex": "duplex2205",
-        "cu": "copper", "copper tube": "copper",
+        "carbon steel": "carbon_steel",
+        "mild steel": "carbon_steel",
+        "cs": "carbon_steel",
+        "ms": "carbon_steel",
+        "galvanised": "galv_steel",
+        "galvanized": "galv_steel",
+        "ss 304": "ss304",
+        "304": "ss304",
+        "1.4301": "ss304",
+        "ss 316": "ss316",
+        "316": "ss316",
+        "316l": "ss316",
+        "1.4401": "ss316",
+        "2205": "duplex2205",
+        "duplex": "duplex2205",
+        "cu": "copper",
+        "copper tube": "copper",
     }
     resolved = aliases.get(key, key)
     return MATERIAL_SUSCEPTIBILITY.get(resolved, MATERIAL_SUSCEPTIBILITY["unknown"])
+
 
 # ── UNDER-INSULATION CORROSION (UIC) ─────────────────────────────────────────
 # Based on NACE SP0198 and CIBSE Guide G
 # Under-insulation creates trapped moisture, restricted oxygen, and warm
 # temperatures that are ideal for SRB and APB colonisation
 UNDER_INSULATION_RISK = {
-    "none":           0.00,   # No insulation
-    "good_condition": 0.10,   # Insulation present, intact, no moisture ingress
-    "weathered":      0.45,   # Insulation weathered/aged — moisture ingress possible
-    "damaged":        0.80,   # Insulation visibly damaged — moisture trapped
-    "wet":            1.00,   # Wet insulation confirmed — MIC very likely
-    "unknown":        0.35,   # Insulation present but condition unknown
+    "none": 0.00,  # No insulation
+    "good_condition": 0.10,  # Insulation present, intact, no moisture ingress
+    "weathered": 0.45,  # Insulation weathered/aged — moisture ingress possible
+    "damaged": 0.80,  # Insulation visibly damaged — moisture trapped
+    "wet": 1.00,  # Wet insulation confirmed — MIC very likely
+    "unknown": 0.35,  # Insulation present but condition unknown
 }
 
 # ── SYSTEM TYPE RISK MODIFIER ─────────────────────────────────────────────────
 # Certain system types have inherent MIC risk regardless of individual element conditions
 SYSTEM_TYPE_MODIFIERS = {
     # IfcDistributionSystem types → (multiplier, description)
-    "DOMESTICCOLDWATER":    (1.30, "Domestic cold water — primary Legionella risk system"),
-    "DOMESTICHOTWATER":     (1.25, "Domestic hot water — Legionella proliferation if < 55°C"),
-    "CHILLEDWATER":         (1.15, "Chilled water — temperature 7–12°C favours biofilm in low-flow zones"),
-    "CONDENSERWATER":       (1.20, "Condenser water — warm recirculating system, high MIC risk"),
-    "FIREPROTECTION":       (1.40, "Fire suppression — infrequent flow, long stagnation periods"),
-    "IRRIGATION":           (1.10, "Irrigation — intermittent flow, warm conditions"),
-    "WASTEWATER":           (0.80, "Waste / drain — anaerobic SRB active but corrosion consequence lower"),
-    "PROCESSWATER":         (1.00, "Process water — risk depends on operating conditions"),
-    "UNKNOWN":              (1.05, "Unknown system type — slight conservative uplift"),
+    "DOMESTICCOLDWATER": (1.30, "Domestic cold water — primary Legionella risk system"),
+    "DOMESTICHOTWATER": (1.25, "Domestic hot water — Legionella proliferation if < 55°C"),
+    "CHILLEDWATER": (1.15, "Chilled water — temperature 7–12°C favours biofilm in low-flow zones"),
+    "CONDENSERWATER": (1.20, "Condenser water — warm recirculating system, high MIC risk"),
+    "FIREPROTECTION": (1.40, "Fire suppression — infrequent flow, long stagnation periods"),
+    "IRRIGATION": (1.10, "Irrigation — intermittent flow, warm conditions"),
+    "WASTEWATER": (0.80, "Waste / drain — anaerobic SRB active but corrosion consequence lower"),
+    "PROCESSWATER": (1.00, "Process water — risk depends on operating conditions"),
+    "UNKNOWN": (1.05, "Unknown system type — slight conservative uplift"),
 }
+
 
 def get_system_modifier(system_type: str) -> tuple[float, str]:
     """Return (multiplier, description) for a system type string."""
@@ -197,6 +360,7 @@ def get_system_modifier(system_type: str) -> tuple[float, str]:
         if key in system_type.upper():
             return val
     return SYSTEM_TYPE_MODIFIERS["UNKNOWN"]
+
 
 # ── RISK BAND CLASSIFICATION ──────────────────────────────────────────────────
 def classify_mic_risk(score: float) -> tuple[str, str]:
@@ -213,6 +377,7 @@ def classify_mic_risk(score: float) -> tuple[str, str]:
     else:
         return "Critical", "Critical"
 
+
 # ── MITIGATION CATALOGUE ──────────────────────────────────────────────────────
 MITIGATIONS = {
     "MIT-MIC-001": "Eliminate dead-leg — reconfigure pipework to active through-flow configuration (HSE HSG274 preferred solution)",
@@ -227,7 +392,10 @@ MITIGATIONS = {
     "MIT-MIC-010": "Conduct thermal disinfection — pasteurisation at minimum 70°C for 1 hour (CIBSE TM13 emergency response)",
 }
 
-def select_mitigation(flow_class: str, temp_class: str, dead_leg_class: str, material_key: str) -> list[str]:
+
+def select_mitigation(
+    flow_class: str, temp_class: str, dead_leg_class: str, material_key: str
+) -> list[str]:
     """Select appropriate mitigations based on primary risk drivers."""
     mits = []
     if dead_leg_class in ("DL4_CRITICAL", "DL3_LONG"):
@@ -244,15 +412,17 @@ def select_mitigation(flow_class: str, temp_class: str, dead_leg_class: str, mat
     mits.append("MIT-MIC-009")
     return list(dict.fromkeys(mits))  # deduplicate preserving order
 
+
 # ── MAIN ASSESSMENT DATACLASS ─────────────────────────────────────────────────
 @dataclass
 class MICElement:
     """Input data for a single piping element to be assessed by MC-001."""
+
     global_id: str
-    element_type: str           # e.g. "IfcPipeSegment"
-    system_type: str            # e.g. "DOMESTICCOLDWATER"
-    material: str               # material name string from IFC
-    nominal_diameter_m: float   # pipe OD in metres
+    element_type: str  # e.g. "IfcPipeSegment"
+    system_type: str  # e.g. "DOMESTICCOLDWATER"
+    material: str  # material name string from IFC
+    nominal_diameter_m: float  # pipe OD in metres
     flow_velocity_ms: Optional[float] = None
     operating_temp_c: Optional[float] = None
     dead_leg_length_m: Optional[float] = None
@@ -264,9 +434,11 @@ class MICElement:
     position_y: float = 0.0
     position_z: float = 0.0
 
+
 @dataclass
 class MICResult:
     """Full MC-001 assessment result for one element."""
+
     global_id: str
     element_type: str
     system_type: str
@@ -292,6 +464,7 @@ class MICResult:
     # Metadata
     ruleset_version: str = RULESET_VERSION
     assessment_date: str = ASSESSMENT_DATE
+
 
 # ── CORE ASSESSMENT FUNCTION ──────────────────────────────────────────────────
 def assess_mic_risk(element: MICElement) -> MICResult:
@@ -319,10 +492,7 @@ def assess_mic_risk(element: MICElement) -> MICResult:
     t_risk = t_data["risk"]
 
     # Dead-leg
-    dl_class, dl_data = classify_dead_leg(
-        element.dead_leg_length_m,
-        element.nominal_diameter_m
-    )
+    dl_class, dl_data = classify_dead_leg(element.dead_leg_length_m, element.nominal_diameter_m)
     dl_risk = dl_data["risk"]
 
     # Material susceptibility
@@ -337,12 +507,7 @@ def assess_mic_risk(element: MICElement) -> MICResult:
     )
 
     # Base composite score
-    base_score = (
-        0.35 * fv_risk +
-        0.30 * t_risk +
-        0.25 * dl_risk +
-        0.10 * mat_score
-    )
+    base_score = 0.35 * fv_risk + 0.30 * t_risk + 0.25 * dl_risk + 0.10 * mat_score
 
     # Apply system modifier
     modified_score = base_score * sys_mult
@@ -376,9 +541,11 @@ def assess_mic_risk(element: MICElement) -> MICResult:
         mitigations=mitigations,
     )
 
+
 def assess_mic_batch(elements: list[MICElement]) -> list[MICResult]:
     """Run MC-001 on a list of elements and return all results."""
     return [assess_mic_risk(el) for el in elements]
+
 
 # ── BCF 2.1 EXPORT ────────────────────────────────────────────────────────────
 def generate_mic_bcf(results: list[MICResult], output_path: str) -> int:
@@ -394,10 +561,7 @@ def generate_mic_bcf(results: list[MICResult], output_path: str) -> int:
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for result in issues:
             issue_id = str(uuid.uuid4())
-            mit_text = "\n".join(
-                f"  {k}: {MITIGATIONS.get(k, k)}"
-                for k in result.mitigations
-            )
+            mit_text = "\n".join(f"  {k}: {MITIGATIONS.get(k, k)}" for k in result.mitigations)
             markup = f"""<?xml version="1.0" encoding="utf-8"?>
 <Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Topic Guid="{issue_id}" TopicType="Issue" TopicStatus="Open">
@@ -464,46 +628,63 @@ Relevant standards:
 
     return len(issues)
 
+
 # ── ASSET REGISTER EXPORT ─────────────────────────────────────────────────────
 def export_mic_asset_register(results: list[MICResult], output_path: str) -> None:
     """Export MC-001 results to CSV asset register."""
     fieldnames = [
-        "GlobalID", "ElementType", "SystemType", "MaterialLabel",
-        "Floor", "Zone",
-        "FlowVelocityClass", "FlowVelocityRisk",
-        "TemperatureClass", "TemperatureRisk",
-        "DeadLegClass", "DeadLegRisk",
-        "MaterialSusceptibility", "SystemModifier", "UnderInsulationRisk",
-        "CompositeScore", "RiskBand", "BCFPriority",
-        "Mitigations", "RulesetVersion", "AssessmentDate"
+        "GlobalID",
+        "ElementType",
+        "SystemType",
+        "MaterialLabel",
+        "Floor",
+        "Zone",
+        "FlowVelocityClass",
+        "FlowVelocityRisk",
+        "TemperatureClass",
+        "TemperatureRisk",
+        "DeadLegClass",
+        "DeadLegRisk",
+        "MaterialSusceptibility",
+        "SystemModifier",
+        "UnderInsulationRisk",
+        "CompositeScore",
+        "RiskBand",
+        "BCFPriority",
+        "Mitigations",
+        "RulesetVersion",
+        "AssessmentDate",
     ]
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for r in results:
-            writer.writerow({
-                "GlobalID": r.global_id,
-                "ElementType": r.element_type,
-                "SystemType": r.system_type,
-                "MaterialLabel": r.material_label,
-                "Floor": r.floor,
-                "Zone": r.zone,
-                "FlowVelocityClass": r.flow_velocity_class,
-                "FlowVelocityRisk": r.flow_velocity_risk,
-                "TemperatureClass": r.temperature_class,
-                "TemperatureRisk": r.temperature_risk,
-                "DeadLegClass": r.dead_leg_class,
-                "DeadLegRisk": r.dead_leg_risk,
-                "MaterialSusceptibility": r.material_susceptibility_score,
-                "SystemModifier": r.system_modifier,
-                "UnderInsulationRisk": r.under_insulation_risk,
-                "CompositeScore": r.composite_score,
-                "RiskBand": r.risk_band,
-                "BCFPriority": r.bcf_priority,
-                "Mitigations": " | ".join(r.mitigations),
-                "RulesetVersion": r.ruleset_version,
-                "AssessmentDate": r.assessment_date,
-            })
+            writer.writerow(
+                {
+                    "GlobalID": r.global_id,
+                    "ElementType": r.element_type,
+                    "SystemType": r.system_type,
+                    "MaterialLabel": r.material_label,
+                    "Floor": r.floor,
+                    "Zone": r.zone,
+                    "FlowVelocityClass": r.flow_velocity_class,
+                    "FlowVelocityRisk": r.flow_velocity_risk,
+                    "TemperatureClass": r.temperature_class,
+                    "TemperatureRisk": r.temperature_risk,
+                    "DeadLegClass": r.dead_leg_class,
+                    "DeadLegRisk": r.dead_leg_risk,
+                    "MaterialSusceptibility": r.material_susceptibility_score,
+                    "SystemModifier": r.system_modifier,
+                    "UnderInsulationRisk": r.under_insulation_risk,
+                    "CompositeScore": r.composite_score,
+                    "RiskBand": r.risk_band,
+                    "BCFPriority": r.bcf_priority,
+                    "Mitigations": " | ".join(r.mitigations),
+                    "RulesetVersion": r.ruleset_version,
+                    "AssessmentDate": r.assessment_date,
+                }
+            )
+
 
 # ── CLI VALIDATION DEMO ───────────────────────────────────────────────────────
 def run_validation_demo():
@@ -525,12 +706,12 @@ def run_validation_demo():
             system_type="DOMESTICCOLDWATER",
             material="carbon_steel",
             nominal_diameter_m=0.050,
-            flow_velocity_ms=0.0,        # Stagnant dead-leg
-            operating_temp_c=28.0,       # Danger zone
-            dead_leg_length_m=2.5,       # 2500mm / 50mm = 50D ratio → Critical
+            flow_velocity_ms=0.0,  # Stagnant dead-leg
+            operating_temp_c=28.0,  # Danger zone
+            dead_leg_length_m=2.5,  # 2500mm / 50mm = 50D ratio → Critical
             insulation_condition="none",
-            floor="B1", zone="Plant Room",
-            
+            floor="B1",
+            zone="Plant Room",
         ),
         MICElement(
             global_id="MIC-VAL-002",
@@ -538,12 +719,12 @@ def run_validation_demo():
             system_type="FIREPROTECTION",
             material="carbon_steel",
             nominal_diameter_m=0.080,
-            flow_velocity_ms=0.0,        # Fire suppression — never flows
-            operating_temp_c=22.0,       # Above 20°C ambient
-            dead_leg_length_m=8.0,       # 8000mm / 80mm = 100D → Critical
+            flow_velocity_ms=0.0,  # Fire suppression — never flows
+            operating_temp_c=22.0,  # Above 20°C ambient
+            dead_leg_length_m=8.0,  # 8000mm / 80mm = 100D → Critical
             insulation_condition="none",
-            floor="B2", zone="Car Park",
-            
+            floor="B2",
+            zone="Car Park",
         ),
         MICElement(
             global_id="MIC-VAL-003",
@@ -551,12 +732,12 @@ def run_validation_demo():
             system_type="DOMESTICHOTWATER",
             material="carbon_steel",
             nominal_diameter_m=0.022,
-            flow_velocity_ms=0.05,       # Near-stagnant
-            operating_temp_c=38.0,       # Perfect Legionella temperature
-            dead_leg_length_m=0.8,       # 800mm / 22mm = 36D → Critical
+            flow_velocity_ms=0.05,  # Near-stagnant
+            operating_temp_c=38.0,  # Perfect Legionella temperature
+            dead_leg_length_m=0.8,  # 800mm / 22mm = 36D → Critical
             insulation_condition="unknown",
-            floor="03", zone="Hotel Room",
-            
+            floor="03",
+            zone="Hotel Room",
         ),
         # --- HIGH risk scenarios ---
         MICElement(
@@ -565,12 +746,12 @@ def run_validation_demo():
             system_type="CHILLEDWATER",
             material="carbon_steel",
             nominal_diameter_m=0.100,
-            flow_velocity_ms=0.08,       # Very low — near stagnant
-            operating_temp_c=10.0,       # Cold — below Legionella but biofilm active
-            dead_leg_length_m=0.6,       # 600mm / 100mm = 6D → Moderate
+            flow_velocity_ms=0.08,  # Very low — near stagnant
+            operating_temp_c=10.0,  # Cold — below Legionella but biofilm active
+            dead_leg_length_m=0.6,  # 600mm / 100mm = 6D → Moderate
             insulation_condition="weathered",
-            floor="01", zone="AHU Plantroom",
-            
+            floor="01",
+            zone="AHU Plantroom",
         ),
         MICElement(
             global_id="MIC-VAL-005",
@@ -578,12 +759,12 @@ def run_validation_demo():
             system_type="CONDENSERWATER",
             material="galv_steel",
             nominal_diameter_m=0.150,
-            flow_velocity_ms=0.25,       # Low flow
-            operating_temp_c=32.0,       # Condenser return — warm
-            dead_leg_length_m=None,      # Unknown topology
+            flow_velocity_ms=0.25,  # Low flow
+            operating_temp_c=32.0,  # Condenser return — warm
+            dead_leg_length_m=None,  # Unknown topology
             insulation_condition="none",
-            floor="RF", zone="Cooling Tower",
-            
+            floor="RF",
+            zone="Cooling Tower",
         ),
         # --- MEDIUM risk scenarios ---
         MICElement(
@@ -592,12 +773,12 @@ def run_validation_demo():
             system_type="DOMESTICHOTWATER",
             material="copper",
             nominal_diameter_m=0.028,
-            flow_velocity_ms=0.45,       # Acceptable but marginal
-            operating_temp_c=58.0,       # Good hot water temperature
-            dead_leg_length_m=0.06,      # 60mm / 28mm = 2.1D → Short
+            flow_velocity_ms=0.45,  # Acceptable but marginal
+            operating_temp_c=58.0,  # Good hot water temperature
+            dead_leg_length_m=0.06,  # 60mm / 28mm = 2.1D → Short
             insulation_condition="good_condition",
-            floor="02", zone="Ward",
-            
+            floor="02",
+            zone="Ward",
         ),
         MICElement(
             global_id="MIC-VAL-007",
@@ -605,12 +786,12 @@ def run_validation_demo():
             system_type="PROCESSWATER",
             material="ss316",
             nominal_diameter_m=0.050,
-            flow_velocity_ms=0.15,       # Low but not stagnant
-            operating_temp_c=None,       # Temperature unknown
-            dead_leg_length_m=0.3,       # 300mm / 50mm = 6D → Moderate
+            flow_velocity_ms=0.15,  # Low but not stagnant
+            operating_temp_c=None,  # Temperature unknown
+            dead_leg_length_m=0.3,  # 300mm / 50mm = 6D → Moderate
             insulation_condition="unknown",
-            floor="B1", zone="Process Area",
-            
+            floor="B1",
+            zone="Process Area",
         ),
         # --- LOW risk scenarios ---
         MICElement(
@@ -619,12 +800,12 @@ def run_validation_demo():
             system_type="DOMESTICHOTWATER",
             material="copper",
             nominal_diameter_m=0.022,
-            flow_velocity_ms=0.8,        # Good velocity
-            operating_temp_c=62.0,       # Above 60°C — Legionella killed
-            dead_leg_length_m=0.0,       # Through-flow — no dead-leg
+            flow_velocity_ms=0.8,  # Good velocity
+            operating_temp_c=62.0,  # Above 60°C — Legionella killed
+            dead_leg_length_m=0.0,  # Through-flow — no dead-leg
             insulation_condition="good_condition",
-            floor="01", zone="Kitchen",
-            
+            floor="01",
+            zone="Kitchen",
         ),
         MICElement(
             global_id="MIC-VAL-009",
@@ -632,12 +813,12 @@ def run_validation_demo():
             system_type="DOMESTICCOLDWATER",
             material="cpvc",
             nominal_diameter_m=0.032,
-            flow_velocity_ms=1.2,        # Good velocity
-            operating_temp_c=12.0,       # Cold and well below 20°C
-            dead_leg_length_m=0.0,       # Through-flow
+            flow_velocity_ms=1.2,  # Good velocity
+            operating_temp_c=12.0,  # Cold and well below 20°C
+            dead_leg_length_m=0.0,  # Through-flow
             insulation_condition="good_condition",
-            floor="01", zone="Office",
-            
+            floor="01",
+            zone="Office",
         ),
         MICElement(
             global_id="MIC-VAL-010",
@@ -645,12 +826,12 @@ def run_validation_demo():
             system_type="DOMESTICHOTWATER",
             material="duplex2205",
             nominal_diameter_m=0.080,
-            flow_velocity_ms=0.7,        # Good velocity
-            operating_temp_c=65.0,       # High temp
-            dead_leg_length_m=0.08,      # 80mm / 80mm = 1D → Short
+            flow_velocity_ms=0.7,  # Good velocity
+            operating_temp_c=65.0,  # High temp
+            dead_leg_length_m=0.08,  # 80mm / 80mm = 1D → Short
             insulation_condition="good_condition",
-            floor="RF", zone="Plant Room",
-            
+            floor="RF",
+            zone="Plant Room",
         ),
     ]
 
@@ -660,12 +841,14 @@ def run_validation_demo():
     for sc in scenarios:
         r = assess_mic_risk(sc)
         results.append(r)
-        print(f"{sc.global_id:<15} {sc.system_type:<20} {r.material_label:<18} {r.composite_score:>7.3f}  {r.risk_band:<10}  ")
+        print(
+            f"{sc.global_id:<15} {sc.system_type:<20} {r.material_label:<18} {r.composite_score:>7.3f}  {r.risk_band:<10}  "
+        )
 
     print("\n" + "=" * 72)
 
     # Summary
-    bands = {"Low":0,"Medium":0,"High":0,"Critical":0}
+    bands = {"Low": 0, "Medium": 0, "High": 0, "Critical": 0}
     for r in results:
         bands[r.risk_band] += 1
 
@@ -688,6 +871,7 @@ def run_validation_demo():
     print("=" * 72)
 
     return results
+
 
 if __name__ == "__main__":
     run_validation_demo()

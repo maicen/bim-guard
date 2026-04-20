@@ -67,9 +67,7 @@ class LiteLLMGeminiRuleExtractor:
     """Extracts structured compliance rules from text chunks using Gemini."""
 
     def __init__(self, *, model: str | None = None, temperature: float = 0):
-        self._model = model or os.getenv(
-            "BIM_GUARD_RULE_MODEL", "gemini/gemini-2.0-flash"
-        )
+        self._model = model or os.getenv("BIM_GUARD_RULE_MODEL", "gemini/gemini-2.0-flash")
         self._temperature = temperature
 
     async def extract_rules_from_text(
@@ -90,7 +88,7 @@ class LiteLLMGeminiRuleExtractor:
             model=self._model,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user",   "content": user_prompt},
+                {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
             temperature=self._temperature,
@@ -109,9 +107,7 @@ class LiteLLMGeminiRuleExtractor:
 
     def _parse(self, content) -> dict:
         if isinstance(content, list):
-            content = "".join(
-                part.get("text", "") for part in content if isinstance(part, dict)
-            )
+            content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
         if not isinstance(content, str) or not content.strip():
             return {"rules": []}
 
@@ -145,35 +141,34 @@ class LiteLLMGeminiRuleExtractor:
             if not isinstance(applies_when, dict):
                 applies_when = {}
 
-            normalized.append({
-                "ref":               ref or f"REQ-AI-{idx:03d}",
-                "desc":              desc,
-                "source_text":       str(rule.get("source_text") or "").strip(),
-
-                "target":            str(rule.get("target") or rule.get("target_ifc_class") or "Unspecified").strip(),
-                "property_set":      str(rule.get("property_set") or "").strip(),
-                "property_name":     str(rule.get("property_name") or "").strip(),
-                "fallback_property": str(rule.get("fallback_property") or "").strip(),
-
-                "rule_type":         str(rule.get("rule_type") or "numeric_range").strip(),
-                "operator":          str(rule.get("operator") or ">=").strip(),
-                "value":             rule.get("value"),
-                "value_min":         rule.get("value_min"),
-                "value_max":         rule.get("value_max"),
-                "unit":              str(rule.get("unit") or "").strip(),
-
-                "applies_when":      applies_when,
-                "severity":          str(rule.get("severity") or "mandatory").strip(),
-                "keyword":           str(rule.get("keyword") or "shall").strip(),
-                "compliance_type":   str(rule.get("compliance_type") or "prescriptive").strip(),
-
-                "exceptions":        rule.get("exceptions") or [],
-                "related_refs":      rule.get("related_refs") or [],
-                "overridden_by":     rule.get("overridden_by"),
-
-                "confidence":        float(rule.get("confidence") or 0.8),
-                "extraction_method": "llm",
-                "needs_review":      bool(rule.get("needs_review", False)),
-            })
+            normalized.append(
+                {
+                    "ref": ref or f"REQ-AI-{idx:03d}",
+                    "desc": desc,
+                    "source_text": str(rule.get("source_text") or "").strip(),
+                    "target": str(
+                        rule.get("target") or rule.get("target_ifc_class") or "Unspecified"
+                    ).strip(),
+                    "property_set": str(rule.get("property_set") or "").strip(),
+                    "property_name": str(rule.get("property_name") or "").strip(),
+                    "fallback_property": str(rule.get("fallback_property") or "").strip(),
+                    "rule_type": str(rule.get("rule_type") or "numeric_range").strip(),
+                    "operator": str(rule.get("operator") or ">=").strip(),
+                    "value": rule.get("value"),
+                    "value_min": rule.get("value_min"),
+                    "value_max": rule.get("value_max"),
+                    "unit": str(rule.get("unit") or "").strip(),
+                    "applies_when": applies_when,
+                    "severity": str(rule.get("severity") or "mandatory").strip(),
+                    "keyword": str(rule.get("keyword") or "shall").strip(),
+                    "compliance_type": str(rule.get("compliance_type") or "prescriptive").strip(),
+                    "exceptions": rule.get("exceptions") or [],
+                    "related_refs": rule.get("related_refs") or [],
+                    "overridden_by": rule.get("overridden_by"),
+                    "confidence": float(rule.get("confidence") or 0.8),
+                    "extraction_method": "llm",
+                    "needs_review": bool(rule.get("needs_review", False)),
+                }
+            )
 
         return normalized

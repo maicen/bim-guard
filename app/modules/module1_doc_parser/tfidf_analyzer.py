@@ -40,13 +40,62 @@ from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
 
 # Words to always ignore — structural words with no compliance value
 STOP_WORDS = {
-    "the", "a", "an", "and", "or", "of", "to", "in", "is", "are",
-    "be", "was", "were", "this", "that", "which", "with", "for",
-    "on", "at", "by", "as", "not", "it", "its", "from", "have",
-    "has", "had", "will", "would", "all", "any", "also", "such",
-    "than", "then", "into", "each", "per", "than", "more", "less",
-    "figure", "table", "section", "article", "subsection", "part",
-    "clause", "page", "see", "refer", "following", "above", "below",
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "of",
+    "to",
+    "in",
+    "is",
+    "are",
+    "be",
+    "was",
+    "were",
+    "this",
+    "that",
+    "which",
+    "with",
+    "for",
+    "on",
+    "at",
+    "by",
+    "as",
+    "not",
+    "it",
+    "its",
+    "from",
+    "have",
+    "has",
+    "had",
+    "will",
+    "would",
+    "all",
+    "any",
+    "also",
+    "such",
+    "than",
+    "then",
+    "into",
+    "each",
+    "per",
+    "than",
+    "more",
+    "less",
+    "figure",
+    "table",
+    "section",
+    "article",
+    "subsection",
+    "part",
+    "clause",
+    "page",
+    "see",
+    "refer",
+    "following",
+    "above",
+    "below",
 }
 
 
@@ -64,9 +113,9 @@ class TFIDFAnalyzer:
             min_doc_freq (int): word must appear in at least this many
                                 paragraphs to be considered
         """
-        self.top_n        = top_n
+        self.top_n = top_n
         self.min_doc_freq = min_doc_freq
-        self._existing    = set(kw.lower() for kw in ALL_KEYWORDS)
+        self._existing = set(kw.lower() for kw in ALL_KEYWORDS)
 
     # ── PRIVATE ───────────────────────────────────────────────────────────────
 
@@ -82,7 +131,7 @@ class TFIDFAnalyzer:
         Returns:
             tuple: (rule_texts: list[str], non_rule_texts: list[str])
         """
-        rule_texts     = []
+        rule_texts = []
         non_rule_texts = []
 
         for chunk in filtered_chunks:
@@ -103,11 +152,16 @@ class TFIDFAnalyzer:
         Filters out numbers, single chars, stop words, and existing keywords.
         """
         token = token.lower().strip()
-        if len(token) < 3:              return False
-        if token.isdigit():             return False
-        if re.match(r"^\d+\.?\d*$", token): return False
-        if token in STOP_WORDS:         return False
-        if token in self._existing:     return False
+        if len(token) < 3:
+            return False
+        if token.isdigit():
+            return False
+        if re.match(r"^\d+\.?\d*$", token):
+            return False
+        if token in STOP_WORDS:
+            return False
+        if token in self._existing:
+            return False
         return True
 
     # ── PUBLIC API ────────────────────────────────────────────────────────────
@@ -134,19 +188,21 @@ class TFIDFAnalyzer:
             print("[TFIDFAnalyzer] No rule paragraphs found — run KeywordFilter first")
             return []
 
-        print(f"[TFIDFAnalyzer] Analysing {len(rule_texts)} rule paragraphs "
-              f"vs {len(non_rule_texts)} non-rule paragraphs...")
+        print(
+            f"[TFIDFAnalyzer] Analysing {len(rule_texts)} rule paragraphs "
+            f"vs {len(non_rule_texts)} non-rule paragraphs..."
+        )
 
         # Combine all texts with labels
-        all_texts  = rule_texts + non_rule_texts
+        all_texts = rule_texts + non_rule_texts
         all_labels = ["rule"] * len(rule_texts) + ["non_rule"] * len(non_rule_texts)
 
         # Run TF-IDF across all paragraphs
         vectorizer = TfidfVectorizer(
-            ngram_range   = (1, 2),          # single words + bigrams
-            min_df        = self.min_doc_freq,
-            max_features  = 5000,
-            stop_words    = list(STOP_WORDS),
+            ngram_range=(1, 2),  # single words + bigrams
+            min_df=self.min_doc_freq,
+            max_features=5000,
+            stop_words=list(STOP_WORDS),
         )
 
         try:
@@ -158,13 +214,16 @@ class TFIDFAnalyzer:
         feature_names = vectorizer.get_feature_names_out()
 
         # Split matrix back into rule vs non-rule
-        rule_matrix     = tfidf_matrix[:len(rule_texts)]
-        non_rule_matrix = tfidf_matrix[len(rule_texts):]
+        rule_matrix = tfidf_matrix[: len(rule_texts)]
+        non_rule_matrix = tfidf_matrix[len(rule_texts) :]
 
         # Mean TF-IDF score per word in each group
-        rule_means     = np.asarray(rule_matrix.mean(axis=0)).flatten()
-        non_rule_means = np.asarray(non_rule_matrix.mean(axis=0)).flatten() \
-                         if non_rule_texts else np.zeros(len(feature_names))
+        rule_means = np.asarray(rule_matrix.mean(axis=0)).flatten()
+        non_rule_means = (
+            np.asarray(non_rule_matrix.mean(axis=0)).flatten()
+            if non_rule_texts
+            else np.zeros(len(feature_names))
+        )
 
         # Distinctiveness = how much higher a word scores in rule vs non-rule text
         distinctiveness = rule_means - non_rule_means
@@ -176,22 +235,24 @@ class TFIDFAnalyzer:
         ranked_indices = np.argsort(distinctiveness)[::-1]
 
         candidates = []
-        for idx in ranked_indices[:self.top_n * 3]:  # over-fetch then filter
-            word  = feature_names[idx]
+        for idx in ranked_indices[: self.top_n * 3]:  # over-fetch then filter
+            word = feature_names[idx]
             score = float(distinctiveness[idx])
-            freq  = int(rule_doc_freq[idx])
+            freq = int(rule_doc_freq[idx])
 
             if score <= 0:
                 break
             if not self._clean_token(word):
                 continue
 
-            candidates.append({
-                "keyword":    word,
-                "tfidf_score": round(score, 4),
-                "rule_freq":   freq,
-                "suggestion":  self._suggest_group(word),
-            })
+            candidates.append(
+                {
+                    "keyword": word,
+                    "tfidf_score": round(score, 4),
+                    "rule_freq": freq,
+                    "suggestion": self._suggest_group(word),
+                }
+            )
 
             if len(candidates) >= self.top_n:
                 break
@@ -263,10 +324,7 @@ class TFIDFAnalyzer:
         Returns:
             list[str]: keyword strings above the threshold
         """
-        return [
-            c["keyword"] for c in candidates
-            if c["tfidf_score"] >= threshold
-        ]
+        return [c["keyword"] for c in candidates if c["tfidf_score"] >= threshold]
 
 
 # ── RUN DIRECTLY ─────────────────────────────────────────────────────────────

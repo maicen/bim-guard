@@ -52,13 +52,14 @@ USE_GPT4O = False
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
-    from .module1_doc_parser.docling_extractor  import DoclingExtractor
+    from .module1_doc_parser.docling_extractor import DoclingExtractor
     from .module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from .module1_doc_parser.section_chunker    import SectionChunker
-    from .module1_doc_parser.keyword_filter     import KeywordFilter
-    from .module3_rule_builder.rule_store       import RuleStore
-    from .module3_rule_builder.rule_generator   import RuleGenerator
-    from .module3_rule_builder.obc_seed_rules   import seed_rules
+    from .module1_doc_parser.section_chunker import SectionChunker
+    from .module1_doc_parser.keyword_filter import KeywordFilter
+    from .module3_rule_builder.rule_store import RuleStore
+    from .module3_rule_builder.rule_generator import RuleGenerator
+    from .module3_rule_builder.obc_seed_rules import seed_rules
+
     if USE_GPT4O:
         from .module3_rule_builder.rule_converter import RuleConverter
     else:
@@ -69,9 +70,9 @@ except ImportError:
 
 
 def run_pipeline(
-    pdf_path:      str | Path,
-    run_sections:  str | list = "all",
-    seed_db_first: bool       = True,
+    pdf_path: str | Path,
+    run_sections: str | list = "all",
+    seed_db_first: bool = True,
 ) -> dict:
     """
     Run the full Module 1 → Module 3 pipeline on an OBC PDF.
@@ -93,25 +94,25 @@ def run_pipeline(
             db_summary      (dict),
         }
     """
-    pdf_path       = Path(pdf_path)
+    pdf_path = Path(pdf_path)
     converter_name = "gpt-4o" if USE_GPT4O else "regex"
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  BIMGuard AI — Module 1 + 3 Pipeline")
     print(f"  PDF       : {pdf_path.name}")
     print(f"  Converter : {converter_name.upper()}")
     print(f"  Sections  : {run_sections}")
     print(f"  DB        : {DB_PATH}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # ── Initialise ────────────────────────────────────────────────────────────
-    store     = RuleStore()   # delegates to RuleService (shared web DB)
+    store = RuleStore()  # delegates to RuleService (shared web DB)
     generator = RuleGenerator(store)
 
     if USE_GPT4O:
         converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
     else:
-        converter = RuleConverter()   # regex needs no arguments
+        converter = RuleConverter()  # regex needs no arguments
 
     # ── Seed pre-built rules ──────────────────────────────────────────────────
     if seed_db_first:
@@ -124,7 +125,7 @@ def run_pipeline(
     # MODULE 1 — STEP 1: Docling extraction
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── MODULE 1 / STEP 1: DOCLING EXTRACTION ──")
-    extractor    = DoclingExtractor()
+    extractor = DoclingExtractor()
     text, tables = extractor.extract(pdf_path)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ def run_pipeline(
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── MODULE 1 / STEP 2: TABLE RULE BUILDER ──")
     table_builder = TableRuleBuilder(store)
-    table_rules   = table_builder.process_all_tables(tables, generator)
+    table_rules = table_builder.process_all_tables(tables, generator)
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 1 — STEP 3: Section Chunker
@@ -159,37 +160,37 @@ def run_pipeline(
 
     for chunk in filtered_chunks:
         section = chunk["section_number"]
-        name    = chunk["section_name"]
+        name = chunk["section_name"]
         print(f"\n  Section {section}: {name}")
 
         raw_rules = converter.extract_rules(chunk)
         print(f"    Extracted : {len(raw_rules)} rules")
 
         if raw_rules:
-            saved_ids   = generator.save_batch(raw_rules)
+            saved_ids = generator.save_batch(raw_rules)
             prose_rules += len(saved_ids)
             print(f"    Saved     : {len(saved_ids)} rules")
 
     # ── Summary ───────────────────────────────────────────────────────────────
     total_rules = store.count()
-    db_summary  = store.summary()
+    db_summary = store.summary()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  PIPELINE COMPLETE")
     print(f"  Converter used               : {converter_name}")
     print(f"  Table rules (no converter)   : {table_rules}")
     print(f"  Prose rules ({converter_name})  : {prose_rules}")
     print(f"  Total rules in DB            : {total_rules}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     return {
-        "pdf_file":       str(pdf_path),
+        "pdf_file": str(pdf_path),
         "converter_used": converter_name,
-        "table_rules":    table_rules,
-        "prose_rules":    prose_rules,
-        "total_rules":    total_rules,
-        "sections_run":   len(filtered_chunks),
-        "db_summary":     db_summary,
+        "table_rules": table_rules,
+        "prose_rules": prose_rules,
+        "total_rules": total_rules,
+        "sections_run": len(filtered_chunks),
+        "db_summary": db_summary,
     }
 
 
@@ -204,19 +205,16 @@ class BIMGuard_App:
         """Return summary counts for the dashboard page."""
         from app.services.projects_service import ProjectsService
         from app.services.documents_service import DocumentService
-        from app.services.persistence import PersistenceService
+        from app.services.rules_service import RuleService
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
-
-        db = PersistenceService.get_db()
-        rules_table = db.t.get("rules")
-        total_rules = len(list(rules_table.rows)) if rules_table is not None else 0
+        rules_svc = RuleService()
 
         return {
-            "total_projects":  projects_svc.total_projects(),
+            "total_projects": projects_svc.total_projects(),
             "total_documents": len(documents_svc.list_documents()),
-            "total_rules":     total_rules,
+            "total_rules": rules_svc.count(),
         }
 
     def orchestrate_workflow(
@@ -253,10 +251,12 @@ class BIMGuard_App:
             if doc is None:
                 continue
             text = doc.get("extracted_text") or ""
-            documents.append({
-                "filename":      doc.get("filename", ""),
-                "section_count": len([l for l in text.splitlines() if l.strip()]),
-            })
+            documents.append(
+                {
+                    "filename": doc.get("filename", ""),
+                    "section_count": len([l for l in text.splitlines() if l.strip()]),
+                }
+            )
 
         # ── IFC parsing ──────────────────────────────────────────────────────
         ifc_path = projects_svc.resolve_ifc_file(project_id)
@@ -276,15 +276,15 @@ class BIMGuard_App:
 
                 n = len(elements)
                 ifc_totals = {
-                    "built_elements":            n,
-                    "all_physical_elements":     n,
+                    "built_elements": n,
+                    "all_physical_elements": n,
                     "adjusted_physical_elements": n,
-                    "all_products":              n,
-                    "adjusted_products":         n,
+                    "all_products": n,
+                    "adjusted_products": n,
                     "filters": {
-                        "include_openings":          include_openings,
-                        "include_spaces":            include_spaces,
-                        "include_type_definitions":  include_type_definitions,
+                        "include_openings": include_openings,
+                        "include_spaces": include_spaces,
+                        "include_type_definitions": include_type_definitions,
                     },
                     "excluded_or_added": {"openings": 0, "spaces": 0, "type_definitions": 0},
                 }
@@ -339,35 +339,38 @@ class BIMGuard_App:
         rule_validations: list[dict] = []
         try:
             from app.services.rules_service import RuleService
+
             library_rules = RuleService().list_rules()
             for rule in library_rules:
                 target = rule.get("target_ifc_class", "")
                 count = ifc_type_counts.get(target, 0)
-                rule_validations.append({
-                    "reference":       rule.get("reference", "—"),
-                    "description":     rule.get("description", ""),
-                    "rule_type":       rule.get("rule_type", ""),
-                    "target_ifc_class": target,
-                    "element_count":   count,
-                    "status":          "present" if count > 0 else "not_found",
-                })
+                rule_validations.append(
+                    {
+                        "reference": rule.get("reference", "—"),
+                        "description": rule.get("description", ""),
+                        "rule_type": rule.get("rule_type", ""),
+                        "target_ifc_class": target,
+                        "element_count": count,
+                        "status": "present" if count > 0 else "not_found",
+                    }
+                )
         except Exception:
             pass
 
         return {
-            "project":             project,
-            "ifc_element_count":   len(elements),
-            "ifc_type_counts":     ifc_type_counts,
-            "ifc_totals":          ifc_totals,
-            "ifc_error":           ifc_error,
-            "documents":           documents,
-            "compliance_results":  compliance_results,
-            "cost_impact":         cost_impact,
-            "issue_stats":         issue_stats,
-            "compliance_is_demo":  is_demo,
-            "bcf_project_id":      project_id,
-            "compliance_error":    compliance_error,
-            "rule_validations":    rule_validations,
+            "project": project,
+            "ifc_element_count": len(elements),
+            "ifc_type_counts": ifc_type_counts,
+            "ifc_totals": ifc_totals,
+            "ifc_error": ifc_error,
+            "documents": documents,
+            "compliance_results": compliance_results,
+            "cost_impact": cost_impact,
+            "issue_stats": issue_stats,
+            "compliance_is_demo": is_demo,
+            "bcf_project_id": project_id,
+            "compliance_error": compliance_error,
+            "rule_validations": rule_validations,
         }
 
 
@@ -381,7 +384,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     run_pipeline(
-        pdf_path      = sys.argv[1],
-        run_sections  = "all",
-        seed_db_first = True,
+        pdf_path=sys.argv[1],
+        run_sections="all",
+        seed_db_first=True,
     )

@@ -8,7 +8,10 @@ from app.main import app
 
 client = TestClient(app)
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SAMPLE_IFC = REPO_ROOT / "IFC-Sample-Test-Files/IFC 4.0.2.1 (IFC 4)/ISO Spec - ReferenceView_V1.2/wall-with-opening-and-window.ifc"
+SAMPLE_IFC = (
+    REPO_ROOT
+    / "IFC-Sample-Test-Files/IFC 4.0.2.1 (IFC 4)/ISO Spec - ReferenceView_V1.2/wall-with-opening-and-window.ifc"
+)
 
 
 def test_ingest_pdf(tmp_path):

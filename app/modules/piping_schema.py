@@ -64,23 +64,40 @@ SCHEMA_VERSION = "1.0.0"
 # to extraction_warnings. The corrosion rule packs key off these strings,
 # so they must match exactly (case-sensitive).
 
-CANONICAL_MATERIALS: frozenset[str] = frozenset({
-    # Stainless steels
-    "SS304", "SS304L", "SS316", "SS316L", "SS316Ti",
-    "Duplex2205", "SuperDuplex2507",
-    # Carbon and galvanised steels
-    "CarbonSteel", "GalvanisedSteel", "BlackSteel",
-    # Copper and copper alloys
-    "Copper_C12200", "Brass_C46400", "CuNi_9010", "CuNi_7030",
-    # Non-ferrous
-    "Aluminium", "Titanium",
-    # Plastics (relevant to crevice-at-support scenarios only)
-    "PVC", "PEX", "HDPE", "PPR",
-    # Cast
-    "DuctileIron", "CastIron",
-    # Sentinel
-    "Unknown",
-})
+CANONICAL_MATERIALS: frozenset[str] = frozenset(
+    {
+        # Stainless steels
+        "SS304",
+        "SS304L",
+        "SS316",
+        "SS316L",
+        "SS316Ti",
+        "Duplex2205",
+        "SuperDuplex2507",
+        # Carbon and galvanised steels
+        "CarbonSteel",
+        "GalvanisedSteel",
+        "BlackSteel",
+        # Copper and copper alloys
+        "Copper_C12200",
+        "Brass_C46400",
+        "CuNi_9010",
+        "CuNi_7030",
+        # Non-ferrous
+        "Aluminium",
+        "Titanium",
+        # Plastics (relevant to crevice-at-support scenarios only)
+        "PVC",
+        "PEX",
+        "HDPE",
+        "PPR",
+        # Cast
+        "DuctileIron",
+        "CastIron",
+        # Sentinel
+        "Unknown",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -89,13 +106,14 @@ CANONICAL_MATERIALS: frozenset[str] = frozenset({
 # Aligned with EN ISO 15329 wetting classes and the existing
 # crevice_corrosion_ruleset.json environment table.
 
+
 class EnvironmentClass(str, Enum):
-    T0_DRY = "T0_dry"                        # <50% RH, indoor heated
-    T1_INDOOR_DAMP = "T1_indoor_damp"        # 50-80% RH, indoor unheated
-    T2_HUMID = "T2_humid"                    # >80% RH or condensing
-    T3_CHLORIDE = "T3_chloride"              # pool halls, coastal <5km
-    T4_MARINE = "T4_marine"                  # direct spray zone
-    T5_INDUSTRIAL = "T5_industrial"          # aggressive chemical atmosphere
+    T0_DRY = "T0_dry"  # <50% RH, indoor heated
+    T1_INDOOR_DAMP = "T1_indoor_damp"  # 50-80% RH, indoor unheated
+    T2_HUMID = "T2_humid"  # >80% RH or condensing
+    T3_CHLORIDE = "T3_chloride"  # pool halls, coastal <5km
+    T4_MARINE = "T4_marine"  # direct spray zone
+    T5_INDUSTRIAL = "T5_industrial"  # aggressive chemical atmosphere
     UNCLASSIFIED = "unclassified"
 
 
@@ -106,6 +124,7 @@ class EnvironmentClass(str, Enum):
 # is required, which seismic bracing mass class is used, and what
 # operator access patterns apply. Extend as needed; add new members at
 # the end and never reorder.
+
 
 class PipingSystem(str, Enum):
     DOMESTIC_COLD_WATER = "domestic_cold_water"
@@ -140,6 +159,7 @@ class PipingSystem(str, Enum):
 # Keys match JT-001 through JT-014 in crevice_corrosion_ruleset.json.
 # See that file for geometry class assignment (open, moderate, tight, critical).
 
+
 class JointType(str, Enum):
     JT001_PLAIN_WELDED = "JT-001_plain_welded"
     JT002_SOCKET_WELDED = "JT-002_socket_welded"
@@ -165,20 +185,20 @@ class JointType(str, Enum):
 # pipe_segment and fitting carry a Centerline; equipment subtypes do not.
 
 ElementSubtype = Literal[
-    "pipe_segment",         # IfcFlowSegment — straight or curved pipe run
-    "fitting",              # elbow, tee, reducer, bend
-    "valve",                # gate, ball, butterfly, check, etc
-    "flange",               # standalone flange pair or blind flange
-    "pump",                 # centrifugal, inline, submersible
-    "tank",                 # buffer, expansion, calorifier
-    "ahu",                  # air handling unit with piping connections
-    "fcu",                  # fan coil unit
-    "strainer",             # y-strainer, basket strainer
-    "filter",               # cartridge, bag, media
-    "meter",                # flow, pressure, temperature meter
-    "heat_exchanger",       # plate, shell-and-tube
-    "manifold",             # multi-port assembly
-    "support",              # clamp, hanger (relevant for spatial)
+    "pipe_segment",  # IfcFlowSegment — straight or curved pipe run
+    "fitting",  # elbow, tee, reducer, bend
+    "valve",  # gate, ball, butterfly, check, etc
+    "flange",  # standalone flange pair or blind flange
+    "pump",  # centrifugal, inline, submersible
+    "tank",  # buffer, expansion, calorifier
+    "ahu",  # air handling unit with piping connections
+    "fcu",  # fan coil unit
+    "strainer",  # y-strainer, basket strainer
+    "filter",  # cartridge, bag, media
+    "meter",  # flow, pressure, temperature meter
+    "heat_exchanger",  # plate, shell-and-tube
+    "manifold",  # multi-port assembly
+    "support",  # clamp, hanger (relevant for spatial)
     "other",
 ]
 
@@ -187,9 +207,11 @@ ElementSubtype = Literal[
 # Geometry primitives
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Point3D:
     """A point in world coordinates. Units: metres."""
+
     x: float
     y: float
     z: float
@@ -198,6 +220,7 @@ class Point3D:
 @dataclass(frozen=True)
 class BoundingBox:
     """Axis-aligned bounding box in world coordinates. Units: metres."""
+
     min: Point3D
     max: Point3D
 
@@ -218,6 +241,7 @@ class Centerline:
     For a straight pipe, two points. For a curved run (fitting, bent pipe),
     multiple points. Units: metres.
     """
+
     points: list[Point3D]
 
     @property
@@ -227,17 +251,14 @@ class Centerline:
         total = 0.0
         for i in range(len(self.points) - 1):
             p1, p2 = self.points[i], self.points[i + 1]
-            total += (
-                (p2.x - p1.x) ** 2
-                + (p2.y - p1.y) ** 2
-                + (p2.z - p1.z) ** 2
-            ) ** 0.5
+            total += ((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2 + (p2.z - p1.z) ** 2) ** 0.5
         return total
 
 
 # ---------------------------------------------------------------------------
 # The main schema
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PipingElement:
@@ -252,33 +273,33 @@ class PipingElement:
     """
 
     # --- Identity (always required) ---
-    id: str                                     # IFC GUID
-    ifc_class: str                              # e.g. "IfcFlowSegment"
+    id: str  # IFC GUID
+    ifc_class: str  # e.g. "IfcFlowSegment"
     subtype: ElementSubtype
-    name: Optional[str] = None                  # human-readable IFC Name
+    name: Optional[str] = None  # human-readable IFC Name
 
     # --- Spatial (required for all spatial comparators) ---
     bbox: Optional[BoundingBox] = None
     centroid: Optional[Point3D] = None
-    centerline: Optional[Centerline] = None     # pipe_segment / fitting only
+    centerline: Optional[Centerline] = None  # pipe_segment / fitting only
     orientation_vector: Optional[Point3D] = None  # unit vector for directional equipment
 
     # --- Containment ---
-    level_id: Optional[str] = None              # IfcBuildingStorey GUID
-    level_name: Optional[str] = None            # "L01 Plant room"
-    space_id: Optional[str] = None              # IfcSpace GUID
+    level_id: Optional[str] = None  # IfcBuildingStorey GUID
+    level_name: Optional[str] = None  # "L01 Plant room"
+    space_id: Optional[str] = None  # IfcSpace GUID
     space_name: Optional[str] = None
     zone_ids: list[str] = field(default_factory=list)
 
     # --- Material (required for corrosion comparators) ---
-    material: str = "Unknown"                   # must be in CANONICAL_MATERIALS
-    material_raw: Optional[str] = None          # original IFC string for debugging
-    coating: Optional[str] = None               # "galvanised_zinc_60um", "epoxy_powder"
-    pren: Optional[float] = None                # overrides rulepack default if set
+    material: str = "Unknown"  # must be in CANONICAL_MATERIALS
+    material_raw: Optional[str] = None  # original IFC string for debugging
+    coating: Optional[str] = None  # "galvanised_zinc_60um", "epoxy_powder"
+    pren: Optional[float] = None  # overrides rulepack default if set
 
     # --- Piping geometry ---
-    nominal_diameter_mm: Optional[float] = None      # DN
-    outside_diameter_mm: Optional[float] = None      # OD
+    nominal_diameter_mm: Optional[float] = None  # DN
+    outside_diameter_mm: Optional[float] = None  # OD
     wall_thickness_mm: Optional[float] = None
     insulation_thickness_mm: Optional[float] = None
     insulation_material: Optional[str] = None
@@ -290,7 +311,7 @@ class PipingElement:
 
     # --- Environment (required for corrosion comparators) ---
     environment_class: EnvironmentClass = EnvironmentClass.UNCLASSIFIED
-    environment_source: Optional[str] = None    # "space_metadata" / "zone" / "manual"
+    environment_source: Optional[str] = None  # "space_metadata" / "zone" / "manual"
 
     # --- Joints (for crevice and clearance) ---
     joint_type: Optional[JointType] = None
@@ -298,11 +319,11 @@ class PipingElement:
 
     # --- Mass (for seismic bracing reservation) ---
     mass_empty_kg: Optional[float] = None
-    mass_filled_kg: Optional[float] = None              # with operating fluid
+    mass_filled_kg: Optional[float] = None  # with operating fluid
 
     # --- Operator access (for clearance comparators) ---
     requires_operator_access: bool = False
-    access_direction: Optional[Point3D] = None          # unit vector
+    access_direction: Optional[Point3D] = None  # unit vector
     access_clearance_required_m: Optional[float] = None  # rulepack default usually wins
 
     # --- Surface area (for galvanic area-ratio calculation) ---
@@ -310,7 +331,7 @@ class PipingElement:
     exposed_surface_area_m2: Optional[float] = None
 
     # --- Raw IFC properties (escape hatch for comparator-specific lookups) ---
-    properties: dict = field(default_factory=dict)      # Pset_* key-values
+    properties: dict = field(default_factory=dict)  # Pset_* key-values
 
     # --- Extraction provenance ---
     extraction_warnings: list[str] = field(default_factory=list)
@@ -319,6 +340,7 @@ class PipingElement:
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
+
 
 def validate(element: PipingElement) -> list[str]:
     """
@@ -336,13 +358,9 @@ def validate(element: PipingElement) -> list[str]:
     if not element.ifc_class:
         issues.append("ifc_class is required")
     if element.material not in CANONICAL_MATERIALS:
-        issues.append(
-            f"material '{element.material}' not in CANONICAL_MATERIALS"
-        )
+        issues.append(f"material '{element.material}' not in CANONICAL_MATERIALS")
     if element.subtype in ("pipe_segment", "fitting") and element.centerline is None:
-        issues.append(
-            f"subtype '{element.subtype}' requires a centerline"
-        )
+        issues.append(f"subtype '{element.subtype}' requires a centerline")
     if element.subtype in ("pipe_segment",) and element.nominal_diameter_mm is None:
         issues.append("pipe_segment requires nominal_diameter_mm")
 
@@ -360,6 +378,7 @@ def validate(element: PipingElement) -> list[str]:
 # ---------------------------------------------------------------------------
 # JSON serialisation
 # ---------------------------------------------------------------------------
+
 
 def to_dict(element: PipingElement) -> dict[str, Any]:
     """Convert a PipingElement to a plain dict (JSON-serialisable)."""
@@ -383,6 +402,7 @@ def _json_default(obj: Any) -> Any:
 # Example instances — canonical fixtures for tests and demos
 # ---------------------------------------------------------------------------
 
+
 def example_ss316_pipe_in_plant_room() -> PipingElement:
     """A stainless 316 header pipe in a chlorinated plant room atmosphere."""
     return PipingElement(
@@ -395,10 +415,12 @@ def example_ss316_pipe_in_plant_room() -> PipingElement:
             max=Point3D(x=18.0, y=1.1, z=3.55),
         ),
         centroid=Point3D(x=10.0, y=1.05, z=3.5),
-        centerline=Centerline(points=[
-            Point3D(x=2.0, y=1.0, z=3.5),
-            Point3D(x=18.0, y=1.0, z=3.5),
-        ]),
+        centerline=Centerline(
+            points=[
+                Point3D(x=2.0, y=1.0, z=3.5),
+                Point3D(x=18.0, y=1.0, z=3.5),
+            ]
+        ),
         level_id="1Kf7q8XzR1pP2mN4gV8xQ",
         level_name="L01 Plant room",
         space_id="2Wn7q8XzR1pP2mN4gV8xQ",

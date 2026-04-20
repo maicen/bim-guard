@@ -25,6 +25,7 @@ except ImportError:
     # Running as a bare CLI script from app/modules/ — adjust sys.path first
     import sys
     from pathlib import Path
+
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
     from app.services.rules_service import RuleService
 
@@ -42,31 +43,31 @@ def _jload(value):
 def _to_cli(r: dict) -> dict:
     """Convert a web-format rule row to the CLI field-name convention."""
     return {
-        "ref":               r.get("reference", ""),
-        "desc":              r.get("description", ""),
-        "target":            r.get("target_ifc_class", ""),
-        "rule_type":         r.get("rule_type", ""),
-        "source_text":       r.get("source_text", ""),
-        "property_set":      r.get("property_set", ""),
-        "property_name":     r.get("property_name", ""),
+        "ref": r.get("reference", ""),
+        "desc": r.get("description", ""),
+        "target": r.get("target_ifc_class", ""),
+        "rule_type": r.get("rule_type", ""),
+        "source_text": r.get("source_text", ""),
+        "property_set": r.get("property_set", ""),
+        "property_name": r.get("property_name", ""),
         "fallback_property": r.get("fallback_property", ""),
-        "operator":          r.get("operator", ""),
-        "check_value":       _jload(r.get("check_value")),
-        "value_min":         _jload(r.get("value_min")),
-        "value_max":         _jload(r.get("value_max")),
-        "unit":              r.get("unit", ""),
-        "applies_when":      _jload(r.get("applies_when")) or {},
-        "severity":          r.get("severity", "mandatory"),
-        "keyword":           r.get("keyword", ""),
-        "compliance_type":   r.get("compliance_type", ""),
-        "exceptions":        _jload(r.get("exceptions")) or [],
-        "related_refs":      _jload(r.get("related_refs")) or [],
-        "overridden_by":     r.get("overridden_by", ""),
-        "confidence":        float(r.get("confidence") or 0.8),
+        "operator": r.get("operator", ""),
+        "check_value": _jload(r.get("check_value")),
+        "value_min": _jload(r.get("value_min")),
+        "value_max": _jload(r.get("value_max")),
+        "unit": r.get("unit", ""),
+        "applies_when": _jload(r.get("applies_when")) or {},
+        "severity": r.get("severity", "mandatory"),
+        "keyword": r.get("keyword", ""),
+        "compliance_type": r.get("compliance_type", ""),
+        "exceptions": _jload(r.get("exceptions")) or [],
+        "related_refs": _jload(r.get("related_refs")) or [],
+        "overridden_by": r.get("overridden_by", ""),
+        "confidence": float(r.get("confidence") or 0.8),
         "extraction_method": r.get("extraction_method", "llm"),
-        "needs_review":      bool(r.get("needs_review", 0)),
+        "needs_review": bool(r.get("needs_review", 0)),
         # keep the web PK available for callers that need it
-        "id":                r.get("id"),
+        "id": r.get("id"),
     }
 
 
@@ -156,17 +157,39 @@ class RuleStore:
         rules = self.get_all_rules()
         if not rules:
             import pandas as pd
-            return pd.DataFrame(columns=[
-                "ref", "rule_type", "target", "property_name",
-                "operator", "check_value", "value_min", "value_max",
-                "unit", "severity", "desc",
-            ])
+
+            return pd.DataFrame(
+                columns=[
+                    "ref",
+                    "rule_type",
+                    "target",
+                    "property_name",
+                    "operator",
+                    "check_value",
+                    "value_min",
+                    "value_max",
+                    "unit",
+                    "severity",
+                    "desc",
+                ]
+            )
         import pandas as pd
-        return pd.DataFrame(rules)[[
-            "ref", "rule_type", "target", "property_name",
-            "operator", "check_value", "value_min", "value_max",
-            "unit", "severity", "desc",
-        ]]
+
+        return pd.DataFrame(rules)[
+            [
+                "ref",
+                "rule_type",
+                "target",
+                "property_name",
+                "operator",
+                "check_value",
+                "value_min",
+                "value_max",
+                "unit",
+                "severity",
+                "desc",
+            ]
+        ]
 
     def count(self) -> int:
         return self._svc.count()

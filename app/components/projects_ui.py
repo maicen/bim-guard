@@ -36,9 +36,7 @@ from monsterui.all import (
 )
 
 
-def project_form(
-    title: str, action: str, project: dict | None = None, include_ifc: bool = False
-):
+def project_form(title: str, action: str, project: dict | None = None, include_ifc: bool = False):
     project = project or {}
     ifc_field = (
         (
@@ -123,9 +121,7 @@ def projects_table_rows(rows: list[dict]):
         return TableActionsMenu(
             edit_href=f"/projects/{row['id']}/edit",
             delete_action=f"/projects/{row['id']}/delete",
-            view_href=(
-                f"/viewer?project_id={row['id']}" if row.get("ifc_file_path") else None
-            ),
+            view_href=(f"/viewer?project_id={row['id']}" if row.get("ifc_file_path") else None),
             view_label="Open IFC in Viewer",
         )
 

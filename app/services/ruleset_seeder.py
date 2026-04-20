@@ -19,6 +19,7 @@ _RULESETS_DIR = Path("data/rulesets")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _load(filename: str) -> dict:
     path = _RULESETS_DIR / filename
     return json.loads(path.read_text(encoding="utf-8"))
@@ -33,6 +34,7 @@ def _create(svc: RuleService, **kwargs) -> None:
 
 # ── GC-001 — Galvanic Corrosion ───────────────────────────────────────────────
 
+
 def _seed_gc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-GC-001"
     if svc.has_ruleset(RULESET_ID):
@@ -40,8 +42,8 @@ def _seed_gc001(svc: RuleService) -> int:
 
     gc = _load("galvanic_corrosion_ruleset.json")
     TARGET = "IfcPipeSegment"
-    MECH   = "GC-001"
-    count  = 0
+    MECH = "GC-001"
+    count = 0
 
     def _r(**kw):
         nonlocal count
@@ -119,7 +121,9 @@ def _seed_gc001(svc: RuleService) -> int:
             check_value=pdata["min_pren"],
             operator=">=",
             source_text=f"Source: {pren_src}",
-            parameters=json.dumps({**pdata, "environment_class": env_key, "formula": pren.get("formula", "")}),
+            parameters=json.dumps(
+                {**pdata, "environment_class": env_key, "formula": pren.get("formula", "")}
+            ),
         )
 
     # ── Mitigations ───────────────────────────────────────────────────────────
@@ -139,6 +143,7 @@ def _seed_gc001(svc: RuleService) -> int:
 
 # ── CC-001 — Crevice Corrosion ────────────────────────────────────────────────
 
+
 def _seed_cc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-CC-001"
     if svc.has_ruleset(RULESET_ID):
@@ -146,8 +151,8 @@ def _seed_cc001(svc: RuleService) -> int:
 
     cc = _load("crevice_corrosion_ruleset.json")
     TARGET = "IfcPipeFitting"
-    MECH   = "CC-001"
-    count  = 0
+    MECH = "CC-001"
+    count = 0
 
     def _r(**kw):
         nonlocal count
@@ -190,7 +195,7 @@ def _seed_cc001(svc: RuleService) -> int:
             reference=f"CC-001.GEOM.{class_key.upper()}",
             rule_type="geometry_class",
             rule_category="reference_config",
-            description=f"Geometry {class_key}: width {data.get('crevice_width_mm','')}, risk {data['risk']}",
+            description=f"Geometry {class_key}: width {data.get('crevice_width_mm', '')}, risk {data['risk']}",
             check_value=data["risk"],
             source_text=f"Source: {geom_src}",
             parameters=json.dumps({**data, "class_key": class_key}),
@@ -238,6 +243,7 @@ def _seed_cc001(svc: RuleService) -> int:
 
 # ── MC-001 — Microbially Influenced Corrosion ─────────────────────────────────
 
+
 def _seed_mc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-MC-001"
     if svc.has_ruleset(RULESET_ID):
@@ -245,8 +251,8 @@ def _seed_mc001(svc: RuleService) -> int:
 
     mc = _load("mic_corrosion_ruleset.json")
     TARGET = "IfcPipeSegment"
-    MECH   = "MC-001"
-    count  = 0
+    MECH = "MC-001"
+    count = 0
 
     def _r(**kw):
         nonlocal count
@@ -354,6 +360,7 @@ def _seed_mc001(svc: RuleService) -> int:
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
+
 
 def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
     """

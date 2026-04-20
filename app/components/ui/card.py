@@ -22,9 +22,7 @@ def CardHeader(*children, cls: str | None = None, **kwargs):
 
 
 def CardTitle(*children, cls: str | None = None, **kwargs):
-    return H3(
-        *children, cls=_cx("font-semibold leading-none tracking-tight", cls), **kwargs
-    )
+    return H3(*children, cls=_cx("font-semibold leading-none tracking-tight", cls), **kwargs)
 
 
 def CardDescription(*children, cls: str | None = None, **kwargs):

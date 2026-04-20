@@ -54,9 +54,7 @@ def NavSection(title, items):
     """Section group using shared sidebar primitives."""
     return SidebarGroup(
         SidebarGroupLabel(title, cls=SiteStyles.caption + " px-3 mb-2 mt-2"),
-        SidebarGroupContent(
-            SidebarMenu(*[NavItem(label, href) for label, href in items])
-        ),
+        SidebarGroupContent(SidebarMenu(*[NavItem(label, href) for label, href in items])),
     )
 
 
@@ -76,9 +74,7 @@ def AppSidebar():
     ]
 
     # Flatten sections into a list of MonsterUI nav components
-    nav_groups = [
-        NavSection(section_title, items) for section_title, items in nav_sections
-    ]
+    nav_groups = [NavSection(section_title, items) for section_title, items in nav_sections]
 
     return Sidebar(cls="apple-blur bg-sidebar border-r border-border h-svh")(
         SidebarTrigger(cls="self-end mb-1 border-border bg-background hover:bg-muted"),
@@ -127,7 +123,5 @@ def DashboardLayout(*content):
     """
     return SidebarProvider(cls=SiteStyles.bg)(
         AppSidebar(),
-        SidebarInset(
-            Main(cls="flex-1")(Div(cls="p-10 max-w-6xl mx-auto space-y-10")(*content))
-        ),
+        SidebarInset(Main(cls="flex-1")(Div(cls="p-10 max-w-6xl mx-auto space-y-10")(*content))),
     )

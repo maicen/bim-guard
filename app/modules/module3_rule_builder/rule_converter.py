@@ -120,8 +120,8 @@ class RuleConverter:
             model      (str):       OpenAI model name (defaults to config.OPENAI_MODEL)
         """
         self.client = openai.OpenAI(api_key=api_key or OPENAI_API_KEY)
-        self.store  = rule_store
-        self.model  = model or OPENAI_MODEL
+        self.store = rule_store
+        self.model = model or OPENAI_MODEL
 
     # ── PRIVATE ───────────────────────────────────────────────────────────────
 
@@ -132,19 +132,19 @@ class RuleConverter:
         so the LLM never guesses the schema.
         """
         existing_targets = []
-        rag_examples     = []
+        rag_examples = []
 
         if self.store:
             existing_targets = self.store.get_existing_entity_types()
-            rag_examples     = self.store.get_rules_sample(limit=3)
+            rag_examples = self.store.get_rules_sample(limit=3)
 
         return RAG_SYSTEM_PROMPT.format(
-            existing_targets = ", ".join(existing_targets) if existing_targets else "None yet",
-            rag_examples     = json.dumps(rag_examples, indent=2) if rag_examples else "None yet",
-            section_name     = chunk.get("section_name", "Unknown"),
-            high             = chunk.get("count_high", 0),
-            medium           = chunk.get("count_medium", 0),
-            low              = chunk.get("count_low", 0),
+            existing_targets=", ".join(existing_targets) if existing_targets else "None yet",
+            rag_examples=json.dumps(rag_examples, indent=2) if rag_examples else "None yet",
+            section_name=chunk.get("section_name", "Unknown"),
+            high=chunk.get("count_high", 0),
+            medium=chunk.get("count_medium", 0),
+            low=chunk.get("count_low", 0),
         )
 
     def _parse_response(self, raw: str, section_number: str) -> list:
@@ -198,17 +198,17 @@ class RuleConverter:
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": f"Extract all rules from this OBC section:\n\n{text}"},
+                {"role": "user", "content": f"Extract all rules from this OBC section:\n\n{text}"},
             ],
             temperature=0.1,
         )
 
-        raw   = response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content.strip()
         rules = self._parse_response(raw, chunk.get("section_number", "?"))
 
         # Tag each rule with its source section
         for rule in rules:
             rule["obc_section_number"] = chunk.get("section_number")
-            rule["obc_section_name"]   = chunk.get("section_name")
+            rule["obc_section_name"] = chunk.get("section_name")
 
         return rules

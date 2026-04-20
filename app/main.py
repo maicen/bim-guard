@@ -43,8 +43,8 @@ def _backfill_obc_metadata(svc) -> None:
         if rule.get("extraction_method") == "seed" and not rule.get("ruleset_id"):
             svc._rules.update(
                 updates={
-                    "mechanism":     "OBC",
-                    "ruleset_id":    "OBC-PART9",
+                    "mechanism": "OBC",
+                    "ruleset_id": "OBC-PART9",
                     "rule_category": "property_check",
                 },
                 pk_values=rule["id"],

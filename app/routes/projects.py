@@ -18,16 +18,12 @@ _projects_service = ProjectsService()
 def setup_routes(rt):
     @rt("/projects")
     def projects_list():
-        return Title("Projects - BIM Guard"), projects_page(
-            _projects_service.list_projects()
-        )
+        return Title("Projects - BIM Guard"), projects_page(_projects_service.list_projects())
 
     @rt("/projects/new")
     def projects_new():
         return Title("New Project - BIM Guard"), DashboardLayout(
-            Container(
-                project_form("Create Project", "/projects/create", include_ifc=True)
-            )
+            Container(project_form("Create Project", "/projects/create", include_ifc=True))
         )
 
     @rt("/projects/create", methods=["POST"])
@@ -37,9 +33,7 @@ def setup_routes(rt):
         status: str = "Draft",
         ifc_file: UploadFile = None,
     ):
-        ifc_file_path, ifc_md5_hash = await _projects_service.prepare_ifc_upload(
-            ifc_file
-        )
+        ifc_file_path, ifc_md5_hash = await _projects_service.prepare_ifc_upload(ifc_file)
         _projects_service.create_project(
             name=name,
             description=description,
@@ -53,15 +47,11 @@ def setup_routes(rt):
     def projects_edit(project_id: int):
         project = _projects_service.get_project(project_id)
         return Title("Edit Project - BIM Guard"), DashboardLayout(
-            Container(
-                project_form("Edit Project", f"/projects/{project_id}/update", project)
-            )
+            Container(project_form("Edit Project", f"/projects/{project_id}/update", project))
         )
 
     @rt("/projects/{project_id}/update", methods=["POST"])
-    def projects_update(
-        project_id: int, name: str, description: str = "", status: str = "Draft"
-    ):
+    def projects_update(project_id: int, name: str, description: str = "", status: str = "Draft"):
         _projects_service.update_project(project_id, name, description, status)
         return redirect_see_other("/projects")
 

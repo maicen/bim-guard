@@ -1,6 +1,22 @@
 import os
 
-from fasthtml.common import A, Div, Form, H3, Option, P, Request, Span, Table, Tbody, Td, Th, Thead, Title, Tr
+from fasthtml.common import (
+    A,
+    Div,
+    Form,
+    H3,
+    Option,
+    P,
+    Request,
+    Span,
+    Table,
+    Tbody,
+    Td,
+    Th,
+    Thead,
+    Title,
+    Tr,
+)
 from app.components.ui import (
     Alert,
     AlertT,
@@ -27,17 +43,15 @@ _bim_guard_app = BIMGuard_App()
 _projects_service = ProjectsService()
 _documents_service = DocumentService()
 
-_DATA_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-)
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
 
 
 def _band_badge(band: str):
     colours = {
         "Critical": "bg-red-600 text-white",
-        "High":     "bg-orange-500 text-white",
-        "Medium":   "bg-yellow-400 text-black",
-        "Low":      "bg-green-600 text-white",
+        "High": "bg-orange-500 text-white",
+        "Medium": "bg-yellow-400 text-black",
+        "Low": "bg-green-600 text-white",
     }
     return Span(
         band,
@@ -232,7 +246,8 @@ def _rule_validation_card(rule_validations: list[dict]):
             Tr(
                 Td(r.get("reference", "—"), cls="px-3 py-2 text-xs font-mono"),
                 Td(
-                    r.get("description", "")[:80] + ("…" if len(r.get("description", "")) > 80 else ""),
+                    r.get("description", "")[:80]
+                    + ("…" if len(r.get("description", "")) > 80 else ""),
                     cls="px-3 py-2 text-sm",
                 ),
                 Td(r.get("target_ifc_class", "—"), cls="px-3 py-2 text-xs font-mono text-blue-700"),
@@ -275,10 +290,7 @@ def setup_routes(rt):
 
         project_options = [
             Option("— select a project —", value="", disabled=True, selected=True)
-        ] + [
-            Option(p.get("name", f"Project {p['id']}"), value=str(p["id"]))
-            for p in projects
-        ]
+        ] + [Option(p.get("name", f"Project {p['id']}"), value=str(p["id"])) for p in projects]
 
         doc_checkboxes = []
         for doc in documents:
@@ -300,9 +312,7 @@ def setup_routes(rt):
             )
 
         if not doc_checkboxes:
-            doc_checkboxes = [
-                P("No documents uploaded yet.", cls="text-sm text-muted-foreground")
-            ]
+            doc_checkboxes = [P("No documents uploaded yet.", cls="text-sm text-muted-foreground")]
 
         return Title("Run Analysis - BIM Guard"), DashboardLayout(
             Container(
@@ -313,9 +323,7 @@ def setup_routes(rt):
                             Form(
                                 Div(
                                     Div(
-                                        FormLabel(
-                                            "Project (IFC Model)", fr="project_id"
-                                        ),
+                                        FormLabel("Project (IFC Model)", fr="project_id"),
                                         Select(
                                             *project_options,
                                             id="project_id",
@@ -443,9 +451,7 @@ def setup_routes(rt):
 
         # IFC summary card
         if ifc_error:
-            ifc_detail = P(
-                f"IFC parsing error: {ifc_error}", cls="text-sm text-destructive"
-            )
+            ifc_detail = P(f"IFC parsing error: {ifc_error}", cls="text-sm text-destructive")
         elif not _projects_service.resolve_ifc_file(project_id):
             ifc_detail = P(
                 "No IFC file attached to this project.",
@@ -465,9 +471,7 @@ def setup_routes(rt):
                     CountTableItemSpec(
                         label="All Physical Elements",
                         total=int(ifc_totals.get("all_physical_elements", 0)),
-                        subtotal=int(
-                            ifc_totals.get("adjusted_physical_elements", ifc_count)
-                        ),
+                        subtotal=int(ifc_totals.get("adjusted_physical_elements", ifc_count)),
                         note="Based on IfcElement",
                     ),
                     CountTableItemSpec(
@@ -518,19 +522,14 @@ def setup_routes(rt):
             error=result.get("compliance_error"),
         )
 
-        rule_validation_card = _rule_validation_card(
-            result.get("rule_validations", [])
-        )
+        rule_validation_card = _rule_validation_card(result.get("rule_validations", []))
 
         sections = [
             Card(
                 CardHeader(CardTitle(project.get("name", "Project"))),
                 CardContent(ifc_detail),
             ),
-            *(
-                doc_cards
-                or [P("No documents selected.", cls="text-sm text-muted-foreground")]
-            ),
+            *(doc_cards or [P("No documents selected.", cls="text-sm text-muted-foreground")]),
             rule_validation_card,
         ]
         if compliance_card:

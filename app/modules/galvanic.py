@@ -76,6 +76,7 @@ RULE_REF_PREFIX = "GC-001"
 # Public entry point
 # ---------------------------------------------------------------------------
 
+
 def compare(
     elements: list[PipingElement],
     rule_pack: dict,
@@ -97,9 +98,7 @@ def compare(
     }
     missing = required_keys - params.keys()
     if missing:
-        raise ValueError(
-            f"Galvanic rule pack is missing required keys: {sorted(missing)}"
-        )
+        raise ValueError(f"Galvanic rule pack is missing required keys: {sorted(missing)}")
 
     issues: list[Issue] = []
     element_by_id = {e.id: e for e in elements}
@@ -135,22 +134,24 @@ def compare(
             if result is None:
                 continue  # below medium threshold — compliant
 
-            issues.append(_build_pair_issue(
-                anode=result["anode"],
-                cathode=result["cathode"],
-                score=result["score"],
-                band=result["band"],
-                voltage_v=result["voltage_v"],
-                area_ratio=result["area_ratio"],
-                environment_class=result["environment_class"],
-                voltage_risk=result["voltage_risk"],
-                area_ratio_risk=result["area_ratio_risk"],
-                environment_multiplier=result["environment_multiplier"],
-                mitigation=_mitigation_for_band(result["band"], params),
-                citations=result["citations"],
-                rule_pack=rule_pack,
-                issue_counter=issue_counter,
-            ))
+            issues.append(
+                _build_pair_issue(
+                    anode=result["anode"],
+                    cathode=result["cathode"],
+                    score=result["score"],
+                    band=result["band"],
+                    voltage_v=result["voltage_v"],
+                    area_ratio=result["area_ratio"],
+                    environment_class=result["environment_class"],
+                    voltage_risk=result["voltage_risk"],
+                    area_ratio_risk=result["area_ratio_risk"],
+                    environment_multiplier=result["environment_multiplier"],
+                    mitigation=_mitigation_for_band(result["band"], params),
+                    citations=result["citations"],
+                    rule_pack=rule_pack,
+                    issue_counter=issue_counter,
+                )
+            )
 
     # PREN adequacy sweep — stainless steels in aggressive environments
     for element in elements:
@@ -164,6 +165,7 @@ def compare(
 # ---------------------------------------------------------------------------
 # Pair assessment — the core GC-001 logic
 # ---------------------------------------------------------------------------
+
 
 def _assess_pair(
     element_a: PipingElement,
@@ -304,6 +306,7 @@ def _area_ratio_risk_from_bands(ratio: float, bands: list[dict]) -> float:
 # PREN adequacy — secondary galvanic check for stainless steels
 # ---------------------------------------------------------------------------
 
+
 def _assess_pren_adequacy(
     element: PipingElement,
     params: dict,
@@ -373,6 +376,7 @@ def _assess_pren_adequacy(
 # Issue construction helpers
 # ---------------------------------------------------------------------------
 
+
 def _build_pair_issue(
     *,
     anode: PipingElement,
@@ -395,10 +399,7 @@ def _build_pair_issue(
         id=f"BGR-{issue_counter[0]:04d}",
         element_id=anode.id,  # issue attaches to the anode (the part that corrodes)
         rule_id=f"{RULE_REF_PREFIX}.PAIR",
-        title=(
-            f"Dissimilar metal coupling — {anode.material} anode to "
-            f"{cathode.material} cathode"
-        ),
+        title=(f"Dissimilar metal coupling — {anode.material} anode to {cathode.material} cathode"),
         description=(
             f"Element {anode.name or anode.id[:8]} ({anode.material}) is "
             f"galvanically coupled to {cathode.name or cathode.id[:8]} "

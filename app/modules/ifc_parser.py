@@ -17,6 +17,7 @@ import uuid
 @dataclass
 class ServiceElement:
     """Represents one MEP service element extracted from the IFC model."""
+
     guid: str
     name: str
     ifc_type: str
@@ -29,56 +30,56 @@ class ServiceElement:
     joint_type: str
     anode_area_m2: float
     cathode_area_m2: float
-    position: tuple          # (x, y, z) in metres
+    position: tuple  # (x, y, z) in metres
     length_m: float
     notes: str = ""
 
 
 # Mapping from IFC type to plain English service category
 IFC_SERVICE_LABELS = {
-    "IfcPipeSegment":       "Pipework",
-    "IfcPipeFitting":       "Pipe fitting",
-    "IfcFlowFitting":       "Flow fitting",
-    "IfcValve":             "Valve",
-    "IfcPump":              "Pump",
-    "IfcHeatExchanger":     "Heat exchanger",
-    "IfcDistributionElement":"Distribution element",
-    "IfcMember":            "Structural member",
-    "IfcPlate":             "Structural plate",
-    "IfcFastener":          "Fastener / fixing",
-    "IfcCableSegment":      "Cable",
-    "IfcDuctSegment":       "Ductwork",
-    "IfcDuctFitting":       "Duct fitting",
+    "IfcPipeSegment": "Pipework",
+    "IfcPipeFitting": "Pipe fitting",
+    "IfcFlowFitting": "Flow fitting",
+    "IfcValve": "Valve",
+    "IfcPump": "Pump",
+    "IfcHeatExchanger": "Heat exchanger",
+    "IfcDistributionElement": "Distribution element",
+    "IfcMember": "Structural member",
+    "IfcPlate": "Structural plate",
+    "IfcFastener": "Fastener / fixing",
+    "IfcCableSegment": "Cable",
+    "IfcDuctSegment": "Ductwork",
+    "IfcDuctFitting": "Duct fitting",
 }
 
 # Infer joint type from IFC element type
 IFC_TO_JOINT = {
-    "IfcPipeFitting":   "JT-001",   # Flanged connections most common
-    "IfcFlowFitting":   "JT-001",
-    "IfcValve":         "JT-013",
-    "IfcFastener":      "JT-010",
-    "IfcMember":        "JT-005",
-    "IfcPlate":         "JT-014",
+    "IfcPipeFitting": "JT-001",  # Flanged connections most common
+    "IfcFlowFitting": "JT-001",
+    "IfcValve": "JT-013",
+    "IfcFastener": "JT-010",
+    "IfcMember": "JT-005",
+    "IfcPlate": "JT-014",
     "IfcHeatExchanger": "JT-009",
-    "IfcPipeSegment":   "JT-012",   # Pipe clamp connection
+    "IfcPipeSegment": "JT-012",  # Pipe clamp connection
 }
 
 # Space type → environment class mapping
 SPACE_TO_ENV = {
-    "pool":            "swimming_pool",
-    "swimming":        "swimming_pool",
-    "plant":           "interior_conditioned",
-    "riser":           "interior_conditioned",
-    "mechanical":      "interior_conditioned",
-    "roof":            "urban_exterior",
-    "facade":          "coastal",
-    "external":        "urban_exterior",
-    "coastal":         "coastal",
-    "marine":          "marine_splash",
-    "industrial":      "industrial",
-    "office":          "interior_dry",
-    "retail":          "interior_dry",
-    "residential":     "interior_dry",
+    "pool": "swimming_pool",
+    "swimming": "swimming_pool",
+    "plant": "interior_conditioned",
+    "riser": "interior_conditioned",
+    "mechanical": "interior_conditioned",
+    "roof": "urban_exterior",
+    "facade": "coastal",
+    "external": "urban_exterior",
+    "coastal": "coastal",
+    "marine": "marine_splash",
+    "industrial": "industrial",
+    "office": "interior_dry",
+    "retail": "interior_dry",
+    "residential": "interior_dry",
 }
 
 
@@ -149,12 +150,8 @@ def classify_environment_from_space(space_name: str, floor: str) -> str:
 def get_element_position(element, ifc_model) -> tuple:
     """Extract (x, y, z) position in metres from IFC element placement."""
     try:
-        mat = ifcopenshell.util.placement.get_local_placement(
-            element.ObjectPlacement
-        )
-        return (round(float(mat[0][3]), 2),
-                round(float(mat[1][3]), 2),
-                round(float(mat[2][3]), 2))
+        mat = ifcopenshell.util.placement.get_local_placement(element.ObjectPlacement)
+        return (round(float(mat[0][3]), 2), round(float(mat[1][3]), 2), round(float(mat[2][3]), 2))
     except Exception:
         return (0.0, 0.0, 0.0)
 
@@ -198,7 +195,7 @@ def parse_ifc(ifc_path: str) -> list[ServiceElement]:
         for el in model.by_type(ifc_type):
             mat_a_raw = get_material_name(el, model)
             mat_a = normalise_material_name(mat_a_raw)
-            mat_b = None   # Second material (e.g. bracket material) — extend via Pset
+            mat_b = None  # Second material (e.g. bracket material) — extend via Pset
 
             floor = get_floor_name(el, model)
             system = get_system_name(el, model)
@@ -216,22 +213,24 @@ def parse_ifc(ifc_path: str) -> list[ServiceElement]:
             anode_area = 0.05
             cathode_area = 0.50
 
-            elements.append(ServiceElement(
-                guid=el.GlobalId,
-                name=el.Name or f"{ifc_type}_{el.id()}",
-                ifc_type=ifc_type,
-                description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
-                material_a=mat_a,
-                material_b=mat_b,
-                location_tag=env,
-                floor=floor,
-                system=system,
-                joint_type=joint,
-                anode_area_m2=anode_area,
-                cathode_area_m2=cathode_area,
-                position=pos,
-                length_m=1.0,
-            ))
+            elements.append(
+                ServiceElement(
+                    guid=el.GlobalId,
+                    name=el.Name or f"{ifc_type}_{el.id()}",
+                    ifc_type=ifc_type,
+                    description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
+                    material_a=mat_a,
+                    material_b=mat_b,
+                    location_tag=env,
+                    floor=floor,
+                    system=system,
+                    joint_type=joint,
+                    anode_area_m2=anode_area,
+                    cathode_area_m2=cathode_area,
+                    position=pos,
+                    length_m=1.0,
+                )
+            )
 
     return elements
 
@@ -243,54 +242,357 @@ def generate_synthetic_elements(n: int = 25) -> list[ServiceElement]:
     environments, and service types — matching real building scenarios.
     """
     import random
+
     random.seed(42)
 
     scenarios = [
         # (name, ifc_type, mat_a, mat_b, env, joint, floor, system, aa, ca, pos)
-        ("CHW Supply Pipe",       "IfcPipeSegment",  "SS_316_passive",       "Galvanized_steel",  "interior_conditioned", "JT-012", "B1 Plant Room", "Chilled Water",      0.05, 0.50, (10,5,0)),
-        ("HWS Return Pipe",       "IfcPipeSegment",  "Copper",               "Galvanized_steel",  "interior_conditioned", "JT-012", "B1 Plant Room", "Hot Water Services", 0.10, 0.40, (12,5,0)),
-        ("Pool Heating Pipe",     "IfcPipeSegment",  "SS_316_passive",       "SS_316_passive",    "swimming_pool",        "JT-001", "Pool Level",    "Pool Heating",       0.08, 0.08, (5,20,0)),
-        ("Pool Plant Flange",     "IfcPipeFitting",  "SS_316_passive",       None,                "swimming_pool",        "JT-001", "Pool Level",    "Pool Heating",       0.02, 0.02, (5,22,0)),
-        ("Coastal Facade Fix",    "IfcFastener",     "Aluminum_alloy_6063",  "SS_316_passive",    "coastal",              "JT-010", "Level 3",       "Facade",             0.002,0.85, (30,0,9)),
-        ("Roof Drainage Fix",     "IfcFastener",     "Galvanized_steel",     "SS_316_passive",    "urban_exterior",       "JT-010", "Roof",          "Drainage",           0.03, 0.50, (15,15,12)),
-        ("Structural Bracket",    "IfcMember",       "Carbon_steel_mild",    "SS_316_passive",    "urban_exterior",       "JT-005", "Level 1",       "Structure",          0.15, 0.40, (8,8,3)),
-        ("Cold Water Feed",       "IfcPipeSegment",  "Copper",               "Cast_iron",         "interior_dry",         "JT-003", "Ground Floor",  "CWS",                0.50, 0.20, (4,4,0)),
-        ("SS Pipe Clamp",         "IfcPipeSegment",  "SS_316_passive",       None,                "interior_conditioned", "JT-011", "B1 Plant Room", "Chilled Water",      0.10, 0.10, (11,6,0)),
-        ("Unlined Pipe Clamp",    "IfcPipeSegment",  "SS_316_passive",       "Carbon_steel_mild", "coastal",              "JT-012", "Roof",          "External Services",  0.05, 0.20, (20,20,12)),
-        ("HX Tube Joint",         "IfcHeatExchanger","SS_316_passive",       None,                "swimming_pool",        "JT-009", "Pool Level",    "Pool Heating",       0.01, 0.50, (6,21,0)),
-        ("Drainage Transition",   "IfcPipeFitting",  "Cast_iron",            "Copper",            "interior_dry",         "JT-002", "Ground Floor",  "Drainage",           0.50, 0.20, (3,3,0)),
-        ("Gas Pipe Riser",        "IfcPipeSegment",  "Carbon_steel_mild",    "Galvanized_steel",  "interior_conditioned", "JT-003", "Riser Shaft",   "Gas",                0.30, 0.30, (7,7,6)),
-        ("Marine Plant Pipe",     "IfcPipeSegment",  "SS_316_passive",       None,                "marine_splash",        "JT-001", "Ground Floor",  "Marine Services",    0.10, 0.10, (25,5,0)),
-        ("Electrical Tray",       "IfcDistributionElement","Aluminum_alloy_6063","Carbon_steel_mild","interior_conditioned","JT-005","Level 1",     "Electrical",         0.80, 0.20, (9,2,3)),
-        ("Vent Duct Bracket",     "IfcDuctSegment",  "Galvanized_steel",     "Carbon_steel_mild", "interior_dry",         "JT-005", "Level 2",       "Ventilation",        0.60, 0.30, (6,10,6)),
-        ("Condenser Pipe",        "IfcPipeSegment",  "Copper",               "Aluminum_alloy_6063","urban_exterior",      "JT-012", "Roof",          "Cooling",            0.08, 0.30, (18,18,12)),
-        ("Fix Plate Coastal",     "IfcPlate",        "SS_316_passive",       None,                "coastal",              "JT-014", "Level 3",       "Facade",             0.02, 0.02, (31,1,9)),
-        ("Sprinkler Header",      "IfcPipeSegment",  "Carbon_steel_mild",    "SS_316_passive",    "interior_conditioned", "JT-001", "Level 1",       "Fire Protection",    0.10, 0.50, (10,10,3)),
-        ("Threaded SS Riser",     "IfcPipeSegment",  "SS_304_passive",       None,                "interior_conditioned", "JT-003", "Riser Shaft",   "Domestic Hot Water", 0.05, 0.05, (7,8,3)),
-        ("Pool Valve Body",       "IfcValve",        "SS_304_passive",       None,                "swimming_pool",        "JT-013", "Pool Level",    "Pool Heating",       0.03, 0.03, (5,23,0)),
-        ("Industrial Flange",     "IfcPipeFitting",  "SS_316_passive",       None,                "industrial",           "JT-001", "Ground Floor",  "Process",            0.04, 0.04, (22,8,0)),
-        ("Lead Flashing Fix",     "IfcFastener",     "Aluminum_alloy_6063",  "Lead",              "urban_exterior",       "JT-010", "Roof",          "Weathering",         0.30, 0.10, (14,14,12)),
-        ("Bronze Valve",          "IfcValve",        "Bronze",               "Copper",            "interior_dry",         "JT-013", "Ground Floor",  "CWS",                0.05, 0.30, (3,5,0)),
-        ("Stainless Header",      "IfcPipeSegment",  "SS_316_passive",       "SS_316_passive",    "urban_exterior",       "JT-002", "Roof",          "Cooling",            0.20, 0.20, (19,19,12)),
+        (
+            "CHW Supply Pipe",
+            "IfcPipeSegment",
+            "SS_316_passive",
+            "Galvanized_steel",
+            "interior_conditioned",
+            "JT-012",
+            "B1 Plant Room",
+            "Chilled Water",
+            0.05,
+            0.50,
+            (10, 5, 0),
+        ),
+        (
+            "HWS Return Pipe",
+            "IfcPipeSegment",
+            "Copper",
+            "Galvanized_steel",
+            "interior_conditioned",
+            "JT-012",
+            "B1 Plant Room",
+            "Hot Water Services",
+            0.10,
+            0.40,
+            (12, 5, 0),
+        ),
+        (
+            "Pool Heating Pipe",
+            "IfcPipeSegment",
+            "SS_316_passive",
+            "SS_316_passive",
+            "swimming_pool",
+            "JT-001",
+            "Pool Level",
+            "Pool Heating",
+            0.08,
+            0.08,
+            (5, 20, 0),
+        ),
+        (
+            "Pool Plant Flange",
+            "IfcPipeFitting",
+            "SS_316_passive",
+            None,
+            "swimming_pool",
+            "JT-001",
+            "Pool Level",
+            "Pool Heating",
+            0.02,
+            0.02,
+            (5, 22, 0),
+        ),
+        (
+            "Coastal Facade Fix",
+            "IfcFastener",
+            "Aluminum_alloy_6063",
+            "SS_316_passive",
+            "coastal",
+            "JT-010",
+            "Level 3",
+            "Facade",
+            0.002,
+            0.85,
+            (30, 0, 9),
+        ),
+        (
+            "Roof Drainage Fix",
+            "IfcFastener",
+            "Galvanized_steel",
+            "SS_316_passive",
+            "urban_exterior",
+            "JT-010",
+            "Roof",
+            "Drainage",
+            0.03,
+            0.50,
+            (15, 15, 12),
+        ),
+        (
+            "Structural Bracket",
+            "IfcMember",
+            "Carbon_steel_mild",
+            "SS_316_passive",
+            "urban_exterior",
+            "JT-005",
+            "Level 1",
+            "Structure",
+            0.15,
+            0.40,
+            (8, 8, 3),
+        ),
+        (
+            "Cold Water Feed",
+            "IfcPipeSegment",
+            "Copper",
+            "Cast_iron",
+            "interior_dry",
+            "JT-003",
+            "Ground Floor",
+            "CWS",
+            0.50,
+            0.20,
+            (4, 4, 0),
+        ),
+        (
+            "SS Pipe Clamp",
+            "IfcPipeSegment",
+            "SS_316_passive",
+            None,
+            "interior_conditioned",
+            "JT-011",
+            "B1 Plant Room",
+            "Chilled Water",
+            0.10,
+            0.10,
+            (11, 6, 0),
+        ),
+        (
+            "Unlined Pipe Clamp",
+            "IfcPipeSegment",
+            "SS_316_passive",
+            "Carbon_steel_mild",
+            "coastal",
+            "JT-012",
+            "Roof",
+            "External Services",
+            0.05,
+            0.20,
+            (20, 20, 12),
+        ),
+        (
+            "HX Tube Joint",
+            "IfcHeatExchanger",
+            "SS_316_passive",
+            None,
+            "swimming_pool",
+            "JT-009",
+            "Pool Level",
+            "Pool Heating",
+            0.01,
+            0.50,
+            (6, 21, 0),
+        ),
+        (
+            "Drainage Transition",
+            "IfcPipeFitting",
+            "Cast_iron",
+            "Copper",
+            "interior_dry",
+            "JT-002",
+            "Ground Floor",
+            "Drainage",
+            0.50,
+            0.20,
+            (3, 3, 0),
+        ),
+        (
+            "Gas Pipe Riser",
+            "IfcPipeSegment",
+            "Carbon_steel_mild",
+            "Galvanized_steel",
+            "interior_conditioned",
+            "JT-003",
+            "Riser Shaft",
+            "Gas",
+            0.30,
+            0.30,
+            (7, 7, 6),
+        ),
+        (
+            "Marine Plant Pipe",
+            "IfcPipeSegment",
+            "SS_316_passive",
+            None,
+            "marine_splash",
+            "JT-001",
+            "Ground Floor",
+            "Marine Services",
+            0.10,
+            0.10,
+            (25, 5, 0),
+        ),
+        (
+            "Electrical Tray",
+            "IfcDistributionElement",
+            "Aluminum_alloy_6063",
+            "Carbon_steel_mild",
+            "interior_conditioned",
+            "JT-005",
+            "Level 1",
+            "Electrical",
+            0.80,
+            0.20,
+            (9, 2, 3),
+        ),
+        (
+            "Vent Duct Bracket",
+            "IfcDuctSegment",
+            "Galvanized_steel",
+            "Carbon_steel_mild",
+            "interior_dry",
+            "JT-005",
+            "Level 2",
+            "Ventilation",
+            0.60,
+            0.30,
+            (6, 10, 6),
+        ),
+        (
+            "Condenser Pipe",
+            "IfcPipeSegment",
+            "Copper",
+            "Aluminum_alloy_6063",
+            "urban_exterior",
+            "JT-012",
+            "Roof",
+            "Cooling",
+            0.08,
+            0.30,
+            (18, 18, 12),
+        ),
+        (
+            "Fix Plate Coastal",
+            "IfcPlate",
+            "SS_316_passive",
+            None,
+            "coastal",
+            "JT-014",
+            "Level 3",
+            "Facade",
+            0.02,
+            0.02,
+            (31, 1, 9),
+        ),
+        (
+            "Sprinkler Header",
+            "IfcPipeSegment",
+            "Carbon_steel_mild",
+            "SS_316_passive",
+            "interior_conditioned",
+            "JT-001",
+            "Level 1",
+            "Fire Protection",
+            0.10,
+            0.50,
+            (10, 10, 3),
+        ),
+        (
+            "Threaded SS Riser",
+            "IfcPipeSegment",
+            "SS_304_passive",
+            None,
+            "interior_conditioned",
+            "JT-003",
+            "Riser Shaft",
+            "Domestic Hot Water",
+            0.05,
+            0.05,
+            (7, 8, 3),
+        ),
+        (
+            "Pool Valve Body",
+            "IfcValve",
+            "SS_304_passive",
+            None,
+            "swimming_pool",
+            "JT-013",
+            "Pool Level",
+            "Pool Heating",
+            0.03,
+            0.03,
+            (5, 23, 0),
+        ),
+        (
+            "Industrial Flange",
+            "IfcPipeFitting",
+            "SS_316_passive",
+            None,
+            "industrial",
+            "JT-001",
+            "Ground Floor",
+            "Process",
+            0.04,
+            0.04,
+            (22, 8, 0),
+        ),
+        (
+            "Lead Flashing Fix",
+            "IfcFastener",
+            "Aluminum_alloy_6063",
+            "Lead",
+            "urban_exterior",
+            "JT-010",
+            "Roof",
+            "Weathering",
+            0.30,
+            0.10,
+            (14, 14, 12),
+        ),
+        (
+            "Bronze Valve",
+            "IfcValve",
+            "Bronze",
+            "Copper",
+            "interior_dry",
+            "JT-013",
+            "Ground Floor",
+            "CWS",
+            0.05,
+            0.30,
+            (3, 5, 0),
+        ),
+        (
+            "Stainless Header",
+            "IfcPipeSegment",
+            "SS_316_passive",
+            "SS_316_passive",
+            "urban_exterior",
+            "JT-002",
+            "Roof",
+            "Cooling",
+            0.20,
+            0.20,
+            (19, 19, 12),
+        ),
     ]
 
     elements = []
     for i, sc in enumerate(scenarios[:n]):
         name, ifc_type, mat_a, mat_b, env, joint, floor, system, aa, ca, pos = sc
-        elements.append(ServiceElement(
-            guid=str(uuid.uuid4()).upper()[:22],
-            name=name,
-            ifc_type=ifc_type,
-            description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
-            material_a=mat_a,
-            material_b=mat_b or mat_a,
-            location_tag=env,
-            floor=floor,
-            system=system,
-            joint_type=joint,
-            anode_area_m2=aa,
-            cathode_area_m2=ca,
-            position=pos,
-            length_m=round(random.uniform(0.5, 8.0), 1),
-        ))
+        elements.append(
+            ServiceElement(
+                guid=str(uuid.uuid4()).upper()[:22],
+                name=name,
+                ifc_type=ifc_type,
+                description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
+                material_a=mat_a,
+                material_b=mat_b or mat_a,
+                location_tag=env,
+                floor=floor,
+                system=system,
+                joint_type=joint,
+                anode_area_m2=aa,
+                cathode_area_m2=ca,
+                position=pos,
+                length_m=round(random.uniform(0.5, 8.0), 1),
+            )
+        )
     return elements

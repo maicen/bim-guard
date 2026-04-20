@@ -118,9 +118,7 @@ class Module1_DocReader:
             if sentence.strip()
         ]
         if len(sentences) <= 1:
-            sentences = [
-                segment.strip() for segment in block.split(" ") if segment.strip()
-            ]
+            sentences = [segment.strip() for segment in block.split(" ") if segment.strip()]
 
         chunks = []
         current = []

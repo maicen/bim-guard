@@ -48,8 +48,15 @@ import re
 # ── SIGNAL WORD SETS ──────────────────────────────────────────────────────────
 
 MODAL_VERBS = {
-    "shall", "must", "should", "will", "may", "need",
-    "require", "required", "requires",
+    "shall",
+    "must",
+    "should",
+    "will",
+    "may",
+    "need",
+    "require",
+    "required",
+    "requires",
 }
 
 OBLIGATION_PATTERNS = [
@@ -70,10 +77,28 @@ OBLIGATION_PATTERNS = [
 ]
 
 MEASUREMENT_NOUNS = {
-    "width", "height", "depth", "length", "area", "clearance",
-    "opening", "slope", "rise", "run", "tread", "riser", "nosing",
-    "distance", "separation", "rating", "headroom", "dimension",
-    "thickness", "size", "capacity", "load",
+    "width",
+    "height",
+    "depth",
+    "length",
+    "area",
+    "clearance",
+    "opening",
+    "slope",
+    "rise",
+    "run",
+    "tread",
+    "riser",
+    "nosing",
+    "distance",
+    "separation",
+    "rating",
+    "headroom",
+    "dimension",
+    "thickness",
+    "size",
+    "capacity",
+    "load",
 }
 
 UNIT_TOKENS = {"mm", "m2", "m²", "metres", "meters", "m", "degrees", "kpa", "mpa"}
@@ -91,6 +116,7 @@ class DependencyParser:
     def __init__(self):
         try:
             import spacy
+
             # Use full pipeline for dependency parsing (not just en_core_web_sm)
             try:
                 self.nlp = spacy.load("en_core_web_md")
@@ -158,7 +184,7 @@ class DependencyParser:
                 signals        (list): what triggered the detection
                 sentence       (str)
         """
-        doc     = self.nlp(sentence_text)
+        doc = self.nlp(sentence_text)
         signals = []
 
         # spaCy signals
@@ -175,22 +201,25 @@ class DependencyParser:
 
         # Scoring
         score = (
-            3 * ("modal_obligation"       in signals) +
-            3 * ("measurement_with_value" in signals) +
-            2 * ("unit_present"           in signals) +
-            1 * len(regex_hits)
+            3 * ("modal_obligation" in signals)
+            + 3 * ("measurement_with_value" in signals)
+            + 2 * ("unit_present" in signals)
+            + 1 * len(regex_hits)
         )
 
-        if score >= 5:   confidence = "HIGH"
-        elif score >= 2: confidence = "MEDIUM"
-        else:            confidence = "LOW"
+        if score >= 5:
+            confidence = "HIGH"
+        elif score >= 2:
+            confidence = "MEDIUM"
+        else:
+            confidence = "LOW"
 
         return {
             "is_obligation": score >= 2,
-            "confidence":    confidence,
-            "signals":       signals,
-            "score":         score,
-            "sentence":      sentence_text.strip(),
+            "confidence": confidence,
+            "signals": signals,
+            "score": score,
+            "sentence": sentence_text.strip(),
         }
 
     # ── PUBLIC API ────────────────────────────────────────────────────────────
@@ -209,10 +238,10 @@ class DependencyParser:
                 obligation_sents  (list)  sentences flagged as obligations
                 dep_confidence    (str)   HIGH/MEDIUM/LOW
         """
-        doc       = self.nlp(paragraph)
+        doc = self.nlp(paragraph)
         sentences = [sent.text for sent in doc.sents]
 
-        best_score    = 0
+        best_score = 0
         obligation_sents = []
 
         for sent in sentences:
@@ -221,15 +250,18 @@ class DependencyParser:
                 obligation_sents.append(result)
                 best_score = max(best_score, result["score"])
 
-        if best_score >= 5:   dep_confidence = "HIGH"
-        elif best_score >= 2: dep_confidence = "MEDIUM"
-        else:                 dep_confidence = "LOW"
+        if best_score >= 5:
+            dep_confidence = "HIGH"
+        elif best_score >= 2:
+            dep_confidence = "MEDIUM"
+        else:
+            dep_confidence = "LOW"
 
         return {
-            "is_rule":          len(obligation_sents) > 0,
+            "is_rule": len(obligation_sents) > 0,
             "obligation_score": best_score,
             "obligation_sents": obligation_sents,
-            "dep_confidence":   dep_confidence,
+            "dep_confidence": dep_confidence,
         }
 
     def analyse_chunks(self, filtered_chunks: list) -> list:
@@ -248,7 +280,7 @@ class DependencyParser:
         print("[DependencyParser] Analysing sentence structure...\n")
 
         upgraded_total = 0
-        enhanced       = []
+        enhanced = []
 
         for chunk in filtered_chunks:
             enhanced_paragraphs = []
@@ -258,19 +290,23 @@ class DependencyParser:
 
                 # Upgrade LOW_CONFIDENCE if dependency parser is confident
                 original_confidence = para["confidence"]
-                new_confidence      = original_confidence
+                new_confidence = original_confidence
 
-                if (original_confidence == "LOW_CONFIDENCE"
-                        and dep_result["dep_confidence"] in ("HIGH", "MEDIUM")):
+                if original_confidence == "LOW_CONFIDENCE" and dep_result["dep_confidence"] in (
+                    "HIGH",
+                    "MEDIUM",
+                ):
                     new_confidence = dep_result["dep_confidence"]
                     upgraded_total += 1
 
-                enhanced_paragraphs.append({
-                    **para,
-                    "confidence":    new_confidence,
-                    "dep_analysis":  dep_result,
-                    "was_upgraded":  new_confidence != original_confidence,
-                })
+                enhanced_paragraphs.append(
+                    {
+                        **para,
+                        "confidence": new_confidence,
+                        "dep_analysis": dep_result,
+                        "was_upgraded": new_confidence != original_confidence,
+                    }
+                )
 
             # Rebuild filtered_text with updated confidence labels
             parts = []
@@ -281,18 +317,20 @@ class DependencyParser:
                     parts.append(p["text"])
 
             # Recount confidence levels
-            count_high   = sum(1 for p in enhanced_paragraphs if p["confidence"] == "HIGH")
+            count_high = sum(1 for p in enhanced_paragraphs if p["confidence"] == "HIGH")
             count_medium = sum(1 for p in enhanced_paragraphs if p["confidence"] == "MEDIUM")
-            count_low    = sum(1 for p in enhanced_paragraphs if p["confidence"] == "LOW_CONFIDENCE")
+            count_low = sum(1 for p in enhanced_paragraphs if p["confidence"] == "LOW_CONFIDENCE")
 
-            enhanced.append({
-                **chunk,
-                "scored_paragraphs": enhanced_paragraphs,
-                "filtered_text":     "\n\n".join(parts),
-                "count_high":        count_high,
-                "count_medium":      count_medium,
-                "count_low":         count_low,
-            })
+            enhanced.append(
+                {
+                    **chunk,
+                    "scored_paragraphs": enhanced_paragraphs,
+                    "filtered_text": "\n\n".join(parts),
+                    "count_high": count_high,
+                    "count_medium": count_medium,
+                    "count_low": count_low,
+                }
+            )
 
         print(f"[DependencyParser] Done")
         print(f"  Paragraphs upgraded from LOW → MEDIUM/HIGH: {upgraded_total}")

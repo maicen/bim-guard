@@ -6,9 +6,7 @@ def _cx(*parts: str | None) -> str:
     return " ".join(part for part in parts if part)
 
 
-def SidebarProvider(
-    *children, default_open: bool = True, cls: str | None = None, **kwargs
-):
+def SidebarProvider(*children, default_open: bool = True, cls: str | None = None, **kwargs):
     state = "expanded" if default_open else "collapsed"
     return Div(
         *children,
@@ -150,9 +148,7 @@ def SidebarMenuItem(*children, cls: str | None = None, **kwargs):
     )
 
 
-def SidebarMenuButton(
-    *children, href: str | None = None, cls: str | None = None, **kwargs
-):
+def SidebarMenuButton(*children, href: str | None = None, cls: str | None = None, **kwargs):
     button_cls = _cx(
         "flex w-full items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 text-left text-sm outline-none",
         "hover:bg-muted hover:text-foreground transition-colors",
@@ -161,9 +157,7 @@ def SidebarMenuButton(
     )
 
     if href is not None:
-        return A(
-            *children, href=href, data_sidebar="menu-button", cls=button_cls, **kwargs
-        )
+        return A(*children, href=href, data_sidebar="menu-button", cls=button_cls, **kwargs)
 
     return HtmlButton(
         *children,

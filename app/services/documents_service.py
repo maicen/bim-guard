@@ -30,9 +30,7 @@ class DocumentService:
     def find_by_md5(self, md5_hash: str):
         return find_row_by_field(self._documents, "md5_hash", md5_hash)
 
-    def create_document(
-        self, md5_hash: str, filename: str, file_path: str, extracted_text: str
-    ):
+    def create_document(self, md5_hash: str, filename: str, file_path: str, extracted_text: str):
         return self._documents.insert(
             {
                 "md5_hash": md5_hash,

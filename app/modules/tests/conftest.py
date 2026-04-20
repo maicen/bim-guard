@@ -12,6 +12,7 @@ import pytest
 # Register custom markers so pytest doesn't warn about them
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: marks tests that need real PDFs and are slow")
     config.addinivalue_line("markers", "llm: marks tests that call the LLM (slow, costs tokens)")
@@ -22,7 +23,7 @@ def pytest_configure(config):
 # Shared paths
 # ═══════════════════════════════════════════════════════════════════════════════
 
-FIXTURES_DIR  = os.path.join(os.path.dirname(__file__), "fixtures")
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
 
 

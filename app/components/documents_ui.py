@@ -44,9 +44,7 @@ def documents_table_rows(rows: list[dict]):
     )
 
 
-def documents_panel(
-    rows: list[dict], message: str | None = None, level: str = "success"
-):
+def documents_panel(rows: list[dict], message: str | None = None, level: str = "success"):
     alert = MessageAlert(AlertSpec(message=message, level=level))
 
     return Div(

@@ -109,9 +109,7 @@ def CreateAction(href: str, title: str = "Create", cls: str | None = None):
 
 
 def SaveAction(title: str = "Save", cls: str | None = None):
-    return IconPostButton(
-        "save", action=None, title=title, cls=cls, button_type="submit"
-    )
+    return IconPostButton("save", action=None, title=title, cls=cls, button_type="submit")
 
 
 def CancelAction(href: str, title: str = "Cancel", cls: str | None = None):

@@ -2,10 +2,11 @@
 
 from fasthtml.common import Div, P, Title
 from monsterui.all import (
+    H1,
     DivFullySpaced,
     Grid,
-    H1,
 )
+
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteStyles
 from app.components.ui import BentoBox, LinkButton
@@ -46,9 +47,7 @@ def setup_routes(rt):
                     str(stats["total_documents"]),
                     "Uploaded specification documents",
                 ),
-                BentoBox(
-                    "Rules", str(stats["total_rules"]), "Compliance rules defined"
-                ),
-                BentoBox("Issues Found (demo)", "34", "-12 from last week"),
+                BentoBox("Rules", str(stats["total_rules"]), "Compliance rules defined"),
+                BentoBox("Issues Found (TODO)", "34", "-12 from last week"),
             ),
         )

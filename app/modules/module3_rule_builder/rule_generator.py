@@ -105,29 +105,29 @@ class RuleGenerator:
         always gets a consistent shape regardless of how sparse the LLM output was.
         """
         defaults = {
-            "ref":               "",
-            "desc":              "",
-            "source_text":       "",
-            "target":            "Unspecified",
-            "property_set":      "",
-            "property_name":     "",
+            "ref": "",
+            "desc": "",
+            "source_text": "",
+            "target": "Unspecified",
+            "property_set": "",
+            "property_name": "",
             "fallback_property": "",
-            "rule_type":         "numeric_comparison",
-            "operator":          ">=",
-            "check_value":       None,
-            "value_min":         None,
-            "value_max":         None,
-            "unit":              "",
-            "applies_when":      {},
-            "severity":          "mandatory",
-            "keyword":           "shall",
-            "compliance_type":   "prescriptive",
-            "exceptions":        [],
-            "related_refs":      [],
-            "overridden_by":     None,
-            "confidence":        0.8,
+            "rule_type": "numeric_comparison",
+            "operator": ">=",
+            "check_value": None,
+            "value_min": None,
+            "value_max": None,
+            "unit": "",
+            "applies_when": {},
+            "severity": "mandatory",
+            "keyword": "shall",
+            "compliance_type": "prescriptive",
+            "exceptions": [],
+            "related_refs": [],
+            "overridden_by": None,
+            "confidence": 0.8,
             "extraction_method": "llm",
-            "needs_review":      False,
+            "needs_review": False,
         }
         for key, val in defaults.items():
             if key not in rule:
@@ -151,10 +151,7 @@ class RuleGenerator:
         # Valid rule type
         rule_type = rule["rule_type"]
         if rule_type not in VALID_RULE_TYPES:
-            return False, (
-                f"Invalid rule_type: '{rule_type}' — "
-                f"must be one of {VALID_RULE_TYPES}"
-            )
+            return False, (f"Invalid rule_type: '{rule_type}' — must be one of {VALID_RULE_TYPES}")
 
         # Rule-type-aware required fields
         required_for_type = RULE_TYPE_REQUIRED_FIELDS.get(rule_type, [])
@@ -176,17 +173,12 @@ class RuleGenerator:
                         "(required for numeric_range)"
                     )
             elif not rule.get(field):
-                return False, (
-                    f"Missing required field '{field}' for rule_type '{rule_type}'"
-                )
+                return False, (f"Missing required field '{field}' for rule_type '{rule_type}'")
 
         # Valid operator (only checked when an operator is present)
         operator = rule.get("operator", "")
         if operator and operator not in VALID_OPERATORS:
-            return False, (
-                f"Invalid operator: '{operator}' — "
-                f"must be one of {VALID_OPERATORS}"
-            )
+            return False, (f"Invalid operator: '{operator}' — must be one of {VALID_OPERATORS}")
 
         # between must have value_min and value_max (not a list in value)
         if operator == "between":
@@ -220,7 +212,7 @@ class RuleGenerator:
         if valid:
             return self.store.save_rule(rule)
         else:
-            ref  = rule.get("ref", "?")
+            ref = rule.get("ref", "?")
             desc = rule.get("desc", "")[:60]
             print(f"  [SKIPPED] [{ref}] {reason} | {desc}")
             return None
@@ -244,13 +236,10 @@ class RuleGenerator:
             if rule_id:
                 saved_ids.append(rule_id)
 
-        total   = len(rules)
-        saved   = len(saved_ids)
+        total = len(rules)
+        saved = len(saved_ids)
         skipped = total - saved
 
-        print(
-            f"  [RuleGenerator] Saved {saved}/{total} rules "
-            f"({skipped} skipped)"
-        )
+        print(f"  [RuleGenerator] Saved {saved}/{total} rules ({skipped} skipped)")
 
         return saved_ids

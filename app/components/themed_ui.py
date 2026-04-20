@@ -1,9 +1,7 @@
 from fasthtml.common import A, Div, Link, Nav, Script, Style
 from monsterui.all import Container, Theme
 
-BASECOAT_CSS_CDN = (
-    "https://cdn.jsdelivr.net/npm/basecoat-css@0.3.11/dist/basecoat.cdn.min.css"
-)
+BASECOAT_CSS_CDN = "https://cdn.jsdelivr.net/npm/basecoat-css@0.3.11/dist/basecoat.cdn.min.css"
 BASECOAT_JS_LOCAL = "/static/js/all.min.js"
 GLOBALS_CSS_LOCAL = "/static/css/globals.css"
 DROPDOWN_JS_LOCAL = "/static/js/dropdown-menu.js"

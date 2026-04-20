@@ -11,15 +11,23 @@ Usage:
 """
 
 TABLE_ENTITY_MAP = {
-    "stair":   "IfcStairFlight", "riser":   "IfcStairFlight",
-    "tread":   "IfcStairFlight", "rise":    "IfcStairFlight",
-    "run":     "IfcStairFlight", "nosing":  "IfcStairFlight",
-    "door":    "IfcDoor",        "doorway": "IfcDoor",
-    "window":  "IfcWindow",      "glazing": "IfcWindow",
-    "ramp":    "IfcRamp",        "slope":   "IfcRamp",
-    "guard":   "IfcRailing",     "handrail":"IfcRailing",
-    "landing": "IfcSlab",        "floor":   "IfcSlab",
-    "wall":    "IfcWall",
+    "stair": "IfcStairFlight",
+    "riser": "IfcStairFlight",
+    "tread": "IfcStairFlight",
+    "rise": "IfcStairFlight",
+    "run": "IfcStairFlight",
+    "nosing": "IfcStairFlight",
+    "door": "IfcDoor",
+    "doorway": "IfcDoor",
+    "window": "IfcWindow",
+    "glazing": "IfcWindow",
+    "ramp": "IfcRamp",
+    "slope": "IfcRamp",
+    "guard": "IfcRailing",
+    "handrail": "IfcRailing",
+    "landing": "IfcSlab",
+    "floor": "IfcSlab",
+    "wall": "IfcWall",
 }
 
 MIN_VARIANTS = {"min", "minimum", "min (mm)", "min. (mm)", "min.", "minimum (mm)"}
@@ -27,7 +35,6 @@ MAX_VARIANTS = {"max", "maximum", "max (mm)", "max. (mm)", "max.", "maximum (mm)
 
 
 class TableRuleBuilder:
-
     def __init__(self, rule_store):
         self.store = rule_store
 
@@ -47,7 +54,7 @@ class TableRuleBuilder:
         return "mm"
 
     def _extract_from_table(self, table_dict: dict, generator) -> int:
-        df  = table_dict["dataframe"].copy()
+        df = table_dict["dataframe"].copy()
         idx = table_dict["table_index"]
         df.columns = [str(c).strip().lower() for c in df.columns]
 
@@ -57,7 +64,7 @@ class TableRuleBuilder:
             return 0
 
         prop_col = df.columns[0]
-        rules    = []
+        rules = []
 
         for _, row in df.iterrows():
             name = str(row.get(prop_col, "")).strip()
@@ -70,21 +77,23 @@ class TableRuleBuilder:
                 continue
 
             prop_name = name.replace(" ", "_").title()
-            target    = self._detect_target(name)
+            target = self._detect_target(name)
 
-            rules.append({
-                "ref":           f"OBC_Table_{idx + 1}",
-                "rule_type":     "numeric_range",
-                "target":        target,
-                "property_name": prop_name,
-                "operator":      "between",
-                "check_value":   None,
-                "value_min":     min_val,
-                "value_max":     max_val,
-                "unit":          self._detect_unit(name),
-                "severity":      "mandatory",
-                "desc":          f"{name} must be between {min_val} and {max_val}",
-            })
+            rules.append(
+                {
+                    "ref": f"OBC_Table_{idx + 1}",
+                    "rule_type": "numeric_range",
+                    "target": target,
+                    "property_name": prop_name,
+                    "operator": "between",
+                    "check_value": None,
+                    "value_min": min_val,
+                    "value_max": max_val,
+                    "unit": self._detect_unit(name),
+                    "severity": "mandatory",
+                    "desc": f"{name} must be between {min_val} and {max_val}",
+                }
+            )
 
         if rules:
             saved = generator.save_batch(rules, source_doc="OBC_Table_Direct")
@@ -100,7 +109,7 @@ class TableRuleBuilder:
         total = 0
         for t in tables:
             saved = self._extract_from_table(t, generator)
-            idx   = t["table_index"]
+            idx = t["table_index"]
             if saved:
                 print(f"  Table {idx + 1}: {saved} rules saved (no LLM)")
             else:

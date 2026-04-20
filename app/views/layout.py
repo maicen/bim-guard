@@ -31,6 +31,4 @@ def Sidebar():
 
 
 def DashboardLayout(*content):
-    return Div(
-        Sidebar(), Main(*content, cls="flex-1 p-8 bg-muted"), cls="flex min-h-screen"
-    )
+    return Div(Sidebar(), Main(*content, cls="flex-1 p-8 bg-muted"), cls="flex min-h-screen")

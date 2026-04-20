@@ -17,8 +17,8 @@ class BCFIssue:
     guid: str
     title: str
     description: str
-    priority: str          # Critical / Major / Normal / Minor
-    status: str            # Active / Open / Info
+    priority: str  # Critical / Major / Normal / Minor
+    status: str  # Active / Open / Info
     assigned_to: str
     due_date: str
     labels: list
@@ -27,7 +27,7 @@ class BCFIssue:
     service_type: str
     floor: str
     risk_band: str
-    mechanism: str         # galvanic / crevice / combined
+    mechanism: str  # galvanic / crevice / combined
     risk_score: float
     mitigation: str
     camera_x: float = 0.0
@@ -123,8 +123,12 @@ def _viewpoint_xml(issue: BCFIssue) -> str:
 
 
 def _risk_colour(band: str) -> str:
-    return {"LOW": "FF107C10", "MEDIUM": "FFFF8C00",
-            "HIGH": "FFC05000", "CRITICAL": "FFC00000"}.get(band, "FF888888")
+    return {
+        "LOW": "FF107C10",
+        "MEDIUM": "FFFF8C00",
+        "HIGH": "FFC05000",
+        "CRITICAL": "FFC00000",
+    }.get(band, "FF888888")
 
 
 def _priority_int(priority: str) -> str:
@@ -138,6 +142,7 @@ def _placeholder_png() -> bytes:
     """
     # Minimal 1×1 red PNG (valid PNG binary)
     import base64
+
     b64 = (
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+h"
         "HgAHggJ/PchI6QAAAABJRU5ErkJggg=="
@@ -159,28 +164,34 @@ def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         # BCF version file (required by spec)
-        zf.writestr("bcf.version", """<?xml version="1.0" encoding="UTF-8"?>
+        zf.writestr(
+            "bcf.version",
+            """<?xml version="1.0" encoding="UTF-8"?>
 <Version VersionId="2.1" xsi:noNamespaceSchemaLocation="version.xsd"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <DetailedVersion>2.1</DetailedVersion>
-</Version>""")
+</Version>""",
+        )
 
         # Project file
         project_guid = str(uuid.uuid4()).upper()
-        zf.writestr("project.bcfp", f"""<?xml version="1.0" encoding="UTF-8"?>
+        zf.writestr(
+            "project.bcfp",
+            f"""<?xml version="1.0" encoding="UTF-8"?>
 <ProjectExtension xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Project ProjectId="{project_guid}">
     <Name>BIMGUARD AI — Corrosion Compliance Report</Name>
   </Project>
   <ExtensionSchema>extensions.xsd</ExtensionSchema>
-</ProjectExtension>""")
+</ProjectExtension>""",
+        )
 
         # One folder per issue
         for i, issue in enumerate(issues):
             folder = issue.guid + "/"
-            zf.writestr(folder + "markup.bcf",    _markup_xml(issue, i))
+            zf.writestr(folder + "markup.bcf", _markup_xml(issue, i))
             zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue))
-            zf.writestr(folder + "snapshot.png",   _placeholder_png())
+            zf.writestr(folder + "snapshot.png", _placeholder_png())
 
     return buf.getvalue()
 
@@ -197,21 +208,21 @@ def issues_from_results(results: list[dict]) -> list[BCFIssue]:
     """
     issues = []
     priority_map = {
-        "LOW":      "Minor",
-        "MEDIUM":   "Normal",
-        "HIGH":     "Major",
+        "LOW": "Minor",
+        "MEDIUM": "Normal",
+        "HIGH": "Major",
         "CRITICAL": "Critical",
     }
     status_map = {
-        "LOW":      "Info",
-        "MEDIUM":   "Open",
-        "HIGH":     "Open",
+        "LOW": "Info",
+        "MEDIUM": "Open",
+        "HIGH": "Open",
         "CRITICAL": "Active",
     }
     engineer_map = {
-        "LOW":      "BIM Manager",
-        "MEDIUM":   "Mechanical / Structural Engineer",
-        "HIGH":     "Lead Engineer",
+        "LOW": "BIM Manager",
+        "MEDIUM": "Mechanical / Structural Engineer",
+        "HIGH": "Lead Engineer",
         "CRITICAL": "Design Lead + Client Representative",
     }
 
@@ -221,8 +232,7 @@ def issues_from_results(results: list[dict]) -> list[BCFIssue]:
             continue  # Only raise issues for Medium and above
 
         days = {"MEDIUM": 21, "HIGH": 7, "CRITICAL": 2}.get(band, 21)
-        due = (datetime.date.today() +
-               datetime.timedelta(days=days)).isoformat()
+        due = (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
 
         pos = r.get("position", (0, 0, 0))
         mech = r.get("dominant_mechanism", "galvanic")
@@ -236,45 +246,47 @@ def issues_from_results(results: list[dict]) -> list[BCFIssue]:
             r.get("floor", ""),
         ]
 
-        issues.append(BCFIssue(
-            guid=str(uuid.uuid4()).upper(),
-            title=f"[BIMGUARD-AI] {band} corrosion risk — {r.get('name','Component')}",
-            description=(
-                f"Corrosion compliance failure detected by BIMGUARD AI.\n\n"
-                f"Component: {r.get('name','')}\n"
-                f"Service type: {r.get('description','')}\n"
-                f"Floor / zone: {r.get('floor','')}\n"
-                f"Material A: {r.get('material_a','')}\n"
-                f"Material B: {r.get('material_b','')}\n"
-                f"Environment: {r.get('environment','')}\n"
-                f"Galvanic score: {r.get('galvanic_score',0):.4f} → {r.get('galvanic_band','')}\n"
-                f"Crevice score:  {r.get('crevice_score',0):.4f} → {r.get('crevice_band','')}\n"
-                f"Overall score:  {score:.4f} → {band}\n"
-                f"Dominant mechanism: {mech}\n\n"
-                f"Required action: {r.get('action','')}\n"
-                f"Mitigation: {r.get('mitigation','')}\n\n"
-                f"Standards: NASA-STD-6012, EN ISO 15329, ISO 19650\n"
-                f"Ruleset: BIMGUARD-GC-001 + BIMGUARD-CC-001 v1.0.0"
-            ),
-            priority=priority_map[band],
-            status=status_map[band],
-            assigned_to=engineer_map[band],
-            due_date=due,
-            labels=labels,
-            component_guid=r.get("guid", str(uuid.uuid4()).upper()),
-            component_name=r.get("name", "Component"),
-            service_type=r.get("description", ""),
-            floor=r.get("floor", ""),
-            risk_band=band,
-            mechanism=mech,
-            risk_score=score,
-            mitigation=r.get("mitigation", ""),
-            camera_x=float(pos[0]),
-            camera_y=float(pos[1]),
-            camera_z=float(pos[2]),
-            target_x=float(pos[0]),
-            target_y=float(pos[1]),
-            target_z=float(pos[2]),
-        ))
+        issues.append(
+            BCFIssue(
+                guid=str(uuid.uuid4()).upper(),
+                title=f"[BIMGUARD-AI] {band} corrosion risk — {r.get('name', 'Component')}",
+                description=(
+                    f"Corrosion compliance failure detected by BIMGUARD AI.\n\n"
+                    f"Component: {r.get('name', '')}\n"
+                    f"Service type: {r.get('description', '')}\n"
+                    f"Floor / zone: {r.get('floor', '')}\n"
+                    f"Material A: {r.get('material_a', '')}\n"
+                    f"Material B: {r.get('material_b', '')}\n"
+                    f"Environment: {r.get('environment', '')}\n"
+                    f"Galvanic score: {r.get('galvanic_score', 0):.4f} → {r.get('galvanic_band', '')}\n"
+                    f"Crevice score:  {r.get('crevice_score', 0):.4f} → {r.get('crevice_band', '')}\n"
+                    f"Overall score:  {score:.4f} → {band}\n"
+                    f"Dominant mechanism: {mech}\n\n"
+                    f"Required action: {r.get('action', '')}\n"
+                    f"Mitigation: {r.get('mitigation', '')}\n\n"
+                    f"Standards: NASA-STD-6012, EN ISO 15329, ISO 19650\n"
+                    f"Ruleset: BIMGUARD-GC-001 + BIMGUARD-CC-001 v1.0.0"
+                ),
+                priority=priority_map[band],
+                status=status_map[band],
+                assigned_to=engineer_map[band],
+                due_date=due,
+                labels=labels,
+                component_guid=r.get("guid", str(uuid.uuid4()).upper()),
+                component_name=r.get("name", "Component"),
+                service_type=r.get("description", ""),
+                floor=r.get("floor", ""),
+                risk_band=band,
+                mechanism=mech,
+                risk_score=score,
+                mitigation=r.get("mitigation", ""),
+                camera_x=float(pos[0]),
+                camera_y=float(pos[1]),
+                camera_z=float(pos[2]),
+                target_x=float(pos[0]),
+                target_y=float(pos[1]),
+                target_z=float(pos[2]),
+            )
+        )
 
     return issues

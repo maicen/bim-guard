@@ -17,15 +17,15 @@ import json
 import time
 import pytest
 
-from module1_doc_parser.section_chunker    import SectionChunker
-from module1_doc_parser.keyword_filter     import KeywordFilter
+from module1_doc_parser.section_chunker import SectionChunker
+from module1_doc_parser.keyword_filter import KeywordFilter
 from module1_doc_parser.table_rule_builder import TableRuleBuilder
-from module3_rule_builder.rule_store       import RuleStore
-from module3_rule_builder.rule_generator   import RuleGenerator
+from module3_rule_builder.rule_store import RuleStore
+from module3_rule_builder.rule_generator import RuleGenerator
 
-TEST_DB      = "tests/test_rules_integration.db"
+TEST_DB = "tests/test_rules_integration.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
-RESULTS_DIR  = os.path.join(os.path.dirname(__file__), "integration_results")
+RESULTS_DIR = os.path.join(os.path.dirname(__file__), "integration_results")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -37,17 +37,17 @@ RESULTS_DIR  = os.path.join(os.path.dirname(__file__), "integration_results")
 
 INTEGRATION_CASES = [
     {
-        "id":   "obc_stairs",
-        "pdf":  "sample_obc_stairs.pdf",
+        "id": "obc_stairs",
+        "pdf": "sample_obc_stairs.pdf",
         "description": "OBC Part 9 — Stairs section",
         # Module 1 expectations
-        "expect_sections": ["4"],         # section numbers that should appear
-        "expect_terms":    ["stair", "shall", "860", "mm"],
-        "min_chunks":      1,
+        "expect_sections": ["4"],  # section numbers that should appear
+        "expect_terms": ["stair", "shall", "860", "mm"],
+        "min_chunks": 1,
         # Module 3 expectations
-        "expect_rules_min":    1,
-        "expect_elements":     ["stair"],
-        "expect_values":       [860],     # numeric thresholds that should appear
+        "expect_rules_min": 1,
+        "expect_elements": ["stair"],
+        "expect_values": [860],  # numeric thresholds that should appear
     },
     # ── Add more cases as you add fixture PDFs ──
     # {
@@ -67,21 +67,22 @@ INTEGRATION_CASES = [
 # Fixtures
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def pipeline():
     """Set up the full Module 1 → Module 3 pipeline."""
-    store   = RuleStore(TEST_DB)
+    store = RuleStore(TEST_DB)
     store.clear_all_rules()
     chunker = SectionChunker()
-    kf      = KeywordFilter()
-    gen     = RuleGenerator(store)
+    kf = KeywordFilter()
+    gen = RuleGenerator(store)
     builder = TableRuleBuilder(store)
 
     yield {
-        "store":   store,
+        "store": store,
         "chunker": chunker,
-        "kf":      kf,
-        "gen":     gen,
+        "kf": kf,
+        "gen": gen,
         "builder": builder,
     }
 
@@ -94,6 +95,7 @@ def pipeline():
 def docling_extractor():
     try:
         from module1_doc_parser.docling_extractor import DoclingExtractor
+
         return DoclingExtractor()
     except ImportError:
         pytest.skip("DoclingExtractor not available")
@@ -107,10 +109,10 @@ def _has_fixture(pdf_name):
 # Full pipeline integration tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.llm
 class TestFullPipeline:
-
     @pytest.mark.parametrize("case", INTEGRATION_CASES, ids=[c["id"] for c in INTEGRATION_CASES])
     def test_pipeline_end_to_end(self, case, pipeline, docling_extractor):
         """
@@ -122,7 +124,7 @@ class TestFullPipeline:
 
         # ── Step 1: Extract text from PDF (Module 1 — DoclingExtractor) ──
         result = docling_extractor.extract(pdf_path)
-        text   = result if isinstance(result, str) else result.get("text", "")
+        text = result if isinstance(result, str) else result.get("text", "")
         tables = result.get("tables", []) if isinstance(result, dict) else []
 
         assert len(text) > 50, "Extraction returned too little text"
@@ -130,18 +132,19 @@ class TestFullPipeline:
         # Check expected terms appear in extracted text
         text_lower = text.lower()
         for term in case["expect_terms"]:
-            assert term.lower() in text_lower, \
-                f"Expected term '{term}' not found in extracted text"
+            assert term.lower() in text_lower, f"Expected term '{term}' not found in extracted text"
 
         # ── Step 2: Chunk the text (Module 1 — SectionChunker) ──
         chunks = pipeline["chunker"].chunk(text)
-        assert len(chunks) >= case["min_chunks"], \
+        assert len(chunks) >= case["min_chunks"], (
             f"Expected ≥{case['min_chunks']} chunks, got {len(chunks)}"
+        )
 
         for section_num in case["expect_sections"]:
             section_nums = [c["section_number"] for c in chunks]
-            assert section_num in section_nums, \
+            assert section_num in section_nums, (
                 f"Expected section '{section_num}' not found in chunks"
+            )
 
         # ── Step 3: Filter by keywords (Module 1 — KeywordFilter) ──
         filtered = pipeline["kf"].score_chunks(chunks)
@@ -160,16 +163,16 @@ class TestFullPipeline:
         if tables:
             pipeline["builder"].process_all_tables(tables, pipeline["gen"])
 
-        assert len(all_rules) >= case["expect_rules_min"], \
+        assert len(all_rules) >= case["expect_rules_min"], (
             f"Expected ≥{case['expect_rules_min']} rules, got {len(all_rules)}"
+        )
 
         # ── Step 5: Validate generated rules ──
         for rule in all_rules:
             rule_data = rule if isinstance(rule, dict) else json.loads(rule)
             # Must have required fields
             for field in ["element", "property", "operator", "value"]:
-                assert field in rule_data, \
-                    f"Rule missing '{field}': {rule_data}"
+                assert field in rule_data, f"Rule missing '{field}': {rule_data}"
 
         # Check that expected elements appear
         all_elements = set()
@@ -179,8 +182,7 @@ class TestFullPipeline:
 
         for expected_el in case["expect_elements"]:
             matches = [e for e in all_elements if expected_el in e or e in expected_el]
-            assert matches, \
-                f"Expected element '{expected_el}' not found. Got: {all_elements}"
+            assert matches, f"Expected element '{expected_el}' not found. Got: {all_elements}"
 
         # Check that expected numeric values appear
         all_values = set()
@@ -193,8 +195,7 @@ class TestFullPipeline:
 
         for expected_val in case.get("expect_values", []):
             close_match = any(abs(v - expected_val) < 1 for v in all_values)
-            assert close_match, \
-                f"Expected value {expected_val} not found. Got: {all_values}"
+            assert close_match, f"Expected value {expected_val} not found. Got: {all_values}"
 
         # ── Save results for debugging ──
         self._save_result(case["id"], all_rules)
@@ -211,10 +212,10 @@ class TestFullPipeline:
 # Consistency tests — same input, multiple runs
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.llm
 class TestPipelineConsistency:
-
     def test_same_input_similar_output(self, pipeline):
         """
         Running the same text through Module 3 twice should produce
@@ -227,14 +228,16 @@ class TestPipelineConsistency:
         time.sleep(1)  # small delay to avoid rate limiting
         rules_2 = pipeline["gen"].generate_rules(text)
 
-        assert len(rules_1) == len(rules_2), \
+        assert len(rules_1) == len(rules_2), (
             f"Rule count inconsistent: run1={len(rules_1)}, run2={len(rules_2)}"
+        )
 
         r1 = rules_1[0] if isinstance(rules_1[0], dict) else json.loads(rules_1[0])
         r2 = rules_2[0] if isinstance(rules_2[0], dict) else json.loads(rules_2[0])
 
-        assert r1.get("element") == r2.get("element"), \
+        assert r1.get("element") == r2.get("element"), (
             f"Element inconsistent: '{r1.get('element')}' vs '{r2.get('element')}'"
+        )
 
         try:
             v1, v2 = float(r1.get("value", 0)), float(r2.get("value", 0))
@@ -246,6 +249,7 @@ class TestPipelineConsistency:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Pipeline without real PDF — uses synthetic text (always runnable)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 @pytest.mark.llm
@@ -275,14 +279,14 @@ of not less than 0.35 m2 with no dimension less than 380 mm.
         assert len(chunks) >= 3
 
         # Filter
-        filtered    = pipeline["kf"].score_chunks(chunks)
+        filtered = pipeline["kf"].score_chunks(chunks)
         high_chunks = [c for c in filtered if c.get("count_high", 0) > 0]
         assert len(high_chunks) >= 1
 
         # Generate rules
         all_rules = []
         for chunk in high_chunks:
-            text  = chunk.get("filtered_text", chunk.get("text", ""))
+            text = chunk.get("filtered_text", chunk.get("text", ""))
             rules = pipeline["gen"].generate_rules(text)
             if rules:
                 all_rules.extend(rules)

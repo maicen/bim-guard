@@ -26,24 +26,25 @@ try:
     from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
+
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
 
 # ── COLOUR CONSTANTS ──────────────────────────────────────────────────────────
-NAVY   = RGBColor(0x1F, 0x38, 0x64) if DOCX_AVAILABLE else None
-BLUE   = RGBColor(0x2E, 0x75, 0xB6) if DOCX_AVAILABLE else None
-WHITE  = RGBColor(0xFF, 0xFF, 0xFF) if DOCX_AVAILABLE else None
-GREY   = RGBColor(0x66, 0x66, 0x66) if DOCX_AVAILABLE else None
-RED    = RGBColor(0xA3, 0x2D, 0x2D) if DOCX_AVAILABLE else None
-AMBER  = RGBColor(0x85, 0x4F, 0x0B) if DOCX_AVAILABLE else None
-GREEN  = RGBColor(0x0F, 0x6E, 0x56) if DOCX_AVAILABLE else None
+NAVY = RGBColor(0x1F, 0x38, 0x64) if DOCX_AVAILABLE else None
+BLUE = RGBColor(0x2E, 0x75, 0xB6) if DOCX_AVAILABLE else None
+WHITE = RGBColor(0xFF, 0xFF, 0xFF) if DOCX_AVAILABLE else None
+GREY = RGBColor(0x66, 0x66, 0x66) if DOCX_AVAILABLE else None
+RED = RGBColor(0xA3, 0x2D, 0x2D) if DOCX_AVAILABLE else None
+AMBER = RGBColor(0x85, 0x4F, 0x0B) if DOCX_AVAILABLE else None
+GREEN = RGBColor(0x0F, 0x6E, 0x56) if DOCX_AVAILABLE else None
 
 BAND_COLOURS = {
     "Critical": (0xA3, 0x2D, 0x2D),
-    "High":     (0xC2, 0x51, 0x0A),
-    "Medium":   (0xB4, 0x53, 0x09),
-    "Low":      (0x0F, 0x6E, 0x56),
+    "High": (0xC2, 0x51, 0x0A),
+    "Medium": (0xB4, 0x53, 0x09),
+    "Low": (0x0F, 0x6E, 0x56),
 }
 
 
@@ -150,8 +151,7 @@ def generate_word_report(
     """
     if not DOCX_AVAILABLE:
         raise ImportError(
-            "python-docx is required for report generation. "
-            "Install with: pip install python-docx"
+            "python-docx is required for report generation. Install with: pip install python-docx"
         )
 
     meta = project_meta or {}
@@ -161,11 +161,11 @@ def generate_word_report(
 
     # ── PAGE SETUP ─────────────────────────────────────────────────────────────
     section = doc.sections[0]
-    section.page_width  = Cm(21.0)
+    section.page_width = Cm(21.0)
     section.page_height = Cm(29.7)
-    section.left_margin   = Cm(2.5)
-    section.right_margin  = Cm(2.5)
-    section.top_margin    = Cm(2.5)
+    section.left_margin = Cm(2.5)
+    section.right_margin = Cm(2.5)
+    section.top_margin = Cm(2.5)
     section.bottom_margin = Cm(2.5)
 
     # ── COVER BLOCK ─────────────────────────────────────────────────────────────
@@ -194,12 +194,12 @@ def generate_word_report(
     meta_table = doc.add_table(rows=6, cols=2)
     meta_table.style = "Table Grid"
     meta_rows = [
-        ("Project",       meta.get("project_name", "—")),
-        ("Client",        meta.get("client", "—")),
-        ("Prepared by",   meta.get("prepared_by", "BIMGUARD AI v1.0.0")),
-        ("IFC file",      meta.get("ifc_file", "—")),
-        ("Report date",   meta.get("date", now)),
-        ("Revision",      meta.get("revision", "P01")),
+        ("Project", meta.get("project_name", "—")),
+        ("Client", meta.get("client", "—")),
+        ("Prepared by", meta.get("prepared_by", "BIMGUARD AI v1.0.0")),
+        ("IFC file", meta.get("ifc_file", "—")),
+        ("Report date", meta.get("date", now)),
+        ("Revision", meta.get("revision", "P01")),
     ]
     for i, (k, v) in enumerate(meta_rows):
         row = meta_table.rows[i]
@@ -229,9 +229,15 @@ def generate_word_report(
     total = len(results)
     issues = sum(v for k, v in bands.items() if k != "Low")
 
-    _body(doc, f"This report presents the automated corrosion compliance assessment produced by BIMGUARD AI for {total} MEP service elements. The assessment was performed using two corrosion compliance engines: GC-001 (galvanic corrosion, ruleset BIMGUARD-GC-001 v1.0.0) and CC-001 (crevice corrosion, ruleset BIMGUARD-CC-001 v1.0.0).")
+    _body(
+        doc,
+        f"This report presents the automated corrosion compliance assessment produced by BIMGUARD AI for {total} MEP service elements. The assessment was performed using two corrosion compliance engines: GC-001 (galvanic corrosion, ruleset BIMGUARD-GC-001 v1.0.0) and CC-001 (crevice corrosion, ruleset BIMGUARD-CC-001 v1.0.0).",
+    )
 
-    _body(doc, f"The assessment identified {issues} elements at Medium risk or above requiring remediation action. Full details of each flagged element, the composite risk score, the mechanism responsible, and the recommended mitigation are provided in Section 3.")
+    _body(
+        doc,
+        f"The assessment identified {issues} elements at Medium risk or above requiring remediation action. Full details of each flagged element, the composite risk score, the mechanism responsible, and the recommended mitigation are provided in Section 3.",
+    )
 
     # Summary metrics table
     doc.add_paragraph()
@@ -239,7 +245,7 @@ def generate_word_report(
     sm.alignment = WD_TABLE_ALIGNMENT.CENTER
     sm.style = "Table Grid"
     headers = ["Total elements", "Issues flagged", "Est. cost (£)", "Programme delay"]
-    values  = [
+    values = [
         str(total),
         str(issues),
         f"£{impact.total_cost_gbp:,.0f}",
@@ -267,10 +273,11 @@ def generate_word_report(
 
     # Cost avoidance note
     avoidance = impact.total_cost_gbp * 5
-    _body(doc,
+    _body(
+        doc,
         f"Based on published industry benchmarks, the cost of resolving these {issues} issues at the current design stage is estimated at £{impact.total_cost_gbp:,.0f}. "
         f"Resolution of equivalent issues discovered during construction would cost approximately 6× more — an estimated £{impact.total_cost_gbp * 6:,.0f} — representing a cost avoidance of £{avoidance:,.0f} by addressing these findings now.",
-        colour=GREEN
+        colour=GREEN,
     )
 
     # ── RISK DISTRIBUTION ────────────────────────────────────────────────────────
@@ -315,13 +322,17 @@ def generate_word_report(
     # ── ISSUE REGISTER ───────────────────────────────────────────────────────────
     _heading(doc, "3. Issue Register")
     _add_rule(doc)
-    _body(doc, "The following table lists all elements flagged at Medium risk or above. Each row contains the IFC GlobalID, service type, material, risk band, composite score, mechanism, and recommended mitigation.")
+    _body(
+        doc,
+        "The following table lists all elements flagged at Medium risk or above. Each row contains the IFC GlobalID, service type, material, risk band, composite score, mechanism, and recommended mitigation.",
+    )
 
     doc.add_paragraph()
 
     # Issue table
     issue_results = [
-        r for r in results
+        r
+        for r in results
         if (r.get("risk_band") if isinstance(r, dict) else getattr(r, "risk_band", "Low")) != "Low"
     ]
 
@@ -344,21 +355,23 @@ def generate_word_report(
 
         for ri, r in enumerate(issue_results):
             if isinstance(r, dict):
-                gid     = r.get("global_id", r.get("GlobalID", "—"))[:12]
-                svc     = r.get("system_type", r.get("element_type", "—"))[:20]
-                mat     = r.get("material_label", r.get("material", "—"))[:20]
-                band    = r.get("risk_band", "—")
-                score   = f"{r.get('composite_score', r.get('GC001_score', 0)):.3f}"
-                mech    = r.get("mechanism", r.get("GC001_mechanism", "GC"))
-                mit     = r.get("recommended_mitigation", "—")[:60]
+                gid = r.get("global_id", r.get("GlobalID", "—"))[:12]
+                svc = r.get("system_type", r.get("element_type", "—"))[:20]
+                mat = r.get("material_label", r.get("material", "—"))[:20]
+                band = r.get("risk_band", "—")
+                score = f"{r.get('composite_score', r.get('GC001_score', 0)):.3f}"
+                mech = r.get("mechanism", r.get("GC001_mechanism", "GC"))
+                mit = r.get("recommended_mitigation", "—")[:60]
             else:
-                gid   = str(getattr(r, "global_id", "—"))[:12]
-                svc   = str(getattr(r, "system_type", getattr(r, "element_type", "—")))[:20]
-                mat   = str(getattr(r, "material_label", getattr(r, "material_key", "—")))[:20]
-                band  = str(getattr(r, "risk_band", "—"))
+                gid = str(getattr(r, "global_id", "—"))[:12]
+                svc = str(getattr(r, "system_type", getattr(r, "element_type", "—")))[:20]
+                mat = str(getattr(r, "material_label", getattr(r, "material_key", "—")))[:20]
+                band = str(getattr(r, "risk_band", "—"))
                 score = f"{float(getattr(r, 'composite_score', 0)):.3f}"
-                mech  = str(getattr(r, "mechanism", "—"))
-                mit   = str(getattr(r, "mitigations", ["—"])[0] if getattr(r, "mitigations", []) else "—")[:60]
+                mech = str(getattr(r, "mechanism", "—"))
+                mit = str(
+                    getattr(r, "mitigations", ["—"])[0] if getattr(r, "mitigations", []) else "—"
+                )[:60]
 
             vals = [gid, svc, mat, band, score, mech, mit]
             row = ir.rows[ri + 1]
@@ -368,7 +381,11 @@ def generate_word_report(
             for ci, val in enumerate(vals):
                 cell = row.cells[ci]
                 cell.text = val
-                run = cell.paragraphs[0].runs[0] if cell.paragraphs[0].runs else cell.paragraphs[0].add_run(val)
+                run = (
+                    cell.paragraphs[0].runs[0]
+                    if cell.paragraphs[0].runs
+                    else cell.paragraphs[0].add_run(val)
+                )
                 run.font.name = "Arial"
                 run.font.size = Pt(8)
                 if ci == 3 and band != "Low":
@@ -384,14 +401,32 @@ def generate_word_report(
     _heading(doc, "4. Assessment Methodology")
     _add_rule(doc)
 
-    _body(doc, "BIMGUARD AI implements a White Box Architecture in which every compliance decision is traceable to a named standard and a specific numerical threshold. The following rulesets and standards were applied in this assessment:")
+    _body(
+        doc,
+        "BIMGUARD AI implements a White Box Architecture in which every compliance decision is traceable to a named standard and a specific numerical threshold. The following rulesets and standards were applied in this assessment:",
+    )
 
     methods = [
-        ("GC-001 v1.0.0", "Galvanic corrosion — voltage gap vs NASA-STD-6012 thresholds, area ratio risk bands, PREN adequacy check (IMOA Design Manual 4th Ed.)"),
-        ("CC-001 v1.0.0", "Crevice corrosion — CCT adequacy per ASTM G48 Method B / CIRIA C692, geometry class per CIBSE Guide G, environment severity per EN ISO 15329:2007"),
-        ("IFC parser",    "ifcopenshell — reads IFC 2x3 and IFC4; normalises material names; reads Pset_PipeSegmentOccurrence, Pset_CoveringCommon, Pset_ZoneCommon"),
-        ("BCF output",    "BCF 2.1 (buildingSMART) — GlobalID, viewpoint, markup, issue history per element"),
-        ("ISO 19650",     "Information container status applied per ISO 19650-2 workflow — S2 / S4 / Status A"),
+        (
+            "GC-001 v1.0.0",
+            "Galvanic corrosion — voltage gap vs NASA-STD-6012 thresholds, area ratio risk bands, PREN adequacy check (IMOA Design Manual 4th Ed.)",
+        ),
+        (
+            "CC-001 v1.0.0",
+            "Crevice corrosion — CCT adequacy per ASTM G48 Method B / CIRIA C692, geometry class per CIBSE Guide G, environment severity per EN ISO 15329:2007",
+        ),
+        (
+            "IFC parser",
+            "ifcopenshell — reads IFC 2x3 and IFC4; normalises material names; reads Pset_PipeSegmentOccurrence, Pset_CoveringCommon, Pset_ZoneCommon",
+        ),
+        (
+            "BCF output",
+            "BCF 2.1 (buildingSMART) — GlobalID, viewpoint, markup, issue history per element",
+        ),
+        (
+            "ISO 19650",
+            "Information container status applied per ISO 19650-2 workflow — S2 / S4 / Status A",
+        ),
     ]
     mt = doc.add_table(rows=len(methods) + 1, cols=2)
     mt.style = "Table Grid"
@@ -422,13 +457,17 @@ def generate_word_report(
 
     # ── DISCLAIMER ────────────────────────────────────────────────────────────────
     _heading(doc, "5. Limitations and Disclaimer", level=2)
-    _body(doc,
+    _body(
+        doc,
         "This report is produced by an automated compliance checking tool. Results are based on data present in the submitted IFC model and are subject to the accuracy and completeness of that data. Area ratio calculations use nominal diameter estimates where modelled surface areas are not available. BIMGUARD AI does not replace a qualified corrosion engineer's judgement and should be used as a screening tool to prioritise further investigation. All Critical and High findings should be reviewed by a competent engineer before remediation action is taken.",
-        italic=True, colour=GREY
+        italic=True,
+        colour=GREY,
     )
-    _body(doc,
+    _body(
+        doc,
         f"Ruleset versions: BIMGUARD-GC-001 v1.0.0 | BIMGUARD-CC-001 v1.0.0 | Assessment date: {now}",
-        italic=True, colour=GREY
+        italic=True,
+        colour=GREY,
     )
 
     # ── SAVE TO BYTES ─────────────────────────────────────────────────────────────
@@ -439,7 +478,7 @@ def generate_word_report(
 
 
 # ── STREAMLIT INTEGRATION SNIPPET ────────────────────────────────────────────
-STREAMLIT_SNIPPET = '''
+STREAMLIT_SNIPPET = """
 # Add to Streamlit app — BCF Issue Manager or dedicated Reports page
 # ─────────────────────────────────────────────────────────────────────────────
 import streamlit as st
@@ -488,4 +527,4 @@ if st.session_state.get("compliance_results"):
                 st.error(f"Report generation failed: {e}")
 else:
     st.info("Run a compliance check first to enable report export.")
-'''
+"""

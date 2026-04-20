@@ -12,11 +12,7 @@ _projects_service = ProjectsService()
 def setup_routes(rt):
     @rt("/viewer")
     def viewer_page(project_id: int | None = None):
-        project = (
-            _projects_service.get_project(project_id)
-            if project_id is not None
-            else None
-        )
+        project = _projects_service.get_project(project_id) if project_id is not None else None
 
         if project_id is not None and project is None:
             return Title("Not Found — BIM Guard"), DashboardLayout(

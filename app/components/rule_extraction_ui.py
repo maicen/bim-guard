@@ -37,9 +37,7 @@ def rule_extraction_page_content():
                     CardContent(
                         Form(
                             Div(
-                                FormLabel(
-                                    "Upload BEP Document (PDF)", fr="extract-document"
-                                ),
+                                FormLabel("Upload BEP Document (PDF)", fr="extract-document"),
                                 Input(
                                     id="extract-document",
                                     type="file",
@@ -50,9 +48,7 @@ def rule_extraction_page_content():
                                 ),
                                 cls="space-y-1",
                             ),
-                            SubmitButton(
-                                "Extract Rules", variant="primary", cls="mt-2"
-                            ),
+                            SubmitButton("Extract Rules", variant="primary", cls="mt-2"),
                             spinner,
                             spinner_style,
                             hx_post="/api/rules/extract",
@@ -100,15 +96,15 @@ def rule_extraction_results(rules: list[dict], filename: str | None):
 
     fragments = []
     for rule in rules:
-        ref      = rule.get("ref", "REQ")
-        desc     = rule.get("desc", "")
-        target   = rule.get("target", "Unspecified")
+        ref = rule.get("ref", "REQ")
+        desc = rule.get("desc", "")
+        target = rule.get("target", "Unspecified")
         operator = rule.get("operator", "")
-        value    = rule.get("value")
-        unit     = rule.get("unit", "")
+        value = rule.get("value")
+        unit = rule.get("unit", "")
         severity = rule.get("severity", "")
-        prop     = rule.get("property_name", "")
-        conf     = rule.get("confidence")
+        prop = rule.get("property_name", "")
+        conf = rule.get("confidence")
         needs_review = rule.get("needs_review", False)
 
         # Build inline condition string e.g. "Width >= 860 mm"
@@ -124,15 +120,30 @@ def rule_extraction_results(rules: list[dict], filename: str | None):
         condition = " ".join(condition_parts) if condition_parts else None
 
         severity_cls = {
-            "mandatory":     "bg-red-100 text-red-800",
-            "recommended":   "bg-yellow-100 text-yellow-800",
+            "mandatory": "bg-red-100 text-red-800",
+            "recommended": "bg-yellow-100 text-yellow-800",
             "informational": "bg-blue-100 text-blue-800",
         }.get(severity, "bg-muted text-muted-foreground")
 
         badges = Div(
-            Span(severity or "mandatory", cls=f"inline-block px-1.5 py-0.5 rounded text-xs font-medium {severity_cls} mr-1") if severity else "",
-            Span(f"{int(conf * 100)}% confident", cls="inline-block px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground") if conf is not None else "",
-            Span("⚠ Review", cls="inline-block px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700 ml-1") if needs_review else "",
+            Span(
+                severity or "mandatory",
+                cls=f"inline-block px-1.5 py-0.5 rounded text-xs font-medium {severity_cls} mr-1",
+            )
+            if severity
+            else "",
+            Span(
+                f"{int(conf * 100)}% confident",
+                cls="inline-block px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground",
+            )
+            if conf is not None
+            else "",
+            Span(
+                "⚠ Review",
+                cls="inline-block px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700 ml-1",
+            )
+            if needs_review
+            else "",
             cls="flex flex-wrap gap-1 mb-2",
         )
 
@@ -141,14 +152,19 @@ def rule_extraction_results(rules: list[dict], filename: str | None):
                 CardContent(
                     Div(
                         Span(ref, cls="font-semibold text-sm"),
-                        Span("New", cls="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs"),
+                        Span(
+                            "New",
+                            cls="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs",
+                        ),
                         cls="flex justify-between items-center mb-1",
                     ),
                     badges,
                     P(desc, cls="text-sm text-muted-foreground mb-2"),
                     Div(
                         Div(f"Target: {target}", cls="font-mono text-xs"),
-                        Div(f"Check: {condition}", cls="font-mono text-xs text-blue-700") if condition else "",
+                        Div(f"Check: {condition}", cls="font-mono text-xs text-blue-700")
+                        if condition
+                        else "",
                         cls="bg-muted p-1.5 rounded mb-2 space-y-0.5",
                     ),
                     Form(
