@@ -1,5 +1,8 @@
 {
     "recommendations": [
-        "github.vscode-pull-request-github"
+        "github.vscode-pull-request-github",
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "qwtel.sqlite-viewer"
     ]
 }
