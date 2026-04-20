@@ -105,7 +105,7 @@ def run_pipeline(
     print(f"{'='*60}\n")
 
     # ── Initialise ────────────────────────────────────────────────────────────
-    store     = RuleStore(DB_PATH)
+    store     = RuleStore()   # delegates to RuleService (shared web DB)
     generator = RuleGenerator(store)
 
     if USE_GPT4O:

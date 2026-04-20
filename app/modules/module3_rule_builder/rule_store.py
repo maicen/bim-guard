@@ -1,297 +1,178 @@
 """
 module3_rule_builder/rule_store.py
 -----------------------------------
-SQLite database layer for BIMGuard rules.
-All standalone CLI modules read from and write to this store.
+Adapter that forwards all reads/writes to the web app's RuleService so the
+CLI pipeline and the web app share one SQLite table (data/bimguard.sqlite).
 
-Responsibilities:
-    - Create and manage the rules table
-    - Save individual rule dicts
-    - Query rules by target IFC class, severity, section ref
-    - Return rules as DataFrames for inspection
-    - Support RAG by returning sample rules as examples
+Public interface is identical to the original standalone RuleStore, so
+RuleGenerator, TableRuleBuilder, RuleConverter, obc_seed_rules, orchestrator,
+and enhanced_orchestrator need no changes.
 
-Usage:
-    from module3_rule_builder.rule_store import RuleStore
-    from config import DB_PATH
+Field-name mapping (CLI → web):
+    ref    → reference
+    desc   → description
+    target → target_ifc_class
 
-    store = RuleStore(DB_PATH)
-    store.save_rule({...})
-    rules = store.fetch_rules_for_target("IfcStairFlight")
+The db_path constructor argument is accepted but ignored; the connection is
+managed by PersistenceService.
 """
 
-import sqlite3
 import json
-import uuid
-from datetime import datetime
-from pathlib import Path
-import pandas as pd
+
+try:
+    from app.services.rules_service import RuleService
+except ImportError:
+    # Running as a bare CLI script from app/modules/ — adjust sys.path first
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+    from app.services.rules_service import RuleService
+
+
+def _jload(value):
+    """Safely deserialize a JSON string stored in the web DB."""
+    if value is None or value == "" or value == "null":
+        return None
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return value
+
+
+def _to_cli(r: dict) -> dict:
+    """Convert a web-format rule row to the CLI field-name convention."""
+    return {
+        "ref":               r.get("reference", ""),
+        "desc":              r.get("description", ""),
+        "target":            r.get("target_ifc_class", ""),
+        "rule_type":         r.get("rule_type", ""),
+        "source_text":       r.get("source_text", ""),
+        "property_set":      r.get("property_set", ""),
+        "property_name":     r.get("property_name", ""),
+        "fallback_property": r.get("fallback_property", ""),
+        "operator":          r.get("operator", ""),
+        "check_value":       _jload(r.get("check_value")),
+        "value_min":         _jload(r.get("value_min")),
+        "value_max":         _jload(r.get("value_max")),
+        "unit":              r.get("unit", ""),
+        "applies_when":      _jload(r.get("applies_when")) or {},
+        "severity":          r.get("severity", "mandatory"),
+        "keyword":           r.get("keyword", ""),
+        "compliance_type":   r.get("compliance_type", ""),
+        "exceptions":        _jload(r.get("exceptions")) or [],
+        "related_refs":      _jload(r.get("related_refs")) or [],
+        "overridden_by":     r.get("overridden_by", ""),
+        "confidence":        float(r.get("confidence") or 0.8),
+        "extraction_method": r.get("extraction_method", "llm"),
+        "needs_review":      bool(r.get("needs_review", 0)),
+        # keep the web PK available for callers that need it
+        "id":                r.get("id"),
+    }
 
 
 class RuleStore:
     """
-    Handles all SQLite read/write operations for the BIMGuard Rule Database.
-    This is the central hub — all CLI modules read from and write to here.
+    Drop-in replacement for the original standalone RuleStore.
+    Delegates all persistence to RuleService (shared web app table).
     """
 
-    CREATE_TABLE = """
-    CREATE TABLE IF NOT EXISTS rules (
-        rule_id          TEXT PRIMARY KEY,
-        source_doc       TEXT,
-        ref              TEXT,
-        rule_type        TEXT,
-        target           TEXT,
-        property_set     TEXT,
-        property_name    TEXT,
-        fallback_property TEXT,
-        operator         TEXT,
-        check_value      TEXT,
-        value_min        TEXT,
-        value_max        TEXT,
-        unit             TEXT,
-        severity         TEXT DEFAULT 'mandatory',
-        desc             TEXT,
-        source_text      TEXT,
-        applies_when     TEXT,
-        keyword          TEXT,
-        compliance_type  TEXT,
-        exceptions       TEXT,
-        related_refs     TEXT,
-        overridden_by    TEXT,
-        confidence       REAL DEFAULT 0.8,
-        extraction_method TEXT DEFAULT 'llm',
-        needs_review     INTEGER DEFAULT 0,
-        raw_payload      TEXT,
-        created_at       TEXT
-    );
-    """
-
-    def __init__(self, db_path):
-        """
-        Initialise the RuleStore and create the rules table if it doesn't exist.
-
-        Args:
-            db_path (str | Path): path to the SQLite database file
-        """
-        self.db_path = Path(db_path)
-        self.conn = sqlite3.connect(str(self.db_path))
-        self.conn.execute(self.CREATE_TABLE)
-        self.conn.commit()
-        print(f"[RuleStore] Connected — {self.count()} existing rules in '{self.db_path.name}'")
+    def __init__(self, db_path=None):
+        # db_path accepted for backward compat but ignored — PersistenceService
+        # owns the connection.
+        self._svc = RuleService()
+        print(f"[RuleStore] Connected — {self.count()} existing rules")
 
     # ── WRITE ─────────────────────────────────────────────────────────────────
 
     def save_rule(self, rule: dict) -> str:
         """
-        Save a single validated rule dict to the database.
-
-        Args:
-            rule (dict): rule dict matching the rich schema in rule_generator.py
-
-        Returns:
-            str: the new rule_id (UUID)
+        Save a single validated rule dict.  Returns the new row ID as str.
+        Accepts the CLI field-name convention (ref / desc / target).
         """
-        rule_id = str(uuid.uuid4())
-        now     = datetime.utcnow().isoformat()
-
-        self.conn.execute(
-            """INSERT INTO rules (
-                rule_id, source_doc, ref, rule_type, target,
-                property_set, property_name, fallback_property,
-                operator, check_value, value_min, value_max, unit,
-                severity, desc, source_text, applies_when,
-                keyword, compliance_type, exceptions, related_refs,
-                overridden_by, confidence, extraction_method, needs_review,
-                raw_payload, created_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (
-                rule_id,
-                rule.get("source_doc"),
-                rule.get("ref"),
-                rule.get("rule_type"),
-                rule.get("target"),
-                rule.get("property_set"),
-                rule.get("property_name"),
-                rule.get("fallback_property"),
-                rule.get("operator"),
-                json.dumps(rule.get("check_value")),
-                json.dumps(rule.get("value_min")),
-                json.dumps(rule.get("value_max")),
-                rule.get("unit"),
-                rule.get("severity", "mandatory"),
-                rule.get("desc"),
-                rule.get("source_text"),
-                json.dumps(rule.get("applies_when") or {}),
-                rule.get("keyword"),
-                rule.get("compliance_type"),
-                json.dumps(rule.get("exceptions") or []),
-                json.dumps(rule.get("related_refs") or []),
-                rule.get("overridden_by"),
-                float(rule.get("confidence") or 0.8),
-                rule.get("extraction_method", "llm"),
-                int(rule.get("needs_review", False)),
-                json.dumps(rule),
-                now,
-            ),
+        row = self._svc.create_rule(
+            reference=str(rule.get("ref") or ""),
+            rule_type=str(rule.get("rule_type") or "numeric_comparison"),
+            description=str(rule.get("desc") or ""),
+            target_ifc_class=str(rule.get("target") or "Unspecified"),
+            source_text=str(rule.get("source_text") or ""),
+            property_set=str(rule.get("property_set") or ""),
+            property_name=str(rule.get("property_name") or ""),
+            fallback_property=str(rule.get("fallback_property") or ""),
+            operator=str(rule.get("operator") or ""),
+            check_value=rule.get("check_value"),
+            value_min=rule.get("value_min"),
+            value_max=rule.get("value_max"),
+            unit=str(rule.get("unit") or ""),
+            applies_when=rule.get("applies_when") or {},
+            severity=str(rule.get("severity") or "mandatory"),
+            keyword=str(rule.get("keyword") or ""),
+            compliance_type=str(rule.get("compliance_type") or ""),
+            exceptions=rule.get("exceptions") or [],
+            related_refs=rule.get("related_refs") or [],
+            overridden_by=str(rule.get("overridden_by") or ""),
+            confidence=float(rule.get("confidence") or 0.8),
+            extraction_method=str(rule.get("extraction_method") or "llm"),
+            needs_review=bool(rule.get("needs_review", False)),
         )
-        self.conn.commit()
-        return rule_id
+        return str(row.id)
 
     def clear_all_rules(self):
-        """Delete all rules from the database. Use carefully — primarily for testing."""
-        self.conn.execute("DELETE FROM rules")
-        self.conn.commit()
+        """Delete every rule from the shared table. Use in testing only."""
+        for r in self._svc.list_rules():
+            self._svc.delete_rule(r["id"])
         print("[RuleStore] All rules deleted")
 
     # ── READ ──────────────────────────────────────────────────────────────────
 
-    def get_all_rules(self) -> list:
-        """
-        Return all rules as a list of dicts (from raw_payload).
+    def get_all_rules(self) -> list[dict]:
+        return [_to_cli(r) for r in self._svc.list_rules()]
 
-        Returns:
-            list[dict]
-        """
-        cur = self.conn.execute("SELECT raw_payload FROM rules")
-        return [json.loads(row[0]) for row in cur.fetchall()]
+    def fetch_rules_for_target(self, target: str) -> list[dict]:
+        return [_to_cli(r) for r in self._svc.fetch_rules_for_target(target)]
 
-    def fetch_rules_for_target(self, target: str) -> list:
-        """
-        Get all rules for a specific IFC target class.
-
-        Args:
-            target (str): e.g. "IfcStairFlight", "IfcDoor"
-
-        Returns:
-            list[dict]: list of rule dicts
-        """
-        cur = self.conn.execute(
-            "SELECT raw_payload FROM rules WHERE target = ?",
-            (target,),
-        )
-        return [json.loads(row[0]) for row in cur.fetchall()]
-
-    # Keep old name as alias for backward compatibility with any existing callers
-    def fetch_rules_for_entity(self, target: str) -> list:
+    def fetch_rules_for_entity(self, target: str) -> list[dict]:
         return self.fetch_rules_for_target(target)
 
-    def fetch_mandatory_rules(self) -> list:
-        """
-        Get all rules with severity = 'mandatory'.
+    def fetch_mandatory_rules(self) -> list[dict]:
+        return [_to_cli(r) for r in self._svc.fetch_mandatory_rules()]
 
-        Returns:
-            list[dict]: list of rule dicts
-        """
-        cur = self.conn.execute(
-            "SELECT raw_payload FROM rules WHERE severity = 'mandatory'"
-        )
-        return [json.loads(row[0]) for row in cur.fetchall()]
+    def fetch_rules_by_ref(self, ref: str) -> list[dict]:
+        return [_to_cli(r) for r in self._svc.fetch_rules_by_ref(ref)]
 
-    def fetch_rules_by_ref(self, ref: str) -> list:
-        """
-        Get all rules for a specific OBC section reference.
+    def fetch_needs_review(self) -> list[dict]:
+        return [_to_cli(r) for r in self._svc.fetch_needs_review()]
 
-        Args:
-            ref (str): e.g. "9.8.2.1"
+    def get_existing_entity_types(self) -> list[str]:
+        return self._svc.get_existing_entity_types()
 
-        Returns:
-            list[dict]
-        """
-        cur = self.conn.execute(
-            "SELECT raw_payload FROM rules WHERE ref LIKE ?",
-            (f"%{ref}%",),
-        )
-        return [json.loads(row[0]) for row in cur.fetchall()]
+    def get_rules_sample(self, limit: int = 3) -> list[dict]:
+        return [_to_cli(r) for r in self._svc.get_rules_sample(limit)]
 
-    def fetch_needs_review(self) -> list:
-        """Return all rules flagged as needing human review."""
-        cur = self.conn.execute(
-            "SELECT raw_payload FROM rules WHERE needs_review = 1"
-        )
-        return [json.loads(row[0]) for row in cur.fetchall()]
-
-    def get_existing_entity_types(self) -> list:
-        """
-        Returns list of distinct IFC target classes already in the DB.
-        Used by the NLP Engine to avoid extracting duplicate rules.
-
-        Returns:
-            list[str]: e.g. ["IfcStairFlight", "IfcDoor", "IfcRailing"]
-        """
-        cur = self.conn.execute("SELECT DISTINCT target FROM rules")
-        return [row[0] for row in cur.fetchall() if row[0]]
-
-    def get_rules_sample(self, limit: int = 3) -> list:
-        """
-        Returns a sample of mandatory rules as RAG examples.
-        Injected into the NLP Engine prompt so the LLM sees
-        the exact schema in action before extracting new rules.
-
-        Args:
-            limit (int): number of examples to return
-
-        Returns:
-            list[dict]
-        """
-        cur = self.conn.execute(
-            "SELECT raw_payload FROM rules WHERE severity = 'mandatory' LIMIT ?",
-            (limit,),
-        )
-        return [json.loads(row[0]) for row in cur.fetchall()]
-
-    def fetch_all_as_dataframe(self) -> pd.DataFrame:
-        """
-        Return all rules as a pandas DataFrame for inspection.
-
-        Returns:
-            pd.DataFrame
-        """
-        return pd.read_sql_query(
-            """SELECT ref, rule_type, target, property_name,
-               operator, check_value, value_min, value_max,
-               unit, severity, desc
-               FROM rules""",
-            self.conn,
-        )
+    def fetch_all_as_dataframe(self):
+        try:
+            import pandas as pd
+        except ImportError:
+            raise RuntimeError("pandas is required for fetch_all_as_dataframe()")
+        rules = self.get_all_rules()
+        if not rules:
+            import pandas as pd
+            return pd.DataFrame(columns=[
+                "ref", "rule_type", "target", "property_name",
+                "operator", "check_value", "value_min", "value_max",
+                "unit", "severity", "desc",
+            ])
+        import pandas as pd
+        return pd.DataFrame(rules)[[
+            "ref", "rule_type", "target", "property_name",
+            "operator", "check_value", "value_min", "value_max",
+            "unit", "severity", "desc",
+        ]]
 
     def count(self) -> int:
-        """Return total number of rules in the database."""
-        return self.conn.execute(
-            "SELECT COUNT(*) FROM rules"
-        ).fetchone()[0]
+        return self._svc.count()
 
     def summary(self) -> dict:
-        """
-        Return a summary dict of the current DB state.
-
-        Returns:
-            dict: {total, mandatory_count, by_entity, by_source}
-        """
-        total = self.count()
-
-        by_entity = {}
-        for row in self.conn.execute(
-            "SELECT target, COUNT(*) FROM rules GROUP BY target"
-        ):
-            by_entity[row[0]] = row[1]
-
-        by_source = {}
-        for row in self.conn.execute(
-            "SELECT source_doc, COUNT(*) FROM rules GROUP BY source_doc"
-        ):
-            by_source[row[0]] = row[1]
-
-        mandatory_count = self.conn.execute(
-            "SELECT COUNT(*) FROM rules WHERE severity = 'mandatory'"
-        ).fetchone()[0]
-
-        return {
-            "total":           total,
-            "mandatory_count": mandatory_count,
-            "by_entity":       by_entity,
-            "by_source":       by_source,
-        }
+        return self._svc.summary()
 
     def close(self):
-        """Close the database connection."""
-        self.conn.close()
+        pass  # PersistenceService owns the connection lifecycle

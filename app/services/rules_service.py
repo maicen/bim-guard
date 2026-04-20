@@ -48,15 +48,13 @@ class RuleService:
             required_columns=_RICH_COLUMNS,
         )
 
-    # ── Queries ───────────────────────────────────────────────────────────────
+    # ── Web CRUD ──────────────────────────────────────────────────────────────
 
-    def list_rules(self):
+    def list_rules(self) -> list[dict]:
         return rows_desc_by_id(self._rules)
 
-    def get_rule(self, rule_id: int):
+    def get_rule(self, rule_id: int) -> dict | None:
         return self._rules.get(rule_id)
-
-    # ── Writes ────────────────────────────────────────────────────────────────
 
     def create_rule(
         self,
@@ -141,6 +139,56 @@ class RuleService:
 
     def delete_rule(self, rule_id: int):
         self._rules.delete(rule_id)
+
+    # ── Pipeline query methods ────────────────────────────────────────────────
+    # Used by RuleStore adapter so the CLI pipeline reads from the same table.
+
+    def count(self) -> int:
+        return len(list(self._rules.rows))
+
+    def fetch_rules_for_target(self, target_ifc_class: str) -> list[dict]:
+        return list(self._rules.rows_where("target_ifc_class = ?", [target_ifc_class]))
+
+    def fetch_mandatory_rules(self) -> list[dict]:
+        return list(self._rules.rows_where("severity = 'mandatory'"))
+
+    def fetch_rules_by_ref(self, ref: str) -> list[dict]:
+        return list(self._rules.rows_where("reference LIKE ?", [f"%{ref}%"]))
+
+    def fetch_needs_review(self) -> list[dict]:
+        return list(self._rules.rows_where("needs_review = 1"))
+
+    def get_existing_entity_types(self) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
+        for r in self._rules.rows:
+            t = r.get("target_ifc_class") or ""
+            if t and t not in seen:
+                seen.add(t)
+                result.append(t)
+        return result
+
+    def get_rules_sample(self, limit: int = 3) -> list[dict]:
+        return list(self._rules.rows_where("severity = 'mandatory'", limit=limit))
+
+    def summary(self) -> dict:
+        rules = list(self._rules.rows)
+        by_entity: dict[str, int] = {}
+        by_source: dict[str, int] = {}
+        mandatory_count = 0
+        for r in rules:
+            target = r.get("target_ifc_class") or ""
+            by_entity[target] = by_entity.get(target, 0) + 1
+            source = r.get("extraction_method") or ""
+            by_source[source] = by_source.get(source, 0) + 1
+            if r.get("severity") == "mandatory":
+                mandatory_count += 1
+        return {
+            "total":           len(rules),
+            "mandatory_count": mandatory_count,
+            "by_entity":       by_entity,
+            "by_source":       by_source,
+        }
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
