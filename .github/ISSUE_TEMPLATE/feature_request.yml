@@ -1,0 +1,60 @@
+name: Feature request
+description: Suggest an improvement, enhancement, or new capability.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea. Help us understand the use case and expected outcome.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve?
+      placeholder: As a ..., I want ..., so that ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider?
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and impact
+      description: Note affected pages/routes/modules and expected tradeoffs.
+      placeholder: |
+        - Affected area: app/routes/...
+        - Backward compatibility: ...
+        - Risk level: low/medium/high
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Define what done looks like.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and discussions first.
+          required: true

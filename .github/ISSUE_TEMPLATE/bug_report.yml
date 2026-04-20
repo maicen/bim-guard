@@ -1,0 +1,79 @@
+name: Bug report
+description: Report a reproducible problem or regression.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug report. Please provide enough detail so we can reproduce and fix the issue.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear and concise description of what happened.
+      placeholder: What did you observe?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include exact steps, inputs, and files if relevant.
+      placeholder: |
+        1. Go to ...
+        2. Upload ...
+        3. Click ...
+        4. See error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Paste traceback, terminal output, and screenshots if available.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: App or commit version
+      description: Commit SHA, tag, or branch where this occurred.
+      placeholder: main (commit abc123)
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, and relevant tooling.
+      placeholder: Windows 11, Python 3.12, uv 0.x
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues to avoid duplicates.
+          required: true
+        - label: I can reproduce this issue with the current main branch.
+          required: false
