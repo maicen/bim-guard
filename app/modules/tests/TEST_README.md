@@ -72,8 +72,10 @@ export OPENAI_API_KEY=sk-...
 ### 3. Install test dependencies
 
 ```bash
-pip install pytest pandas anthropic
+uv sync --group dev --group ml-pipeline
 ```
+
+> Test dependencies are managed through `pyproject.toml` and `uv` groups.
 
 ## Test Markers
 
@@ -87,6 +89,7 @@ pip install pytest pandas anthropic
 ## Snapshots
 
 Snapshots auto-generate on first run. To reset:
+
 ```bash
 rm tests/snapshots/*.json
 pytest tests/ -v  # recreates them

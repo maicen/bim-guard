@@ -1,8 +1,10 @@
-# BIMGuard AI — Module 1 + 3
+# BIMGuard Modules — Module 1 + 3 (OBC Example)
 
 Automated OBC Part 9 compliance rule extraction pipeline.
 Converts Ontario Building Code PDFs into structured rules stored in `rules.db`,
 ready for IFC model compliance checking in Module 4.
+
+This module documentation uses an OBC example dataset, but the BIM-Guard app architecture is domain-agnostic and supports other standards/rulesets.
 
 ---
 
@@ -44,11 +46,9 @@ USE_GPT4O = True    # GPT-4o — more accurate, costs per API call
 
 ## Setup
 
-### 1. Navigate to the API folder
+### 1. Run commands from the project root
 
-```bash
-cd apps/api
-```
+All commands below assume you are in the repository root (`bim-guard/`).
 
 ### 2. Install Python dependencies
 
@@ -75,16 +75,16 @@ OPENAI_API_KEY=sk-your-key-here
 
 ```bash
 # Full pipeline — all 13 OBC sections
-python orchestrator.py data/input_docs/OBC_Part9.pdf
+uv run python -m app.modules.orchestrator data/input_docs/OBC_Part9.pdf
 
 # Test on one section first (recommended)
-python orchestrator.py data/input_docs/OBC_Part9.pdf
+uv run python -m app.modules.orchestrator data/input_docs/OBC_Part9.pdf
 ```
 
 Or from Python:
 
 ```python
-from orchestrator import run_pipeline
+from app.modules.orchestrator import run_pipeline
 
 result = run_pipeline(
     pdf_path      = "data/input_docs/OBC_Part9.pdf",
@@ -102,7 +102,7 @@ print(result)
 Seed them without uploading a PDF:
 
 ```bash
-python -m modules.module3_rule_builder.obc_seed_rules
+uv run python -m app.modules.module3_rule_builder.obc_seed_rules
 ```
 
 ---
@@ -110,7 +110,7 @@ python -m modules.module3_rule_builder.obc_seed_rules
 ## Run Tests
 
 ```bash
-pytest tests/ -v
+uv run pytest app/modules/tests -v
 ```
 
 ---
@@ -118,44 +118,32 @@ pytest tests/ -v
 ## File Structure
 
 ```
-apps/api/
+bim-guard/
 ├── app/
-│   ├── config.py                           ← all paths + settings
-│   ├── orchestrator.py                     ← single entry point
-│   │
-│   ├── modules/
-│   │   ├── module1_doc_parser/
-│   │   │   ├── docling_extractor.py        ← Step 1: PDF → text + tables
-│   │   │   ├── table_rule_builder.py       ← Step 2: tables → rules directly
-│   │   │   ├── section_chunker.py          ← Step 3: text → 13 sections
-│   │   │   ├── keyword_filter.py           ← Step 4: spaCy scoring
-│   │   │   ├── tfidf_analyzer.py           ← Improvement 1: keyword discovery
-│   │   │   ├── dependency_parser.py        ← Improvement 2: grammar signals
-│   │   │   ├── confidence_scorer.py        ← Improvement 3: SEND/SKIP decision
-│   │   │   ├── bert_classifier.py          ← Improvement 4: sentence classifier
-│   │   │   ├── enhanced_orchestrator.py    ← runs all 4 improvements
-│   │   │   └── keywords/
-│   │   │       └── keyword_master.py       ← 193 keywords, 12 groups
-│   │   │
-│   │   └── module3_rule_builder/
-│   │       ├── rule_store.py               ← SQLite CRUD
-│   │       ├── rule_generator.py           ← validate + save rules
-│   │       ├── rule_converter.py           ← GPT-4o + RAG NLP engine
-│   │       ├── regex_rule_converter.py     ← regex engine (default)
-│   │       └── obc_seed_rules.py           ← 25 pre-built OBC rules
-│   │
-│   ├── data/
-│   │   ├── input_docs/                     ← place OBC PDFs here
-│   │   ├── ifc_models/                     ← IFC files for Module 2/4
-│   │   ├── reports/                        ← output reports (gitignored)
-│   │   └── rules/
-│   │       └── rules.db                    ← generated, gitignored
-│   │
-│   └── tests/
-│       ├── test_module1.py
-│       └── test_module3.py
-│
-└── .env.example                            ← copy to .env, add API key
+│   └── modules/
+│       ├── module1_doc_parser/
+│       │   ├── docling_extractor.py        ← Step 1: PDF → text + tables
+│       │   ├── table_rule_builder.py       ← Step 2: tables → rules directly
+│       │   ├── section_chunker.py          ← Step 3: text → 13 sections
+│       │   ├── keyword_filter.py           ← Step 4: spaCy scoring
+│       │   ├── tfidf_analyzer.py           ← Improvement 1: keyword discovery
+│       │   ├── dependency_parser.py        ← Improvement 2: grammar signals
+│       │   ├── confidence_scorer.py        ← Improvement 3: SEND/SKIP decision
+│       │   ├── bert_classifier.py          ← Improvement 4: sentence classifier
+│       │   ├── enhanced_orchestrator.py    ← runs all 4 improvements
+│       │   └── keywords/
+│       │       └── keyword_master.py       ← 193 keywords, 12 groups
+│       ├── module3_rule_builder/
+│       │   ├── rule_store.py               ← SQLite CRUD
+│       │   ├── rule_generator.py           ← validate + save rules
+│       │   ├── rule_converter.py           ← GPT-4o + RAG NLP engine
+│       │   ├── regex_rule_converter.py     ← regex engine (default)
+│       │   └── obc_seed_rules.py           ← 25 pre-built OBC rules
+│       └── orchestrator.py                 ← single entry point
+├── data/
+│   └── bimguard.sqlite                     ← active SQLite database
+├── example.env                              ← copy to .env, add API key
+└── pyproject.toml                           ← dependency and tool config
 ```
 
 ---

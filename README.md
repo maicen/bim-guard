@@ -51,9 +51,9 @@ bim-guard/
 │   │   ├── gemini_rule_extractor.py
 │   │   └── ifc_parser.py
 │   ├── modules/                # 5-step compliance pipeline
-│   │   ├── module1_doc_reader.py
+│   │   ├── module1_doc_parser/
 │   │   ├── module2_ifc_read.py
-│   │   ├── module3_rule_builder.py
+│   │   ├── module3_rule_builder/
 │   │   ├── module4_comparator.py
 │   │   ├── module5_reporter.py
 │   │   └── orchestrator.py
@@ -147,10 +147,14 @@ Rule extraction is available at `/library/rules/extract`.
 Current flow:
 
 1. Upload a BEP/regulation PDF.
-2. `Module1_DocReader` extracts PDF text.
+2. `Module1_DocParser` extracts PDF text.
 3. Text is normalized and chunked for long documents.
 4. `RuleExtractionService` sends each chunk to Gemini through LiteLLM.
 5. Extracted rules are normalized and de-duplicated.
+
+## Documentation Map
+
+Use [docs/README.md](docs/README.md) as the authoritative index for repository documentation. It groups markdown files by purpose and marks which docs are current vs. archival/reference.
 
 ## Next Development Steps
 

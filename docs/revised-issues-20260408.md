@@ -118,7 +118,7 @@ Body: Add form fields for project name and environment class selection to the up
 
 ## 40 — Connect the upload screen to the Python Gemini backend ([#40](https://github.com/maicen/bim-guard/issues/40))
 
-Body: The FastHTML upload form submits to a backend route that triggers `app/modules/orchestrator.py` and `app/modules/module3_rule_builder.py` to parse IFC, extract rules via Gemini, and render results server-side.
+Body: The FastHTML upload form submits to a backend route that triggers `app/modules/orchestrator.py` and `app/modules/module3_rule_builder/` to parse IFC, extract rules via Gemini, and render results server-side.
 
 - Work reference: FastHTML route wiring, Gemini integration, backend compliance workflow.
 

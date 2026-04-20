@@ -42,10 +42,10 @@ See `master_prompt.md` for the system-level master prompt that configures the no
 This NotebookLM directory is one component of the wider BIMGUARD AI repository, which also contains:
 
 - `/engines` — Python source for GC-001 (galvanic) and CC-001 (crevice) corrosion engines
-- `/app` — Streamlit web application source
+- `/app` — FastHTML full-stack web application source
 - `/rulesets` — JSON rulesets for GC-001 and CC-001
 - `/docs` — Thesis chapters and presentation decks
-- `/notebooklm` — This directory
+- `/docs/NotebookLM` — This directory
 
 ## Academic context
 

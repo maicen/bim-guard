@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | File | Who reads it | What it defines |
 | --- | --- | --- |
 | README.md | Humans | What the project is |
-| AGENTS.md, CLAUDE.md, .github\instructions\project-specific.instructions.md | Coding agents | How to build the project |
+| AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
 | DESIGN.md | Design agents | How the project should look and feel |
 
 ## Commands
@@ -71,7 +71,7 @@ SQLite at `data/bim_guard.db`. Three tables:
 
 Five sequential modules — most are stubs awaiting implementation:
 
-1. **Module1_DocReader** — PDF text extraction (implemented via pypdf)
+1. **Module1_DocParser** — PDF text extraction and section preprocessing
 2. **Module2_IFCRead** — IFC file parsing (stub)
 3. **Module3_RuleBuilder** — NLP → structured rules (stub, AI integration point)
 4. **Module4_Comparator** — IFC vs rules validation (stub)

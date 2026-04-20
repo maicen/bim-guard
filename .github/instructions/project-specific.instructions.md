@@ -11,7 +11,7 @@ applyTo: "app/**"
 | File | Who reads it | What it defines |
 | --- | --- | --- |
 | README.md | Humans | What the project is |
-| AGENTS.md, CLAUDE.md, .github\instructions\project-specific.instructions.md | Coding agents | How to build the project |
+| AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
 | DESIGN.md | Design agents | How the project should look and feel |
 
 
@@ -450,9 +450,9 @@ The 5-module pipeline processes BIM compliance:
 
 | Module | File | Responsibility |
 |---|---|---|
-| 1 | `module1_doc_reader.py` | Parse compliance documents (PDF → text) |
+| 1 | `module1_doc_parser/` | Parse compliance documents (PDF → text) |
 | 2 | `module2_ifc_read.py` | Load and extract IFC model data |
-| 3 | `module3_rule_builder.py` | Build SHACL/regex rules from documents |
+| 3 | `module3_rule_builder/` | Build SHACL/regex rules from documents |
 | 4 | `module4_comparator.py` | Validate IFC data against rules |
 | 5 | `module5_reporter.py` | Generate BCF/CSV compliance reports |
 

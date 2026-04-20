@@ -401,7 +401,7 @@ These are called out explicitly so reviewers can see what is deliberate vs. stil
 - **BCF viewpoint screenshots.** Currently placeholder PNGs. The plan is to render actual screenshots from the Plotly 3D viewer; tracked in the thesis Chapter 5 "limitations" section.
 - **Cost / duration model.** Hardcoded in the prototype; to be made user-configurable via CSV upload, handled by `schedule_impact.py` + `project_store`.
 - **LLM rule extraction UI.** The service (`llm_rule_extractor.py`) is in scope; a full curation UI may be deferred post-submission — the architectural slot is reserved so the thesis argument holds.
-- **No FastHTML repo was attached to this task.** This document therefore describes the target architecture defined by the task brief and proven by the Streamlit prototype. It should be re-checked against the actual repository once the migration lands, and this "open items" section updated.
+- **Migration status.** The repository is now FastHTML-first. Treat this file as a living architecture reference and update it whenever routes, modules, or deployment assumptions change.
 
 ## 15. Change log
 

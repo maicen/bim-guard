@@ -1,5 +1,9 @@
 # BIMGUARD AI — Streamlit App Extensions
+
 ## Integration Guide
+
+> [!WARNING]
+> Archived document. This guide describes pre-migration Streamlit integration and does not reflect the current FastHTML full-stack repository architecture. Keep for historical reference only.
 
 Four new modules extend the existing Streamlit application. Drop them into
 your `modules/` directory alongside `ifc_parser.py`, `compliance_runner.py`,
@@ -10,17 +14,20 @@ your `modules/` directory alongside `ifc_parser.py`, `compliance_runner.py`,
 ## Module 1 — `cost_model.py` (User-configurable cost rates)
 
 ### What it does
+
 Replaces the hardcoded cost and duration impact model with a user-uploadable
 CSV file. Falls back to built-in UK commercial MEP defaults if no CSV is
 uploaded. The built-in defaults cover all three engines (GC/CC/MC) across
 all four risk bands.
 
 ### Installation
+
 ```bash
 # No additional dependencies beyond existing Streamlit + pandas
 ```
 
 ### Integration (Schedule & Cost Impact page)
+
 ```python
 from modules.cost_model import CostModel
 
@@ -49,6 +56,7 @@ impact = st.session_state.cost_model.calculate_impact(
 ```
 
 ### CSV format
+
 Headers: `risk_band, mechanism, material_group, cost_per_item_gbp, duration_days, remediation_description, contractor_type`
 
 `mechanism` values: `GC`, `CC`, `MC`
@@ -60,17 +68,20 @@ Headers: `risk_band, mechanism, material_group, cost_per_item_gbp, duration_days
 ## Module 2 — `report_generator.py` (Word report export)
 
 ### What it does
+
 Generates a formatted Word (.docx) compliance report including: cover page
 with project metadata, executive summary, risk distribution table, full issue
 register with colour-coded bands, methodology section, and disclaimer.
 Ready for client delivery or regulatory submission.
 
 ### Installation
+
 ```bash
 pip install python-docx
 ```
 
 ### Integration (add to BCF Issue Manager or create a Reports page)
+
 ```python
 from modules.report_generator import generate_word_report
 
@@ -101,21 +112,25 @@ if st.button("Generate Word report"):
 ## Module 3 — `ifc_geometry.py` (Actual area calculations)
 
 ### What it does
+
 Improves surface area calculations for the GC-001 area ratio check by
 reading actual geometric mesh data from IFC elements via ifcopenshell.geom,
 rather than estimating from nominal diameter alone. Falls back gracefully
 to nominal-diameter estimation when geometry is not available.
 
 Also provides:
+
 - `nps_to_od_m()` — NPS to actual OD lookup per ASME B36.10M
 - `dn_to_od_m()` — DN to actual OD lookup per EN 10220
 
 ### Installation
+
 ```bash
 # Already uses ifcopenshell — no new dependencies
 ```
 
 ### Integration (in ifc_parser.py, replace area estimation)
+
 ```python
 from modules.ifc_geometry import IFCGeometryExtractor, estimate_surface_area
 
@@ -143,6 +158,7 @@ ratio, band = extractor.calculate_area_ratio(
 ## Module 4 — `issue_tracker.py` (Issue history tracking)
 
 ### What it does
+
 Tracks issues across multiple compliance runs — recording when each element
 was first flagged, how its risk band has changed over time, and when it was
 resolved. Persists history to a local JSON file (`bimguard_issue_history.json`)
@@ -150,11 +166,13 @@ between Streamlit sessions. Provides the data source for the BCF issue history
 field in markup.bcf.
 
 ### Installation
+
 ```bash
 # No additional dependencies
 ```
 
 ### Integration (BCF Issue Manager page)
+
 ```python
 from modules.issue_tracker import IssueTracker
 
@@ -247,6 +265,7 @@ They do not modify existing modules — they extend the app by adding new
 functionality alongside the existing code.
 
 Dependencies summary:
+
 | Module           | New dependencies |
 |------------------|-----------------|
 | cost_model.py    | none (uses pandas already in requirements) |

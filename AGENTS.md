@@ -21,5 +21,5 @@ The app is available at `http://127.0.0.1:8000`.
 | File | Who reads it | What it defines |
 | --- | --- | --- |
 | README.md | Humans | What the project is |
-| AGENTS.md, CLAUDE.md, .github\instructions\project-specific.instructions.md | Coding agents | How to build the project |
+| AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
 | DESIGN.md | Design agents | How the project should look and feel |
