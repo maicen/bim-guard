@@ -90,7 +90,7 @@ class RuleService:
         return self._rules.insert(
             {
                 "reference":          reference.strip(),
-                "rule_type":          rule_type.strip() or "numeric_range",
+                "rule_type":          rule_type.strip() or "numeric_comparison",
                 "description":        description.strip(),
                 "target_ifc_class":   target_ifc_class.strip(),
                 "parameters":         self._norm_json(parameters),
@@ -130,7 +130,7 @@ class RuleService:
         self._rules.update(
             updates={
                 "reference":        reference.strip(),
-                "rule_type":        rule_type.strip() or "numeric_range",
+                "rule_type":        rule_type.strip() or "numeric_comparison",
                 "description":      description.strip(),
                 "target_ifc_class": target_ifc_class.strip(),
                 "parameters":       self._norm_json(parameters),

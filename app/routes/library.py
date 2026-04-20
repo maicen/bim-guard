@@ -380,7 +380,7 @@ def setup_routes(rt):
 
         _rule_service.create_rule(
             reference=str(rule.get("ref") or "REQ-AI").strip(),
-            rule_type=str(rule.get("rule_type") or "numeric_range"),
+            rule_type=str(rule.get("rule_type") or "numeric_comparison"),
             description=str(rule.get("desc") or ""),
             target_ifc_class=str(rule.get("target") or "Unspecified"),
             source_text=str(rule.get("source_text") or ""),
@@ -388,7 +388,7 @@ def setup_routes(rt):
             property_name=str(rule.get("property_name") or ""),
             fallback_property=str(rule.get("fallback_property") or ""),
             operator=str(rule.get("operator") or ""),
-            check_value=rule.get("value"),
+            check_value=rule.get("check_value") if "check_value" in rule else rule.get("value"),
             value_min=rule.get("value_min"),
             value_max=rule.get("value_max"),
             unit=str(rule.get("unit") or ""),
@@ -426,7 +426,7 @@ def setup_routes(rt):
                 continue
             _rule_service.create_rule(
                 reference=str(rule.get("ref") or "REQ-AI").strip(),
-                rule_type=str(rule.get("rule_type") or "numeric_range"),
+                rule_type=str(rule.get("rule_type") or "numeric_comparison"),
                 description=desc,
                 target_ifc_class=str(rule.get("target") or "Unspecified").strip(),
                 source_text=str(rule.get("source_text") or ""),
@@ -434,7 +434,7 @@ def setup_routes(rt):
                 property_name=str(rule.get("property_name") or ""),
                 fallback_property=str(rule.get("fallback_property") or ""),
                 operator=str(rule.get("operator") or ""),
-                check_value=rule.get("value"),
+                check_value=rule.get("check_value") if "check_value" in rule else rule.get("value"),
                 value_min=rule.get("value_min"),
                 value_max=rule.get("value_max"),
                 unit=str(rule.get("unit") or ""),

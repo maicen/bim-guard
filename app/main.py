@@ -47,11 +47,29 @@ def _seed_library() -> None:
             return  # already has rules — don't overwrite
         for rule in OBC_SEED_RULES:
             svc.create_rule(
-                reference=rule.get("section_ref", "OBC"),
-                rule_type=rule.get("rule_type", "json_check"),
-                description=rule.get("description", ""),
-                target_ifc_class=rule.get("entity_type", "Unspecified"),
-                parameters="{}",
+                reference=str(rule.get("ref") or "OBC"),
+                rule_type=str(rule.get("rule_type") or "numeric_comparison"),
+                description=str(rule.get("desc") or ""),
+                target_ifc_class=str(rule.get("target") or "Unspecified"),
+                source_text=str(rule.get("source_text") or ""),
+                property_set=str(rule.get("property_set") or ""),
+                property_name=str(rule.get("property_name") or ""),
+                fallback_property=str(rule.get("fallback_property") or ""),
+                operator=str(rule.get("operator") or ""),
+                check_value=rule.get("check_value"),
+                value_min=rule.get("value_min"),
+                value_max=rule.get("value_max"),
+                unit=str(rule.get("unit") or ""),
+                applies_when=rule.get("applies_when") or {},
+                severity=str(rule.get("severity") or "mandatory"),
+                keyword=str(rule.get("keyword") or ""),
+                compliance_type=str(rule.get("compliance_type") or ""),
+                exceptions=rule.get("exceptions") or [],
+                related_refs=rule.get("related_refs") or [],
+                overridden_by=str(rule.get("overridden_by") or ""),
+                confidence=float(rule.get("confidence") or 0.8),
+                extraction_method="seed",
+                needs_review=bool(rule.get("needs_review", False)),
             )
     except Exception:
         pass  # never crash startup over seeding
