@@ -16,6 +16,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies
 uv sync
 
+# Install optional ML pipeline dependency group
+uv sync --group ml-pipeline
+
 # Run development server
 uv run uvicorn main:app --reload
 
@@ -24,6 +27,10 @@ uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 There are no automated tests or lint commands configured.
+
+## Dependency Management Rule
+
+All Python dependencies must be managed via uv and declared in pyproject.toml (including optional dependency groups). Do not add or maintain separate requirements.txt files.
 
 ## Architecture
 

@@ -7,7 +7,12 @@ BIM-Guard is a **FastHTML full-stack application**. The UI and backend routes ar
 ## Setup commands
 
 - Install deps: `uv sync`
+- Install optional ML deps group: `uv sync --group ml-pipeline`
 - Start server: `uv run uvicorn main:app --reload`
+
+## Dependency Management Rule
+
+All Python dependencies must be managed via `uv` and declared in `pyproject.toml` (including optional dependency groups). Do not add or maintain separate `requirements.txt` files.
 
 The app is available at `http://127.0.0.1:8000`.
 

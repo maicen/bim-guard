@@ -104,13 +104,13 @@ uv sync
 
 This creates a `.venv` and installs all dependencies declared in `pyproject.toml`. Python 3.12 or later is required.
 
-**Step 3b — ML pipeline dependencies** (Docling, spaCy, scikit-learn, PyTorch, etc.):
+**Step 3b — ML pipeline dependencies group** (Docling, spaCy, scikit-learn, etc.):
 
 ```bash
-uv pip install -r app/modules/requirements.txt
+uv sync --group ml-pipeline
 ```
 
-> This installs the heavier ML libraries used by the Module 1 document parser pipeline (docling, spacy + English model, torch, transformers, scikit-learn). First run will download model weights — allow a few minutes.
+> This installs the optional `ml-pipeline` dependency group defined in `pyproject.toml` (including docling, spacy + English model, and scikit-learn). First run may download model weights — allow a few minutes.
 
 ### 4. Configure environment variables (required for AI features)
 
@@ -156,8 +156,6 @@ Current flow:
 
 - Verify the reported issues.
 - Verify the BCF exported.
-
-
 
 Output rule fields:
 

@@ -31,7 +31,7 @@ OBC PDF
 
 ---
 
-## Switching Between Regex and GPT-4o 
+## Switching Between Regex and GPT-4o
 
 Open `orchestrator.py` and change one line:
 
@@ -45,21 +45,24 @@ USE_GPT4O = True    # GPT-4o — more accurate, costs per API call
 ## Setup
 
 ### 1. Navigate to the API folder
+
 ```bash
 cd apps/api
 ```
 
 ### 2. Install Python dependencies
+
 ```bash
-pip install -r requirements.txt
+uv sync --group ml-pipeline
 ```
 
-> The spaCy English model (`en_core_web_sm`) is included in `requirements.txt` and installed automatically.
+> The spaCy English model (`en_core_web_sm`) is included in the `ml-pipeline` dependency group in `pyproject.toml` and installed automatically.
 
 > **First run:** Docling will download its vision models (~2 min, one-time only).
 > Use a GPU runtime for faster processing if available.
 
 ### 3. Set your API key (only needed if USE_GPT4O = True)
+
 ```bash
 cp .env.example .env
 # Edit .env and add your OpenAI API key
@@ -79,6 +82,7 @@ python orchestrator.py data/input_docs/OBC_Part9.pdf
 ```
 
 Or from Python:
+
 ```python
 from orchestrator import run_pipeline
 
@@ -151,7 +155,6 @@ apps/api/
 │       ├── test_module1.py
 │       └── test_module3.py
 │
-├── requirements.txt
 └── .env.example                            ← copy to .env, add API key
 ```
 
@@ -192,6 +195,7 @@ apps/api/
 ## Next Steps (Module 2 + 4)
 
 Once rules.db is populated:
+
 - **Module 2** reads IFC files and extracts element properties
 - **Module 4** compares IFC properties against rules.db and flags failures
 - **Module 5** generates BCF / CSV / PDF compliance reports
