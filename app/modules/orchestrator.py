@@ -40,7 +40,9 @@ import os
 import sys
 from pathlib import Path
 
-DB_PATH = Path("data") / "bimguard.sqlite"
+from app.services.persistence import PersistenceService
+
+DB_PATH = PersistenceService.DB_PATH
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # ── SWITCH HERE ───────────────────────────────────────────────────────────────

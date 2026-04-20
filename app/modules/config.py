@@ -8,8 +8,10 @@ Imported by rule_generator.py, rule_converter.py, and obc_seed_rules.py.
 import os
 from pathlib import Path
 
+from app.services.persistence import PersistenceService
+
 # ── Database ──────────────────────────────────────────────────────────────────
-DB_PATH = Path(__file__).parent.parent.parent / "data" / "bimguard.sqlite"
+DB_PATH = PersistenceService.DB_PATH
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
