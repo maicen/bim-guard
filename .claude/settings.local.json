@@ -11,7 +11,9 @@
       "WebFetch(domain:unpkg.com)",
       "WebFetch(domain:app.unpkg.com)",
       "Bash(powershell -ExecutionPolicy Bypass -Command \"irm https://astral.sh/uv/install.ps1 | iex\")",
-      "Bash(\"/c/Users/Malak/.local/bin/uv\" --version)"
+      "Bash(\"/c/Users/Malak/.local/bin/uv\" --version)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

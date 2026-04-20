@@ -1,0 +1,43 @@
+# Version control
+.git/
+.gitignore
+.gitmodules
+
+# Python artifacts
+__pycache__/
+*.py[oc]
+*.egg-info/
+.venv/
+
+# IDE / tooling
+.vscode/
+.claude/
+.Jules/
+.playwright-mcp/
+
+# Secrets — never bake into image
+.env
+.sesskey
+
+# Runtime data (mounted at run time, not baked in)
+data/uploads/
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/bimguard_issue_history.json
+
+# Docs and test fixtures not needed in image
+docs/
+IFC-Sample-Test-Files/
+app/modules/tests/
+
+# Build / dist artifacts
+build/
+dist/
+wheels/
+
+# Misc
+*.md
+!README.md
+index.html
+open_issues_full.json

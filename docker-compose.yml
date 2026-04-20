@@ -1,0 +1,22 @@
+services:
+  bim-guard:
+    build: .
+    image: bim-guard:latest
+    container_name: bim-guard-app
+    ports:
+      - "8000:8000"
+    environment:
+      # Pass API keys from host .env (or set them directly here for testing)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - BIM_GUARD_RULE_MODEL=${BIM_GUARD_RULE_MODEL:-gemini/gemini-2.0-flash}
+    volumes:
+      # Persist SQLite database and uploaded files across container restarts
+      - ./data:/app/data
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
