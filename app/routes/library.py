@@ -455,6 +455,65 @@ def setup_routes(rt):
             cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium cursor-default",
         )
 
+    @rt("/library/rules/import-json")
+    def rules_import_json_page():
+        return Title("Import JSON Ruleset - BIM Guard"), DashboardLayout(
+            Container(
+                H1("Import JSON Ruleset", cls="text-3xl font-bold tracking-tight"),
+                P(
+                    "Upload a JSON ruleset file. The file must have a 'ruleset_id' field and a 'rules' array.",
+                    cls="text-muted-foreground",
+                ),
+                UICard(
+                    UICardHeader(UICardTitle("Upload Ruleset JSON")),
+                    UICardContent(
+                        Form(
+                            Div(
+                                FormLabel("Ruleset JSON file (.json)", fr="ruleset_file"),
+                                Input(
+                                    id="ruleset_file",
+                                    type="file",
+                                    name="ruleset_file",
+                                    accept=".json",
+                                    required=True,
+                                ),
+                                cls="space-y-1",
+                            ),
+                            SubmitButton("Import Ruleset", variant="primary"),
+                            hx_post="/api/rules/import-json",
+                            hx_target="#import-result",
+                            enctype="multipart/form-data",
+                            cls="space-y-4",
+                        ),
+                        Div(id="import-result"),
+                    ),
+                ),
+                cls="space-y-4",
+            )
+        )
+
+    @rt("/api/rules/import-json", methods=["POST"])
+    async def rules_import_json_api(ruleset_file: UploadFile):
+        import json as _json
+        file_content = await ruleset_file.read()
+        if not file_content:
+            return Alert("No file received.", cls=AlertT.error)
+        try:
+            json_data = _json.loads(file_content.decode("utf-8"))
+        except Exception as exc:
+            return Alert(f"Invalid JSON: {exc}", cls=AlertT.error)
+        try:
+            count = _rule_service.import_ruleset(json_data)
+        except ValueError as exc:
+            return Alert(str(exc), cls=AlertT.error)
+        except Exception as exc:
+            return Alert(f"Import failed: {exc}", cls=AlertT.error)
+        ruleset_id = json_data.get("ruleset_id", "")
+        return Span(
+            f"Imported {count} rules from '{ruleset_id}' ✓",
+            cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium",
+        )
+
     @rt("/api/rules/extract", methods=["POST"])
     async def rules_extract_api(document: UploadFile):
         file_content = await document.read()

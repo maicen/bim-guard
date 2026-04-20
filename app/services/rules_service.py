@@ -3,9 +3,8 @@ import json
 from app.services.persistence import PersistenceService
 from app.utils import now_iso_utc, rows_desc_by_id
 
-# Columns added in the rich-schema upgrade.
-# PersistenceService.get_table() uses required_columns to ALTER TABLE
-# for any column that does not yet exist, so old DBs migrate automatically.
+# ── Schema columns ────────────────────────────────────────────────────────────
+
 _RICH_COLUMNS = {
     "source_text":        str,
     "property_set":       str,
@@ -28,24 +27,55 @@ _RICH_COLUMNS = {
     "needs_review":       int,
 }
 
+# Columns that classify a rule within the broader multi-mechanism schema.
+# Added via required_columns so existing DBs migrate automatically.
+_META_COLUMNS = {
+    "mechanism":     str,   # "OBC" | "GC-001" | "CC-001" | "MC-001"
+    "ruleset_id":    str,   # "OBC-PART9" | "BIMGUARD-GC-001" | …
+    "rule_category": str,   # "property_check" | "threshold_band" | "material_property"
+                            # | "scoring_model" | "mitigation" | "reference_config"
+}
+
+# ── Valid controlled vocabulary ───────────────────────────────────────────────
+
+MECHANISMS = {"OBC", "GC-001", "CC-001", "MC-001", "IFC"}
+
+RULE_CATEGORIES = {
+    "property_check",   # IFC element property assertion (OBC, building code)
+    "scoring_model",    # Composite score formula + weights
+    "threshold_band",   # Classification band with risk score
+    "material_property",# Material-level data (galvanic potential, CCT, MIC susceptibility)
+    "reference_config", # Named lookup entry (environment class, joint type, etc.)
+    "mitigation",       # Remediation action catalogue entry
+}
+
 
 class RuleService:
-    """Encapsulates CRUD operations for compliance rules."""
+    """
+    Encapsulates CRUD + query operations for compliance rules.
+
+    The single 'rules' table stores all rule types across mechanisms:
+    - OBC property checks (property_check)
+    - Engine lookup tables (threshold_band, reference_config, material_property)
+    - Scoring formulae (scoring_model)
+    - Mitigation catalogue (mitigation)
+    """
 
     def __init__(self):
+        all_required = {**_RICH_COLUMNS, **_META_COLUMNS}
         self._rules = PersistenceService.get_table(
             "rules",
             {
-                "id":             int,
-                "reference":      str,
-                "rule_type":      str,
-                "description":    str,
+                "id":               int,
+                "reference":        str,
+                "rule_type":        str,
+                "description":      str,
                 "target_ifc_class": str,
-                "parameters":     str,   # kept for backward-compat
-                "created_at":     str,
-                "updated_at":     str,
+                "parameters":       str,   # kept for backward-compat / engine data
+                "created_at":       str,
+                "updated_at":       str,
             },
-            required_columns=_RICH_COLUMNS,
+            required_columns=all_required,
         )
 
     # ── Web CRUD ──────────────────────────────────────────────────────────────
@@ -63,7 +93,7 @@ class RuleService:
         description: str,
         target_ifc_class: str,
         parameters: str = "{}",
-        # rich-schema fields (all optional for backward compat)
+        # rich schema
         source_text: str = "",
         property_set: str = "",
         property_name: str = "",
@@ -83,6 +113,10 @@ class RuleService:
         confidence: float | None = None,
         extraction_method: str = "manual",
         needs_review: bool = False,
+        # classification meta
+        mechanism: str = "",
+        ruleset_id: str = "",
+        rule_category: str = "property_check",
     ):
         now = now_iso_utc()
         return self._rules.insert(
@@ -111,6 +145,9 @@ class RuleService:
                 "confidence":         str(confidence) if confidence is not None else "",
                 "extraction_method":  extraction_method or "manual",
                 "needs_review":       int(needs_review),
+                "mechanism":          mechanism or "",
+                "ruleset_id":         ruleset_id or "",
+                "rule_category":      rule_category or "property_check",
                 "created_at":         now,
                 "updated_at":         now,
             }
@@ -140,8 +177,22 @@ class RuleService:
     def delete_rule(self, rule_id: int):
         self._rules.delete(rule_id)
 
-    # ── Pipeline query methods ────────────────────────────────────────────────
-    # Used by RuleStore adapter so the CLI pipeline reads from the same table.
+    # ── Classification queries ────────────────────────────────────────────────
+
+    def has_ruleset(self, ruleset_id: str) -> bool:
+        """Return True if at least one rule with this ruleset_id exists."""
+        return len(list(self._rules.rows_where("ruleset_id = ?", [ruleset_id], limit=1))) > 0
+
+    def list_by_mechanism(self, mechanism: str) -> list[dict]:
+        return list(self._rules.rows_where("mechanism = ?", [mechanism]))
+
+    def list_by_ruleset(self, ruleset_id: str) -> list[dict]:
+        return list(self._rules.rows_where("ruleset_id = ?", [ruleset_id]))
+
+    def list_by_category(self, rule_category: str) -> list[dict]:
+        return list(self._rules.rows_where("rule_category = ?", [rule_category]))
+
+    # ── Pipeline query methods (used by RuleStore adapter) ────────────────────
 
     def count(self) -> int:
         return len(list(self._rules.rows))
@@ -175,12 +226,15 @@ class RuleService:
         rules = list(self._rules.rows)
         by_entity: dict[str, int] = {}
         by_source: dict[str, int] = {}
+        by_mechanism: dict[str, int] = {}
         mandatory_count = 0
         for r in rules:
             target = r.get("target_ifc_class") or ""
             by_entity[target] = by_entity.get(target, 0) + 1
             source = r.get("extraction_method") or ""
             by_source[source] = by_source.get(source, 0) + 1
+            mech = r.get("mechanism") or "—"
+            by_mechanism[mech] = by_mechanism.get(mech, 0) + 1
             if r.get("severity") == "mandatory":
                 mandatory_count += 1
         return {
@@ -188,7 +242,92 @@ class RuleService:
             "mandatory_count": mandatory_count,
             "by_entity":       by_entity,
             "by_source":       by_source,
+            "by_mechanism":    by_mechanism,
         }
+
+    # ── JSON ruleset import ───────────────────────────────────────────────────
+
+    def import_ruleset(self, json_data: dict) -> int:
+        """
+        Import rules from a canonical JSON ruleset document.
+
+        Expected format:
+            {
+                "ruleset_id": "MY-RULESET",
+                "mechanism":  "GC-001",          # optional
+                "rules": [
+                    {
+                        "ref":           "R-001",
+                        "rule_type":     "numeric_comparison",
+                        "rule_category": "property_check",
+                        "desc":          "...",
+                        "target":        "IfcDoor",
+                        ...
+                    }
+                ]
+            }
+
+        Field names follow the CLI convention (ref/desc/target) OR the web
+        convention (reference/description/target_ifc_class) — both accepted.
+        Returns the number of rules successfully imported.
+        """
+        ruleset_id = str(json_data.get("ruleset_id") or "").strip()
+        if not ruleset_id:
+            raise ValueError("JSON ruleset must have a non-empty 'ruleset_id'.")
+
+        rules = json_data.get("rules")
+        if not isinstance(rules, list):
+            raise ValueError("JSON ruleset must have a 'rules' array.")
+
+        top_mechanism = str(json_data.get("mechanism") or "")
+        saved = 0
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+            desc = str(
+                rule.get("desc") or rule.get("description") or ""
+            ).strip()
+            if not desc:
+                continue
+            self.create_rule(
+                reference=str(rule.get("ref") or rule.get("reference") or "").strip(),
+                rule_type=str(rule.get("rule_type") or "numeric_comparison"),
+                description=desc,
+                target_ifc_class=str(
+                    rule.get("target") or rule.get("target_ifc_class") or "Unspecified"
+                ).strip(),
+                source_text=str(rule.get("source_text") or ""),
+                property_set=str(rule.get("property_set") or ""),
+                property_name=str(rule.get("property_name") or ""),
+                fallback_property=str(rule.get("fallback_property") or ""),
+                operator=str(rule.get("operator") or ""),
+                check_value=(
+                    rule.get("check_value")
+                    if "check_value" in rule
+                    else rule.get("value")
+                ),
+                value_min=rule.get("value_min"),
+                value_max=rule.get("value_max"),
+                unit=str(rule.get("unit") or ""),
+                applies_when=rule.get("applies_when") or {},
+                severity=str(rule.get("severity") or "mandatory"),
+                keyword=str(rule.get("keyword") or ""),
+                compliance_type=str(rule.get("compliance_type") or ""),
+                exceptions=rule.get("exceptions") or [],
+                related_refs=rule.get("related_refs") or [],
+                overridden_by=str(rule.get("overridden_by") or ""),
+                confidence=(
+                    float(rule["confidence"]) if rule.get("confidence") is not None else None
+                ),
+                extraction_method=str(rule.get("extraction_method") or "import"),
+                needs_review=bool(rule.get("needs_review", False)),
+                mechanism=str(rule.get("mechanism") or top_mechanism),
+                ruleset_id=ruleset_id,
+                rule_category=str(rule.get("rule_category") or "property_check"),
+                parameters=json.dumps(rule.get("parameters") or {}),
+            )
+            saved += 1
+        return saved
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
