@@ -1,5 +1,5 @@
 import json
-from fasthtml.common import Button, Div, P, Span
+from fasthtml.common import Button, Details, Div, P, Pre, Span, Summary
 from app.components.ui import (
     Card,
     CardContent,
@@ -67,9 +67,14 @@ def rule_extraction_page_content():
             ),
             Div(cls="w-px bg-border"),
             Div(
-                H3(
-                    "Extracted Rules",
-                    cls="text-lg font-semibold mb-4 px-6 pt-6",
+                # Sticky header with title + bulk actions
+                Div(
+                    H3("Extracted Rules", cls="text-lg font-semibold"),
+                    Div(
+                        id="bulk-action-bar",
+                        cls="flex gap-2 items-center",
+                    ),
+                    cls="flex items-center justify-between px-6 py-3 border-b bg-background sticky top-0 z-10",
                 ),
                 Div(
                     P(
@@ -77,9 +82,9 @@ def rule_extraction_page_content():
                         cls="text-sm text-muted-foreground text-center py-10",
                     ),
                     id="extracted-rules-container",
-                    cls="px-6 pb-6 space-y-4",
+                    cls="px-6 pb-6 space-y-4 overflow-y-auto",
                 ),
-                cls="w-full md:w-[400px] lg:w-[450px] bg-background border-l overflow-y-auto",
+                cls="w-full md:w-[400px] lg:w-[500px] bg-background border-l flex flex-col",
             ),
             cls="flex flex-1 overflow-hidden",
         ),
@@ -87,41 +92,64 @@ def rule_extraction_page_content():
     )
 
 
-def rule_extraction_results(rules: list[dict], filename: str | None):
+def rule_extraction_results(
+    rules: list[dict],
+    filename: str | None,
+    *,
+    warnings: list[str] | None = None,
+):
+    warning_banners = [
+        Alert(
+            UkIcon("alert-triangle", cls="h-4 w-4"),
+            Span(w),
+            cls="mb-3 text-amber-700 border-amber-400 [&>svg]:text-amber-700",
+        )
+        for w in (warnings or [])
+    ]
+
     if not rules:
-        return Alert(
-            UkIcon("info", cls="h-4 w-4"),
-            Span(
-                f"No compliance rules were found in {filename or 'the uploaded file'}. "
-                "Try a document that contains explicit BIM or building code requirements."
+        return Div(
+            *warning_banners,
+            Alert(
+                UkIcon("info", cls="h-4 w-4"),
+                Span(
+                    f"No compliance rules were found in {filename or 'the uploaded file'}. "
+                    "Try a document that contains explicit BIM or building code requirements."
+                ),
+                cls="mb-4 text-yellow-700 border-yellow-500 [&>svg]:text-yellow-700",
             ),
-            cls="mb-4 text-yellow-700 border-yellow-500 [&>svg]:text-yellow-700",
         )
 
     fragments = []
     for rule in rules:
-        ref      = rule.get("ref", "REQ")
-        desc     = rule.get("desc", "")
-        target   = rule.get("target", "Unspecified")
-        operator = rule.get("operator", "")
-        value    = rule.get("value")
-        unit     = rule.get("unit", "")
-        severity = rule.get("severity", "")
-        prop     = rule.get("property_name", "")
-        conf     = rule.get("confidence")
-        needs_review = rule.get("needs_review", False)
+        ref             = rule.get("ref", "REQ")
+        desc            = rule.get("desc", "")
+        target          = rule.get("target", "Unspecified")
+        operator        = rule.get("operator", "")
+        value           = rule.get("value")
+        value_min       = rule.get("value_min")
+        value_max       = rule.get("value_max")
+        unit            = rule.get("unit", "")
+        severity        = rule.get("severity", "")
+        prop            = rule.get("property_name", "")
+        prop_set        = rule.get("property_set", "")
+        source_text     = rule.get("source_text", "")
+        related_refs    = rule.get("related_refs") or []
+        conf            = rule.get("confidence")
+        needs_review    = rule.get("needs_review", False)
+        method          = rule.get("extraction_method", "llm")
+        compliance_type = rule.get("compliance_type", "")
 
-        # Build inline condition string e.g. "Width >= 860 mm"
-        condition_parts = []
-        if prop:
-            condition_parts.append(prop)
-        if operator:
-            condition_parts.append(operator)
-        if value is not None:
-            condition_parts.append(str(value))
-        if unit:
-            condition_parts.append(unit)
-        condition = " ".join(condition_parts) if condition_parts else None
+        # Condition string: handle between vs single value
+        if operator == "between" and value_min is not None and value_max is not None:
+            condition = f"{prop} between {value_min}–{value_max} {unit}".strip()
+        else:
+            parts = []
+            if prop:      parts.append(prop)
+            if operator:  parts.append(operator)
+            if value is not None: parts.append(str(value))
+            if unit:      parts.append(unit)
+            condition = " ".join(parts) if parts else None
 
         severity_cls = {
             "mandatory":     "bg-red-100 text-red-800",
@@ -129,11 +157,60 @@ def rule_extraction_results(rules: list[dict], filename: str | None):
             "informational": "bg-blue-100 text-blue-800",
         }.get(severity, "bg-muted text-muted-foreground")
 
+        method_cls = (
+            "bg-emerald-100 text-emerald-800" if method == "table"
+            else "bg-purple-100 text-purple-800"
+        )
+        method_label = "table" if method == "table" else "AI"
+
         badges = Div(
             Span(severity or "mandatory", cls=f"inline-block px-1.5 py-0.5 rounded text-xs font-medium {severity_cls} mr-1") if severity else "",
-            Span(f"{int(conf * 100)}% confident", cls="inline-block px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground") if conf is not None else "",
-            Span("⚠ Review", cls="inline-block px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700 ml-1") if needs_review else "",
+            Span(method_label, cls=f"inline-block px-1.5 py-0.5 rounded text-xs font-medium {method_cls} mr-1"),
+            Span(f"{int(conf * 100)}% conf", cls="inline-block px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground mr-1") if conf is not None else "",
+            Span("⚠ Review", cls="inline-block px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700") if needs_review else "",
             cls="flex flex-wrap gap-1 mb-2",
+        )
+
+        # Rule structure block
+        structure_rows = [
+            ("Target", target),
+            ("Check", condition) if condition else None,
+            ("Property Set", prop_set) if prop_set else None,
+            ("Type", f"{rule.get('rule_type', '')} · {compliance_type}") if compliance_type else ("Type", rule.get("rule_type", "")),
+            ("Refs", ", ".join(related_refs)) if related_refs else None,
+        ]
+        structure = Div(
+            *[
+                Div(
+                    Span(label + ":", cls="text-muted-foreground w-20 shrink-0"),
+                    Span(val, cls="font-mono text-xs text-blue-700 break-all"),
+                    cls="flex gap-2",
+                )
+                for row in structure_rows if row is not None
+                for label, val in [row]
+                if val
+            ],
+            cls="bg-muted p-1.5 rounded mb-2 space-y-0.5 text-xs",
+        )
+
+        # Source text collapsible
+        source_block = (
+            Details(
+                Summary("Source text", cls="text-xs text-muted-foreground cursor-pointer select-none"),
+                P(source_text, cls="text-xs text-muted-foreground mt-1 italic"),
+                cls="mb-2",
+            )
+            if source_text else ""
+        )
+
+        # JSON collapsible
+        json_block = Details(
+            Summary("View JSON", cls="text-xs text-muted-foreground cursor-pointer select-none"),
+            Pre(
+                json.dumps(rule, indent=2),
+                cls="text-xs bg-muted p-2 rounded overflow-x-auto mt-1 max-h-48",
+            ),
+            cls="mb-2",
         )
 
         fragments.append(
@@ -146,11 +223,9 @@ def rule_extraction_results(rules: list[dict], filename: str | None):
                     ),
                     badges,
                     P(desc, cls="text-sm text-muted-foreground mb-2"),
-                    Div(
-                        Div(f"Target: {target}", cls="font-mono text-xs"),
-                        Div(f"Check: {condition}", cls="font-mono text-xs text-blue-700") if condition else "",
-                        cls="bg-muted p-1.5 rounded mb-2 space-y-0.5",
-                    ),
+                    structure,
+                    source_block,
+                    json_block,
                     Form(
                         Input(type="hidden", name="rule_json", value=json.dumps(rule)),
                         Button(
@@ -168,31 +243,55 @@ def rule_extraction_results(rules: list[dict], filename: str | None):
             )
         )
 
+    llm_count   = sum(1 for r in rules if r.get("extraction_method") != "table")
+    table_count = sum(1 for r in rules if r.get("extraction_method") == "table")
+    summary_parts = [f"{len(rules)} rules"]
+    if table_count: summary_parts.append(f"{table_count} from tables")
+    if llm_count:   summary_parts.append(f"{llm_count} via AI")
+
     success_msg = Alert(
         UkIcon("check-circle", cls="h-4 w-4"),
-        Span(f"Extracted {len(rules)} rules from {filename or 'uploaded file'}"),
-        cls="mb-4 text-emerald-600 border-emerald-600 [&>svg]:text-emerald-600",
+        Span(f"Extracted {' · '.join(summary_parts)} from {filename or 'uploaded file'}"),
+        cls="mb-3 text-emerald-600 border-emerald-600 [&>svg]:text-emerald-600",
     )
 
-    # "Save All" encodes all rules as JSON in a single hidden field
-    save_all_btn = Form(
+    # Bulk action bar — swapped into the sticky header via OOB
+    bulk_actions = Form(
         Input(type="hidden", name="rules_json", value=json.dumps(rules)),
         Div(
             Button(
-                "Save All to Library",
+                UkIcon("save", cls="h-3.5 w-3.5 mr-1"), "Save All",
                 type="submit",
                 id="save-all-btn",
-                cls="text-sm px-4 py-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90",
+                cls="inline-flex items-center text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 font-medium",
+            ),
+            Button(
+                UkIcon("download", cls="h-3.5 w-3.5 mr-1"), "Export JSON",
+                type="button",
+                onclick=_download_json_script(rules, filename),
+                cls="inline-flex items-center text-xs px-3 py-1.5 rounded border bg-background hover:bg-muted font-medium",
             ),
             id="save-all-container",
+            cls="flex gap-2",
         ),
         hx_post="/api/rules/save-all-extracted",
         hx_target="#save-all-container",
         hx_swap="outerHTML",
-        cls="mb-4",
+        # OOB swap: replace the bulk-action-bar in the sticky header
+        hx_swap_oob="innerHTML:#bulk-action-bar",
     )
 
-    return Div(success_msg, save_all_btn, *fragments)
+    return Div(*warning_banners, success_msg, bulk_actions, *fragments)
+
+
+def _download_json_script(rules: list[dict], filename: str | None) -> str:
+    safe_name = (filename or "rules").replace(".pdf", "").replace(" ", "_")
+    payload = json.dumps(rules, indent=2).replace("'", "\\'").replace("`", "\\`")
+    return (
+        f"const blob=new Blob([`{payload}`],{{type:'application/json'}});"
+        f"const a=document.createElement('a');a.href=URL.createObjectURL(blob);"
+        f"a.download='{safe_name}_rules.json';a.click();"
+    )
 
 
 def rule_extraction_empty_file_result():

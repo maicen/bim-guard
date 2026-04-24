@@ -197,6 +197,56 @@ OBC_SEED_RULES = [
         "desc": "Limiting distance from exterior wall face to property line must be calculated",
     },
 
+    # ── RAMPS ─────────────────────────────────────────────────────────────────
+    {
+        "ref": "OBC 3.8.3.4", "rule_type": "numeric_comparison",
+        "target": "IfcRamp", "property_name": "Slope",
+        "operator": "<=", "check_value": 0.083, "unit": "ratio", "severity": "mandatory",
+        "desc": "Accessible ramp slope must not exceed 1:12 (0.083)",
+    },
+    {
+        "ref": "OBC 3.8.3.4", "rule_type": "numeric_comparison",
+        "target": "IfcRamp", "property_name": "Width",
+        "operator": ">=", "check_value": 1100, "unit": "mm", "severity": "mandatory",
+        "desc": "Accessible ramp clear width minimum — 1100 mm",
+    },
+
+    # ── CORRIDORS ─────────────────────────────────────────────────────────────
+    {
+        "ref": "OBC 3.8.3.2", "rule_type": "numeric_comparison",
+        "target": "IfcSpace", "property_name": "Width",
+        "operator": ">=", "check_value": 1100, "unit": "mm", "severity": "mandatory",
+        "desc": "Accessible corridor / aisle minimum clear width — 1100 mm",
+    },
+
+    # ── CEILING HEIGHT ────────────────────────────────────────────────────────
+    {
+        "ref": "OBC 9.5.1.1", "rule_type": "numeric_comparison",
+        "target": "IfcSpace", "property_name": "Height",
+        "operator": ">=", "check_value": 2400, "unit": "mm", "severity": "mandatory",
+        "desc": "Habitable room minimum ceiling height — 2400 mm",
+    },
+    {
+        "ref": "OBC 9.5.1.2", "rule_type": "numeric_comparison",
+        "target": "IfcSpace", "property_name": "Height",
+        "operator": ">=", "check_value": 1950, "unit": "mm", "severity": "mandatory",
+        "desc": "Bathroom / utility room minimum ceiling height — 1950 mm",
+    },
+
+    # ── FIRE RESISTANCE ───────────────────────────────────────────────────────
+    {
+        "ref": "OBC 9.10.9.13", "rule_type": "prohibition",
+        "target": "IfcWall", "property_name": "FireRating",
+        "operator": "exists", "check_value": None, "unit": None, "severity": "mandatory",
+        "desc": "Party walls between dwelling units must have a FireRating property",
+    },
+    {
+        "ref": "OBC 9.10.9.14", "rule_type": "numeric_comparison",
+        "target": "IfcWall", "property_name": "FireRating",
+        "operator": ">=", "check_value": 45, "unit": "min", "severity": "mandatory",
+        "desc": "Fire-rated wall between dwelling units — minimum 45-minute fire resistance",
+    },
+
     # ── MODEL QA ─────────────────────────────────────────────────────────────
     {
         "ref": "BIMGuard QA", "rule_type": "prohibition",

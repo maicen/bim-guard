@@ -26,6 +26,10 @@ _RICH_COLUMNS = {
     "confidence":         str,
     "extraction_method":  str,
     "needs_review":       int,
+    # Extended identity fields
+    "mechanism":          str,
+    "ruleset_id":         str,
+    "rule_category":      str,
 }
 
 
@@ -126,6 +130,29 @@ class RuleService:
         description: str,
         target_ifc_class: str,
         parameters: str = "{}",
+        # identity
+        mechanism: str = "",
+        ruleset_id: str = "",
+        rule_category: str = "",
+        # ifc target
+        property_set: str = "",
+        property_name: str = "",
+        fallback_property: str = "",
+        # rule logic
+        operator: str = "",
+        check_value=None,
+        value_min=None,
+        value_max=None,
+        unit: str = "",
+        # classification
+        severity: str = "mandatory",
+        keyword: str = "",
+        compliance_type: str = "",
+        # content
+        source_text: str = "",
+        # meta
+        confidence: float | None = None,
+        needs_review: bool = False,
     ):
         self._rules.update(
             updates={
@@ -134,10 +161,40 @@ class RuleService:
                 "description":      description.strip(),
                 "target_ifc_class": target_ifc_class.strip(),
                 "parameters":       self._norm_json(parameters),
+                "mechanism":        mechanism or "",
+                "ruleset_id":       ruleset_id or "",
+                "rule_category":    rule_category or "",
+                "property_set":     property_set or "",
+                "property_name":    property_name or "",
+                "fallback_property": fallback_property or "",
+                "operator":         operator or "",
+                "check_value":      json.dumps(self._parse_numeric(check_value)),
+                "value_min":        json.dumps(self._parse_numeric(value_min)),
+                "value_max":        json.dumps(self._parse_numeric(value_max)),
+                "unit":             unit or "",
+                "severity":         severity or "mandatory",
+                "keyword":          keyword or "",
+                "compliance_type":  compliance_type or "",
+                "source_text":      source_text or "",
+                "confidence":       str(confidence) if confidence is not None else "",
+                "needs_review":     int(bool(needs_review)),
                 "updated_at":       now_iso_utc(),
             },
             pk_values=rule_id,
         )
+
+    @staticmethod
+    def _parse_numeric(value):
+        """Convert a form string value to float, or None if blank/invalid."""
+        if value is None:
+            return None
+        s = str(value).strip()
+        if not s:
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
 
     def delete_rule(self, rule_id: int):
         self._rules.delete(rule_id)

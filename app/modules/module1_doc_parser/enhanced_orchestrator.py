@@ -32,25 +32,48 @@ USAGE:
     )
 """
 
+import os
 import sys
 from pathlib import Path
 
-from config import DB_PATH, OPENAI_API_KEY
+# Imports work both as a CLI script (python enhanced_orchestrator.py)
+# and when imported by the web app (from app.modules.module1_doc_parser...).
+try:
+    from config import DB_PATH
+    from module1_doc_parser.docling_extractor  import DoclingExtractor
+    from module1_doc_parser.table_rule_builder import TableRuleBuilder
+    from module1_doc_parser.section_chunker    import SectionChunker
+    from module1_doc_parser.keyword_filter     import KeywordFilter
+    from module1_doc_parser.dependency_parser  import DependencyParser
+    from module1_doc_parser.confidence_scorer  import ConfidenceScorer
+    from module3_rule_builder.rule_store       import RuleStore
+    from module3_rule_builder.rule_generator   import RuleGenerator
+    from module3_rule_builder.rule_converter   import RuleConverter
+    from module3_rule_builder.obc_seed_rules   import seed_rules
+except ImportError:
+    from app.modules.config import DB_PATH
+    from app.modules.module1_doc_parser.docling_extractor  import DoclingExtractor
+    from app.modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
+    from app.modules.module1_doc_parser.section_chunker    import SectionChunker
+    from app.modules.module1_doc_parser.keyword_filter     import KeywordFilter
+    from app.modules.module1_doc_parser.dependency_parser  import DependencyParser
+    from app.modules.module1_doc_parser.confidence_scorer  import ConfidenceScorer
+    from app.modules.module3_rule_builder.rule_store       import RuleStore
+    from app.modules.module3_rule_builder.rule_generator   import RuleGenerator
+    from app.modules.module3_rule_builder.rule_converter   import RuleConverter
+    from app.modules.module3_rule_builder.obc_seed_rules   import seed_rules
 
-# Module 1
-from module1_doc_parser.docling_extractor  import DoclingExtractor
-from module1_doc_parser.table_rule_builder import TableRuleBuilder
-from module1_doc_parser.section_chunker    import SectionChunker
-from module1_doc_parser.keyword_filter     import KeywordFilter
-from module1_doc_parser.tfidf_analyzer     import TFIDFAnalyzer
-from module1_doc_parser.dependency_parser  import DependencyParser
-from module1_doc_parser.confidence_scorer  import ConfidenceScorer
+# TF-IDF requires scikit-learn — optional
+try:
+    try:
+        from module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
+    except ImportError:
+        from app.modules.module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
+    _TFIDF_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    _TFIDF_AVAILABLE = False
 
-# Module 3
-from module3_rule_builder.rule_store      import RuleStore
-from module3_rule_builder.rule_generator  import RuleGenerator
-from module3_rule_builder.rule_converter  import RuleConverter
-from module3_rule_builder.obc_seed_rules  import seed_rules
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 
 def run_enhanced_pipeline(
@@ -126,13 +149,16 @@ def run_enhanced_pipeline(
     filtered_chunks = KeywordFilter().score_chunks(chunks)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # IMPROVEMENT 1 — TF-IDF keyword discovery
+    # IMPROVEMENT 1 — TF-IDF keyword discovery (optional — needs scikit-learn)
     # ─────────────────────────────────────────────────────────────────────────
     if discover_keywords:
-        print("\n── IMPROVEMENT 1: TF-IDF KEYWORD DISCOVERY ──")
-        analyzer   = TFIDFAnalyzer(top_n=30)
-        new_kws    = analyzer.discover(filtered_chunks)
-        analyzer.print_report(new_kws)
+        if _TFIDF_AVAILABLE:
+            print("\n── IMPROVEMENT 1: TF-IDF KEYWORD DISCOVERY ──")
+            analyzer = TFIDFAnalyzer(top_n=30)
+            new_kws  = analyzer.discover(filtered_chunks)
+            analyzer.print_report(new_kws)
+        else:
+            print("\n── IMPROVEMENT 1: TF-IDF SKIPPED (install scikit-learn to enable) ──")
 
     # ─────────────────────────────────────────────────────────────────────────
     # IMPROVEMENT 2 — Dependency parsing
