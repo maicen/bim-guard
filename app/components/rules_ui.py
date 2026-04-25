@@ -181,7 +181,7 @@ def rule_form(title: str, action: str, rule: dict | None = None):
         ifc_opts.insert(0, SelectOptionSpec(label=current_ifc, value=current_ifc, selected=True))
 
     return Card(
-        CardHeader(CardTitle(title)),
+        CardHeader(CardTitle(title, cls="text-4xl font-bold text-center")),
         CardContent(
             Form(
                 ActionRow(

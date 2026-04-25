@@ -173,7 +173,10 @@ def run_enhanced_pipeline(
     bert_chunks = None
     if use_bert:
         print("\n── IMPROVEMENT 3: BERT CLASSIFIER ──")
-        from module1_doc_parser.bert_classifier import BERTClassifier
+        try:
+            from module1_doc_parser.bert_classifier import BERTClassifier
+        except ImportError:
+            from app.modules.module1_doc_parser.bert_classifier import BERTClassifier
         bert = BERTClassifier(mode=bert_mode, model_path=bert_model_path)
         bert_chunks = bert.classify_chunks(filtered_chunks)
     else:

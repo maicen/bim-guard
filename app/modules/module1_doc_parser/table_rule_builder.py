@@ -71,20 +71,30 @@ class TableRuleBuilder:
                 continue
 
             rules.append({
-                "ref":              f"OBC_Table_{idx + 1}",
-                "desc":             f"{name} must be between {min_val} and {max_val}",
-                "source_text":      "",
-                "target":           self._detect_target(name),
-                "property_name":    name.replace(" ", "_").title(),
-                "rule_type":        "numeric_range",
-                "operator":         "between",
-                "value_min":        min_val,
-                "value_max":        max_val,
-                "unit":             self._detect_unit(name),
-                "severity":         "mandatory",
-                "confidence":       1.0,
+                "ref":               f"OBC_Table_{idx + 1}",
+                "desc":              f"{name} must be between {min_val} and {max_val}",
+                "source_text":       "",
+                "target":            self._detect_target(name),
+                "property_set":      "",
+                "property_name":     name.replace(" ", "_").title(),
+                "fallback_property": "",
+                "rule_type":         "numeric_range",
+                "operator":          "between",
+                "value":             None,       # table rules use value_min/value_max
+                "check_value":       None,       # Module 3 compatibility
+                "value_min":         min_val,
+                "value_max":         max_val,
+                "unit":              self._detect_unit(name),
+                "applies_when":      {},
+                "severity":          "mandatory",
+                "keyword":           "shall",
+                "compliance_type":   "prescriptive",
+                "exceptions":        [],
+                "related_refs":      [],
+                "overridden_by":     None,
+                "confidence":        1.0,
                 "extraction_method": "table",
-                "needs_review":     False,
+                "needs_review":      False,
             })
 
         return rules

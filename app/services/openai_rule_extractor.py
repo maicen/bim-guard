@@ -100,6 +100,8 @@ class OpenAIRuleExtractor:
             response_format={"type": "json_object"},
             temperature=self._temperature,
         )
+        if not response.choices:
+            return []
         payload = self._parse(response.choices[0].message.content)
         return self._normalize(payload.get("rules", []))
 
@@ -147,6 +149,11 @@ class OpenAIRuleExtractor:
             if not isinstance(applies_when, dict):
                 applies_when = {}
 
+            # LLM may return "value" or "check_value" — normalise to both so
+            # the web UI displays it and Module 3 / RuleGenerator can consume it.
+            check_value = rule.get("value") if rule.get("value") is not None \
+                          else rule.get("check_value")
+
             normalized.append({
                 "ref":               ref or f"REQ-AI-{idx:03d}",
                 "desc":              desc,
@@ -159,7 +166,8 @@ class OpenAIRuleExtractor:
 
                 "rule_type":         str(rule.get("rule_type") or "numeric_range").strip(),
                 "operator":          str(rule.get("operator") or ">=").strip(),
-                "value":             rule.get("value"),
+                "value":             check_value,        # display / UI key
+                "check_value":       check_value,        # Module 3 / RuleGenerator key
                 "value_min":         rule.get("value_min"),
                 "value_max":         rule.get("value_max"),
                 "unit":              str(rule.get("unit") or "").strip(),

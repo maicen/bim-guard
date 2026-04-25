@@ -67,14 +67,9 @@ def rule_extraction_page_content():
             ),
             Div(cls="w-px bg-border"),
             Div(
-                # Sticky header with title + bulk actions
                 Div(
                     H3("Extracted Rules", cls="text-lg font-semibold"),
-                    Div(
-                        id="bulk-action-bar",
-                        cls="flex gap-2 items-center",
-                    ),
-                    cls="flex items-center justify-between px-6 py-3 border-b bg-background sticky top-0 z-10",
+                    cls="flex items-center justify-between px-6 py-3 border-b bg-background",
                 ),
                 Div(
                     P(
@@ -82,7 +77,7 @@ def rule_extraction_page_content():
                         cls="text-sm text-muted-foreground text-center py-10",
                     ),
                     id="extracted-rules-container",
-                    cls="px-6 pb-6 space-y-4 overflow-y-auto",
+                    cls="px-6 pb-6 space-y-4 overflow-y-auto flex-1",
                 ),
                 cls="w-full md:w-[400px] lg:w-[500px] bg-background border-l flex flex-col",
             ),
@@ -255,43 +250,36 @@ def rule_extraction_results(
         cls="mb-3 text-emerald-600 border-emerald-600 [&>svg]:text-emerald-600",
     )
 
-    # Bulk action bar — swapped into the sticky header via OOB
-    bulk_actions = Form(
-        Input(type="hidden", name="rules_json", value=json.dumps(rules)),
-        Div(
-            Button(
-                UkIcon("save", cls="h-3.5 w-3.5 mr-1"), "Save All",
-                type="submit",
-                id="save-all-btn",
-                cls="inline-flex items-center text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 font-medium",
-            ),
-            Button(
-                UkIcon("download", cls="h-3.5 w-3.5 mr-1"), "Export JSON",
-                type="button",
-                onclick=_download_json_script(rules, filename),
-                cls="inline-flex items-center text-xs px-3 py-1.5 rounded border bg-background hover:bg-muted font-medium",
-            ),
-            id="save-all-container",
-            cls="flex gap-2",
+    _btn = (
+        "display:inline-flex;align-items:center;gap:5px;"
+        "font-size:12px;font-weight:500;padding:6px 14px;"
+        "border-radius:6px;border:none;cursor:pointer;"
+        "background:#1e293b;color:#ffffff;"
+    )
+
+    # Save All — plain HTMX POST, no data in the request (server reads its own cache)
+    # Export JSON — plain browser navigation to a download endpoint
+    action_bar = Div(
+        Button(
+            UkIcon("save", cls="h-3.5 w-3.5"), "Save All",
+            type="button",
+            style=_btn,
+            hx_post="/api/rules/save-all-extracted",
+            hx_target="#save-all-msg",
+            hx_swap="innerHTML",
         ),
-        hx_post="/api/rules/save-all-extracted",
-        hx_target="#save-all-container",
-        hx_swap="outerHTML",
-        # OOB swap: replace the bulk-action-bar in the sticky header
-        hx_swap_oob="innerHTML:#bulk-action-bar",
+        Button(
+            UkIcon("download", cls="h-3.5 w-3.5"), "Export JSON",
+            type="button",
+            style=_btn,
+            onclick="window.location='/api/rules/export-json'",
+        ),
+        Span("", id="save-all-msg", cls="text-xs text-emerald-700 ml-1"),
+        cls="sticky top-0 z-10 bg-background border-b py-2 mb-3 -mx-6 px-6 flex gap-2 items-center",
     )
 
-    return Div(*warning_banners, success_msg, bulk_actions, *fragments)
+    return Div(*warning_banners, success_msg, action_bar, *fragments)
 
-
-def _download_json_script(rules: list[dict], filename: str | None) -> str:
-    safe_name = (filename or "rules").replace(".pdf", "").replace(" ", "_")
-    payload = json.dumps(rules, indent=2).replace("'", "\\'").replace("`", "\\`")
-    return (
-        f"const blob=new Blob([`{payload}`],{{type:'application/json'}});"
-        f"const a=document.createElement('a');a.href=URL.createObjectURL(blob);"
-        f"a.download='{safe_name}_rules.json';a.click();"
-    )
 
 
 def rule_extraction_empty_file_result():

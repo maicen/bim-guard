@@ -31,11 +31,13 @@ OR import and call:
 """
 
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import re
 
-from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
+try:
+    from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
+except ImportError:
+    from app.modules.module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
 
 
 # Words to always ignore — structural words with no compliance value
