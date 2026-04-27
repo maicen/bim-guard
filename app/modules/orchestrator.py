@@ -202,19 +202,16 @@ class BIMGuard_App:
         """Return summary counts for the dashboard page."""
         from app.services.projects_service import ProjectsService
         from app.services.documents_service import DocumentService
-        from app.services.persistence import PersistenceService
+        from app.services.rules_service import RuleService
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
-
-        db = PersistenceService.get_db()
-        rules_table = db.t.get("rules")
-        total_rules = len(list(rules_table.rows)) if rules_table is not None else 0
+        rules_svc = RuleService()
 
         return {
             "total_projects":  projects_svc.total_projects(),
             "total_documents": len(documents_svc.list_documents()),
-            "total_rules":     total_rules,
+            "total_rules":     len(rules_svc.list_rules()),
         }
 
     def orchestrate_workflow(
@@ -331,41 +328,61 @@ class BIMGuard_App:
         except Exception as exc:
             compliance_error = str(exc)
 
-        # ── Module 3: Rule validation against IFC model ───────────────────────
-        # Fetches every rule saved in the library and checks whether the model
-        # contains elements of the required IFC class (basic Module 4 check).
-        rule_validations: list[dict] = []
+        # ── Module 2 + 4 + 5: Rule-based compliance check ────────────────────
+        rule_compliance: list[dict] = []
+        rule_compliance_summary: dict = {}
+        rule_compliance_error: str | None = None
+        rule_validations: list[dict] = []   # kept for backward-compat
+
         try:
             from app.services.rules_service import RuleService
+            from .module2_ifc_read    import Module2_IFCRead
+            from .module4_comparator  import Module4_Comparator
+            from .module5_reporter    import Module5_Reporter
+
             library_rules = RuleService().list_rules()
+
+            # Basic element-presence check (legacy rule_validations card)
             for rule in library_rules:
                 target = rule.get("target_ifc_class", "")
-                count = ifc_type_counts.get(target, 0)
+                count  = ifc_type_counts.get(target, 0)
                 rule_validations.append({
-                    "reference":       rule.get("reference", "—"),
-                    "description":     rule.get("description", ""),
-                    "rule_type":       rule.get("rule_type", ""),
+                    "reference":        rule.get("reference", "—"),
+                    "description":      rule.get("description", ""),
+                    "rule_type":        rule.get("rule_type", ""),
                     "target_ifc_class": target,
-                    "element_count":   count,
-                    "status":          "present" if count > 0 else "not_found",
+                    "element_count":    count,
+                    "status":           "present" if count > 0 else "not_found",
                 })
-        except Exception:
-            pass
+
+            # Full Module 2 → 4 → 5 compliance pipeline (only when IFC file exists)
+            if ifc_path and not ifc_error and library_rules:
+                m2 = Module2_IFCRead(ifc_path)
+                extraction   = m2.extract_for_compliance(library_rules)
+                rule_compliance = Module4_Comparator().validate_metadata(extraction)
+                rule_compliance_summary = Module5_Reporter().render_visual_report(rule_compliance)
+
+        except Exception as exc:
+            rule_compliance_error = str(exc)
 
         return {
-            "project":             project,
-            "ifc_element_count":   len(elements),
-            "ifc_type_counts":     ifc_type_counts,
-            "ifc_totals":          ifc_totals,
-            "ifc_error":           ifc_error,
-            "documents":           documents,
-            "compliance_results":  compliance_results,
-            "cost_impact":         cost_impact,
-            "issue_stats":         issue_stats,
-            "compliance_is_demo":  is_demo,
-            "bcf_project_id":      project_id,
-            "compliance_error":    compliance_error,
-            "rule_validations":    rule_validations,
+            "project":                  project,
+            "ifc_element_count":        len(elements),
+            "ifc_type_counts":          ifc_type_counts,
+            "ifc_totals":               ifc_totals,
+            "ifc_error":                ifc_error,
+            "documents":                documents,
+            "compliance_results":       compliance_results,
+            "cost_impact":              cost_impact,
+            "issue_stats":              issue_stats,
+            "compliance_is_demo":       is_demo,
+            "bcf_project_id":           project_id,
+            "compliance_error":         compliance_error,
+            "rule_validations":         rule_validations,
+            # Module 4 results
+            "rule_compliance":          rule_compliance,
+            "rule_compliance_summary":  rule_compliance_summary,
+            "rule_compliance_error":    rule_compliance_error,
         }
 
 
