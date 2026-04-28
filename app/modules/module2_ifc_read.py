@@ -41,6 +41,17 @@ try:
 except ImportError:
     _IFCOPENSHELL_AVAILABLE = False
 
+try:
+    from .ifc_quality.validator import IFCValidator
+    from .ifc_quality.improver import improve_ifc_file
+    _QUALITY_TOOLS_AVAILABLE = True
+except ImportError:
+    _QUALITY_TOOLS_AVAILABLE = False
+
+# Minimum quality score (0-100) required before extraction proceeds.
+# Files below this threshold are auto-improved before loading.
+IFC_MIN_QUALITY_SCORE = 70
+
 
 # ── IFC property-type → Python type label ────────────────────────────────────
 _IFC_TYPE_MAP = {
@@ -67,8 +78,10 @@ class Module2_IFCRead:
     """Full IFC reader for Module 2 compliance extraction."""
 
     def __init__(self, file_path: Path | str | None = None):
-        self.file_path = Path(file_path) if file_path else None
-        self.ifc_file  = None
+        self.file_path       = Path(file_path) if file_path else None
+        self.ifc_file        = None
+        self.quality_report: dict       = {}
+        self.quality_warnings: list[str] = []
         if self.file_path:
             self.load_ifc_file()
 
@@ -79,7 +92,33 @@ class Module2_IFCRead:
             raise ImportError("ifcopenshell is not installed.")
         if not self.file_path or not self.file_path.exists():
             raise FileNotFoundError(f"IFC file not found: {self.file_path}")
-        self.ifc_file = ifcopenshell.open(str(self.file_path))
+
+        load_path = self.file_path
+        self.quality_report: dict = {}
+        self.quality_warnings: list[str] = []
+
+        if _QUALITY_TOOLS_AVAILABLE:
+            results = IFCValidator(str(load_path)).validate()
+            self.quality_report = results
+            score = results.get("overall", {}).get("score", 100)
+
+            if score < IFC_MIN_QUALITY_SCORE:
+                improved_path = load_path.with_stem(load_path.stem + "_improved")
+                print(f"IFC quality {score:.1f}% < {IFC_MIN_QUALITY_SCORE}% — "
+                      f"auto-improving → {improved_path.name}")
+                improve_ifc_file(str(load_path), str(improved_path))
+                load_path = improved_path
+                self.quality_warnings.append(
+                    f"Quality {score:.1f}% was below threshold; "
+                    f"auto-improved file used: {improved_path.name}"
+                )
+            elif score < 80:
+                self.quality_warnings.append(
+                    f"IFC quality is fair ({score:.1f}%). "
+                    "Consider running the IFC improver for better results."
+                )
+
+        self.ifc_file = ifcopenshell.open(str(load_path))
         return self.ifc_file
 
     def get_all_elements(self, ifc_type: str = "IfcBuildingElement") -> list:
