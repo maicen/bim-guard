@@ -4,7 +4,7 @@ Connects IFC service elements to GC-001 and CC-001 engines.
 Returns unified results ready for BCF generation and dashboard.
 """
 
-from .ifc_parser import ServiceElement
+from ..module2_ifc_read.ifc_parser import ServiceElement
 
 # ── Galvanic potential table ────────────────────────────────────────────────
 GP = {

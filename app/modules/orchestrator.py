@@ -231,8 +231,8 @@ class BIMGuard_App:
         """
         from app.services.projects_service import ProjectsService
         from app.services.documents_service import DocumentService
-        from .ifc_parser import parse_ifc, generate_synthetic_elements
-        from .compliance_runner import run_compliance_checks
+        from .module2_ifc_read.ifc_parser import parse_ifc, generate_synthetic_elements
+        from .module4_comparator.compliance_runner import run_compliance_checks
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
