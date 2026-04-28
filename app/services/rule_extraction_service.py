@@ -10,6 +10,8 @@ Step  Description                         Status
   5   TF-IDF Keyword Discovery            Optional — active when spaCy installed
   6   Dependency Parser                   Optional — active when spaCy installed
   7   Confidence Scorer                   Optional — active when spaCy installed
+ 7b   Module 1-b NLP Annotator           Optional — deontic/condition/crossref/
+                                                    dimension/dependency/IFC hints
   8   BERT Classifier                     Optional — active when transformers +
                                                     fine-tuned model both present
   9   OpenAI LLM extraction               Active
@@ -57,6 +59,13 @@ try:
     _TFIDF_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     _TFIDF_AVAILABLE = False
+
+# Module 1-b: NLP annotation layer (optional — pure Python, no extra deps)
+try:
+    from app.modules.module1b_nlp_annotator import Module1b_NLPAnnotator
+    _NLP_ANNOTATOR_AVAILABLE = True
+except Exception:
+    _NLP_ANNOTATOR_AVAILABLE = False
 
 # Step 8: BERT classifier (optional — requires transformers + fine-tuned model)
 _BERT_MODEL_PATH = Path("models/bert_obc_classifier")
@@ -173,6 +182,14 @@ class RuleExtractionService:
                     dep_chunks=dep_chunks,
                     bert_chunks=bert_chunks,
                 )
+
+                # Step 7b: Module 1-b NLP annotation (deontic, conditions,
+                # cross-refs, dependencies, dimensions, IFC hints)
+                if _NLP_ANNOTATOR_AVAILABLE:
+                    try:
+                        final_chunks = Module1b_NLPAnnotator().annotate(final_chunks)
+                    except Exception:
+                        pass  # annotation failure must never break extraction
 
                 sendable = [c for c in final_chunks if c.get("filtered_text", "").strip()]
                 text_key = "filtered_text"
