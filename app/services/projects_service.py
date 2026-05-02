@@ -2,13 +2,13 @@
 
 from pathlib import Path
 
+from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import (
     md5_hex,
     now_iso_utc,
     rows_desc_by_id,
     safe_upload_name,
-    store_upload_bytes,
 )
 
 
@@ -17,7 +17,7 @@ class ProjectsService:
 
     def __init__(self):
         """Initialize project storage and ensure required table columns exist."""
-        self._ifc_upload_dir = PersistenceService.uploads_dir("ifc")
+        self._storage = ObjectStorage()
         self._projects = PersistenceService.get_table(
             "projects",
             {
@@ -59,8 +59,8 @@ class ProjectsService:
             return "", ""
 
         ifc_md5_hash = md5_hex(content)
-        stored_path = store_upload_bytes(filename, content, self._ifc_upload_dir)
-        return str(stored_path), ifc_md5_hash
+        storage_ref = self._storage.save_upload(filename, content, "uploads/ifc")
+        return storage_ref, ifc_md5_hash
 
     def create_project(
         self,
@@ -100,6 +100,9 @@ class ProjectsService:
 
     def delete_project(self, project_id: int):
         """Delete a project row by primary key."""
+        project = self.get_project(project_id)
+        if project is not None:
+            self._storage.delete(project.get("ifc_file_path") or "")
         self._projects.delete(project_id)
 
     def resolve_ifc_file(self, project_id: int) -> Path | None:
@@ -112,8 +115,4 @@ class ProjectsService:
         if not ifc_file_path:
             return None
 
-        file_path = Path(ifc_file_path)
-        if not file_path.exists() or not file_path.is_file():
-            return None
-
-        return file_path
+        return self._storage.materialize_local_path(ifc_file_path)

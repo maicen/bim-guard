@@ -1,7 +1,6 @@
 """Document persistence service for uploaded source files and extracted text."""
 
-from pathlib import Path
-
+from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import find_row_by_field, now_iso_utc, rows_desc_by_id
 
@@ -11,6 +10,7 @@ class DocumentService:
 
     def __init__(self):
         """Initialize the documents table and upload storage directory."""
+        self._storage = ObjectStorage()
         self.upload_dir = PersistenceService.uploads_dir()
         self._documents = PersistenceService.get_table(
             "documents",
@@ -48,6 +48,10 @@ class DocumentService:
             }
         )
 
+    def store_document_file(self, filename: str, content: bytes) -> str:
+        """Persist document bytes and return the durable storage reference."""
+        return self._storage.save_upload(filename, content, "uploads")
+
     def update_document(self, document_id: int, filename: str, extracted_text: str):
         """Update mutable document metadata and extracted text."""
         self._documents.update(
@@ -68,9 +72,7 @@ class DocumentService:
         file_path = document.get("file_path")
         if file_path:
             try:
-                path = Path(file_path)
-                if path.exists():
-                    path.unlink()
+                self._storage.delete(file_path)
             except OSError:
                 # Keep DB deletion resilient even when file cleanup fails.
                 pass

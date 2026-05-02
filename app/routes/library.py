@@ -62,7 +62,6 @@ from app.utils import (
     md5_hex,
     redirect_see_other,
     safe_upload_name,
-    store_upload_bytes,
     validate_document_upload,
 )
 
@@ -154,7 +153,7 @@ def setup_routes(rt):
                 level="warning",
             )
 
-        stored_path = store_upload_bytes(filename, file_content, _document_service.upload_dir)
+        stored_path = _document_service.store_document_file(filename, file_content)
 
         reader = Module1_DocReader()
         if filename.lower().endswith(".pdf"):
@@ -165,7 +164,7 @@ def setup_routes(rt):
         _document_service.create_document(
             md5_hash=md5_hash,
             filename=filename,
-            file_path=str(stored_path),
+            file_path=stored_path,
             extracted_text=extracted_text,
         )
 

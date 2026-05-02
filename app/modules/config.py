@@ -11,11 +11,13 @@ from app.services.persistence import PersistenceService
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_PATH = PersistenceService.DB_PATH
+# Runtime backend is selected via BIM_GUARD_DB_BACKEND (sqlite or supabase).
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("OPGEMINIODEL", "gpt-4o")
-GEMINIGEMINI
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "OBC_Part9_PDF"
 SOURCE_DOC_SEED = "OBC_Part9_Seed"
