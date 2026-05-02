@@ -55,13 +55,13 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..issue_schema import (
+from .issue_schema import (
     Issue,
     RiskBand,
     band_from_score,
     make_issue,
 )
-from ..piping_schema import (
+from ..module2_ifc_read.piping_schema import (
     CANONICAL_MATERIALS,
     EnvironmentClass,
     PipingElement,
@@ -488,7 +488,7 @@ if __name__ == "__main__":
     here = Path(__file__).resolve().parent
     sys.path.insert(0, str(here.parent.parent.parent))
 
-    from app.modules.piping_schema import (  # noqa: E402
+    from app.modules.module2_ifc_read.piping_schema import (  # noqa: E402
         example_pump,
         example_ss316_pipe_in_plant_room,
         example_valve,

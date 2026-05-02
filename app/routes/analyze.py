@@ -4,10 +4,12 @@ import os
 
 from fasthtml.common import (
     A,
+    Details,
     Div,
     Form,
     Option,
     P,
+    Summary,
     Request,
     Span,
     Table,
@@ -283,6 +285,171 @@ def _rule_validation_card(rule_validations: list[dict]):
     )
 
 
+def _rule_compliance_card(compliance_results: list[dict], summary: dict, error: str | None):
+    """Module 4 rule compliance card — shows PASS/FAIL per rule with element details."""
+    title = "Rule Compliance Check — Module 4"
+
+    if error:
+        return Card(
+            CardHeader(CardTitle(title)),
+            CardContent(P(f"Compliance check error: {error}", cls="text-sm text-destructive")),
+        )
+
+    if not compliance_results:
+        return None
+
+    total = summary.get("total_rules", 0)
+    passed = summary.get("passed", 0)
+    failed = summary.get("failed", 0)
+    missing = summary.get("missing_data", 0)
+    no_elem = summary.get("no_elements", 0)
+    rate = summary.get("pass_rate", 0)
+    mand_f = summary.get("mandatory_failed", 0)
+
+    # Colour the pass-rate pill
+    rate_cls = (
+        "bg-green-100 text-green-800"
+        if rate >= 80
+        else "bg-yellow-100 text-yellow-800"
+        if rate >= 50
+        else "bg-red-100 text-red-800"
+    )
+
+    summary_bar = Div(
+        Span(
+            f"{rate:.0f}% pass rate",
+            cls=f"inline-block px-3 py-1 rounded-full text-sm font-semibold {rate_cls} mr-3",
+        ),
+        Span(f"✓ {passed} passed", cls="text-xs text-green-700 mr-2"),
+        Span(f"✗ {failed} failed", cls="text-xs text-red-700 mr-2"),
+        Span(f"~ {missing} missing data", cls="text-xs text-yellow-700 mr-2") if missing else "",
+        Span(f"○ {no_elem} no elements", cls="text-xs text-muted-foreground") if no_elem else "",
+        Span(f"  ⚠ {mand_f} mandatory failures", cls="text-xs text-red-600 font-semibold ml-2")
+        if mand_f
+        else "",
+        cls="flex flex-wrap items-center gap-1 mb-4",
+    )
+
+    _STATUS_CLS = {
+        "PASS": "bg-green-100 text-green-800",
+        "FAIL": "bg-red-100 text-red-800",
+        "MISSING_DATA": "bg-yellow-100 text-yellow-800",
+        "PARTIAL": "bg-orange-100 text-orange-800",
+        "NO_ELEMENTS": "bg-gray-100 text-gray-600",
+    }
+
+    header_cells = [
+        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+        for h in ("Ref", "Description", "Target", "Property", "Rule", "Status", "Pass/Fail/Miss")
+    ]
+
+    rows = []
+    for r in compliance_results:
+        op = r.get("operator", "")
+        if op == "between":
+            rule_str = f"between {r.get('value_min')}–{r.get('value_max')} {r.get('unit', '')}"
+        elif op == "exists":
+            rule_str = "exists"
+        else:
+            rule_str = f"{op} {r.get('check_value', '')} {r.get('unit', '')}".strip()
+
+        status = r.get("status", "")
+        s_cls = _STATUS_CLS.get(status, "bg-gray-100 text-gray-600")
+
+        counts = Span(
+            f"{r.get('pass_count', 0)} / {r.get('fail_count', 0)} / {r.get('missing_count', 0)}",
+            cls="font-mono text-xs",
+        )
+
+        # Collapsible failure details
+        failures = r.get("failures", [])
+        fail_detail = ""
+        if failures:
+            fail_rows = [
+                Tr(
+                    Td(f.get("element_name", "")[:40], cls="px-2 py-1 text-xs font-mono"),
+                    Td(str(f.get("actual", "")), cls="px-2 py-1 text-xs"),
+                    Td(f.get("reason", ""), cls="px-2 py-1 text-xs text-red-700"),
+                )
+                for f in failures[:20]
+            ]
+            fail_detail = Details(
+                Summary(
+                    f"{len(failures)} failing element(s)", cls="text-xs text-red-600 cursor-pointer"
+                ),
+                Div(
+                    Table(
+                        Thead(
+                            Tr(
+                                Th("Element", cls="px-2 py-1 text-xs bg-muted"),
+                                Th("Actual", cls="px-2 py-1 text-xs bg-muted"),
+                                Th("Reason", cls="px-2 py-1 text-xs bg-muted"),
+                            )
+                        ),
+                        Tbody(*fail_rows),
+                        cls="w-full text-xs border rounded mt-1",
+                    ),
+                    cls="max-h-48 overflow-y-auto",
+                ),
+            )
+
+        rows.append(
+            Tr(
+                Td(r.get("rule_ref", "—"), cls="px-3 py-2 text-xs font-mono"),
+                Td(
+                    Div(
+                        (r.get("rule_desc", "") or "")[:70]
+                        + ("…" if len(r.get("rule_desc", "") or "") > 70 else ""),
+                        fail_detail,
+                    ),
+                    cls="px-3 py-2 text-xs",
+                ),
+                Td(r.get("target", "—"), cls="px-3 py-2 text-xs font-mono text-blue-700"),
+                Td(r.get("property_name", ""), cls="px-3 py-2 text-xs font-mono"),
+                Td(rule_str, cls="px-3 py-2 text-xs font-mono"),
+                Td(
+                    Span(
+                        status,
+                        cls=f"inline-block px-1.5 py-0.5 rounded text-xs font-semibold {s_cls}",
+                    ),
+                    cls="px-3 py-2",
+                ),
+                Td(counts, cls="px-3 py-2"),
+                cls="border-b border-muted last:border-0",
+            )
+        )
+
+    csv_btn = A(
+        "Download CSV",
+        href="/reports/compliance-csv",
+        cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-white hover:bg-slate-600 mt-3",
+    )
+
+    return Card(
+        CardHeader(
+            Div(
+                CardTitle(title),
+                P(
+                    "Full property-level compliance check against every rule in the library.",
+                    cls="text-xs text-muted-foreground mt-0.5",
+                ),
+            )
+        ),
+        CardContent(
+            summary_bar,
+            Div(
+                Table(Thead(Tr(*header_cells)), Tbody(*rows), cls="w-full text-sm"),
+                cls="overflow-auto border rounded-md",
+            ),
+            csv_btn,
+        ),
+    )
+
+
+# Module-level cache for CSV export (populated in analysis_run_post)
+_last_compliance_results: list[dict] = []
+
+
 def setup_routes(rt):
     """Register analysis workflow routes."""
 
@@ -527,6 +694,16 @@ def setup_routes(rt):
 
         rule_validation_card = _rule_validation_card(result.get("rule_validations", []))
 
+        rc = result.get("rule_compliance", [])
+        rc_summary = result.get("rule_compliance_summary", {})
+        rc_error = result.get("rule_compliance_error")
+
+        # Cache for CSV download
+        global _last_compliance_results
+        _last_compliance_results = rc
+
+        rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error)
+
         sections = [
             Card(
                 CardHeader(CardTitle(project.get("name", "Project"))),
@@ -535,10 +712,25 @@ def setup_routes(rt):
             *(doc_cards or [P("No documents selected.", cls="text-sm text-muted-foreground")]),
             rule_validation_card,
         ]
+        if rule_compliance_card:
+            sections.append(rule_compliance_card)
         if compliance_card:
             sections.append(compliance_card)
 
         return Div(*sections, cls="space-y-4")
+
+    @rt("/reports/compliance-csv")
+    def compliance_csv_download():
+        """Download the last rule compliance check as a CSV file."""
+        from starlette.responses import Response as StarletteResponse
+        from app.modules.module5_reporter import Module5_Reporter
+
+        csv_content = Module5_Reporter().generate_csv_summary(_last_compliance_results)
+        return StarletteResponse(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="compliance_results.csv"'},
+        )
 
     @rt("/reports/bcf/{project_id}")
     def bcf_download(project_id: int):

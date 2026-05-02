@@ -234,9 +234,9 @@ class BIMGuard_App:
         """
         from app.services.documents_service import DocumentService
         from app.services.projects_service import ProjectsService
-
-        from .compliance_runner import run_compliance_checks
-        from .ifc_parser import generate_synthetic_elements, parse_ifc
+        from app.services.projects_service import ProjectsService
+        from .module2_ifc_read.ifc_parser import parse_ifc, generate_synthetic_elements
+        from .module4_comparator.compliance_runner import run_compliance_checks
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
@@ -334,14 +334,21 @@ class BIMGuard_App:
         except Exception as exc:
             compliance_error = str(exc)
 
-        # ── Module 3: Rule validation against IFC model ───────────────────────
-        # Fetches every rule saved in the library and checks whether the model
-        # contains elements of the required IFC class (basic Module 4 check).
-        rule_validations: list[dict] = []
+        # ── Module 2 + 4 + 5: Rule-based compliance check ────────────────────
+        rule_compliance: list[dict] = []
+        rule_compliance_summary: dict = {}
+        rule_compliance_error: str | None = None
+        rule_validations: list[dict] = []  # kept for backward-compat
+
         try:
             from app.services.rules_service import RuleService
+            from .module2_ifc_read import Module2_IFCRead
+            from .module4_comparator import Module4_Comparator
+            from .module5_reporter import Module5_Reporter
 
             library_rules = RuleService().list_rules()
+
+            # Basic element-presence check (legacy rule_validations card)
             for rule in library_rules:
                 target = rule.get("target_ifc_class", "")
                 count = ifc_type_counts.get(target, 0)
@@ -355,8 +362,16 @@ class BIMGuard_App:
                         "status": "present" if count > 0 else "not_found",
                     }
                 )
-        except Exception:
-            pass
+
+            # Full Module 2 → 4 → 5 compliance pipeline (only when IFC file exists)
+            if ifc_path and not ifc_error and library_rules:
+                m2 = Module2_IFCRead(ifc_path)
+                extraction = m2.extract_for_compliance(library_rules)
+                rule_compliance = Module4_Comparator().validate_metadata(extraction)
+                rule_compliance_summary = Module5_Reporter().render_visual_report(rule_compliance)
+
+        except Exception as exc:
+            rule_compliance_error = str(exc)
 
         return {
             "project": project,
@@ -372,6 +387,10 @@ class BIMGuard_App:
             "bcf_project_id": project_id,
             "compliance_error": compliance_error,
             "rule_validations": rule_validations,
+            # Module 4 results
+            "rule_compliance": rule_compliance,
+            "rule_compliance_summary": rule_compliance_summary,
+            "rule_compliance_error": rule_compliance_error,
         }
 
 

@@ -264,16 +264,42 @@ class BERTClassifier:
             print("[BERTClassifier] Downloading CODE-ACCORD from HuggingFace...")
             dataset = load_dataset(CODEACCORD_HF)
 
+            # Detect actual field names from the dataset
+            sample = dataset[list(dataset.keys())[0]][0]
+            text_field = next(
+                (f for f in ("sentence", "Sentence", "text", "Text") if f in sample), None
+            )
+            label_field = next(
+                (f for f in ("is_rule", "IsRule", "label", "Label", "compliance") if f in sample),
+                None,
+            )
+
+            if not text_field or not label_field:
+                raise ValueError(
+                    f"Cannot find text/label fields in CODE-ACCORD. "
+                    f"Available fields: {list(sample.keys())}"
+                )
+
+            print(f"  Using text field='{text_field}', label field='{label_field}'")
+
             def format_row(row):
-                # TODO: map CODE-ACCORD label field names to text/label
-                # Check actual field names at: https://huggingface.co/datasets/Accord-Project/CODE-ACCORD
+                raw_label = row[label_field]
                 return {
-                    "text": row.get("sentence", row.get("text", "")),
-                    "label": 1 if row.get("is_rule", row.get("label")) else 0,
+                    "text": str(row[text_field]),
+                    "label": 1
+                    if (
+                        raw_label is True
+                        or raw_label == 1
+                        or str(raw_label).lower() in ("true", "1", "yes", "rule")
+                    )
+                    else 0,
                 }
 
             train = [format_row(r) for r in dataset["train"]]
-            eval_ = [format_row(r) for r in dataset.get("validation", dataset["test"])]
+            eval_ = [
+                format_row(r)
+                for r in dataset.get("validation", dataset.get("test", dataset["train"][-50:]))
+            ]
             print(f"  Train: {len(train)} sentences | Eval: {len(eval_)} sentences")
             return train, eval_
 

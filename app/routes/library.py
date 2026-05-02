@@ -70,6 +70,11 @@ _document_service = DocumentService()
 _rule_service = RuleService()
 _rule_extraction_service = RuleExtractionService()
 
+# Server-side cache of the most recent extraction — avoids passing large JSON
+# through form attributes or hidden inputs (encoding issues with special chars).
+_last_extracted: list[dict] = []
+_last_extracted_filename: str = ""
+
 
 def _not_found_page(entity: str, back_href: str, back_title: str):
     return Title(f"{entity} Not Found - BIM Guard"), DashboardLayout(
@@ -387,17 +392,57 @@ def setup_routes(rt):
         description: str,
         target_ifc_class: str,
         parameters: str = "{}",
+        # identity
+        mechanism: str = "",
+        ruleset_id: str = "",
+        rule_category: str = "",
+        # ifc target
+        property_set: str = "",
+        property_name: str = "",
+        fallback_property: str = "",
+        # rule logic
+        operator: str = "",
+        check_value: str = "",
+        value_min: str = "",
+        value_max: str = "",
+        unit: str = "",
+        # classification
+        severity: str = "mandatory",
+        keyword: str = "",
+        compliance_type: str = "",
+        # content
+        source_text: str = "",
+        # meta
+        confidence: str = "",
+        needs_review: str = "",
     ):
         if _rule_service.get_rule(rule_id) is None:
             return redirect_see_other("/library/rules")
 
         _rule_service.update_rule(
             rule_id,
-            reference,
-            rule_type,
-            description,
-            target_ifc_class,
-            parameters,
+            reference=reference,
+            rule_type=rule_type,
+            description=description,
+            target_ifc_class=target_ifc_class,
+            parameters=parameters,
+            mechanism=mechanism,
+            ruleset_id=ruleset_id,
+            rule_category=rule_category,
+            property_set=property_set,
+            property_name=property_name,
+            fallback_property=fallback_property,
+            operator=operator,
+            check_value=check_value or None,
+            value_min=value_min or None,
+            value_max=value_max or None,
+            unit=unit,
+            severity=severity,
+            keyword=keyword,
+            compliance_type=compliance_type,
+            source_text=source_text,
+            confidence=float(confidence) if confidence.strip() else None,
+            needs_review=bool(needs_review),
         )
         return redirect_see_other(f"/library/rules/{rule_id}")
 
@@ -418,6 +463,8 @@ def setup_routes(rt):
         except Exception:
             rule = {}
 
+        # check_value: prefer explicit "check_value" key, fall back to "value"
+        _cv = rule.get("check_value") if rule.get("check_value") is not None else rule.get("value")
         _rule_service.create_rule(
             reference=str(rule.get("ref") or "REQ-AI").strip(),
             rule_type=str(rule.get("rule_type") or "numeric_comparison"),
@@ -428,7 +475,7 @@ def setup_routes(rt):
             property_name=str(rule.get("property_name") or ""),
             fallback_property=str(rule.get("fallback_property") or ""),
             operator=str(rule.get("operator") or ""),
-            check_value=rule.get("check_value") if "check_value" in rule else rule.get("value"),
+            check_value=_cv,
             value_min=rule.get("value_min"),
             value_max=rule.get("value_max"),
             unit=str(rule.get("unit") or ""),
@@ -439,7 +486,7 @@ def setup_routes(rt):
             exceptions=rule.get("exceptions") or [],
             related_refs=rule.get("related_refs") or [],
             confidence=float(rule.get("confidence") or 0.8),
-            extraction_method="llm",
+            extraction_method=str(rule.get("extraction_method") or "llm"),
             needs_review=bool(rule.get("needs_review", False)),
         )
         return Span(
@@ -448,23 +495,21 @@ def setup_routes(rt):
         )
 
     @rt("/api/rules/save-all-extracted", methods=["POST"])
-    async def rules_save_all_extracted(req: Request):
-        import json as _json
-
-        form = await req.form()
-        rules_json = form.get("rules_json", "[]")
-        try:
-            rules = _json.loads(rules_json)
-        except Exception:
-            rules = []
-
+    async def rules_save_all_extracted():
+        """Save every rule from the last extraction. Reads from server cache \u2014 no form data needed."""
+        global _last_extracted
         saved = 0
-        for rule in rules:
+        for rule in _last_extracted:
             if not isinstance(rule, dict):
                 continue
             desc = str(rule.get("desc") or "").strip()
             if not desc:
                 continue
+            _cv = (
+                rule.get("check_value")
+                if rule.get("check_value") is not None
+                else rule.get("value")
+            )
             _rule_service.create_rule(
                 reference=str(rule.get("ref") or "REQ-AI").strip(),
                 rule_type=str(rule.get("rule_type") or "numeric_comparison"),
@@ -475,7 +520,7 @@ def setup_routes(rt):
                 property_name=str(rule.get("property_name") or ""),
                 fallback_property=str(rule.get("fallback_property") or ""),
                 operator=str(rule.get("operator") or ""),
-                check_value=rule.get("check_value") if "check_value" in rule else rule.get("value"),
+                check_value=_cv,
                 value_min=rule.get("value_min"),
                 value_max=rule.get("value_max"),
                 unit=str(rule.get("unit") or ""),
@@ -486,14 +531,28 @@ def setup_routes(rt):
                 exceptions=rule.get("exceptions") or [],
                 related_refs=rule.get("related_refs") or [],
                 confidence=float(rule.get("confidence") or 0.8),
-                extraction_method="llm",
+                extraction_method=str(rule.get("extraction_method") or "llm"),
                 needs_review=bool(rule.get("needs_review", False)),
             )
             saved += 1
 
         return Span(
             f"Saved {saved} rules \u2713",
-            cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium cursor-default",
+            cls="text-xs font-medium text-emerald-700",
+        )
+
+    @rt("/api/rules/export-json")
+    def rules_export_json():
+        """Download the last extraction as a JSON file \u2014 no data passed through UI."""
+        import json as _json
+        from fasthtml.common import Response
+
+        global _last_extracted, _last_extracted_filename
+        safe = (_last_extracted_filename or "rules").replace(".pdf", "").replace(" ", "_")
+        return Response(
+            content=_json.dumps(_last_extracted, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{safe}_rules.json"'},
         )
 
     @rt("/api/rules/import-json", methods=["POST"])
@@ -521,21 +580,28 @@ def setup_routes(rt):
 
     @rt("/api/rules/extract", methods=["POST"])
     async def rules_extract_api(document: UploadFile):
+        global _last_extracted, _last_extracted_filename
         file_content = await document.read()
         if not file_content:
             return rule_extraction_empty_file_result()
 
         try:
-            rules = await _rule_extraction_service.extract_rules(file_content)
+            result = await _rule_extraction_service.extract_rules(file_content)
         except RuntimeError as exc:
             msg = str(exc)
-            if "api key" in msg.lower() or "gemini" in msg.lower():
+            if "api key" in msg.lower() or "openai" in msg.lower():
                 msg = (
-                    "Gemini API key not configured. "
-                    "Copy example.env to .env and set GEMINI_API_KEY, then restart the server."
+                    "OpenAI API key not configured. "
+                    "Copy example.env to .env and set OPENAI_API_KEY, then restart the server."
                 )
             return Alert(msg, cls=AlertT.error)
         except Exception as exc:
-            return Alert(f"Rule extraction failed: {exc}", cls=AlertT.error)
+            return Alert(
+                f"Rule extraction failed: {type(exc).__name__}: {exc}",
+                cls=AlertT.error,
+            )
 
-        return rule_extraction_results(rules, document.filename)
+        _last_extracted = result.rules
+        _last_extracted_filename = document.filename or ""
+
+        return rule_extraction_results(result.rules, document.filename, warnings=result.warnings)

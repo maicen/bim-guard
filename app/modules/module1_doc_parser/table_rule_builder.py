@@ -35,7 +35,7 @@ MAX_VARIANTS = {"max", "maximum", "max (mm)", "max. (mm)", "max.", "maximum (mm)
 
 
 class TableRuleBuilder:
-    def __init__(self, rule_store):
+    def __init__(self, rule_store=None):
         self.store = rule_store
 
     def _detect_target(self, text: str) -> str:
@@ -53,7 +53,8 @@ class TableRuleBuilder:
             return "deg"
         return "mm"
 
-    def _extract_from_table(self, table_dict: dict, generator) -> int:
+    def _build_rule_dicts(self, table_dict: dict) -> list[dict]:
+        """Build rule dicts from a table DataFrame without saving to any store."""
         df = table_dict["dataframe"].copy()
         idx = table_dict["table_index"]
         df.columns = [str(c).strip().lower() for c in df.columns]
@@ -61,7 +62,7 @@ class TableRuleBuilder:
         min_col = next((c for c in df.columns if c in MIN_VARIANTS), None)
         max_col = next((c for c in df.columns if c in MAX_VARIANTS), None)
         if not min_col or not max_col:
-            return 0
+            return []
 
         prop_col = df.columns[0]
         rules = []
@@ -76,25 +77,50 @@ class TableRuleBuilder:
             except (ValueError, TypeError):
                 continue
 
-            prop_name = name.replace(" ", "_").title()
-            target = self._detect_target(name)
-
             rules.append(
                 {
                     "ref": f"OBC_Table_{idx + 1}",
+                    "desc": f"{name} must be between {min_val} and {max_val}",
+                    "source_text": "",
+                    "target": self._detect_target(name),
+                    "property_set": "",
+                    "property_name": name.replace(" ", "_").title(),
+                    "fallback_property": "",
                     "rule_type": "numeric_range",
-                    "target": target,
-                    "property_name": prop_name,
                     "operator": "between",
-                    "check_value": None,
+                    "value": None,  # table rules use value_min/value_max
+                    "check_value": None,  # Module 3 compatibility
                     "value_min": min_val,
                     "value_max": max_val,
                     "unit": self._detect_unit(name),
+                    "applies_when": {},
                     "severity": "mandatory",
-                    "desc": f"{name} must be between {min_val} and {max_val}",
+                    "keyword": "shall",
+                    "compliance_type": "prescriptive",
+                    "exceptions": [],
+                    "related_refs": [],
+                    "overridden_by": None,
+                    "confidence": 1.0,
+                    "extraction_method": "table",
+                    "needs_review": False,
                 }
             )
 
+        return rules
+
+    def extract_all_as_dicts(self, tables: list) -> list[dict]:
+        """Return all table rules as dicts without saving to any store."""
+        all_rules: list[dict] = []
+        for t in tables:
+            all_rules.extend(self._build_rule_dicts(t))
+        if all_rules:
+            print(
+                f"[TableRuleBuilder] {len(all_rules)} table rules built from {len(tables)} tables"
+            )
+        return all_rules
+
+    def _extract_from_table(self, table_dict: dict, generator) -> int:
+        rules = self._build_rule_dicts(table_dict)
         if rules:
             saved = generator.save_batch(rules, source_doc="OBC_Table_Direct")
             return len(saved)

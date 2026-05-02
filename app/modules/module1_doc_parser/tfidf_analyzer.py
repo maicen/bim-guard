@@ -30,11 +30,14 @@ OR import and call:
     analyzer.print_report(new_keywords)
 """
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
 import re
 
-import numpy as np
-from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
-from sklearn.feature_extraction.text import TfidfVectorizer
+try:
+    from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
+except ImportError:
+    from app.modules.module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
 
 # Words to always ignore — structural words with no compliance value
 STOP_WORDS = {
