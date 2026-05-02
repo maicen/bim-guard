@@ -10,7 +10,7 @@ MAICEN-1125-M10 · Final Master's Project · Group 5 · Zigurat Global Institute
 
 **BIM Guard** is a BIM compliance application built with FastHTML (Python) and MonsterUI. It lets users upload IFC models, define compliance rules from documents, and generate reports.
 
-**Tech stack:** FastHTML · MonsterUI · FastLite (SQLite) · IfcOpenShell · HTMX · LiteLLM (Gemini)
+**Tech stack:** FastHTML · MonsterUI · Supabase (Postgres + Storage) · IfcOpenShell · HTMX · Gemini
 
 ## Instructions Files Map
 
@@ -42,8 +42,10 @@ bim-guard/
 │   │   ├── projects.py
 │   │   ├── analyze.py
 │   │   └── viewer.py           # In-browser IFC 3D viewer
-│   ├── services/               # Business logic and persistence
-│   │   ├── persistence.py      # SQLite schema via fastlite
+│   ├── services/               # Business logic and persistence adapters
+│   │   ├── persistence.py      # DB backend selector (Supabase default)
+│   │   ├── db_adapters.py      # SQLite/Supabase table adapter layer
+│   │   ├── object_storage.py   # Local/Supabase object storage adapter
 │   │   ├── documents_service.py
 │   │   ├── projects_service.py
 │   │   ├── rules_service.py
@@ -59,9 +61,10 @@ bim-guard/
 │   │   └── orchestrator.py
 │   └── views/
 │       └── layout.py
-├── data/                       # Runtime data (SQLite DB + uploads)
-│   └── uploads/
-│       └── ifc/
+├── data/                       # Runtime cache and local dev artifacts
+│   ├── cache/
+│   └── rulesets/
+├── scripts/                    # One-off migration/backfill utilities
 ├── docs/                       # Supporting documentation and resources
 ├── static/                     # CSS, JS, and IFC viewer assets
 │   ├── css/
@@ -112,7 +115,7 @@ uv sync --group ml-pipeline
 
 > This installs the optional `ml-pipeline` dependency group defined in `pyproject.toml` (including docling, spacy + English model, and scikit-learn). First run may download model weights — allow a few minutes.
 
-### 4. Configure environment variables (required for AI features)
+### 4. Configure environment variables
 
 Create a `.env` file from the template:
 
@@ -124,13 +127,23 @@ Copy-Item example.env .env
 cp example.env .env
 ```
 
-Open `.env` and set your Gemini API key — get one free at [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys):
+Open `.env` and set Supabase credentials:
+
+```
+BIM_GUARD_DB_BACKEND=supabase
+BIM_GUARD_STORAGE_BACKEND=supabase
+SUPABASE_URL=...
+SUPABASE_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+For rule extraction, also set a Gemini key (free at [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys)):
 
 ```
 GEMINI_API_KEY=your_key_here
 ```
 
-> Without this key the **Rule Extraction Studio** (`/library/rules/extract`) will show an error. Basic document upload and text extraction (pypdf) work without a key.
+> Without Gemini credentials, the **Rule Extraction Studio** (`/library/rules/extract`) will show an error. Core project/document workflows still work.
 
 ### 5. Run the app
 
@@ -139,6 +152,35 @@ uv run uvicorn main:app --reload
 ```
 
 The app will be available at `http://127.0.0.1:8000`.
+
+## Deployment
+
+### Docker Compose
+
+Run with Docker Compose (Supabase-backed):
+
+```bash
+docker compose up --build
+```
+
+- `docker-compose.yml` passes Supabase environment variables from host `.env`.
+- A named cache volume is mounted at `/app/data/cache` for downloaded storage objects.
+
+### Render.com
+
+This repository includes `render.yaml` for Render deployment using Docker.
+
+Required Render environment variables:
+
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Optional AI variables:
+
+- `GEMINI_API_KEY`
+- `GOOGLE_API_KEY`
+- `BIM_GUARD_RULE_MODEL`
 
 ## Rule Extraction (AI)
 

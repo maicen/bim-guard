@@ -25,17 +25,17 @@ When in doubt, the project-specific instructions file is authoritative.
 
 ## Database Access
 
-- Single accessor: `from app.db import db; conn = db()`.
-- Schema bootstrap and table creation go through `PersistenceService.get_table(...)` in `app/services/persistence.py`.
-- `DB_PATH` is `PersistenceService.DB_PATH` — do **not** re-define it in other modules.
-- FastLite only. No SQLAlchemy, no Pydantic models.
-- Tables: `db().t.projects`, `db().t.documents`, `db().t.rules`.
+- Single accessor: `PersistenceService.get_table(...)` in `app/services/persistence.py`.
+- Runtime default is Supabase (`BIM_GUARD_DB_BACKEND=supabase`), with SQLite as optional fallback.
+- Do not query Supabase directly from routes; keep DB access inside services.
+- Table adapters expose a unified interface for `projects`, `documents`, and `rules`.
 
 ## File Uploads
 
 - Handler must be `async def` and accept `UploadFile`.
-- Save to `data/uploads/` (IFC files → `data/uploads/ifc/`).
-- Filename: `{uuid4_hex}_{original_name}` — use `PersistenceService.uploads_dir()` for the path.
+- Save through `ObjectStorage.save_upload(...)` in `app/services/object_storage.py`.
+- Runtime default is Supabase Storage (`BIM_GUARD_STORAGE_BACKEND=supabase`), with local storage as optional fallback.
+- Store returned references (`sb://bucket/key` or local path) in DB records instead of constructing paths in routes.
 
 ## Naming Conventions
 
@@ -65,4 +65,4 @@ When in doubt, the project-specific instructions file is authoritative.
 ## Timestamps
 
 - Use ISO 8601 UTC strings: `datetime.utcnow().isoformat()`.
-- Store as `str` columns in SQLite.
+- Store as string timestamp columns in DB records (Supabase default backend).

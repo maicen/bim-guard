@@ -8,6 +8,8 @@
 | **Scope** | Backend structure, FastHTML/MonsterUI full-stack wiring, request lifecycle |
 | **Owner** | Group 5 — Masters in BIM Management, Zigurat Global Institute of Technology |
 
+> Note: some sections below are historical migration-plan material retained for thesis context. For current runtime setup, treat `README.md`, `docker-compose.yml`, and `render.yaml` as the operational source of truth.
+
 ---
 
 ## 1. Purpose and scope
@@ -42,8 +44,9 @@ The FastHTML / MonsterUI stack addresses these issues while keeping the implemen
 | IFC processing | **ifcopenshell** | Open-source IFC 2x3 / IFC4 parser |
 | Point clouds | **laspy**, **pye57** | `.las` / `.laz` / `.e57` readers (open formats) |
 | Plotting | **plotly** | 3D risk maps, Gantt, charts (rendered as HTML fragments) |
-| Persistence | **SQLite** via stdlib `sqlite3` (or `sqlmodel` if complexity grows) | Project state, issue history, audit trail |
-| LLM rule extraction | **Anthropic Claude API** (`/v1/messages`) | Translate engineering standards text into structured JSON rulesets |
+| Persistence | **Supabase Postgres** (default) via adapter layer | Project state, documents, rules, audit-style records |
+| Object storage | **Supabase Storage** (default) via adapter layer | IFC files, uploaded documents, generated artifacts |
+| LLM rule extraction | **Gemini API** | Translate engineering standards text into structured JSON rulesets |
 
 ### 3.1 How the app is started
 
@@ -90,10 +93,11 @@ bimguard-ai/
 │   │   └── schedule_impact.py             # Issues → programme delay & £ cost
 │   ├── services/                          # Persistence, configuration, external integrations
 │   │   ├── __init__.py
-│   │   ├── project_store.py               # CRUD for projects, elements, issues
-│   │   ├── ruleset_loader.py              # Load & version-check JSON rulesets
-│   │   ├── llm_rule_extractor.py          # Standards text → structured rules via Claude API
-│   │   └── db.py                          # SQLite connection, schema, migrations
+│   │   ├── persistence.py                 # DB adapter bootstrap (Supabase default)
+│   │   ├── db_adapters.py                 # Table adapters (SQLite + Supabase)
+│   │   ├── object_storage.py              # Object storage adapters (local + Supabase)
+│   │   ├── rules_service.py               # Rule CRUD
+│   │   └── gemini_rule_extractor.py       # Standards text → structured rules via Gemini
 │   ├── engines/                           # Validated rule engines (lifted from prototype)
 │   │   ├── bimguard_corrosion_engine.py   # GC-001 v1.0.0
 │   │   └── bimguard_crevice_engine.py     # CC-001 v1.0.0
@@ -107,15 +111,14 @@ bimguard-ai/
 │       ├── tables.py                      # Element and risk tables
 │       └── charts.py                      # Plotly → FT wrappers
 └── data/
-    ├── projects/                          # Per-project working folders
-    ├── uploads/                           # Raw user uploads (IFC, point clouds)
-    └── bcf_out/                           # Generated BCF 2.1 ZIPs for download
+    ├── rulesets/                          # Seed JSON rulesets
+    └── cache/                             # Runtime cache for downloaded storage objects
 ```
 
 Three design principles govern this layout:
 
 1. **Routes know about HTTP, modules do not.** Anything in `app/modules/` is pure Python that can be unit-tested without a server. Routes adapt HTTP requests into module calls and module results into FT trees.
-2. **Services are the only path to state.** Modules and routes never open the database or touch `data/` directly; they go through `app/services/`. This keeps persistence swappable (SQLite today, Postgres or S3 later) without rewriting the pipeline.
+2. **Services are the only path to state.** Modules and routes never open the database or touch artifact storage directly; they go through `app/services/`. Persistence and object storage are swappable through adapters (Supabase defaults, SQLite/local optional for local fallback).
 3. **Engines are immutable from the app's perspective.** `app/engines/` contains the validated GC-001 and CC-001 logic from the Streamlit prototype. The rest of the app consumes them as a library — it does not edit them.
 
 ## 5. Request lifecycle
@@ -179,8 +182,8 @@ app, rt = fast_app(
     live=True,    # auto-reload hooks during development
 )
 
-# Ensure SQLite schema exists before the first request.
-init_db()
+# Run startup initialization hooks.
+initialize_startup_state()
 
 # Each route module exposes a `register(rt)` function that attaches its endpoints.
 for module in (home, ingest, overview, compliance, pointcloud, bcf, schedule):
@@ -303,14 +306,14 @@ Services are the only components that perform I/O (besides reading uploaded file
 
 | Service | Responsibility | Key functions |
 |---|---|---|
-| `db.py` | SQLite connection, schema DDL, simple migration table | `init_db()`, `connection()`, `migrate()` |
-| `project_store.py` | CRUD for projects, elements, results, issues; session-level "current project" lookup | `current_project()`, `save_elements()`, `save_results()`, `save_issues()`, `list_projects()` |
-| `ruleset_loader.py` | Load `app/rulesets/*.json` with version stamps; validate schema; cache in memory | `load_active_rulesets()`, `list_rulesets()`, `ruleset_version(name)` |
-| `llm_rule_extractor.py` | Take an uploaded standards extract (text / PDF page) and use the Claude API to produce a candidate JSON ruleset for human review before it lands in `app/rulesets/` | `propose_ruleset(source_text, mechanism)`, `diff_against_active(candidate)` |
+| `persistence.py` | Backend selection and table bootstrap (Supabase default, SQLite fallback) | `get_db()`, `get_table(...)` |
+| `db_adapters.py` | Unified table API over SQLite and Supabase | `SQLiteTableAdapter`, `SupabaseTableAdapter` |
+| `object_storage.py` | Unified object storage API over local filesystem and Supabase Storage | `save_upload(...)`, `materialize_local_path(...)`, `delete(...)` |
+| `gemini_rule_extractor.py` | Extract candidate rules from standards text using Gemini | `extract_rules(...)`, validation helpers |
 
-### 9.1 Persistence schema (initial)
+### 9.1 Persistence schema (current)
 
-SQLite is sufficient for the FMP scope. Tables:
+Supabase Postgres is the default runtime backend. Core tables:
 
 - `projects (id, name, created_at, active_gc_version, active_cc_version)`
 - `elements (id, project_id, guid, material, system, floor, space, joint_type, env_class, …)`
@@ -323,7 +326,7 @@ SQLite is sufficient for the FMP scope. Tables:
 "LLM-translated engineering rules" is the mechanism by which new compliance rules (for example, a new grade/environment pair from CIRIA or IMOA) are on-boarded without hand-coding JSON. The flow is:
 
 1. User uploads the relevant extract (text / PDF page) of a standard.
-2. `llm_rule_extractor.propose_ruleset()` sends the extract to the Claude API (`/v1/messages`) with a system prompt that constrains output to the project's JSON ruleset schema.
+2. `gemini_rule_extractor` sends the extract to Gemini with a constrained prompt that targets the project's JSON rule schema.
 3. The response is parsed and diffed against the currently active ruleset.
 4. The diff is shown to the user for approval; on approval it is written to `app/rulesets/` with a new semantic version number.
 
@@ -333,12 +336,11 @@ The engine code itself is unchanged — it always reads the latest active versio
 
 | HTTP endpoint | Module(s) | Service(s) | Engine(s) | Writes |
 |---|---|---|---|---|
-| `POST /ingest` | `ifc_parser` | `project_store` | — | `data/uploads/`, `elements` table |
-| `POST /ingest/pointcloud` | `pointcloud_loader` | `project_store` | — | `data/uploads/`, `projects` table |
-| `POST /compliance/run` | `compliance_runner` | `ruleset_loader`, `project_store` | GC-001, CC-001 | `results` table |
-| `GET /bcf/download` | `bcf_generator` | `project_store` | — | `data/bcf_out/*.bcfzip`, `issues` table |
-| `GET /schedule` | `schedule_impact` | `project_store` | — | — (read-only) |
-| `POST /rulesets/propose` (future) | — | `llm_rule_extractor`, `ruleset_loader` | — | `app/rulesets/*.json` after approval |
+| `POST /projects/create` | `module2_ifc_read` (indirect via services) | `projects_service`, `object_storage` | — | Supabase Storage + `projects` table |
+| `POST /api/documents/upload` | `module1_doc_parser` | `documents_service`, `object_storage` | — | Supabase Storage + `documents` table |
+| `POST /analyze/results` | `orchestrator` | `projects_service`, `documents_service`, `rules_service` | GC-001, CC-001 | read-mostly (analysis output in response) |
+| `GET /projects/{id}/ifc` | — | `projects_service`, `object_storage` | — | storage read + cache write |
+| `POST /library/rules/create` | `module3_rule_builder` (service path) | `rules_service` | — | `rules` table |
 
 A route may call multiple modules; a module may call multiple services; services and engines are leaves and do not call back up the stack.
 
@@ -378,29 +380,25 @@ uv run uvicorn main:app --reload
 # open http://localhost:8000
 ```
 
-**Container (planned):**
+**Container (current):**
 
 ```dockerfile
-FROM python:3.12-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-WORKDIR /app
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
-COPY . .
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+docker compose up --build
 ```
 
-**Static assets:** FastHTML serves MonsterUI / HTMX assets via the headers injected by `Theme.blue.headers()`, so no separate CDN or build step is needed for the FMP demo.
+**Render.com:** Deployment is defined in `render.yaml` and runs the same Docker image with environment variables injected in the Render dashboard.
+
+**Static assets:** FastHTML serves MonsterUI / HTMX assets via app headers, so no separate frontend build step is required.
 
 ## 14. Open items and assumptions
 
 These are called out explicitly so reviewers can see what is deliberate vs. still-to-decide:
 
-- **Persistence store.** SQLite is assumed as sufficient for the FMP. If the multi-user workspace is demonstrated at review time, the store may move to Postgres behind the same `project_store` service interface.
+- **Persistence store.** Supabase Postgres is the default backend. SQLite/local backends remain available as fallback through adapters.
 - **Authentication.** Not in scope for the FMP demo. When added, it belongs in `app/services/auth.py` and is enforced via a FastHTML middleware registered in `main.py`.
 - **BCF viewpoint screenshots.** Currently placeholder PNGs. The plan is to render actual screenshots from the Plotly 3D viewer; tracked in the thesis Chapter 5 "limitations" section.
 - **Cost / duration model.** Hardcoded in the prototype; to be made user-configurable via CSV upload, handled by `schedule_impact.py` + `project_store`.
-- **LLM rule extraction UI.** The service (`llm_rule_extractor.py`) is in scope; a full curation UI may be deferred post-submission — the architectural slot is reserved so the thesis argument holds.
+- **LLM rule extraction UI.** The Gemini extraction service is in scope; a full curation UI may be deferred post-submission.
 - **Migration status.** The repository is now FastHTML-first. Treat this file as a living architecture reference and update it whenever routes, modules, or deployment assumptions change.
 
 ## 15. Change log

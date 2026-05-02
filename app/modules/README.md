@@ -151,7 +151,7 @@ app/modules/
 │   ├── __init__.py
 │   ├── rule_generator.py
 │   ├── rule_converter.py        — OpenAI GPT-4o rule extractor
-│   ├── rule_store.py            — SQLite persistence (CLI)
+│   ├── rule_store.py            — shared rule persistence via app services
 │   ├── obc_seed_rules.py        — 25+ OBC baseline rules
 │   └── module3_rule_builder_mock.py
 │
@@ -213,9 +213,9 @@ uv sync --group ml-pipeline
 ### 3. Set your API key (only needed if USE_GPT4O = True)
 
 ```bash
-cp .env.example .env
-# Edit .env and add your OpenAI API key
-GEMINI_API_KEY=sk-your-key-here
+cp example.env .env
+# Edit .env and add your Gemini API key
+GEMINI_API_KEY=your_key_here
 ```
 
 ---
@@ -283,14 +283,14 @@ bim-guard/
 │       │   └── keywords/
 │       │       └── keyword_master.py       ← 193 keywords, 12 groups
 │       ├── module3_rule_builder/
-│       │   ├── rule_store.py               ← SQLite CRUD
+│       │   ├── rule_store.py               ← shared CRUD via RuleService
 │       │   ├── rule_generator.py           ← validate + save rules
 │       │   ├── rule_converter.py           ← GPT-4o + RAG NLP engine
 │       │   ├── regex_rule_converter.py     ← regex engine (default)
 │       │   └── obc_seed_rules.py           ← 25 pre-built OBC rules
 │       └── orchestrator.py                 ← single entry point
 ├── data/
-│   └── bimguard.sqlite                     ← active SQLite database
+│   └── cache/                              ← runtime local cache for remote storage objects
 ├── example.env                              ← copy to .env, add API key
 └── pyproject.toml                           ← dependency and tool config
 ```
