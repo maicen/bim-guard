@@ -190,14 +190,14 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
     )
 
 
-def _rule_validation_card(rule_validations: list[dict]):
+def _rule_validation_card(rule_validations: list[dict], analysis_theme: str):
     """Build the Module 3 rule validation card for the analysis results page."""
     if not rule_validations:
         return Card(
-            CardHeader(CardTitle("Rule Validation — Module 3")),
+            CardHeader(CardTitle(f"Rule Validation — Module 3 ({analysis_theme})")),
             CardContent(
                 P(
-                    "No rules found in the library. "
+                    f"No {analysis_theme} rules found in the library. "
                     "Go to Library → Rule Extraction Studio to extract and save rules first.",
                     cls="text-sm text-muted-foreground",
                 )
@@ -263,7 +263,7 @@ def _rule_validation_card(rule_validations: list[dict]):
     return Card(
         CardHeader(
             Div(
-                CardTitle("Rule Validation — Module 3"),
+                CardTitle(f"Rule Validation — Module 3 ({analysis_theme})"),
                 P(
                     "Each library rule is checked against the IFC model. "
                     "'No elements' means that IFC class is absent from this model.",
@@ -285,9 +285,11 @@ def _rule_validation_card(rule_validations: list[dict]):
     )
 
 
-def _rule_compliance_card(compliance_results: list[dict], summary: dict, error: str | None):
+def _rule_compliance_card(
+    compliance_results: list[dict], summary: dict, error: str | None, analysis_theme: str
+):
     """Module 4 rule compliance card — shows PASS/FAIL per rule with element details."""
-    title = "Rule Compliance Check — Module 4"
+    title = f"Rule Compliance Check — Module 4 ({analysis_theme})"
 
     if error:
         return Card(
@@ -502,6 +504,16 @@ def setup_routes(rt):
                                         ),
                                     ),
                                     Div(
+                                        FormLabel("Analysis Theme", fr="analysis_theme"),
+                                        Select(
+                                            Option("Architecture", value="Architecture", selected=True),
+                                            Option("MEP", value="MEP"),
+                                            id="analysis_theme",
+                                            name="analysis_theme",
+                                            required=True,
+                                        ),
+                                    ),
+                                    Div(
                                         FormLabel("Documents"),
                                         Div(
                                             *doc_checkboxes,
@@ -599,12 +611,14 @@ def setup_routes(rt):
             return Alert("Invalid project selection.", cls=AlertT.error)
 
         doc_ids = [int(v) for v in form.getlist("document_ids") if v]
+        analysis_theme = (form.get("analysis_theme") or "Architecture").strip()
         include_openings = bool(form.get("include_openings"))
         include_spaces = bool(form.get("include_spaces"))
         include_type_definitions = bool(form.get("include_type_definitions"))
         result = _bim_guard_app.orchestrate_workflow(
             project_id,
             doc_ids,
+            analysis_theme=analysis_theme,
             include_openings=include_openings,
             include_spaces=include_spaces,
             include_type_definitions=include_type_definitions,
@@ -614,6 +628,7 @@ def setup_routes(rt):
             return Alert(result["error"], cls=AlertT.error)
 
         project = result["project"]
+        selected_theme = result.get("analysis_theme", "Architecture")
         ifc_count = result["ifc_element_count"]
         ifc_type_counts = result.get("ifc_type_counts") or {}
         ifc_totals = result.get("ifc_totals") or {}
@@ -692,7 +707,9 @@ def setup_routes(rt):
             error=result.get("compliance_error"),
         )
 
-        rule_validation_card = _rule_validation_card(result.get("rule_validations", []))
+        rule_validation_card = _rule_validation_card(
+            result.get("rule_validations", []), selected_theme
+        )
 
         rc = result.get("rule_compliance", [])
         rc_summary = result.get("rule_compliance_summary", {})
@@ -702,11 +719,11 @@ def setup_routes(rt):
         global _last_compliance_results
         _last_compliance_results = rc
 
-        rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error)
+        rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error, selected_theme)
 
         sections = [
             Card(
-                CardHeader(CardTitle(project.get("name", "Project"))),
+                CardHeader(CardTitle(f"{project.get('name', 'Project')} — {selected_theme} Theme")),
                 CardContent(ifc_detail),
             ),
             *(doc_cards or [P("No documents selected.", cls="text-sm text-muted-foreground")]),
@@ -714,7 +731,7 @@ def setup_routes(rt):
         ]
         if rule_compliance_card:
             sections.append(rule_compliance_card)
-        if compliance_card:
+        if selected_theme == "MEP" and compliance_card:
             sections.append(compliance_card)
 
         return Div(*sections, cls="space-y-4")

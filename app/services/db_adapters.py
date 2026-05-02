@@ -6,6 +6,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from postgrest.exceptions import APIError
+
 
 @dataclass(slots=True)
 class _WhereExpr:
@@ -146,9 +148,18 @@ class SupabaseTableAdapter:
 
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert one row and return inserted payload from API."""
-        response = self._client.table(self._table_name).insert(payload).execute()
-        rows = response.data or []
-        return rows[0] if rows else payload
+        try:
+            response = self._client.table(self._table_name).insert(payload).execute()
+            rows = response.data or []
+            return rows[0] if rows else payload
+        except APIError as exc:
+            if self._should_retry_insert_with_pk(exc, payload):
+                retry_payload = dict(payload)
+                retry_payload[self._pk] = self._next_numeric_pk()
+                response = self._client.table(self._table_name).insert(retry_payload).execute()
+                rows = response.data or []
+                return rows[0] if rows else retry_payload
+            raise
 
     def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
         """Update one row by primary key."""
@@ -204,6 +215,34 @@ class SupabaseTableAdapter:
             offset += remaining
 
         return collected
+
+    def _should_retry_insert_with_pk(self, exc: APIError, payload: dict[str, Any]) -> bool:
+        """Return True when an insert failed due to duplicate primary key without explicit PK."""
+        if self._pk in payload:
+            return False
+
+        code = str(getattr(exc, "code", "") or "")
+        details = str(getattr(exc, "details", "") or "")
+        return code == "23505" and f"Key ({self._pk})=(" in details
+
+    def _next_numeric_pk(self) -> int:
+        """Compute the next integer primary key value for fallback inserts."""
+        response = (
+            self._client.table(self._table_name)
+            .select(self._pk)
+            .order(self._pk, desc=True)
+            .limit(1)
+            .execute()
+        )
+        rows = response.data or []
+        if not rows:
+            return 1
+
+        current = rows[0].get(self._pk)
+        try:
+            return int(current) + 1
+        except (TypeError, ValueError):
+            return 1
 
     @staticmethod
     def _apply_expr(query: Any, expr: _WhereExpr) -> Any:
