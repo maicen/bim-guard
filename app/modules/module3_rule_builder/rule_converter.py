@@ -25,10 +25,10 @@ import json
 
 import openai
 
-try:GEMINI
-    from config import GEMINI_API_KEY, OGEMINI_MODEL
-except ImportError:GEMINI
-    from app.modules.config import GEMINI_API_KEY, GEMINI_MODEL
+try:
+    from config import OPENAI_API_KEY, OPENAI_MODEL
+except ImportError:
+    from app.modules.config import OPENAI_API_KEY, OPENAI_MODEL
 
 
 # ── SYSTEM PROMPT ─────────────────────────────────────────────────────────────
@@ -115,13 +115,13 @@ class RuleConverter:
 
     def __init__(self, api_key: str = None, rule_store=None, model: str = None):
         """
-        Args:GEMINI
+        Args:
             api_key    (str):       OpenAI API key (defaults to config.OPENAI_API_KEY)
-            rule_store (RuleStore): RuleStore instance for RAG example retGEMINI
+            rule_store (RuleStore): RuleStore instance for RAG examples
             model      (str):       OpenAI model name (defaults to config.OPENAI_MODEL)
-        """GEMINI
+        """
         self.client = openai.OpenAI(api_key=api_key or OPENAI_API_KEY)
-        self.store = rule_storGEMINI
+        self.store = rule_store
         self.model = model or OPENAI_MODEL
 
     # ── PRIVATE ───────────────────────────────────────────────────────────────
