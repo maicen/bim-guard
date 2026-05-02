@@ -30,16 +30,17 @@ COPY main.py ./
 COPY app/ ./app/
 COPY static/ ./static/
 
-# Ensure the data directory exists so SQLite and uploads work
-RUN mkdir -p data/uploads/ifc data/rulesets
-
-# Copy default rulesets (non-secret config, safe to bake in)
+# data/rulesets — baked into the image; read at startup by ruleset_seeder
+# data/cache    — writable dir for Supabase Storage file cache
+RUN mkdir -p data/rulesets data/cache/supabase-storage
 COPY data/rulesets/ ./data/rulesets/
 
 # Make sure the venv is on PATH
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    BIM_GUARD_DB_BACKEND=supabase \
+    BIM_GUARD_STORAGE_BACKEND=supabase
 
 EXPOSE 8000
 
@@ -47,4 +48,4 @@ EXPOSE 8000
 RUN useradd -m -u 1000 bimguard && chown -R bimguard:bimguard /app
 USER bimguard
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -6,13 +6,20 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Pass API keys from host .env (or set them directly here for testing)
+      # Supabase — required; all data and file storage lives here
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      # Backend selectors (defaults already set in image; explicit here for clarity)
+      - BIM_GUARD_DB_BACKEND=supabase
+      - BIM_GUARD_STORAGE_BACKEND=supabase
+      # AI rule extraction
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - BIM_GUARD_RULE_MODEL=${BIM_GUARD_RULE_MODEL:-gemini/gemini-2.0-flash}
     volumes:
-      # Persist SQLite database and uploaded files across container restarts
-      - ./data:/app/data
+      # Persist the Supabase Storage file cache across container restarts
+      - bim-guard-cache:/app/data/cache
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" ]
       interval: 30s
@@ -20,3 +27,6 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+
+volumes:
+  bim-guard-cache:
