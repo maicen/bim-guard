@@ -15,7 +15,7 @@ class PersistenceService:
     DATA_DIR = Path("data")
     DB_PATH = DATA_DIR / "bimguard.sqlite"
     UPLOADS_DIR = DATA_DIR / "uploads"
-    DB_BACKEND = os.getenv("BIM_GUARD_DB_BACKEND", "sqlite").strip().lower()
+    DB_BACKEND = os.getenv("BIM_GUARD_DB_BACKEND", "supabase").strip().lower()
     _db = None
 
     @classmethod

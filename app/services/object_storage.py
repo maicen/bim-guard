@@ -14,7 +14,7 @@ class ObjectStorage:
 
     def __init__(self) -> None:
         """Initialize storage settings from environment variables."""
-        self._backend = os.getenv("BIM_GUARD_STORAGE_BACKEND", "local").strip().lower()
+        self._backend = os.getenv("BIM_GUARD_STORAGE_BACKEND", "supabase").strip().lower()
         self._bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "bim-guard-artifacts").strip()
         self._prefix = os.getenv("SUPABASE_STORAGE_PREFIX", "").strip("/")
         self._data_dir = Path("data")
