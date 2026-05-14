@@ -27,6 +27,7 @@ NAV_ICONS = {
     "Run Analysis": "cpu",
     "Reports": "file-text",
     "Documents": "book-open",
+    "Rule Extraction Studio": "list-checks",
     "Rules": "list-checks",
     "Settings": "settings",
 }
@@ -71,7 +72,14 @@ def AppSidebar():
             ],
         ),
         ("Analysis", [("Run Analysis", "/analysis/run"), ("Reports", "/reports")]),
-        ("Library", [("Documents", "/library/documents"), ("Rules", "/library/rules")]),
+        (
+            "Library",
+            [
+                ("Documents", "/library/documents"),
+                ("Rule Extraction Studio", "/library/rules/extract"),
+                ("Rules", "/library/rules"),
+            ],
+        ),
     ]
 
     # Flatten sections into a list of MonsterUI nav components

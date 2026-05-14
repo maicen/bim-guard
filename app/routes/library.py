@@ -29,6 +29,7 @@ from app.components.rule_extraction_ui import (
     rule_extraction_empty_file_result,
     rule_extraction_page_content,
     rule_extraction_results,
+    provider_model_select_fragment,
 )
 from app.components.rules_ui import rule_form, rules_panel
 from app.components.ui import (
@@ -56,6 +57,8 @@ from app.components.ui import (
 )
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.services.documents_service import DocumentService
+from app.services.llm_client import LiteLLMClient
+from app.services.rule_extractor import LiteLLMRuleExtractor
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rules_service import RuleService
 from app.utils import (
@@ -296,7 +299,7 @@ def setup_routes(rt):
     def rules_extract_page():
         return (
             Title("Rule Extraction - BIM Guard"),
-            DashboardLayout(rule_extraction_page_content()),
+            DashboardLayout(rule_extraction_page_content(_document_service.list_documents())),
         )
 
     @rt("/library/rules/import-json")
@@ -577,21 +580,42 @@ def setup_routes(rt):
             cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium",
         )
 
+    @rt("/api/rules/provider-models")
+    def api_provider_models(provider: str = "openai"):
+        return provider_model_select_fragment(provider)
+
     @rt("/api/rules/extract", methods=["POST"])
-    async def rules_extract_api(document: UploadFile):
+    async def rules_extract_api(
+        document_id: int = 0,
+        provider: str = "openai",
+        model: str = "gpt-4o-mini",
+        api_key: str = "",
+    ):
         global _last_extracted, _last_extracted_filename
-        file_content = await document.read()
-        if not file_content:
+
+        if not document_id:
+            return Alert("Please select a document.", cls=AlertT.warning)
+
+        document = _document_service.get_document(document_id)
+        if document is None:
+            return Alert("Selected document was not found.", cls=AlertT.error)
+
+        extracted_text = str(document.get("extracted_text") or "").strip()
+        if not extracted_text:
             return rule_extraction_empty_file_result()
 
+        extractor = LiteLLMRuleExtractor(client=LiteLLMClient(model=model, api_key=api_key or None))
+        svc = RuleExtractionService(provider=extractor)
+
         try:
-            result = await _rule_extraction_service.extract_rules(file_content)
+            result = await svc.extract_rules_from_text(extracted_text)
         except RuntimeError as exc:
             msg = str(exc)
-            if "api key" in msg.lower() or "openai" in msg.lower():
+            if "api key" in msg.lower() or "api_key" in msg.lower() or "apikey" in msg.lower():
                 msg = (
-                    "OpenAI API key not configured. "
-                    "Copy example.env to .env and set OPENAI_API_KEY, then restart the server."
+                    f"API key not configured for {provider!r}. "
+                    "Provide a key in the API Key field or set the relevant "
+                    "environment variable on the server."
                 )
             return Alert(msg, cls=AlertT.error)
         except Exception as exc:
@@ -601,6 +625,10 @@ def setup_routes(rt):
             )
 
         _last_extracted = result.rules
-        _last_extracted_filename = document.filename or ""
+        _last_extracted_filename = str(document.get("filename") or "")
 
-        return rule_extraction_results(result.rules, document.filename, warnings=result.warnings)
+        return rule_extraction_results(
+            result.rules,
+            str(document.get("filename") or ""),
+            warnings=result.warnings,
+        )

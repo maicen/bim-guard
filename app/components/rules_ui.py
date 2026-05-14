@@ -128,27 +128,35 @@ def rules_panel(rows: list[dict], message: str | None = None, level: str = "succ
                         variant="secondary",
                         cls="text-sm",
                     ),
-                    cls="flex items-center justify-between",
+                    cls="flex items-center justify-between gap-2 flex-wrap",
                 )
             ),
             CardContent(
-                Table(
-                    Thead(
-                        Tr(
-                            Th("Reference"),
-                            Th("Mechanism"),
-                            Th("Type"),
-                            Th("Target Class"),
-                            Th("Category"),
-                            Th("Updated"),
-                            Th("Description"),
-                            Th("Actions"),
-                        )
+                Div(
+                    Div(
+                        Table(
+                            Thead(
+                                Tr(
+                                    Th("Reference"),
+                                    Th("Mechanism"),
+                                    Th("Type"),
+                                    Th("Target Class"),
+                                    Th("Category"),
+                                    Th("Updated"),
+                                    Th("Description"),
+                                    Th("Actions"),
+                                )
+                            ),
+                            Tbody(*rules_table_rows(rows)),
+                            cls="w-full min-w-[1200px]",
+                        ),
+                        cls="w-full min-w-0 max-h-[65vh] overflow-auto",
                     ),
-                    Tbody(*rules_table_rows(rows)),
-                    cls="min-w-[1200px]",
-                )
+                    cls="w-full min-w-0",
+                ),
+                cls="w-full min-w-0 pt-0",
             ),
+            cls="w-full max-w-full h-full min-h-0 overflow-hidden",
         ),
         cls="space-y-4",
     )

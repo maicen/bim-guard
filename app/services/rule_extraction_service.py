@@ -1,5 +1,4 @@
-"""
-Rule extraction pipeline — Module 1 → OpenAI → rules list.
+"""Rule extraction pipeline — document parsing → LLM (via litellm) → rules list.
 
 Step  Description                         Status
 ────  ──────────────────────────────────  ──────────────────────────────────────
@@ -14,7 +13,7 @@ Step  Description                         Status
                                                     dimension/dependency/IFC hints
   8   BERT Classifier                     Optional — active when transformers +
                                                     fine-tuned model both present
-  9   OpenAI LLM extraction               Active
+  9   LLM extraction (litellm)            Active
  10   Deduplication                       Active
 
 Docling is the primary extractor. pypdf runs in parallel as a hot standby.
@@ -28,7 +27,8 @@ from pathlib import Path
 
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.modules.module1_doc_parser.section_chunker import SectionChunker
-from app.services.openai_rule_extractor import OpenAIRuleExtractor, RuleExtractionProvider
+from app.services.llm_client import LiteLLMClient
+from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
 
 # ── Optional module flags ─────────────────────────────────────────────────────
 
@@ -103,7 +103,9 @@ class RuleExtractionService:
     ):
         """Initialize document parser and extraction provider dependencies."""
         self._doc_reader = doc_reader or Module1_DocReader()
-        self._provider = provider or OpenAIRuleExtractor()
+        self._provider = provider or LiteLLMRuleExtractor(
+            client=LiteLLMClient(model=os.getenv("BIM_GUARD_RULE_MODEL", "gpt-4o-mini"))
+        )
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -125,6 +127,30 @@ class RuleExtractionService:
         if tables and _TABLE_BUILDER_AVAILABLE:
             table_rules = TableRuleBuilder().extract_all_as_dicts(tables)
 
+        return await self._extract_rules_from_text_with_tables(
+            text=text,
+            table_rules=table_rules,
+            warnings=warnings,
+        )
+
+    async def extract_rules_from_text(self, text: str) -> ExtractionResult:
+        """Extract compliance rules from pre-extracted document text."""
+        if not text or not text.strip():
+            return ExtractionResult(rules=[], warnings=[])
+
+        return await self._extract_rules_from_text_with_tables(
+            text=text,
+            table_rules=[],
+            warnings=[],
+        )
+
+    async def _extract_rules_from_text_with_tables(
+        self,
+        *,
+        text: str,
+        table_rules: list[dict],
+        warnings: list[str],
+    ) -> ExtractionResult:
         # ── Step 3: Section Chunker ────────────────────────────────────────
         obc_chunks = SectionChunker().chunk(text)
         if obc_chunks:
@@ -204,7 +230,7 @@ class RuleExtractionService:
             except (ImportError, OSError):
                 pass  # spaCy model not downloaded — skip all filtering
 
-        # ── Step 9: OpenAI LLM ────────────────────────────────────────────
+        # ── Step 9: LLM extraction via litellm ────────────────────────────
         prose_rules: list[dict] = []
         total = len(sendable)
 

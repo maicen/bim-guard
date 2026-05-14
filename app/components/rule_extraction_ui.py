@@ -1,20 +1,79 @@
 import json
-from fasthtml.common import Button, Details, Div, P, Pre, Span, Summary
-from monsterui.all import H1, H3, Alert, Form, FormLabel, Input, UkIcon
-from app.components.ui import (
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-    HtmxSpinner,
-    SubmitButton,
-)
+from fasthtml.common import Button, Details, Div, Option, P, Pre, Span, Summary
+from monsterui.all import H1, H3, Alert, Form, FormLabel, Input, Select, UkIcon
+from app.components.ui import Card, CardContent, CardHeader, CardTitle, HtmxSpinner
+
+# ── Provider / model catalogue ───────────────────────────────────────────────────
+
+PROVIDER_LABELS: dict[str, str] = {
+    "openrouter": "OpenRouter",
+    "openai": "OpenAI",
+    "gemini": "Google Gemini",
+    "anthropic": "Anthropic",
+}
+
+# Values are (litellm_model_string, display_label) pairs.
+PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
+    "openrouter": [
+        ("openrouter/google/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
+        ("openrouter/google/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
+        ("openrouter/google/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
+        ("openrouter/google/gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite Preview"),
+    ],
+    "openai": [
+        ("gpt-4o", "GPT-4o"),
+        ("gpt-4o-mini", "GPT-4o Mini"),
+        ("gpt-4-turbo", "GPT-4 Turbo"),
+        ("gpt-3.5-turbo", "GPT-3.5 Turbo"),
+    ],
+    "gemini": [
+        ("gemini/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
+        ("gemini/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
+        ("gemini/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
+        ("gemini/gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite Preview"),
+    ],
+    "anthropic": [
+        ("anthropic/claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
+        ("anthropic/claude-3-5-haiku-20241022", "Claude 3.5 Haiku"),
+        ("anthropic/claude-3-opus-20240229", "Claude 3 Opus"),
+    ],
+}
 
 
-def rule_extraction_page_content():
+def _model_select(provider: str = "openai"):
+    models = PROVIDER_MODELS.get(provider, PROVIDER_MODELS["openai"])
+    return Select(
+        *[
+            Option(label, value=value, selected=(idx == 0))
+            for idx, (value, label) in enumerate(models)
+        ],
+        id="model-select",
+        name="model",
+        cls="w-full",
+    )
+
+
+def provider_model_select_fragment(provider: str = "openai"):
+    """HTMX fragment: the model <select> wrapper, swapped when provider changes."""
+    return Div(_model_select(provider), id="model-select-container")
+
+
+def rule_extraction_page_content(documents: list[dict]):
     spinner, spinner_style = HtmxSpinner(
         "extract-spinner", "Scanning document and building rules via AI..."
     )
+
+    document_options = [
+        Option(doc.get("filename", f"Document {doc.get('id', '')}"), value=str(doc["id"]))
+        for doc in documents
+        if doc.get("id") is not None
+    ]
+    has_documents = len(document_options) > 0
+
+    provider_options = [
+        Option(label, value=slug, selected=(slug == "openai"))
+        for slug, label in PROVIDER_LABELS.items()
+    ]
 
     return Div(
         Div(
@@ -24,7 +83,7 @@ def rule_extraction_page_content():
                     cls="text-lg font-semibold tracking-tight",
                 ),
                 P(
-                    "Upload a BEP document to extract rules via AI.",
+                    "Choose a provider and document, then extract compliance rules via AI.",
                     cls="text-xs text-muted-foreground",
                 ),
             ),
@@ -32,32 +91,97 @@ def rule_extraction_page_content():
         ),
         Div(
             Div(
-                Card(
-                    CardHeader(CardTitle("Upload BEP Document")),
-                    CardContent(
-                        Form(
+                Form(
+                    # ── AI Provider card ─────────────────────────────────────
+                    Card(
+                        CardHeader(CardTitle("AI Provider")),
+                        CardContent(
                             Div(
-                                FormLabel("Upload BEP Document (PDF)", fr="extract-document"),
-                                Input(
-                                    id="extract-document",
-                                    type="file",
-                                    name="document",
-                                    accept=".pdf",
-                                    required=True,
-                                    cls="mt-2",
+                                FormLabel("Provider", fr="provider-select"),
+                                Select(
+                                    *provider_options,
+                                    id="provider-select",
+                                    name="provider",
+                                    cls="w-full",
+                                    hx_get="/api/rules/provider-models",
+                                    hx_target="#model-select-container",
+                                    hx_swap="outerHTML",
+                                    hx_trigger="change",
                                 ),
                                 cls="space-y-1",
                             ),
-                            SubmitButton("Extract Rules", variant="primary", cls="mt-2"),
-                            spinner,
-                            spinner_style,
-                            hx_post="/api/rules/extract",
-                            hx_target="#extracted-rules-container",
-                            hx_indicator="#extract-spinner",
-                            enctype="multipart/form-data",
+                            Div(
+                                FormLabel("Model", fr="model-select"),
+                                Div(
+                                    _model_select("openai"),
+                                    id="model-select-container",
+                                ),
+                                cls="space-y-1",
+                            ),
+                            Div(
+                                FormLabel("API Key", fr="api-key"),
+                                Input(
+                                    id="api-key",
+                                    name="api_key",
+                                    type="password",
+                                    placeholder="Leave blank to use server environment key",
+                                    cls="w-full",
+                                ),
+                                P(
+                                    "Key is sent only to your server and forwarded to the provider. "
+                                    "Never stored.",
+                                    cls="text-xs text-muted-foreground mt-1",
+                                ),
+                                cls="space-y-1",
+                            ),
                             cls="space-y-4",
-                        )
+                        ),
                     ),
+                    # ── Document selection card ───────────────────────────────
+                    Card(
+                        CardHeader(CardTitle("Select Document")),
+                        CardContent(
+                            Div(
+                                FormLabel("Choose uploaded document", fr="extract-document-id"),
+                                Select(
+                                    Option(
+                                        "Select a document"
+                                        if has_documents
+                                        else "No uploaded documents available",
+                                        value="",
+                                        selected=True,
+                                    ),
+                                    *document_options,
+                                    id="extract-document-id",
+                                    name="document_id",
+                                    required=True,
+                                    cls="w-full",
+                                ),
+                                cls="space-y-1",
+                            ),
+                            P(
+                                "Only documents already uploaded in /library/documents are listed.",
+                                cls="text-xs text-muted-foreground mt-2",
+                            ),
+                        ),
+                    ),
+                    # ── Submit ────────────────────────────────────────────────
+                    Button(
+                        "Extract Rules",
+                        type="submit",
+                        disabled=not has_documents,
+                        cls=(
+                            "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 "
+                            "text-sm font-medium transition-colors bg-primary text-primary-foreground "
+                            "hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        ),
+                    ),
+                    spinner,
+                    spinner_style,
+                    hx_post="/api/rules/extract",
+                    hx_target="#extracted-rules-container",
+                    hx_indicator="#extract-spinner",
+                    cls="space-y-4",
                 ),
                 cls="flex-1 bg-muted/30 p-6 overflow-auto",
             ),
@@ -69,7 +193,7 @@ def rule_extraction_page_content():
                 ),
                 Div(
                     P(
-                        "Upload a document and click 'Extract' to see results here.",
+                        "Select a document and click 'Extract' to see results here.",
                         cls="text-sm text-muted-foreground text-center py-10",
                     ),
                     id="extracted-rules-container",
@@ -104,7 +228,7 @@ def rule_extraction_results(
             Alert(
                 UkIcon("info", cls="h-4 w-4"),
                 Span(
-                    f"No compliance rules were found in {filename or 'the uploaded file'}. "
+                    f"No compliance rules were found in {filename or 'the selected document'}. "
                     "Try a document that contains explicit BIM or building code requirements."
                 ),
                 cls="mb-4 text-yellow-700 border-yellow-500 [&>svg]:text-yellow-700",
@@ -276,7 +400,7 @@ def rule_extraction_results(
 
     success_msg = Alert(
         UkIcon("check-circle", cls="h-4 w-4"),
-        Span(f"Extracted {' · '.join(summary_parts)} from {filename or 'uploaded file'}"),
+        Span(f"Extracted {' · '.join(summary_parts)} from {filename or 'selected document'}"),
         cls="mb-3 text-emerald-600 border-emerald-600 [&>svg]:text-emerald-600",
     )
 
@@ -314,4 +438,4 @@ def rule_extraction_results(
 
 
 def rule_extraction_empty_file_result():
-    return Alert("Uploaded file is empty.")
+    return Alert("Selected document has no extractable text.")

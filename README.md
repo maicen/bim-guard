@@ -10,7 +10,7 @@ MAICEN-1125-M10 · Final Master's Project · Group 5 · Zigurat Global Institute
 
 **BIM Guard** is a BIM compliance application built with FastHTML (Python) and MonsterUI. It lets users upload IFC models, define compliance rules from documents, and generate reports.
 
-**Tech stack:** FastHTML · MonsterUI · Supabase (Postgres + Storage) · IfcOpenShell · HTMX · Gemini
+**Tech stack:** FastHTML · MonsterUI · Supabase (Postgres + Storage) · IfcOpenShell · HTMX · litellm (multi-provider AI)
 
 ## Instructions Files Map
 
@@ -49,8 +49,9 @@ bim-guard/
 │   │   ├── documents_service.py
 │   │   ├── projects_service.py
 │   │   ├── rules_service.py
-│   │   ├── rule_extraction_service.py
-│   │   ├── gemini_rule_extractor.py
+│   │   ├── rule_extraction_service.py  # Pipeline orchestration (steps 1–10)
+│   │   ├── llm_client.py               # litellm transport (provider-agnostic)
+│   │   ├── rule_extractor.py           # Prompt, JSON parsing, normalisation
 │   │   └── ifc_parser.py
 │   ├── modules/                # 5-step compliance pipeline
 │   │   ├── module1_doc_parser/
@@ -137,18 +138,37 @@ SUPABASE_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-For rule extraction, also set a Gemini key (free at [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys)):
+For rule extraction, set an API key for your preferred provider (you only need one):
 
 ```
+# OpenAI
+OPENAI_API_KEY=your_key_here
+
+# Google Gemini  (free tier at aistudio.google.com/api-keys)
 GEMINI_API_KEY=your_key_here
+
+# Anthropic
+ANTHROPIC_API_KEY=your_key_here
+
+# Mistral
+MISTRAL_API_KEY=your_key_here
 ```
 
-> Without Gemini credentials, the **Rule Extraction Studio** (`/library/rules/extract`) will show an error. Core project/document workflows still work.
+Optionally pin a default model (any [LiteLLM model string](https://docs.litellm.ai/docs/providers)):
+
+```
+BIM_GUARD_RULE_MODEL=gpt-4o-mini
+```
+
+> Without any LLM credentials, the **Rule Extraction Studio** (`/library/rules/extract`) will show an error when extraction is triggered. All other workflows (projects, documents, IFC viewer) continue to work.
 
 ### 5. Run the app
 
 ```bash
 uv run uvicorn main:app --reload
+# or for development
+uv run uvicorn main:app --reload --log-level debug
+
 ```
 
 The app will be available at `http://127.0.0.1:8000`.
@@ -176,23 +196,70 @@ Required Render environment variables:
 - `SUPABASE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-Optional AI variables:
+Optional AI variables (set whichever provider you use):
 
+- `OPENAI_API_KEY`
 - `GEMINI_API_KEY`
-- `GOOGLE_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `MISTRAL_API_KEY`
 - `BIM_GUARD_RULE_MODEL`
+
+## Application Workflow
+
+```
+ Upload IFC model          Upload regulation PDF
+       │                          │
+       ▼                          ▼
+  /projects              /library/documents
+ (store + view)         (store + extract text)
+       │                          │
+       │                   /library/rules/extract
+       │                  (choose provider + model)
+       │                          │
+       │                   RuleExtractionService
+       │                  ┌───────────────────────┐
+       │                  │ 1. Docling / pypdf     │
+       │                  │ 2. Table rule builder  │
+       │                  │ 3. Section chunker     │
+       │                  │ 4–7. spaCy pipeline*   │
+       │                  │ 8. BERT classifier*    │
+       │                  │ 9. LiteLLM → any LLM  │
+       │                  │ 10. Deduplication      │
+       │                  └───────────────────────┘
+       │                          │
+       │                  /library/rules
+       │                  (review + curate)
+       │                          │
+       └──────────┬───────────────┘
+                  ▼
+            /analyze
+       (run compliance check)
+                  │
+                  ▼
+            BCF report
+              export
+
+  * optional — requires ml-pipeline dependency group
+```
 
 ## Rule Extraction (AI)
 
 Rule extraction is available at `/library/rules/extract`.
 
-Current flow:
+The **Rule Extraction Studio** lets you choose any LiteLLM-supported provider
+(OpenAI, Google Gemini, Anthropic, Mistral) and model, optionally supply an API
+key per-request, then extract structured compliance rules from any document
+already uploaded to the library.
 
-1. Upload a BEP/regulation PDF.
-2. `Module1_DocParser` extracts PDF text.
-3. Text is normalized and chunked for long documents.
-4. `RuleExtractionService` sends each chunk to Gemini through LiteLLM.
-5. Extracted rules are normalized and de-duplicated.
+Extraction pipeline:
+
+1. Select a provider, model, and document — the document's pre-extracted text is read from the database.
+2. Text is normalised and split into OBC-style section chunks.
+3. Optional spaCy pipeline (keyword filter → dependency parser → confidence scorer) prunes low-signal chunks.
+4. Each chunk is sent to the chosen LLM via `LiteLLMClient`.
+5. `LiteLLMRuleExtractor` parses and normalises the JSON response into the BIM rule schema.
+6. Results are de-duplicated and displayed for review.
+7. Accepted rules can be saved directly to the Rule Library.
 
 ## Documentation Map
 
