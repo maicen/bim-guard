@@ -221,6 +221,7 @@ class BIMGuard_App:
         self,
         project_id: int,
         doc_ids: list[int],
+        analysis_theme: str = "Architecture",
         include_openings: bool = True,
         include_spaces: bool = True,
         include_type_definitions: bool = False,
@@ -235,11 +236,13 @@ class BIMGuard_App:
         from app.services.documents_service import DocumentService
         from app.services.projects_service import ProjectsService
         from app.services.projects_service import ProjectsService
+        from app.services.rules_service import RuleService
         from .module2_ifc_read.ifc_parser import parse_ifc, generate_synthetic_elements
         from .module4_comparator.compliance_runner import run_compliance_checks
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
+        selected_theme = RuleService.normalize_theme(analysis_theme)
 
         project = projects_svc.get_project(project_id)
         if project is None:
@@ -317,22 +320,28 @@ class BIMGuard_App:
         cost_impact = None
         issue_stats: dict = {}
 
-        try:
-            raw_results = run_compliance_checks(elements)
-            # Normalise band names to Title case for the UI
-            band_map = {"LOW": "Low", "MEDIUM": "Medium", "HIGH": "High", "CRITICAL": "Critical"}
-            for r in raw_results:
-                r["risk_band"] = band_map.get(r.get("overall_band", "Low"), "Low")
-            compliance_results = raw_results
+        if selected_theme == "MEP":
+            try:
+                raw_results = run_compliance_checks(elements)
+                # Normalise band names to Title case for the UI
+                band_map = {
+                    "LOW": "Low",
+                    "MEDIUM": "Medium",
+                    "HIGH": "High",
+                    "CRITICAL": "Critical",
+                }
+                for r in raw_results:
+                    r["risk_band"] = band_map.get(r.get("overall_band", "Low"), "Low")
+                compliance_results = raw_results
 
-            bands = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
-            for r in compliance_results:
-                b = r.get("risk_band", "Low")
-                if b in bands:
-                    bands[b] += 1
-            issue_stats = bands
-        except Exception as exc:
-            compliance_error = str(exc)
+                bands = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+                for r in compliance_results:
+                    b = r.get("risk_band", "Low")
+                    if b in bands:
+                        bands[b] += 1
+                issue_stats = bands
+            except Exception as exc:
+                compliance_error = str(exc)
 
         # ── Module 2 + 4 + 5: Rule-based compliance check ────────────────────
         rule_compliance: list[dict] = []
@@ -341,12 +350,11 @@ class BIMGuard_App:
         rule_validations: list[dict] = []  # kept for backward-compat
 
         try:
-            from app.services.rules_service import RuleService
             from .module2_ifc_read import Module2_IFCRead
             from .module4_comparator import Module4_Comparator
             from .module5_reporter import Module5_Reporter
 
-            library_rules = RuleService().list_rules()
+            library_rules = RuleService().list_by_theme(selected_theme)
 
             # Basic element-presence check (legacy rule_validations card)
             for rule in library_rules:
@@ -375,6 +383,7 @@ class BIMGuard_App:
 
         return {
             "project": project,
+            "analysis_theme": selected_theme,
             "ifc_element_count": len(elements),
             "ifc_type_counts": ifc_type_counts,
             "ifc_totals": ifc_totals,

@@ -51,6 +51,21 @@ RULE_CATEGORIES = {
     "mitigation",  # Remediation action catalogue entry
 }
 
+THEMES = {"Architecture", "MEP"}
+
+_MEP_IFC_PREFIXES = (
+    "IfcFlow",
+    "IfcPipe",
+    "IfcDuct",
+    "IfcCable",
+    "IfcDistribution",
+    "IfcPump",
+    "IfcBoiler",
+    "IfcChiller",
+    "IfcUnitary",
+    "IfcSanitary",
+)
+
 
 class RuleService:
     """
@@ -255,6 +270,34 @@ class RuleService:
     def list_by_category(self, rule_category: str) -> list[dict]:
         """Return all rules matching the provided rule category."""
         return list(self._rules.rows_where("rule_category = ?", [rule_category]))
+
+    @staticmethod
+    def normalize_theme(theme: str | None) -> str:
+        """Normalize a user-selected theme to one of the supported values."""
+        value = (theme or "").strip().lower()
+        if value == "mep":
+            return "MEP"
+        return "Architecture"
+
+    @classmethod
+    def infer_theme(cls, rule: dict) -> str:
+        """Infer Architecture vs MEP for a rule from mechanism and IFC target hints."""
+        mechanism = (rule.get("mechanism") or "").strip().upper()
+        if mechanism in {"GC-001", "CC-001", "MC-001"}:
+            return "MEP"
+        if mechanism in {"OBC", "IFC"}:
+            return "Architecture"
+
+        target = (rule.get("target_ifc_class") or "").strip()
+        if target.startswith(_MEP_IFC_PREFIXES):
+            return "MEP"
+
+        return "Architecture"
+
+    def list_by_theme(self, theme: str) -> list[dict]:
+        """Return all rules categorized under the requested analysis theme."""
+        selected = self.normalize_theme(theme)
+        return [r for r in self._rules.rows if self.infer_theme(r) == selected]
 
     # ── Pipeline query methods (used by RuleStore adapter) ────────────────────
 
