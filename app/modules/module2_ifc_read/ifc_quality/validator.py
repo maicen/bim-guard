@@ -19,6 +19,7 @@ from typing import Dict
 try:
     import ifcopenshell
     from ifcopenshell.util.element import get_psets
+
     _IFC_AVAILABLE = True
 except ImportError:
     _IFC_AVAILABLE = False
@@ -38,7 +39,6 @@ class IFCValidator:
 
         try:
             self.ifc = ifcopenshell.open(self.filepath)
-            print(f"File opened: {self.filepath}")
         except Exception as exc:
             return {"valid": False, "error": str(exc), "filepath": self.filepath}
 
@@ -48,22 +48,21 @@ class IFCValidator:
         self._check_guids()
         self._check_properties()
         self._calculate_score()
-        self._print_report()
         return self.results
 
     # ── Checks ────────────────────────────────────────────────────────────────
 
     def _check_metadata(self):
         self.results["metadata"] = {
-            "schema":       self.ifc.schema,
-            "file_path":    self.filepath,
+            "schema": self.ifc.schema,
+            "file_path": self.filepath,
             "file_size_kb": Path(self.filepath).stat().st_size / 1024,
         }
 
     def _check_elements(self):
         element_types: dict = {}
         total = 0
-        for el in self.ifc.entities:
+        for el in self._iter_entities():
             t = el.is_a()
             element_types[t] = element_types.get(t, 0) + 1
             total += 1
@@ -72,7 +71,7 @@ class IFCValidator:
     def _check_labeling(self):
         named = unnamed = 0
         samples: list = []
-        for el in self.ifc.entities:
+        for el in self._iter_entities():
             if hasattr(el, "Name"):
                 if el.Name and str(el.Name).strip():
                     named += 1
@@ -83,34 +82,42 @@ class IFCValidator:
         total = named + unnamed
         score = (named / total * 100) if total else 0
         self.results["labeling"] = {
-            "named": named, "unnamed": unnamed, "total": total,
-            "score": score, "sample_names": samples,
+            "named": named,
+            "unnamed": unnamed,
+            "total": total,
+            "score": score,
+            "sample_names": samples,
         }
 
     def _check_guids(self):
         with_guid = 0
         samples: list = []
-        for el in self.ifc.entities:
+        entities = self._iter_entities()
+        for el in entities:
             if hasattr(el, "GlobalId") and el.GlobalId:
                 with_guid += 1
                 if len(samples) < 3:
-                    samples.append({
-                        "type": el.is_a(),
-                        "guid": str(el.GlobalId),
-                        "name": getattr(el, "Name", "N/A"),
-                    })
-        total = len(list(self.ifc.entities))
+                    samples.append(
+                        {
+                            "type": el.is_a(),
+                            "guid": str(el.GlobalId),
+                            "name": getattr(el, "Name", "N/A"),
+                        }
+                    )
+        total = len(entities)
         score = (with_guid / total * 100) if total else 0
         self.results["guids"] = {
-            "with_guid": with_guid, "total": total,
-            "score": score, "samples": samples,
+            "with_guid": with_guid,
+            "total": total,
+            "score": score,
+            "samples": samples,
         }
 
     def _check_properties(self):
         with_props = without_props = 0
         all_psets: set = set()
         samples: list = []
-        for el in self.ifc.entities:
+        for el in self._iter_entities():
             try:
                 psets = get_psets(el, psets_only=False)
                 if psets:
@@ -123,9 +130,7 @@ class IFCValidator:
                             "sample_props": {},
                         }
                         for ps_name in list(psets.keys())[:2]:
-                            entry["sample_props"][ps_name] = dict(
-                                list(psets[ps_name].items())[:3]
-                            )
+                            entry["sample_props"][ps_name] = dict(list(psets[ps_name].items())[:3])
                         samples.append(entry)
                 else:
                     without_props += 1
@@ -134,10 +139,25 @@ class IFCValidator:
         total = with_props + without_props
         score = (with_props / total * 100) if total else 0
         self.results["properties"] = {
-            "with_properties": with_props, "without_properties": without_props,
-            "total": total, "score": score,
-            "property_set_types": list(all_psets), "samples": samples,
+            "with_properties": with_props,
+            "without_properties": without_props,
+            "total": total,
+            "score": score,
+            "property_set_types": list(all_psets),
+            "samples": samples,
         }
+
+    def _iter_entities(self) -> list:
+        """Return IFC entities in a version-safe way across IfcOpenShell releases."""
+        try:
+            return list(self.ifc)
+        except Exception:
+            pass
+
+        try:
+            return list(self.ifc.by_type("IfcRoot"))
+        except Exception:
+            return []
 
     def _calculate_score(self):
         l = self.results.get("labeling", {}).get("score", 0)
@@ -145,26 +165,10 @@ class IFCValidator:
         p = self.results.get("properties", {}).get("score", 0)
         self.results["overall"] = {
             "score": (l + g + p) / 3,
-            "labeling_weight": l, "guid_weight": g, "property_weight": p,
+            "labeling_weight": l,
+            "guid_weight": g,
+            "property_weight": p,
         }
-
-    def _print_report(self):
-        score = self.results.get("overall", {}).get("score", 0)
-        print(f"\n{'='*55}")
-        print(f"IFC QUALITY SCORE: {score:.1f}%")
-        if score >= 80:
-            verdict = "EXCELLENT — ready for compliance checking"
-        elif score >= 70:
-            verdict = "GOOD — usable, consider improving"
-        elif score >= 60:
-            verdict = "FAIR — run improver before use"
-        else:
-            verdict = "POOR — improvement required"
-        print(f"VERDICT: {verdict}")
-        print(f"  Labeling : {self.results['labeling']['score']:.1f}%")
-        print(f"  GUIDs    : {self.results['guids']['score']:.1f}%")
-        print(f"  Properties: {self.results['properties']['score']:.1f}%")
-        print(f"{'='*55}\n")
 
 
 def validate_ifc_file(filepath: str) -> Dict:
@@ -173,6 +177,7 @@ def validate_ifc_file(filepath: str) -> Dict:
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) < 2:
         print("Usage: python validator.py <file.ifc>")
         sys.exit(1)

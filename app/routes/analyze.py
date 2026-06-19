@@ -506,7 +506,9 @@ def setup_routes(rt):
                                     Div(
                                         FormLabel("Analysis Theme", fr="analysis_theme"),
                                         Select(
-                                            Option("Architecture", value="Architecture", selected=True),
+                                            Option(
+                                                "Architecture", value="Architecture", selected=True
+                                            ),
                                             Option("MEP", value="MEP"),
                                             id="analysis_theme",
                                             name="analysis_theme",
@@ -633,6 +635,8 @@ def setup_routes(rt):
         ifc_type_counts = result.get("ifc_type_counts") or {}
         ifc_totals = result.get("ifc_totals") or {}
         ifc_error = result["ifc_error"]
+        ifc_quality = result.get("ifc_quality_report") or {}
+        ifc_quality_warnings = result.get("ifc_quality_warnings") or []
 
         # IFC summary card
         if ifc_error:
@@ -645,6 +649,46 @@ def setup_routes(rt):
         else:
             filters = ifc_totals.get("filters") or {}
             deltas = ifc_totals.get("excluded_or_added") or {}
+            overall = ifc_quality.get("overall") or {}
+            labeling = ifc_quality.get("labeling") or {}
+            guids = ifc_quality.get("guids") or {}
+            properties = ifc_quality.get("properties") or {}
+
+            quality_alerts = [
+                Alert(msg, cls=AlertT.warning if hasattr(AlertT, "warning") else "")
+                for msg in ifc_quality_warnings
+            ]
+
+            quality_block = (
+                Card(
+                    CardHeader(CardTitle("IFC Quality")),
+                    CardContent(
+                        P(
+                            f"Overall score: {overall.get('score', 0):.1f}%",
+                            cls="text-sm font-medium",
+                        ),
+                        Div(
+                            P(
+                                f"Labeling: {labeling.get('score', 0):.1f}%",
+                                cls="text-xs text-muted-foreground",
+                            ),
+                            P(
+                                f"GUIDs: {guids.get('score', 0):.1f}%",
+                                cls="text-xs text-muted-foreground",
+                            ),
+                            P(
+                                f"Properties: {properties.get('score', 0):.1f}%",
+                                cls="text-xs text-muted-foreground",
+                            ),
+                            cls="space-y-1 mt-2",
+                        ),
+                        *quality_alerts,
+                    ),
+                )
+                if ifc_quality
+                else ""
+            )
+
             counts_table = ItemsCountDataTable(
                 [
                     CountTableItemSpec(
@@ -680,6 +724,7 @@ def setup_routes(rt):
             )
 
             ifc_detail = Div(
+                quality_block,
                 counts_table,
                 cls="space-y-1",
             )

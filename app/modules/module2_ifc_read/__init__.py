@@ -44,6 +44,7 @@ except ImportError:
 try:
     from .ifc_quality.validator import IFCValidator
     from .ifc_quality.improver import improve_ifc_file
+
     _QUALITY_TOOLS_AVAILABLE = True
 except ImportError:
     _QUALITY_TOOLS_AVAILABLE = False
@@ -55,21 +56,21 @@ IFC_MIN_QUALITY_SCORE = 70
 
 # ── IFC property-type → Python type label ────────────────────────────────────
 _IFC_TYPE_MAP = {
-    "IfcReal":             "real",
-    "IfcInteger":          "integer",
-    "IfcBoolean":          "boolean",
-    "IfcLogical":          "boolean",
-    "IfcLabel":            "string",
-    "IfcText":             "string",
-    "IfcIdentifier":       "string",
+    "IfcReal": "real",
+    "IfcInteger": "integer",
+    "IfcBoolean": "boolean",
+    "IfcLogical": "boolean",
+    "IfcLabel": "string",
+    "IfcText": "string",
+    "IfcIdentifier": "string",
     "IfcPositiveLengthMeasure": "real",
-    "IfcLengthMeasure":    "real",
-    "IfcAreaMeasure":      "real",
-    "IfcVolumeMeasure":    "real",
-    "IfcPlaneAngleMeasure":"real",
-    "IfcCountMeasure":     "integer",
-    "IfcMassMeasure":      "real",
-    "IfcTimeMeasure":      "real",
+    "IfcLengthMeasure": "real",
+    "IfcAreaMeasure": "real",
+    "IfcVolumeMeasure": "real",
+    "IfcPlaneAngleMeasure": "real",
+    "IfcCountMeasure": "integer",
+    "IfcMassMeasure": "real",
+    "IfcTimeMeasure": "real",
     "IfcThermalTransmittanceMeasure": "real",
 }
 
@@ -78,9 +79,9 @@ class Module2_IFCRead:
     """Full IFC reader for Module 2 compliance extraction."""
 
     def __init__(self, file_path: Path | str | None = None):
-        self.file_path       = Path(file_path) if file_path else None
-        self.ifc_file        = None
-        self.quality_report: dict       = {}
+        self.file_path = Path(file_path) if file_path else None
+        self.ifc_file = None
+        self.quality_report: dict = {}
         self.quality_warnings: list[str] = []
         if self.file_path:
             self.load_ifc_file()
@@ -104,8 +105,6 @@ class Module2_IFCRead:
 
             if score < IFC_MIN_QUALITY_SCORE:
                 improved_path = load_path.with_stem(load_path.stem + "_improved")
-                print(f"IFC quality {score:.1f}% < {IFC_MIN_QUALITY_SCORE}% — "
-                      f"auto-improving → {improved_path.name}")
                 improve_ifc_file(str(load_path), str(improved_path))
                 load_path = improved_path
                 self.quality_warnings.append(
@@ -184,66 +183,79 @@ class Module2_IFCRead:
         if ifc_type == "IfcPropertySingleValue":
             nv = prop.NominalValue
             if nv is None:
-                return {"value": None, "value_type": "null", "unit": None,
-                        "ifc_type": ifc_type}
-            raw        = getattr(nv, "wrappedValue", nv)
-            vtype      = _IFC_TYPE_MAP.get(nv.is_a(), "string")
+                return {"value": None, "value_type": "null", "unit": None, "ifc_type": ifc_type}
+            raw = getattr(nv, "wrappedValue", nv)
+            vtype = _IFC_TYPE_MAP.get(nv.is_a(), "string")
             unit_label = self._resolve_unit(getattr(prop, "Unit", None))
             return {
-                "value":       raw,
-                "value_type":  vtype,
-                "unit":        unit_label,
+                "value": raw,
+                "value_type": vtype,
+                "unit": unit_label,
                 "lower_bound": None,
                 "upper_bound": None,
                 "enum_values": None,
-                "ifc_type":    ifc_type,
+                "ifc_type": ifc_type,
             }
 
         if ifc_type == "IfcPropertyBoundedValue":
-            lo = getattr(prop.LowerBoundValue, "wrappedValue", None) \
-                 if prop.LowerBoundValue else None
-            hi = getattr(prop.UpperBoundValue, "wrappedValue", None) \
-                 if prop.UpperBoundValue else None
-            sp = getattr(prop.SetPointValue, "wrappedValue", None) \
-                 if getattr(prop, "SetPointValue", None) else None
+            lo = (
+                getattr(prop.LowerBoundValue, "wrappedValue", None)
+                if prop.LowerBoundValue
+                else None
+            )
+            hi = (
+                getattr(prop.UpperBoundValue, "wrappedValue", None)
+                if prop.UpperBoundValue
+                else None
+            )
+            sp = (
+                getattr(prop.SetPointValue, "wrappedValue", None)
+                if getattr(prop, "SetPointValue", None)
+                else None
+            )
             return {
-                "value":       sp if sp is not None else lo,
-                "value_type":  "bounded",
-                "unit":        self._resolve_unit(getattr(prop, "Unit", None)),
+                "value": sp if sp is not None else lo,
+                "value_type": "bounded",
+                "unit": self._resolve_unit(getattr(prop, "Unit", None)),
                 "lower_bound": lo,
                 "upper_bound": hi,
                 "enum_values": None,
-                "ifc_type":    ifc_type,
+                "ifc_type": ifc_type,
             }
 
         if ifc_type == "IfcPropertyEnumeratedValue":
-            values = [
-                getattr(v, "wrappedValue", v)
-                for v in (prop.EnumerationValues or [])
-            ]
+            values = [getattr(v, "wrappedValue", v) for v in (prop.EnumerationValues or [])]
             return {
-                "value":       values[0] if values else None,
-                "value_type":  "enum",
-                "unit":        None,
+                "value": values[0] if values else None,
+                "value_type": "enum",
+                "unit": None,
                 "lower_bound": None,
                 "upper_bound": None,
                 "enum_values": values,
-                "ifc_type":    ifc_type,
+                "ifc_type": ifc_type,
             }
 
         # IfcPropertyListValue, IfcPropertyTableValue, etc.
-        return {"value": str(prop), "value_type": "complex",
-                "unit": None, "ifc_type": ifc_type}
+        return {"value": str(prop), "value_type": "complex", "unit": None, "ifc_type": ifc_type}
 
     def _parse_ifc_quantity(self, qty) -> dict:
         """Decode one IFC quantity (area, length, count, …)."""
-        for attr in ("LengthValue", "AreaValue", "VolumeValue",
-                     "WeightValue", "CountValue", "TimeValue"):
+        for attr in (
+            "LengthValue",
+            "AreaValue",
+            "VolumeValue",
+            "WeightValue",
+            "CountValue",
+            "TimeValue",
+        ):
             v = getattr(qty, attr, None)
             if v is not None:
-                return {"value": v, "value_type": "real",
-                        "unit": attr.replace("Value", "").lower(),
-                        "ifc_type": qty.is_a()}
+                return {
+                    "value": v,
+                    "value_type": "real",
+                    "unit": attr.replace("Value", "").lower(),
+                    "ifc_type": qty.is_a(),
+                }
         return {"value": None, "value_type": "unknown", "ifc_type": qty.is_a()}
 
     def _resolve_unit(self, unit_ref) -> str | None:
@@ -254,18 +266,29 @@ class Module2_IFCRead:
             ifc_t = unit_ref.is_a()
             if ifc_t == "IfcSIUnit":
                 prefix = getattr(unit_ref, "Prefix", None) or ""
-                name   = getattr(unit_ref, "Name",   "") or ""
+                name = getattr(unit_ref, "Name", "") or ""
                 _SI_ABBREV = {
-                    "METRE": "m", "SQUARE_METRE": "m²", "CUBIC_METRE": "m³",
-                    "GRAM": "g", "SECOND": "s", "AMPERE": "A",
-                    "KELVIN": "K", "RADIAN": "rad", "STERADIAN": "sr",
-                    "HERTZ": "Hz", "NEWTON": "N", "PASCAL": "Pa",
+                    "METRE": "m",
+                    "SQUARE_METRE": "m²",
+                    "CUBIC_METRE": "m³",
+                    "GRAM": "g",
+                    "SECOND": "s",
+                    "AMPERE": "A",
+                    "KELVIN": "K",
+                    "RADIAN": "rad",
+                    "STERADIAN": "sr",
+                    "HERTZ": "Hz",
+                    "NEWTON": "N",
+                    "PASCAL": "Pa",
                 }
                 _PREFIX = {
-                    "MILLI": "m", "CENTI": "c", "KILO": "k", "MEGA": "M",
+                    "MILLI": "m",
+                    "CENTI": "c",
+                    "KILO": "k",
+                    "MEGA": "M",
                 }
                 abbrev = _SI_ABBREV.get(name, name.lower())
-                return f"{_PREFIX.get(prefix,'')}{abbrev}" if abbrev else None
+                return f"{_PREFIX.get(prefix, '')}{abbrev}" if abbrev else None
             if ifc_t == "IfcConversionBasedUnit":
                 return getattr(unit_ref, "Name", None)
             if ifc_t == "IfcContextDependentUnit":
@@ -288,8 +311,9 @@ class Module2_IFCRead:
             for rel in getattr(element, "ContainedInStructure", []):
                 container = rel.RelatingStructure
                 if container.is_a("IfcSpace"):
-                    space_name = getattr(container, "LongName", None) \
-                                 or getattr(container, "Name", None)
+                    space_name = getattr(container, "LongName", None) or getattr(
+                        container, "Name", None
+                    )
                 if container.is_a("IfcBuildingStorey"):
                     storey_name = getattr(container, "Name", None)
                     storey_elev = getattr(container, "Elevation", None)
@@ -306,10 +330,10 @@ class Module2_IFCRead:
         except Exception:
             pass
         return {
-            "storey_name":      storey_name,
+            "storey_name": storey_name,
             "storey_elevation": float(storey_elev) if storey_elev is not None else None,
-            "space_name":       space_name,
-            "building_name":    building_name,
+            "space_name": space_name,
+            "building_name": building_name,
         }
 
     def get_type_info(self, element) -> dict:
@@ -324,14 +348,14 @@ class Module2_IFCRead:
         try:
             el_type = ifcopenshell.util.element.get_type(element)
             if el_type:
-                type_name  = getattr(el_type, "Name", None)
-                type_guid  = getattr(el_type, "GlobalId", None)
+                type_name = getattr(el_type, "Name", None)
+                type_guid = getattr(el_type, "GlobalId", None)
                 type_props = self.extract_rich_properties(el_type)
         except Exception:
             pass
         return {
-            "type_name":       type_name,
-            "type_guid":       type_guid,
+            "type_name": type_name,
+            "type_guid": type_guid,
             "type_properties": type_props,
         }
 
@@ -351,17 +375,19 @@ class Module2_IFCRead:
                 parent_type = parent.is_a()
             for rel in getattr(element, "IsDecomposedBy", []):
                 for child in rel.RelatedObjects:
-                    children.append({
-                        "name": getattr(child, "Name", None),
-                        "type": child.is_a(),
-                        "guid": child.GlobalId,
-                    })
+                    children.append(
+                        {
+                            "name": getattr(child, "Name", None),
+                            "type": child.is_a(),
+                            "guid": child.GlobalId,
+                        }
+                    )
         except Exception:
             pass
         return {
             "parent_name": parent_name,
             "parent_type": parent_type,
-            "children":    children,
+            "children": children,
         }
 
     # ── Gap 3: Material / composition ─────────────────────────────────────────
@@ -396,35 +422,46 @@ class Module2_IFCRead:
                 mat_type = "layer_set"
                 layer_set = mat.ForLayerSet if t == "IfcMaterialLayerSetUsage" else mat
                 for layer in getattr(layer_set, "MaterialLayers", []):
-                    name = getattr(layer.Material, "Name", "Unknown") \
-                           if layer.Material else "Unknown"
+                    name = (
+                        getattr(layer.Material, "Name", "Unknown") if layer.Material else "Unknown"
+                    )
                     thickness = getattr(layer, "LayerThickness", None)
-                    category  = getattr(layer, "Category", None)
-                    layers.append({
-                        "name":         name,
-                        "thickness_mm": float(thickness) if thickness is not None else None,
-                        "category":     category,
-                    })
+                    category = getattr(layer, "Category", None)
+                    layers.append(
+                        {
+                            "name": name,
+                            "thickness_mm": float(thickness) if thickness is not None else None,
+                            "category": category,
+                        }
+                    )
                     material_names.append(name)
 
             elif t == "IfcMaterialConstituentSet":
                 mat_type = "constituent_set"
                 for constituent in getattr(mat, "MaterialConstituents", []):
-                    name = getattr(constituent.Material, "Name", "Unknown") \
-                           if constituent.Material else "Unknown"
+                    name = (
+                        getattr(constituent.Material, "Name", "Unknown")
+                        if constituent.Material
+                        else "Unknown"
+                    )
                     fraction = getattr(constituent, "Fraction", None)
-                    layers.append({
-                        "name":      name,
-                        "fraction":  float(fraction) if fraction is not None else None,
-                        "category":  getattr(constituent, "Category", None),
-                    })
+                    layers.append(
+                        {
+                            "name": name,
+                            "fraction": float(fraction) if fraction is not None else None,
+                            "category": getattr(constituent, "Category", None),
+                        }
+                    )
                     material_names.append(name)
 
             elif t == "IfcMaterialProfileSet":
                 mat_type = "profile_set"
                 for profile in getattr(mat, "MaterialProfiles", []):
-                    name = getattr(profile.Material, "Name", "Unknown") \
-                           if profile.Material else "Unknown"
+                    name = (
+                        getattr(profile.Material, "Name", "Unknown")
+                        if profile.Material
+                        else "Unknown"
+                    )
                     material_names.append(name)
 
         except Exception:
@@ -432,8 +469,8 @@ class Module2_IFCRead:
 
         return {
             "material_type": mat_type,
-            "layers":        layers,
-            "materials":     material_names,
+            "layers": layers,
+            "materials": material_names,
         }
 
     # ── Gap 4: Direct IFC attributes ──────────────────────────────────────────
@@ -453,12 +490,23 @@ class Module2_IFCRead:
             return {}
 
         _SKIP = {
-            "id", "type", "GlobalId", "OwnerHistory",
-            "ObjectPlacement", "Representation",
-            "HasAssignments", "IsDecomposedBy", "Decomposes",
-            "HasAssociations", "IsDefinedBy", "ReferencedBy",
-            "ContainedInStructure", "ConnectedTo", "ConnectedFrom",
-            "FillsVoids", "HasOpenings",
+            "id",
+            "type",
+            "GlobalId",
+            "OwnerHistory",
+            "ObjectPlacement",
+            "Representation",
+            "HasAssignments",
+            "IsDecomposedBy",
+            "Decomposes",
+            "HasAssociations",
+            "IsDefinedBy",
+            "ReferencedBy",
+            "ContainedInStructure",
+            "ConnectedTo",
+            "ConnectedFrom",
+            "FillsVoids",
+            "HasOpenings",
         }
         result = {}
         for k, v in info.items():
@@ -493,10 +541,10 @@ class Module2_IFCRead:
 
         results = []
         for rule in rules:
-            target    = str(rule.get("target_ifc_class") or "").strip()
-            prop_name = str(rule.get("property_name")    or "").strip()
-            prop_set  = str(rule.get("property_set")     or "").strip()
-            operator  = str(rule.get("operator")         or "").strip()
+            target = str(rule.get("target_ifc_class") or "").strip()
+            prop_name = str(rule.get("property_name") or "").strip()
+            prop_set = str(rule.get("property_set") or "").strip()
+            operator = str(rule.get("operator") or "").strip()
 
             if not target or (not prop_name and operator not in ("exists", "not_exists")):
                 continue
@@ -509,14 +557,12 @@ class Module2_IFCRead:
             element_results = []
             for el in elements:
                 actual_value = None
-                found_pset   = None
+                found_pset = None
                 rich_detail: dict = {}
 
                 # ── Pass 1: simple get_psets (fast path) ──────────────────
                 try:
-                    psets_simple = ifcopenshell.util.element.get_psets(
-                        el, psets_only=False
-                    )
+                    psets_simple = ifcopenshell.util.element.get_psets(el, psets_only=False)
                 except Exception:
                     psets_simple = {}
 
@@ -524,7 +570,7 @@ class Module2_IFCRead:
                     v = psets_simple[prop_set].get(prop_name)
                     if v is not None:
                         actual_value = v
-                        found_pset   = prop_set
+                        found_pset = prop_set
 
                 if actual_value is None and prop_name:
                     for ps_name, props in psets_simple.items():
@@ -532,13 +578,13 @@ class Module2_IFCRead:
                             v = props[prop_name]
                             if v is not None:
                                 actual_value = v
-                                found_pset   = ps_name
+                                found_pset = ps_name
                                 break
 
                 # ── Pass 2: rich property extraction (for type/unit/bounds) ─
                 if prop_name and found_pset:
                     try:
-                        rich_all  = self.extract_rich_properties(el)
+                        rich_all = self.extract_rich_properties(el)
                         rich_pset = rich_all.get(found_pset, {})
                         rich_prop = rich_pset.get(prop_name, {})
                         if rich_prop:
@@ -553,55 +599,59 @@ class Module2_IFCRead:
                         v = direct.get(prop_name)
                         if v is not None:
                             actual_value = v
-                            found_pset   = "direct_attribute"
+                            found_pset = "direct_attribute"
                     except Exception:
                         pass
 
                 # ── Spatial, type, material context ───────────────────────
                 try:
-                    spatial  = self.get_spatial_location(el)
+                    spatial = self.get_spatial_location(el)
                     type_inf = self.get_type_info(el)
                     mat_info = self.get_material_info(el)
                 except Exception:
                     spatial = type_inf = mat_info = {}
 
-                element_results.append({
-                    # Core compliance fields (consumed by Module 4)
-                    "guid":         el.GlobalId,
-                    "name":         getattr(el, "Name", None) or f"{target}_{el.id()}",
-                    "actual_value": actual_value,
-                    "found_pset":   found_pset,
-                    "found":        actual_value is not None,
-                    # Gap 1: rich property metadata
-                    "value_type":   rich_detail.get("value_type"),
-                    "value_unit":   rich_detail.get("unit"),
-                    "lower_bound":  rich_detail.get("lower_bound"),
-                    "upper_bound":  rich_detail.get("upper_bound"),
-                    "enum_values":  rich_detail.get("enum_values"),
-                    # Gap 2: spatial + type
-                    "storey":       spatial.get("storey_name"),
-                    "space":        spatial.get("space_name"),
-                    "element_type": type_inf.get("type_name"),
-                    # Gap 3: material
-                    "materials":    mat_info.get("materials", []),
-                    "material_layers": mat_info.get("layers", []),
-                })
+                element_results.append(
+                    {
+                        # Core compliance fields (consumed by Module 4)
+                        "guid": el.GlobalId,
+                        "name": getattr(el, "Name", None) or f"{target}_{el.id()}",
+                        "actual_value": actual_value,
+                        "found_pset": found_pset,
+                        "found": actual_value is not None,
+                        # Gap 1: rich property metadata
+                        "value_type": rich_detail.get("value_type"),
+                        "value_unit": rich_detail.get("unit"),
+                        "lower_bound": rich_detail.get("lower_bound"),
+                        "upper_bound": rich_detail.get("upper_bound"),
+                        "enum_values": rich_detail.get("enum_values"),
+                        # Gap 2: spatial + type
+                        "storey": spatial.get("storey_name"),
+                        "space": spatial.get("space_name"),
+                        "element_type": type_inf.get("type_name"),
+                        # Gap 3: material
+                        "materials": mat_info.get("materials", []),
+                        "material_layers": mat_info.get("layers", []),
+                    }
+                )
 
-            results.append({
-                "rule_id":          rule.get("id"),
-                "rule_ref":         str(rule.get("reference")   or ""),
-                "rule_desc":        str(rule.get("description") or ""),
-                "target_ifc_class": target,
-                "property_name":    prop_name,
-                "property_set":     prop_set,
-                "operator":         operator,
-                "check_value":      self._decode_json_val(rule.get("check_value")),
-                "value_min":        self._decode_json_val(rule.get("value_min")),
-                "value_max":        self._decode_json_val(rule.get("value_max")),
-                "unit":             str(rule.get("unit")     or ""),
-                "severity":         str(rule.get("severity") or "mandatory"),
-                "elements":         element_results,
-            })
+            results.append(
+                {
+                    "rule_id": rule.get("id"),
+                    "rule_ref": str(rule.get("reference") or ""),
+                    "rule_desc": str(rule.get("description") or ""),
+                    "target_ifc_class": target,
+                    "property_name": prop_name,
+                    "property_set": prop_set,
+                    "operator": operator,
+                    "check_value": self._decode_json_val(rule.get("check_value")),
+                    "value_min": self._decode_json_val(rule.get("value_min")),
+                    "value_max": self._decode_json_val(rule.get("value_max")),
+                    "unit": str(rule.get("unit") or ""),
+                    "severity": str(rule.get("severity") or "mandatory"),
+                    "elements": element_results,
+                }
+            )
 
         return results
 
@@ -613,16 +663,16 @@ class Module2_IFCRead:
         decomposition.
         """
         return {
-            "guid":             element.GlobalId,
-            "ifc_type":         element.is_a(),
-            "name":             getattr(element, "Name", None),
-            "description":      getattr(element, "Description", None),
+            "guid": element.GlobalId,
+            "ifc_type": element.is_a(),
+            "name": getattr(element, "Name", None),
+            "description": getattr(element, "Description", None),
             "direct_attributes": self.get_direct_attributes(element),
-            "properties":       self.extract_rich_properties(element),
-            "spatial":          self.get_spatial_location(element),
-            "type_info":        self.get_type_info(element),
-            "materials":        self.get_material_info(element),
-            "decomposition":    self.get_decomposition(element),
+            "properties": self.extract_rich_properties(element),
+            "spatial": self.get_spatial_location(element),
+            "type_info": self.get_type_info(element),
+            "materials": self.get_material_info(element),
+            "decomposition": self.get_decomposition(element),
         }
 
     # ── Utility ───────────────────────────────────────────────────────────────
@@ -632,8 +682,7 @@ class Module2_IFCRead:
         if not self.ifc_file:
             raise ValueError("No IFC file loaded.")
         return [
-            {"id": el.id(), "type": el.is_a(),
-             "properties": self.extract_properties(el)}
+            {"id": el.id(), "type": el.is_a(), "properties": self.extract_properties(el)}
             for el in self._resolve_building_elements()
         ]
 
@@ -645,16 +694,20 @@ class Module2_IFCRead:
     ) -> dict:
         if not self.ifc_file:
             raise ValueError("No IFC file loaded.")
-        built  = len(self._resolve_building_elements())
-        phys   = self._count_by_type("IfcElement")
-        prods  = self._count_by_type("IfcProduct")
-        opens  = self._count_by_type("IfcOpeningElement")
+        built = len(self._resolve_building_elements())
+        phys = self._count_by_type("IfcElement")
+        prods = self._count_by_type("IfcProduct")
+        opens = self._count_by_type("IfcOpeningElement")
         spaces = self._count_by_type("IfcSpace")
-        types  = self._count_by_type("IfcElementType")
-        adj_phys  = max(0, phys  - (opens  if not include_openings else 0))
-        adj_prods = max(0, prods - (opens  if not include_openings else 0)
-                                 - (spaces if not include_spaces    else 0)
-                                 + (types  if include_type_definitions else 0))
+        types = self._count_by_type("IfcElementType")
+        adj_phys = max(0, phys - (opens if not include_openings else 0))
+        adj_prods = max(
+            0,
+            prods
+            - (opens if not include_openings else 0)
+            - (spaces if not include_spaces else 0)
+            + (types if include_type_definitions else 0),
+        )
         return {
             "built_elements": built,
             "all_physical_elements": phys,
@@ -667,7 +720,9 @@ class Module2_IFCRead:
                 "include_type_definitions": include_type_definitions,
             },
             "excluded_or_added": {
-                "openings": opens, "spaces": spaces, "type_definitions": types,
+                "openings": opens,
+                "spaces": spaces,
+                "type_definitions": types,
             },
         }
 

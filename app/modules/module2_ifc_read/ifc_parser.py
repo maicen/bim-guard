@@ -38,6 +38,7 @@ class ServiceElement:
 # Mapping from IFC type to plain English service category
 IFC_SERVICE_LABELS = {
     "IfcPipeSegment": "Pipework",
+    "IfcFlowSegment": "Flow segment",
     "IfcPipeFitting": "Pipe fitting",
     "IfcFlowFitting": "Flow fitting",
     "IfcValve": "Valve",
@@ -62,6 +63,7 @@ IFC_TO_JOINT = {
     "IfcPlate": "JT-014",
     "IfcHeatExchanger": "JT-009",
     "IfcPipeSegment": "JT-012",  # Pipe clamp connection
+    "IfcFlowSegment": "JT-012",
 }
 
 # Space type → environment class mapping
@@ -175,24 +177,20 @@ def get_system_name(element, ifc_model) -> str:
     return "Unassigned"
 
 
-def parse_ifc(ifc_path: str) -> list[ServiceElement]:
-    """
-    Main entry point. Parses an IFC file and returns a list of
-    ServiceElement objects ready for corrosion compliance checking.
-
-    Args:
-        ifc_path: Path to .ifc file (IFC 2x3 or IFC4)
-
-    Returns:
-        List of ServiceElement dataclass instances
-    """
-    model = ifcopenshell.open(ifc_path)
+def parse_ifc_model(model) -> list[ServiceElement]:
+    """Parse an already opened IFC model into service elements."""
     elements = []
 
     target_types = list(IFC_SERVICE_LABELS.keys())
 
     for ifc_type in target_types:
-        for el in model.by_type(ifc_type):
+        # IFC2X3/IFC4 differ for some MEP classes; skip unknown classes safely.
+        try:
+            typed_elements = model.by_type(ifc_type)
+        except Exception:
+            continue
+
+        for el in typed_elements:
             mat_a_raw = get_material_name(el, model)
             mat_a = normalise_material_name(mat_a_raw)
             mat_b = None  # Second material (e.g. bracket material) — extend via Pset
@@ -233,6 +231,20 @@ def parse_ifc(ifc_path: str) -> list[ServiceElement]:
             )
 
     return elements
+
+
+def parse_ifc(ifc_path: str) -> list[ServiceElement]:
+    """
+    Backward-compatible wrapper that opens an IFC file and parses service elements.
+
+    Args:
+        ifc_path: Path to .ifc file (IFC 2x3 or IFC4)
+
+    Returns:
+        List of ServiceElement dataclass instances
+    """
+    model = ifcopenshell.open(ifc_path)
+    return parse_ifc_model(model)
 
 
 def generate_synthetic_elements(n: int = 25) -> list[ServiceElement]:

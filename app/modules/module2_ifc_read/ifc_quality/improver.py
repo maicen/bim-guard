@@ -16,6 +16,7 @@ try:
     import ifcopenshell
     from ifcopenshell.util.element import get_psets
     from ifcopenshell.api import run
+
     _IFC_AVAILABLE = True
 except ImportError:
     _IFC_AVAILABLE = False
@@ -23,36 +24,43 @@ except ImportError:
 _DEFAULT_PSETS: dict = {
     "IfcWall": {
         "Pset_WallCommon": {
-            "LoadBearing": False, "FireRating": "0",
-            "AcousticRating": "0dB", "Thickness": 0.15,
+            "LoadBearing": False,
+            "FireRating": "0",
+            "AcousticRating": "0dB",
+            "Thickness": 0.15,
         }
     },
     "IfcDoor": {
         "Pset_DoorCommon": {
-            "FireRating": "0", "SmokeStop": False,
-            "IsExternal": False, "Acoustic": "0dB",
+            "FireRating": "0",
+            "SmokeStop": False,
+            "IsExternal": False,
+            "Acoustic": "0dB",
         }
     },
     "IfcWindow": {
         "Pset_WindowCommon": {
-            "FireRating": "0", "IsExternal": False,
-            "Acoustic": "0dB", "ThermalTransmittance": 3.0,
+            "FireRating": "0",
+            "IsExternal": False,
+            "Acoustic": "0dB",
+            "ThermalTransmittance": 3.0,
         }
     },
     "IfcSpace": {
         "Pset_SpaceCommon": {
-            "GrossFloorArea": 0.0, "NetFloorArea": 0.0,
+            "GrossFloorArea": 0.0,
+            "NetFloorArea": 0.0,
             "OccupancyType": "Unknown",
         }
     },
     "IfcSlab": {
         "Pset_SlabCommon": {
-            "FireRating": "0", "AcousticRating": "0dB", "Thickness": 0.25,
+            "FireRating": "0",
+            "AcousticRating": "0dB",
+            "Thickness": 0.25,
         }
     },
-    "IfcRoof": {
-        "Pset_RoofCommon": {"FireRating": "0", "PitchAngle": 0.0}
-    },
+    "IfcRoof": {"Pset_RoofCommon": {"FireRating": "0", "PitchAngle": 0.0}},
 }
 
 
@@ -80,18 +88,19 @@ class IFCImprover:
 
     def _add_missing_guids(self):
         added = 0
-        for el in self.ifc.entities:
+        for el in self._iter_entities():
             if hasattr(el, "GlobalId"):
                 if not el.GlobalId or not str(el.GlobalId).strip():
                     el.GlobalId = str(uuid.uuid4()).replace("-", "")[:22]
                     added += 1
         msg = f"GUIDs added: {added}"
-        print(msg); self._log.append(msg)
+        print(msg)
+        self._log.append(msg)
 
     def _add_missing_names(self):
         added = 0
         counts: dict = {}
-        for el in self.ifc.entities:
+        for el in self._iter_entities():
             if hasattr(el, "Name"):
                 if not el.Name or not str(el.Name).strip():
                     t = el.is_a()
@@ -99,11 +108,12 @@ class IFCImprover:
                     el.Name = f"{t}_{counts[t]:03d}"
                     added += 1
         msg = f"Names added: {added}"
-        print(msg); self._log.append(msg)
+        print(msg)
+        self._log.append(msg)
 
     def _add_default_properties(self):
         added = 0
-        for el in self.ifc.entities:
+        for el in self._iter_entities():
             t = el.is_a()
             if t not in _DEFAULT_PSETS:
                 continue
@@ -120,20 +130,16 @@ class IFCImprover:
                     except Exception:
                         pass
         msg = f"Property sets added: {added}"
-        print(msg); self._log.append(msg)
+        print(msg)
+        self._log.append(msg)
 
     def _build_summary(self) -> Dict:
-        total = len(list(self.ifc.entities))
-        with_guid = sum(
-            1 for e in self.ifc.entities
-            if hasattr(e, "GlobalId") and e.GlobalId
-        )
-        with_name = sum(
-            1 for e in self.ifc.entities
-            if hasattr(e, "Name") and e.Name
-        )
+        entities = self._iter_entities()
+        total = len(entities)
+        with_guid = sum(1 for e in entities if hasattr(e, "GlobalId") and e.GlobalId)
+        with_name = sum(1 for e in entities if hasattr(e, "Name") and e.Name)
         with_props = 0
-        for el in self.ifc.entities:
+        for el in entities:
             try:
                 if get_psets(el, psets_only=False):
                     with_props += 1
@@ -141,11 +147,23 @@ class IFCImprover:
                 pass
         return {
             "total_elements": total,
-            "with_guid":       with_guid,
-            "with_name":       with_name,
+            "with_guid": with_guid,
+            "with_name": with_name,
             "with_properties": with_props,
-            "improvements":    self._log,
+            "improvements": self._log,
         }
+
+    def _iter_entities(self) -> list:
+        """Return IFC entities in a version-safe way across IfcOpenShell releases."""
+        try:
+            return list(self.ifc)
+        except Exception:
+            pass
+
+        try:
+            return list(self.ifc.by_type("IfcRoot"))
+        except Exception:
+            return []
 
 
 def improve_ifc_file(input_path: str, output_path: str | None = None) -> Dict:
@@ -159,6 +177,7 @@ def improve_ifc_file(input_path: str, output_path: str | None = None) -> Dict:
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) < 2:
         print("Usage: python improver.py <input.ifc> [output.ifc]")
         sys.exit(1)

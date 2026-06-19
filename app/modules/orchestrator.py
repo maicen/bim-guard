@@ -229,15 +229,15 @@ class BIMGuard_App:
         """
         Run the full analysis pipeline for a project:
         1. Load project + documents from DB
-        2. Parse the IFC file (or use synthetic demo data)
+        2. Load and parse the IFC file once (or use synthetic demo data)
         3. Run corrosion compliance checks
         4. Return a unified result dict consumed by the analyze route
         """
         from app.services.documents_service import DocumentService
         from app.services.projects_service import ProjectsService
-        from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
-        from .module2_ifc_read.ifc_parser import parse_ifc, generate_synthetic_elements
+        from .module2_ifc_read import Module2_IFCRead
+        from .module2_ifc_read.ifc_parser import parse_ifc_model, generate_synthetic_elements
         from .module4_comparator.compliance_runner import run_compliance_checks
 
         projects_svc = ProjectsService()
@@ -269,29 +269,30 @@ class BIMGuard_App:
         ifc_type_counts: dict = {}
         ifc_totals: dict = {}
         is_demo = False
+        m2_reader: Module2_IFCRead | None = None
+        ifc_quality_report: dict = {}
+        ifc_quality_warnings: list[str] = []
 
         if ifc_path:
             try:
-                elements = parse_ifc(str(ifc_path))
+                # Open IFC once, then reuse the loaded model for both parsing paths.
+                m2_reader = Module2_IFCRead(ifc_path)
+                ifc_quality_report = m2_reader.quality_report or {}
+                ifc_quality_warnings = m2_reader.quality_warnings or []
+                if selected_theme == "MEP":
+                    elements = parse_ifc_model(m2_reader.ifc_file)
+                else:
+                    elements = []
+
+                ifc_totals = m2_reader.extract_summary_counts(
+                    include_openings=include_openings,
+                    include_spaces=include_spaces,
+                    include_type_definitions=include_type_definitions,
+                )
 
                 # Count by IFC type
                 for el in elements:
                     ifc_type_counts[el.ifc_type] = ifc_type_counts.get(el.ifc_type, 0) + 1
-
-                n = len(elements)
-                ifc_totals = {
-                    "built_elements": n,
-                    "all_physical_elements": n,
-                    "adjusted_physical_elements": n,
-                    "all_products": n,
-                    "adjusted_products": n,
-                    "filters": {
-                        "include_openings": include_openings,
-                        "include_spaces": include_spaces,
-                        "include_type_definitions": include_type_definitions,
-                    },
-                    "excluded_or_added": {"openings": 0, "spaces": 0, "type_definitions": 0},
-                }
             except Exception as exc:
                 ifc_error = str(exc)
         else:
@@ -350,7 +351,6 @@ class BIMGuard_App:
         rule_validations: list[dict] = []  # kept for backward-compat
 
         try:
-            from .module2_ifc_read import Module2_IFCRead
             from .module4_comparator import Module4_Comparator
             from .module5_reporter import Module5_Reporter
 
@@ -359,6 +359,11 @@ class BIMGuard_App:
             # Basic element-presence check (legacy rule_validations card)
             for rule in library_rules:
                 target = rule.get("target_ifc_class", "")
+                if target not in ifc_type_counts and m2_reader and not ifc_error:
+                    try:
+                        ifc_type_counts[target] = len(m2_reader.ifc_file.by_type(target))
+                    except Exception:
+                        ifc_type_counts[target] = 0
                 count = ifc_type_counts.get(target, 0)
                 rule_validations.append(
                     {
@@ -372,22 +377,28 @@ class BIMGuard_App:
                 )
 
             # Full Module 2 → 4 → 5 compliance pipeline (only when IFC file exists)
-            if ifc_path and not ifc_error and library_rules:
-                m2 = Module2_IFCRead(ifc_path)
-                extraction = m2.extract_for_compliance(library_rules)
+            if m2_reader and not ifc_error and library_rules:
+                extraction = m2_reader.extract_for_compliance(library_rules)
                 rule_compliance = Module4_Comparator().validate_metadata(extraction)
                 rule_compliance_summary = Module5_Reporter().render_visual_report(rule_compliance)
 
         except Exception as exc:
             rule_compliance_error = str(exc)
 
+        if selected_theme == "MEP":
+            ifc_element_count = len(elements)
+        else:
+            ifc_element_count = int(ifc_totals.get("adjusted_products", 0))
+
         return {
             "project": project,
             "analysis_theme": selected_theme,
-            "ifc_element_count": len(elements),
+            "ifc_element_count": ifc_element_count,
             "ifc_type_counts": ifc_type_counts,
             "ifc_totals": ifc_totals,
             "ifc_error": ifc_error,
+            "ifc_quality_report": ifc_quality_report,
+            "ifc_quality_warnings": ifc_quality_warnings,
             "documents": documents,
             "compliance_results": compliance_results,
             "cost_impact": cost_impact,
