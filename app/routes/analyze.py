@@ -637,6 +637,7 @@ def setup_routes(rt):
         ifc_error = result["ifc_error"]
         ifc_quality = result.get("ifc_quality_report") or {}
         ifc_quality_warnings = result.get("ifc_quality_warnings") or []
+        ifc_schema_note = result.get("ifc_schema_note")
 
         # IFC summary card
         if ifc_error:
@@ -658,6 +659,13 @@ def setup_routes(rt):
                 Alert(msg, cls=AlertT.warning if hasattr(AlertT, "warning") else "")
                 for msg in ifc_quality_warnings
             ]
+            if ifc_schema_note:
+                quality_alerts.append(
+                    Alert(
+                        ifc_schema_note,
+                        cls=AlertT.info if hasattr(AlertT, "info") else "",
+                    )
+                )
 
             quality_block = (
                 Card(

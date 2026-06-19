@@ -237,7 +237,11 @@ class BIMGuard_App:
         from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
         from .module2_ifc_read import Module2_IFCRead
-        from .module2_ifc_read.ifc_parser import parse_ifc_model, generate_synthetic_elements
+        from .module2_ifc_read.ifc_parser import (
+            generate_synthetic_elements,
+            get_schema_compatibility_note,
+            parse_ifc_model,
+        )
         from .module4_comparator.compliance_runner import run_compliance_checks
 
         projects_svc = ProjectsService()
@@ -272,6 +276,7 @@ class BIMGuard_App:
         m2_reader: Module2_IFCRead | None = None
         ifc_quality_report: dict = {}
         ifc_quality_warnings: list[str] = []
+        ifc_schema_note: str | None = None
 
         if ifc_path:
             try:
@@ -279,6 +284,7 @@ class BIMGuard_App:
                 m2_reader = Module2_IFCRead(ifc_path)
                 ifc_quality_report = m2_reader.quality_report or {}
                 ifc_quality_warnings = m2_reader.quality_warnings or []
+                ifc_schema_note = get_schema_compatibility_note(m2_reader.ifc_file)
                 if selected_theme == "MEP":
                     elements = parse_ifc_model(m2_reader.ifc_file)
                 else:
@@ -399,6 +405,7 @@ class BIMGuard_App:
             "ifc_error": ifc_error,
             "ifc_quality_report": ifc_quality_report,
             "ifc_quality_warnings": ifc_quality_warnings,
+            "ifc_schema_note": ifc_schema_note,
             "documents": documents,
             "compliance_results": compliance_results,
             "cost_impact": cost_impact,

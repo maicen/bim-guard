@@ -233,6 +233,17 @@ def parse_ifc_model(model) -> list[ServiceElement]:
     return elements
 
 
+def get_schema_compatibility_note(model) -> str | None:
+    """Return a short note when the IFC schema omits MEP classes used by this parser."""
+    schema = str(getattr(model, "schema", "") or "").upper()
+    if schema.startswith("IFC2X3"):
+        return (
+            "Schema compatibility: this IFC2X3 model may skip IFC4 MEP classes such as "
+            "IfcPipeSegment; equivalent flow elements are parsed where available."
+        )
+    return None
+
+
 def parse_ifc(ifc_path: str) -> list[ServiceElement]:
     """
     Backward-compatible wrapper that opens an IFC file and parses service elements.
