@@ -1,136 +1,70 @@
 # BIM-Guard
 
-## 🔗 Live Demo
+## Live Demo
 
-👉 **[View the BIMGUARD AI Interactive Pipeline](https://maicen.github.io/bim-guard/)**
+View the published demo at [https://maicen.github.io/bim-guard/](https://maicen.github.io/bim-guard/).
 
-MAICEN-1125-M10 · Final Master's Project · Group 5 · Zigurat Global Institute of Technology
+## Overview
 
-## Project Overview
+BIM-Guard is a FastHTML and MonsterUI application for BIM compliance workflows. Users can upload IFC models and regulatory documents, extract rules, review a rule library, run compliance analysis, and export artifacts such as BCF reports.
 
-**BIM Guard** is a BIM compliance application built with FastHTML (Python) and MonsterUI. It lets users upload IFC models, define compliance rules from documents, and generate reports.
+The app is a single ASGI service. UI and backend routes live together in Python, with HTMX used for partial updates and MonsterUI for the component layer.
 
-**Tech stack:** FastHTML · MonsterUI · Supabase (Postgres + Storage) · IfcOpenShell · HTMX · litellm (multi-provider AI)
+## Stack
 
-## Instructions Files Map
+- FastHTML and HTMX for routing and partial page updates
+- MonsterUI for UI components
+- IfcOpenShell for IFC parsing
+- fastlite plus adapter services for persistence
+- Supabase for the default database and storage backends
+- LiteLLM for rule extraction across multiple providers
 
-| File | Who reads it | What it defines |
-| --- | --- | --- |
-| README.md | Humans | What the project is |
-| AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
-| DESIGN.md | Design agents | How the project should look and feel |
-
-## Repository Structure
+## Repository Layout
 
 ```
 bim-guard/
-├── app/                        # Main application package
-│   ├── main.py                 # FastHTML app init and route mounting
-│   ├── utils.py                # Shared utilities (env loading, helpers)
-│   ├── components/             # Reusable FastHTML UI elements
-│   │   ├── layout.py           # DashboardLayout, AppSidebar, AppHeader
-│   │   ├── documents_ui.py
-│   │   ├── projects_ui.py
-│   │   ├── rules_ui.py
-│   │   ├── rule_extraction_ui.py
-│   │   ├── themed_ui.py
-│   │   └── ui/                 # Low-level component primitives
-│   │       ├── button.py, card.py, table.py, sidebar.py, ...
-│   ├── routes/                 # HTTP handlers and HTMX responses
-│   │   ├── dashboard.py
-│   │   ├── library.py
-│   │   ├── projects.py
-│   │   ├── analyze.py
-│   │   └── viewer.py           # In-browser IFC 3D viewer
-│   ├── services/               # Business logic and persistence adapters
-│   │   ├── persistence.py      # DB backend selector (Supabase default)
-│   │   ├── db_adapters.py      # SQLite/Supabase table adapter layer
-│   │   ├── object_storage.py   # Local/Supabase object storage adapter
-│   │   ├── documents_service.py
-│   │   ├── projects_service.py
-│   │   ├── rules_service.py
-│   │   ├── rule_extraction_service.py  # Pipeline orchestration (steps 1–10)
-│   │   ├── llm_client.py               # litellm transport (provider-agnostic)
-│   │   ├── rule_extractor.py           # Prompt, JSON parsing, normalisation
-│   │   └── ifc_parser.py
-│   ├── modules/                # 5-step compliance pipeline
-│   │   ├── module1_doc_parser/
-│   │   ├── module2_ifc_read.py
-│   │   ├── module3_rule_builder/
-│   │   ├── module4_comparator.py
-│   │   ├── module5_reporter.py
-│   │   └── orchestrator.py
-│   └── views/
-│       └── layout.py
-├── data/                       # Runtime cache and local dev artifacts
-│   ├── cache/
-│   └── rulesets/
-├── scripts/                    # One-off migration/backfill utilities
-├── docs/                       # Supporting documentation and resources
-├── static/                     # CSS, JS, and IFC viewer assets
-│   ├── css/
-│   ├── js/
-│   └── lib/
-├── IFC-Sample-Test-Files/      # Sample IFC models for testing
-├── main.py                     # Uvicorn entrypoint
-├── pyproject.toml              # Python project metadata and dependencies
-└── example.env                 # Environment variable template
+├── app/
+│   ├── main.py          # App bootstrap and route registration
+│   ├── components/      # Reusable UI building blocks
+│   ├── routes/          # HTTP handlers and HTMX responses
+│   ├── services/        # Persistence, storage, and extraction services
+│   ├── modules/         # 5-step compliance pipeline
+│   ├── engines/         # Corrosion engines and demo data
+│   └── views/           # Shared page layout helpers
+├── data/                # Local runtime data, cache, and seed rule sets
+├── docs/                # Supporting documentation
+├── scripts/             # Migration and backfill utilities
+├── static/              # CSS, JS, and viewer assets
+├── main.py              # Uvicorn entrypoint (`uv run uvicorn main:app --reload`)
+├── pyproject.toml       # Project metadata and dependencies
+└── example.env          # Environment template for local development
 ```
 
 ## Getting Started
 
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/maicen/bim-guard.git
-cd bim-guard
-```
-
-### 2. Install uv
-
-[uv](https://docs.astral.sh/uv/) is the package manager used by this project. Install it with:
-
-```bash
-# macOS / Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows (PowerShell)
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-### 3. Install dependencies
-
-**Step 3a — core app dependencies** (FastHTML, MonsterUI, pypdf, etc.):
+### 1. Install dependencies
 
 ```bash
 uv sync
 ```
 
-This creates a `.venv` and installs all dependencies declared in `pyproject.toml`. Python 3.12 or later is required.
-
-**Step 3b — ML pipeline dependencies group** (Docling, spaCy, scikit-learn, etc.):
+Python 3.12 or later is required. If you need the optional document-processing pipeline, install the extra group as well:
 
 ```bash
 uv sync --group ml-pipeline
 ```
 
-> This installs the optional `ml-pipeline` dependency group defined in `pyproject.toml` (including docling, spacy + English model, and scikit-learn). First run may download model weights — allow a few minutes.
+### 2. Configure environment variables
 
-### 4. Configure environment variables
-
-Create a `.env` file from the template:
+Create your local `.env` file from the template:
 
 ```bash
-# PowerShell
-Copy-Item example.env .env
-
-# macOS / Linux
 cp example.env .env
 ```
 
-Open `.env` and set Supabase credentials:
+The template defaults to local SQLite and local file storage for development. Switch these to Supabase if you want to use the hosted backend:
 
-```
+```env
 BIM_GUARD_DB_BACKEND=supabase
 BIM_GUARD_STORAGE_BACKEND=supabase
 SUPABASE_URL=...
@@ -138,128 +72,58 @@ SUPABASE_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-For rule extraction, set an API key for your preferred provider (you only need one):
+For rule extraction, set at least one provider key. Only one is needed:
 
-```
-# OpenAI
-OPENAI_API_KEY=your_key_here
-
-# Google Gemini  (free tier at aistudio.google.com/api-keys)
-GEMINI_API_KEY=your_key_here
-
-# Anthropic
-ANTHROPIC_API_KEY=your_key_here
-
-# Mistral
-MISTRAL_API_KEY=your_key_here
+```env
+OPENAI_API_KEY=...
+GEMINI_API_KEY=...
+ANTHROPIC_API_KEY=...
+MISTRAL_API_KEY=...
 ```
 
-Optionally pin a default model (any [LiteLLM model string](https://docs.litellm.ai/docs/providers)):
+You can also pin the default LLM model with `BIM_GUARD_RULE_MODEL`.
 
-```
-BIM_GUARD_RULE_MODEL=gpt-4o-mini
-```
-
-> Without any LLM credentials, the **Rule Extraction Studio** (`/library/rules/extract`) will show an error when extraction is triggered. All other workflows (projects, documents, IFC viewer) continue to work.
-
-### 5. Run the app
+### 3. Run the app
 
 ```bash
 uv run uvicorn main:app --reload
-# or for development
-uv run uvicorn main:app --reload --log-level debug
-
 ```
 
-The app will be available at `http://127.0.0.1:8000`.
+The app is available at [http://127.0.0.1:8000](http://127.0.0.1:8000). You can also start it with `python main.py` if you prefer a direct entrypoint.
+
+## Main Routes
+
+- `/` landing page
+- `/dashboard` dashboard
+- `/projects` project management
+- `/library` document and rule library
+- `/library/documents` document uploads
+- `/library/rules/extract` AI-assisted rule extraction
+- `/analyze` compliance analysis
+- `/viewer` IFC viewer
 
 ## Deployment
 
 ### Docker Compose
 
-Run with Docker Compose (Supabase-backed):
-
 ```bash
 docker compose up --build
 ```
 
-- `docker-compose.yml` passes Supabase environment variables from host `.env`.
-- A named cache volume is mounted at `/app/data/cache` for downloaded storage objects.
+`docker-compose.yml` wires the Supabase environment variables from your shell or `.env` file and mounts a cache volume for downloaded artifacts.
 
-### Render.com
+### Render
 
-This repository includes `render.yaml` for Render deployment using Docker.
+The repository includes `render.yaml` for Docker-based deployment on Render. Set the Supabase variables and any AI provider keys you intend to use.
 
-Required Render environment variables:
+## Notes
 
-- `SUPABASE_URL`
-- `SUPABASE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `app/main.py` is the application bootstrap used by the root `main.py` entrypoint.
+- `README.md`, `AGENTS.md`, `CLAUDE.md`, and `.github/instructions/project-specific.instructions.md` are the main source files for project guidance.
+- There is no separate `requirements.txt`; dependency management is handled with `uv` in `pyproject.toml`.
 
-Optional AI variables (set whichever provider you use):
-
-- `OPENAI_API_KEY`
-- `GEMINI_API_KEY`
-- `ANTHROPIC_API_KEY`
-- `MISTRAL_API_KEY`
-- `BIM_GUARD_RULE_MODEL`
-
-## Application Workflow
-
-```
- Upload IFC model          Upload regulation PDF
-       │                          │
-       ▼                          ▼
-  /projects              /library/documents
- (store + view)         (store + extract text)
-       │                          │
-       │                   /library/rules/extract
-       │                  (choose provider + model)
-       │                          │
-       │                   RuleExtractionService
-       │                  ┌───────────────────────┐
-       │                  │ 1. Docling / pypdf     │
-       │                  │ 2. Table rule builder  │
-       │                  │ 3. Section chunker     │
-       │                  │ 4–7. spaCy pipeline*   │
-       │                  │ 8. BERT classifier*    │
-       │                  │ 9. LiteLLM → any LLM  │
-       │                  │ 10. Deduplication      │
-       │                  └───────────────────────┘
-       │                          │
-       │                  /library/rules
-       │                  (review + curate)
-       │                          │
-       └──────────┬───────────────┘
-                  ▼
-            /analyze
-       (run compliance check)
-                  │
-                  ▼
-            BCF report
-              export
-
-  * optional — requires ml-pipeline dependency group
-```
-
-## Rule Extraction (AI)
-
-Rule extraction is available at `/library/rules/extract`.
-
-The **Rule Extraction Studio** lets you choose any LiteLLM-supported provider
-(OpenAI, Google Gemini, Anthropic, Mistral) and model, optionally supply an API
-key per-request, then extract structured compliance rules from any document
-already uploaded to the library.
-
-Extraction pipeline:
-
-1. Select a provider, model, and document — the document's pre-extracted text is read from the database.
-2. Text is normalised and split into OBC-style section chunks.
-3. Optional spaCy pipeline (keyword filter → dependency parser → confidence scorer) prunes low-signal chunks.
-4. Each chunk is sent to the chosen LLM via `LiteLLMClient`.
-5. `LiteLLMRuleExtractor` parses and normalises the JSON response into the BIM rule schema.
 6. Results are de-duplicated and displayed for review.
-7. Accepted rules can be saved directly to the Rule Library.
+2. Accepted rules can be saved directly to the Rule Library.
 
 ## Documentation Map
 
