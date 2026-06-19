@@ -17,4 +17,8 @@ data/bimguard.sqlite-wal
 docs\MonsterUI\
 .playwright-mcp/
 .sesskey
+<<<<<<< HEAD
 data/cache/
+=======
+.DS_Store
+>>>>>>> 758a23a (update .gitignore to exclude .DS_Store and add new dependencies in pyproject.toml and uv.lock for networkx and pyvis)
