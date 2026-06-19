@@ -82,7 +82,7 @@ class IFCImprover:
 
     def save(self, output_filepath: str):
         self.ifc.write(output_filepath)
-        print(f"Improved file saved: {output_filepath}")
+        self._log.append(f"Improved file saved: {output_filepath}")
 
     # ── Steps ─────────────────────────────────────────────────────────────────
 
@@ -94,7 +94,6 @@ class IFCImprover:
                     el.GlobalId = str(uuid.uuid4()).replace("-", "")[:22]
                     added += 1
         msg = f"GUIDs added: {added}"
-        print(msg)
         self._log.append(msg)
 
     def _add_missing_names(self):
@@ -108,7 +107,6 @@ class IFCImprover:
                     el.Name = f"{t}_{counts[t]:03d}"
                     added += 1
         msg = f"Names added: {added}"
-        print(msg)
         self._log.append(msg)
 
     def _add_default_properties(self):
@@ -130,7 +128,6 @@ class IFCImprover:
                     except Exception:
                         pass
         msg = f"Property sets added: {added}"
-        print(msg)
         self._log.append(msg)
 
     def _build_summary(self) -> Dict:

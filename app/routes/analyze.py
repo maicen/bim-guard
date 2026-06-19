@@ -49,6 +49,374 @@ _documents_service = DocumentService()
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
 
 
+def _analysis_form(projects, documents, mode: str):
+    """Build the analysis form for the requested workflow mode."""
+    is_initial = mode == "initial"
+    project_options = [Option("— select a project —", value="", disabled=True, selected=True)] + [
+        Option(p.get("name", f"Project {p['id']}"), value=str(p["id"])) for p in projects
+    ]
+
+    form_sections = [
+        Div(
+            FormLabel("Project (IFC Model)", fr="project_id"),
+            Select(
+                *project_options,
+                id="project_id",
+                name="project_id",
+                required=True,
+            ),
+        ),
+        Div(
+            FormLabel("Analysis Theme", fr="analysis_theme"),
+            Select(
+                Option("Architecture", value="Architecture", selected=True),
+                Option("MEP", value="MEP"),
+                id="analysis_theme",
+                name="analysis_theme",
+                required=True,
+            ),
+        ),
+    ]
+
+    if not is_initial:
+        doc_checkboxes = []
+        for doc in documents:
+            doc_checkboxes.append(
+                Div(
+                    Checkbox(
+                        id=f"doc_{doc['id']}",
+                        name="document_ids",
+                        value=str(doc["id"]),
+                        cls="mr-2",
+                    ),
+                    Label(
+                        doc.get("filename", f"Document {doc['id']}"),
+                        for_=f"doc_{doc['id']}",
+                        cls="text-sm cursor-pointer",
+                    ),
+                    cls="flex items-center gap-1",
+                )
+            )
+
+        if not doc_checkboxes:
+            doc_checkboxes = [P("No documents uploaded yet.", cls="text-sm text-muted-foreground")]
+
+        form_sections.append(
+            Div(
+                FormLabel("Documents"),
+                Div(
+                    *doc_checkboxes,
+                    cls="space-y-2 border rounded-md p-3 bg-muted/30",
+                ),
+            )
+        )
+
+    form_sections.append(
+        Div(
+            FormLabel("Count Options"),
+            Div(
+                Div(
+                    Checkbox(
+                        id="include_openings",
+                        name="include_openings",
+                        value="1",
+                        checked=True,
+                        cls="mr-2",
+                    ),
+                    Label(
+                        "Include openings (IfcOpeningElement)",
+                        for_="include_openings",
+                        cls="text-sm cursor-pointer",
+                    ),
+                    cls="flex items-center gap-1",
+                ),
+                Div(
+                    Checkbox(
+                        id="include_spaces",
+                        name="include_spaces",
+                        value="1",
+                        checked=True,
+                        cls="mr-2",
+                    ),
+                    Label(
+                        "Include spaces (IfcSpace)",
+                        for_="include_spaces",
+                        cls="text-sm cursor-pointer",
+                    ),
+                    cls="flex items-center gap-1",
+                ),
+                Div(
+                    Checkbox(
+                        id="include_type_definitions",
+                        name="include_type_definitions",
+                        value="1",
+                        cls="mr-2",
+                    ),
+                    Label(
+                        "Include type definitions (IfcElementType)",
+                        for_="include_type_definitions",
+                        cls="text-sm cursor-pointer",
+                    ),
+                    cls="flex items-center gap-1",
+                ),
+                cls="space-y-2 border rounded-md p-3 bg-muted/30",
+            ),
+        )
+    )
+
+    submit_label = "Run Initial Analysis" if is_initial else "Run Model Vs Rules Analysis"
+    spinner_id = "initial-analysis-spinner" if is_initial else "model-rules-spinner"
+    results_id = "initial-analysis-results" if is_initial else "model-rules-results"
+    hx_post = "/analysis/initial/results" if is_initial else "/analysis/results"
+    card_title = "Initial Analysis" if is_initial else "Model Vs Rules Analysis"
+    helper_copy = (
+        "Inspect the IFC model structure, counts, and quality signals before checking rules."
+        if is_initial
+        else "Compare the selected IFC model against the saved rules in the library."
+    )
+
+    return Div(
+        Card(
+            CardHeader(
+                Div(
+                    CardTitle(card_title),
+                    P(helper_copy, cls="text-sm text-muted-foreground mt-1"),
+                )
+            ),
+            CardContent(
+                Form(
+                    Div(
+                        *form_sections,
+                        Div(
+                            SubmitButton(submit_label, variant="primary"),
+                            Div(
+                                P(
+                                    "Running analysis…",
+                                    cls="text-sm text-muted-foreground",
+                                ),
+                                id=spinner_id,
+                                cls="htmx-indicator",
+                                style="display:none",
+                            ),
+                            cls="flex items-center gap-4",
+                        ),
+                    ),
+                    method="post",
+                    action=hx_post,
+                    hx_post=hx_post,
+                    hx_target=f"#{results_id}",
+                    hx_swap="innerHTML",
+                    hx_indicator=f"#{spinner_id}",
+                ),
+            ),
+        ),
+        Div(id=results_id),
+    )
+
+
+async def _run_analysis_request(req: Request):
+    """Parse and validate the analysis request, then run the orchestrator."""
+    form = await req.form()
+    project_id_raw = form.get("project_id") or ""
+    if not project_id_raw:
+        return None, Alert("Please select a project.", cls=AlertT.error)
+    try:
+        project_id = int(project_id_raw)
+    except ValueError:
+        return None, Alert("Invalid project selection.", cls=AlertT.error)
+
+    doc_ids = [int(v) for v in form.getlist("document_ids") if v]
+    analysis_theme = (form.get("analysis_theme") or "Architecture").strip()
+    include_openings = bool(form.get("include_openings"))
+    include_spaces = bool(form.get("include_spaces"))
+    include_type_definitions = bool(form.get("include_type_definitions"))
+    result = _bim_guard_app.orchestrate_workflow(
+        project_id,
+        doc_ids,
+        analysis_theme=analysis_theme,
+        include_openings=include_openings,
+        include_spaces=include_spaces,
+        include_type_definitions=include_type_definitions,
+    )
+
+    if "error" in result:
+        return None, Alert(result["error"], cls=AlertT.error)
+
+    return {"project_id": project_id, "result": result}, None
+
+
+def _build_ifc_summary_content(result: dict, project_id: int):
+    """Build the IFC detail block shared by the initial analysis page."""
+    ifc_count = result["ifc_element_count"]
+    ifc_type_counts = result.get("ifc_type_counts") or {}
+    ifc_totals = result.get("ifc_totals") or {}
+    ifc_error = result["ifc_error"]
+    ifc_quality = result.get("ifc_quality_report") or {}
+    ifc_quality_warnings = result.get("ifc_quality_warnings") or []
+    ifc_quality_improvements = result.get("ifc_quality_improvements") or []
+    ifc_schema_note = result.get("ifc_schema_note")
+
+    if ifc_error:
+        return P(f"IFC parsing error: {ifc_error}", cls="text-sm text-destructive")
+    if not _projects_service.resolve_ifc_file(project_id):
+        return P(
+            "No IFC file attached to this project.",
+            cls="text-sm text-muted-foreground",
+        )
+
+    filters = ifc_totals.get("filters") or {}
+    deltas = ifc_totals.get("excluded_or_added") or {}
+    overall = ifc_quality.get("overall") or {}
+    labeling = ifc_quality.get("labeling") or {}
+    guids = ifc_quality.get("guids") or {}
+    properties = ifc_quality.get("properties") or {}
+
+    quality_alerts = [
+        Alert(msg, cls=AlertT.warning if hasattr(AlertT, "warning") else "")
+        for msg in ifc_quality_warnings
+    ]
+    if ifc_schema_note:
+        quality_alerts.append(
+            Alert(
+                ifc_schema_note,
+                cls=AlertT.info if hasattr(AlertT, "info") else "",
+            )
+        )
+
+    quality_block = (
+        Card(
+            CardHeader(CardTitle("IFC Quality")),
+            CardContent(
+                P(
+                    f"Overall score: {overall.get('score', 0):.1f}%",
+                    cls="text-sm font-medium",
+                ),
+                Div(
+                    P(
+                        f"Labeling: {labeling.get('score', 0):.1f}%",
+                        cls="text-xs text-muted-foreground",
+                    ),
+                    P(
+                        f"GUIDs: {guids.get('score', 0):.1f}%",
+                        cls="text-xs text-muted-foreground",
+                    ),
+                    P(
+                        f"Properties: {properties.get('score', 0):.1f}%",
+                        cls="text-xs text-muted-foreground",
+                    ),
+                    cls="space-y-1 mt-2",
+                ),
+                *quality_alerts,
+            ),
+        )
+        if ifc_quality
+        else ""
+    )
+
+    improvement_block = (
+        Card(
+            CardHeader(
+                Div(
+                    CardTitle("Improvement Summary"),
+                    P(
+                        "Automatic fixes applied while preparing this IFC file for analysis.",
+                        cls="text-xs text-muted-foreground mt-0.5",
+                    ),
+                )
+            ),
+            CardContent(
+                Div(
+                    *[
+                        P(message, cls="text-sm text-muted-foreground")
+                        for message in ifc_quality_improvements
+                    ],
+                    cls="space-y-1",
+                )
+            ),
+        )
+        if ifc_quality_improvements
+        else ""
+    )
+
+    counts_table = ItemsCountDataTable(
+        [
+            CountTableItemSpec(
+                label="Built Elements",
+                total=int(ifc_totals.get("built_elements", ifc_count)),
+                subtotal=int(ifc_totals.get("built_elements", ifc_count)),
+                note="Schema-aware building entities",
+            ),
+            CountTableItemSpec(
+                label="All Physical Elements",
+                total=int(ifc_totals.get("all_physical_elements", 0)),
+                subtotal=int(ifc_totals.get("adjusted_physical_elements", ifc_count)),
+                note="Based on IfcElement",
+            ),
+            CountTableItemSpec(
+                label="All Products",
+                total=int(ifc_totals.get("all_products", 0)),
+                subtotal=int(ifc_totals.get("adjusted_products", 0)),
+                note="Based on IfcProduct",
+            ),
+        ],
+        caption="Built, physical, and product item counts",
+        options_summary=(
+            "Options: "
+            f"openings={'on' if filters.get('include_openings', True) else 'off'} "
+            f"(count: {deltas.get('openings', 0)}), "
+            f"spaces={'on' if filters.get('include_spaces', True) else 'off'} "
+            f"(count: {deltas.get('spaces', 0)}), "
+            f"type defs={'on' if filters.get('include_type_definitions', False) else 'off'} "
+            f"(count: {deltas.get('type_definitions', 0)})."
+        ),
+        built_type_breakdown=ifc_type_counts,
+    )
+
+    return Div(
+        quality_block,
+        improvement_block,
+        counts_table,
+        cls="space-y-1",
+    )
+
+
+def _build_document_cards(result: dict):
+    """Build document summary cards for the model-vs-rules page."""
+    cards = []
+    for doc in result["documents"]:
+        cards.append(
+            Card(
+                CardHeader(CardTitle(doc["filename"] or "Untitled document")),
+                CardContent(
+                    P(
+                        f"{doc['section_count']} text sections extracted.",
+                        cls="text-sm text-muted-foreground",
+                    )
+                ),
+            )
+        )
+    return cards
+
+
+def _build_ifc_graph_card(result: dict, project_id: int):
+    """Return a temporary placeholder while graph visualization is disabled."""
+    # TODO: Re-enable the PyVis IFC graph after the initial-analysis UI flow is stabilized.
+    del result, project_id
+    return Card(
+        CardHeader(CardTitle("IFC Relationship Graph")),
+        CardContent(
+            P(
+                "Graph visualization is temporarily disabled.",
+                cls="text-sm text-muted-foreground",
+            ),
+            P(
+                "TODO: re-enable the PyVis-based IFC relationship graph once the initial-analysis UI flow is finalized.",
+                cls="text-xs text-muted-foreground mt-1",
+            ),
+        ),
+    )
+
+
 def _band_badge(band: str):
     colours = {
         "Critical": "bg-red-600 text-white",
@@ -455,301 +823,55 @@ _last_compliance_results: list[dict] = []
 def setup_routes(rt):
     """Register analysis workflow routes."""
 
+    @rt("/analysis/initial")
+    def analysis_initial():
+        projects = _projects_service.list_projects()
+        documents = _documents_service.list_documents()
+
+        return Title("Initial Analysis - BIM Guard"), DashboardLayout(
+            Container(_analysis_form(projects, documents, mode="initial"), cls="space-y-4")
+        )
+
     @rt("/analysis/run")
     def analysis_run():
         projects = _projects_service.list_projects()
         documents = _documents_service.list_documents()
 
-        project_options = [
-            Option("— select a project —", value="", disabled=True, selected=True)
-        ] + [Option(p.get("name", f"Project {p['id']}"), value=str(p["id"])) for p in projects]
-
-        doc_checkboxes = []
-        for doc in documents:
-            doc_checkboxes.append(
-                Div(
-                    Checkbox(
-                        id=f"doc_{doc['id']}",
-                        name="document_ids",
-                        value=str(doc["id"]),
-                        cls="mr-2",
-                    ),
-                    Label(
-                        doc.get("filename", f"Document {doc['id']}"),
-                        for_=f"doc_{doc['id']}",
-                        cls="text-sm cursor-pointer",
-                    ),
-                    cls="flex items-center gap-1",
-                )
-            )
-
-        if not doc_checkboxes:
-            doc_checkboxes = [P("No documents uploaded yet.", cls="text-sm text-muted-foreground")]
-
-        return Title("Run Analysis - BIM Guard"), DashboardLayout(
-            Container(
-                Div(
-                    Card(
-                        CardHeader(CardTitle("Select Inputs")),
-                        CardContent(
-                            Form(
-                                Div(
-                                    Div(
-                                        FormLabel("Project (IFC Model)", fr="project_id"),
-                                        Select(
-                                            *project_options,
-                                            id="project_id",
-                                            name="project_id",
-                                            required=True,
-                                        ),
-                                    ),
-                                    Div(
-                                        FormLabel("Analysis Theme", fr="analysis_theme"),
-                                        Select(
-                                            Option(
-                                                "Architecture", value="Architecture", selected=True
-                                            ),
-                                            Option("MEP", value="MEP"),
-                                            id="analysis_theme",
-                                            name="analysis_theme",
-                                            required=True,
-                                        ),
-                                    ),
-                                    Div(
-                                        FormLabel("Documents"),
-                                        Div(
-                                            *doc_checkboxes,
-                                            cls="space-y-2 border rounded-md p-3 bg-muted/30",
-                                        ),
-                                    ),
-                                    Div(
-                                        FormLabel("Count Options"),
-                                        Div(
-                                            Div(
-                                                Checkbox(
-                                                    id="include_openings",
-                                                    name="include_openings",
-                                                    value="1",
-                                                    checked=True,
-                                                    cls="mr-2",
-                                                ),
-                                                Label(
-                                                    "Include openings (IfcOpeningElement)",
-                                                    for_="include_openings",
-                                                    cls="text-sm cursor-pointer",
-                                                ),
-                                                cls="flex items-center gap-1",
-                                            ),
-                                            Div(
-                                                Checkbox(
-                                                    id="include_spaces",
-                                                    name="include_spaces",
-                                                    value="1",
-                                                    checked=True,
-                                                    cls="mr-2",
-                                                ),
-                                                Label(
-                                                    "Include spaces (IfcSpace)",
-                                                    for_="include_spaces",
-                                                    cls="text-sm cursor-pointer",
-                                                ),
-                                                cls="flex items-center gap-1",
-                                            ),
-                                            Div(
-                                                Checkbox(
-                                                    id="include_type_definitions",
-                                                    name="include_type_definitions",
-                                                    value="1",
-                                                    cls="mr-2",
-                                                ),
-                                                Label(
-                                                    "Include type definitions (IfcElementType)",
-                                                    for_="include_type_definitions",
-                                                    cls="text-sm cursor-pointer",
-                                                ),
-                                                cls="flex items-center gap-1",
-                                            ),
-                                            cls="space-y-2 border rounded-md p-3 bg-muted/30",
-                                        ),
-                                    ),
-                                    Div(
-                                        SubmitButton(
-                                            "Run Analysis",
-                                            variant="primary",
-                                        ),
-                                        Div(
-                                            P(
-                                                "Running analysis…",
-                                                cls="text-sm text-muted-foreground",
-                                            ),
-                                            id="run-spinner",
-                                            cls="htmx-indicator",
-                                            style="display:none",
-                                        ),
-                                        cls="flex items-center gap-4",
-                                    ),
-                                ),
-                                hx_post="/analysis/results",
-                                hx_target="#analysis-results",
-                                hx_swap="innerHTML",
-                                hx_indicator="#run-spinner",
-                            ),
-                        ),
-                    ),
-                    Div(id="analysis-results"),
-                )
-            )
+        return Title("Model Vs Rules Analysis - BIM Guard"), DashboardLayout(
+            Container(_analysis_form(projects, documents, mode="model-rules"), cls="space-y-4")
         )
+
+    @rt("/analysis/initial/results", methods=["POST"])
+    async def analysis_initial_post(req: Request):
+        analysis_data, error_response = await _run_analysis_request(req)
+        if error_response:
+            return error_response
+
+        project_id = analysis_data["project_id"]
+        result = analysis_data["result"]
+        project = result["project"]
+        selected_theme = result.get("analysis_theme", "Architecture")
+
+        sections = [
+            Card(
+                CardHeader(CardTitle(f"{project.get('name', 'Project')} — {selected_theme} Theme")),
+                CardContent(_build_ifc_summary_content(result, project_id)),
+            ),
+            _build_ifc_graph_card(result, project_id),
+        ]
+
+        return Div(*sections, cls="space-y-4")
 
     @rt("/analysis/results", methods=["POST"])
     async def analysis_run_post(req: Request):
-        form = await req.form()
-        project_id_raw = form.get("project_id") or ""
-        if not project_id_raw:
-            return Alert("Please select a project.", cls=AlertT.error)
-        try:
-            project_id = int(project_id_raw)
-        except ValueError:
-            return Alert("Invalid project selection.", cls=AlertT.error)
+        analysis_data, error_response = await _run_analysis_request(req)
+        if error_response:
+            return error_response
 
-        doc_ids = [int(v) for v in form.getlist("document_ids") if v]
-        analysis_theme = (form.get("analysis_theme") or "Architecture").strip()
-        include_openings = bool(form.get("include_openings"))
-        include_spaces = bool(form.get("include_spaces"))
-        include_type_definitions = bool(form.get("include_type_definitions"))
-        result = _bim_guard_app.orchestrate_workflow(
-            project_id,
-            doc_ids,
-            analysis_theme=analysis_theme,
-            include_openings=include_openings,
-            include_spaces=include_spaces,
-            include_type_definitions=include_type_definitions,
-        )
-
-        if "error" in result:
-            return Alert(result["error"], cls=AlertT.error)
-
+        result = analysis_data["result"]
         project = result["project"]
         selected_theme = result.get("analysis_theme", "Architecture")
-        ifc_count = result["ifc_element_count"]
-        ifc_type_counts = result.get("ifc_type_counts") or {}
-        ifc_totals = result.get("ifc_totals") or {}
-        ifc_error = result["ifc_error"]
-        ifc_quality = result.get("ifc_quality_report") or {}
-        ifc_quality_warnings = result.get("ifc_quality_warnings") or []
-        ifc_schema_note = result.get("ifc_schema_note")
-
-        # IFC summary card
-        if ifc_error:
-            ifc_detail = P(f"IFC parsing error: {ifc_error}", cls="text-sm text-destructive")
-        elif not _projects_service.resolve_ifc_file(project_id):
-            ifc_detail = P(
-                "No IFC file attached to this project.",
-                cls="text-sm text-muted-foreground",
-            )
-        else:
-            filters = ifc_totals.get("filters") or {}
-            deltas = ifc_totals.get("excluded_or_added") or {}
-            overall = ifc_quality.get("overall") or {}
-            labeling = ifc_quality.get("labeling") or {}
-            guids = ifc_quality.get("guids") or {}
-            properties = ifc_quality.get("properties") or {}
-
-            quality_alerts = [
-                Alert(msg, cls=AlertT.warning if hasattr(AlertT, "warning") else "")
-                for msg in ifc_quality_warnings
-            ]
-            if ifc_schema_note:
-                quality_alerts.append(
-                    Alert(
-                        ifc_schema_note,
-                        cls=AlertT.info if hasattr(AlertT, "info") else "",
-                    )
-                )
-
-            quality_block = (
-                Card(
-                    CardHeader(CardTitle("IFC Quality")),
-                    CardContent(
-                        P(
-                            f"Overall score: {overall.get('score', 0):.1f}%",
-                            cls="text-sm font-medium",
-                        ),
-                        Div(
-                            P(
-                                f"Labeling: {labeling.get('score', 0):.1f}%",
-                                cls="text-xs text-muted-foreground",
-                            ),
-                            P(
-                                f"GUIDs: {guids.get('score', 0):.1f}%",
-                                cls="text-xs text-muted-foreground",
-                            ),
-                            P(
-                                f"Properties: {properties.get('score', 0):.1f}%",
-                                cls="text-xs text-muted-foreground",
-                            ),
-                            cls="space-y-1 mt-2",
-                        ),
-                        *quality_alerts,
-                    ),
-                )
-                if ifc_quality
-                else ""
-            )
-
-            counts_table = ItemsCountDataTable(
-                [
-                    CountTableItemSpec(
-                        label="Built Elements",
-                        total=int(ifc_totals.get("built_elements", ifc_count)),
-                        subtotal=int(ifc_totals.get("built_elements", ifc_count)),
-                        note="Schema-aware building entities",
-                    ),
-                    CountTableItemSpec(
-                        label="All Physical Elements",
-                        total=int(ifc_totals.get("all_physical_elements", 0)),
-                        subtotal=int(ifc_totals.get("adjusted_physical_elements", ifc_count)),
-                        note="Based on IfcElement",
-                    ),
-                    CountTableItemSpec(
-                        label="All Products",
-                        total=int(ifc_totals.get("all_products", 0)),
-                        subtotal=int(ifc_totals.get("adjusted_products", 0)),
-                        note="Based on IfcProduct",
-                    ),
-                ],
-                caption="Built, physical, and product item counts",
-                options_summary=(
-                    "Options: "
-                    f"openings={'on' if filters.get('include_openings', True) else 'off'} "
-                    f"(count: {deltas.get('openings', 0)}), "
-                    f"spaces={'on' if filters.get('include_spaces', True) else 'off'} "
-                    f"(count: {deltas.get('spaces', 0)}), "
-                    f"type defs={'on' if filters.get('include_type_definitions', False) else 'off'} "
-                    f"(count: {deltas.get('type_definitions', 0)})."
-                ),
-                built_type_breakdown=ifc_type_counts,
-            )
-
-            ifc_detail = Div(
-                quality_block,
-                counts_table,
-                cls="space-y-1",
-            )
-
-        doc_cards = []
-        for doc in result["documents"]:
-            doc_cards.append(
-                Card(
-                    CardHeader(CardTitle(doc["filename"] or "Untitled document")),
-                    CardContent(
-                        P(
-                            f"{doc['section_count']} text sections extracted.",
-                            cls="text-sm text-muted-foreground",
-                        )
-                    ),
-                )
-            )
+        doc_cards = _build_document_cards(result)
 
         compliance_card = _compliance_card(
             results=result.get("compliance_results", []),
@@ -777,7 +899,12 @@ def setup_routes(rt):
         sections = [
             Card(
                 CardHeader(CardTitle(f"{project.get('name', 'Project')} — {selected_theme} Theme")),
-                CardContent(ifc_detail),
+                CardContent(
+                    P(
+                        "Model loaded and ready for rule comparison against the saved library rules.",
+                        cls="text-sm text-muted-foreground",
+                    )
+                ),
             ),
             *(doc_cards or [P("No documents selected.", cls="text-sm text-muted-foreground")]),
             rule_validation_card,

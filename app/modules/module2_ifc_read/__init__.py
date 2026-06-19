@@ -97,6 +97,7 @@ class Module2_IFCRead:
         load_path = self.file_path
         self.quality_report: dict = {}
         self.quality_warnings: list[str] = []
+        self.quality_improvements: list[str] = []
 
         if _QUALITY_TOOLS_AVAILABLE:
             results = IFCValidator(str(load_path)).validate()
@@ -105,12 +106,13 @@ class Module2_IFCRead:
 
             if score < IFC_MIN_QUALITY_SCORE:
                 improved_path = load_path.with_stem(load_path.stem + "_improved")
-                improve_ifc_file(str(load_path), str(improved_path))
+                improvement_summary = improve_ifc_file(str(load_path), str(improved_path))
                 load_path = improved_path
                 self.quality_warnings.append(
                     f"Quality {score:.1f}% was below threshold; "
                     f"auto-improved file used: {improved_path.name}"
                 )
+                self.quality_improvements = improvement_summary.get("improvements", [])
             elif score < 80:
                 self.quality_warnings.append(
                     f"IFC quality is fair ({score:.1f}%). "

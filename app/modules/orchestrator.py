@@ -276,6 +276,7 @@ class BIMGuard_App:
         m2_reader: Module2_IFCRead | None = None
         ifc_quality_report: dict = {}
         ifc_quality_warnings: list[str] = []
+        ifc_quality_improvements: list[str] = []
         ifc_schema_note: str | None = None
 
         if ifc_path:
@@ -284,6 +285,7 @@ class BIMGuard_App:
                 m2_reader = Module2_IFCRead(ifc_path)
                 ifc_quality_report = m2_reader.quality_report or {}
                 ifc_quality_warnings = m2_reader.quality_warnings or []
+                ifc_quality_improvements = m2_reader.quality_improvements or []
                 ifc_schema_note = get_schema_compatibility_note(m2_reader.ifc_file)
                 if selected_theme == "MEP":
                     elements = parse_ifc_model(m2_reader.ifc_file)
@@ -405,6 +407,7 @@ class BIMGuard_App:
             "ifc_error": ifc_error,
             "ifc_quality_report": ifc_quality_report,
             "ifc_quality_warnings": ifc_quality_warnings,
+            "ifc_quality_improvements": ifc_quality_improvements,
             "ifc_schema_note": ifc_schema_note,
             "documents": documents,
             "compliance_results": compliance_results,
