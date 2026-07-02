@@ -62,10 +62,11 @@ class Module4_Comparator:
         elements  = item.get("elements", [])
 
         if not elements:
-            return self._result(item, "NO_ELEMENTS", 0, 0, 0, 0, [])
+            return self._result(item, "NO_ELEMENTS", 0, 0, 0, 0, [], [])
 
         pass_count = fail_count = missing_count = 0
         failures: list[dict] = []
+        missing_elements: list[dict] = []
 
         for el in elements:
             actual = el.get("actual_value")
@@ -84,6 +85,11 @@ class Module4_Comparator:
 
             if actual is None:
                 missing_count += 1
+                missing_elements.append({
+                    "element_name": el.get("name", ""),
+                    "guid": el.get("guid", ""),
+                    "storey": el.get("storey", ""),
+                })
                 continue
 
             passed, reason = self._compare(operator, actual, check_val, val_min, val_max, unit)
@@ -103,7 +109,7 @@ class Module4_Comparator:
             status = "PASS"
 
         return self._result(item, status, pass_count, fail_count,
-                            missing_count, len(elements), failures)
+                            missing_count, len(elements), failures, missing_elements)
 
     def _compare(self, operator, actual, check_val, val_min, val_max, unit):
         try:
@@ -155,23 +161,24 @@ class Module4_Comparator:
                 "actual": actual, "reason": reason}
 
     @staticmethod
-    def _result(item, status, pass_count, fail_count, missing_count, total, failures) -> dict:
+    def _result(item, status, pass_count, fail_count, missing_count, total, failures, missing_elements=None) -> dict:
         return {
-            "rule_ref":      item.get("rule_ref", ""),
-            "rule_desc":     item.get("rule_desc", ""),
-            "target":        item.get("target_ifc_class", ""),
-            "property_name": item.get("property_name", ""),
-            "property_set":  item.get("property_set", ""),
-            "operator":      item.get("operator", ""),
-            "check_value":   item.get("check_value"),
-            "value_min":     item.get("value_min"),
-            "value_max":     item.get("value_max"),
-            "unit":          item.get("unit", ""),
-            "severity":      item.get("severity", "mandatory"),
-            "status":        status,
-            "pass_count":    pass_count,
-            "fail_count":    fail_count,
-            "missing_count": missing_count,
-            "total_count":   total,
-            "failures":      failures,
+            "rule_ref":        item.get("rule_ref", ""),
+            "rule_desc":       item.get("rule_desc", ""),
+            "target":          item.get("target_ifc_class", ""),
+            "property_name":   item.get("property_name", ""),
+            "property_set":    item.get("property_set", ""),
+            "operator":        item.get("operator", ""),
+            "check_value":     item.get("check_value"),
+            "value_min":       item.get("value_min"),
+            "value_max":       item.get("value_max"),
+            "unit":            item.get("unit", ""),
+            "severity":        item.get("severity", "mandatory"),
+            "status":          status,
+            "pass_count":      pass_count,
+            "fail_count":      fail_count,
+            "missing_count":   missing_count,
+            "total_count":     total,
+            "failures":        failures,
+            "missing_elements": missing_elements or [],
         }

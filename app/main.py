@@ -13,7 +13,7 @@ from app.utils import load_env_file
 
 load_env_file()
 
-from app.routes import analyze, dashboard, library, projects, viewer
+from app.routes import analyze, dashboard, library, projects, revit_sync, viewer
 
 APP_HEADERS = SiteTheme()
 
@@ -98,6 +98,39 @@ def _seed_library() -> None:
         # Seed GC-001 / CC-001 / MC-001 engine rulesets (each idempotent)
         seed_engine_rulesets(svc)
 
+        # Seed extended OBC rules (NumberOfRiser, IsExternal, fixture checks, etc.)
+        if not svc.has_ruleset("OBC-PART9-EXT"):
+            from app.modules.module3_rule_builder.obc_extended_rules import OBC_EXTENDED_RULES
+            for rule in OBC_EXTENDED_RULES:
+                svc.create_rule(
+                    reference=str(rule.get("ref") or "OBC"),
+                    rule_type=str(rule.get("rule_type") or "numeric_comparison"),
+                    description=str(rule.get("desc") or ""),
+                    target_ifc_class=str(rule.get("target") or "Unspecified"),
+                    source_text="",
+                    property_set=str(rule.get("property_set") or ""),
+                    property_name=str(rule.get("property_name") or ""),
+                    fallback_property="",
+                    operator=str(rule.get("operator") or ""),
+                    check_value=rule.get("check_value"),
+                    value_min=rule.get("value_min"),
+                    value_max=rule.get("value_max"),
+                    unit=str(rule.get("unit") or ""),
+                    applies_when={},
+                    severity=str(rule.get("severity") or "informational"),
+                    keyword="",
+                    compliance_type="",
+                    exceptions=[],
+                    related_refs=[],
+                    overridden_by="",
+                    confidence=0.9,
+                    extraction_method="seed",
+                    needs_review=False,
+                    mechanism="OBC",
+                    ruleset_id="OBC-PART9-EXT",
+                    rule_category="property_check",
+                )
+
     except Exception:
         pass  # never crash startup over seeding
 
@@ -108,6 +141,7 @@ def _setup_routes() -> None:
     dashboard.setup_routes(rt)
     library.setup_routes(rt)
     projects.setup_routes(rt)
+    revit_sync.setup_routes(rt)
 
 
 _seed_library()

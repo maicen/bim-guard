@@ -54,6 +54,40 @@ except ImportError:
 IFC_MIN_QUALITY_SCORE = 70
 
 
+# ── IFC class fallback map ────────────────────────────────────────────────────
+# Revit and some other authoring tools export the *container* class rather than
+# the sub-element class that buildingSMART rules target.  When by_type(target)
+# returns nothing, try each fallback in order.  For IfcStair specifically we
+# also walk IsDecomposedBy to recover the individual IfcStairFlight children.
+_IFC_CLASS_FALLBACKS: dict[str, list[str]] = {
+    "IfcStairFlight":    ["IfcStair"],
+    "IfcRailing":        ["IfcHandRail", "IfcMember"],
+    "IfcSlab":           ["IfcPlate", "IfcFooting"],
+    "IfcSpace":          ["IfcZone"],
+    "IfcSanitaryTerminal": ["IfcFlowTerminal"],
+    "IfcAlarm":          ["IfcSensor"],
+}
+
+# ── Property alias map ────────────────────────────────────────────────────────
+# When the nominated property_name is absent, try these alternate names before
+# giving up.  Covers Revit parameter naming variations and IFC schema aliases.
+_PROPERTY_ALIASES: dict[str, list[str]] = {
+    "OverallWidth":     ["Width", "ClearWidth", "NominalWidth", "GrossWidth", "NetWidth"],
+    "OverallHeight":    ["Height", "ClearHeight", "NominalHeight", "GrossHeight", "NetHeight"],
+    "Width":            ["OverallWidth", "ClearWidth", "NominalWidth", "GrossWidth"],
+    "Height":           ["OverallHeight", "ClearHeight", "NominalHeight", "GrossHeight"],
+    "TreadLength":      ["TreadDepth", "GoingType", "Going", "TreadRun", "StepDepth"],
+    "RiserHeight":      ["RiserType", "Riser", "RiserHeightType", "StepHeight"],
+    "RequiredHeadroom": ["HeadroomClearance", "Headroom", "ClearHeight", "ClearanceHeight"],
+    "HandrailHeight":   ["Height", "RailingHeight", "BarrierHeight"],
+    "Area":             ["ClearOpeningArea", "GrossArea", "NetArea", "OpeningArea"],
+    "RequiredSlope":    ["Slope", "PitchAngle", "SlopeAngle", "Gradient"],
+    "PitchAngle":       ["Slope", "RequiredSlope", "SlopeAngle", "Gradient"],
+    "FireRating":       ["FireResistanceRating", "FireResistance", "REI", "FRR"],
+    "LongName":         ["Name", "SpaceName", "RoomName"],
+}
+
+
 # ── IFC property-type → Python type label ────────────────────────────────────
 _IFC_TYPE_MAP = {
     "IfcReal": "real",
@@ -524,6 +558,60 @@ class Module2_IFCRead:
                 result[k] = list(v)
         return result
 
+    # ── Extraction helpers ────────────────────────────────────────────────────
+
+    def _get_elements_with_fallback(self, target: str) -> list:
+        """
+        Return IFC elements for *target* class.
+
+        If the direct lookup returns nothing, walk _IFC_CLASS_FALLBACKS.
+        For the IfcStair → IfcStairFlight case, decompose the stair containers
+        to get the individual flight sub-elements.
+        """
+        try:
+            elements = list(self.ifc_file.by_type(target))
+        except Exception:
+            elements = []
+
+        if elements:
+            return elements
+
+        for fallback_cls in _IFC_CLASS_FALLBACKS.get(target, []):
+            try:
+                candidates = list(self.ifc_file.by_type(fallback_cls))
+            except Exception:
+                continue
+
+            if not candidates:
+                continue
+
+            # Special case: IfcStair container → decompose into IfcStairFlight
+            if target == "IfcStairFlight" and fallback_cls == "IfcStair":
+                flights = []
+                for stair in candidates:
+                    for rel in getattr(stair, "IsDecomposedBy", []):
+                        for child in rel.RelatedObjects:
+                            if child.is_a("IfcStairFlight"):
+                                flights.append(child)
+                if flights:
+                    return flights
+                # No explicit flights found — use the stair containers themselves
+                return candidates
+
+            return candidates
+
+        return []
+
+    @staticmethod
+    def _lookup_in_psets(psets: dict, prop_name: str):
+        """Return (value, pset_name) for the first hit of prop_name in psets."""
+        for ps_name, props in psets.items():
+            if isinstance(props, dict) and prop_name in props:
+                v = props[prop_name]
+                if v is not None:
+                    return v, ps_name
+        return None, None
+
     # ── Compliance extraction (all fallbacks) ─────────────────────────────────
 
     def extract_for_compliance(self, rules: list[dict]) -> list[dict]:
@@ -547,14 +635,13 @@ class Module2_IFCRead:
             prop_name = str(rule.get("property_name") or "").strip()
             prop_set = str(rule.get("property_set") or "").strip()
             operator = str(rule.get("operator") or "").strip()
+            fallback_prop = str(rule.get("fallback_property") or "").strip()
 
             if not target or (not prop_name and operator not in ("exists", "not_exists")):
                 continue
 
-            try:
-                elements = self.ifc_file.by_type(target)
-            except Exception:
-                elements = []
+            # Use class fallback so IfcStair containers resolve to IfcStairFlight, etc.
+            elements = self._get_elements_with_fallback(target)
 
             element_results = []
             for el in elements:
@@ -562,7 +649,7 @@ class Module2_IFCRead:
                 found_pset = None
                 rich_detail: dict = {}
 
-                # ── Pass 1: simple get_psets (fast path) ──────────────────
+                # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
                 try:
                     psets_simple = ifcopenshell.util.element.get_psets(el, psets_only=False)
                 except Exception:
@@ -575,26 +662,22 @@ class Module2_IFCRead:
                         found_pset = prop_set
 
                 if actual_value is None and prop_name:
-                    for ps_name, props in psets_simple.items():
-                        if isinstance(props, dict) and prop_name in props:
-                            v = props[prop_name]
-                            if v is not None:
-                                actual_value = v
-                                found_pset = ps_name
-                                break
+                    v, ps = self._lookup_in_psets(psets_simple, prop_name)
+                    if v is not None:
+                        actual_value, found_pset = v, ps
 
-                # ── Pass 2: rich property extraction (for type/unit/bounds) ─
+                # ── Pass 2: rich property metadata (type/unit/bounds) ─────
                 if prop_name and found_pset:
                     try:
                         rich_all = self.extract_rich_properties(el)
-                        rich_pset = rich_all.get(found_pset, {})
-                        rich_prop = rich_pset.get(prop_name, {})
+                        pset_key = found_pset.split(":")[-1]  # strip "type:" prefix if any
+                        rich_prop = rich_all.get(pset_key, {}).get(prop_name, {})
                         if rich_prop:
                             rich_detail = rich_prop
                     except Exception:
                         pass
 
-                # ── Pass 3: direct IFC attribute fallback ─────────────────
+                # ── Pass 3: direct IFC schema attributes ──────────────────
                 if actual_value is None and prop_name:
                     try:
                         direct = self.get_direct_attributes(el)
@@ -604,6 +687,61 @@ class Module2_IFCRead:
                             found_pset = "direct_attribute"
                     except Exception:
                         pass
+
+                # ── Pass 4: element TYPE properties ───────────────────────
+                # Many Revit-exported properties (OverallWidth, FireRating, …)
+                # live on the IfcDoorType / IfcWindowType, not the instance.
+                if actual_value is None and prop_name:
+                    try:
+                        el_type = ifcopenshell.util.element.get_type(el)
+                        if el_type:
+                            type_psets = ifcopenshell.util.element.get_psets(
+                                el_type, psets_only=False
+                            )
+                            v, ps = self._lookup_in_psets(type_psets, prop_name)
+                            if v is not None:
+                                actual_value = v
+                                found_pset = f"type:{ps}"
+                            if actual_value is None:
+                                type_direct = self.get_direct_attributes(el_type)
+                                v = type_direct.get(prop_name)
+                                if v is not None:
+                                    actual_value = v
+                                    found_pset = "type:direct_attribute"
+                    except Exception:
+                        pass
+
+                # ── Pass 5: property aliases (name variations) ────────────
+                if actual_value is None and prop_name:
+                    for alias in _PROPERTY_ALIASES.get(prop_name, []):
+                        v, ps = self._lookup_in_psets(psets_simple, alias)
+                        if v is not None:
+                            actual_value, found_pset = v, f"alias:{ps}"
+                            break
+                        try:
+                            direct = self.get_direct_attributes(el)
+                            v = direct.get(alias)
+                            if v is not None:
+                                actual_value = v
+                                found_pset = "alias:direct_attribute"
+                                break
+                        except Exception:
+                            pass
+
+                # ── Pass 6: rule's fallback_property field ────────────────
+                if actual_value is None and fallback_prop:
+                    v, ps = self._lookup_in_psets(psets_simple, fallback_prop)
+                    if v is not None:
+                        actual_value, found_pset = v, f"fallback:{ps}"
+                    if actual_value is None:
+                        try:
+                            direct = self.get_direct_attributes(el)
+                            v = direct.get(fallback_prop)
+                            if v is not None:
+                                actual_value = v
+                                found_pset = "fallback:direct_attribute"
+                        except Exception:
+                            pass
 
                 # ── Spatial, type, material context ───────────────────────
                 try:
@@ -656,6 +794,219 @@ class Module2_IFCRead:
             )
 
         return results
+
+    # ── Building-level summary (no geometry required) ─────────────────────────
+
+    def extract_building_summary(self) -> dict:
+        """
+        Extract building-level summary data from the IFC model.
+
+        Returns counts, areas, storey heights, fixture types, and QA flags
+        without requiring any mesh / geometry computation.
+        """
+        if not self.ifc_file:
+            return {}
+
+        summary: dict = {}
+
+        # ── Storeys ───────────────────────────────────────────────────────────
+        try:
+            raw_storeys = self.ifc_file.by_type("IfcBuildingStorey")
+            storeys = sorted(
+                [
+                    {
+                        "name": getattr(s, "Name", None) or f"Level {i}",
+                        "elevation": float(getattr(s, "Elevation", 0) or 0),
+                        "guid": s.GlobalId,
+                    }
+                    for i, s in enumerate(raw_storeys)
+                ],
+                key=lambda x: x["elevation"],
+            )
+            summary["storey_count"] = len(storeys)
+            summary["storeys"] = storeys
+
+            floor_heights = []
+            for i in range(1, len(storeys)):
+                diff = storeys[i]["elevation"] - storeys[i - 1]["elevation"]
+                floor_heights.append(
+                    {
+                        "from": storeys[i - 1]["name"],
+                        "to": storeys[i]["name"],
+                        "height_mm": round(diff),
+                    }
+                )
+            summary["floor_heights"] = floor_heights
+        except Exception:
+            summary["storey_count"] = 0
+            summary["storeys"] = []
+            summary["floor_heights"] = []
+
+        # ── Spaces / Rooms ────────────────────────────────────────────────────
+        try:
+            spaces = self.ifc_file.by_type("IfcSpace")
+            total_area = 0.0
+            rooms_by_storey: dict[str, dict] = {}
+            unplaced_rooms = []
+
+            for sp in spaces:
+                psets = ifcopenshell.util.element.get_psets(sp, psets_only=False)
+
+                # Area — check Qto then Pset
+                area: float | None = None
+                for ps_props in psets.values():
+                    if not isinstance(ps_props, dict):
+                        continue
+                    for key in ("NetFloorArea", "GrossFloorArea", "Area", "NetArea"):
+                        v = ps_props.get(key)
+                        if v is not None:
+                            try:
+                                area = float(v)
+                            except (ValueError, TypeError):
+                                pass
+                            break
+                    if area is not None:
+                        break
+
+                if area:
+                    total_area += area
+
+                spatial = self.get_spatial_location(sp)
+                storey = spatial.get("storey_name") or "Unassigned"
+
+                if not list(getattr(sp, "ContainedInStructure", [])):
+                    unplaced_rooms.append(
+                        {
+                            "name": (
+                                getattr(sp, "LongName", None)
+                                or getattr(sp, "Name", None)
+                                or "Unnamed"
+                            ),
+                            "guid": sp.GlobalId,
+                        }
+                    )
+
+                if storey not in rooms_by_storey:
+                    rooms_by_storey[storey] = {"count": 0, "total_area_m2": 0.0}
+                rooms_by_storey[storey]["count"] += 1
+                if area:
+                    rooms_by_storey[storey]["total_area_m2"] = round(
+                        rooms_by_storey[storey]["total_area_m2"] + area, 2
+                    )
+
+            summary["room_count"] = len(spaces)
+            summary["total_gfa_m2"] = round(total_area, 2)
+            summary["rooms_per_storey"] = rooms_by_storey
+            summary["unplaced_rooms"] = unplaced_rooms
+        except Exception:
+            summary["room_count"] = 0
+            summary["total_gfa_m2"] = 0.0
+            summary["rooms_per_storey"] = {}
+            summary["unplaced_rooms"] = []
+
+        # ── Element counts by IFC class ───────────────────────────────────────
+        _COUNT_TYPES = [
+            "IfcDoor", "IfcWindow", "IfcWall", "IfcSlab",
+            "IfcStairFlight", "IfcRamp", "IfcRailing",
+            "IfcColumn", "IfcBeam", "IfcSanitaryTerminal", "IfcAlarm",
+        ]
+        element_counts: dict[str, int] = {}
+        for ifc_type in _COUNT_TYPES:
+            try:
+                # Use class fallback so IfcStairFlight counts include IfcStair-decomposed flights
+                elems = self._get_elements_with_fallback(ifc_type)
+                if elems:
+                    element_counts[ifc_type] = len(elems)
+            except Exception:
+                pass
+        summary["element_counts"] = element_counts
+
+        # ── Plumbing fixture counts (IfcSanitaryTerminal by PredefinedType) ──
+        _FIXTURE_LABELS: dict[str, str] = {
+            "TOILETPAN": "WC / Toilet",
+            "BATH": "Bath",
+            "SHOWER": "Shower",
+            "WASHHANDBASIN": "Washbasin",
+            "SINK": "Sink",
+            "URINAL": "Urinal",
+            "CISTERN": "Cistern",
+        }
+        fixture_counts: dict[str, int] = {}
+        try:
+            fixtures = self._get_elements_with_fallback("IfcSanitaryTerminal")
+            for f in fixtures:
+                ptype = getattr(f, "PredefinedType", None)
+                if not ptype:
+                    psets = ifcopenshell.util.element.get_psets(f, psets_only=False)
+                    for ps in psets.values():
+                        if isinstance(ps, dict) and "PredefinedType" in ps:
+                            ptype = ps["PredefinedType"]
+                            break
+                label = _FIXTURE_LABELS.get(str(ptype or "").upper(), str(ptype or "Unknown").title())
+                fixture_counts[label] = fixture_counts.get(label, 0) + 1
+        except Exception:
+            pass
+        summary["fixture_counts"] = fixture_counts
+
+        # ── External door count ───────────────────────────────────────────────
+        external_doors = 0
+        try:
+            doors = self._get_elements_with_fallback("IfcDoor")
+            for door in doors:
+                psets = ifcopenshell.util.element.get_psets(door, psets_only=False)
+                is_ext = None
+                for ps in psets.values():
+                    if isinstance(ps, dict) and "IsExternal" in ps:
+                        is_ext = ps["IsExternal"]
+                        break
+                if is_ext is True or str(is_ext).upper() in ("TRUE", "1", "YES"):
+                    external_doors += 1
+        except Exception:
+            pass
+        summary["external_door_count"] = external_doors
+
+        # ── Alarm / detector count by type ────────────────────────────────────
+        alarm_counts: dict[str, int] = {}
+        _ALARM_LABELS: dict[str, str] = {
+            "SMOKEALARM": "Smoke Alarm",
+            "FIREDETECTOR": "Fire Detector",
+            "HEATDETECTOR": "Heat Detector",
+            "CO2SENSOR": "CO Sensor",
+            "MANUALPULLBOX": "Manual Pull Station",
+        }
+        try:
+            alarms = self._get_elements_with_fallback("IfcAlarm")
+            for a in alarms:
+                ptype = getattr(a, "PredefinedType", None)
+                if not ptype:
+                    psets = ifcopenshell.util.element.get_psets(a, psets_only=False)
+                    for ps in psets.values():
+                        if isinstance(ps, dict) and "PredefinedType" in ps:
+                            ptype = ps["PredefinedType"]
+                            break
+                label = _ALARM_LABELS.get(str(ptype or "").upper(), str(ptype or "Unknown").title())
+                alarm_counts[label] = alarm_counts.get(label, 0) + 1
+        except Exception:
+            pass
+        summary["alarm_counts"] = alarm_counts
+
+        # ── QA: unnamed elements ──────────────────────────────────────────────
+        unnamed_elements: list[dict] = []
+        for ifc_type in ("IfcDoor", "IfcWindow", "IfcStairFlight", "IfcRailing", "IfcSpace"):
+            try:
+                elems = self._get_elements_with_fallback(ifc_type)
+                unnamed = [
+                    {"type": ifc_type, "guid": el.GlobalId}
+                    for el in elems
+                    if not getattr(el, "Name", None)
+                ]
+                if unnamed:
+                    unnamed_elements.append({"type": ifc_type, "count": len(unnamed)})
+            except Exception:
+                pass
+        summary["unnamed_elements"] = unnamed_elements
+
+        return summary
 
     def get_full_element_data(self, element) -> dict:
         """

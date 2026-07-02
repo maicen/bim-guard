@@ -7,6 +7,7 @@ from fasthtml.common import (
     Details,
     Div,
     Form,
+    H3,
     Option,
     P,
     Summary,
@@ -708,86 +709,196 @@ def _rule_compliance_card(
         "NO_ELEMENTS": "bg-gray-100 text-gray-600",
     }
 
+    _IFC_LABELS = {
+        "IfcStairFlight": "Stairs",
+        "IfcDoor":        "Doors",
+        "IfcWindow":      "Windows",
+        "IfcRailing":     "Railings & Guards",
+        "IfcRamp":        "Ramps",
+        "IfcSlab":        "Slabs & Landings",
+        "IfcWall":        "Walls",
+        "IfcSpace":       "Spaces & Rooms",
+        "IfcZone":        "Zones",
+        "IfcColumn":      "Columns",
+        "IfcBeam":        "Beams",
+        "IfcFooting":     "Footings & Foundations",
+        "IfcPipeSegment":      "Pipes",
+        "IfcDuctSegment":      "Ducts",
+        "IfcSanitaryTerminal": "Plumbing Fixtures",
+        "IfcAlarm":            "Alarms & Detectors",
+    }
+
+    # Group results by IFC class, preserving order of first appearance
+    from collections import defaultdict
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    seen_targets: list[str] = []
+    for r in compliance_results:
+        t = r.get("target", "Other")
+        if t not in grouped:
+            seen_targets.append(t)
+        grouped[t].append(r)
+
     header_cells = [
         Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-        for h in ("Ref", "Description", "Target", "Property", "Rule", "Status", "Pass/Fail/Miss")
+        for h in ("Ref", "Description", "Property", "Rule", "Status", "Pass / Fail / Miss")
     ]
 
     rows = []
-    for r in compliance_results:
-        op = r.get("operator", "")
-        if op == "between":
-            rule_str = f"between {r.get('value_min')}–{r.get('value_max')} {r.get('unit', '')}"
-        elif op == "exists":
-            rule_str = "exists"
-        else:
-            rule_str = f"{op} {r.get('check_value', '')} {r.get('unit', '')}".strip()
+    for target in seen_targets:
+        label = _IFC_LABELS.get(target, target)
+        group_results = grouped[target]
 
-        status = r.get("status", "")
-        s_cls = _STATUS_CLS.get(status, "bg-gray-100 text-gray-600")
+        # Count group-level status summary
+        g_pass   = sum(1 for r in group_results if r.get("status") == "PASS")
+        g_fail   = sum(1 for r in group_results if r.get("status") == "FAIL")
+        g_miss   = sum(1 for r in group_results if r.get("status") in ("MISSING_DATA", "PARTIAL"))
+        g_noelem = sum(1 for r in group_results if r.get("status") == "NO_ELEMENTS")
 
-        counts = Span(
-            f"{r.get('pass_count', 0)} / {r.get('fail_count', 0)} / {r.get('missing_count', 0)}",
-            cls="font-mono text-xs",
+        badge_cls = (
+            "bg-red-100 text-red-700" if g_fail
+            else "bg-yellow-100 text-yellow-700" if g_miss
+            else "bg-gray-100 text-gray-500" if g_noelem
+            else "bg-green-100 text-green-700"
         )
-
-        # Collapsible failure details
-        failures = r.get("failures", [])
-        fail_detail = ""
-        if failures:
-            fail_rows = [
-                Tr(
-                    Td(f.get("element_name", "")[:40], cls="px-2 py-1 text-xs font-mono"),
-                    Td(str(f.get("actual", "")), cls="px-2 py-1 text-xs"),
-                    Td(f.get("reason", ""), cls="px-2 py-1 text-xs text-red-700"),
-                )
-                for f in failures[:20]
-            ]
-            fail_detail = Details(
-                Summary(
-                    f"{len(failures)} failing element(s)", cls="text-xs text-red-600 cursor-pointer"
-                ),
-                Div(
-                    Table(
-                        Thead(
-                            Tr(
-                                Th("Element", cls="px-2 py-1 text-xs bg-muted"),
-                                Th("Actual", cls="px-2 py-1 text-xs bg-muted"),
-                                Th("Reason", cls="px-2 py-1 text-xs bg-muted"),
-                            )
-                        ),
-                        Tbody(*fail_rows),
-                        cls="w-full text-xs border rounded mt-1",
-                    ),
-                    cls="max-h-48 overflow-y-auto",
-                ),
-            )
+        badge_txt = (
+            f"{g_fail} failed" if g_fail
+            else f"{g_miss} missing" if g_miss
+            else "no elements" if g_noelem
+            else "all pass"
+        )
 
         rows.append(
             Tr(
-                Td(r.get("rule_ref", "—"), cls="px-3 py-2 text-xs font-mono"),
                 Td(
                     Div(
-                        (r.get("rule_desc", "") or "")[:70]
-                        + ("…" if len(r.get("rule_desc", "") or "") > 70 else ""),
-                        fail_detail,
+                        Span(label, cls="font-semibold text-sm text-foreground"),
+                        Span(target, cls="text-xs text-muted-foreground font-mono ml-2"),
+                        Span(badge_txt, cls=f"ml-auto text-xs px-2 py-0.5 rounded-full font-medium {badge_cls}"),
+                        cls="flex items-center gap-2",
                     ),
-                    cls="px-3 py-2 text-xs",
+                    colspan="6",
+                    cls="px-3 py-2 bg-muted/60 border-t-2 border-border",
                 ),
-                Td(r.get("target", "—"), cls="px-3 py-2 text-xs font-mono text-blue-700"),
-                Td(r.get("property_name", ""), cls="px-3 py-2 text-xs font-mono"),
-                Td(rule_str, cls="px-3 py-2 text-xs font-mono"),
-                Td(
-                    Span(
-                        status,
-                        cls=f"inline-block px-1.5 py-0.5 rounded text-xs font-semibold {s_cls}",
-                    ),
-                    cls="px-3 py-2",
-                ),
-                Td(counts, cls="px-3 py-2"),
-                cls="border-b border-muted last:border-0",
+                cls="",
             )
         )
+
+        for r in group_results:
+            op = r.get("operator", "")
+            if op == "between":
+                rule_str = f"between {r.get('value_min')}–{r.get('value_max')} {r.get('unit', '')}"
+            elif op == "exists":
+                rule_str = "exists"
+            else:
+                rule_str = f"{op} {r.get('check_value', '')} {r.get('unit', '')}".strip()
+
+            status = r.get("status", "")
+            s_cls = _STATUS_CLS.get(status, "bg-gray-100 text-gray-600")
+
+            counts = Span(
+                f"{r.get('pass_count', 0)} / {r.get('fail_count', 0)} / {r.get('missing_count', 0)}",
+                cls="font-mono text-xs",
+            )
+
+            # Collapsible failure details
+            failures = r.get("failures", [])
+            fail_detail = ""
+            if failures:
+                fail_rows = [
+                    Tr(
+                        Td(f.get("element_name", "")[:40], cls="px-2 py-1 text-xs font-mono"),
+                        Td(str(f.get("actual", "")), cls="px-2 py-1 text-xs"),
+                        Td(f.get("reason", ""), cls="px-2 py-1 text-xs text-red-700"),
+                    )
+                    for f in failures[:20]
+                ]
+                fail_detail = Details(
+                    Summary(
+                        f"{len(failures)} failing element(s) — click to expand",
+                        cls="text-xs text-red-600 cursor-pointer font-semibold mt-1",
+                    ),
+                    Div(
+                        Table(
+                            Thead(
+                                Tr(
+                                    Th("Element", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("Actual value", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("Reason", cls="px-2 py-1 text-xs bg-muted"),
+                                )
+                            ),
+                            Tbody(*fail_rows),
+                            cls="w-full text-xs border rounded mt-1",
+                        ),
+                        cls="max-h-48 overflow-y-auto",
+                    ),
+                )
+
+            # Collapsible missing-data details
+            missing_elements = r.get("missing_elements", [])
+            missing_detail = ""
+            if missing_elements:
+                missing_rows = [
+                    Tr(
+                        Td(m.get("element_name", "")[:40], cls="px-2 py-1 text-xs font-mono"),
+                        Td(m.get("storey", "—"), cls="px-2 py-1 text-xs"),
+                        Td(m.get("guid", "")[:20], cls="px-2 py-1 text-xs text-muted-foreground font-mono"),
+                    )
+                    for m in missing_elements[:20]
+                ]
+                overflow_note = (
+                    Div(
+                        f"... and {len(missing_elements) - 20} more elements",
+                        cls="text-xs text-muted-foreground px-2 py-1",
+                    )
+                    if len(missing_elements) > 20 else ""
+                )
+                missing_detail = Details(
+                    Summary(
+                        f"{len(missing_elements)} element(s) missing this property — click to expand",
+                        cls="text-xs text-yellow-700 cursor-pointer font-semibold mt-1",
+                    ),
+                    Div(
+                        Table(
+                            Thead(
+                                Tr(
+                                    Th("Element", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("Storey", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("GUID", cls="px-2 py-1 text-xs bg-muted"),
+                                )
+                            ),
+                            Tbody(*missing_rows),
+                            cls="w-full text-xs border rounded mt-1",
+                        ),
+                        overflow_note,
+                        cls="max-h-48 overflow-y-auto",
+                    ),
+                )
+
+            rows.append(
+                Tr(
+                    Td(r.get("rule_ref", "—"), cls="px-3 py-2 text-xs font-mono"),
+                    Td(
+                        Div(
+                            (r.get("rule_desc", "") or "")[:70]
+                            + ("..." if len(r.get("rule_desc", "") or "") > 70 else ""),
+                            fail_detail,
+                            missing_detail,
+                        ),
+                        cls="px-3 py-2 text-xs",
+                    ),
+                    Td(r.get("property_name", ""), cls="px-3 py-2 text-xs font-mono"),
+                    Td(rule_str, cls="px-3 py-2 text-xs font-mono"),
+                    Td(
+                        Span(
+                            status,
+                            cls=f"inline-block px-1.5 py-0.5 rounded text-xs font-semibold {s_cls}",
+                        ),
+                        cls="px-3 py-2",
+                    ),
+                    Td(counts, cls="px-3 py-2"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
 
     csv_btn = A(
         "Download CSV",
@@ -812,6 +923,171 @@ def _rule_compliance_card(
                 cls="overflow-auto border rounded-md",
             ),
             csv_btn,
+        ),
+    )
+
+
+_ELEM_LABELS = {
+    "IfcDoor":            "Doors",
+    "IfcWindow":          "Windows",
+    "IfcWall":            "Walls",
+    "IfcSlab":            "Slabs",
+    "IfcStairFlight":     "Stair Flights",
+    "IfcRamp":            "Ramps",
+    "IfcRailing":         "Railings",
+    "IfcColumn":          "Columns",
+    "IfcBeam":            "Beams",
+    "IfcSanitaryTerminal":"Fixtures",
+    "IfcAlarm":           "Alarms",
+}
+
+
+def _building_summary_card(summary: dict):
+    """Render a Building Overview card from extract_building_summary() output."""
+    if not summary:
+        return ""
+
+    storey_count   = summary.get("storey_count", 0)
+    room_count     = summary.get("room_count", 0)
+    gfa            = summary.get("total_gfa_m2", 0.0)
+    ext_doors      = summary.get("external_door_count", 0)
+    element_counts = summary.get("element_counts", {})
+    fixture_counts = summary.get("fixture_counts", {})
+    alarm_counts   = summary.get("alarm_counts", {})
+    floor_heights  = summary.get("floor_heights", [])
+    rooms_per_storey = summary.get("rooms_per_storey", {})
+    storeys        = summary.get("storeys", [])
+    unplaced       = summary.get("unplaced_rooms", [])
+    unnamed        = summary.get("unnamed_elements", [])
+
+    # ── Stat strip ────────────────────────────────────────────────────────────
+    def _stat(label, value):
+        return Div(
+            Span(str(value), cls="text-2xl font-bold block"),
+            Span(label, cls="text-xs text-muted-foreground"),
+            cls="text-center px-4 py-3 bg-muted rounded-lg",
+        )
+
+    stat_strip = Div(
+        _stat("Storeys", storey_count),
+        _stat("Rooms / Spaces", room_count),
+        _stat("GFA m²", f"{gfa:,.1f}" if gfa else "—"),
+        _stat("Exit Doors", ext_doors),
+        cls="grid grid-cols-4 gap-3 mb-5",
+    )
+
+    # ── Floor breakdown table ─────────────────────────────────────────────────
+    floor_table = ""
+    if storeys:
+        fh_by_from = {h["from"]: h["height_mm"] for h in floor_heights}
+        floor_rows = []
+        for s in storeys:
+            name   = s["name"]
+            ri     = rooms_per_storey.get(name, {})
+            r_cnt  = ri.get("count", 0)
+            r_area = ri.get("total_area_m2", 0.0)
+            h_mm   = fh_by_from.get(name)
+            floor_rows.append(
+                Tr(
+                    Td(name, cls="px-3 py-2 text-sm font-medium"),
+                    Td(f"{h_mm:,} mm" if h_mm else "—", cls="px-3 py-2 text-sm font-mono"),
+                    Td(str(r_cnt) if r_cnt else "—", cls="px-3 py-2 text-sm text-center"),
+                    Td(f"{r_area:,.1f}" if r_area else "—", cls="px-3 py-2 text-sm font-mono text-right"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        floor_table = Div(
+            H3("Floor Breakdown", cls="text-sm font-semibold mb-2"),
+            Div(
+                Table(
+                    Thead(Tr(
+                        Th("Storey",          cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Floor-to-Floor",  cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Rooms",           cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Area m²",         cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
+                    )),
+                    Tbody(*floor_rows),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md mb-5",
+            ),
+        )
+
+    # ── Element count badges ──────────────────────────────────────────────────
+    elem_badges = ""
+    if element_counts:
+        elem_badges = Div(
+            H3("Elements Found", cls="text-sm font-semibold mb-2"),
+            Div(
+                *[
+                    Span(
+                        f"{_ELEM_LABELS.get(k, k)}: {v}",
+                        cls="inline-block px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-800 border border-blue-200 font-medium",
+                    )
+                    for k, v in sorted(element_counts.items(), key=lambda x: _ELEM_LABELS.get(x[0], x[0]))
+                ],
+                cls="flex flex-wrap gap-2 mb-5",
+            ),
+        )
+
+    # ── Plumbing fixture badges ───────────────────────────────────────────────
+    fixture_badges = ""
+    if fixture_counts:
+        fixture_badges = Div(
+            H3("Plumbing Fixtures", cls="text-sm font-semibold mb-2"),
+            Div(
+                *[
+                    Span(f"{k}: {v}",
+                         cls="inline-block px-2 py-1 rounded-full text-xs bg-cyan-50 text-cyan-800 border border-cyan-200 font-medium")
+                    for k, v in sorted(fixture_counts.items())
+                ],
+                cls="flex flex-wrap gap-2 mb-5",
+            ),
+        )
+
+    # ── Alarm badges ─────────────────────────────────────────────────────────
+    alarm_badges = ""
+    if alarm_counts:
+        alarm_badges = Div(
+            H3("Fire / CO Alarms", cls="text-sm font-semibold mb-2"),
+            Div(
+                *[
+                    Span(f"{k}: {v}",
+                         cls="inline-block px-2 py-1 rounded-full text-xs bg-red-50 text-red-800 border border-red-200 font-medium")
+                    for k, v in sorted(alarm_counts.items())
+                ],
+                cls="flex flex-wrap gap-2 mb-5",
+            ),
+        )
+
+    # ── QA issues ─────────────────────────────────────────────────────────────
+    qa_items = []
+    if unplaced:
+        qa_items.append(
+            P(f"⚠ {len(unplaced)} unplaced room(s) — not assigned to any storey",
+              cls="text-xs text-yellow-700")
+        )
+    for u in unnamed:
+        qa_items.append(
+            P(f"⚠ {u['count']} {_ELEM_LABELS.get(u['type'], u['type'])} element(s) missing Name property",
+              cls="text-xs text-yellow-700")
+        )
+    qa_block = ""
+    if qa_items:
+        qa_block = Div(
+            H3("Model QA", cls="text-sm font-semibold mb-2"),
+            Div(*qa_items, cls="space-y-1 p-3 bg-yellow-50 rounded-md border border-yellow-200"),
+        )
+
+    return Card(
+        CardHeader(CardTitle("Building Overview")),
+        CardContent(
+            stat_strip,
+            floor_table,
+            elem_badges,
+            fixture_badges,
+            alarm_badges,
+            qa_block,
         ),
     )
 
@@ -852,11 +1128,14 @@ def setup_routes(rt):
         project = result["project"]
         selected_theme = result.get("analysis_theme", "Architecture")
 
+        bldg_card = _building_summary_card(result.get("building_summary", {}))
+
         sections = [
             Card(
                 CardHeader(CardTitle(f"{project.get('name', 'Project')} — {selected_theme} Theme")),
                 CardContent(_build_ifc_summary_content(result, project_id)),
             ),
+            *(([bldg_card]) if bldg_card else []),
             _build_ifc_graph_card(result, project_id),
         ]
 
@@ -896,6 +1175,8 @@ def setup_routes(rt):
 
         rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error, selected_theme)
 
+        bldg_card = _building_summary_card(result.get("building_summary", {}))
+
         sections = [
             Card(
                 CardHeader(CardTitle(f"{project.get('name', 'Project')} — {selected_theme} Theme")),
@@ -906,6 +1187,7 @@ def setup_routes(rt):
                     )
                 ),
             ),
+            *(([bldg_card]) if bldg_card else []),
             *(doc_cards or [P("No documents selected.", cls="text-sm text-muted-foreground")]),
             rule_validation_card,
         ]
