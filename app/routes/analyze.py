@@ -928,17 +928,24 @@ def _rule_compliance_card(
 
 
 _ELEM_LABELS = {
-    "IfcDoor":            "Doors",
-    "IfcWindow":          "Windows",
-    "IfcWall":            "Walls",
-    "IfcSlab":            "Slabs",
-    "IfcStairFlight":     "Stair Flights",
-    "IfcRamp":            "Ramps",
-    "IfcRailing":         "Railings",
-    "IfcColumn":          "Columns",
-    "IfcBeam":            "Beams",
-    "IfcSanitaryTerminal":"Fixtures",
-    "IfcAlarm":           "Alarms",
+    "IfcDoor":             "Doors",
+    "IfcWindow":           "Windows",
+    "IfcWall":             "Walls",
+    "IfcCurtainWall":      "Curtain Walls",
+    "IfcSlab":             "Slabs",
+    "IfcRoof":             "Roofs",
+    "IfcCovering":         "Ceilings",
+    "IfcStairFlight":      "Stair Flights",
+    "IfcRamp":             "Ramps",
+    "IfcRampFlight":       "Ramp Flights",
+    "IfcRailing":          "Railings",
+    "IfcColumn":           "Columns",
+    "IfcBeam":             "Beams",
+    "IfcMember":           "Structural Members",
+    "IfcSanitaryTerminal": "Fixtures",
+    "IfcAlarm":            "Alarms",
+    "IfcSensor":           "Sensors",
+    "IfcFurnishingElement":"Furniture",
 }
 
 
@@ -1092,6 +1099,144 @@ def _building_summary_card(summary: dict):
     )
 
 
+def _spatial_checks_card(spatial: dict):
+    """Render Tier 2 spatial compliance results — daylight ratios and fire separation."""
+    if not spatial:
+        return ""
+
+    has_boundaries = spatial.get("has_boundaries", False)
+    warnings = spatial.get("warnings", [])
+    daylight = spatial.get("daylight", [])
+    fire_sep = spatial.get("fire_separation", [])
+
+    if not has_boundaries:
+        msg = (warnings[0] if warnings else
+               "No IfcRelSpaceBoundary data — re-export with Space Boundaries enabled.")
+        return Card(
+            CardHeader(CardTitle("Spatial Compliance — Tier 2")),
+            CardContent(
+                Span(
+                    msg,
+                    cls="text-sm text-yellow-700",
+                )
+            ),
+        )
+
+    warning_items = [
+        Span(w, cls="block text-xs text-yellow-700") for w in warnings
+    ]
+
+    # ── Daylight ratio table ──────────────────────────────────────────────────
+    daylight_block = ""
+    if daylight:
+        d_pass = sum(1 for r in daylight if r["passes"])
+        d_fail = len(daylight) - d_pass
+        rate_cls = "bg-green-100 text-green-800" if d_fail == 0 else "bg-red-100 text-red-800"
+        d_rows = []
+        for r in sorted(daylight, key=lambda x: x["passes"]):
+            status_cls = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            d_rows.append(
+                Tr(
+                    Td(r["space_name"][:40], cls="px-3 py-2 text-xs"),
+                    Td(f"{r['floor_area_m2']:.1f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td(f"{r['total_window_area_m2']:.2f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td(f"{r['daylight_ratio']:.3f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {status_cls}"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        daylight_block = Div(
+            Div(
+                H3("Daylight Ratio — OBC 9.7.2", cls="text-sm font-semibold"),
+                Span(
+                    f"{d_pass}/{len(daylight)} pass",
+                    cls=f"text-xs px-2 py-0.5 rounded-full font-medium {rate_cls}",
+                ),
+                cls="flex items-center justify-between mb-2",
+            ),
+            Div(
+                Table(
+                    Thead(Tr(
+                        Th("Room", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Floor m²", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Window m²", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Ratio", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                    )),
+                    Tbody(*d_rows),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md mb-4",
+            ),
+        )
+
+    # ── Fire separation table ─────────────────────────────────────────────────
+    fire_block = ""
+    if fire_sep:
+        f_pass = sum(1 for r in fire_sep if r["passes"])
+        f_fail = len(fire_sep) - f_pass
+        f_rate_cls = "bg-green-100 text-green-800" if f_fail == 0 else "bg-red-100 text-red-800"
+        f_rows = []
+        for r in sorted(fire_sep, key=lambda x: x["passes"]):
+            rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
+            rating_cls = "text-red-700" if r["missing_rating"] else (
+                "text-green-700" if r["passes"] else "text-orange-700"
+            )
+            spaces_txt = ", ".join(r["adjacent_spaces"][:2])
+            if len(r["adjacent_spaces"]) > 2:
+                spaces_txt += f" +{len(r['adjacent_spaces']) - 2}"
+            f_rows.append(
+                Tr(
+                    Td(r["wall_name"][:35], cls="px-3 py-2 text-xs font-mono"),
+                    Td(spaces_txt[:50], cls="px-3 py-2 text-xs"),
+                    Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rating_cls}"),
+                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rating_cls}"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        fire_block = Div(
+            Div(
+                H3("Fire Separation — OBC 9.10.9", cls="text-sm font-semibold"),
+                Span(
+                    f"{f_pass}/{len(fire_sep)} pass",
+                    cls=f"text-xs px-2 py-0.5 rounded-full font-medium {f_rate_cls}",
+                ),
+                cls="flex items-center justify-between mb-2",
+            ),
+            Div(
+                Table(
+                    Thead(Tr(
+                        Th("Wall", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Between Spaces", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Fire Rating", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                    )),
+                    Tbody(*f_rows),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md",
+            ),
+        )
+
+    return Card(
+        CardHeader(
+            Div(
+                CardTitle("Spatial Compliance — Tier 2"),
+                P(
+                    f"{spatial.get('space_count', 0)} spaces · "
+                    f"{spatial.get('party_wall_count', 0)} party walls detected",
+                    cls="text-xs text-muted-foreground mt-0.5",
+                ),
+            )
+        ),
+        CardContent(
+            Div(*warning_items, cls="space-y-1 mb-4") if warning_items else "",
+            daylight_block,
+            fire_block,
+        ),
+    )
+
+
 # Module-level cache for CSV export (populated in analysis_run_post)
 _last_compliance_results: list[dict] = []
 
@@ -1129,6 +1274,7 @@ def setup_routes(rt):
         selected_theme = result.get("analysis_theme", "Architecture")
 
         bldg_card = _building_summary_card(result.get("building_summary", {}))
+        spatial_card = _spatial_checks_card(result.get("spatial_checks", {}))
 
         sections = [
             Card(
@@ -1136,6 +1282,7 @@ def setup_routes(rt):
                 CardContent(_build_ifc_summary_content(result, project_id)),
             ),
             *(([bldg_card]) if bldg_card else []),
+            *(([spatial_card]) if spatial_card else []),
             _build_ifc_graph_card(result, project_id),
         ]
 
@@ -1176,6 +1323,7 @@ def setup_routes(rt):
         rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error, selected_theme)
 
         bldg_card = _building_summary_card(result.get("building_summary", {}))
+        spatial_card = _spatial_checks_card(result.get("spatial_checks", {}))
 
         sections = [
             Card(
@@ -1188,6 +1336,7 @@ def setup_routes(rt):
                 ),
             ),
             *(([bldg_card]) if bldg_card else []),
+            *(([spatial_card]) if spatial_card else []),
             *(doc_cards or [P("No documents selected.", cls="text-sm text-muted-foreground")]),
             rule_validation_card,
         ]
