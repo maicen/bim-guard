@@ -53,6 +53,7 @@ _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 
 def _analysis_form(projects, documents, mode: str):
     """Build the analysis form for the requested workflow mode."""
+    is_simple = mode == "simple"
     is_initial = mode == "initial"
     project_options = [Option("— select a project —", value="", disabled=True, selected=True)] + [
         Option(p.get("name", f"Project {p['id']}"), value=str(p["id"])) for p in projects
@@ -68,19 +69,23 @@ def _analysis_form(projects, documents, mode: str):
                 required=True,
             ),
         ),
-        Div(
-            FormLabel("Analysis Theme", fr="analysis_theme"),
-            Select(
-                Option("Architecture", value="Architecture", selected=True),
-                Option("MEP", value="MEP"),
-                id="analysis_theme",
-                name="analysis_theme",
-                required=True,
-            ),
-        ),
     ]
 
-    if not is_initial:
+    if not is_simple:
+        form_sections.append(
+            Div(
+                FormLabel("Analysis Theme", fr="analysis_theme"),
+                Select(
+                    Option("Architecture", value="Architecture", selected=True),
+                    Option("MEP", value="MEP"),
+                    id="analysis_theme",
+                    name="analysis_theme",
+                    required=True,
+                ),
+            )
+        )
+
+    if not is_initial and not is_simple:
         doc_checkboxes = []
         for doc in documents:
             doc_checkboxes.append(
@@ -113,69 +118,83 @@ def _analysis_form(projects, documents, mode: str):
             )
         )
 
-    form_sections.append(
-        Div(
-            FormLabel("Count Options"),
+    if not is_simple:
+        form_sections.append(
             Div(
+                FormLabel("Count Options"),
                 Div(
-                    Checkbox(
-                        id="include_openings",
-                        name="include_openings",
-                        value="1",
-                        checked=True,
-                        cls="mr-2",
+                    Div(
+                        Checkbox(
+                            id="include_openings",
+                            name="include_openings",
+                            value="1",
+                            checked=True,
+                            cls="mr-2",
+                        ),
+                        Label(
+                            "Include openings (IfcOpeningElement)",
+                            for_="include_openings",
+                            cls="text-sm cursor-pointer",
+                        ),
+                        cls="flex items-center gap-1",
                     ),
-                    Label(
-                        "Include openings (IfcOpeningElement)",
-                        for_="include_openings",
-                        cls="text-sm cursor-pointer",
+                    Div(
+                        Checkbox(
+                            id="include_spaces",
+                            name="include_spaces",
+                            value="1",
+                            checked=True,
+                            cls="mr-2",
+                        ),
+                        Label(
+                            "Include spaces (IfcSpace)",
+                            for_="include_spaces",
+                            cls="text-sm cursor-pointer",
+                        ),
+                        cls="flex items-center gap-1",
                     ),
-                    cls="flex items-center gap-1",
+                    Div(
+                        Checkbox(
+                            id="include_type_definitions",
+                            name="include_type_definitions",
+                            value="1",
+                            cls="mr-2",
+                        ),
+                        Label(
+                            "Include type definitions (IfcElementType)",
+                            for_="include_type_definitions",
+                            cls="text-sm cursor-pointer",
+                        ),
+                        cls="flex items-center gap-1",
+                    ),
+                    cls="space-y-2 border rounded-md p-3 bg-muted/30",
                 ),
-                Div(
-                    Checkbox(
-                        id="include_spaces",
-                        name="include_spaces",
-                        value="1",
-                        checked=True,
-                        cls="mr-2",
-                    ),
-                    Label(
-                        "Include spaces (IfcSpace)",
-                        for_="include_spaces",
-                        cls="text-sm cursor-pointer",
-                    ),
-                    cls="flex items-center gap-1",
-                ),
-                Div(
-                    Checkbox(
-                        id="include_type_definitions",
-                        name="include_type_definitions",
-                        value="1",
-                        cls="mr-2",
-                    ),
-                    Label(
-                        "Include type definitions (IfcElementType)",
-                        for_="include_type_definitions",
-                        cls="text-sm cursor-pointer",
-                    ),
-                    cls="flex items-center gap-1",
-                ),
-                cls="space-y-2 border rounded-md p-3 bg-muted/30",
-            ),
+            )
         )
-    )
 
-    submit_label = "Run Initial Analysis" if is_initial else "Run Model Vs Rules Analysis"
-    results_id = "initial-analysis-results" if is_initial else "model-rules-results"
+    if mode == "simple":
+        submit_label = "Run Simple Analysis"
+        results_id = "simple-analysis-results"
+        hx_post = "/analysis/simple/results"
+        card_title = "Simple Analysis"
+        helper_copy = (
+            "Check the IFC model against OBC Part 9 building code categories: "
+            "Windows, Doors, Stairs, Egress, Fire Protection, Garage, and more."
+        )
+    elif is_initial:
+        submit_label = "Run Initial Analysis"
+        results_id = "initial-analysis-results"
+        hx_post = "/analysis/initial/results"
+        card_title = "Initial Analysis"
+        helper_copy = "Inspect the IFC model structure, counts, and quality signals before checking rules."
+    else:
+        submit_label = "Run Model Vs Rules Analysis"
+        results_id = "model-rules-results"
+        hx_post = "/analysis/results"
+        card_title = "Model Vs Rules Analysis"
+        helper_copy = "Compare the selected IFC model against the saved rules in the library."
+
     loader_id = f"{results_id}-loader"
-    hx_post = "/analysis/initial/results" if is_initial else "/analysis/results"
-    card_title = "Initial Analysis" if is_initial else "Model Vs Rules Analysis"
-    helper_copy = (
-        "Inspect the IFC model structure, counts, and quality signals before checking rules."
-        if is_initial
-        else "Compare the selected IFC model against the saved rules in the library."
-    )
 
     # JS: on submit → copy loading card into results area + disable button
     before_js = (
@@ -1436,8 +1455,553 @@ def _egress_checks_card(egress: dict):
 _last_compliance_results: list[dict] = []
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Simple Analysis — domain-based compliance card helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _fmt_val_s(v) -> str:
+    """Format a numeric compliance value for display."""
+    if isinstance(v, float):
+        return f"{v:,.2f}" if v >= 1 else f"{v:.4f}"
+    return str(v) if v is not None else "—"
+
+
+def _domain_badge(rule_results: list) -> tuple:
+    """Return (label, tailwind_cls) from a list of Module 4 rule result dicts."""
+    if not rule_results:
+        return "N/A", "bg-gray-100 text-gray-500"
+    statuses = [r.get("status", "NO_ELEMENTS") for r in rule_results]
+    real = [s for s in statuses if s != "NO_ELEMENTS"]
+    if not real:
+        return "N/A", "bg-gray-100 text-gray-500"
+    n_fail = real.count("FAIL")
+    if n_fail:
+        return f"{n_fail} rule(s) failed", "bg-red-100 text-red-800"
+    if any(s in ("MISSING_DATA", "PARTIAL") for s in real):
+        return "Missing data", "bg-yellow-100 text-yellow-800"
+    return "All pass", "bg-green-100 text-green-800"
+
+
+def _simple_elem_tbl(elements: list, operator: str = "", check_val=None, unit: str = ""):
+    """Scrollable element table with Floor/Room/GUID/Actual/Required/Issue columns."""
+    if not elements:
+        return P("No elements.", cls="text-xs text-muted-foreground")
+
+    def _req(op, cv, u):
+        if op == ">=" and cv is not None: return f"≥ {cv} {u}".strip()
+        if op == "<=" and cv is not None: return f"≤ {cv} {u}".strip()
+        if op == "between": return "in range"
+        return f"{op} {cv} {u}".strip() if cv is not None else "—"
+
+    rows = []
+    for el in elements[:30]:
+        actual = el.get("actual") if "actual" in el else el.get("actual_value")
+        reason = el.get("reason") or ""
+        storey = el.get("storey") or "—"
+        space = el.get("space") or ""
+        guid = (el.get("guid") or "")[:14]
+        name = (el.get("element_name") or el.get("name") or "—")[:32]
+        is_fail = bool(reason)
+        rows.append(Tr(
+            Td(Span(name, cls="text-xs font-mono"), cls="px-3 py-2"),
+            Td(
+                Span(storey, cls="text-xs block"),
+                Span(space, cls="text-xs text-muted-foreground block") if space else "",
+                cls="px-3 py-2",
+            ),
+            Td(Span(guid, cls="text-xs font-mono text-muted-foreground"), cls="px-3 py-2"),
+            Td(
+                _fmt_val_s(actual) + (f" {unit}" if unit and actual is not None else ""),
+                cls="px-3 py-2 text-xs font-mono",
+            ),
+            Td(_req(operator, check_val, unit), cls="px-3 py-2 text-xs text-muted-foreground"),
+            Td(
+                Span(
+                    reason if reason else "missing",
+                    cls=f"text-xs font-semibold {'text-red-700' if is_fail else 'text-yellow-700'}",
+                ),
+                cls="px-3 py-2",
+            ),
+            cls="border-b border-muted last:border-0",
+        ))
+    if len(elements) > 30:
+        rows.append(Tr(Td(
+            f"… and {len(elements) - 30} more",
+            cls="px-3 py-2 text-xs text-muted-foreground italic",
+            colspan="6",
+        )))
+    return Div(
+        Table(
+            Thead(Tr(*[
+                Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+                for h in ("Element", "Floor / Room", "GUID", "Actual", "Required", "Issue")
+            ])),
+            Tbody(*rows),
+            cls="w-full text-xs",
+        ),
+        cls="overflow-auto border rounded-md max-h-64",
+    )
+
+
+def _simple_rule_section(rule: dict):
+    """Collapsible sub-section for one Module 4 rule check."""
+    status = rule.get("status", "NO_ELEMENTS")
+    if status == "NO_ELEMENTS":
+        return ""
+    ref = rule.get("rule_ref", "") or ""
+    desc = (rule.get("rule_desc", "") or "")[:65]
+    operator = rule.get("operator", "")
+    check_val = rule.get("check_value")
+    unit = rule.get("unit", "") or ""
+    pass_c = rule.get("pass_count", 0)
+    fail_c = rule.get("fail_count", 0)
+    miss_c = rule.get("missing_count", 0)
+    total = rule.get("total_count", 0)
+    failures = rule.get("failures", [])
+    missing_els = rule.get("missing_elements", [])
+
+    if operator == ">=":        req_str = f"≥ {check_val} {unit}".strip()
+    elif operator == "<=":      req_str = f"≤ {check_val} {unit}".strip()
+    elif operator == "between": req_str = f"{rule.get('value_min')}–{rule.get('value_max')} {unit}".strip()
+    elif operator == "exists":  req_str = "must be present"
+    else:                       req_str = f"{operator} {check_val} {unit}".strip() if check_val is not None else "—"
+
+    summary_txt = (
+        f"{fail_c} fail · {pass_c} pass · {miss_c} missing"
+        if fail_c or miss_c else f"{pass_c}/{total} pass"
+    )
+    label = f"{ref}  {desc}" if ref else desc
+
+    parts = []
+    if failures:
+        parts.append(Div(
+            P(f"{fail_c} element(s) failing:", cls="text-xs font-semibold text-red-700 mb-1"),
+            _simple_elem_tbl(failures, operator, check_val, unit),
+        ))
+    if missing_els:
+        parts.append(Div(
+            P(f"{miss_c} element(s) missing this property:",
+              cls="text-xs font-semibold text-yellow-700 mb-1 mt-3"),
+            _simple_elem_tbl(missing_els),
+        ))
+    if not parts:
+        parts = [P(f"✓ All {pass_c} elements pass.", cls="text-xs text-green-700")]
+
+    return _collapsible_section(
+        label, *parts,
+        badge=f"{summary_txt}  ·  {req_str}",
+        open=status in ("FAIL", "MISSING_DATA"),
+    )
+
+
+def _simple_domain_card(
+    title: str,
+    obc_ref: str,
+    rule_results: list,
+    extra_sections: list | None = None,
+    override_badge: tuple | None = None,
+):
+    """Outer collapsible card for one building code domain."""
+    status_label, badge_cls = _domain_badge(rule_results)
+    if override_badge:
+        status_label, badge_cls = override_badge
+
+    rule_secs = [_simple_rule_section(r) for r in rule_results]
+    all_content = [s for s in rule_secs if s] + (extra_sections or [])
+
+    has_fail = any(r.get("status") == "FAIL" for r in rule_results)
+    if override_badge and "fail" in (override_badge[0] or "").lower():
+        has_fail = True
+
+    if not all_content:
+        all_content = [
+            P("No applicable checks found in the rule library for this category.",
+              cls="text-sm text-muted-foreground italic")
+        ]
+
+    return _collapsible_card(
+        title,
+        Div(
+            Span(obc_ref, cls="text-xs text-muted-foreground mr-2"),
+            Span(status_label,
+                 cls=f"inline-block px-2 py-0.5 rounded text-xs font-semibold {badge_cls}"),
+            cls="flex items-center mb-4",
+        ),
+        *all_content,
+        open=has_fail,
+    )
+
+
+# ── Domain card builders ───────────────────────────────────────────────────────
+
+def _simple_windows_card(by_class: dict, spatial_checks: dict):
+    rules = by_class.get("IfcWindow", [])
+    daylight = (spatial_checks or {}).get("daylight", [])
+    extra = []
+    override = None
+
+    if daylight:
+        d_pass = sum(1 for r in daylight if r["passes"])
+        d_fail = len(daylight) - d_pass
+        d_rows = []
+        for r in sorted(daylight, key=lambda x: x["passes"]):
+            sc = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            d_rows.append(Tr(
+                Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
+                Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
+                Td(f"{r['floor_area_m2']:.1f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                Td(f"{r['total_window_area_m2']:.2f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                Td(f"{r['daylight_ratio']:.3f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {sc}"),
+                cls="border-b border-muted last:border-0",
+            ))
+        extra.append(_collapsible_section(
+            "Daylight Ratio — OBC 9.7.2.1 (≥ 1/10 floor area)",
+            Div(
+                Table(
+                    Thead(Tr(*[
+                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+                        for h in ("Floor", "Room", "Floor m²", "Window m²", "Ratio", "Status")
+                    ])),
+                    Tbody(*d_rows),
+                    cls="w-full text-xs",
+                ),
+                cls="overflow-auto border rounded-md max-h-64",
+            ),
+            badge=f"{d_pass}/{len(daylight)} pass",
+            open=d_fail > 0,
+        ))
+        if d_fail > 0 and not any(r.get("status") == "FAIL" for r in rules):
+            override = (f"{d_fail} room(s) below daylight ratio", "bg-red-100 text-red-800")
+
+    return _simple_domain_card("Windows & Glazing", "OBC 9.7 · 9.8", rules, extra, override)
+
+
+def _simple_doors_card(by_class: dict):
+    return _simple_domain_card("Doors", "OBC 9.5 · 9.9.5", by_class.get("IfcDoor", []))
+
+
+def _simple_stairs_card(by_class: dict):
+    rules = by_class.get("IfcStairFlight", []) + by_class.get("IfcRailing", [])
+    return _simple_domain_card("Stairs, Guards & Handrails", "OBC 9.8.1 · 9.8.7", rules)
+
+
+def _simple_ramps_card(by_class: dict):
+    rules = by_class.get("IfcRamp", []) + by_class.get("IfcRampFlight", [])
+    return _simple_domain_card("Ramps", "OBC 9.8.8", rules)
+
+
+def _simple_egress_card(egress: dict):
+    """Egress domain card built from Tier 3 egress check results."""
+    if not egress:
+        return _simple_domain_card("Means of Egress", "OBC 9.9 · 9.10", [])
+
+    exit_data = egress.get("exit_count", {})
+    travel = egress.get("travel_distance", [])
+    total_exits = exit_data.get("total_exterior_doors", 0)
+    exit_results = exit_data.get("results", [])
+
+    all_passes = [r["passes"] for r in exit_results] + [r["passes"] for r in travel]
+    if not all_passes:
+        override = ("N/A", "bg-gray-100 text-gray-500")
+    elif all(all_passes):
+        override = ("All pass", "bg-green-100 text-green-800")
+    else:
+        fail_n = sum(1 for p in all_passes if not p)
+        override = (f"{fail_n} check(s) failed", "bg-red-100 text-red-800")
+
+    extra = []
+    if exit_results:
+        e_rows = []
+        for r in exit_results:
+            sc = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            e_rows.append(Tr(
+                Td(r["storey"], cls="px-3 py-2 text-xs"),
+                Td(str(r["exit_count"]), cls="px-3 py-2 text-xs font-mono text-center"),
+                Td(str(r["required_min"]), cls="px-3 py-2 text-xs font-mono text-center"),
+                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {sc}"),
+                cls="border-b border-muted last:border-0",
+            ))
+        extra.append(_collapsible_section(
+            f"Exit Count — OBC 9.9.4.1  ({total_exits} exterior door(s))",
+            Div(
+                Table(
+                    Thead(Tr(*[
+                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+                        for h in ("Storey", "Exits", "Required", "Status")
+                    ])),
+                    Tbody(*e_rows),
+                    cls="w-full text-xs",
+                ),
+                cls="overflow-auto border rounded-md",
+            ),
+            badge=f"{sum(1 for r in exit_results if r['passes'])}/{len(exit_results)} pass",
+            open=any(not r["passes"] for r in exit_results),
+        ))
+    else:
+        extra.append(_collapsible_section(
+            "Exit Count — OBC 9.9.4.1",
+            P("No exterior doors found. Tag doors as IsExternal=True in your authoring tool.",
+              cls="text-xs text-yellow-700"),
+            open=True,
+        ))
+
+    if travel:
+        td_pass = sum(1 for r in travel if r["passes"])
+        td_rows = []
+        for r in sorted(travel, key=lambda x: (x["passes"], -(x.get("travel_distance_m") or 0))):
+            dist = f"{r['travel_distance_m']:.1f} m" if r.get("travel_distance_m") is not None else "No path"
+            sc = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            td_rows.append(Tr(
+                Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
+                Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
+                Td(dist, cls="px-3 py-2 text-xs font-mono text-right"),
+                Td(r.get("nearest_exit") or "—", cls="px-3 py-2 text-xs"),
+                Td(
+                    "✓ Pass" if r["passes"] else ("✗ No path" if r.get("no_path") else "✗ Exceeds"),
+                    cls=f"px-3 py-2 text-xs {sc}",
+                ),
+                cls="border-b border-muted last:border-0",
+            ))
+        extra.append(_collapsible_section(
+            "Travel Distance — OBC 9.9.10.1",
+            Div(
+                Table(
+                    Thead(Tr(*[
+                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+                        for h in ("Floor", "Room", "Distance", "Nearest Exit", "Status")
+                    ])),
+                    Tbody(*td_rows),
+                    cls="w-full text-xs",
+                ),
+                cls="overflow-auto border rounded-md max-h-64",
+            ),
+            badge=f"{td_pass}/{len(travel)} pass",
+            open=td_pass < len(travel),
+        ))
+
+    return _simple_domain_card("Means of Egress", "OBC 9.9 · 9.10", [], extra, override)
+
+
+def _simple_washrooms_card(by_class: dict, building_summary: dict):
+    rules = by_class.get("IfcSanitaryTerminal", [])
+    return _simple_domain_card("Washrooms & Accessibility", "OBC 9.5 · 3.8.3", rules)
+
+
+def _simple_plumbing_card(building_summary: dict):
+    fixture_counts = (building_summary or {}).get("fixture_counts", {})
+    if not fixture_counts:
+        return _simple_domain_card(
+            "Plumbing Fixture Counts", "OBC 9.32 · NBC", [],
+            override_badge=("N/A — no fixtures found", "bg-gray-100 text-gray-500"),
+        )
+    badges = [
+        Span(f"{k}: {v}",
+             cls="inline-block px-2 py-1 rounded-full text-xs bg-cyan-50 text-cyan-800 border border-cyan-200 font-medium")
+        for k, v in sorted(fixture_counts.items())
+    ]
+    return _simple_domain_card(
+        "Plumbing Fixture Counts", "OBC 9.32 · NBC", [],
+        extra_sections=[_collapsible_section(
+            "Fixture Inventory",
+            Div(*badges, cls="flex flex-wrap gap-2"),
+            badge=f"{sum(fixture_counts.values())} fixtures",
+            open=True,
+        )],
+        override_badge=("Inventory only", "bg-blue-100 text-blue-800"),
+    )
+
+
+def _simple_fire_card(by_class: dict, spatial_checks: dict, building_summary: dict):
+    rules = by_class.get("IfcAlarm", [])
+    spatial = spatial_checks or {}
+    fire_sep = spatial.get("fire_separation", [])
+    alarm_counts = (building_summary or {}).get("alarm_counts", {})
+    extra = []
+    override = None
+
+    if fire_sep:
+        f_pass = sum(1 for r in fire_sep if r["passes"])
+        f_fail = len(fire_sep) - f_pass
+        f_rows = []
+        for r in sorted(fire_sep, key=lambda x: x["passes"]):
+            rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
+            rc = "text-red-700" if r["missing_rating"] else (
+                "text-green-700" if r["passes"] else "text-orange-700"
+            )
+            spaces_txt = ", ".join(r["adjacent_spaces"][:2])
+            if len(r["adjacent_spaces"]) > 2:
+                spaces_txt += f" +{len(r['adjacent_spaces']) - 2}"
+            f_rows.append(Tr(
+                Td(r["wall_name"][:35], cls="px-3 py-2 text-xs font-mono"),
+                Td(spaces_txt[:50], cls="px-3 py-2 text-xs"),
+                Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rc}"),
+                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rc}"),
+                cls="border-b border-muted last:border-0",
+            ))
+        extra.append(_collapsible_section(
+            "Fire Separation — OBC 9.10.9",
+            Div(
+                Table(
+                    Thead(Tr(*[
+                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+                        for h in ("Wall", "Between Spaces", "Fire Rating", "Status")
+                    ])),
+                    Tbody(*f_rows),
+                    cls="w-full text-xs",
+                ),
+                cls="overflow-auto border rounded-md max-h-64",
+            ),
+            badge=f"{f_pass}/{len(fire_sep)} pass",
+            open=f_fail > 0,
+        ))
+        if f_fail > 0:
+            override = (f"{f_fail} separation issue(s)", "bg-red-100 text-red-800")
+
+    if alarm_counts:
+        alarm_badges = [
+            Span(f"{k}: {v}",
+                 cls="inline-block px-2 py-1 rounded-full text-xs bg-red-50 text-red-800 border border-red-200 font-medium")
+            for k, v in sorted(alarm_counts.items())
+        ]
+        extra.append(_collapsible_section(
+            "Alarm Inventory",
+            Div(*alarm_badges, cls="flex flex-wrap gap-2"),
+            badge=f"{sum(alarm_counts.values())} alarms",
+            open=False,
+        ))
+
+    return _simple_domain_card("Fire Protection (House-Level)", "OBC 9.10 · NBC 3.2",
+                                rules, extra, override)
+
+
+def _simple_garage_card(spatial_checks: dict):
+    spatial = spatial_checks or {}
+    garage_sep = spatial.get("garage_separation", {})
+    if not garage_sep:
+        return _simple_domain_card(
+            "Garage / Carport", "OBC 9.10.14", [],
+            override_badge=("N/A — no garage detected", "bg-gray-100 text-gray-500"),
+        )
+
+    g_results = garage_sep.get("results", [])
+    g_warnings = garage_sep.get("warnings", [])
+    extra = []
+    override = None
+
+    if g_results:
+        g_pass = sum(1 for r in g_results if r["passes"])
+        g_fail = len(g_results) - g_pass
+        g_rows = []
+        for r in sorted(g_results, key=lambda x: x["passes"]):
+            rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
+            rc = "text-red-700" if r["missing_rating"] else (
+                "text-green-700" if r["passes"] else "text-orange-700"
+            )
+            g_rows.append(Tr(
+                Td(r["element_type"], cls="px-3 py-2 text-xs font-semibold"),
+                Td(r["element_name"][:35], cls="px-3 py-2 text-xs font-mono"),
+                Td(r["garage_space"][:25], cls="px-3 py-2 text-xs"),
+                Td(r["adjacent_space"][:25], cls="px-3 py-2 text-xs"),
+                Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rc}"),
+                Td(f"≥ {r['required_min']} min", cls="px-3 py-2 text-xs font-mono"),
+                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rc}"),
+                cls="border-b border-muted last:border-0",
+            ))
+        extra.append(_collapsible_section(
+            "Garage Fire Separation — OBC 9.10.14.2",
+            Div(
+                Table(
+                    Thead(Tr(*[
+                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
+                        for h in ("Type", "Element", "Garage Space", "Adjacent", "Rating", "Required", "Status")
+                    ])),
+                    Tbody(*g_rows),
+                    cls="w-full text-xs",
+                ),
+                cls="overflow-auto border rounded-md max-h-64",
+            ),
+            badge=f"{g_pass}/{len(g_results)} pass",
+            open=g_fail > 0,
+        ))
+        if g_fail > 0:
+            override = (f"{g_fail} separation issue(s)", "bg-red-100 text-red-800")
+    elif g_warnings:
+        extra.append(_collapsible_section(
+            "Garage Fire Separation — OBC 9.10.14.2",
+            Div(*[Span(w, cls="block text-xs text-yellow-700") for w in g_warnings]),
+            open=True,
+        ))
+
+    return _simple_domain_card("Garage / Carport", "OBC 9.10.14", [], extra, override)
+
+
 def setup_routes(rt):
     """Register analysis workflow routes."""
+
+    @rt("/analysis/simple")
+    def analysis_simple():
+        projects = _projects_service.list_projects()
+        documents = _documents_service.list_documents()
+        return Title("Simple Analysis - BIM Guard"), DashboardLayout(
+            Container(_analysis_form(projects, documents, mode="simple"), cls="space-y-4")
+        )
+
+    @rt("/analysis/simple/results", methods=["POST"])
+    async def analysis_simple_post(req: Request):
+        form = await req.form()
+        project_id_raw = form.get("project_id") or ""
+        if not project_id_raw:
+            return Alert("Please select a project.", cls=AlertT.error)
+        try:
+            project_id = int(project_id_raw)
+        except ValueError:
+            return Alert("Invalid project selection.", cls=AlertT.error)
+
+        result = _bim_guard_app.orchestrate_workflow(
+            project_id,
+            doc_ids=[],
+            analysis_theme="Architecture",
+            include_openings=True,
+            include_spaces=True,
+            include_type_definitions=False,
+        )
+        if "error" in result:
+            return Alert(result["error"], cls=AlertT.error)
+
+        from collections import defaultdict
+        project = result["project"]
+        rule_compliance = result.get("rule_compliance", [])
+        spatial_checks = result.get("spatial_checks", {})
+        egress_checks = result.get("egress_checks", {})
+        building_summary = result.get("building_summary", {})
+
+        by_class: dict = defaultdict(list)
+        for r in rule_compliance:
+            by_class[r.get("target", "")].append(r)
+
+        bldg_card = _building_summary_card(building_summary)
+
+        sections = [
+            Card(
+                CardHeader(CardTitle(f"{project.get('name', 'Project')} — Simple Analysis")),
+                CardContent(P(
+                    "Domain-based compliance check against OBC Part 9.",
+                    cls="text-sm text-muted-foreground",
+                )),
+            ),
+            *(([bldg_card]) if bldg_card else []),
+            _simple_windows_card(by_class, spatial_checks),
+            _simple_doors_card(by_class),
+            _simple_stairs_card(by_class),
+            _simple_ramps_card(by_class),
+            _simple_egress_card(egress_checks),
+            _simple_washrooms_card(by_class, building_summary),
+            _simple_plumbing_card(building_summary),
+            _simple_fire_card(by_class, spatial_checks, building_summary),
+            _simple_garage_card(spatial_checks),
+        ]
+        return Div(*sections, cls="space-y-4")
 
     @rt("/analysis/initial")
     def analysis_initial():

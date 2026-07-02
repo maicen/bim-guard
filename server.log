@@ -1,0 +1,3 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\Malak\\bimguard 30june\\bim-guard']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [68948] using WatchFiles
