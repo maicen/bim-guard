@@ -88,7 +88,8 @@ class Module4_Comparator:
                 missing_elements.append({
                     "element_name": el.get("name", ""),
                     "guid": el.get("guid", ""),
-                    "storey": el.get("storey", ""),
+                    "storey": el.get("storey") or "—",
+                    "space": el.get("space") or "—",
                 })
                 continue
 
@@ -157,8 +158,14 @@ class Module4_Comparator:
 
     @staticmethod
     def _failure(el, actual, reason) -> dict:
-        return {"element_name": el.get("name"), "guid": el.get("guid"),
-                "actual": actual, "reason": reason}
+        return {
+            "element_name": el.get("name"),
+            "guid": el.get("guid"),
+            "storey": el.get("storey") or "—",
+            "space": el.get("space") or "—",
+            "actual": actual,
+            "reason": reason,
+        }
 
     @staticmethod
     def _result(item, status, pass_count, fail_count, missing_count, total, failures, missing_elements=None) -> dict:

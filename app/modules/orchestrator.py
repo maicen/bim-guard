@@ -280,6 +280,7 @@ class BIMGuard_App:
         ifc_schema_note: str | None = None
         building_summary: dict = {}
         spatial_checks: dict = {}
+        egress_checks: dict = {}
 
         if ifc_path:
             try:
@@ -297,6 +298,10 @@ class BIMGuard_App:
                     spatial_checks = m2_reader.extract_spatial_checks()
                 except Exception:
                     spatial_checks = {}
+                try:
+                    egress_checks = m2_reader.extract_egress_checks()
+                except Exception:
+                    egress_checks = {}
                 if selected_theme == "MEP":
                     elements = parse_ifc_model(m2_reader.ifc_file)
                 else:
@@ -433,6 +438,7 @@ class BIMGuard_App:
             "rule_compliance_error": rule_compliance_error,
             "building_summary": building_summary,
             "spatial_checks": spatial_checks,
+            "egress_checks": egress_checks,
         }
 
 

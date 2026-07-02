@@ -10,6 +10,7 @@ from fasthtml.common import (
     H3,
     Option,
     P,
+    Script,
     Summary,
     Request,
     Span,
@@ -166,14 +167,27 @@ def _analysis_form(projects, documents, mode: str):
     )
 
     submit_label = "Run Initial Analysis" if is_initial else "Run Model Vs Rules Analysis"
-    spinner_id = "initial-analysis-spinner" if is_initial else "model-rules-spinner"
     results_id = "initial-analysis-results" if is_initial else "model-rules-results"
+    loader_id = f"{results_id}-loader"
     hx_post = "/analysis/initial/results" if is_initial else "/analysis/results"
     card_title = "Initial Analysis" if is_initial else "Model Vs Rules Analysis"
     helper_copy = (
         "Inspect the IFC model structure, counts, and quality signals before checking rules."
         if is_initial
         else "Compare the selected IFC model against the saved rules in the library."
+    )
+
+    # JS: on submit → copy loading card into results area + disable button
+    before_js = (
+        f"var r=document.getElementById('{results_id}'),"
+        f"l=document.getElementById('{loader_id}');"
+        "if(r&&l)r.innerHTML=l.innerHTML;"
+        "var b=this.querySelector('[type=submit]');"
+        "if(b){{b.disabled=true;b.dataset.orig=b.textContent;b.textContent='Analysing…';}}"
+    )
+    after_js = (
+        "var b=this.querySelector('[type=submit]');"
+        "if(b){{b.disabled=false;if(b.dataset.orig)b.textContent=b.dataset.orig;}}"
     )
 
     return Div(
@@ -190,15 +204,6 @@ def _analysis_form(projects, documents, mode: str):
                         *form_sections,
                         Div(
                             SubmitButton(submit_label, variant="primary"),
-                            Div(
-                                P(
-                                    "Running analysis…",
-                                    cls="text-sm text-muted-foreground",
-                                ),
-                                id=spinner_id,
-                                cls="htmx-indicator",
-                                style="display:none",
-                            ),
                             cls="flex items-center gap-4",
                         ),
                     ),
@@ -207,10 +212,34 @@ def _analysis_form(projects, documents, mode: str):
                     hx_post=hx_post,
                     hx_target=f"#{results_id}",
                     hx_swap="innerHTML",
-                    hx_indicator=f"#{spinner_id}",
+                    **{"hx-on:htmx:before-request": before_js,
+                       "hx-on:htmx:after-request": after_js},
                 ),
             ),
         ),
+        # Hidden loading card — cloned into results area when request starts
+        Div(
+            Div(
+                Div(style=(
+                    "width:40px;height:40px;border-radius:50%;"
+                    "border:4px solid #e2e8f0;border-top-color:#3b82f6;"
+                    "animation:bimguard-spin .75s linear infinite;"
+                    "margin:0 auto 16px;"
+                )),
+                P("Analysing model…", cls="text-base font-semibold"),
+                P(
+                    "Loading IFC · Extracting properties · Running compliance checks",
+                    cls="text-xs text-muted-foreground mt-1",
+                ),
+                cls="text-center py-14",
+            ),
+            cls="border rounded-lg shadow-sm bg-card",
+            id=loader_id,
+            style="display:none",
+        ),
+        Script("(function(){var s=document.createElement('style');"
+               "s.textContent='@keyframes bimguard-spin{to{transform:rotate(360deg)}}';"
+               "document.head.appendChild(s);})();"),
         Div(id=results_id),
     )
 
@@ -285,55 +314,30 @@ def _build_ifc_summary_content(result: dict, project_id: int):
         )
 
     quality_block = (
-        Card(
-            CardHeader(CardTitle("IFC Quality")),
-            CardContent(
-                P(
-                    f"Overall score: {overall.get('score', 0):.1f}%",
-                    cls="text-sm font-medium",
-                ),
-                Div(
-                    P(
-                        f"Labeling: {labeling.get('score', 0):.1f}%",
-                        cls="text-xs text-muted-foreground",
-                    ),
-                    P(
-                        f"GUIDs: {guids.get('score', 0):.1f}%",
-                        cls="text-xs text-muted-foreground",
-                    ),
-                    P(
-                        f"Properties: {properties.get('score', 0):.1f}%",
-                        cls="text-xs text-muted-foreground",
-                    ),
-                    cls="space-y-1 mt-2",
-                ),
-                *quality_alerts,
+        _collapsible_card(
+            "IFC Quality",
+            P(f"Overall score: {overall.get('score', 0):.1f}%", cls="text-sm font-medium"),
+            Div(
+                P(f"Labeling: {labeling.get('score', 0):.1f}%", cls="text-xs text-muted-foreground"),
+                P(f"GUIDs: {guids.get('score', 0):.1f}%", cls="text-xs text-muted-foreground"),
+                P(f"Properties: {properties.get('score', 0):.1f}%", cls="text-xs text-muted-foreground"),
+                cls="space-y-1 mt-2",
             ),
+            *quality_alerts,
+            open=False,
         )
         if ifc_quality
         else ""
     )
 
     improvement_block = (
-        Card(
-            CardHeader(
-                Div(
-                    CardTitle("Improvement Summary"),
-                    P(
-                        "Automatic fixes applied while preparing this IFC file for analysis.",
-                        cls="text-xs text-muted-foreground mt-0.5",
-                    ),
-                )
+        _collapsible_card(
+            "Improvement Summary",
+            Div(
+                *[P(message, cls="text-sm text-muted-foreground") for message in ifc_quality_improvements],
+                cls="space-y-1",
             ),
-            CardContent(
-                Div(
-                    *[
-                        P(message, cls="text-sm text-muted-foreground")
-                        for message in ifc_quality_improvements
-                    ],
-                    cls="space-y-1",
-                )
-            ),
+            open=False,
         )
         if ifc_quality_improvements
         else ""
@@ -546,16 +550,14 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
         else ""
     )
 
-    return Card(
-        CardHeader(CardTitle("Corrosion Compliance — GC-001 / CC-001")),
-        CardContent(
-            demo_notice,
-            badge_row,
-            cost_line,
-            tracker_line,
-            results_table,
-            bcf_btn,
-        ),
+    return _collapsible_card(
+        "Corrosion Compliance — GC-001 / CC-001",
+        demo_notice,
+        badge_row,
+        cost_line,
+        tracker_line,
+        results_table,
+        bcf_btn,
     )
 
 
@@ -629,28 +631,18 @@ def _rule_validation_card(rule_validations: list[dict], analysis_theme: str):
             )
         )
 
-    return Card(
-        CardHeader(
-            Div(
-                CardTitle(f"Rule Validation — Module 3 ({analysis_theme})"),
-                P(
-                    "Each library rule is checked against the IFC model. "
-                    "'No elements' means that IFC class is absent from this model.",
-                    cls="text-xs text-muted-foreground mt-0.5",
-                ),
-            )
-        ),
-        CardContent(
-            summary,
-            Div(
-                Table(
-                    Thead(Tr(*header_cells)),
-                    Tbody(*data_rows),
-                    cls="w-full text-sm",
-                ),
-                cls="overflow-auto border rounded-md",
+    return _collapsible_card(
+        f"Rule Validation — Module 3 ({analysis_theme})",
+        summary,
+        Div(
+            Table(
+                Thead(Tr(*header_cells)),
+                Tbody(*data_rows),
+                cls="w-full text-sm",
             ),
+            cls="overflow-auto border rounded-md",
         ),
+        open=False,
     )
 
 
@@ -804,11 +796,25 @@ def _rule_compliance_card(
             failures = r.get("failures", [])
             fail_detail = ""
             if failures:
+                def _fmt_actual(v):
+                    if isinstance(v, float):
+                        return f"{v:,.2f}" if v >= 1 else f"{v:.4f}"
+                    return str(v) if v is not None else "—"
+
                 fail_rows = [
                     Tr(
-                        Td(f.get("element_name", "")[:40], cls="px-2 py-1 text-xs font-mono"),
-                        Td(str(f.get("actual", "")), cls="px-2 py-1 text-xs"),
+                        Td(f.get("element_name", "—")[:35], cls="px-2 py-1 text-xs font-mono"),
+                        Td(
+                            Span(f.get("storey") or "—", cls="block text-xs"),
+                            Span(f.get("space") or "", cls="block text-xs text-muted-foreground"),
+                            cls="px-2 py-1",
+                        ),
+                        Td(_fmt_actual(f.get("actual")), cls="px-2 py-1 text-xs font-mono"),
                         Td(f.get("reason", ""), cls="px-2 py-1 text-xs text-red-700"),
+                        Td(
+                            Span((f.get("guid") or "")[:12], cls="text-xs text-muted-foreground font-mono"),
+                            cls="px-2 py-1",
+                        ),
                     )
                     for f in failures[:20]
                 ]
@@ -822,8 +828,10 @@ def _rule_compliance_card(
                             Thead(
                                 Tr(
                                     Th("Element", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("Floor / Room", cls="px-2 py-1 text-xs bg-muted"),
                                     Th("Actual value", cls="px-2 py-1 text-xs bg-muted"),
                                     Th("Reason", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("GUID", cls="px-2 py-1 text-xs bg-muted"),
                                 )
                             ),
                             Tbody(*fail_rows),
@@ -839,9 +847,10 @@ def _rule_compliance_card(
             if missing_elements:
                 missing_rows = [
                     Tr(
-                        Td(m.get("element_name", "")[:40], cls="px-2 py-1 text-xs font-mono"),
-                        Td(m.get("storey", "—"), cls="px-2 py-1 text-xs"),
-                        Td(m.get("guid", "")[:20], cls="px-2 py-1 text-xs text-muted-foreground font-mono"),
+                        Td(m.get("element_name", "")[:35], cls="px-2 py-1 text-xs font-mono"),
+                        Td(m.get("storey") or "—", cls="px-2 py-1 text-xs"),
+                        Td(m.get("space") or "—", cls="px-2 py-1 text-xs text-muted-foreground"),
+                        Td(m.get("guid", "")[:16], cls="px-2 py-1 text-xs text-muted-foreground font-mono"),
                     )
                     for m in missing_elements[:20]
                 ]
@@ -862,7 +871,8 @@ def _rule_compliance_card(
                             Thead(
                                 Tr(
                                     Th("Element", cls="px-2 py-1 text-xs bg-muted"),
-                                    Th("Storey", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("Floor", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("Room", cls="px-2 py-1 text-xs bg-muted"),
                                     Th("GUID", cls="px-2 py-1 text-xs bg-muted"),
                                 )
                             ),
@@ -906,24 +916,14 @@ def _rule_compliance_card(
         cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-white hover:bg-slate-600 mt-3",
     )
 
-    return Card(
-        CardHeader(
-            Div(
-                CardTitle(title),
-                P(
-                    "Full property-level compliance check against every rule in the library.",
-                    cls="text-xs text-muted-foreground mt-0.5",
-                ),
-            )
+    return _collapsible_card(
+        title,
+        summary_bar,
+        Div(
+            Table(Thead(Tr(*header_cells)), Tbody(*rows), cls="w-full text-sm"),
+            cls="overflow-auto border rounded-md",
         ),
-        CardContent(
-            summary_bar,
-            Div(
-                Table(Thead(Tr(*header_cells)), Tbody(*rows), cls="w-full text-sm"),
-                cls="overflow-auto border rounded-md",
-            ),
-            csv_btn,
-        ),
+        csv_btn,
     )
 
 
@@ -947,6 +947,39 @@ _ELEM_LABELS = {
     "IfcSensor":           "Sensors",
     "IfcFurnishingElement":"Furniture",
 }
+
+
+def _collapsible_card(title: str, *content, subtitle: str = "", open: bool = True):
+    """Top-level collapsible result card with a clickable header."""
+    return Details(
+        Summary(
+            Div(
+                Span(title, cls="font-semibold text-base"),
+                Span(subtitle, cls="text-xs text-muted-foreground ml-2") if subtitle else "",
+                cls="flex items-center gap-1",
+            ),
+            cls="px-6 py-4 border-b bg-muted/30 cursor-pointer select-none list-none",
+        ),
+        Div(*content, cls="px-6 py-5 space-y-4 bg-card"),
+        cls="border rounded-lg shadow-sm overflow-hidden",
+        open=open,
+    )
+
+
+def _collapsible_section(title: str, *content, badge: str = "", open: bool = True):
+    """Collapsible sub-section inside a card (smaller heading)."""
+    return Details(
+        Summary(
+            Div(
+                Span(title, cls="text-sm font-semibold"),
+                Span(badge, cls="ml-2 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground") if badge else "",
+                cls="flex items-center",
+            ),
+            cls="cursor-pointer select-none py-1 list-none",
+        ),
+        Div(*content, cls="mt-2"),
+        open=open,
+    )
 
 
 def _building_summary_card(summary: dict):
@@ -997,7 +1030,11 @@ def _building_summary_card(summary: dict):
             floor_rows.append(
                 Tr(
                     Td(name, cls="px-3 py-2 text-sm font-medium"),
-                    Td(f"{h_mm:,} mm" if h_mm else "—", cls="px-3 py-2 text-sm font-mono"),
+                    Td(
+                        (f"{h_mm / 1000:.2f} m" if h_mm >= 1000 else f"{h_mm:,} mm")
+                        if h_mm else "—",
+                        cls="px-3 py-2 text-sm font-mono",
+                    ),
                     Td(str(r_cnt) if r_cnt else "—", cls="px-3 py-2 text-sm text-center"),
                     Td(f"{r_area:,.1f}" if r_area else "—", cls="px-3 py-2 text-sm font-mono text-right"),
                     cls="border-b border-muted last:border-0",
@@ -1086,16 +1123,14 @@ def _building_summary_card(summary: dict):
             Div(*qa_items, cls="space-y-1 p-3 bg-yellow-50 rounded-md border border-yellow-200"),
         )
 
-    return Card(
-        CardHeader(CardTitle("Building Overview")),
-        CardContent(
-            stat_strip,
-            floor_table,
-            elem_badges,
-            fixture_badges,
-            alarm_badges,
-            qa_block,
-        ),
+    return _collapsible_card(
+        "Building Overview",
+        stat_strip,
+        _collapsible_section("Floor Breakdown", floor_table) if floor_table else "",
+        _collapsible_section("Elements Found", elem_badges) if elem_badges else "",
+        _collapsible_section("Plumbing Fixtures", fixture_badges) if fixture_badges else "",
+        _collapsible_section("Fire / CO Alarms", alarm_badges) if alarm_badges else "",
+        qa_block,
     )
 
 
@@ -1108,18 +1143,14 @@ def _spatial_checks_card(spatial: dict):
     warnings = spatial.get("warnings", [])
     daylight = spatial.get("daylight", [])
     fire_sep = spatial.get("fire_separation", [])
+    garage_sep = spatial.get("garage_separation", {})
 
     if not has_boundaries:
         msg = (warnings[0] if warnings else
                "No IfcRelSpaceBoundary data — re-export with Space Boundaries enabled.")
-        return Card(
-            CardHeader(CardTitle("Spatial Compliance — Tier 2")),
-            CardContent(
-                Span(
-                    msg,
-                    cls="text-sm text-yellow-700",
-                )
-            ),
+        return _collapsible_card(
+            "Spatial Compliance — Tier 2",
+            Span(msg, cls="text-sm text-yellow-700"),
         )
 
     warning_items = [
@@ -1127,7 +1158,7 @@ def _spatial_checks_card(spatial: dict):
     ]
 
     # ── Daylight ratio table ──────────────────────────────────────────────────
-    daylight_block = ""
+    daylight_section = ""
     if daylight:
         d_pass = sum(1 for r in daylight if r["passes"])
         d_fail = len(daylight) - d_pass
@@ -1137,7 +1168,8 @@ def _spatial_checks_card(spatial: dict):
             status_cls = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
             d_rows.append(
                 Tr(
-                    Td(r["space_name"][:40], cls="px-3 py-2 text-xs"),
+                    Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
+                    Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
                     Td(f"{r['floor_area_m2']:.1f}", cls="px-3 py-2 text-xs font-mono text-right"),
                     Td(f"{r['total_window_area_m2']:.2f}", cls="px-3 py-2 text-xs font-mono text-right"),
                     Td(f"{r['daylight_ratio']:.3f}", cls="px-3 py-2 text-xs font-mono text-right"),
@@ -1145,18 +1177,12 @@ def _spatial_checks_card(spatial: dict):
                     cls="border-b border-muted last:border-0",
                 )
             )
-        daylight_block = Div(
-            Div(
-                H3("Daylight Ratio — OBC 9.7.2", cls="text-sm font-semibold"),
-                Span(
-                    f"{d_pass}/{len(daylight)} pass",
-                    cls=f"text-xs px-2 py-0.5 rounded-full font-medium {rate_cls}",
-                ),
-                cls="flex items-center justify-between mb-2",
-            ),
+        daylight_section = _collapsible_section(
+            "Daylight Ratio — OBC 9.7.2",
             Div(
                 Table(
                     Thead(Tr(
+                        Th("Floor", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
                         Th("Room", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
                         Th("Floor m²", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
                         Th("Window m²", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
@@ -1166,12 +1192,13 @@ def _spatial_checks_card(spatial: dict):
                     Tbody(*d_rows),
                     cls="w-full text-sm",
                 ),
-                cls="overflow-auto border rounded-md mb-4",
+                cls="overflow-auto border rounded-md",
             ),
+            badge=f"{d_pass}/{len(daylight)} pass",
         )
 
     # ── Fire separation table ─────────────────────────────────────────────────
-    fire_block = ""
+    fire_section = ""
     if fire_sep:
         f_pass = sum(1 for r in fire_sep if r["passes"])
         f_fail = len(fire_sep) - f_pass
@@ -1194,15 +1221,8 @@ def _spatial_checks_card(spatial: dict):
                     cls="border-b border-muted last:border-0",
                 )
             )
-        fire_block = Div(
-            Div(
-                H3("Fire Separation — OBC 9.10.9", cls="text-sm font-semibold"),
-                Span(
-                    f"{f_pass}/{len(fire_sep)} pass",
-                    cls=f"text-xs px-2 py-0.5 rounded-full font-medium {f_rate_cls}",
-                ),
-                cls="flex items-center justify-between mb-2",
-            ),
+        fire_section = _collapsible_section(
+            "Fire Separation — OBC 9.10.9",
             Div(
                 Table(
                     Thead(Tr(
@@ -1216,24 +1236,199 @@ def _spatial_checks_card(spatial: dict):
                 ),
                 cls="overflow-auto border rounded-md",
             ),
+            badge=f"{f_pass}/{len(fire_sep)} pass",
         )
 
-    return Card(
-        CardHeader(
-            Div(
-                CardTitle("Spatial Compliance — Tier 2"),
-                P(
-                    f"{spatial.get('space_count', 0)} spaces · "
-                    f"{spatial.get('party_wall_count', 0)} party walls detected",
-                    cls="text-xs text-muted-foreground mt-0.5",
+    # ── Garage separation section ─────────────────────────────────────────────
+    garage_section = ""
+    if garage_sep:
+        g_results = garage_sep.get("results", [])
+        g_warnings = garage_sep.get("warnings", [])
+        g_found = garage_sep.get("garage_spaces_found", 0)
+
+        if g_results:
+            g_pass = sum(1 for r in g_results if r["passes"])
+            g_rows = []
+            for r in sorted(g_results, key=lambda x: x["passes"]):
+                rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
+                rating_cls = "text-red-700" if r["missing_rating"] else (
+                    "text-green-700" if r["passes"] else "text-orange-700"
+                )
+                req_txt = f"≥ {r['required_min']} min"
+                g_rows.append(
+                    Tr(
+                        Td(r["element_type"], cls="px-3 py-2 text-xs font-semibold"),
+                        Td(r["element_name"][:35], cls="px-3 py-2 text-xs font-mono"),
+                        Td(r["garage_space"][:25], cls="px-3 py-2 text-xs"),
+                        Td(r["adjacent_space"][:25], cls="px-3 py-2 text-xs"),
+                        Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rating_cls}"),
+                        Td(req_txt, cls="px-3 py-2 text-xs font-mono"),
+                        Td("✓ Pass" if r["passes"] else "✗ Fail",
+                           cls=f"px-3 py-2 text-xs {rating_cls}"),
+                        cls="border-b border-muted last:border-0",
+                    )
+                )
+            garage_content = Div(
+                Table(
+                    Thead(Tr(
+                        Th("Type", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Element", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Garage Space", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Adjacent Space", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Fire Rating", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Required", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                    )),
+                    Tbody(*g_rows),
+                    cls="w-full text-sm",
                 ),
+                cls="overflow-auto border rounded-md",
             )
+            badge = f"{g_pass}/{len(g_results)} pass"
+        else:
+            garage_content = Div(
+                *[Span(w, cls="block text-xs text-yellow-700") for w in g_warnings],
+                cls="space-y-1",
+            )
+            badge = f"{g_found} garage(s)"
+
+        garage_section = _collapsible_section(
+            "Garage Separation — OBC 9.10.14.2",
+            garage_content,
+            badge=badge,
+        )
+
+    subtitle = (
+        f"{spatial.get('space_count', 0)} spaces · "
+        f"{spatial.get('party_wall_count', 0)} party walls"
+    )
+    return _collapsible_card(
+        "Spatial Compliance — Tier 2",
+        Div(*[Span(w, cls="block text-xs text-yellow-700") for w in warnings], cls="space-y-1") if warnings else "",
+        daylight_section,
+        fire_section,
+        garage_section,
+        subtitle=subtitle,
+    )
+
+
+def _egress_checks_card(egress: dict):
+    """Render Tier 3 egress compliance results — exit count and travel distances."""
+    if not egress:
+        return ""
+
+    exit_data = egress.get("exit_count", {})
+    travel = egress.get("travel_distance", [])
+    has_graph = egress.get("has_graph", False)
+    warnings = egress.get("warnings", [])
+
+    total_exits = exit_data.get("total_exterior_doors", 0)
+    exit_results = exit_data.get("results", [])
+    exit_warnings = exit_data.get("warnings", [])
+    all_warnings = exit_warnings + warnings
+
+    # ── Exit count section ────────────────────────────────────────────────────
+    exit_rows = []
+    for r in exit_results:
+        status_cls = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+        exit_rows.append(
+            Tr(
+                Td(r["storey"], cls="px-3 py-2 text-xs"),
+                Td(str(r["exit_count"]), cls="px-3 py-2 text-xs font-mono text-center"),
+                Td(str(r["required_min"]), cls="px-3 py-2 text-xs font-mono text-center"),
+                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {status_cls}"),
+                cls="border-b border-muted last:border-0",
+            )
+        )
+
+    exit_section = _collapsible_section(
+        "Exit Count — OBC 9.9.4.1",
+        Div(
+            P(f"Total exterior doors detected: {total_exits}", cls="text-sm mb-2"),
+            Div(
+                Table(
+                    Thead(Tr(
+                        Th("Storey", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Exits", cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Required", cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                    )),
+                    Tbody(*exit_rows) if exit_rows else Tbody(
+                        Tr(Td("No exterior doors found — tag doors as IsExternal=True",
+                              cls="px-3 py-2 text-xs text-yellow-700", colspan="4"))
+                    ),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md",
+            ),
+        ) if exit_results else P(
+            "No exterior doors found — tag doors as IsExternal=True in the authoring tool.",
+            cls="text-sm text-yellow-700",
         ),
-        CardContent(
-            Div(*warning_items, cls="space-y-1 mb-4") if warning_items else "",
-            daylight_block,
-            fire_block,
-        ),
+        badge=f"{total_exits} exit(s)",
+    )
+
+    # ── Travel distance section ───────────────────────────────────────────────
+    travel_section = ""
+    if travel:
+        td_pass = sum(1 for r in travel if r["passes"])
+        td_fail = len(travel) - td_pass
+        td_rows = []
+        for r in sorted(travel, key=lambda x: (x["passes"], -(x.get("travel_distance_m") or 0))):
+            dist_txt = (
+                f"{r['travel_distance_m']:.1f} m"
+                if r.get("travel_distance_m") is not None
+                else "No path"
+            )
+            status_cls = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            td_rows.append(
+                Tr(
+                    Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
+                    Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
+                    Td(dist_txt, cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td(r.get("nearest_exit") or "—", cls="px-3 py-2 text-xs"),
+                    Td("✓ Pass" if r["passes"] else ("✗ No path" if r.get("no_path") else "✗ Exceeds"),
+                       cls=f"px-3 py-2 text-xs {status_cls}"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        travel_section = _collapsible_section(
+            "Travel Distance — OBC 9.9.10.1",
+            Div(
+                Table(
+                    Thead(Tr(
+                        Th("Floor", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Room", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Distance", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Nearest Exit", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
+                    )),
+                    Tbody(*td_rows),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md",
+            ),
+            badge=f"{td_pass}/{len(travel)} pass",
+        )
+    elif not has_graph:
+        travel_section = _collapsible_section(
+            "Travel Distance — OBC 9.9.10.1",
+            P(
+                "Space boundary data required. Re-export the IFC model with "
+                "Space Boundaries enabled to activate this check.",
+                cls="text-sm text-yellow-700",
+            ),
+        )
+
+    warning_items = [Span(w, cls="block text-xs text-yellow-700") for w in all_warnings]
+
+    subtitle = f"{total_exits} exit(s) · {len(travel)} rooms checked"
+    return _collapsible_card(
+        "Egress Compliance — Tier 3",
+        Div(*warning_items, cls="space-y-1") if warning_items else "",
+        exit_section,
+        travel_section,
+        subtitle=subtitle,
     )
 
 
@@ -1275,6 +1470,7 @@ def setup_routes(rt):
 
         bldg_card = _building_summary_card(result.get("building_summary", {}))
         spatial_card = _spatial_checks_card(result.get("spatial_checks", {}))
+        egress_card = _egress_checks_card(result.get("egress_checks", {}))
 
         sections = [
             Card(
@@ -1283,6 +1479,7 @@ def setup_routes(rt):
             ),
             *(([bldg_card]) if bldg_card else []),
             *(([spatial_card]) if spatial_card else []),
+            *(([egress_card]) if egress_card else []),
             _build_ifc_graph_card(result, project_id),
         ]
 
@@ -1297,7 +1494,6 @@ def setup_routes(rt):
         result = analysis_data["result"]
         project = result["project"]
         selected_theme = result.get("analysis_theme", "Architecture")
-        doc_cards = _build_document_cards(result)
 
         compliance_card = _compliance_card(
             results=result.get("compliance_results", []),
@@ -1324,6 +1520,7 @@ def setup_routes(rt):
 
         bldg_card = _building_summary_card(result.get("building_summary", {}))
         spatial_card = _spatial_checks_card(result.get("spatial_checks", {}))
+        egress_card = _egress_checks_card(result.get("egress_checks", {}))
 
         sections = [
             Card(
@@ -1337,7 +1534,7 @@ def setup_routes(rt):
             ),
             *(([bldg_card]) if bldg_card else []),
             *(([spatial_card]) if spatial_card else []),
-            *(doc_cards or [P("No documents selected.", cls="text-sm text-muted-foreground")]),
+            *(([egress_card]) if egress_card else []),
             rule_validation_card,
         ]
         if rule_compliance_card:

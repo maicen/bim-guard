@@ -199,6 +199,24 @@ class IFCSpatialAdjacency:
 
 # ── Tier 2 checks ─────────────────────────────────────────────────────────────
 
+def _get_storey_name(space) -> str | None:
+    """Resolve the IfcBuildingStorey name for a space via ContainedInStructure."""
+    try:
+        for rel in getattr(space, "ContainedInStructure", []):
+            container = rel.RelatingStructure
+            if container.is_a("IfcBuildingStorey"):
+                return getattr(container, "Name", None)
+            # Space may be nested inside another space — walk one level up
+            if container.is_a("IfcSpace"):
+                for rel2 in getattr(container, "ContainedInStructure", []):
+                    cont2 = rel2.RelatingStructure
+                    if cont2.is_a("IfcBuildingStorey"):
+                        return getattr(cont2, "Name", None)
+    except Exception:
+        pass
+    return None
+
+
 def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
     """
     OBC 9.7.2 — every habitable room must have window area >= 1/10 of floor area.
@@ -218,6 +236,7 @@ def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
             or getattr(space, "Name", None)
             or space_guid
         )
+        storey_name = _get_storey_name(space)
 
         floor_area = _get_area_from_psets(space)
         if not floor_area:
@@ -248,6 +267,7 @@ def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
                 "obc_ref": "OBC 9.7.2",
                 "space_guid": space_guid,
                 "space_name": space_name,
+                "storey_name": storey_name or "—",
                 "floor_area_m2": round(floor_area, 3),
                 "total_window_area_m2": round(total_window_area, 3),
                 "daylight_ratio": round(ratio, 4),
@@ -260,6 +280,19 @@ def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
         )
 
     return results
+
+
+_GARAGE_KW = frozenset(["garage", "carport", "car port", "parking", "vehicle"])
+
+
+def _is_garage_space(space) -> bool:
+    """Return True when the space name suggests it is a garage or carport."""
+    name = (
+        getattr(space, "LongName", None)
+        or getattr(space, "Name", None)
+        or ""
+    ).lower()
+    return any(kw in name for kw in _GARAGE_KW)
 
 
 def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
@@ -327,3 +360,171 @@ def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
         )
 
     return results
+
+
+def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
+    """
+    OBC 9.10.14.2 — fire separation between attached garage and dwelling.
+
+    Walls between garage and living space: FireRating ≥ 30 min.
+    Doors between garage and living space: FireRating ≥ 20 min.
+
+    Returns:
+        {
+          "garage_spaces_found": int,
+          "results": [per-element check dicts],
+          "warnings": [str],
+        }
+    """
+    if not adjacency.has_boundaries:
+        return {
+            "garage_spaces_found": 0,
+            "results": [],
+            "warnings": ["No IfcRelSpaceBoundary data — garage separation check skipped."],
+        }
+
+    # ── Identify garage spaces ────────────────────────────────────────────────
+    garage_guids: set[str] = set()
+    garage_names: dict[str, str] = {}
+    for sguid, data in adjacency._space_data.items():
+        space = data["space"]
+        if _is_garage_space(space):
+            garage_guids.add(sguid)
+            garage_names[sguid] = (
+                getattr(space, "LongName", None)
+                or getattr(space, "Name", None)
+                or sguid
+            )
+
+    if not garage_guids:
+        return {
+            "garage_spaces_found": 0,
+            "results": [],
+            "warnings": [
+                "No garage or carport spaces detected. "
+                "Name the garage space 'Garage' or 'Carport' in the authoring tool."
+            ],
+        }
+
+    # ── Build door → spaces map (walls already exist in _wall_spaces) ─────────
+    door_to_spaces: dict[str, list[str]] = {}
+    door_elements: dict[str, object] = {}
+    for sguid, data in adjacency._space_data.items():
+        for b in data["boundaries"]:
+            if b["element_type"] != "IfcDoor" or not b["physical"]:
+                continue
+            dguid = b["element_guid"]
+            if dguid not in door_to_spaces:
+                door_to_spaces[dguid] = []
+                door_elements[dguid] = b["element"]
+            if sguid not in door_to_spaces[dguid]:
+                door_to_spaces[dguid].append(sguid)
+
+    results: list[dict] = []
+    warnings: list[str] = []
+
+    def _space_label(sguid: str) -> str:
+        d = adjacency._space_data.get(sguid, {})
+        sp = d.get("space")
+        if sp is None:
+            return sguid
+        return (
+            getattr(sp, "LongName", None)
+            or getattr(sp, "Name", None)
+            or sguid
+        )
+
+    # ── Check walls ───────────────────────────────────────────────────────────
+    for wall_guid, space_guids in adjacency._wall_spaces.items():
+        garage_side = [g for g in space_guids if g in garage_guids]
+        living_side = [g for g in space_guids if g not in garage_guids]
+        if not garage_side or not living_side:
+            continue
+
+        # Resolve wall element
+        wall = None
+        try:
+            for candidate in adjacency.ifc_file.by_type("IfcWall"):
+                if candidate.GlobalId == wall_guid:
+                    wall = candidate
+                    break
+        except Exception:
+            pass
+        if wall is None:
+            continue
+
+        wall_name = getattr(wall, "Name", None) or wall_guid
+        raw_rating, numeric_rating = _get_fire_rating(wall)
+        missing = raw_rating is None
+        passes = not missing and numeric_rating is not None and numeric_rating >= 30
+
+        results.append({
+            "check": "garage_separation",
+            "obc_ref": "OBC 9.10.14.2",
+            "element_type": "Wall",
+            "element_name": wall_name,
+            "garage_space": garage_names.get(garage_side[0], garage_side[0]),
+            "adjacent_space": _space_label(living_side[0]),
+            "fire_rating_raw": raw_rating,
+            "fire_rating_min": numeric_rating,
+            "required_min": 30,
+            "passes": passes,
+            "missing_rating": missing,
+            "severity": "mandatory",
+        })
+
+    # ── Check doors ───────────────────────────────────────────────────────────
+    for door_guid, space_guids in door_to_spaces.items():
+        garage_side = [g for g in space_guids if g in garage_guids]
+        living_side = [g for g in space_guids if g not in garage_guids]
+        if not garage_side or not living_side:
+            continue
+
+        door_el = door_elements.get(door_guid)
+        if door_el is None:
+            continue
+
+        door_name = getattr(door_el, "Name", None) or door_guid
+        raw_rating, numeric_rating = _get_fire_rating(door_el)
+        missing = raw_rating is None
+        passes = not missing and numeric_rating is not None and numeric_rating >= 20
+
+        results.append({
+            "check": "garage_separation",
+            "obc_ref": "OBC 9.10.14.2",
+            "element_type": "Door",
+            "element_name": door_name,
+            "garage_space": garage_names.get(garage_side[0], garage_side[0]),
+            "adjacent_space": _space_label(living_side[0]),
+            "fire_rating_raw": raw_rating,
+            "fire_rating_min": numeric_rating,
+            "required_min": 20,
+            "passes": passes,
+            "missing_rating": missing,
+            "severity": "mandatory",
+        })
+
+    # ── Summary warnings ──────────────────────────────────────────────────────
+    missing_count = sum(1 for r in results if r["missing_rating"])
+    fail_count    = sum(1 for r in results if not r["passes"] and not r["missing_rating"])
+
+    if not results:
+        warnings.append(
+            "Garage space(s) found but no shared walls or doors with adjacent spaces detected. "
+            "Check that IfcRelSpaceBoundary data includes garage boundaries."
+        )
+    if missing_count:
+        warnings.append(
+            f"{missing_count} garage-separation element(s) have no FireRating declared "
+            "(OBC 9.10.14.2: walls ≥ 30 min, doors ≥ 20 min)."
+        )
+    if fail_count:
+        warnings.append(
+            f"{fail_count} garage-separation element(s) have insufficient fire rating."
+        )
+
+    return {
+        "garage_spaces_found": len(garage_guids),
+        "results": results,
+        "warnings": warnings,
+    }

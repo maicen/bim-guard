@@ -48,10 +48,21 @@ except ImportError:
     _GEOMETRY_AVAILABLE = False
 
 try:
-    from .ifc_spatial import IFCSpatialAdjacency, check_daylight_ratios, check_fire_separation
+    from .ifc_spatial import (
+        IFCSpatialAdjacency,
+        check_daylight_ratios,
+        check_fire_separation,
+        check_garage_separation,
+    )
     _SPATIAL_AVAILABLE = True
 except ImportError:
     _SPATIAL_AVAILABLE = False
+
+try:
+    from .ifc_egress import IFCEgressGraph, check_exit_count, check_egress_travel_distance
+    _EGRESS_AVAILABLE = True
+except ImportError:
+    _EGRESS_AVAILABLE = False
 
 try:
     from .ifc_quality.validator import IFCValidator
@@ -111,6 +122,26 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
 }
 
 
+# ── Length measure IFC types ──────────────────────────────────────────────────
+# Values with these NominalValue types are in model length units and must be
+# scaled to mm before Module 4 comparison when the model is not in mm.
+_LENGTH_MEASURE_TYPES: frozenset[str] = frozenset([
+    "IfcPositiveLengthMeasure",
+    "IfcLengthMeasure",
+    "IfcNonNegativeLengthMeasure",
+])
+
+# Direct IFC schema attributes that are always length values (metres-based model
+# stores them in metres, mm-based model in mm).  Used when rich property metadata
+# is not available (Pass 3 / 4 direct attribute lookups).
+_LENGTH_DIRECT_ATTRS: frozenset[str] = frozenset([
+    "overallwidth", "overallheight", "width", "height",
+    "treadlength", "treaddepth", "going", "riserheight",
+    "handrailheight", "sillheight", "headroomclearance",
+    "requireheadroom", "clearwidth", "nominalwidth", "nominalheight",
+    "clearheight", "elevationwithflooring",
+])
+
 # ── IFC property-type → Python type label ────────────────────────────────────
 _IFC_TYPE_MAP = {
     "IfcReal": "real",
@@ -142,6 +173,7 @@ class Module2_IFCRead:
         self.quality_warnings: list[str] = []
         self.geometry_extractor: "IFCGeometryExtractor | None" = None
         self.spatial_adjacency: "IFCSpatialAdjacency | None" = None
+        self.egress_graph: "IFCEgressGraph | None" = None
         if self.file_path:
             self.load_ifc_file()
 
@@ -183,6 +215,8 @@ class Module2_IFCRead:
             self.geometry_extractor = IFCGeometryExtractor(self.ifc_file)
         if _SPATIAL_AVAILABLE:
             self.spatial_adjacency = IFCSpatialAdjacency(self.ifc_file).build()
+        if _EGRESS_AVAILABLE and self.spatial_adjacency is not None:
+            self.egress_graph = IFCEgressGraph(self.spatial_adjacency).build()
         return self.ifc_file
 
     def get_all_elements(self, ifc_type: str = "IfcBuildingElement") -> list:
@@ -248,7 +282,8 @@ class Module2_IFCRead:
         if ifc_type == "IfcPropertySingleValue":
             nv = prop.NominalValue
             if nv is None:
-                return {"value": None, "value_type": "null", "unit": None, "ifc_type": ifc_type}
+                return {"value": None, "value_type": "null", "unit": None,
+                        "ifc_type": ifc_type, "measure_type": None}
             raw = getattr(nv, "wrappedValue", nv)
             vtype = _IFC_TYPE_MAP.get(nv.is_a(), "string")
             unit_label = self._resolve_unit(getattr(prop, "Unit", None))
@@ -260,6 +295,7 @@ class Module2_IFCRead:
                 "upper_bound": None,
                 "enum_values": None,
                 "ifc_type": ifc_type,
+                "measure_type": nv.is_a(),  # e.g. "IfcPositiveLengthMeasure"
             }
 
         if ifc_type == "IfcPropertyBoundedValue":
@@ -658,6 +694,9 @@ class Module2_IFCRead:
         if not self.ifc_file:
             raise ValueError("No IFC file loaded.")
 
+        # Pre-compute once; 1.0 means model is already in mm → no scaling needed
+        _unit_scale_mm = self._get_length_unit_scale_mm()
+
         results = []
         for rule in rules:
             target = str(rule.get("target_ifc_class") or "").strip()
@@ -795,6 +834,23 @@ class Module2_IFCRead:
                     except Exception:
                         pass
 
+                # ── Pass 8: unit conversion (model-units → mm) ───────────
+                # Geometry (Pass 7) already returns mm.  Pset/attribute passes
+                # return model-native units, which for metre-based models means
+                # values like 0.75 instead of 750.  Scale here so Module 4
+                # comparisons are always against mm values when rules use mm.
+                if (
+                    _unit_scale_mm != 1.0
+                    and actual_value is not None
+                    and isinstance(actual_value, (int, float))
+                    and found_pset != "geometry"
+                ):
+                    measure_type = rich_detail.get("measure_type", "")
+                    prop_lower = prop_name.lower()
+                    if (measure_type in _LENGTH_MEASURE_TYPES
+                            or prop_lower in _LENGTH_DIRECT_ATTRS):
+                        actual_value = round(actual_value * _unit_scale_mm, 4)
+
                 # ── Type, material context ────────────────────────────────
                 try:
                     type_inf = self.get_type_info(el)
@@ -846,6 +902,47 @@ class Module2_IFCRead:
 
         return results
 
+    # ── Unit-scale helper (does not require geometry extractor) ──────────────
+
+    def _get_length_unit_scale_mm(self) -> float:
+        """
+        Return model-unit → mm multiplier by reading IfcUnitAssignment directly.
+
+        Always reads from the IFC file (not from geometry_extractor) to avoid
+        inheriting any stale or incorrectly-detected unit scale.
+        """
+        if not self.ifc_file:
+            return 1.0
+        _SI_TO_MM = {
+            "MILLIMETRE": 1.0, "MILLIMETER": 1.0,
+            "CENTIMETRE": 10.0, "CENTIMETER": 10.0,
+            "METRE": 1000.0, "METER": 1000.0,
+            "KILOMETRE": 1_000_000.0, "KILOMETER": 1_000_000.0,
+            "INCH": 25.4, "FOOT": 304.8,
+        }
+        _PREFIX_FACTORS = {"MILLI": 0.001, "CENTI": 0.01, "KILO": 1000.0, "": 1.0}
+        try:
+            for ua in self.ifc_file.by_type("IfcUnitAssignment"):
+                for unit in (ua.Units or []):
+                    if not hasattr(unit, "UnitType"):
+                        continue
+                    if "LENGTHUNIT" not in str(unit.UnitType).upper():
+                        continue
+                    if unit.is_a("IfcSIUnit"):
+                        prefix = str(getattr(unit, "Prefix", "") or "").upper()
+                        name = str(getattr(unit, "Name", "METRE") or "METRE").upper()
+                        base_mm = _SI_TO_MM.get(name, 1000.0)
+                        return base_mm * _PREFIX_FACTORS.get(prefix, 1.0)
+                    if unit.is_a("IfcConversionBasedUnit"):
+                        cname = str(getattr(unit, "Name", "") or "").upper()
+                        if "FOOT" in cname:
+                            return 304.8
+                        if "INCH" in cname:
+                            return 25.4
+        except Exception:
+            pass
+        return 1.0
+
     # ── Building-level summary (no geometry required) ─────────────────────────
 
     def extract_building_summary(self) -> dict:
@@ -860,6 +957,9 @@ class Module2_IFCRead:
 
         summary: dict = {}
 
+        # Unit scale: model-unit → mm (e.g. 1000.0 when model is in metres)
+        unit_scale = self._get_length_unit_scale_mm()
+
         # ── Storeys ───────────────────────────────────────────────────────────
         try:
             raw_storeys = self.ifc_file.by_type("IfcBuildingStorey")
@@ -867,7 +967,8 @@ class Module2_IFCRead:
                 [
                     {
                         "name": getattr(s, "Name", None) or f"Level {i}",
-                        "elevation": float(getattr(s, "Elevation", 0) or 0),
+                        # elevation stored in mm for consistent downstream use
+                        "elevation": float(getattr(s, "Elevation", 0) or 0) * unit_scale,
                         "guid": s.GlobalId,
                     }
                     for i, s in enumerate(raw_storeys)
@@ -894,6 +995,51 @@ class Module2_IFCRead:
             summary["floor_heights"] = []
 
         # ── Spaces / Rooms ────────────────────────────────────────────────────
+
+        # Build space→storey map top-down (storey → children) rather than
+        # bottom-up (space → Decomposes/ContainedInStructure) because some
+        # IFC exporters leave the space's back-references empty.
+        _space_guid_to_storey: dict[str, str] = {}
+        try:
+            for _s in self.ifc_file.by_type("IfcBuildingStorey"):
+                _sname = getattr(_s, "Name", None) or "Unassigned"
+                # Pattern A: spaces directly contained in storey
+                for _rel in getattr(_s, "ContainsElements", []):
+                    for _child in getattr(_rel, "RelatedElements", []):
+                        try:
+                            if _child.is_a("IfcSpace"):
+                                _space_guid_to_storey[_child.GlobalId] = _sname
+                        except Exception:
+                            pass
+                # Pattern B: spaces aggregated under storey
+                for _rel in getattr(_s, "IsDecomposedBy", []):
+                    for _child in getattr(_rel, "RelatedObjects", []):
+                        try:
+                            if _child.is_a("IfcSpace"):
+                                _space_guid_to_storey[_child.GlobalId] = _sname
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        def _storey_name_for_space(sp) -> str:
+            """Return storey name from top-down map, then fall back to space relationships."""
+            # Top-down lookup (most reliable)
+            name = _space_guid_to_storey.get(sp.GlobalId)
+            if name:
+                return name
+            # Bottom-up fallback: direct containment
+            for rel in getattr(sp, "ContainedInStructure", []):
+                cont = rel.RelatingStructure
+                if cont.is_a("IfcBuildingStorey"):
+                    return getattr(cont, "Name", None) or "Unassigned"
+            # Bottom-up fallback: aggregation
+            for rel in getattr(sp, "Decomposes", []):
+                parent = rel.RelatingObject
+                if parent.is_a("IfcBuildingStorey"):
+                    return getattr(parent, "Name", None) or "Unassigned"
+            return "Unassigned"
+
         try:
             spaces = self.ifc_file.by_type("IfcSpace")
             total_area = 0.0
@@ -922,10 +1068,9 @@ class Module2_IFCRead:
                 if area:
                     total_area += area
 
-                spatial = self.get_spatial_location(sp)
-                storey = spatial.get("storey_name") or "Unassigned"
+                storey = _storey_name_for_space(sp)
 
-                if not list(getattr(sp, "ContainedInStructure", [])):
+                if _storey_name_for_space(sp) == "Unassigned":
                     unplaced_rooms.append(
                         {
                             "name": (
@@ -1108,6 +1253,7 @@ class Module2_IFCRead:
 
         daylight = check_daylight_ratios(adj)
         fire_sep = check_fire_separation(adj)
+        garage_sep = check_garage_separation(adj)
 
         daylight_fails = sum(1 for r in daylight if not r["passes"])
         fire_fails = sum(1 for r in fire_sep if not r["passes"])
@@ -1134,6 +1280,67 @@ class Module2_IFCRead:
             "party_wall_count": adj.party_wall_count(),
             "daylight": daylight,
             "fire_separation": fire_sep,
+            "garage_separation": garage_sep,
+            "warnings": warnings,
+        }
+
+    # ── Tier 3: egress checks ─────────────────────────────────────────────────
+
+    def extract_egress_checks(self) -> dict:
+        """
+        Run Tier 3 egress compliance checks.
+
+        Returns:
+            {
+              "exit_count": dict from check_exit_count(),
+              "travel_distance": list from check_egress_travel_distance(),
+              "has_graph": bool,
+              "warnings": [str],
+            }
+        """
+        warnings: list[str] = []
+
+        # Exit count always runs (doesn't need boundary data)
+        if self.ifc_file and _EGRESS_AVAILABLE:
+            exit_count = check_exit_count(self.ifc_file)
+        else:
+            exit_count = {
+                "total_exterior_doors": 0,
+                "exits_per_storey": {},
+                "results": [],
+                "warnings": ["Egress engine not available."],
+            }
+            warnings.append("Egress engine not available.")
+
+        # Travel distance requires boundary data + egress graph
+        has_graph = self.egress_graph is not None and self.egress_graph.graph is not None
+        if has_graph and _EGRESS_AVAILABLE:
+            travel_distance = check_egress_travel_distance(self.egress_graph)
+            if not self.egress_graph._exit_spaces:
+                warnings.append(
+                    "No exits identified in the space graph (no exterior doors linked to spaces). "
+                    "Travel-distance check requires exterior doors tagged IsExternal=True and "
+                    "IfcRelSpaceBoundary data."
+                )
+        else:
+            travel_distance = []
+            if not has_graph:
+                warnings.append(
+                    "Egress travel-distance check requires IfcRelSpaceBoundary data. "
+                    "Re-export the model with Space Boundaries enabled."
+                )
+
+        td_fails = sum(1 for r in travel_distance if not r["passes"])
+        if td_fails:
+            warnings.append(
+                f"{td_fails} habitable space(s) exceed the OBC 9.9.10.1 "
+                f"maximum travel distance of 25 m."
+            )
+
+        return {
+            "exit_count": exit_count,
+            "travel_distance": travel_distance,
+            "has_graph": has_graph,
             "warnings": warnings,
         }
 
