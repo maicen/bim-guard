@@ -50,6 +50,7 @@ VALID_RULE_TYPES = [
 
 # ── IFC class → plain-language keyword mapping ────────────────────────────────
 # Used by _enrich_target() to auto-correct free-text entity names.
+# Multi-word phrases must come before their component words so they win first.
 OBC_TO_IFC_MAP = {
     # Stairs
     "stair": "IfcStairFlight",
@@ -66,8 +67,13 @@ OBC_TO_IFC_MAP = {
     "doorway": "IfcDoor",
     # Windows
     "window": "IfcWindow",
-    "glazing": "IfcWindow",
     "skylight": "IfcWindow",
+    # Curtain walls / glazing systems (check before "wall" and "glazing")
+    "curtain wall": "IfcCurtainWall",
+    "curtain-wall": "IfcCurtainWall",
+    "glazing system": "IfcCurtainWall",
+    "storefront": "IfcCurtainWall",
+    "glazing": "IfcCurtainWall",
     # Ramps
     "ramp": "IfcRamp",
     "slope": "IfcRamp",
@@ -81,6 +87,14 @@ OBC_TO_IFC_MAP = {
     "partition": "IfcWall",
     "firewall": "IfcWall",
     "separation": "IfcWall",
+    # Ceilings / soffits
+    "suspended ceiling": "IfcCovering",
+    "drop ceiling": "IfcCovering",
+    "ceiling": "IfcCovering",
+    "soffit": "IfcCovering",
+    # Roofing
+    "roof": "IfcRoof",
+    "roofing": "IfcRoof",
     # Slabs / landings
     "slab": "IfcSlab",
     "landing": "IfcSlab",
@@ -91,12 +105,48 @@ OBC_TO_IFC_MAP = {
     "room": "IfcSpace",
     "corridor": "IfcSpace",
     "zone": "IfcZone",
-    # Structure
+    # Plumbing fixtures (check multi-word before single-word)
+    "water closet": "IfcSanitaryTerminal",
+    "floor drain": "IfcSanitaryTerminal",
+    "wash basin": "IfcSanitaryTerminal",
+    "hand basin": "IfcSanitaryTerminal",
+    "toilet": "IfcSanitaryTerminal",
+    "lavatory": "IfcSanitaryTerminal",
+    "urinal": "IfcSanitaryTerminal",
+    "bathtub": "IfcSanitaryTerminal",
+    "shower": "IfcSanitaryTerminal",
+    "basin": "IfcSanitaryTerminal",
+    "sink": "IfcSanitaryTerminal",
+    "plumbing fixture": "IfcSanitaryTerminal",
+    "sanitary": "IfcSanitaryTerminal",
+    # Fire / life safety alarms & detectors (multi-word first)
+    "smoke detector": "IfcAlarm",
+    "fire alarm": "IfcAlarm",
+    "smoke alarm": "IfcAlarm",
+    "heat detector": "IfcAlarm",
+    "carbon monoxide": "IfcAlarm",
+    "co detector": "IfcAlarm",
+    "alarm": "IfcAlarm",
+    "detector": "IfcSensor",
+    "sensor": "IfcSensor",
+    # Structural members
     "column": "IfcColumn",
     "footing": "IfcFooting",
     "foundation": "IfcFooting",
     "beam": "IfcBeam",
+    "truss": "IfcMember",
+    "joist": "IfcMember",
+    "rafter": "IfcMember",
+    "lintel": "IfcMember",
+    "member": "IfcMember",
+    # Furniture / casework
+    "furniture": "IfcFurnishingElement",
+    "workstation": "IfcFurnishingElement",
+    "casework": "IfcFurnishingElement",
+    "cabinet": "IfcFurnishingElement",
     # MEP
+    "sprinkler": "IfcFlowTerminal",
+    "diffuser": "IfcFlowTerminal",
     "pipe": "IfcPipeSegment",
     "duct": "IfcDuctSegment",
 }
@@ -112,10 +162,18 @@ IFC_PROPERTY_SET_MAP = {
     "IfcRampFlight": "Pset_RampFlightCommon",
     "IfcSlab": "Pset_SlabCommon",
     "IfcWall": "Pset_WallCommon",
+    "IfcCurtainWall": "Pset_CurtainWallCommon",
     "IfcSpace": "Pset_SpaceCommon",
+    "IfcCovering": "Pset_CoveringCommon",
+    "IfcRoof": "Pset_RoofCommon",
     "IfcColumn": "Pset_ColumnCommon",
     "IfcBeam": "Pset_BeamCommon",
+    "IfcMember": "Pset_MemberCommon",
     "IfcFooting": "Pset_FootingCommon",
+    "IfcSanitaryTerminal": "Pset_SanitaryTerminalCommon",
+    "IfcAlarm": "Pset_AlarmCommon",
+    "IfcSensor": "Pset_SensorCommon",
+    "IfcFlowTerminal": "Pset_FlowTerminalCommon",
 }
 
 # ── Rule type → minimum required fields ──────────────────────────────────────

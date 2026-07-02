@@ -28,17 +28,37 @@ IFC_CLASS_OPTIONS = [
     "IfcBuilding",
     "IfcBuildingStorey",
     "IfcSpace",
+    "IfcZone",
+    # Vertical enclosure
     "IfcWall",
+    "IfcCurtainWall",
+    # Openings
     "IfcDoor",
     "IfcWindow",
+    # Horizontal structure
     "IfcSlab",
     "IfcRoof",
+    "IfcCovering",
+    # Vertical structure
     "IfcColumn",
     "IfcBeam",
+    "IfcMember",
+    "IfcFooting",
+    # Circulation
     "IfcStair",
+    "IfcStairFlight",
+    "IfcRamp",
+    "IfcRampFlight",
     "IfcRailing",
+    # Plumbing / fixtures
+    "IfcSanitaryTerminal",
     "IfcFlowTerminal",
-    # MEP / piping types (corrosion engine targets)
+    # Fire / life safety
+    "IfcAlarm",
+    "IfcSensor",
+    # Furniture
+    "IfcFurnishingElement",
+    # MEP / piping types
     "IfcPipeSegment",
     "IfcPipeFitting",
     "IfcValve",

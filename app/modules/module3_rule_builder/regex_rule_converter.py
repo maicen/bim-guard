@@ -27,13 +27,62 @@ except ImportError:
 # ── Property name keywords ───────────────────────────────────────────────────
 # Checked longest-phrase-first against the paragraph text to pick property_name.
 PROPERTY_KEYWORDS = [
+    # Stair geometry (most specific first)
     ("riser height", "RiserHeight"),
-    ("riser", "RiserHeight"),
+    ("number of riser", "NumberOfRiser"),
+    ("number of tread", "NumberOfTreads"),
+    ("riser count", "NumberOfRiser"),
     ("tread depth", "TreadDepth"),
+    ("riser", "RiserHeight"),
     ("tread", "TreadDepth"),
+    ("nosing", "NosingLength"),
+    # Fire & life safety
+    ("fire resistance rating", "FireRating"),
+    ("fire resistance", "FireRating"),
+    ("fire rating", "FireRating"),
+    ("fire retardant", "FireRating"),
+    ("combustibility", "Combustibility"),
+    ("flame spread", "FlameSpread"),
+    ("smoke developed", "SmokeDevelopedIndex"),
+    ("sprinkler", "HasSprinklers"),
+    # Acoustic
+    ("sound transmission class", "AcousticRating"),
+    ("sound transmission", "AcousticRating"),
+    ("impact sound", "AcousticRating"),
+    ("noise level", "AcousticRating"),
+    # Thermal / energy
+    ("thermal transmittance", "ThermalTransmittance"),
+    ("thermal resistance", "ThermalResistance"),
+    ("u-value", "ThermalTransmittance"),
+    ("u value", "ThermalTransmittance"),
+    ("r-value", "ThermalResistance"),
+    ("r value", "ThermalResistance"),
+    ("insulation value", "ThermalResistance"),
+    ("insulation", "ThermalResistance"),
+    # Accessibility & clearance
+    ("vertical rise", "VerticalRise"),
+    ("handrail diameter", "HandrailGraspingDiameter"),
+    ("grip diameter", "HandrailGraspingDiameter"),
+    ("handrail height", "HandrailHeight"),
+    ("landing width", "Width"),
     ("headroom", "HeadroomClearance"),
     ("clear width", "Width"),
     ("clearance", "Clearance"),
+    # Ventilation / HVAC
+    ("ventilation rate", "VentilationRate"),
+    ("air change", "AirChangeRate"),
+    ("ceiling height", "Height"),
+    # Glazing / envelope
+    ("visible light transmittance", "VisibleLightTransmittance"),
+    ("solar heat gain", "SolarHeatGainCoefficient"),
+    # Structural
+    ("load bearing", "LoadBearing"),
+    ("bearing capacity", "LoadBearing"),
+    ("compressive strength", "CompressiveStrength"),
+    # Occupancy
+    ("occupancy load", "OccupancyLoad"),
+    ("occupancy type", "OccupancyType"),
+    # Dimensions (generic — keep last to avoid shadowing specific terms above)
     ("width", "Width"),
     ("height", "Height"),
     ("slope", "Slope"),

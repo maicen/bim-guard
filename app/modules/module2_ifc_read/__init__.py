@@ -42,6 +42,18 @@ except ImportError:
     _IFCOPENSHELL_AVAILABLE = False
 
 try:
+    from .ifc_geometry import IFCGeometryExtractor
+    _GEOMETRY_AVAILABLE = True
+except ImportError:
+    _GEOMETRY_AVAILABLE = False
+
+try:
+    from .ifc_spatial import IFCSpatialAdjacency, check_daylight_ratios, check_fire_separation
+    _SPATIAL_AVAILABLE = True
+except ImportError:
+    _SPATIAL_AVAILABLE = False
+
+try:
     from .ifc_quality.validator import IFCValidator
     from .ifc_quality.improver import improve_ifc_file
 
@@ -60,12 +72,23 @@ IFC_MIN_QUALITY_SCORE = 70
 # returns nothing, try each fallback in order.  For IfcStair specifically we
 # also walk IsDecomposedBy to recover the individual IfcStairFlight children.
 _IFC_CLASS_FALLBACKS: dict[str, list[str]] = {
-    "IfcStairFlight":    ["IfcStair"],
-    "IfcRailing":        ["IfcHandRail", "IfcMember"],
-    "IfcSlab":           ["IfcPlate", "IfcFooting"],
-    "IfcSpace":          ["IfcZone"],
+    "IfcStairFlight":      ["IfcStair"],
+    "IfcRampFlight":       ["IfcRamp"],
+    "IfcRailing":          ["IfcHandRail", "IfcMember"],
+    "IfcSlab":             ["IfcPlate", "IfcFooting"],
+    "IfcSpace":            ["IfcZone"],
     "IfcSanitaryTerminal": ["IfcFlowTerminal"],
-    "IfcAlarm":          ["IfcSensor"],
+    "IfcAlarm":            ["IfcSensor"],
+    # Roofs are often modelled as IfcSlab with PredefinedType=ROOF
+    "IfcRoof":             ["IfcSlab"],
+    # Structural members may be exported as beams or columns
+    "IfcMember":           ["IfcBeam", "IfcColumn"],
+    # Ceilings may be exported as generic IfcBuildingElementProxy
+    "IfcCovering":         ["IfcBuildingElementProxy"],
+    # Curtain walls may fall back to IfcWall in older exports
+    "IfcCurtainWall":      ["IfcWall"],
+    # Furniture may be exported as generic proxy elements
+    "IfcFurnishingElement": ["IfcBuildingElementProxy"],
 }
 
 # ── Property alias map ────────────────────────────────────────────────────────
@@ -117,6 +140,8 @@ class Module2_IFCRead:
         self.ifc_file = None
         self.quality_report: dict = {}
         self.quality_warnings: list[str] = []
+        self.geometry_extractor: "IFCGeometryExtractor | None" = None
+        self.spatial_adjacency: "IFCSpatialAdjacency | None" = None
         if self.file_path:
             self.load_ifc_file()
 
@@ -154,6 +179,10 @@ class Module2_IFCRead:
                 )
 
         self.ifc_file = ifcopenshell.open(str(load_path))
+        if _GEOMETRY_AVAILABLE:
+            self.geometry_extractor = IFCGeometryExtractor(self.ifc_file)
+        if _SPATIAL_AVAILABLE:
+            self.spatial_adjacency = IFCSpatialAdjacency(self.ifc_file).build()
         return self.ifc_file
 
     def get_all_elements(self, ifc_type: str = "IfcBuildingElement") -> list:
@@ -649,6 +678,12 @@ class Module2_IFCRead:
                 found_pset = None
                 rich_detail: dict = {}
 
+                # Spatial context fetched early — floor_z needed for Pass 7
+                try:
+                    spatial = self.get_spatial_location(el)
+                except Exception:
+                    spatial = {}
+
                 # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
                 try:
                     psets_simple = ifcopenshell.util.element.get_psets(el, psets_only=False)
@@ -743,13 +778,29 @@ class Module2_IFCRead:
                         except Exception:
                             pass
 
-                # ── Spatial, type, material context ───────────────────────
+                # ── Pass 7: bounding-box geometry (Tier 1) ───────────────
+                # Only runs when all Pset/attribute passes returned nothing.
+                if actual_value is None and prop_name and self.geometry_extractor:
+                    try:
+                        floor_z = spatial.get("storey_elevation")
+                        # storey_elevation from IFC is in model units; convert to mm
+                        if floor_z is not None and self.geometry_extractor._unit_scale != 1.0:
+                            floor_z = floor_z * self.geometry_extractor._unit_scale
+                        geo_val = self.geometry_extractor.get_geometry_value(
+                            el, prop_name, floor_z
+                        )
+                        if geo_val is not None:
+                            actual_value = geo_val
+                            found_pset = "geometry"
+                    except Exception:
+                        pass
+
+                # ── Type, material context ────────────────────────────────
                 try:
-                    spatial = self.get_spatial_location(el)
                     type_inf = self.get_type_info(el)
                     mat_info = self.get_material_info(el)
                 except Exception:
-                    spatial = type_inf = mat_info = {}
+                    type_inf = mat_info = {}
 
                 element_results.append(
                     {
@@ -906,9 +957,20 @@ class Module2_IFCRead:
 
         # ── Element counts by IFC class ───────────────────────────────────────
         _COUNT_TYPES = [
-            "IfcDoor", "IfcWindow", "IfcWall", "IfcSlab",
-            "IfcStairFlight", "IfcRamp", "IfcRailing",
-            "IfcColumn", "IfcBeam", "IfcSanitaryTerminal", "IfcAlarm",
+            # Vertical enclosure
+            "IfcWall", "IfcCurtainWall",
+            # Openings
+            "IfcDoor", "IfcWindow",
+            # Horizontal structure
+            "IfcSlab", "IfcRoof", "IfcCovering",
+            # Vertical structure
+            "IfcColumn", "IfcBeam", "IfcMember",
+            # Circulation
+            "IfcStairFlight", "IfcRamp", "IfcRampFlight", "IfcRailing",
+            # Fixtures / life safety
+            "IfcSanitaryTerminal", "IfcAlarm", "IfcSensor",
+            # Furniture
+            "IfcFurnishingElement",
         ]
         element_counts: dict[str, int] = {}
         for ifc_type in _COUNT_TYPES:
@@ -1007,6 +1069,73 @@ class Module2_IFCRead:
         summary["unnamed_elements"] = unnamed_elements
 
         return summary
+
+    # ── Tier 2: spatial adjacency checks ─────────────────────────────────────
+
+    def extract_spatial_checks(self) -> dict:
+        """
+        Run Tier 2 spatial compliance checks that require room-to-element linking.
+
+        Returns:
+            {
+              "has_boundaries": bool,
+              "space_count": int,
+              "party_wall_count": int,
+              "daylight": [list of per-room daylight ratio results],
+              "fire_separation": [list of per-party-wall fire rating results],
+              "warnings": [str],
+            }
+        """
+        if not self.ifc_file or not self.spatial_adjacency:
+            return {
+                "has_boundaries": False,
+                "space_count": 0,
+                "party_wall_count": 0,
+                "daylight": [],
+                "fire_separation": [],
+                "warnings": ["Spatial adjacency engine not available."],
+            }
+
+        adj = self.spatial_adjacency
+        warnings: list[str] = []
+
+        if not adj.has_boundaries:
+            warnings.append(
+                "No IfcRelSpaceBoundary data found in this file. "
+                "Export with 'Space Boundaries' enabled for daylight and "
+                "fire separation checks."
+            )
+
+        daylight = check_daylight_ratios(adj)
+        fire_sep = check_fire_separation(adj)
+
+        daylight_fails = sum(1 for r in daylight if not r["passes"])
+        fire_fails = sum(1 for r in fire_sep if not r["passes"])
+        fire_missing = sum(1 for r in fire_sep if r["missing_rating"])
+
+        if daylight_fails:
+            warnings.append(
+                f"{daylight_fails} room(s) do not meet the OBC 9.7.2 "
+                "1/10 daylight ratio requirement."
+            )
+        if fire_missing:
+            warnings.append(
+                f"{fire_missing} party wall(s) have no FireRating declared "
+                "(OBC 9.10.9 requires ≥ 45 min)."
+            )
+        if fire_fails and not fire_missing:
+            warnings.append(
+                f"{fire_fails} party wall(s) have FireRating below 45 min (OBC 9.10.9)."
+            )
+
+        return {
+            "has_boundaries": adj.has_boundaries,
+            "space_count": adj.space_count(),
+            "party_wall_count": adj.party_wall_count(),
+            "daylight": daylight,
+            "fire_separation": fire_sep,
+            "warnings": warnings,
+        }
 
     def get_full_element_data(self, element) -> dict:
         """

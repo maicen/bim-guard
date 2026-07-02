@@ -1,7 +1,8 @@
 import json
-from fasthtml.common import Button, Details, Div, Option, P, Pre, Span, Summary
+from fasthtml.common import Button, Details, Div, Label, Option, P, Pre, Span, Summary
 from monsterui.all import H1, H3, Alert, Form, FormLabel, Input, Select, UkIcon
 from app.components.ui import Card, CardContent, CardHeader, CardTitle, HtmxSpinner
+from app.components.rules_ui import IFC_CLASS_OPTIONS
 
 # ── Provider / model catalogue ───────────────────────────────────────────────────
 
@@ -357,6 +358,56 @@ def rule_extraction_results(
             cls="mb-2",
         )
 
+        # Inline editor — lets user correct target/property before saving
+        ifc_options = [
+            Option(c, value=c, selected=(c == target)) for c in IFC_CLASS_OPTIONS
+        ]
+        if target and target not in IFC_CLASS_OPTIONS:
+            ifc_options.insert(0, Option(target, value=target, selected=True))
+
+        inline_editor = Details(
+            Summary(
+                "Edit before saving",
+                cls="text-xs text-muted-foreground cursor-pointer select-none mb-1",
+            ),
+            Div(
+                Div(
+                    Label("Target IFC Class", fr=f"ov-target-{ref}", cls="text-xs font-medium"),
+                    Select(
+                        *ifc_options,
+                        id=f"ov-target-{ref}",
+                        name="override_target",
+                        cls="w-full text-xs mt-0.5",
+                    ),
+                    cls="space-y-0.5",
+                ),
+                Div(
+                    Label("Property Name", fr=f"ov-prop-{ref}", cls="text-xs font-medium"),
+                    Input(
+                        id=f"ov-prop-{ref}",
+                        name="override_property",
+                        value=prop,
+                        placeholder="e.g. FireRating",
+                        cls="w-full text-xs mt-0.5",
+                    ),
+                    cls="space-y-0.5",
+                ),
+                Div(
+                    Label("Property Set", fr=f"ov-pset-{ref}", cls="text-xs font-medium"),
+                    Input(
+                        id=f"ov-pset-{ref}",
+                        name="override_property_set",
+                        value=prop_set,
+                        placeholder="e.g. Pset_DoorCommon",
+                        cls="w-full text-xs mt-0.5",
+                    ),
+                    cls="space-y-0.5",
+                ),
+                cls="grid grid-cols-1 gap-2 p-2 bg-muted/50 rounded mt-1",
+            ),
+            cls="mb-2",
+        )
+
         fragments.append(
             Card(
                 CardContent(
@@ -375,6 +426,7 @@ def rule_extraction_results(
                     json_block,
                     Form(
                         Input(type="hidden", name="rule_json", value=json.dumps(rule)),
+                        inline_editor,
                         Button(
                             "Save to Library",
                             type="submit",

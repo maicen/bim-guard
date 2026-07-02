@@ -2,17 +2,20 @@
 BIMGUARD AI — IFC Geometry Extraction
 modules/ifc_geometry.py
 
-Improves area and volume calculations by reading actual geometric
-representations from IfcPipeSegment elements rather than estimating
-from nominal diameter alone.
+Two responsibilities:
 
-Falls back gracefully to nominal-diameter estimation when geometry
-is not available — consistent with the existing parser behaviour.
+  1. Pipe surface area — used by the GC-001 corrosion engine.
+     Reads actual mesh geometry or falls back to nominal-diameter estimation.
+
+  2. Tier 1 architectural geometry — bounding-box measurements for
+     architectural elements (windows, railings, stairs, ramps).
+     Provides actual Height, SillHeight, HandrailHeight, Width, and Slope
+     when those values are absent from property sets.
 
 Usage:
-  from modules.ifc_geometry import IFCGeometryExtractor
   extractor = IFCGeometryExtractor(ifc_model)
-  area = extractor.get_external_surface_area(element)
+  bbox  = extractor.get_bounding_box(element)
+  value = extractor.get_geometry_value(element, "SillHeight", floor_z=0.0)
 """
 
 import logging
@@ -32,22 +35,102 @@ except ImportError:
     logger.warning("ifcopenshell not available — geometry extraction will use estimation only")
 
 
+# Properties that can be derived from a bounding box when Psets are empty.
+# Keys are lowercase property names; values are the measurement method to call.
+_GEOMETRY_PROPERTY_MAP: dict[str, str] = {
+    # Vertical extent of the element itself
+    "height":            "height",
+    "overallheight":     "height",
+    "clearheight":       "height",
+    "nominalheight":     "height",
+    "grossheight":       "height",
+    # Width (horizontal extent)
+    "width":             "width",
+    "overallwidth":      "width",
+    "clearwidth":        "width",
+    "nominalwidth":      "width",
+    "grosswidth":        "width",
+    # Sill / bottom of element above the storey floor
+    "sillheight":        "sill_height",
+    "windowsillheight":  "sill_height",
+    # Handrail / top of element above the storey floor
+    "handrailheight":    "handrail_height",
+    "railingheight":     "handrail_height",
+    "barrierheight":     "handrail_height",
+    # Slope / pitch (returned in degrees)
+    "slope":             "slope_deg",
+    "pitchangle":        "slope_deg",
+    "requiredslope":     "slope_deg",
+    "slopeangle":        "slope_deg",
+    "gradient":          "slope_deg",
+    # Headroom — vertical clearance of the element (stair flight height)
+    "headroomclearance": "height",
+    "requireheadroom":   "height",
+    "headroom":          "height",
+}
+
+
 class IFCGeometryExtractor:
     """
-    Extracts geometric properties from IFC pipe elements.
-    Provides actual surface area calculations where possible,
-    with fallback to nominal-diameter estimation.
+    Extracts geometric properties from IFC elements via mesh tessellation.
+
+    Tier 1 (architectural): bounding-box measurements — height, width,
+    sill height, handrail height, slope.  Used as Pass 7 fallback when all
+    Pset lookups in extract_for_compliance() return nothing.
+
+    Pipe surface area (GC-001 corrosion engine): unchanged from before.
     """
 
     def __init__(self, ifc_model=None):
         self.model = ifc_model
         self._settings = None
+        self._unit_scale: float = 1.0  # model-unit → mm
         if IFCOS_AVAILABLE and ifc_model is not None:
             try:
                 self._settings = ifcopenshell.geom.settings()
                 self._settings.set(self._settings.USE_WORLD_COORDS, True)
+                self._unit_scale = self._detect_length_unit_scale(ifc_model)
             except Exception as e:
                 logger.warning(f"Could not initialise geometry settings: {e}")
+
+    # ── Unit detection ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _detect_length_unit_scale(ifc_model) -> float:
+        """
+        Return a multiplier that converts model length units to millimetres.
+        Falls back to 1.0 (assumes mm) if detection fails.
+        """
+        _SI_TO_MM = {
+            "MILLIMETRE": 1.0,
+            "CENTIMETRE": 10.0,
+            "METRE":      1000.0,
+            "KILOMETRE":  1_000_000.0,
+            "INCH":       25.4,
+            "FOOT":       304.8,
+        }
+        try:
+            for unit_assignment in ifc_model.by_type("IfcUnitAssignment"):
+                for unit in unit_assignment.Units:
+                    if not hasattr(unit, "UnitType"):
+                        continue
+                    if str(unit.UnitType) != "LENGTHUNIT":
+                        continue
+                    if unit.is_a("IfcSIUnit"):
+                        prefix_factors = {"MILLI": 0.001, "CENTI": 0.01, "": 1.0, None: 1.0}
+                        prefix = str(getattr(unit, "Prefix", "") or "")
+                        name = str(getattr(unit, "Name", "METRE") or "METRE")
+                        base_mm = _SI_TO_MM.get(name, 1000.0)
+                        return base_mm * prefix_factors.get(prefix, 1.0)
+                    if unit.is_a("IfcConversionBasedUnit"):
+                        name = str(getattr(unit, "Name", "") or "").upper()
+                        if "FOOT" in name:
+                            return 304.8
+                        if "INCH" in name:
+                            return 25.4
+        except Exception:
+            pass
+        return 1.0  # default: model is already in mm
 
     # ── SURFACE AREA ─────────────────────────────────────────────────────────
 
@@ -197,6 +280,126 @@ class IFCGeometryExtractor:
             return (round(x, 4), round(y, 4), round(z, 4))
         except Exception:
             return (0.0, 0.0, 0.0)
+
+    # ── TIER 1: BOUNDING-BOX GEOMETRY ────────────────────────────────────────
+
+    def get_bounding_box(self, element) -> dict | None:
+        """
+        Return world-coordinate bounding box of any IFC element.
+
+        Returns dict with min/max xyz in millimetres, or None if geometry
+        is unavailable (no geom kernel, or element has no shape).
+        """
+        if self._settings is None or element is None:
+            return None
+        try:
+            shape = ifcopenshell.geom.create_shape(self._settings, element)
+            verts = shape.geometry.verts
+            if not verts:
+                return None
+            s = self._unit_scale
+            xs = [verts[i] * s for i in range(0, len(verts), 3)]
+            ys = [verts[i] * s for i in range(1, len(verts), 3)]
+            zs = [verts[i] * s for i in range(2, len(verts), 3)]
+            return {
+                "min_x": min(xs), "max_x": max(xs),
+                "min_y": min(ys), "max_y": max(ys),
+                "min_z": min(zs), "max_z": max(zs),
+            }
+        except Exception as e:
+            logger.debug(f"Bounding box failed for {element}: {e}")
+            return None
+
+    def get_height_mm(self, element) -> float | None:
+        """Vertical extent (max_z − min_z) in mm."""
+        bbox = self.get_bounding_box(element)
+        return round(bbox["max_z"] - bbox["min_z"], 1) if bbox else None
+
+    def get_width_mm(self, element) -> float | None:
+        """Horizontal extent — larger of X and Y spans — in mm."""
+        bbox = self.get_bounding_box(element)
+        if not bbox:
+            return None
+        return round(max(
+            bbox["max_x"] - bbox["min_x"],
+            bbox["max_y"] - bbox["min_y"],
+        ), 1)
+
+    def get_bottom_z_mm(self, element) -> float | None:
+        """Lowest point of element in world coordinates (mm)."""
+        bbox = self.get_bounding_box(element)
+        return round(bbox["min_z"], 1) if bbox else None
+
+    def get_top_z_mm(self, element) -> float | None:
+        """Highest point of element in world coordinates (mm)."""
+        bbox = self.get_bounding_box(element)
+        return round(bbox["max_z"], 1) if bbox else None
+
+    def get_slope_deg(self, element) -> float | None:
+        """
+        Slope angle in degrees estimated from bounding box.
+
+        Meaningful for inclined elements (ramps, stair flights).
+        Returns arctan(rise / run) where run is the longer horizontal span.
+        """
+        bbox = self.get_bounding_box(element)
+        if not bbox:
+            return None
+        rise = bbox["max_z"] - bbox["min_z"]
+        run = max(
+            bbox["max_x"] - bbox["min_x"],
+            bbox["max_y"] - bbox["min_y"],
+        )
+        if run <= 0:
+            return None
+        return round(math.degrees(math.atan(rise / run)), 2)
+
+    def get_geometry_value(
+        self,
+        element,
+        property_name: str,
+        floor_z_mm: float | None = None,
+    ) -> float | None:
+        """
+        Derive a compliance property value from bounding-box geometry.
+
+        Args:
+            element: IFC element instance.
+            property_name: Rule property name (case-insensitive).
+            floor_z_mm: World Z of the storey floor in mm.
+                        Required for sill_height and handrail_height.
+
+        Returns:
+            Numeric value in mm (or degrees for slope), or None if not derivable.
+        """
+        method = _GEOMETRY_PROPERTY_MAP.get(property_name.lower())
+        if method is None:
+            return None
+
+        if method == "height":
+            return self.get_height_mm(element)
+
+        if method == "width":
+            return self.get_width_mm(element)
+
+        if method == "slope_deg":
+            return self.get_slope_deg(element)
+
+        if method == "sill_height":
+            bot = self.get_bottom_z_mm(element)
+            if bot is None:
+                return None
+            ref = floor_z_mm if floor_z_mm is not None else 0.0
+            return round(bot - ref, 1)
+
+        if method == "handrail_height":
+            top = self.get_top_z_mm(element)
+            if top is None:
+                return None
+            ref = floor_z_mm if floor_z_mm is not None else 0.0
+            return round(top - ref, 1)
+
+        return None
 
     # ── AREA RATIO CALCULATION ────────────────────────────────────────────────
 

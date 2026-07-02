@@ -465,6 +465,17 @@ def setup_routes(rt):
         except Exception:
             rule = {}
 
+        # Apply user inline-editor overrides on top of extracted rule fields
+        override_target = (form.get("override_target") or "").strip()
+        override_property = (form.get("override_property") or "").strip()
+        override_property_set = (form.get("override_property_set") or "").strip()
+        if override_target:
+            rule["target"] = override_target
+        if override_property:
+            rule["property_name"] = override_property
+        if override_property_set:
+            rule["property_set"] = override_property_set
+
         # check_value: prefer explicit "check_value" key, fall back to "value"
         _cv = rule.get("check_value") if rule.get("check_value") is not None else rule.get("value")
         _rule_service.create_rule(
