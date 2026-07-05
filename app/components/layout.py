@@ -1,8 +1,11 @@
 # app\components\layout.py
+import time
+
 from fasthtml.common import H2, Div, Main, Span
 from monsterui.all import DivLAligned, TextT, UkIcon
 
 from app.components.themed_ui import SiteStyles
+from app.services.persistence import PersistenceService
 from app.components.ui import (
     Sidebar,
     SidebarContent,
@@ -33,6 +36,52 @@ NAV_ICONS = {
     "Rules": "list-checks",
     "Settings": "settings",
 }
+
+_DB_HEALTH_TTL_SECONDS = 15.0
+_DB_HEALTH_CACHE = {
+    "checked_at": 0.0,
+    "ok": False,
+}
+
+
+def _probe_db_health() -> bool:
+    """Probe DB connectivity with short-lived caching to avoid per-request churn."""
+    now = time.monotonic()
+    age = now - _DB_HEALTH_CACHE["checked_at"]
+    if age <= _DB_HEALTH_TTL_SECONDS:
+        return bool(_DB_HEALTH_CACHE["ok"])
+
+    ok = False
+    try:
+        db = PersistenceService.get_db()
+        backend = PersistenceService.DB_BACKEND
+        if backend == "supabase":
+            db.table("projects").select("id").limit(1).execute()
+            ok = True
+        else:
+            if hasattr(db, "q"):
+                db.q("select 1")
+            ok = True
+    except Exception:
+        ok = False
+
+    _DB_HEALTH_CACHE["checked_at"] = now
+    _DB_HEALTH_CACHE["ok"] = ok
+    return ok
+
+
+def _sidebar_db_status():
+    """Render compact DB status in sidebar footer."""
+    backend = PersistenceService.DB_BACKEND.upper()
+    ok = _probe_db_health()
+    dot_cls = "bg-emerald-500" if ok else "bg-rose-500"
+    text = "Connected" if ok else "Degraded"
+
+    return DivLAligned(
+        Div(cls=f"h-2.5 w-2.5 rounded-full {dot_cls}"),
+        Span(f"DB {backend}: {text}", cls="text-xs text-muted-foreground"),
+        cls="gap-2 px-2 py-1",
+    )
 
 
 def NavItem(title, url):
@@ -107,6 +156,7 @@ def AppSidebar():
                 cls="px-2",
             ),
             SidebarFooter(
+                _sidebar_db_status(),
                 SidebarMenu(
                     SidebarMenuItem(
                         SidebarMenuButton(
