@@ -11,3 +11,5 @@ INFO:     127.0.0.1:55668 - "GET /static/js/dropdown-menu.js HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55668 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 No IfcRelSpaceBoundary data found. Daylight and fire separation checks will be skipped. Export your model with Space Boundaries enabled.
 INFO:     127.0.0.1:55668 - "POST /analysis/simple/results HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app\components\layout.py', 'app\routes\dashboard.py'. Reloading...
+ 
