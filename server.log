@@ -12,4 +12,10 @@ INFO:     127.0.0.1:55668 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 No IfcRelSpaceBoundary data found. Daylight and fire separation checks will be skipped. Export your model with Space Boundaries enabled.
 INFO:     127.0.0.1:55668 - "POST /analysis/simple/results HTTP/1.1" 200 OK
 WARNING:  WatchFiles detected changes in 'app\components\layout.py', 'app\routes\dashboard.py'. Reloading...
- 
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24128]
+INFO:     Started server process [71252]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
