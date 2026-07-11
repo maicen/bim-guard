@@ -27,11 +27,12 @@ from app.components.documents_ui import document_edit_form, documents_panel
 from app.components.layout import DashboardLayout
 from app.components.rule_extraction_ui import (
     rule_extraction_empty_file_result,
+    rule_extraction_free_result,
     rule_extraction_page_content,
     rule_extraction_results,
     provider_model_select_fragment,
 )
-from app.components.rules_ui import rule_form, rules_panel
+from app.components.rules_ui import rule_form, rules_folders_panel, rules_panel
 from app.components.ui import (
     Alert,
     AlertT,
@@ -55,9 +56,11 @@ from app.components.ui import (
 from app.components.ui import (
     CardTitle as UICardTitle,
 )
+from app.modules import orchestrator
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.services.documents_service import DocumentService
 from app.services.llm_client import LiteLLMClient
+from app.services.object_storage import ObjectStorage
 from app.services.rule_extractor import LiteLLMRuleExtractor
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rules_service import RuleService
@@ -71,6 +74,15 @@ from app.utils import (
 _document_service = DocumentService()
 _rule_service = RuleService()
 _rule_extraction_service = RuleExtractionService()
+
+
+def _folders_with_rules() -> list[dict]:
+    """List folders with their member rules attached, for the expandable panel."""
+    folders = _rule_service.list_folders()
+    for folder in folders:
+        folder["rules"] = _rule_service.list_by_ruleset(folder["ruleset_id"])
+    return folders
+
 
 # Server-side cache of the most recent extraction — avoids passing large JSON
 # through form attributes or hidden inputs (encoding issues with special chars).
@@ -267,6 +279,7 @@ def setup_routes(rt):
                     ),
                     cls="justify-end",
                 ),
+                rules_folders_panel(_folders_with_rules()),
                 rules_panel(_rule_service.list_rules(), message=message or None),
                 cls="space-y-4",
             )
@@ -454,6 +467,57 @@ def setup_routes(rt):
             _rule_service.delete_rule(rule_id)
         return redirect_see_other("/library/rules")
 
+    @rt("/api/rules/bulk-delete", methods=["POST"])
+    async def rules_bulk_delete(req: Request):
+        form = await req.form()
+        rule_ids = [int(v) for v in form.getlist("rule_ids") if v.strip().isdigit()]
+        if rule_ids:
+            _rule_service.delete_rules(rule_ids)
+        return redirect_see_other("/library/rules")
+
+    @rt("/api/rules/folders/delete", methods=["POST"])
+    def rules_folder_delete(ruleset_id: str = ""):
+        ruleset_id = ruleset_id.strip()
+        if not ruleset_id:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message="No folder specified.",
+                level="warning",
+            )
+        count = _rule_service.delete_folder(ruleset_id)
+        if count == 0:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message=f"Folder '{ruleset_id}' was not found.",
+                level="warning",
+            )
+        return rules_folders_panel(
+            _folders_with_rules(),
+            message=f"Deleted folder '{ruleset_id}' ({count} rule(s) removed).",
+        )
+
+    @rt("/api/rules/folders/rename", methods=["POST"])
+    def rules_folder_rename(old_id: str = "", new_id: str = ""):
+        old_id = old_id.strip()
+        new_id = new_id.strip()
+        if not old_id or not new_id or old_id == new_id:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message="Enter a new, different folder name to rename.",
+                level="warning",
+            )
+        count = _rule_service.rename_folder(old_id, new_id)
+        if count == 0:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message=f"Folder '{old_id}' was not found.",
+                level="warning",
+            )
+        return rules_folders_panel(
+            _folders_with_rules(),
+            message=f"Renamed '{old_id}' to '{new_id}' ({count} rule(s)).",
+        )
+
     @rt("/api/rules/save-extracted", methods=["POST"])
     async def rules_save_extracted(req: Request):
         import json as _json
@@ -475,6 +539,8 @@ def setup_routes(rt):
             rule["property_name"] = override_property
         if override_property_set:
             rule["property_set"] = override_property_set
+
+        folder_name = (form.get("folder_name") or "").strip()
 
         # check_value: prefer explicit "check_value" key, fall back to "value"
         _cv = rule.get("check_value") if rule.get("check_value") is not None else rule.get("value")
@@ -501,6 +567,7 @@ def setup_routes(rt):
             confidence=float(rule.get("confidence") or 0.8),
             extraction_method=str(rule.get("extraction_method") or "llm"),
             needs_review=bool(rule.get("needs_review", False)),
+            ruleset_id=folder_name,
         )
         return Span(
             "Saved \u2713",
@@ -508,9 +575,10 @@ def setup_routes(rt):
         )
 
     @rt("/api/rules/save-all-extracted", methods=["POST"])
-    async def rules_save_all_extracted():
-        """Save every rule from the last extraction. Reads from server cache \u2014 no form data needed."""
+    async def rules_save_all_extracted(folder_name: str = ""):
+        """Save every rule from the last extraction. Reads rules from server cache."""
         global _last_extracted
+        folder_name = folder_name.strip()
         saved = 0
         for rule in _last_extracted:
             if not isinstance(rule, dict):
@@ -546,6 +614,7 @@ def setup_routes(rt):
                 confidence=float(rule.get("confidence") or 0.8),
                 extraction_method=str(rule.get("extraction_method") or "llm"),
                 needs_review=bool(rule.get("needs_review", False)),
+                ruleset_id=folder_name,
             )
             saved += 1
 
@@ -643,3 +712,45 @@ def setup_routes(rt):
             str(document.get("filename") or ""),
             warnings=result.warnings,
         )
+
+    @rt("/api/rules/extract-free", methods=["POST"])
+    def rules_extract_free_api(document_id: int = 0, folder_name: str = ""):
+        """Run the free/offline CLI pipeline (Docling + regex, no LLM) on an uploaded PDF."""
+        if not document_id:
+            return Alert("Please select a document.", cls=AlertT.warning)
+
+        if not orchestrator._PIPELINE_AVAILABLE:
+            return Alert(
+                "The offline pipeline is unavailable on this server (a Module 1/3 "
+                "dependency failed to import).",
+                cls=AlertT.error,
+            )
+
+        document = _document_service.get_document(document_id)
+        if document is None:
+            return Alert("Selected document was not found.", cls=AlertT.error)
+
+        filename = str(document.get("filename") or "")
+        if not filename.lower().endswith(".pdf"):
+            return Alert(
+                "The free offline pipeline only supports PDF documents "
+                "(it parses tables directly out of the PDF).",
+                cls=AlertT.warning,
+            )
+
+        local_path = ObjectStorage().materialize_local_path(document.get("file_path") or "")
+        if local_path is None:
+            return Alert("Could not locate the stored PDF file for this document.", cls=AlertT.error)
+
+        ruleset_id = folder_name.strip() or Path(filename).stem
+        try:
+            summary = orchestrator.run_pipeline(
+                local_path, run_sections="all", seed_db_first=True, ruleset_id=ruleset_id
+            )
+        except Exception as exc:
+            return Alert(
+                f"Free extraction failed: {type(exc).__name__}: {exc}",
+                cls=AlertT.error,
+            )
+
+        return rule_extraction_free_result(summary, filename, ruleset_id)

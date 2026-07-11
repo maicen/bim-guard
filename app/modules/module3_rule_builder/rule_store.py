@@ -90,7 +90,7 @@ class RuleStore:
         Save a single validated rule dict.  Returns the new row ID as str.
         Accepts the CLI field-name convention (ref / desc / target).
         """
-        row = self._svc.create_rule(
+        return self._row_id(self._svc.create_rule(
             reference=str(rule.get("ref") or ""),
             rule_type=str(rule.get("rule_type") or "numeric_comparison"),
             description=str(rule.get("desc") or ""),
@@ -114,8 +114,17 @@ class RuleStore:
             confidence=float(rule.get("confidence") or 0.8),
             extraction_method=str(rule.get("extraction_method") or "llm"),
             needs_review=bool(rule.get("needs_review", False)),
-        )
-        return str(row.id)
+            mechanism=str(rule.get("mechanism") or ""),
+            ruleset_id=str(rule.get("ruleset_id") or ""),
+            rule_category=str(rule.get("rule_category") or "property_check"),
+        ))
+
+    @staticmethod
+    def _row_id(row) -> str:
+        """Extract the primary key from either adapter's insert() return shape."""
+        if isinstance(row, dict):
+            return str(row.get("id"))
+        return str(getattr(row, "id", row))
 
     def clear_all_rules(self):
         """Delete every rule from the shared table. Use in testing only."""

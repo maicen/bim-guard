@@ -152,6 +152,10 @@ def build_pyvis_graph(
         font_color="#e5e7eb",
         select_menu=True,
         filter_menu=True,
+        # Served directly as an HTTP response (no sibling lib/ folder on disk
+        # like pyvis's own write_html() creates), so assets must load from a
+        # CDN rather than pyvis's default local-relative-path scripts.
+        cdn_resources="remote",
     )
     net.barnes_hut(
         gravity=-18000,
@@ -177,6 +181,10 @@ def build_pyvis_graph(
             size=size,
             group=ifc_type,
         )
+        # pyvis's own add_node() silently drops the color= kwarg whenever
+        # group= is also passed (it falls back to group-based auto-coloring
+        # instead) — set it directly on the stored node options to override.
+        net.nodes[-1]["color"] = color
 
     for source, target, attrs in limited_edges:
         net.add_edge(

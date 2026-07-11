@@ -37,10 +37,21 @@ Usage:
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 
 from app.services.persistence import PersistenceService
+
+# The pipeline's progress logging uses box-drawing/unicode symbols, which
+# crash with UnicodeEncodeError on Windows consoles/servers defaulting to
+# cp1252 stdout. Force UTF-8 so run_pipeline() is safe to call from a web
+# request, not just an interactive UTF-8 terminal.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
 DB_PATH = PersistenceService.DB_PATH
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -52,6 +63,7 @@ USE_GPT4O = False
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
+    from .module1_doc_parser import Module1_DocReader
     from .module1_doc_parser.docling_extractor import DoclingExtractor
     from .module1_doc_parser.keyword_filter import KeywordFilter
     from .module1_doc_parser.section_chunker import SectionChunker
@@ -73,6 +85,7 @@ def run_pipeline(
     pdf_path: str | Path,
     run_sections: str | list = "all",
     seed_db_first: bool = True,
+    ruleset_id: str = "",
 ) -> dict:
     """
     Run the full Module 1 → Module 3 pipeline on an OBC PDF.
@@ -82,6 +95,9 @@ def run_pipeline(
         run_sections  (str | list): "all" or list e.g. ["4", "6"]
                                     Use a single section to test first.
         seed_db_first (bool):       seed 25 pre-built OBC rules before processing
+        ruleset_id    (str):        folder/group name tagged onto rules newly
+                                     extracted by this run (table + prose rules).
+                                     Seeded baseline rules are left untouched.
 
     Returns:
         dict: {
@@ -92,6 +108,7 @@ def run_pipeline(
             total_rules     (int),   total in DB after run
             sections_run    (int),
             db_summary      (dict),
+            warnings        (list[str]), non-fatal issues (e.g. missing spaCy model)
         }
     """
     pdf_path = Path(pdf_path)
@@ -133,13 +150,32 @@ def run_pipeline(
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── MODULE 1 / STEP 2: TABLE RULE BUILDER ──")
     table_builder = TableRuleBuilder(store)
-    table_rules = table_builder.process_all_tables(tables, generator)
+    table_rules = table_builder.process_all_tables(tables, generator, ruleset_id)
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 1 — STEP 3: Section Chunker
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── MODULE 1 / STEP 3: SECTION CHUNKER ──")
     chunks = SectionChunker().chunk(text)
+
+    if not chunks:
+        # No headings this chunker recognises (or the source PDF collapsed to
+        # one undifferentiated block with no line breaks at all — Docling
+        # does this on some documents). Fall back to the same generic,
+        # size-bounded chunker the AI extraction path already uses instead
+        # of giving up and sending nothing downstream.
+        print("  [SectionChunker] 0 sections — falling back to generic chunking")
+        generic_blocks = Module1_DocReader().extract_text_sections(text)
+        chunks = [
+            {
+                "section_number": str(i + 1),
+                "section_name": f"Section {i + 1}",
+                "text": block,
+                "char_count": len(block),
+            }
+            for i, block in enumerate(generic_blocks)
+        ]
+        print(f"  [SectionChunker] Generic fallback produced {len(chunks)} chunk(s)")
 
     # Filter to requested sections only
     if run_sections != "all":
@@ -150,7 +186,33 @@ def run_pipeline(
     # MODULE 1 — STEP 4: Keyword Filter
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── MODULE 1 / STEP 4: KEYWORD FILTER ──")
-    filtered_chunks = KeywordFilter().score_chunks(chunks)
+    warnings: list[str] = []
+    try:
+        filtered_chunks = KeywordFilter().score_chunks(chunks)
+    except (ImportError, OSError) as exc:
+        # spaCy or its en_core_web_sm model isn't installed on this server
+        # (optional `ml-pipeline` dependency group). Degrade instead of
+        # discarding everything: pass paragraphs through unscored (neutral
+        # MEDIUM confidence) so RegexRuleConverter still gets a chance to
+        # pattern-match — we just lose the keyword-based noise filtering.
+        msg = (
+            f"Keyword filter unavailable ({exc}) — paragraphs are unscored "
+            "for this run (no smart filtering), but regex rule extraction "
+            "still ran on all of them."
+        )
+        print(f"  [WARN] {msg}")
+        warnings.append(msg)
+        filtered_chunks = [
+            {
+                **c,
+                "scored_paragraphs": [
+                    {"text": p.strip(), "score": 0, "matched": [], "confidence": "MEDIUM"}
+                    for p in re.split(r"\n{2,}", c["text"])
+                    if len(p.strip()) >= 20
+                ],
+            }
+            for c in chunks
+        ]
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 3: Converter → RuleGenerator → RuleStore
@@ -167,6 +229,9 @@ def run_pipeline(
         print(f"    Extracted : {len(raw_rules)} rules")
 
         if raw_rules:
+            if ruleset_id:
+                for rule in raw_rules:
+                    rule["ruleset_id"] = ruleset_id
             saved_ids = generator.save_batch(raw_rules)
             prose_rules += len(saved_ids)
             print(f"    Saved     : {len(saved_ids)} rules")
@@ -191,6 +256,7 @@ def run_pipeline(
         "total_rules": total_rules,
         "sections_run": len(filtered_chunks),
         "db_summary": db_summary,
+        "warnings": warnings,
     }
 
 
@@ -222,6 +288,7 @@ class BIMGuard_App:
         project_id: int,
         doc_ids: list[int],
         analysis_theme: str = "Architecture",
+        rule_folder: str = "",
         include_openings: bool = True,
         include_spaces: bool = True,
         include_type_definitions: bool = False,
@@ -247,6 +314,7 @@ class BIMGuard_App:
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
         selected_theme = RuleService.normalize_theme(analysis_theme)
+        rule_folder = (rule_folder or "").strip()
 
         project = projects_svc.get_project(project_id)
         if project is None:
@@ -378,6 +446,10 @@ class BIMGuard_App:
             from .module5_reporter import Module5_Reporter
 
             library_rules = RuleService().list_by_theme(selected_theme)
+            if rule_folder:
+                library_rules = [
+                    r for r in library_rules if (r.get("ruleset_id") or "") == rule_folder
+                ]
 
             # Basic element-presence check (legacy rule_validations card)
             for rule in library_rules:
@@ -416,6 +488,7 @@ class BIMGuard_App:
         return {
             "project": project,
             "analysis_theme": selected_theme,
+            "rule_folder": rule_folder,
             "ifc_element_count": ifc_element_count,
             "ifc_type_counts": ifc_type_counts,
             "ifc_totals": ifc_totals,

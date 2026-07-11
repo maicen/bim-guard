@@ -1,9 +1,21 @@
 """
 module1_doc_parser/section_chunker.py
 ---------------------------------------
-Step 3 — Splits Docling markdown text into 13 OBC section chunks.
-Detects Docling markdown headings (# 4 Stairs) first,
-falls back to plain text heading detection.
+Step 3 — Splits Docling markdown text into section chunks.
+
+Recognises headings in this priority order:
+  1. The original 13-topic OBC Part 9 taxonomy ("# 4 Stairs", "4 Stairs...")
+     — exact match required, preserved for backward compatibility.
+  2. Any markdown heading, any level ("## SECTION 8.14 ...") — Docling's own
+     structural markers, independent of numbering scheme.
+  3. "SECTION 8.14 ...", "CHAPTER 3 ...", "PART II ..." style plain-text
+     headings, for documents whose PDF backend didn't preserve markdown "#".
+
+Documents whose PDF extraction collapses to too few line breaks for any of
+the above to find (e.g. a single undifferentiated block of text) yield zero
+chunks here; callers should fall back to a generic size-bounded chunker
+(see Module1_DocReader.extract_text_sections) rather than sending nothing
+downstream.
 
 Usage:
     from module1_doc_parser.section_chunker import SectionChunker
@@ -31,44 +43,85 @@ OBC_SECTION_NAMES = {
     "13": "Model QA",
 }
 
-MD_HEADING = re.compile(r"^#{1,3}\s+(1[0-3]|[1-9])\s+.+")
-TXT_HEADING = re.compile(r"^(1[0-3]|[1-9])[\s\.].+")
+# ── 1. Original OBC 13-topic taxonomy — unchanged, exact match only ──────────
+_OBC_MD_HEADING = re.compile(r"^#{1,3}\s+(1[0-3]|[1-9])\s+.+")
+_OBC_TXT_HEADING = re.compile(r"^(1[0-3]|[1-9])[\s\.].+")
+
+# ── 2. Any markdown heading, any level, any numbering scheme ─────────────────
+_MD_ANY_HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
+
+# ── 3. "SECTION 8.14 ...", "CHAPTER 3 ...", "PART II ..." plain-text headings.
+# Requires the line to start with the keyword — real prose essentially never
+# opens a line this way, so this is a low false-positive-risk pattern.
+_SECTION_WORD_HEADING = re.compile(
+    r"^(SECTION|Section|CHAPTER|Chapter|PART|Part)\s+([\w.]+)\.?\s*(.*)$"
+)
+
+_TRAILING_NUMBER = re.compile(r"\d+(?:\.\d+)*")
 
 
 class SectionChunker:
     def _detect_section(self, line: str):
+        """Return (section_number, section_name) for a heading line, else None."""
         s = line.strip()
-        if MD_HEADING.match(s):
+        if not s:
+            return None
+
+        if _OBC_MD_HEADING.match(s):
             m = re.search(r"(1[0-3]|[1-9])", s)
-            return m.group(1) if m else None
-        if TXT_HEADING.match(s):
+            if m:
+                num = m.group(1)
+                return num, OBC_SECTION_NAMES.get(num, "Unknown")
+
+        if _OBC_TXT_HEADING.match(s):
             m = re.match(r"^(1[0-3]|[1-9])", s)
             if m:
                 candidate = m.group(1)
                 if s[len(candidate) : len(candidate) + 1] == " ":
-                    return candidate
+                    return candidate, OBC_SECTION_NAMES.get(candidate, "Unknown")
+
+        m = _MD_ANY_HEADING.match(s)
+        if m:
+            return self._derive_number_and_name(m.group(2).strip())
+
+        m = _SECTION_WORD_HEADING.match(s)
+        if m:
+            keyword, ref, rest = m.group(1), m.group(2), m.group(3).strip()
+            name = f"{keyword} {ref}" + (f" — {rest[:80]}" if rest else "")
+            return ref, name[:100]
+
         return None
+
+    @staticmethod
+    def _derive_number_and_name(heading_text: str):
+        """Build a (number, name) pair from an arbitrary heading string."""
+        m = _TRAILING_NUMBER.search(heading_text)
+        number = m.group(0) if m else heading_text[:20] or "?"
+        name = heading_text[:100] or number
+        return number, name
 
     def chunk(self, full_text: str) -> list:
         lines = full_text.split("\n")
         chunks = []
         current_num = None
+        current_name = None
         current_lines = []
 
         for line in lines:
-            num = self._detect_section(line)
-            if num and num in OBC_SECTION_HEADINGS:
+            detected = self._detect_section(line)
+            if detected:
+                num, name = detected
                 if current_num and current_lines:
                     text = "\n".join(current_lines).strip()
                     chunks.append(
                         {
                             "section_number": current_num,
-                            "section_name": OBC_SECTION_NAMES.get(current_num, "Unknown"),
+                            "section_name": current_name,
                             "text": text,
                             "char_count": len(text),
                         }
                     )
-                current_num = num
+                current_num, current_name = num, name
                 current_lines = [line.strip()]
             elif current_num:
                 current_lines.append(line.strip())
@@ -78,7 +131,7 @@ class SectionChunker:
             chunks.append(
                 {
                     "section_number": current_num,
-                    "section_name": OBC_SECTION_NAMES.get(current_num, "Unknown"),
+                    "section_name": current_name,
                     "text": text,
                     "char_count": len(text),
                 }
@@ -86,6 +139,6 @@ class SectionChunker:
 
         print(f"[SectionChunker] {len(chunks)} sections detected")
         for c in chunks:
-            print(f"  {c['section_number']:<4} {c['section_name']:<40} {c['char_count']:>8,} chars")
+            print(f"  {c['section_number']:<6} {c['section_name']:<40} {c['char_count']:>8,} chars")
 
         return chunks

@@ -19,3 +19,211 @@ INFO:     Finished server process [24128]
 INFO:     Started server process [71252]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in '.git-rewrite\t\app\components\ui\table_actions.py', '.git-rewrite\t\app\modules\module3_rule_builder\regex_rule_converter.py', '.git-rewrite\t\app\modules\module3_rule_builder\module3_rule_builder_mock.py', '.git-rewrite\t\app\modules\tests\conftest.py', '.git-rewrite\t\app\components\ui\switch.py', '.git-rewrite\t\app\engines\demo_data.py', '.git-rewrite\t\app\services\revit_sync_service.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_geometry.py', '.git-rewrite\t\app\services\llm_client.py', '.git-rewrite\t\app\components\documents_ui.py', '.git-rewrite\t\app\modules\module2_ifc_read\__init__.py', '.git-rewrite\t\app\services\rule_extraction_service.py', '.git-rewrite\t\app\modules\module4_comparator\compliance_runner.py', '.git-rewrite\t\app\services\persistence.py', '.git-rewrite\t\app\components\ui\__init__.py', '.git-rewrite\t\app\modules\tests\test_module1.py', '.git-rewrite\t\app\services\bcf_exporter.py', '.git-rewrite\t\app\engines\bimguard_mic_engine.py', '.git-rewrite\t\app\modules\module2_ifc_read\piping_schema.py', '.git-rewrite\t\app\components\ui\label.py', '.git-rewrite\t\app\modules\module4_comparator\__init__.py', '.git-rewrite\t\app\modules\__init__.py', '.git-rewrite\t\app\engines\bimguard_corrosion_engine.py', '.git-rewrite\t\app\components\ui\sidebar.py', '.git-rewrite\t\app\routes\__init__.py', '.git-rewrite\t\app\components\ui\card.py', '.git-rewrite\t\app\components\ui\button.py', '.git-rewrite\t\app\components\rule_extraction_ui.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\generator.py', '.git-rewrite\t\app\components\ui\tooltip.py', '.git-rewrite\t\app\db.py', '.git-rewrite\t\app\modules\orchestrator.py', '.git-rewrite\t\app\components\projects_ui.py', '.git-rewrite\t\app\modules\tests\test_compliance.py', '.git-rewrite\t\app\components\ui\dropdown_menu.py', '.git-rewrite\t\app\modules\module1_doc_parser\keywords\__init__.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\dimension_extractor.py', '.git-rewrite\t\app\modules\module1_doc_parser\section_chunker.py', '.git-rewrite\t\app\__init__.py', '.git-rewrite\t\app\components\ui\collapsible.py', '.git-rewrite\t\app\engines\__init__.py', '.git-rewrite\t\app\modules\module4_comparator\issue_schema.py', '.git-rewrite\t\app\modules\module3_rule_builder\rule_generator.py', '.git-rewrite\t\app\components\ui\button_group.py', '.git-rewrite\t\app\modules\module1_doc_parser\tfidf_analyzer.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\__init__.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_graph.py', '.git-rewrite\t\app\modules\module5_reporter\cost_model.py', '.git-rewrite\t\app\modules\module1_doc_parser\__init__.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\dependency_mapper.py', '.git-rewrite\t\app\modules\module3_rule_builder\rule_store.py', '.git-rewrite\t\app\services\rule_extractor.py', '.git-rewrite\t\app\components\ui\bento_box.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\improver.py', '.git-rewrite\t\app\views\layout.py', '.git-rewrite\t\app\services\db_adapters.py', '.git-rewrite\t\app\services\ruleset_seeder.py', '.git-rewrite\t\app\services\rules_service.py', '.git-rewrite\t\app\modules\module1_doc_parser\keywords\keyword_master.py', '.git-rewrite\t\app\engines\bimguard_crevice_engine.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\deontic_extractor.py', '.git-rewrite\t\app\services\documents_service.py', '.git-rewrite\t\app\modules\module4_comparator\issue_tracker.py', '.git-rewrite\t\app\modules\module5_reporter\bcf_generator.py', '.git-rewrite\t\app\modules\module5_reporter\report_generator.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\validator.py', '.git-rewrite\t\app\modules\module3_rule_builder\__init__.py', '.git-rewrite\t\app\routes\analyze.py', '.git-rewrite\t\app\routes\library.py', '.git-rewrite\t\app\modules\module4_comparator\galvanic.py', '.git-rewrite\t\app\modules\module1_doc_parser\confidence_scorer.py', '.git-rewrite\t\app\components\ui\toggle_group.py', '.git-rewrite\t\app\services\__init__.py', '.git-rewrite\t\app\components\themed_ui.py', '.git-rewrite\t\app\services\projects_service.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\annotation_schema.py', '.git-rewrite\t\app\components\ui\table.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_egress.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\cross_ref_resolver.py', '.git-rewrite\t\app\utils.py', '.git-rewrite\t\app\modules\module3_rule_builder\obc_extended_rules.py', '.git-rewrite\t\app\modules\module1_doc_parser\dependency_parser.py', '.git-rewrite\t\app\modules\tests\test_module3.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\condition_parser.py', '.git-rewrite\t\app\modules\module1_doc_parser\enhanced_orchestrator.py', '.git-rewrite\t\app\main.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\__init__.py', '.git-rewrite\t\app\components\rules_ui.py', '.git-rewrite\t\app\components\ui\toggle.py', '.git-rewrite\t\app\routes\revit_sync.py', '.git-rewrite\t\app\modules\tests\eval_harness.py', '.git-rewrite\t\app\modules\module1_doc_parser\table_rule_builder.py', '.git-rewrite\t\app\modules\config.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_spatial.py', '.git-rewrite\t\app\modules\tests\test_integration.py', '.git-rewrite\t\app\modules\module3_rule_builder\rule_converter.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_parser.py', '.git-rewrite\t\app\modules\module1_doc_parser\keyword_filter.py', '.git-rewrite\t\app\modules\module1_doc_parser\bert_classifier.py', '.git-rewrite\t\app\components\ui\checkbox.py', '.git-rewrite\t\app\routes\projects.py', '.git-rewrite\t\app\routes\viewer.py', '.git-rewrite\t\app\modules\module1_doc_parser\docling_extractor.py', '.git-rewrite\t\app\routes\dashboard.py', '.git-rewrite\t\app\components\__init__.py', '.git-rewrite\t\app\services\object_storage.py', '.git-rewrite\t\app\modules\module5_reporter\__init__.py', '.git-rewrite\t\app\modules\module3_rule_builder\obc_seed_rules.py', '.git-rewrite\t\app\components\layout.py', '.git-rewrite\t\app\modules\module5_reporter\schedule_impact.py', '.git-rewrite\t\app\components\ui\utils.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [71252]
+WARNING:  WatchFiles detected changes in '.git-rewrite\t\app\components\documents_ui.py', '.git-rewrite\t\app\services\rule_extraction_service.py', '.git-rewrite\t\app\modules\module2_ifc_read\__init__.py', '.git-rewrite\t\app\modules\module4_comparator\compliance_runner.py', '.git-rewrite\t\app\components\ui\__init__.py', '.git-rewrite\t\app\services\bcf_exporter.py', '.git-rewrite\t\app\components\ui\label.py', '.git-rewrite\t\app\modules\__init__.py', '.git-rewrite\t\app\routes\__init__.py', '.git-rewrite\t\app\modules\module1_doc_parser\section_chunker.py', '.git-rewrite\t\app\__init__.py', '.git-rewrite\t\app\engines\__init__.py', '.git-rewrite\t\app\modules\module4_comparator\issue_schema.py', '.git-rewrite\t\app\modules\module3_rule_builder\rule_generator.py', '.git-rewrite\t\app\services\rule_extractor.py', '.git-rewrite\t\app\modules\module3_rule_builder\rule_store.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\improver.py', '.git-rewrite\t\app\services\ruleset_seeder.py', '.git-rewrite\t\app\modules\module4_comparator\issue_tracker.py', '.git-rewrite\t\app\modules\module5_reporter\bcf_generator.py', '.git-rewrite\t\app\routes\analyze.py', '.git-rewrite\t\score_module1b.py', '.git-rewrite\t\app\modules\module1_doc_parser\confidence_scorer.py', '.git-rewrite\t\app\components\themed_ui.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_egress.py', '.git-rewrite\t\app\modules\module3_rule_builder\obc_extended_rules.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\cross_ref_resolver.py', '.git-rewrite\t\main.py', '.git-rewrite\t\app\components\rules_ui.py', '.git-rewrite\t\app\modules\config.py', '.git-rewrite\t\app\modules\tests\test_integration.py', '.git-rewrite\t\app\components\ui\checkbox.py', '.git-rewrite\t\app\routes\dashboard.py', '.git-rewrite\t\app\services\object_storage.py', '.git-rewrite\t\app\modules\module5_reporter\__init__.py', '.git-rewrite\t\app\components\layout.py', '.git-rewrite\t\app\modules\module5_reporter\schedule_impact.py', '.git-rewrite\t\app\engines\demo_data.py', '.git-rewrite\t\app\services\revit_sync_service.py', '.git-rewrite\t\app\services\persistence.py', '.git-rewrite\t\app\engines\bimguard_mic_engine.py', '.git-rewrite\t\app\components\ui\sidebar.py', '.git-rewrite\t\app\engines\bimguard_corrosion_engine.py', '.git-rewrite\t\app\components\ui\card.py', '.git-rewrite\t\app\components\projects_ui.py', '.git-rewrite\t\app\components\ui\dropdown_menu.py', '.git-rewrite\t\app\modules\module1_doc_parser\keywords\__init__.py', '.git-rewrite\t\app\modules\tests\test_compliance.py', '.git-rewrite\t\scripts\migrate_artifacts_to_supabase_storage.py', '.git-rewrite\t\scripts\fix_property_names.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_graph.py', '.git-rewrite\t\app\modules\module1_doc_parser\__init__.py', '.git-rewrite\t\app\services\rules_service.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\deontic_extractor.py', '.git-rewrite\t\app\routes\library.py', '.git-rewrite\t\app\services\__init__.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\annotation_schema.py', '.git-rewrite\t\app\modules\module1_doc_parser\dependency_parser.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\__init__.py', '.git-rewrite\t\app\modules\module1_doc_parser\table_rule_builder.py', '.git-rewrite\t\app\modules\module3_rule_builder\rule_converter.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_parser.py', '.git-rewrite\t\app\modules\module1_doc_parser\bert_classifier.py', '.git-rewrite\t\app\modules\module1_doc_parser\docling_extractor.py', '.git-rewrite\t\app\modules\module3_rule_builder\obc_seed_rules.py', '.git-rewrite\t\app\modules\module3_rule_builder\regex_rule_converter.py', '.git-rewrite\t\app\components\ui\switch.py', '.git-rewrite\t\app\modules\tests\test_module1.py', '.git-rewrite\t\app\modules\module2_ifc_read\piping_schema.py', '.git-rewrite\t\app\components\ui\button.py', '.git-rewrite\t\app\db.py', '.git-rewrite\t\app\modules\orchestrator.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\dimension_extractor.py', '.git-rewrite\t\app\modules\module1_doc_parser\tfidf_analyzer.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\__init__.py', '.git-rewrite\t\app\services\db_adapters.py', '.git-rewrite\t\app\modules\module1_doc_parser\keywords\keyword_master.py', '.git-rewrite\t\app\engines\bimguard_crevice_engine.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\validator.py', '.git-rewrite\t\app\modules\module5_reporter\report_generator.py', '.git-rewrite\t\app\modules\module3_rule_builder\__init__.py', '.git-rewrite\t\app\components\ui\toggle_group.py', '.git-rewrite\t\app\modules\tests\test_module3.py', '.git-rewrite\t\app\modules\module1_doc_parser\enhanced_orchestrator.py', '.git-rewrite\t\app\components\ui\toggle.py', '.git-rewrite\t\app\modules\tests\eval_harness.py', '.git-rewrite\t\app\routes\projects.py', '.git-rewrite\t\app\components\__init__.py', '.git-rewrite\t\scripts\migrate_sqlite_to_supabase.py', '.git-rewrite\t\app\components\ui\table_actions.py', '.git-rewrite\t\app\modules\module3_rule_builder\module3_rule_builder_mock.py', '.git-rewrite\t\app\modules\tests\conftest.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_geometry.py', '.git-rewrite\t\app\services\llm_client.py', '.git-rewrite\t\app\modules\module4_comparator\__init__.py', '.git-rewrite\t\app\components\rule_extraction_ui.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_quality\generator.py', '.git-rewrite\t\app\components\ui\tooltip.py', '.git-rewrite\t\app\components\ui\collapsible.py', '.git-rewrite\t\app\components\ui\button_group.py', '.git-rewrite\t\scripts\backfill_storage_references.py', '.git-rewrite\t\app\modules\module5_reporter\cost_model.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\dependency_mapper.py', '.git-rewrite\t\app\components\ui\bento_box.py', '.git-rewrite\t\app\views\layout.py', '.git-rewrite\t\app\services\documents_service.py', '.git-rewrite\t\app\modules\module4_comparator\galvanic.py', '.git-rewrite\t\app\services\projects_service.py', '.git-rewrite\t\app\components\ui\table.py', '.git-rewrite\t\app\utils.py', '.git-rewrite\t\scripts\inspect_ifc_properties.py', '.git-rewrite\t\app\modules\module1b_nlp_annotator\condition_parser.py', '.git-rewrite\t\app\main.py', '.git-rewrite\t\app\routes\revit_sync.py', '.git-rewrite\t\app\modules\module1_doc_parser\keyword_filter.py', '.git-rewrite\t\app\routes\viewer.py', '.git-rewrite\t\icons.py', '.git-rewrite\t\app\modules\module2_ifc_read\ifc_spatial.py', '.git-rewrite\t\app\components\ui\utils.py'. Reloading...
+ INFO:     Started server process [62884]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [62884]
+INFO:     Started server process [68632]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\routes\library.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [68632]
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py', 'app\modules\orchestrator.py', 'app\routes\library.py'. Reloading...
+ INFO:     Started server process [59408]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [59408]
+WARNING:  WatchFiles detected changes in 'app\modules\module3_rule_builder\rule_store.py'. Reloading...
+ INFO:     Started server process [48380]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48380]
+WARNING:  WatchFiles detected changes in 'app\modules\orchestrator.py', 'app\modules\module3_rule_builder\rule_store.py', 'app\components\rule_extraction_ui.py'. Reloading...
+ INFO:     Started server process [44104]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [44104]
+INFO:     Started server process [17708]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\services\rules_service.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17708]
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py', 'app\modules\orchestrator.py', 'app\modules\module3_rule_builder\rule_store.py', 'app\modules\module1_doc_parser\table_rule_builder.py', 'app\routes\library.py'. Reloading...
+ INFO:     Started server process [11216]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [11216]
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py'. Reloading...
+ INFO:     Started server process [80676]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [80676]
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py'. Reloading...
+ INFO:     Started server process [51728]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51728]
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py'. Reloading...
+ INFO:     Started server process [59452]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [59452]
+INFO:     Started server process [19668]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [19668]
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py', 'app\routes\analyze.py', 'app\components\rules_ui.py', 'app\routes\library.py'. Reloading...
+ INFO:     Started server process [22596]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [22596]
+INFO:     Started server process [54204]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\components\rules_ui.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [54204]
+WARNING:  WatchFiles detected changes in 'app\components\rule_extraction_ui.py', 'app\components\rules_ui.py', 'app\routes\library.py'. Reloading...
+ INFO:     Started server process [77892]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [77892]
+INFO:     Started server process [43540]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\routes\analyze.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [43540]
+WARNING:  WatchFiles detected changes in 'app\routes\analyze.py'. Reloading...
+ INFO:     Started server process [7756]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [7756]
+INFO:     Started server process [60368]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\modules\orchestrator.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [60368]
+WARNING:  WatchFiles detected changes in 'app\modules\orchestrator.py', 'app\modules\module1_doc_parser\section_chunker.py'. Reloading...
+ INFO:     Started server process [75800]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [75800]
+INFO:     Started server process [72440]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\modules\orchestrator.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [72440]
+WARNING:  WatchFiles detected changes in 'app\components\rules_ui.py', 'app\modules\orchestrator.py', 'app\services\rules_service.py'. Reloading...
+ INFO:     Started server process [55276]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [55276]
+WARNING:  WatchFiles detected changes in 'app\routes\library.py'. Reloading...
+ INFO:     Started server process [32624]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [32624]
+INFO:     Started server process [31260]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\routes\analyze.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [31260]
+WARNING:  WatchFiles detected changes in 'app\routes\analyze.py'. Reloading...
+ INFO:     Started server process [50072]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [50072]
+INFO:     Started server process [74064]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\routes\analyze.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [74064]
+WARNING:  WatchFiles detected changes in 'app\modules\module2_ifc_read\ifc_graph.py'. Reloading...
+ INFO:     Started server process [77040]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [77040]
+INFO:     Started server process [75536]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

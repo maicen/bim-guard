@@ -8,8 +8,10 @@ from fasthtml.common import (
     Div,
     Form,
     H3,
+    Iframe,
     Option,
     P,
+    Response,
     Script,
     Summary,
     Request,
@@ -43,12 +45,20 @@ from app.components.ui import (
 from app.modules.orchestrator import BIMGuard_App
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
+from app.services.rules_service import RuleService
 
 _bim_guard_app = BIMGuard_App()
 _projects_service = ProjectsService()
 _documents_service = DocumentService()
+_rule_service = RuleService()
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+
+# Rule-compliance results from the last Initial Analysis run per project, so
+# the IFC graph iframe can reuse them for violation highlighting instead of
+# re-running the full IFC-parse + compliance pipeline (which alone takes
+# 100s+ on a real building model — measured on bimguard_headquarter1).
+_last_initial_rule_compliance: dict[int, list[dict]] = {}
 
 
 def _analysis_form(projects, documents, mode: str):
@@ -70,6 +80,37 @@ def _analysis_form(projects, documents, mode: str):
             ),
         ),
     ]
+
+    # Rule Folder — shown for every mode, right under the project picker, so
+    # you can scope a check to rules you extracted yourself instead of the
+    # built-in OBC rules seeded from source (obc_seed_rules.py).
+    folders = _rule_service.list_folders()
+    folder_options = [Option("All folders", value="", selected=True)] + [
+        Option(f"{f['ruleset_id']} ({f['count']})", value=f["ruleset_id"]) for f in folders
+    ]
+    folder_help = (
+        "Narrow the check to one saved folder of rules — only that folder's rules "
+        "are used, the built-in seeded OBC rules are excluded. Leave on 'All "
+        "folders' to test everything, including the built-in OBC rules."
+        if is_simple
+        else (
+            "Narrow the check to one saved folder of rules — only that folder's "
+            "rules are used, the built-in seeded OBC rules are excluded. Leave on "
+            "'All folders' to test every rule in the theme above, including "
+            "built-in OBC rules."
+        )
+    )
+    form_sections.append(
+        Div(
+            FormLabel("Rule Folder", fr="rule_folder"),
+            Select(
+                *folder_options,
+                id="rule_folder",
+                name="rule_folder",
+            ),
+            P(folder_help, cls="text-xs text-muted-foreground mt-1"),
+        )
+    )
 
     if not is_simple:
         form_sections.append(
@@ -276,6 +317,7 @@ async def _run_analysis_request(req: Request):
 
     doc_ids = [int(v) for v in form.getlist("document_ids") if v]
     analysis_theme = (form.get("analysis_theme") or "Architecture").strip()
+    rule_folder = (form.get("rule_folder") or "").strip()
     include_openings = bool(form.get("include_openings"))
     include_spaces = bool(form.get("include_spaces"))
     include_type_definitions = bool(form.get("include_type_definitions"))
@@ -283,6 +325,7 @@ async def _run_analysis_request(req: Request):
         project_id,
         doc_ids,
         analysis_theme=analysis_theme,
+        rule_folder=rule_folder,
         include_openings=include_openings,
         include_spaces=include_spaces,
         include_type_definitions=include_type_definitions,
@@ -423,19 +466,36 @@ def _build_document_cards(result: dict):
 
 
 def _build_ifc_graph_card(result: dict, project_id: int):
-    """Return a temporary placeholder while graph visualization is disabled."""
-    # TODO: Re-enable the PyVis IFC graph after the initial-analysis UI flow is stabilized.
-    del result, project_id
+    """Embed the PyVis IFC relationship graph (containment/aggregation/connectivity)."""
+    if not project_id or result.get("ifc_error") or not _projects_service.resolve_ifc_file(project_id):
+        return Card(
+            CardHeader(CardTitle("IFC Relationship Graph")),
+            CardContent(
+                P(
+                    "No IFC file available for this project — upload one to see the "
+                    "relationship graph.",
+                    cls="text-sm text-muted-foreground",
+                )
+            ),
+        )
+
+    src = f"/reports/ifc-graph/{project_id}"
+
     return Card(
         CardHeader(CardTitle("IFC Relationship Graph")),
         CardContent(
             P(
-                "Graph visualization is temporarily disabled.",
-                cls="text-sm text-muted-foreground",
+                "Containment, aggregation, and connectivity relationships between "
+                "elements. Red nodes failed a compliance rule; green nodes are "
+                "spatial containers (project/site/building/storey/space).",
+                cls="text-xs text-muted-foreground mb-2",
             ),
-            P(
-                "TODO: re-enable the PyVis-based IFC relationship graph once the initial-analysis UI flow is finalized.",
-                cls="text-xs text-muted-foreground mt-1",
+            Iframe(
+                src=src,
+                style=(
+                    "width:100%;height:720px;border:1px solid var(--border);"
+                    "border-radius:8px;"
+                ),
             ),
         ),
     )
@@ -587,7 +647,7 @@ def _rule_validation_card(rule_validations: list[dict], analysis_theme: str):
             CardHeader(CardTitle(f"Rule Validation — Module 3 ({analysis_theme})")),
             CardContent(
                 P(
-                    f"No {analysis_theme} rules found in the library. "
+                    f"No matching rules found in the library for {analysis_theme}. "
                     "Go to Library → Rule Extraction Studio to extract and save rules first.",
                     cls="text-sm text-muted-foreground",
                 )
@@ -1958,10 +2018,12 @@ def setup_routes(rt):
         except ValueError:
             return Alert("Invalid project selection.", cls=AlertT.error)
 
+        rule_folder = (form.get("rule_folder") or "").strip()
         result = _bim_guard_app.orchestrate_workflow(
             project_id,
             doc_ids=[],
             analysis_theme="Architecture",
+            rule_folder=rule_folder,
             include_openings=True,
             include_spaces=True,
             include_type_definitions=False,
@@ -1981,10 +2043,12 @@ def setup_routes(rt):
             by_class[r.get("target", "")].append(r)
 
         bldg_card = _building_summary_card(building_summary)
+        result_folder = result.get("rule_folder", "")
+        folder_note = f" (Folder: {result_folder})" if result_folder else ""
 
         sections = [
             Card(
-                CardHeader(CardTitle(f"{project.get('name', 'Project')} — Simple Analysis")),
+                CardHeader(CardTitle(f"{project.get('name', 'Project')} — Simple Analysis{folder_note}")),
                 CardContent(P(
                     "Domain-based compliance check against OBC Part 9.",
                     cls="text-sm text-muted-foreground",
@@ -2031,6 +2095,10 @@ def setup_routes(rt):
         result = analysis_data["result"]
         project = result["project"]
         selected_theme = result.get("analysis_theme", "Architecture")
+        rule_folder = result.get("rule_folder", "")
+        theme_label = f"{selected_theme} Theme" + (f" · Folder: {rule_folder}" if rule_folder else "")
+
+        _last_initial_rule_compliance[project_id] = result.get("rule_compliance", [])
 
         bldg_card = _building_summary_card(result.get("building_summary", {}))
         spatial_card = _spatial_checks_card(result.get("spatial_checks", {}))
@@ -2038,7 +2106,7 @@ def setup_routes(rt):
 
         sections = [
             Card(
-                CardHeader(CardTitle(f"{project.get('name', 'Project')} — {selected_theme} Theme")),
+                CardHeader(CardTitle(f"{project.get('name', 'Project')} — {theme_label}")),
                 CardContent(_build_ifc_summary_content(result, project_id)),
             ),
             *(([bldg_card]) if bldg_card else []),
@@ -2058,6 +2126,8 @@ def setup_routes(rt):
         result = analysis_data["result"]
         project = result["project"]
         selected_theme = result.get("analysis_theme", "Architecture")
+        rule_folder = result.get("rule_folder", "")
+        theme_label = f"{selected_theme} Theme" + (f" · Folder: {rule_folder}" if rule_folder else "")
 
         compliance_card = _compliance_card(
             results=result.get("compliance_results", []),
@@ -2069,7 +2139,7 @@ def setup_routes(rt):
         )
 
         rule_validation_card = _rule_validation_card(
-            result.get("rule_validations", []), selected_theme
+            result.get("rule_validations", []), theme_label
         )
 
         rc = result.get("rule_compliance", [])
@@ -2080,7 +2150,7 @@ def setup_routes(rt):
         global _last_compliance_results
         _last_compliance_results = rc
 
-        rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error, selected_theme)
+        rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error, theme_label)
 
         bldg_card = _building_summary_card(result.get("building_summary", {}))
         spatial_card = _spatial_checks_card(result.get("spatial_checks", {}))
@@ -2088,7 +2158,7 @@ def setup_routes(rt):
 
         sections = [
             Card(
-                CardHeader(CardTitle(f"{project.get('name', 'Project')} — {selected_theme} Theme")),
+                CardHeader(CardTitle(f"{project.get('name', 'Project')} — {theme_label}")),
                 CardContent(
                     P(
                         "Model loaded and ready for rule comparison against the saved library rules.",
@@ -2142,6 +2212,46 @@ def setup_routes(rt):
                 )
             },
         )
+
+    @rt("/reports/ifc-graph/{project_id}")
+    def ifc_graph_report(project_id: int):
+        """Standalone PyVis HTML page — embedded via iframe on the Initial Analysis results.
+
+        Violation highlighting reuses the rule-compliance result already computed
+        by the Initial Analysis page load (see _last_initial_rule_compliance) —
+        re-running orchestrate_workflow() here measured 100s+ on a real model,
+        all of it wasted just to get a list of failed-element GUIDs.
+        """
+        from app.modules.module2_ifc_read.ifc_graph import render_ifc_graph
+
+        ifc_path = _projects_service.resolve_ifc_file(project_id)
+        if not ifc_path:
+            return Response(
+                content="<p style='font-family:sans-serif;padding:2rem;'>"
+                "No IFC file found for this project.</p>",
+                media_type="text/html",
+            )
+
+        cached_compliance = _last_initial_rule_compliance.get(project_id, [])
+        violations = [
+            {"element": f.get("guid")}
+            for r in cached_compliance
+            for f in r.get("failures", [])
+            if f.get("guid")
+        ]
+
+        try:
+            graph_data = render_ifc_graph(ifc_path, violations)
+        except Exception as exc:
+            return Response(
+                content=(
+                    "<p style='font-family:sans-serif;padding:2rem;color:#b91c1c;'>"
+                    f"Graph build failed: {exc}</p>"
+                ),
+                media_type="text/html",
+            )
+
+        return Response(content=graph_data["html"], media_type="text/html")
 
     @rt("/reports")
     def reports():

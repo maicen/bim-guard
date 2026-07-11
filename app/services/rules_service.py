@@ -267,6 +267,58 @@ class RuleService:
         """Return all rules that belong to a ruleset identifier."""
         return list(self._rules.rows_where("ruleset_id = ?", [ruleset_id]))
 
+    def list_folders(self) -> list[dict]:
+        """Return distinct non-empty ruleset_id values with rule counts, A-Z."""
+        counts: dict[str, int] = {}
+        for r in self._rules.rows:
+            ruleset_id = (r.get("ruleset_id") or "").strip()
+            if not ruleset_id:
+                continue
+            counts[ruleset_id] = counts.get(ruleset_id, 0) + 1
+        return [
+            {"ruleset_id": ruleset_id, "count": count}
+            for ruleset_id, count in sorted(counts.items())
+        ]
+
+    def rename_folder(self, old_id: str, new_id: str) -> int:
+        """Bulk-rename a ruleset_id across every rule that has it. Returns rows updated."""
+        old_id = old_id.strip()
+        new_id = new_id.strip()
+        if not old_id or not new_id or old_id == new_id:
+            return 0
+
+        now = now_iso_utc()
+        updated = 0
+        for rule in self.list_by_ruleset(old_id):
+            self._rules.update(
+                updates={"ruleset_id": new_id, "updated_at": now},
+                pk_values=rule["id"],
+            )
+            updated += 1
+        return updated
+
+    def delete_folder(self, ruleset_id: str) -> int:
+        """Delete every rule that belongs to a ruleset_id. Returns rows deleted."""
+        ruleset_id = ruleset_id.strip()
+        if not ruleset_id:
+            return 0
+
+        deleted = 0
+        for rule in self.list_by_ruleset(ruleset_id):
+            self._rules.delete(rule["id"])
+            deleted += 1
+        return deleted
+
+    def delete_rules(self, rule_ids: list[int]) -> int:
+        """Delete multiple rules by primary key. Returns rows deleted."""
+        deleted = 0
+        for rule_id in rule_ids:
+            if self.get_rule(rule_id) is None:
+                continue
+            self._rules.delete(rule_id)
+            deleted += 1
+        return deleted
+
     def list_by_category(self, rule_category: str) -> list[dict]:
         """Return all rules matching the provided rule category."""
         return list(self._rules.rows_where("rule_category = ?", [rule_category]))

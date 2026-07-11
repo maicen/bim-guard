@@ -1,5 +1,5 @@
-from fasthtml.common import Div, Span, Tbody, Td, Th, Thead, Tr
-from monsterui.all import Form, Table
+from fasthtml.common import Button, Details, Div, P, Span, Summary, Tbody, Td, Th, Thead, Tr
+from monsterui.all import Form, Input, Table
 
 from app.components.ui import (
     ActionRow,
@@ -15,6 +15,7 @@ from app.components.ui import (
     SaveAction,
     SelectField,
     SelectOptionSpec,
+    SubmitButton,
     TableActionsMenu,
     TableSpec,
     TextAreaField,
@@ -103,9 +104,23 @@ def _mechanism_badge(mechanism: str):
     return Span(mech or "—", cls=f"text-xs font-medium px-2 py-0.5 rounded {css}")
 
 
+def _select_all_checkbox():
+    """Header checkbox that toggles every rule_ids checkbox in its own form."""
+    return Input(
+        type="checkbox",
+        cls="h-4 w-4",
+        title="Select all",
+        onclick=(
+            "this.closest('form').querySelectorAll('input[name=rule_ids]')"
+            ".forEach(function(cb){cb.checked = this.checked}, this)"
+        ),
+    )
+
+
 def rules_table_rows(rows: list[dict]):
     def _build_row(row: dict):
         return Tr(
+            Td(Input(type="checkbox", name="rule_ids", value=str(row["id"]), cls="h-4 w-4")),
             Td(row.get("reference", "-")),
             Td(_mechanism_badge(row.get("mechanism", ""))),
             Td(row.get("rule_type", "-")),
@@ -129,7 +144,133 @@ def rules_table_rows(rows: list[dict]):
     return build_table_rows(
         rows,
         _build_row,
-        TableSpec(empty_message="No rules available yet.", empty_colspan=8),
+        TableSpec(empty_message="No rules available yet.", empty_colspan=9),
+    )
+
+
+def rules_folders_panel(folders: list[dict], message: str | None = None, level: str = "success"):
+    """Named rule folders (ruleset_id groups), expandable to show and manage
+    the rules inside — includes both webpage-extracted folders and built-in
+    seeded rulesets (e.g. OBC-PART9). Each folder dict should carry a "rules"
+    key (list of rule rows) for the expanded table; falls back to empty."""
+    alert = MessageAlert(AlertSpec(message=message, level=level))
+
+    if not folders:
+        body = P(
+            "No named folders yet. Folders are created when you save extracted "
+            "rules under a name in the Rule Extraction Studio.",
+            cls="text-sm text-muted-foreground",
+        )
+    else:
+        items = []
+        for f in folders:
+            ruleset_id = f["ruleset_id"]
+            folder_rules = f.get("rules") or []
+            rename_form = Form(
+                Input(type="hidden", name="old_id", value=ruleset_id),
+                Input(
+                    name="new_id",
+                    value=ruleset_id,
+                    cls="text-xs h-8",
+                    style="width:180px;padding:2px 8px;border-radius:6px;",
+                ),
+                Button(
+                    "Rename",
+                    type="submit",
+                    cls=(
+                        "text-xs px-2 py-1 rounded bg-secondary "
+                        "text-secondary-foreground hover:opacity-90"
+                    ),
+                ),
+                hx_post="/api/rules/folders/rename",
+                hx_target="#rule-folders-panel",
+                hx_swap="outerHTML",
+                cls="flex items-center gap-2",
+            )
+            delete_folder_form = Form(
+                Input(type="hidden", name="ruleset_id", value=ruleset_id),
+                Button(
+                    "Delete Folder",
+                    type="submit",
+                    cls=(
+                        "text-xs px-2 py-1 rounded bg-destructive/10 text-destructive "
+                        "hover:bg-destructive/20"
+                    ),
+                ),
+                hx_post="/api/rules/folders/delete",
+                hx_target="#rule-folders-panel",
+                hx_swap="outerHTML",
+                hx_confirm=(
+                    f"Delete folder \"{ruleset_id}\" and all {f['count']} rule(s) "
+                    "inside it? This cannot be undone."
+                ),
+                cls="flex items-center",
+            )
+            rule_table = (
+                Form(
+                    Div(
+                        SubmitButton(
+                            "Delete Selected",
+                            variant="secondary",
+                            cls="text-xs text-destructive",
+                        ),
+                        cls="flex justify-end mb-1",
+                    ),
+                    Div(
+                        Table(
+                            Thead(
+                                Tr(
+                                    Th(_select_all_checkbox()),
+                                    Th("Reference"),
+                                    Th("Mechanism"),
+                                    Th("Type"),
+                                    Th("Target Class"),
+                                    Th("Category"),
+                                    Th("Updated"),
+                                    Th("Description"),
+                                    Th("Actions"),
+                                )
+                            ),
+                            Tbody(*rules_table_rows(folder_rules)),
+                            cls="w-full min-w-[1100px]",
+                        ),
+                        cls="w-full overflow-auto max-h-[50vh] border rounded-md",
+                    ),
+                    method="post",
+                    action="/api/rules/bulk-delete",
+                    onsubmit=(
+                        "return confirm('Delete the selected rule(s)? "
+                        "This cannot be undone.')"
+                    ),
+                )
+                if folder_rules
+                else P("No rules found in this folder.", cls="text-xs text-muted-foreground")
+            )
+            items.append(
+                Details(
+                    Summary(
+                        Span(ruleset_id, cls="text-sm font-medium"),
+                        Span(
+                            f"{f['count']} rule(s)",
+                            cls="text-xs text-muted-foreground ml-2",
+                        ),
+                        cls="cursor-pointer select-none py-2 list-none",
+                    ),
+                    Div(rename_form, delete_folder_form, cls="flex items-center gap-3 mb-3"),
+                    rule_table,
+                    cls="py-1 border-b last:border-0",
+                )
+            )
+        body = Div(*items)
+
+    return Div(
+        *alert,
+        Card(
+            CardHeader(CardTitle("Rule Folders")),
+            CardContent(body),
+        ),
+        id="rule-folders-panel",
+        cls="space-y-2",
     )
 
 
@@ -152,29 +293,46 @@ def rules_panel(rows: list[dict], message: str | None = None, level: str = "succ
                 )
             ),
             CardContent(
-                Div(
+                Form(
                     Div(
-                        Table(
-                            Thead(
-                                Tr(
-                                    Th("Reference"),
-                                    Th("Mechanism"),
-                                    Th("Type"),
-                                    Th("Target Class"),
-                                    Th("Category"),
-                                    Th("Updated"),
-                                    Th("Description"),
-                                    Th("Actions"),
-                                )
-                            ),
-                            Tbody(*rules_table_rows(rows)),
-                            cls="w-full min-w-[1200px]",
+                        SubmitButton(
+                            "Delete Selected",
+                            variant="secondary",
+                            cls="text-sm text-destructive",
                         ),
-                        cls="w-full min-w-0 max-h-[65vh] overflow-auto",
+                        cls="flex justify-end mb-2",
                     ),
-                    cls="w-full min-w-0",
+                    Div(
+                        Div(
+                            Table(
+                                Thead(
+                                    Tr(
+                                        Th(_select_all_checkbox()),
+                                        Th("Reference"),
+                                        Th("Mechanism"),
+                                        Th("Type"),
+                                        Th("Target Class"),
+                                        Th("Category"),
+                                        Th("Updated"),
+                                        Th("Description"),
+                                        Th("Actions"),
+                                    )
+                                ),
+                                Tbody(*rules_table_rows(rows)),
+                                cls="w-full min-w-[1200px]",
+                            ),
+                            cls="w-full min-w-0 max-h-[65vh] overflow-auto",
+                        ),
+                        cls="w-full min-w-0",
+                    ),
+                    method="post",
+                    action="/api/rules/bulk-delete",
+                    onsubmit=(
+                        "return confirm('Delete the selected rule(s)? "
+                        "This cannot be undone.')"
+                    ),
+                    cls="w-full min-w-0 pt-0",
                 ),
-                cls="w-full min-w-0 pt-0",
             ),
             cls="w-full max-w-full h-full min-h-0 overflow-hidden",
         ),

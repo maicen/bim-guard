@@ -119,14 +119,17 @@ class TableRuleBuilder:
             )
         return all_rules
 
-    def _extract_from_table(self, table_dict: dict, generator) -> int:
+    def _extract_from_table(self, table_dict: dict, generator, ruleset_id: str = "") -> int:
         rules = self._build_rule_dicts(table_dict)
+        if ruleset_id:
+            for rule in rules:
+                rule["ruleset_id"] = ruleset_id
         if rules:
             saved = generator.save_batch(rules, source_doc="OBC_Table_Direct")
             return len(saved)
         return 0
 
-    def process_all_tables(self, tables: list, generator) -> int:
+    def process_all_tables(self, tables: list, generator, ruleset_id: str = "") -> int:
         if not tables:
             print("[TableRuleBuilder] No tables found")
             return 0
@@ -134,7 +137,7 @@ class TableRuleBuilder:
         print(f"[TableRuleBuilder] Processing {len(tables)} tables...")
         total = 0
         for t in tables:
-            saved = self._extract_from_table(t, generator)
+            saved = self._extract_from_table(t, generator, ruleset_id)
             idx = t["table_index"]
             if saved:
                 print(f"  Table {idx + 1}: {saved} rules saved (no LLM)")

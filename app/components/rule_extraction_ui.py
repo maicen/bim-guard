@@ -1,5 +1,6 @@
 import json
-from fasthtml.common import Button, Details, Div, Label, Option, P, Pre, Span, Summary
+from pathlib import Path
+from fasthtml.common import A, Button, Details, Div, Label, Option, P, Pre, Span, Summary
 from monsterui.all import H1, H3, Alert, Form, FormLabel, Input, Select, UkIcon
 from app.components.ui import Card, CardContent, CardHeader, CardTitle, HtmxSpinner
 from app.components.rules_ui import IFC_CLASS_OPTIONS
@@ -70,6 +71,18 @@ def rule_extraction_page_content(documents: list[dict]):
         if doc.get("id") is not None
     ]
     has_documents = len(document_options) > 0
+
+    # Free-pipeline document select carries a suggested folder name per option,
+    # picked up by onchange JS to pre-fill the folder-name field below it.
+    free_document_options = [
+        Option(
+            doc.get("filename", f"Document {doc.get('id', '')}"),
+            value=str(doc["id"]),
+            **{"data-folder": Path(doc.get("filename") or "").stem or f"Document {doc.get('id', '')}"},
+        )
+        for doc in documents
+        if doc.get("id") is not None
+    ]
 
     provider_options = [
         Option(label, value=slug, selected=(slug == "openai"))
@@ -184,7 +197,74 @@ def rule_extraction_page_content(documents: list[dict]):
                     hx_indicator="#extract-spinner",
                     cls="space-y-4",
                 ),
-                cls="flex-1 bg-muted/30 p-6 overflow-auto",
+                # ── Free/offline pipeline (no API key, no LLM calls) ────────────
+                Card(
+                    CardHeader(CardTitle("Or: Free Offline Extraction")),
+                    CardContent(
+                        P(
+                            "Runs the offline OBC pipeline (Docling table extraction + "
+                            "section-aware regex rule conversion) locally — no API key, "
+                            "no LLM calls. Best on OBC Part 9-formatted PDFs. Rules are saved "
+                            "straight to the library, skipping the review step.",
+                            cls="text-xs text-muted-foreground mb-3",
+                        ),
+                        Form(
+                            Div(
+                                FormLabel("Choose uploaded PDF", fr="free-document-id"),
+                                Select(
+                                    Option(
+                                        "Select a document"
+                                        if has_documents
+                                        else "No uploaded documents available",
+                                        value="",
+                                        selected=True,
+                                    ),
+                                    *free_document_options,
+                                    id="free-document-id",
+                                    name="document_id",
+                                    required=True,
+                                    cls="w-full",
+                                    onchange=(
+                                        "var o=this.options[this.selectedIndex];"
+                                        "var f=document.getElementById('free-folder-name');"
+                                        "if(f&&o.dataset.folder)f.value=o.dataset.folder;"
+                                    ),
+                                ),
+                                cls="space-y-1",
+                            ),
+                            Div(
+                                FormLabel("Save extracted rules to folder", fr="free-folder-name"),
+                                Input(
+                                    id="free-folder-name",
+                                    name="folder_name",
+                                    placeholder="e.g. Toronto Fire Code",
+                                    cls="w-full",
+                                ),
+                                P(
+                                    "Editable — pre-fills from the PDF's filename when you pick a document.",
+                                    cls="text-xs text-muted-foreground mt-1",
+                                ),
+                                cls="space-y-1",
+                            ),
+                            Button(
+                                "Run Free Pipeline",
+                                type="submit",
+                                disabled=not has_documents,
+                                cls=(
+                                    "inline-flex items-center justify-center gap-2 rounded-md "
+                                    "px-4 py-2 text-sm font-medium transition-colors bg-secondary "
+                                    "text-secondary-foreground hover:opacity-90 "
+                                    "disabled:cursor-not-allowed disabled:opacity-50 mt-2"
+                                ),
+                            ),
+                            hx_post="/api/rules/extract-free",
+                            hx_target="#extracted-rules-container",
+                            hx_indicator="#extract-spinner",
+                            cls="space-y-2",
+                        ),
+                    ),
+                ),
+                cls="flex-1 bg-muted/30 p-6 overflow-auto space-y-4",
             ),
             Div(cls="w-px bg-border"),
             Div(
@@ -435,6 +515,7 @@ def rule_extraction_results(
                         hx_post="/api/rules/save-extracted",
                         hx_target="this",
                         hx_swap="outerHTML",
+                        hx_include="#extract-folder-name",
                     ),
                     cls="space-y-2",
                 ),
@@ -463,9 +544,25 @@ def rule_extraction_results(
         "background:#1e293b;color:#ffffff;"
     )
 
-    # Save All — plain HTMX POST, no data in the request (server reads its own cache)
-    # Export JSON — plain browser navigation to a download endpoint
+    # Folder name — shared by every "Save to Library" form and "Save All" below
+    # via hx-include, so all rules from this extraction land in one folder.
+    suggested_folder = Path(filename or "").stem or "Extracted Rules"
+    folder_field = Div(
+        Label("Save to folder", fr="extract-folder-name", cls="text-xs font-medium mr-1"),
+        Input(
+            id="extract-folder-name",
+            name="folder_name",
+            value=suggested_folder,
+            cls="text-xs w-48 inline-block",
+            style="padding:4px 8px;border-radius:6px;",
+        ),
+        cls="flex items-center gap-1",
+    )
+
+    # Save All — HTMX POST including the folder field (server reads its own
+    # rule cache). Export JSON — plain browser navigation to a download endpoint
     action_bar = Div(
+        folder_field,
         Button(
             UkIcon("save", cls="h-3.5 w-3.5"),
             "Save All",
@@ -474,6 +571,7 @@ def rule_extraction_results(
             hx_post="/api/rules/save-all-extracted",
             hx_target="#save-all-msg",
             hx_swap="innerHTML",
+            hx_include="#extract-folder-name",
         ),
         Button(
             UkIcon("download", cls="h-3.5 w-3.5"),
@@ -483,7 +581,7 @@ def rule_extraction_results(
             onclick="window.location='/api/rules/export-json'",
         ),
         Span("", id="save-all-msg", cls="text-xs text-emerald-700 ml-1"),
-        cls="sticky top-0 z-10 bg-background border-b py-2 mb-3 -mx-6 px-6 flex gap-2 items-center",
+        cls="sticky top-0 z-10 bg-background border-b py-2 mb-3 -mx-6 px-6 flex flex-wrap gap-2 items-center",
     )
 
     return Div(*warning_banners, success_msg, action_bar, *fragments)
@@ -491,3 +589,67 @@ def rule_extraction_results(
 
 def rule_extraction_empty_file_result():
     return Alert("Selected document has no extractable text.")
+
+
+def rule_extraction_free_result(summary: dict, filename: str, ruleset_id: str = ""):
+    """Render the outcome of the offline CLI pipeline (already saved to the DB)."""
+    table_rules = summary.get("table_rules", 0)
+    prose_rules = summary.get("prose_rules", 0)
+    total_rules = summary.get("total_rules", 0)
+    sections_run = summary.get("sections_run", 0)
+    new_rules = table_rules + prose_rules
+
+    warning_banners = [
+        Alert(
+            UkIcon("alert-triangle", cls="h-4 w-4"),
+            Span(w),
+            cls="mb-3 text-amber-700 border-amber-400 [&>svg]:text-amber-700",
+        )
+        for w in (summary.get("warnings") or [])
+    ]
+
+    if new_rules == 0:
+        outcome_alert = Alert(
+            UkIcon("alert-triangle", cls="h-4 w-4"),
+            Span(
+                f"No new rules were extracted from {filename}. Folder \"{ruleset_id}\" was "
+                "NOT created — a folder only appears once it has at least one rule in it "
+                f"({sections_run} section(s) scanned, {total_rules} rule(s) already in the "
+                "library from before)."
+            ),
+            cls="mb-1 text-amber-700 border-amber-400 [&>svg]:text-amber-700",
+        )
+        outcome_detail = P(
+            "This usually means the document doesn't have OBC Part 9-style numbered "
+            "sections or tables with Min/Max columns, which is what this offline "
+            "pipeline looks for. Try the AI Extraction Studio above instead — it reads "
+            "the document's meaning rather than its formatting.",
+            cls="text-xs text-muted-foreground mb-2",
+        )
+    else:
+        outcome_alert = Alert(
+            UkIcon("check-circle", cls="h-4 w-4"),
+            Span(
+                f"Free pipeline complete for {filename}: {table_rules} table rule(s) + "
+                f"{prose_rules} regex rule(s) saved across {sections_run} section(s). "
+                f"{total_rules} rule(s) now in the library."
+            ),
+            cls="mb-3 text-emerald-600 border-emerald-600 [&>svg]:text-emerald-600",
+        )
+        outcome_detail = P(
+            f"{new_rules} newly-extracted rule(s) were saved to folder \"{ruleset_id}\". "
+            "Rules from the offline pipeline are saved directly — there is no inline "
+            "review step like the AI extraction path.",
+            cls="text-xs text-muted-foreground mb-2",
+        )
+
+    return Div(
+        *warning_banners,
+        outcome_alert,
+        outcome_detail,
+        A(
+            "View Rule Library →",
+            href="/library/rules",
+            cls="text-sm text-primary underline",
+        ),
+    )
