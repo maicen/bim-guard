@@ -227,3 +227,10 @@ INFO:     Finished server process [77040]
 INFO:     Started server process [75536]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\routes\analyze.py'. Reloading...
+ INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [75536]
+WARNING:  WatchFiles detected changes in 'app\modules\module2_ifc_read\ifc_graph.py', 'app\routes\analyze.py'. Reloading...
+ 

@@ -101,6 +101,9 @@ _GEOMETRY_PROPERTY_MAP: dict[str, str] = {
     "footprintarea":       "footprint_area",
     "surfacearea":         "surface_area",
     "outersurfacearea":    "surface_area",
+    # Perimeter
+    "perimeter":           "footprint_perimeter",
+    "footprintperimeter":  "footprint_perimeter",
 }
 
 
@@ -312,6 +315,16 @@ class IFCGeometryExtractor:
         except Exception:
             return None
 
+    def get_footprint_perimeter_mm(self, element) -> float | None:
+        """Perimeter of the 2-D footprint (top-down) in mm — ifcopenshell.util.shape.get_footprint_perimeter()."""
+        shape = self._get_shape(element)
+        if shape is None:
+            return None
+        try:
+            return round(_ifcos_shape.get_footprint_perimeter(shape.geometry) * self._unit_scale, 1)
+        except Exception:
+            return None
+
     def get_surface_area_m2(self, element) -> float | None:
         """
         Outer surface area in m².
@@ -472,6 +485,9 @@ class IFCGeometryExtractor:
         if method == "surface_area":
             area = self.get_surface_area_m2(element)
             return round(area * 1e6, 1) if area is not None else None
+
+        if method == "footprint_perimeter":
+            return self.get_footprint_perimeter_mm(element)
 
         return None
 
