@@ -142,10 +142,10 @@ class IFCGeometryExtractor:
     def _detect_length_unit_scale(ifc_model) -> float:
         """Return multiplier that converts model length units to millimetres."""
         _SI_TO_MM = {
-            "MILLIMETRE": 1.0,
-            "CENTIMETRE": 10.0,
-            "METRE":      1000.0,
-            "KILOMETRE":  1_000_000.0,
+            "MILLIMETRE": 1.0, "MILLIMETER": 1.0,
+            "CENTIMETRE": 10.0, "CENTIMETER": 10.0,
+            "METRE":      1000.0, "METER":      1000.0,
+            "KILOMETRE":  1_000_000.0, "KILOMETER":  1_000_000.0,
             "INCH":       25.4,
             "FOOT":       304.8,
         }
@@ -157,9 +157,19 @@ class IFCGeometryExtractor:
                     if "LENGTHUNIT" not in str(unit.UnitType).upper():
                         continue
                     if unit.is_a("IfcSIUnit"):
-                        prefix_factors = {"MILLI": 0.001, "CENTI": 0.01, "": 1.0, None: 1.0}
-                        prefix = str(getattr(unit, "Prefix", "") or "")
-                        name = str(getattr(unit, "Name", "METRE") or "METRE")
+                        # KILO included: without it, a kilometre-scaled model
+                        # (Prefix=.KILO., Name=.METRE.) silently loses the
+                        # 1000x prefix factor and is scaled as if it were
+                        # plain metres.
+                        prefix_factors = {
+                            "MILLI": 0.001, "CENTI": 0.01, "KILO": 1000.0, "": 1.0,
+                        }
+                        # IFC enum values are uppercase by schema convention, but
+                        # some exporters deviate — normalise defensively so this
+                        # matches Module2_IFCRead._get_length_unit_scale_mm()
+                        # (the Pset/attribute-side unit detector) exactly.
+                        prefix = str(getattr(unit, "Prefix", "") or "").upper()
+                        name = str(getattr(unit, "Name", "METRE") or "METRE").upper()
                         base_mm = _SI_TO_MM.get(name, 1000.0)
                         return base_mm * prefix_factors.get(prefix, 1.0)
                     if unit.is_a("IfcConversionBasedUnit"):

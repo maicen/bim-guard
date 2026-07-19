@@ -9,7 +9,9 @@ from app.components.ui import (
     CardContent,
     CardHeader,
     CardTitle,
+    Checkbox,
     FieldSpec,
+    FormLabel,
     LinkButton,
     MessageAlert,
     SaveAction,
@@ -87,6 +89,27 @@ RULE_CATEGORY_OPTIONS = [
     SelectOptionSpec(label="material_property", value="material_property"),
     SelectOptionSpec(label="reference_config", value="reference_config"),
     SelectOptionSpec(label="mitigation", value="mitigation"),
+]
+
+# Matches Module4_Comparator's supported operators (module4_comparator/__init__.py docstring).
+OPERATOR_OPTIONS = [
+    SelectOptionSpec(label="— none —", value=""),
+    SelectOptionSpec(label=">=", value=">="),
+    SelectOptionSpec(label="<=", value="<="),
+    SelectOptionSpec(label=">", value=">"),
+    SelectOptionSpec(label="<", value="<"),
+    SelectOptionSpec(label="==", value="=="),
+    SelectOptionSpec(label="!=", value="!="),
+    SelectOptionSpec(label="between", value="between"),
+    SelectOptionSpec(label="exists", value="exists"),
+    SelectOptionSpec(label="not_exists", value="not_exists"),
+    SelectOptionSpec(label="matches", value="matches"),
+]
+
+SEVERITY_OPTIONS = [
+    SelectOptionSpec(label="mandatory", value="mandatory"),
+    SelectOptionSpec(label="recommended", value="recommended"),
+    SelectOptionSpec(label="informational", value="informational"),
 ]
 
 _MECHANISM_BADGE = {
@@ -340,6 +363,19 @@ def rules_panel(rows: list[dict], message: str | None = None, level: str = "succ
     )
 
 
+def _decode_json_field(value) -> str:
+    """Unwrap a JSON-encoded DB scalar (e.g. '800' or 'null') to a plain form value."""
+    if value is None or value == "":
+        return ""
+    try:
+        import json
+
+        decoded = json.loads(value)
+        return "" if decoded is None else str(decoded)
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def rule_form(title: str, action: str, rule: dict | None = None):
     rule = rule or {}
     selected_ifc_class = rule.get("target_ifc_class", "")
@@ -367,6 +403,18 @@ def rule_form(title: str, action: str, rule: dict | None = None):
     cat_options = [
         SelectOptionSpec(label=o.label, value=o.value, selected=o.value == selected_cat)
         for o in RULE_CATEGORY_OPTIONS
+    ]
+
+    selected_operator = rule.get("operator", "")
+    operator_options = [
+        SelectOptionSpec(label=o.label, value=o.value, selected=o.value == selected_operator)
+        for o in OPERATOR_OPTIONS
+    ]
+
+    selected_severity = rule.get("severity", "mandatory")
+    severity_options = [
+        SelectOptionSpec(label=o.label, value=o.value, selected=o.value == selected_severity)
+        for o in SEVERITY_OPTIONS
     ]
 
     return Card(
@@ -440,6 +488,141 @@ def rule_form(title: str, action: str, rule: dict | None = None):
                         required=True,
                     ),
                     rows=5,
+                ),
+                Span("Compliance Check", cls="text-sm font-semibold block pt-2"),
+                TextInputField(
+                    FieldSpec(
+                        label="Property Set",
+                        field_id="property_set",
+                        name="property_set",
+                        value=rule.get("property_set", ""),
+                        placeholder="e.g. Pset_WindowCommon",
+                    )
+                ),
+                TextInputField(
+                    FieldSpec(
+                        label="Property Name",
+                        field_id="property_name",
+                        name="property_name",
+                        value=rule.get("property_name", ""),
+                        placeholder="e.g. ClearOpeningArea",
+                    )
+                ),
+                TextInputField(
+                    FieldSpec(
+                        label="Fallback Property",
+                        field_id="fallback_property",
+                        name="fallback_property",
+                        value=rule.get("fallback_property", ""),
+                        placeholder="tried when Property Name is absent",
+                    )
+                ),
+                SelectField(
+                    FieldSpec(
+                        label="Operator",
+                        field_id="operator",
+                        name="operator",
+                    ),
+                    operator_options,
+                ),
+                Div(
+                    TextInputField(
+                        FieldSpec(
+                            label="Check Value",
+                            field_id="check_value",
+                            name="check_value",
+                            value=_decode_json_field(rule.get("check_value")),
+                            placeholder="single-threshold operators",
+                        ),
+                        input_type="number",
+                    ),
+                    TextInputField(
+                        FieldSpec(
+                            label="Value Min",
+                            field_id="value_min",
+                            name="value_min",
+                            value=_decode_json_field(rule.get("value_min")),
+                            placeholder="'between' operator",
+                        ),
+                        input_type="number",
+                    ),
+                    TextInputField(
+                        FieldSpec(
+                            label="Value Max",
+                            field_id="value_max",
+                            name="value_max",
+                            value=_decode_json_field(rule.get("value_max")),
+                            placeholder="'between' operator",
+                        ),
+                        input_type="number",
+                    ),
+                    cls="grid grid-cols-3 gap-3",
+                ),
+                TextInputField(
+                    FieldSpec(
+                        label="Unit",
+                        field_id="unit",
+                        name="unit",
+                        value=rule.get("unit", ""),
+                        placeholder="e.g. mm, m2",
+                    )
+                ),
+                Span("Classification & Metadata", cls="text-sm font-semibold block pt-2"),
+                SelectField(
+                    FieldSpec(
+                        label="Severity",
+                        field_id="severity",
+                        name="severity",
+                    ),
+                    severity_options,
+                ),
+                TextInputField(
+                    FieldSpec(
+                        label="Keyword",
+                        field_id="keyword",
+                        name="keyword",
+                        value=rule.get("keyword", ""),
+                        placeholder="e.g. shall",
+                    )
+                ),
+                TextInputField(
+                    FieldSpec(
+                        label="Compliance Type",
+                        field_id="compliance_type",
+                        name="compliance_type",
+                        value=rule.get("compliance_type", ""),
+                        placeholder="e.g. prescriptive",
+                    )
+                ),
+                TextInputField(
+                    FieldSpec(
+                        label="Confidence (0-1)",
+                        field_id="confidence",
+                        name="confidence",
+                        value=str(rule.get("confidence") or ""),
+                        placeholder="e.g. 0.8",
+                    ),
+                    input_type="number",
+                ),
+                Div(
+                    Checkbox(
+                        id="needs_review",
+                        name="needs_review",
+                        checked=bool(rule.get("needs_review")),
+                    ),
+                    FormLabel("Needs review", fr="needs_review", cls="cursor-pointer"),
+                    cls="flex items-center gap-2",
+                ),
+                Span("Source", cls="text-sm font-semibold block pt-2"),
+                TextAreaField(
+                    FieldSpec(
+                        label="Source Text (original document paragraph)",
+                        field_id="source_text",
+                        name="source_text",
+                        value=rule.get("source_text", ""),
+                        placeholder="No source text recorded for this rule.",
+                    ),
+                    rows=6,
                 ),
                 TextAreaField(
                     FieldSpec(

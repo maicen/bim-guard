@@ -133,13 +133,23 @@ _LENGTH_MEASURE_TYPES: frozenset[str] = frozenset([
 
 # Direct IFC schema attributes that are always length values (metres-based model
 # stores them in metres, mm-based model in mm).  Used when rich property metadata
-# is not available (Pass 3 / 4 direct attribute lookups).
+# is not available (Pass 3 / 4 direct attribute lookups, and the Pass 5 / 6
+# alias / fallback routes, which never populate rich_detail at all — see the
+# comment at the Pass 8 call site). Keep this in sync with the length-typed
+# entries in _PROPERTY_ALIASES above and ifc_geometry.py's
+# _GEOMETRY_PROPERTY_MAP, since a name matched via either of those but missing
+# here would silently skip unit conversion.
 _LENGTH_DIRECT_ATTRS: frozenset[str] = frozenset([
     "overallwidth", "overallheight", "width", "height",
     "treadlength", "treaddepth", "going", "riserheight",
     "handrailheight", "sillheight", "headroomclearance",
     "requireheadroom", "clearwidth", "nominalwidth", "nominalheight",
     "clearheight", "elevationwithflooring",
+    "grosswidth", "grossheight", "netwidth", "netheight",
+    "thickness", "length", "depth",
+    "corridorwidth", "minimumwidth", "passagewidth",
+    "perimeter", "footprintperimeter",
+    "diameter", "nominaldiameter",
 ])
 
 # ── IFC property-type → Python type label ────────────────────────────────────

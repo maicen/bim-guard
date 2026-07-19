@@ -32,7 +32,7 @@ from app.components.rule_extraction_ui import (
     rule_extraction_results,
     provider_model_select_fragment,
 )
-from app.components.rules_ui import rule_form, rules_folders_panel, rules_panel
+from app.components.rules_ui import _decode_json_field, rule_form, rules_folders_panel, rules_panel
 from app.components.ui import (
     Alert,
     AlertT,
@@ -358,6 +358,37 @@ def setup_routes(rt):
         if rule is None:
             return _not_found_page("Rule", "/library/rules", "Back to Rules")
 
+        operator = rule.get("operator", "")
+        unit = rule.get("unit", "")
+        check_value = _decode_json_field(rule.get("check_value"))
+        value_min = _decode_json_field(rule.get("value_min"))
+        value_max = _decode_json_field(rule.get("value_max"))
+        if operator == "between" and value_min and value_max:
+            condition = f"between {value_min} and {value_max} {unit}".strip()
+        elif operator:
+            condition = f"{operator} {check_value} {unit}".strip()
+        else:
+            condition = ""
+
+        meta_rows = [
+            ("Type", rule.get("rule_type", "-")),
+            ("Target IFC Class", rule.get("target_ifc_class", "-")),
+            ("Property", rule.get("property_name", "") or None),
+            ("Property Set", rule.get("property_set", "") or None),
+            ("Check", condition or None),
+            ("Severity", rule.get("severity", "") or None),
+            ("Folder (ruleset_id)", rule.get("ruleset_id", "") or None),
+            ("Mechanism", rule.get("mechanism", "") or None),
+            ("Extraction Method", rule.get("extraction_method", "") or None),
+            (
+                "Confidence",
+                f"{float(rule['confidence']) * 100:.0f}%" if rule.get("confidence") else None,
+            ),
+            ("Needs Review", "Yes" if rule.get("needs_review") else None),
+        ]
+
+        source_text = (rule.get("source_text") or "").strip()
+
         return Title(f"{rule.get('reference', 'Rule')} - BIM Guard"), DashboardLayout(
             Container(
                 DivLAligned(
@@ -368,17 +399,39 @@ def setup_routes(rt):
                 Card(
                     CardHeader(CardTitle("Rule Details")),
                     CardBody(
-                        P(f"Type: {rule.get('rule_type', '-')}", cls="text-sm"),
-                        P(
-                            f"Target IFC Class: {rule.get('target_ifc_class', '-')}",
-                            cls="text-sm",
+                        P(rule.get("description", ""), cls="text-sm font-medium"),
+                        Div(
+                            *[
+                                Div(
+                                    Span(f"{label}: ", cls="text-muted-foreground"),
+                                    Span(value, cls="font-mono"),
+                                    cls="text-xs",
+                                )
+                                for label, value in meta_rows
+                                if value
+                            ],
+                            cls="space-y-1 bg-muted p-3 rounded border",
                         ),
-                        P(rule.get("description", ""), cls="text-sm"),
+                        cls="space-y-3",
+                    ),
+                ),
+                Card(
+                    CardHeader(CardTitle("Source Text")),
+                    CardBody(
+                        P(
+                            source_text or "No source text recorded for this rule.",
+                            cls="text-sm whitespace-pre-wrap"
+                            + ("" if source_text else " text-muted-foreground italic"),
+                        ),
+                    ),
+                ),
+                Card(
+                    CardHeader(CardTitle("Raw Parameters")),
+                    CardBody(
                         Div(
                             rule.get("parameters", "{}"),
                             cls="font-mono text-xs bg-muted p-2 rounded border",
                         ),
-                        cls="space-y-3",
                     ),
                 ),
                 BackAction(href="/library/rules", title="Back to Rules"),
