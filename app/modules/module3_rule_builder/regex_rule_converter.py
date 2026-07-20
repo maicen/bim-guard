@@ -113,7 +113,10 @@ UNIT_ALIASES = {
 }
 # Longest alias first so "mm" / "millimetres" win over a bare "m" at the same position.
 _UNIT_PATTERN = "|".join(re.escape(u) for u in sorted(UNIT_ALIASES, key=len, reverse=True))
-_NUM = r"(\d+(?:\.\d+)?)"
+# OBC/SBC text formats large numbers with a space as the thousands separator
+# (e.g. "2 050 mm" for 2050mm) instead of a comma. Try the grouped form first
+# so "2 050" is captured whole; falls back to a plain run of digits otherwise.
+_NUM = r"(\d{1,3}(?:[ ,]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
 
 # (regex, operator, rule_type). Checked in order; first match wins.
 _PATTERNS = [
@@ -127,7 +130,7 @@ _PATTERNS = [
     ),
     (
         re.compile(
-            rf"\b(?:not less than|no less than|minimum(?: of)?|at least)\s+{_NUM}\s*({_UNIT_PATTERN})\b",
+            rf"\b(?:not (?:be )?less than|no less than|minimum(?: of)?|at least)\s+{_NUM}\s*({_UNIT_PATTERN})\b",
             re.IGNORECASE,
         ),
         ">=",
@@ -135,7 +138,7 @@ _PATTERNS = [
     ),
     (
         re.compile(
-            rf"\b(?:not more than|no more than|maximum(?: of)?|at most)\s+{_NUM}\s*({_UNIT_PATTERN})\b",
+            rf"\b(?:not (?:be )?more than|no more than|maximum(?: of)?|at most)\s+{_NUM}\s*({_UNIT_PATTERN})\b",
             re.IGNORECASE,
         ),
         "<=",
@@ -158,6 +161,11 @@ _PROHIBITION_PATTERN = re.compile(
 
 # OBC-style section references, e.g. "9.8.2.1.(2)"
 _REF_PATTERN = re.compile(r"\b\d+(?:\.\d+){2,}(?:\.\(\d+\))?\b")
+
+
+def _parse_num(raw: str) -> float:
+    """Convert a matched _NUM group to float, stripping space/comma thousands separators."""
+    return float(raw.replace(" ", "").replace(",", ""))
 
 
 class RegexRuleConverter:
@@ -193,21 +201,11 @@ class RegexRuleConverter:
 
         ref = self._detect_ref(text, chunk.get("section_number", ""))
 
-        if _PROHIBITION_PATTERN.search(text):
-            return {
-                "ref": ref,
-                "desc": text[:200],
-                "source_text": text,
-                "target": target,
-                "rule_type": "prohibition",
-                "operator": "not_exists",
-                "severity": "mandatory",
-                "keyword": "shall not",
-                "confidence": 0.5,
-                "extraction_method": "regex",
-                "needs_review": True,
-            }
-
+        # Numeric thresholds first: "shall not be less than X mm" contains the
+        # substring "shall not", which would otherwise get misclassified as a
+        # bare prohibition (operator=not_exists, no value) below, silently
+        # discarding the actual >= X requirement. Only treat "shall not ..."
+        # as a true prohibition when no numeric pattern matched it.
         for pattern, operator, rule_type in _PATTERNS:
             match = pattern.search(text)
             if not match:
@@ -234,15 +232,30 @@ class RegexRuleConverter:
 
             if operator == "between":
                 value_min, value_max, unit = match.groups()
-                rule["value_min"] = float(value_min)
-                rule["value_max"] = float(value_max)
+                rule["value_min"] = _parse_num(value_min)
+                rule["value_max"] = _parse_num(value_max)
                 rule["unit"] = UNIT_ALIASES.get(unit.lower(), unit.lower())
             else:
                 value, unit = match.groups()
-                rule["check_value"] = float(value)
+                rule["check_value"] = _parse_num(value)
                 rule["unit"] = UNIT_ALIASES.get(unit.lower(), unit.lower())
 
             return rule
+
+        if _PROHIBITION_PATTERN.search(text):
+            return {
+                "ref": ref,
+                "desc": text[:200],
+                "source_text": text,
+                "target": target,
+                "rule_type": "prohibition",
+                "operator": "not_exists",
+                "severity": "mandatory",
+                "keyword": "shall not",
+                "confidence": 0.5,
+                "extraction_method": "regex",
+                "needs_review": True,
+            }
 
         return None
 

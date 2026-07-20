@@ -13,7 +13,7 @@ from app.utils import load_env_file
 
 load_env_file()
 
-from app.routes import analyze, dashboard, library, projects, revit_sync, viewer
+from app.routes import analyze, dashboard, library, modeling_manual, projects, revit_sync, viewer
 
 APP_HEADERS = SiteTheme()
 
@@ -140,6 +140,7 @@ def _setup_routes() -> None:
     analyze.setup_routes(rt)
     dashboard.setup_routes(rt)
     library.setup_routes(rt)
+    modeling_manual.setup_routes(rt)
     projects.setup_routes(rt)
     revit_sync.setup_routes(rt)
 

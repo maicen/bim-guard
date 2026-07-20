@@ -687,6 +687,166 @@ class Module2_IFCRead:
                     return v, ps_name
         return None, None
 
+    # ── Reusable single-property resolution cascade ──────────────────────────
+
+    def _resolve_element_property(
+        self,
+        el,
+        prop_name: str,
+        prop_set: str = "",
+        fallback_prop: str = "",
+        spatial: dict | None = None,
+        unit_scale_mm: float = 1.0,
+    ) -> tuple[object, "str | None", dict]:
+        """
+        Resolve one property value for one element via the 8-pass cascade
+        (instance Pset -> rich metadata -> direct attribute -> type-level Pset
+        -> alias -> fallback_property -> geometry -> unit conversion).
+
+        Used both for a rule's main property and for property-referencing
+        bounds (value_min_property / value_max_property), which is why this
+        is factored out rather than left inline in extract_for_compliance().
+
+        Returns (actual_value, found_pset, rich_detail).
+        """
+        spatial = spatial or {}
+        actual_value = None
+        found_pset = None
+        rich_detail: dict = {}
+
+        if not prop_name:
+            return actual_value, found_pset, rich_detail
+
+        # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
+        try:
+            psets_simple = ifcopenshell.util.element.get_psets(el, psets_only=False)
+        except Exception:
+            psets_simple = {}
+
+        if prop_set and prop_set in psets_simple:
+            v = psets_simple[prop_set].get(prop_name)
+            if v is not None:
+                actual_value = v
+                found_pset = prop_set
+
+        if actual_value is None:
+            v, ps = self._lookup_in_psets(psets_simple, prop_name)
+            if v is not None:
+                actual_value, found_pset = v, ps
+
+        # ── Pass 2: rich property metadata (type/unit/bounds) ─────
+        if found_pset:
+            try:
+                rich_all = self.extract_rich_properties(el)
+                pset_key = found_pset.split(":")[-1]  # strip "type:" prefix if any
+                rich_prop = rich_all.get(pset_key, {}).get(prop_name, {})
+                if rich_prop:
+                    rich_detail = rich_prop
+            except Exception:
+                pass
+
+        # ── Pass 3: direct IFC schema attributes ──────────────────
+        if actual_value is None:
+            try:
+                direct = self.get_direct_attributes(el)
+                v = direct.get(prop_name)
+                if v is not None:
+                    actual_value = v
+                    found_pset = "direct_attribute"
+            except Exception:
+                pass
+
+        # ── Pass 4: element TYPE properties ───────────────────────
+        # Many Revit-exported properties (OverallWidth, FireRating, …)
+        # live on the IfcDoorType / IfcWindowType, not the instance.
+        if actual_value is None:
+            try:
+                el_type = ifcopenshell.util.element.get_type(el)
+                if el_type:
+                    type_psets = ifcopenshell.util.element.get_psets(
+                        el_type, psets_only=False
+                    )
+                    v, ps = self._lookup_in_psets(type_psets, prop_name)
+                    if v is not None:
+                        actual_value = v
+                        found_pset = f"type:{ps}"
+                    if actual_value is None:
+                        type_direct = self.get_direct_attributes(el_type)
+                        v = type_direct.get(prop_name)
+                        if v is not None:
+                            actual_value = v
+                            found_pset = "type:direct_attribute"
+            except Exception:
+                pass
+
+        # ── Pass 5: property aliases (name variations) ────────────
+        if actual_value is None:
+            for alias in _PROPERTY_ALIASES.get(prop_name, []):
+                v, ps = self._lookup_in_psets(psets_simple, alias)
+                if v is not None:
+                    actual_value, found_pset = v, f"alias:{ps}"
+                    break
+                try:
+                    direct = self.get_direct_attributes(el)
+                    v = direct.get(alias)
+                    if v is not None:
+                        actual_value = v
+                        found_pset = "alias:direct_attribute"
+                        break
+                except Exception:
+                    pass
+
+        # ── Pass 6: rule's fallback_property field ────────────────
+        if actual_value is None and fallback_prop:
+            v, ps = self._lookup_in_psets(psets_simple, fallback_prop)
+            if v is not None:
+                actual_value, found_pset = v, f"fallback:{ps}"
+            if actual_value is None:
+                try:
+                    direct = self.get_direct_attributes(el)
+                    v = direct.get(fallback_prop)
+                    if v is not None:
+                        actual_value = v
+                        found_pset = "fallback:direct_attribute"
+                except Exception:
+                    pass
+
+        # ── Pass 7: bounding-box geometry (Tier 1) ───────────────
+        # Only runs when all Pset/attribute passes returned nothing.
+        if actual_value is None and self.geometry_extractor:
+            try:
+                floor_z = spatial.get("storey_elevation")
+                # storey_elevation from IFC is in model units; convert to mm
+                if floor_z is not None and self.geometry_extractor._unit_scale != 1.0:
+                    floor_z = floor_z * self.geometry_extractor._unit_scale
+                geo_val = self.geometry_extractor.get_geometry_value(
+                    el, prop_name, floor_z
+                )
+                if geo_val is not None:
+                    actual_value = geo_val
+                    found_pset = "geometry"
+            except Exception:
+                pass
+
+        # ── Pass 8: unit conversion (model-units → mm) ───────────
+        # Geometry (Pass 7) already returns mm.  Pset/attribute passes
+        # return model-native units, which for metre-based models means
+        # values like 0.75 instead of 750.  Scale here so Module 4
+        # comparisons are always against mm values when rules use mm.
+        if (
+            unit_scale_mm != 1.0
+            and actual_value is not None
+            and isinstance(actual_value, (int, float))
+            and found_pset != "geometry"
+        ):
+            measure_type = rich_detail.get("measure_type", "")
+            prop_lower = prop_name.lower()
+            if (measure_type in _LENGTH_MEASURE_TYPES
+                    or prop_lower in _LENGTH_DIRECT_ATTRS):
+                actual_value = round(actual_value * unit_scale_mm, 4)
+
+        return actual_value, found_pset, rich_detail
+
     # ── Compliance extraction (all fallbacks) ─────────────────────────────────
 
     def extract_for_compliance(self, rules: list[dict]) -> list[dict]:
@@ -715,6 +875,15 @@ class Module2_IFCRead:
             operator = str(rule.get("operator") or "").strip()
             fallback_prop = str(rule.get("fallback_property") or "").strip()
 
+            # Property-referencing bounds — e.g. OBC 9.8.4.3.(3): tread depth
+            # must be between its own Run and Run + 25mm. Instead of a fixed
+            # numeric value_min/value_max, the bound is another property on
+            # the same element (optionally offset by a fixed amount).
+            value_min_property = str(rule.get("value_min_property") or "").strip()
+            value_max_property = str(rule.get("value_max_property") or "").strip()
+            value_min_offset = self._decode_json_val(rule.get("value_min_offset")) or 0.0
+            value_max_offset = self._decode_json_val(rule.get("value_max_offset")) or 0.0
+
             if not target or (not prop_name and operator not in ("exists", "not_exists")):
                 continue
 
@@ -723,143 +892,38 @@ class Module2_IFCRead:
 
             element_results = []
             for el in elements:
-                actual_value = None
-                found_pset = None
-                rich_detail: dict = {}
-
                 # Spatial context fetched early — floor_z needed for Pass 7
                 try:
                     spatial = self.get_spatial_location(el)
                 except Exception:
                     spatial = {}
 
-                # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
-                try:
-                    psets_simple = ifcopenshell.util.element.get_psets(el, psets_only=False)
-                except Exception:
-                    psets_simple = {}
+                actual_value, found_pset, rich_detail = self._resolve_element_property(
+                    el,
+                    prop_name,
+                    prop_set=prop_set,
+                    fallback_prop=fallback_prop,
+                    spatial=spatial,
+                    unit_scale_mm=_unit_scale_mm,
+                )
 
-                if prop_set and prop_set in psets_simple:
-                    v = psets_simple[prop_set].get(prop_name)
-                    if v is not None:
-                        actual_value = v
-                        found_pset = prop_set
-
-                if actual_value is None and prop_name:
-                    v, ps = self._lookup_in_psets(psets_simple, prop_name)
-                    if v is not None:
-                        actual_value, found_pset = v, ps
-
-                # ── Pass 2: rich property metadata (type/unit/bounds) ─────
-                if prop_name and found_pset:
-                    try:
-                        rich_all = self.extract_rich_properties(el)
-                        pset_key = found_pset.split(":")[-1]  # strip "type:" prefix if any
-                        rich_prop = rich_all.get(pset_key, {}).get(prop_name, {})
-                        if rich_prop:
-                            rich_detail = rich_prop
-                    except Exception:
-                        pass
-
-                # ── Pass 3: direct IFC schema attributes ──────────────────
-                if actual_value is None and prop_name:
-                    try:
-                        direct = self.get_direct_attributes(el)
-                        v = direct.get(prop_name)
-                        if v is not None:
-                            actual_value = v
-                            found_pset = "direct_attribute"
-                    except Exception:
-                        pass
-
-                # ── Pass 4: element TYPE properties ───────────────────────
-                # Many Revit-exported properties (OverallWidth, FireRating, …)
-                # live on the IfcDoorType / IfcWindowType, not the instance.
-                if actual_value is None and prop_name:
-                    try:
-                        el_type = ifcopenshell.util.element.get_type(el)
-                        if el_type:
-                            type_psets = ifcopenshell.util.element.get_psets(
-                                el_type, psets_only=False
-                            )
-                            v, ps = self._lookup_in_psets(type_psets, prop_name)
-                            if v is not None:
-                                actual_value = v
-                                found_pset = f"type:{ps}"
-                            if actual_value is None:
-                                type_direct = self.get_direct_attributes(el_type)
-                                v = type_direct.get(prop_name)
-                                if v is not None:
-                                    actual_value = v
-                                    found_pset = "type:direct_attribute"
-                    except Exception:
-                        pass
-
-                # ── Pass 5: property aliases (name variations) ────────────
-                if actual_value is None and prop_name:
-                    for alias in _PROPERTY_ALIASES.get(prop_name, []):
-                        v, ps = self._lookup_in_psets(psets_simple, alias)
-                        if v is not None:
-                            actual_value, found_pset = v, f"alias:{ps}"
-                            break
-                        try:
-                            direct = self.get_direct_attributes(el)
-                            v = direct.get(alias)
-                            if v is not None:
-                                actual_value = v
-                                found_pset = "alias:direct_attribute"
-                                break
-                        except Exception:
-                            pass
-
-                # ── Pass 6: rule's fallback_property field ────────────────
-                if actual_value is None and fallback_prop:
-                    v, ps = self._lookup_in_psets(psets_simple, fallback_prop)
-                    if v is not None:
-                        actual_value, found_pset = v, f"fallback:{ps}"
-                    if actual_value is None:
-                        try:
-                            direct = self.get_direct_attributes(el)
-                            v = direct.get(fallback_prop)
-                            if v is not None:
-                                actual_value = v
-                                found_pset = "fallback:direct_attribute"
-                        except Exception:
-                            pass
-
-                # ── Pass 7: bounding-box geometry (Tier 1) ───────────────
-                # Only runs when all Pset/attribute passes returned nothing.
-                if actual_value is None and prop_name and self.geometry_extractor:
-                    try:
-                        floor_z = spatial.get("storey_elevation")
-                        # storey_elevation from IFC is in model units; convert to mm
-                        if floor_z is not None and self.geometry_extractor._unit_scale != 1.0:
-                            floor_z = floor_z * self.geometry_extractor._unit_scale
-                        geo_val = self.geometry_extractor.get_geometry_value(
-                            el, prop_name, floor_z
-                        )
-                        if geo_val is not None:
-                            actual_value = geo_val
-                            found_pset = "geometry"
-                    except Exception:
-                        pass
-
-                # ── Pass 8: unit conversion (model-units → mm) ───────────
-                # Geometry (Pass 7) already returns mm.  Pset/attribute passes
-                # return model-native units, which for metre-based models means
-                # values like 0.75 instead of 750.  Scale here so Module 4
-                # comparisons are always against mm values when rules use mm.
-                if (
-                    _unit_scale_mm != 1.0
-                    and actual_value is not None
-                    and isinstance(actual_value, (int, float))
-                    and found_pset != "geometry"
-                ):
-                    measure_type = rich_detail.get("measure_type", "")
-                    prop_lower = prop_name.lower()
-                    if (measure_type in _LENGTH_MEASURE_TYPES
-                            or prop_lower in _LENGTH_DIRECT_ATTRS):
-                        actual_value = round(actual_value * _unit_scale_mm, 4)
+                # Resolve property-referencing bounds for this specific element
+                # (each stair flight has its own Run, so this must be per-element,
+                # unlike the rule-level numeric value_min/value_max).
+                resolved_value_min = None
+                resolved_value_max = None
+                if value_min_property:
+                    min_val, _, _ = self._resolve_element_property(
+                        el, value_min_property, spatial=spatial, unit_scale_mm=_unit_scale_mm
+                    )
+                    if isinstance(min_val, (int, float)):
+                        resolved_value_min = round(min_val + value_min_offset, 4)
+                if value_max_property:
+                    max_val, _, _ = self._resolve_element_property(
+                        el, value_max_property, spatial=spatial, unit_scale_mm=_unit_scale_mm
+                    )
+                    if isinstance(max_val, (int, float)):
+                        resolved_value_max = round(max_val + value_max_offset, 4)
 
                 # ── Type, material context ────────────────────────────────
                 try:
@@ -876,6 +940,9 @@ class Module2_IFCRead:
                         "actual_value": actual_value,
                         "found_pset": found_pset,
                         "found": actual_value is not None,
+                        # Property-referencing bounds resolved for this element
+                        "resolved_value_min": resolved_value_min,
+                        "resolved_value_max": resolved_value_max,
                         # Gap 1: rich property metadata
                         "value_type": rich_detail.get("value_type"),
                         "value_unit": rich_detail.get("unit"),
@@ -904,6 +971,10 @@ class Module2_IFCRead:
                     "check_value": self._decode_json_val(rule.get("check_value")),
                     "value_min": self._decode_json_val(rule.get("value_min")),
                     "value_max": self._decode_json_val(rule.get("value_max")),
+                    "value_min_property": value_min_property,
+                    "value_max_property": value_max_property,
+                    "value_min_offset": value_min_offset,
+                    "value_max_offset": value_max_offset,
                     "unit": str(rule.get("unit") or ""),
                     "severity": str(rule.get("severity") or "mandatory"),
                     "elements": element_results,

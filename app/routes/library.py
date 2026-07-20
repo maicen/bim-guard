@@ -259,7 +259,11 @@ def setup_routes(rt):
         return redirect_see_other("/library/documents")
 
     @rt("/library/rules")
-    def rules_list(message: str = ""):
+    def rules_list(message: str = "", needs_review: int = 0):
+        needs_review_only = bool(needs_review)
+        rows = (
+            _rule_service.fetch_needs_review() if needs_review_only else _rule_service.list_rules()
+        )
         return Title("Rules - BIM Guard"), DashboardLayout(
             Container(
                 DivLAligned(
@@ -280,7 +284,12 @@ def setup_routes(rt):
                     cls="justify-end",
                 ),
                 rules_folders_panel(_folders_with_rules()),
-                rules_panel(_rule_service.list_rules(), message=message or None),
+                rules_panel(
+                    rows,
+                    message=message or None,
+                    needs_review_only=needs_review_only,
+                    needs_review_count=_rule_service.count_needs_review(),
+                ),
                 cls="space-y-4",
             )
         )
@@ -363,8 +372,23 @@ def setup_routes(rt):
         check_value = _decode_json_field(rule.get("check_value"))
         value_min = _decode_json_field(rule.get("value_min"))
         value_max = _decode_json_field(rule.get("value_max"))
-        if operator == "between" and value_min and value_max:
-            condition = f"between {value_min} and {value_max} {unit}".strip()
+        value_min_property = (rule.get("value_min_property") or "").strip()
+        value_max_property = (rule.get("value_max_property") or "").strip()
+        value_min_offset = _decode_json_field(rule.get("value_min_offset")) or "0"
+        value_max_offset = _decode_json_field(rule.get("value_max_offset")) or "0"
+
+        def _bound_desc(fixed_value: str, ref_property: str, offset: str) -> str:
+            if ref_property:
+                offset_txt = f" + {offset}" if offset and offset != "0" else ""
+                return f"its own {ref_property}{offset_txt}"
+            return fixed_value
+
+        if operator == "between" and (
+            (value_min and value_max) or value_min_property or value_max_property
+        ):
+            lo = _bound_desc(value_min, value_min_property, value_min_offset)
+            hi = _bound_desc(value_max, value_max_property, value_max_offset)
+            condition = f"between {lo} and {hi} {unit}".strip()
         elif operator:
             condition = f"{operator} {check_value} {unit}".strip()
         else:
@@ -473,6 +497,10 @@ def setup_routes(rt):
         check_value: str = "",
         value_min: str = "",
         value_max: str = "",
+        value_min_property: str = "",
+        value_max_property: str = "",
+        value_min_offset: str = "",
+        value_max_offset: str = "",
         unit: str = "",
         # classification
         severity: str = "mandatory",
@@ -504,6 +532,10 @@ def setup_routes(rt):
             check_value=check_value or None,
             value_min=value_min or None,
             value_max=value_max or None,
+            value_min_property=value_min_property,
+            value_max_property=value_max_property,
+            value_min_offset=value_min_offset or 0,
+            value_max_offset=value_max_offset or 0,
             unit=unit,
             severity=severity,
             keyword=keyword,
@@ -610,6 +642,10 @@ def setup_routes(rt):
             check_value=_cv,
             value_min=rule.get("value_min"),
             value_max=rule.get("value_max"),
+            value_min_property=str(rule.get("value_min_property") or ""),
+            value_max_property=str(rule.get("value_max_property") or ""),
+            value_min_offset=rule.get("value_min_offset") or 0,
+            value_max_offset=rule.get("value_max_offset") or 0,
             unit=str(rule.get("unit") or ""),
             applies_when=rule.get("applies_when") or {},
             severity=str(rule.get("severity") or "mandatory"),
@@ -657,6 +693,10 @@ def setup_routes(rt):
                 check_value=_cv,
                 value_min=rule.get("value_min"),
                 value_max=rule.get("value_max"),
+                value_min_property=str(rule.get("value_min_property") or ""),
+                value_max_property=str(rule.get("value_max_property") or ""),
+                value_min_offset=rule.get("value_min_offset") or 0,
+                value_max_offset=rule.get("value_max_offset") or 0,
                 unit=str(rule.get("unit") or ""),
                 applies_when=rule.get("applies_when") or {},
                 severity=str(rule.get("severity") or "mandatory"),

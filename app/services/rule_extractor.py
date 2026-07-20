@@ -53,6 +53,10 @@ a top-level "rules" array. Each rule MUST have ALL of the following fields:
   "value":             860,
   "value_min":         null,
   "value_max":         null,
+  "value_min_property": null,
+  "value_max_property": null,
+  "value_min_offset":  0,
+  "value_max_offset":  0,
   "unit":              "mm | m | m2 | deg | ratio | null",
 
   "applies_when": {
@@ -80,7 +84,37 @@ RULES:
 - Use "exists" operator + value null for presence-only checks.
 - Set confidence < 0.7 and needs_review true when the text is ambiguous.
 - Skip commentary, examples, definitions, and duplicate rules.
-- Exclude requirements that cannot be expressed as a discrete checkable rule.\
+- Exclude requirements that cannot be expressed as a discrete checkable rule.
+
+RELATIVE BOUNDS (value_min_property / value_max_property):
+Some requirements define a min/max bound as ANOTHER PROPERTY OF THE SAME ELEMENT,
+not a fixed number — e.g. "must be at least as wide as X" or "must not exceed X plus
+25 mm", where X is itself a measured property (Run, Width, Height, ...) that varies
+per element instance. NEVER flatten this into a literal numeric value_min/value_max —
+that silently produces a wrong absolute range (e.g. treating "0 to 25mm" as the
+allowed range instead of "the element's own X, up to X+25mm").
+
+Instead:
+- Set "value_min_property" / "value_max_property" to the IFC property name that the
+  bound is measured relative to (e.g. "Run"), and leave value_min/value_max null.
+- Set "value_min_offset" / "value_max_offset" to the fixed amount added to that
+  property to get the actual bound (0 if there's no offset).
+- Only set the side(s) that are actually relative; a rule can mix a relative bound on
+  one side with a fixed value_min/value_max on the other, or use only one side.
+
+Example — OBC 9.8.4.3.(3): "Depth of a tapered tread must be between its run and its
+run plus 25 mm.":
+{
+  "ref": "9.8.4.3.(3)", "desc": "Tapered tread depth must be between its run and run + 25mm",
+  "target": "IfcStairFlight", "property_set": "Pset_StairFlightCommon",
+  "property_name": "TreadLength", "fallback_property": "TreadDepth",
+  "rule_type": "numeric_range", "operator": "between", "value": null,
+  "value_min": null, "value_max": null,
+  "value_min_property": "Run", "value_max_property": "Run",
+  "value_min_offset": 0, "value_max_offset": 25,
+  "unit": "mm", "severity": "mandatory", "keyword": "shall",
+  "compliance_type": "prescriptive", "confidence": 0.85, "needs_review": false
+}\
 """
 
 
@@ -212,6 +246,10 @@ def _normalize(rules: list) -> list[dict]:
                 "check_value": check_value,  # Module 3 / RuleGenerator key
                 "value_min": rule.get("value_min"),
                 "value_max": rule.get("value_max"),
+                "value_min_property": str(rule.get("value_min_property") or "").strip(),
+                "value_max_property": str(rule.get("value_max_property") or "").strip(),
+                "value_min_offset": rule.get("value_min_offset") or 0,
+                "value_max_offset": rule.get("value_max_offset") or 0,
                 "unit": str(rule.get("unit") or "").strip(),
                 "applies_when": applies_when,
                 "severity": str(rule.get("severity") or "mandatory").strip(),

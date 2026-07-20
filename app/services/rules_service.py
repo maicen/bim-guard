@@ -16,6 +16,16 @@ _RICH_COLUMNS = {
     "check_value": str,  # JSON-encoded scalar / null
     "value_min": str,
     "value_max": str,
+    # Relative bounds: when set, value_min/value_max above are ignored and the
+    # bound is instead resolved per-element as (that element's own named
+    # property + offset) — e.g. "tread depth between its run and its run plus
+    # 25mm" -> value_max_property="Run", value_max_offset=25. Lets a rule
+    # compare one property against another property of the SAME element
+    # instead of only a fixed literal number.
+    "value_min_property": str,
+    "value_max_property": str,
+    "value_min_offset": str,  # JSON-encoded numeric, default 0
+    "value_max_offset": str,  # JSON-encoded numeric, default 0
     "unit": str,
     "applies_when": str,  # JSON object string
     "severity": str,
@@ -122,6 +132,10 @@ class RuleService:
         check_value=None,
         value_min=None,
         value_max=None,
+        value_min_property: str = "",
+        value_max_property: str = "",
+        value_min_offset=0,
+        value_max_offset=0,
         unit: str = "",
         applies_when: dict | None = None,
         severity: str = "mandatory",
@@ -155,6 +169,10 @@ class RuleService:
                 "check_value": json.dumps(check_value),
                 "value_min": json.dumps(value_min),
                 "value_max": json.dumps(value_max),
+                "value_min_property": value_min_property or "",
+                "value_max_property": value_max_property or "",
+                "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
+                "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
                 "unit": unit or "",
                 "applies_when": json.dumps(applies_when or {}),
                 "severity": severity or "mandatory",
@@ -195,6 +213,10 @@ class RuleService:
         check_value=None,
         value_min=None,
         value_max=None,
+        value_min_property: str = "",
+        value_max_property: str = "",
+        value_min_offset=0,
+        value_max_offset=0,
         unit: str = "",
         # classification
         severity: str = "mandatory",
@@ -224,6 +246,10 @@ class RuleService:
                 "check_value": json.dumps(self._parse_numeric(check_value)),
                 "value_min": json.dumps(self._parse_numeric(value_min)),
                 "value_max": json.dumps(self._parse_numeric(value_max)),
+                "value_min_property": value_min_property or "",
+                "value_max_property": value_max_property or "",
+                "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
+                "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
                 "unit": unit or "",
                 "severity": severity or "mandatory",
                 "keyword": keyword or "",
@@ -370,8 +396,13 @@ class RuleService:
         return list(self._rules.rows_where("reference LIKE ?", [f"%{ref}%"]))
 
     def fetch_needs_review(self) -> list[dict]:
-        """Return rules flagged for manual review."""
-        return list(self._rules.rows_where("needs_review = 1"))
+        """Return rules flagged for manual review, newest first."""
+        rows = self._rules.rows_where("needs_review = 1")
+        return sorted(rows, key=lambda row: row["id"], reverse=True)
+
+    def count_needs_review(self) -> int:
+        """Return the number of rules flagged for manual review."""
+        return len(self._rules.rows_where("needs_review = 1"))
 
     def get_existing_entity_types(self) -> list[str]:
         """Return distinct target IFC classes present in stored rules."""

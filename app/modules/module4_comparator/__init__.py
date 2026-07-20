@@ -93,7 +93,18 @@ class Module4_Comparator:
                 })
                 continue
 
-            passed, reason = self._compare(operator, actual, check_val, val_min, val_max, unit)
+            # Property-referencing bounds (value_min_property / value_max_property)
+            # are resolved per-element by Module 2 since each element can have a
+            # different reference value (e.g. each stair flight's own Run).
+            # Fall back to the rule-level numeric bound when no per-element
+            # bound was resolved (either the rule uses a fixed value, or the
+            # referenced property wasn't found on this element).
+            el_val_min = el.get("resolved_value_min")
+            el_val_min = el_val_min if el_val_min is not None else val_min
+            el_val_max = el.get("resolved_value_max")
+            el_val_max = el_val_max if el_val_max is not None else val_max
+
+            passed, reason = self._compare(operator, actual, check_val, el_val_min, el_val_max, unit)
             if passed:
                 pass_count += 1
             else:

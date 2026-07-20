@@ -140,7 +140,18 @@ def _select_all_checkbox():
     )
 
 
-def rules_table_rows(rows: list[dict]):
+def _needs_review_badge(row: dict):
+    if not row.get("needs_review"):
+        return Span("-", cls="text-xs text-muted-foreground")
+    confidence = row.get("confidence")
+    label = "Review" + (f" ({confidence})" if confidence not in (None, "") else "")
+    return Span(
+        label,
+        cls="text-xs font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-800",
+    )
+
+
+def rules_table_rows(rows: list[dict], empty_message: str = "No rules available yet."):
     def _build_row(row: dict):
         return Tr(
             Td(Input(type="checkbox", name="rule_ids", value=str(row["id"]), cls="h-4 w-4")),
@@ -149,6 +160,7 @@ def rules_table_rows(rows: list[dict]):
             Td(row.get("rule_type", "-")),
             Td(row.get("target_ifc_class", "-")),
             Td(row.get("rule_category", "-"), cls="text-xs text-muted-foreground"),
+            Td(_needs_review_badge(row)),
             Td(row.get("updated_at", "-"), cls="text-sm text-muted-foreground"),
             Td(
                 (row.get("description") or "")[:100]
@@ -167,7 +179,7 @@ def rules_table_rows(rows: list[dict]):
     return build_table_rows(
         rows,
         _build_row,
-        TableSpec(empty_message="No rules available yet.", empty_colspan=9),
+        TableSpec(empty_message=empty_message, empty_colspan=10),
     )
 
 
@@ -249,6 +261,7 @@ def rules_folders_panel(folders: list[dict], message: str | None = None, level: 
                                     Th("Type"),
                                     Th("Target Class"),
                                     Th("Category"),
+                                    Th("Review"),
                                     Th("Updated"),
                                     Th("Description"),
                                     Th("Actions"),
@@ -297,20 +310,48 @@ def rules_folders_panel(folders: list[dict], message: str | None = None, level: 
     )
 
 
-def rules_panel(rows: list[dict], message: str | None = None, level: str = "success"):
+def rules_panel(
+    rows: list[dict],
+    message: str | None = None,
+    level: str = "success",
+    needs_review_only: bool = False,
+    needs_review_count: int = 0,
+):
     alert = MessageAlert(AlertSpec(message=message, level=level))
+
+    if needs_review_only:
+        filter_toggle = LinkButton(
+            "All Rules",
+            href="/library/rules",
+            variant="secondary",
+            cls="text-sm",
+        )
+        empty_message = "Nothing flagged for review right now."
+    else:
+        label = f"Needs Review ({needs_review_count})" if needs_review_count else "Needs Review"
+        filter_toggle = LinkButton(
+            label,
+            href="/library/rules?needs_review=1",
+            variant="secondary",
+            cls="text-sm",
+        )
+        empty_message = "No rules available yet."
 
     return Div(
         *alert,
         Card(
             CardHeader(
                 Div(
-                    CardTitle("Rule Library"),
-                    LinkButton(
-                        "Import JSON Ruleset",
-                        href="/library/rules/import-json",
-                        variant="secondary",
-                        cls="text-sm",
+                    CardTitle("Rule Library" + (" — Needs Review" if needs_review_only else "")),
+                    Div(
+                        filter_toggle,
+                        LinkButton(
+                            "Import JSON Ruleset",
+                            href="/library/rules/import-json",
+                            variant="secondary",
+                            cls="text-sm",
+                        ),
+                        cls="flex items-center gap-2",
                     ),
                     cls="flex items-center justify-between gap-2 flex-wrap",
                 )
@@ -336,12 +377,13 @@ def rules_panel(rows: list[dict], message: str | None = None, level: str = "succ
                                         Th("Type"),
                                         Th("Target Class"),
                                         Th("Category"),
+                                        Th("Review"),
                                         Th("Updated"),
                                         Th("Description"),
                                         Th("Actions"),
                                     )
                                 ),
-                                Tbody(*rules_table_rows(rows)),
+                                Tbody(*rules_table_rows(rows, empty_message=empty_message)),
                                 cls="w-full min-w-[1200px]",
                             ),
                             cls="w-full min-w-0 max-h-[65vh] overflow-auto",
@@ -557,6 +599,54 @@ def rule_form(title: str, action: str, rule: dict | None = None):
                         input_type="number",
                     ),
                     cls="grid grid-cols-3 gap-3",
+                ),
+                Span(
+                    "Relative bounds (optional) — when the min/max is itself another "
+                    "property of the element (e.g. tread depth must be between its own "
+                    "Run and Run + 25mm), set the property name here instead of a fixed "
+                    "Value Min/Max above. Leave blank to use the fixed values above.",
+                    cls="text-xs text-muted-foreground block",
+                ),
+                Div(
+                    TextInputField(
+                        FieldSpec(
+                            label="Value Min Property",
+                            field_id="value_min_property",
+                            name="value_min_property",
+                            value=rule.get("value_min_property", ""),
+                            placeholder="e.g. Run",
+                        )
+                    ),
+                    TextInputField(
+                        FieldSpec(
+                            label="Value Min Offset",
+                            field_id="value_min_offset",
+                            name="value_min_offset",
+                            value=_decode_json_field(rule.get("value_min_offset")),
+                            placeholder="added to Min Property",
+                        ),
+                        input_type="number",
+                    ),
+                    TextInputField(
+                        FieldSpec(
+                            label="Value Max Property",
+                            field_id="value_max_property",
+                            name="value_max_property",
+                            value=rule.get("value_max_property", ""),
+                            placeholder="e.g. Run",
+                        )
+                    ),
+                    TextInputField(
+                        FieldSpec(
+                            label="Value Max Offset",
+                            field_id="value_max_offset",
+                            name="value_max_offset",
+                            value=_decode_json_field(rule.get("value_max_offset")),
+                            placeholder="added to Max Property",
+                        ),
+                        input_type="number",
+                    ),
+                    cls="grid grid-cols-4 gap-3",
                 ),
                 TextInputField(
                     FieldSpec(

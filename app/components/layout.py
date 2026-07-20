@@ -34,6 +34,7 @@ NAV_ICONS = {
     "Documents": "book-open",
     "Rule Extraction Studio": "list-checks",
     "Rules": "list-checks",
+    "Modeling Manual": "box",
     "Settings": "settings",
 }
 
@@ -123,6 +124,14 @@ def AppSidebar():
             ],
         ),
         (
+            "Library",
+            [
+                ("Documents", "/library/documents"),
+                ("Rule Extraction Studio", "/library/rules/extract"),
+                ("Rules", "/library/rules"),
+            ],
+        ),
+        (
             "Analysis",
             [
                 ("Simple Analysis", "/analysis/simple"),
@@ -132,11 +141,9 @@ def AppSidebar():
             ],
         ),
         (
-            "Library",
+            "3D Modeling Manual",
             [
-                ("Documents", "/library/documents"),
-                ("Rule Extraction Studio", "/library/rules/extract"),
-                ("Rules", "/library/rules"),
+                ("Modeling Manual", "/modeling-manual"),
             ],
         ),
     ]
