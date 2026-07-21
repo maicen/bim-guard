@@ -124,7 +124,7 @@ The repository includes `render.yaml` for Docker-based deployment on Render. Set
 - `README.md`, `AGENTS.md`, `CLAUDE.md`, and `.github/instructions/project-specific.instructions.md` are the main source files for project guidance.
 - There is no separate `requirements.txt`; dependency management is handled with `uv` in `pyproject.toml`.
 
-6. Results are de-duplicated and displayed for review.
+1. Results are de-duplicated and displayed for review.
 2. Accepted rules can be saved directly to the Rule Library.
 
 ## Documentation Map
