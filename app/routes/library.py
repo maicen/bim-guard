@@ -17,6 +17,7 @@ from monsterui.all import (
     CardHeader,
     CardTitle,
     Container,
+    ContainerT,
     DivLAligned,
     Form,
     FormLabel,
@@ -290,8 +291,9 @@ def setup_routes(rt):
                     needs_review_only=needs_review_only,
                     needs_review_count=_rule_service.count_needs_review(),
                 ),
-                cls="space-y-4",
-            )
+                cls=(ContainerT.expand, "space-y-4"),
+            ),
+            content_cls="p-10 w-full max-w-none space-y-10",
         )
 
     @rt("/library/rules/new")
@@ -833,7 +835,9 @@ def setup_routes(rt):
 
         local_path = ObjectStorage().materialize_local_path(document.get("file_path") or "")
         if local_path is None:
-            return Alert("Could not locate the stored PDF file for this document.", cls=AlertT.error)
+            return Alert(
+                "Could not locate the stored PDF file for this document.", cls=AlertT.error
+            )
 
         ruleset_id = folder_name.strip() or Path(filename).stem
         try:

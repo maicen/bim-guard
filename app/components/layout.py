@@ -193,11 +193,11 @@ def AppSidebar():
     )
 
 
-def DashboardLayout(*content):
+def DashboardLayout(*content, content_cls: str = "p-10 max-w-6xl mx-auto space-y-10"):
     """
     Standard layout for dashboard pages with collapsible sidebar primitives.
     """
     return SidebarProvider(cls=SiteStyles.bg)(
         AppSidebar(),
-        SidebarInset(Main(cls="flex-1")(Div(cls="p-10 max-w-6xl mx-auto space-y-10")(*content))),
+        SidebarInset(Main(cls="flex-1")(Div(cls=content_cls)(*content))),
     )

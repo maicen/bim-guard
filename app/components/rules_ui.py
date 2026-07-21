@@ -236,7 +236,7 @@ def rules_folders_panel(folders: list[dict], message: str | None = None, level: 
                 hx_target="#rule-folders-panel",
                 hx_swap="outerHTML",
                 hx_confirm=(
-                    f"Delete folder \"{ruleset_id}\" and all {f['count']} rule(s) "
+                    f'Delete folder "{ruleset_id}" and all {f["count"]} rule(s) '
                     "inside it? This cannot be undone."
                 ),
                 cls="flex items-center",
@@ -275,8 +275,7 @@ def rules_folders_panel(folders: list[dict], message: str | None = None, level: 
                     method="post",
                     action="/api/rules/bulk-delete",
                     onsubmit=(
-                        "return confirm('Delete the selected rule(s)? "
-                        "This cannot be undone.')"
+                        "return confirm('Delete the selected rule(s)? This cannot be undone.')"
                     ),
                 )
                 if folder_rules
@@ -304,6 +303,7 @@ def rules_folders_panel(folders: list[dict], message: str | None = None, level: 
         Card(
             CardHeader(CardTitle("Rule Folders")),
             CardContent(body),
+            cls="w-full",
         ),
         id="rule-folders-panel",
         cls="space-y-2",
@@ -393,8 +393,7 @@ def rules_panel(
                     method="post",
                     action="/api/rules/bulk-delete",
                     onsubmit=(
-                        "return confirm('Delete the selected rule(s)? "
-                        "This cannot be undone.')"
+                        "return confirm('Delete the selected rule(s)? This cannot be undone.')"
                     ),
                     cls="w-full min-w-0 pt-0",
                 ),
