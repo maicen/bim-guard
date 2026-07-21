@@ -83,6 +83,8 @@ MISTRAL_API_KEY=...
 
 You can also pin the default LLM model with `BIM_GUARD_RULE_MODEL`.
 
+Supabase schema changes are now tracked in-repo under `supabase/migrations/`. For a fresh Supabase environment, apply the migrations in that folder instead of relying on runtime table creation.
+
 ### 3. Run the app
 
 ```bash
