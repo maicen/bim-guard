@@ -9,6 +9,7 @@ from monsterui.all import (
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
+from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
 from app.utils import load_env_file
 
 load_env_file()
@@ -101,6 +102,7 @@ def _seed_library() -> None:
         # Seed extended OBC rules (NumberOfRiser, IsExternal, fixture checks, etc.)
         if not svc.has_ruleset("OBC-PART9-EXT"):
             from app.modules.module3_rule_builder.obc_extended_rules import OBC_EXTENDED_RULES
+
             for rule in OBC_EXTENDED_RULES:
                 svc.create_rule(
                     reference=str(rule.get("ref") or "OBC"),
@@ -146,6 +148,10 @@ def _setup_routes() -> None:
 
 
 _seed_library()
+try:
+    warm_optional_rule_pipeline_dependencies()
+except Exception:
+    pass
 _setup_routes()
 
 

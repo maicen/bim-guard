@@ -28,6 +28,7 @@ from pathlib import Path
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.modules.module1_doc_parser.section_chunker import SectionChunker
 from app.services.llm_client import LiteLLMClient
+from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
 from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
 
 # ── Optional module flags ─────────────────────────────────────────────────────
@@ -177,6 +178,7 @@ class RuleExtractionService:
         text_key = "text"
         sendable = chunks_to_process
         bert_chunks = None
+        warnings.extend(warm_optional_rule_pipeline_dependencies())
 
         if _SPACY_AVAILABLE:
             try:

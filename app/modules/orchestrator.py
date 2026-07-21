@@ -42,6 +42,10 @@ import sys
 from pathlib import Path
 
 from app.services.persistence import PersistenceService
+from app.services.pipeline_dependencies import (
+    describe_rule_store,
+    warm_optional_rule_pipeline_dependencies,
+)
 
 # The pipeline's progress logging uses box-drawing/unicode symbols, which
 # crash with UnicodeEncodeError on Windows consoles/servers defaulting to
@@ -53,7 +57,6 @@ for _stream in (sys.stdout, sys.stderr):
     except (AttributeError, ValueError):
         pass
 
-DB_PATH = PersistenceService.DB_PATH
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # ── SWITCH HERE ───────────────────────────────────────────────────────────────
@@ -119,8 +122,12 @@ def run_pipeline(
     print(f"  PDF       : {pdf_path.name}")
     print(f"  Converter : {converter_name.upper()}")
     print(f"  Sections  : {run_sections}")
-    print(f"  DB        : {DB_PATH}")
+    print(f"  DB        : {describe_rule_store()}")
     print(f"{'=' * 60}\n")
+
+    dependency_warnings = list(warm_optional_rule_pipeline_dependencies())
+    for warning in dependency_warnings:
+        print(f"  [WARN] {warning}")
 
     # ── Initialise ────────────────────────────────────────────────────────────
     store = RuleStore()  # delegates to RuleService (shared web DB)
@@ -186,7 +193,7 @@ def run_pipeline(
     # MODULE 1 — STEP 4: Keyword Filter
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── MODULE 1 / STEP 4: KEYWORD FILTER ──")
-    warnings: list[str] = []
+    warnings: list[str] = list(dependency_warnings)
     try:
         filtered_chunks = KeywordFilter().score_chunks(chunks)
     except (ImportError, OSError) as exc:

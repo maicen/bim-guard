@@ -2,7 +2,7 @@
 module3_rule_builder/rule_store.py
 -----------------------------------
 Adapter that forwards all reads/writes to the web app's RuleService so the
-CLI pipeline and the web app share one SQLite table (data/bimguard.sqlite).
+CLI pipeline and the web app share the same configured rules table.
 
 Public interface is identical to the original standalone RuleStore, so
 RuleGenerator, TableRuleBuilder, RuleConverter, obc_seed_rules, orchestrator,
@@ -13,8 +13,8 @@ Field-name mapping (CLI → web):
     desc   → description
     target → target_ifc_class
 
-The db_path constructor argument is accepted but ignored; the connection is
-managed by PersistenceService.
+The db_path constructor argument is accepted but ignored; PersistenceService
+owns the active backend connection.
 """
 
 import json
@@ -55,6 +55,10 @@ def _to_cli(r: dict) -> dict:
         "check_value": _jload(r.get("check_value")),
         "value_min": _jload(r.get("value_min")),
         "value_max": _jload(r.get("value_max")),
+        "value_min_property": r.get("value_min_property", ""),
+        "value_max_property": r.get("value_max_property", ""),
+        "value_min_offset": _jload(r.get("value_min_offset")),
+        "value_max_offset": _jload(r.get("value_max_offset")),
         "unit": r.get("unit", ""),
         "applies_when": _jload(r.get("applies_when")) or {},
         "severity": r.get("severity", "mandatory"),
@@ -90,34 +94,40 @@ class RuleStore:
         Save a single validated rule dict.  Returns the new row ID as str.
         Accepts the CLI field-name convention (ref / desc / target).
         """
-        return self._row_id(self._svc.create_rule(
-            reference=str(rule.get("ref") or ""),
-            rule_type=str(rule.get("rule_type") or "numeric_comparison"),
-            description=str(rule.get("desc") or ""),
-            target_ifc_class=str(rule.get("target") or "Unspecified"),
-            source_text=str(rule.get("source_text") or ""),
-            property_set=str(rule.get("property_set") or ""),
-            property_name=str(rule.get("property_name") or ""),
-            fallback_property=str(rule.get("fallback_property") or ""),
-            operator=str(rule.get("operator") or ""),
-            check_value=rule.get("check_value"),
-            value_min=rule.get("value_min"),
-            value_max=rule.get("value_max"),
-            unit=str(rule.get("unit") or ""),
-            applies_when=rule.get("applies_when") or {},
-            severity=str(rule.get("severity") or "mandatory"),
-            keyword=str(rule.get("keyword") or ""),
-            compliance_type=str(rule.get("compliance_type") or ""),
-            exceptions=rule.get("exceptions") or [],
-            related_refs=rule.get("related_refs") or [],
-            overridden_by=str(rule.get("overridden_by") or ""),
-            confidence=float(rule.get("confidence") or 0.8),
-            extraction_method=str(rule.get("extraction_method") or "llm"),
-            needs_review=bool(rule.get("needs_review", False)),
-            mechanism=str(rule.get("mechanism") or ""),
-            ruleset_id=str(rule.get("ruleset_id") or ""),
-            rule_category=str(rule.get("rule_category") or "property_check"),
-        ))
+        return self._row_id(
+            self._svc.create_rule(
+                reference=str(rule.get("ref") or ""),
+                rule_type=str(rule.get("rule_type") or "numeric_comparison"),
+                description=str(rule.get("desc") or ""),
+                target_ifc_class=str(rule.get("target") or "Unspecified"),
+                source_text=str(rule.get("source_text") or ""),
+                property_set=str(rule.get("property_set") or ""),
+                property_name=str(rule.get("property_name") or ""),
+                fallback_property=str(rule.get("fallback_property") or ""),
+                operator=str(rule.get("operator") or ""),
+                check_value=rule.get("check_value"),
+                value_min=rule.get("value_min"),
+                value_max=rule.get("value_max"),
+                value_min_property=str(rule.get("value_min_property") or ""),
+                value_max_property=str(rule.get("value_max_property") or ""),
+                value_min_offset=rule.get("value_min_offset") or 0,
+                value_max_offset=rule.get("value_max_offset") or 0,
+                unit=str(rule.get("unit") or ""),
+                applies_when=rule.get("applies_when") or {},
+                severity=str(rule.get("severity") or "mandatory"),
+                keyword=str(rule.get("keyword") or ""),
+                compliance_type=str(rule.get("compliance_type") or ""),
+                exceptions=rule.get("exceptions") or [],
+                related_refs=rule.get("related_refs") or [],
+                overridden_by=str(rule.get("overridden_by") or ""),
+                confidence=float(rule.get("confidence") or 0.8),
+                extraction_method=str(rule.get("extraction_method") or "llm"),
+                needs_review=bool(rule.get("needs_review", False)),
+                mechanism=str(rule.get("mechanism") or ""),
+                ruleset_id=str(rule.get("ruleset_id") or ""),
+                rule_category=str(rule.get("rule_category") or "property_check"),
+            )
+        )
 
     @staticmethod
     def _row_id(row) -> str:
