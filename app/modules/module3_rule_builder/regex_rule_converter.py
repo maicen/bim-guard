@@ -37,7 +37,9 @@ PROPERTY_KEYWORDS = [
     ("tread", "TreadDepth"),
     ("nosing", "NosingLength"),
     # Fire & life safety
+    ("fire-resistance rating", "FireRating"),
     ("fire resistance rating", "FireRating"),
+    ("fire-resistance", "FireRating"),
     ("fire resistance", "FireRating"),
     ("fire rating", "FireRating"),
     ("fire retardant", "FireRating"),
@@ -110,6 +112,16 @@ UNIT_ALIASES = {
     "°": "deg",
     "%": "ratio",
     "m": "m",
+    # Durations — fire-resistance ratings, self-closing device timing, egress
+    # travel time, etc. (e.g. "fire-resistance rating of not less than 45 min").
+    "minutes": "min",
+    "minute": "min",
+    "mins": "min",
+    "min": "min",
+    "hours": "hr",
+    "hour": "hr",
+    "hrs": "hr",
+    "hr": "hr",
 }
 # Longest alias first so "mm" / "millimetres" win over a bare "m" at the same position.
 _UNIT_PATTERN = "|".join(re.escape(u) for u in sorted(UNIT_ALIASES, key=len, reverse=True))
@@ -138,7 +150,7 @@ _PATTERNS = [
     ),
     (
         re.compile(
-            rf"\b(?:not (?:be )?more than|no more than|maximum(?: of)?|at most)\s+{_NUM}\s*({_UNIT_PATTERN})\b",
+            rf"\b(?:not (?:be )?more than|no more than|no greater than|maximum(?: of)?|at most|not (?:to )?exceed)\s+{_NUM}\s*({_UNIT_PATTERN})\b",
             re.IGNORECASE,
         ),
         "<=",

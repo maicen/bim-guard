@@ -1514,6 +1514,19 @@ def _egress_checks_card(egress: dict):
 # Module-level cache for CSV export (populated in analysis_run_post)
 _last_compliance_results: list[dict] = []
 
+# Module-level cache for the Simple Analysis per-category Excel export
+# (populated in analysis_simple_post)
+_last_simple_compliance: list[dict] = []
+
+_SIMPLE_CATEGORY_TARGETS: dict[str, list[str]] = {
+    "windows":   ["IfcWindow"],
+    "doors":     ["IfcDoor"],
+    "stairs":    ["IfcStairFlight", "IfcRailing"],
+    "ramps":     ["IfcRamp", "IfcRampFlight"],
+    "washrooms": ["IfcSanitaryTerminal"],
+    "fire":      ["IfcAlarm"],
+}
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Simple Analysis — domain-based compliance card helpers
@@ -1542,51 +1555,48 @@ def _domain_badge(rule_results: list) -> tuple:
     return "All pass", "bg-green-100 text-green-800"
 
 
-def _simple_elem_tbl(elements: list, operator: str = "", check_val=None, unit: str = ""):
-    """Scrollable element table with Floor/Room/GUID/Actual/Required/Issue columns."""
-    if not elements:
+def _simple_full_elem_tbl(all_elements: list, rule: dict):
+    """Scrollable element table for one rule — every evaluated element (pass,
+    fail, and missing), sorted so problems surface first."""
+    if not all_elements:
         return P("No elements.", cls="text-xs text-muted-foreground")
 
-    def _req(op, cv, u):
-        if op == ">=" and cv is not None: return f"≥ {cv} {u}".strip()
-        if op == "<=" and cv is not None: return f"≤ {cv} {u}".strip()
-        if op == "between": return "in range"
-        return f"{op} {cv} {u}".strip() if cv is not None else "—"
+    required = _rule_required_text(rule)
+    unit = rule.get("unit", "") or ""
+    order = {"FAIL": 0, "MISSING": 1, "PASS": 2}
+    ordered = sorted(all_elements, key=lambda el: order.get(el.get("status"), 3))
 
     rows = []
-    for el in elements[:30]:
-        actual = el.get("actual") if "actual" in el else el.get("actual_value")
-        reason = el.get("reason") or ""
+    for el in ordered[:50]:
+        status = el.get("status")
+        actual = el.get("actual")
+        actual_txt = _fmt_val_s(actual) + (f" {unit}" if unit and actual is not None else "")
         storey = el.get("storey") or "—"
         space = el.get("space") or ""
         guid = (el.get("guid") or "")[:14]
-        name = (el.get("element_name") or el.get("name") or "—")[:32]
-        is_fail = bool(reason)
+        name = (el.get("element_name") or "—")[:32]
+        if status == "FAIL":
+            status_txt, status_cls, row_cls = el.get("reason") or "fail", "text-red-700 font-semibold", "bg-red-50"
+        elif status == "MISSING":
+            status_txt, status_cls, row_cls = "missing", "text-yellow-700 font-semibold", "bg-yellow-50"
+        else:
+            status_txt, status_cls, row_cls = "✓ pass", "text-green-700", ""
         rows.append(Tr(
             Td(Span(name, cls="text-xs font-mono"), cls="px-3 py-2"),
             Td(
                 Span(storey, cls="text-xs block"),
-                Span(space, cls="text-xs text-muted-foreground block") if space else "",
+                Span(space, cls="text-xs text-muted-foreground block") if space and space != "—" else "",
                 cls="px-3 py-2",
             ),
             Td(Span(guid, cls="text-xs font-mono text-muted-foreground"), cls="px-3 py-2"),
-            Td(
-                _fmt_val_s(actual) + (f" {unit}" if unit and actual is not None else ""),
-                cls="px-3 py-2 text-xs font-mono",
-            ),
-            Td(_req(operator, check_val, unit), cls="px-3 py-2 text-xs text-muted-foreground"),
-            Td(
-                Span(
-                    reason if reason else "missing",
-                    cls=f"text-xs font-semibold {'text-red-700' if is_fail else 'text-yellow-700'}",
-                ),
-                cls="px-3 py-2",
-            ),
-            cls="border-b border-muted last:border-0",
+            Td(actual_txt, cls="px-3 py-2 text-xs font-mono"),
+            Td(required, cls="px-3 py-2 text-xs text-muted-foreground"),
+            Td(Span(status_txt, cls=f"text-xs {status_cls}"), cls="px-3 py-2"),
+            cls=f"border-b border-muted last:border-0 {row_cls}",
         ))
-    if len(elements) > 30:
+    if len(ordered) > 50:
         rows.append(Tr(Td(
-            f"… and {len(elements) - 30} more",
+            f"… and {len(ordered) - 50} more",
             cls="px-3 py-2 text-xs text-muted-foreground italic",
             colspan="6",
         )))
@@ -1594,12 +1604,204 @@ def _simple_elem_tbl(elements: list, operator: str = "", check_val=None, unit: s
         Table(
             Thead(Tr(*[
                 Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-                for h in ("Element", "Floor / Room", "GUID", "Actual", "Required", "Issue")
+                for h in ("Element", "Floor / Room", "GUID", "Actual", "Required", "Status")
             ])),
             Tbody(*rows),
             cls="w-full text-xs",
         ),
         cls="overflow-auto border rounded-md max-h-64",
+    )
+
+
+def _rule_required_text(rule: dict) -> str:
+    """Human-readable requirement string for one Module 4 rule result."""
+    operator = rule.get("operator", "")
+    check_val = rule.get("check_value")
+    unit = rule.get("unit", "") or ""
+    if operator == ">=":        return f"≥ {check_val} {unit}".strip()
+    if operator == "<=":        return f"≤ {check_val} {unit}".strip()
+    if operator == "between":   return f"{rule.get('value_min')}–{rule.get('value_max')} {unit}".strip()
+    if operator == "exists":    return "must be present"
+    if operator == "not_exists": return "must not be present"
+    return f"{operator} {check_val} {unit}".strip() if check_val is not None else "—"
+
+
+def _pivot_category_elements(rule_results: list) -> tuple[list, list]:
+    """
+    Pivot a category's per-rule Module 4 results (e.g. all IfcDoor rules) into
+    one row per physical element with one actual/required pair per rule.
+
+    Returns (columns, rows):
+      columns — the rule_results entries actually used (NO_ELEMENTS ones dropped)
+      rows    — [{"name","storey","space","guid","cells": {rule_key: entry|None}, "issues": [str]}]
+    """
+    columns = [r for r in rule_results if r.get("status") != "NO_ELEMENTS"]
+    if not columns:
+        return [], []
+
+    identities: dict[str, dict] = {}
+    cells: dict[str, dict[str, dict]] = {}
+
+    for rule in columns:
+        rule_key = rule.get("rule_ref") or rule.get("property_name") or str(id(rule))
+        for el in rule.get("all_elements", []):
+            guid = el.get("guid") or el.get("element_name") or ""
+            if not guid:
+                continue
+            if guid not in identities:
+                identities[guid] = {
+                    "name": el.get("element_name") or "—",
+                    "storey": el.get("storey") or "—",
+                    "space": el.get("space") or "—",
+                    "guid": guid,
+                }
+            cells.setdefault(guid, {})[rule_key] = el
+
+    rows = []
+    for guid, identity in identities.items():
+        row_cells = {}
+        issues = []
+        for rule in columns:
+            rule_key = rule.get("rule_ref") or rule.get("property_name") or str(id(rule))
+            entry = cells.get(guid, {}).get(rule_key)
+            row_cells[rule_key] = entry
+            if entry and entry.get("status") != "PASS":
+                label = rule.get("property_name") or rule_key
+                issues.append(f"{label}: {entry.get('reason') or 'missing'}")
+        rows.append({**identity, "cells": row_cells, "issues": issues})
+
+    rows.sort(key=lambda r: (len(r["issues"]) == 0, r["name"]))
+    return columns, rows
+
+
+# Pixel widths + left offsets for the three frozen identity columns in the
+# summary table, so they stay visible while scrolling through property columns.
+_STICKY_COL_WIDTHS = [150, 110, 120]
+_STICKY_COL_OFFSETS = [0, 150, 260]
+
+
+def _simple_summary_table(category: str, rule_results: list):
+    """Always-on per-element summary: one row per element tested, one
+    actual/required column pair per rule, and an aggregated Issues column.
+    Rows/cells with a failing or missing property are highlighted red/yellow.
+    Full (untruncated) data is available via the Download Excel / PDF buttons."""
+    columns, rows = _pivot_category_elements(rule_results)
+
+    if not columns:
+        return ""
+
+    download_btns = Div(
+        A(
+            "Download Excel",
+            href=f"/reports/simple-summary-xlsx/{category}",
+            cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-white hover:bg-slate-600",
+        ),
+        A(
+            "Download PDF",
+            href=f"/reports/simple-summary-pdf/{category}",
+            cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-white hover:bg-slate-600",
+        ),
+        cls="flex gap-2",
+    )
+
+    if not rows:
+        return Div(
+            P("No elements found in the model for this category.",
+              cls="text-xs text-muted-foreground italic mb-2"),
+            cls="mb-4",
+        )
+
+    id_headers = ["Element", "Floor / Room", "GUID"]
+
+    def _sticky(i: int) -> str:
+        return f"sticky left-[{_STICKY_COL_OFFSETS[i]}px] z-20"
+
+    row1 = [
+        Th(h, rowspan="2",
+           cls=f"px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted align-bottom {_sticky(i)}")
+        for i, h in enumerate(id_headers)
+    ]
+    row2 = []
+    for rule in columns:
+        label = rule.get("property_name") or rule.get("rule_ref") or "?"
+        row1.append(Th(
+            Span(label, cls="block"),
+            Span(rule.get("rule_ref", ""), cls="block text-[10px] font-normal text-muted-foreground"),
+            colspan="2",
+            cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted border-l-2 border-slate-300",
+        ))
+        row2.append(Th("Actual", cls="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground bg-muted border-l-2 border-slate-300"))
+        row2.append(Th("Required", cls="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground bg-muted"))
+    row1.append(Th("Issues", rowspan="2",
+                    cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted align-bottom"))
+
+    body_rows = []
+    display_rows = rows[:50]
+    for r in display_rows:
+        row_has_issue = bool(r["issues"])
+        row_bg = "bg-red-50/60" if row_has_issue else "bg-white"
+        id_cells = [
+            Td(Span(r["name"][:32], cls="text-xs font-mono"),
+               cls=f"px-3 py-2 {_sticky(0)} {row_bg}", style=f"width:{_STICKY_COL_WIDTHS[0]}px"),
+            Td(
+                Span(r["storey"], cls="text-xs block"),
+                Span(r["space"], cls="text-xs text-muted-foreground block") if r["space"] not in ("", "—") else "",
+                cls=f"px-3 py-2 {_sticky(1)} {row_bg}", style=f"width:{_STICKY_COL_WIDTHS[1]}px",
+            ),
+            Td(Span(r["guid"][:14], cls="text-xs font-mono text-muted-foreground"),
+               cls=f"px-3 py-2 {_sticky(2)} {row_bg}", style=f"width:{_STICKY_COL_WIDTHS[2]}px"),
+        ]
+        tds = list(id_cells)
+        for rule in columns:
+            rule_key = rule.get("rule_ref") or rule.get("property_name") or "?"
+            entry = r["cells"].get(rule_key)
+            unit = rule.get("unit", "") or ""
+            status = entry.get("status") if entry else None
+            if entry is None:
+                actual_txt = "—"
+            else:
+                actual_v = entry.get("actual")
+                actual_txt = _fmt_val_s(actual_v) + (f" {unit}" if unit and actual_v is not None else "")
+            cell_cls = (
+                "bg-red-100 text-red-800 font-semibold" if status == "FAIL"
+                else "bg-yellow-100 text-yellow-800 font-semibold" if status == "MISSING"
+                else ""
+            )
+            tds.append(Td(actual_txt, cls=f"px-3 py-2 text-xs font-mono border-l-2 border-slate-300 {cell_cls}"))
+            tds.append(Td(_rule_required_text(rule), cls="px-3 py-2 text-xs text-muted-foreground"))
+        issues_txt = "; ".join(r["issues"]) if r["issues"] else "✓ none"
+        tds.append(Td(
+            issues_txt,
+            cls=f"px-3 py-2 text-xs {'text-red-700 font-medium' if r['issues'] else 'text-green-700'}",
+        ))
+        body_rows.append(Tr(*tds, cls="border-b border-muted last:border-0"))
+
+    note = (
+        P(f"Showing 50 of {len(rows)} elements — download for the full list.",
+          cls="text-xs text-muted-foreground italic mt-2")
+        if len(rows) > 50 else ""
+    )
+
+    return Div(
+        Div(
+            Div(
+                H3("Summary — all elements tested", cls="text-sm font-semibold"),
+                P("Red = fails its rule · Yellow = property missing · rows with any issue are tinted and sorted first.",
+                  cls="text-[11px] text-muted-foreground"),
+            ),
+            download_btns,
+            cls="flex items-start justify-between mb-2 gap-4",
+        ),
+        Div(
+            Table(
+                Thead(Tr(*row1), Tr(*row2)),
+                Tbody(*body_rows),
+                cls="w-full text-xs",
+            ),
+            cls="overflow-auto border rounded-md max-h-96",
+        ),
+        note,
+        cls="mb-4",
     )
 
 
@@ -1610,21 +1812,13 @@ def _simple_rule_section(rule: dict):
         return ""
     ref = rule.get("rule_ref", "") or ""
     desc = (rule.get("rule_desc", "") or "")[:65]
-    operator = rule.get("operator", "")
-    check_val = rule.get("check_value")
-    unit = rule.get("unit", "") or ""
     pass_c = rule.get("pass_count", 0)
     fail_c = rule.get("fail_count", 0)
     miss_c = rule.get("missing_count", 0)
     total = rule.get("total_count", 0)
-    failures = rule.get("failures", [])
-    missing_els = rule.get("missing_elements", [])
+    all_els = rule.get("all_elements", [])
 
-    if operator == ">=":        req_str = f"≥ {check_val} {unit}".strip()
-    elif operator == "<=":      req_str = f"≤ {check_val} {unit}".strip()
-    elif operator == "between": req_str = f"{rule.get('value_min')}–{rule.get('value_max')} {unit}".strip()
-    elif operator == "exists":  req_str = "must be present"
-    else:                       req_str = f"{operator} {check_val} {unit}".strip() if check_val is not None else "—"
+    req_str = _rule_required_text(rule)
 
     summary_txt = (
         f"{fail_c} fail · {pass_c} pass · {miss_c} missing"
@@ -1632,23 +1826,8 @@ def _simple_rule_section(rule: dict):
     )
     label = f"{ref}  {desc}" if ref else desc
 
-    parts = []
-    if failures:
-        parts.append(Div(
-            P(f"{fail_c} element(s) failing:", cls="text-xs font-semibold text-red-700 mb-1"),
-            _simple_elem_tbl(failures, operator, check_val, unit),
-        ))
-    if missing_els:
-        parts.append(Div(
-            P(f"{miss_c} element(s) missing this property:",
-              cls="text-xs font-semibold text-yellow-700 mb-1 mt-3"),
-            _simple_elem_tbl(missing_els),
-        ))
-    if not parts:
-        parts = [P(f"✓ All {pass_c} elements pass.", cls="text-xs text-green-700")]
-
     return _collapsible_section(
-        label, *parts,
+        label, _simple_full_elem_tbl(all_els, rule),
         badge=f"{summary_txt}  ·  {req_str}",
         open=status in ("FAIL", "MISSING_DATA"),
     )
@@ -1660,6 +1839,7 @@ def _simple_domain_card(
     rule_results: list,
     extra_sections: list | None = None,
     override_badge: tuple | None = None,
+    category: str | None = None,
 ):
     """Outer collapsible card for one building code domain."""
     status_label, badge_cls = _domain_badge(rule_results)
@@ -1667,7 +1847,8 @@ def _simple_domain_card(
         status_label, badge_cls = override_badge
 
     rule_secs = [_simple_rule_section(r) for r in rule_results]
-    all_content = [s for s in rule_secs if s] + (extra_sections or [])
+    summary_tbl = _simple_summary_table(category, rule_results) if category else ""
+    all_content = ([summary_tbl] if summary_tbl else []) + [s for s in rule_secs if s] + (extra_sections or [])
 
     has_fail = any(r.get("status") == "FAIL" for r in rule_results)
     if override_badge and "fail" in (override_badge[0] or "").lower():
@@ -1682,7 +1863,6 @@ def _simple_domain_card(
     return _collapsible_card(
         title,
         Div(
-            Span(obc_ref, cls="text-xs text-muted-foreground mr-2"),
             Span(status_label,
                  cls=f"inline-block px-2 py-0.5 rounded text-xs font-semibold {badge_cls}"),
             cls="flex items-center mb-4",
@@ -1734,21 +1914,21 @@ def _simple_windows_card(by_class: dict, spatial_checks: dict):
         if d_fail > 0 and not any(r.get("status") == "FAIL" for r in rules):
             override = (f"{d_fail} room(s) below daylight ratio", "bg-red-100 text-red-800")
 
-    return _simple_domain_card("Windows & Glazing", "OBC 9.7 · 9.8", rules, extra, override)
+    return _simple_domain_card("Windows & Glazing", "OBC 9.7 · 9.8", rules, extra, override, category="windows")
 
 
 def _simple_doors_card(by_class: dict):
-    return _simple_domain_card("Doors", "OBC 9.5 · 9.9.5", by_class.get("IfcDoor", []))
+    return _simple_domain_card("Doors", "OBC 9.5 · 9.9.5", by_class.get("IfcDoor", []), category="doors")
 
 
 def _simple_stairs_card(by_class: dict):
     rules = by_class.get("IfcStairFlight", []) + by_class.get("IfcRailing", [])
-    return _simple_domain_card("Stairs, Guards & Handrails", "OBC 9.8.1 · 9.8.7", rules)
+    return _simple_domain_card("Stairs, Guards & Handrails", "OBC 9.8.1 · 9.8.7", rules, category="stairs")
 
 
 def _simple_ramps_card(by_class: dict):
     rules = by_class.get("IfcRamp", []) + by_class.get("IfcRampFlight", [])
-    return _simple_domain_card("Ramps", "OBC 9.8.8", rules)
+    return _simple_domain_card("Ramps", "OBC 9.8.8", rules, category="ramps")
 
 
 def _simple_egress_card(egress: dict):
@@ -1845,7 +2025,7 @@ def _simple_egress_card(egress: dict):
 
 def _simple_washrooms_card(by_class: dict, building_summary: dict):
     rules = by_class.get("IfcSanitaryTerminal", [])
-    return _simple_domain_card("Washrooms & Accessibility", "OBC 9.5 · 3.8.3", rules)
+    return _simple_domain_card("Washrooms & Accessibility", "OBC 9.5 · 3.8.3", rules, category="washrooms")
 
 
 def _simple_plumbing_card(building_summary: dict):
@@ -1932,7 +2112,7 @@ def _simple_fire_card(by_class: dict, spatial_checks: dict, building_summary: di
         ))
 
     return _simple_domain_card("Fire Protection (House-Level)", "OBC 9.10 · NBC 3.2",
-                                rules, extra, override)
+                                rules, extra, override, category="fire")
 
 
 def _simple_garage_card(spatial_checks: dict):
@@ -2037,6 +2217,9 @@ def setup_routes(rt):
         spatial_checks = result.get("spatial_checks", {})
         egress_checks = result.get("egress_checks", {})
         building_summary = result.get("building_summary", {})
+
+        global _last_simple_compliance
+        _last_simple_compliance = rule_compliance
 
         by_class: dict = defaultdict(list)
         for r in rule_compliance:
@@ -2189,6 +2372,168 @@ def setup_routes(rt):
             content=csv_content,
             media_type="text/csv",
             headers={"Content-Disposition": 'attachment; filename="compliance_results.csv"'},
+        )
+
+    @rt("/reports/simple-summary-xlsx/{category}")
+    def simple_summary_xlsx_download(category: str):
+        """Download the full per-element summary table for one Simple Analysis category,
+        with failing/missing cells highlighted the same way as the on-screen table."""
+        import io
+        from starlette.responses import Response as StarletteResponse
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+
+        targets = _SIMPLE_CATEGORY_TARGETS.get(category, [])
+        rule_results = [r for r in _last_simple_compliance if r.get("target") in targets]
+        columns, rows = _pivot_category_elements(rule_results)
+
+        # Excel's standard "Bad" (red) / "Neutral" (yellow) conditional-format colours.
+        fail_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        fail_font = Font(color="9C0006")
+        missing_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+        missing_font = Font(color="9C6500")
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = (category or "Summary")[:31]
+
+        header = ["Element", "Floor", "Room", "GUID"]
+        for rule in columns:
+            label = f"{rule.get('property_name') or rule.get('rule_ref') or '?'} ({rule.get('rule_ref', '')})"
+            header += [f"{label} — Actual", f"{label} — Required"]
+        header.append("Issues")
+        ws.append(header)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+        ws.freeze_panes = "E2"
+
+        for r in rows:
+            row_has_issue = bool(r["issues"])
+            row = [r["name"], r["storey"], r["space"], r["guid"]]
+            statuses = []
+            for rule in columns:
+                rule_key = rule.get("rule_ref") or rule.get("property_name") or "?"
+                entry = r["cells"].get(rule_key)
+                unit = rule.get("unit", "") or ""
+                if entry is None:
+                    actual_txt = "—"
+                else:
+                    actual_v = entry.get("actual")
+                    actual_txt = _fmt_val_s(actual_v) + (f" {unit}" if unit and actual_v is not None else "")
+                row += [actual_txt, _rule_required_text(rule)]
+                statuses.append(entry.get("status") if entry else None)
+            row.append("; ".join(r["issues"]) if r["issues"] else "")
+            ws.append(row)
+
+            excel_row = ws.max_row
+            if row_has_issue:
+                ws.cell(row=excel_row, column=1).fill = fail_fill
+                ws.cell(row=excel_row, column=len(row)).fill = fail_fill
+            for i, status in enumerate(statuses):
+                actual_col = 5 + (i * 2)  # A-D identity cols, then Actual/Required pairs
+                if status == "FAIL":
+                    cell = ws.cell(row=excel_row, column=actual_col)
+                    cell.fill, cell.font = fail_fill, fail_font
+                elif status == "MISSING":
+                    cell = ws.cell(row=excel_row, column=actual_col)
+                    cell.fill, cell.font = missing_fill, missing_font
+
+        for col_cells in ws.columns:
+            length = max((len(str(c.value)) for c in col_cells if c.value is not None), default=8)
+            ws.column_dimensions[col_cells[0].column_letter].width = min(max(length + 2, 10), 40)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        return StarletteResponse(
+            content=buf.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{category or "summary"}_summary.xlsx"'},
+        )
+
+    @rt("/reports/simple-summary-pdf/{category}")
+    def simple_summary_pdf_download(category: str):
+        """Download a print-friendly PDF of the per-element summary.
+
+        The wide actual/required pivot used on-screen and in Excel doesn't fit a
+        printed page once a category has more than a handful of rules, so the PDF
+        uses one compact Property/Actual/Required/Status table per element instead,
+        with failing rows first and colour-highlighted the same way as the app.
+        """
+        import io
+        from starlette.responses import Response as StarletteResponse
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        targets = _SIMPLE_CATEGORY_TARGETS.get(category, [])
+        rule_results = [r for r in _last_simple_compliance if r.get("target") in targets]
+        columns, rows = _pivot_category_elements(rule_results)
+
+        styles = getSampleStyleSheet()
+        order = {"FAIL": 0, "MISSING": 1, "PASS": 2}
+
+        story = [
+            Paragraph(f"{(category or 'Summary').title()} — Compliance Summary", styles["Heading1"]),
+            Paragraph(f"{len(rows)} element(s) tested against {len(columns)} rule(s).", styles["Normal"]),
+            Spacer(1, 10),
+        ]
+
+        for r in rows:
+            header_txt = f"{r['name']} — {r['storey']}"
+            if r["space"] not in ("", "—"):
+                header_txt += f" / {r['space']}"
+            header_txt += f"   ({r['guid']})"
+
+            props = []
+            for rule in columns:
+                rule_key = rule.get("rule_ref") or rule.get("property_name") or "?"
+                entry = r["cells"].get(rule_key)
+                status = entry.get("status") if entry else "MISSING"
+                unit = rule.get("unit", "") or ""
+                actual_txt = "—" if entry is None else (
+                    _fmt_val_s(entry.get("actual")) + (f" {unit}" if unit and entry.get("actual") is not None else "")
+                )
+                label = rule.get("property_name") or rule_key
+                status_txt = {"PASS": "Pass", "FAIL": "Fail", "MISSING": "Missing"}.get(status, status)
+                props.append((label, actual_txt, _rule_required_text(rule), status_txt, status))
+            props.sort(key=lambda p: order.get(p[4], 3))
+
+            table_data = [["Property", "Actual", "Required", "Status"]] + [p[:4] for p in props]
+            tbl = Table(table_data, colWidths=[160, 100, 100, 60])
+            style_cmds = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#334155")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+            for i, (_, _, _, _, status) in enumerate(props, start=1):
+                if status == "FAIL":
+                    style_cmds.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#FFC7CE")))
+                    style_cmds.append(("TEXTCOLOR", (0, i), (-1, i), colors.HexColor("#9C0006")))
+                elif status == "MISSING":
+                    style_cmds.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#FFEB9C")))
+                    style_cmds.append(("TEXTCOLOR", (0, i), (-1, i), colors.HexColor("#9C6500")))
+            tbl.setStyle(TableStyle(style_cmds))
+
+            story.append(KeepTogether([
+                Paragraph(header_txt, styles["Heading3"]),
+                tbl,
+                Spacer(1, 12),
+            ]))
+
+        if not rows:
+            story.append(Paragraph("No elements found in the model for this category.", styles["Normal"]))
+
+        buf = io.BytesIO()
+        SimpleDocTemplate(
+            buf, pagesize=letter, topMargin=36, bottomMargin=36, leftMargin=36, rightMargin=36,
+        ).build(story)
+        return StarletteResponse(
+            content=buf.getvalue(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{category or "summary"}_summary.pdf"'},
         )
 
     @rt("/reports/bcf/{project_id}")

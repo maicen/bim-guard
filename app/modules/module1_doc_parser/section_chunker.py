@@ -6,9 +6,14 @@ Step 3 — Splits Docling markdown text into section chunks.
 Recognises headings in this priority order:
   1. The original 13-topic OBC Part 9 taxonomy ("# 4 Stairs", "4 Stairs...")
      — exact match required, preserved for backward compatibility.
-  2. Any markdown heading, any level ("## SECTION 8.14 ...") — Docling's own
+  2. Real OBC dotted-decimal numbering ("9.8.2.1.  Stair Width") — the actual
+     Article/Sentence numbering scheme building codes use, independent of
+     markdown and independent of the 13-topic taxonomy above. This is what
+     pypdf's plain-text extraction of a real OBC PDF looks like, so it's the
+     pattern the live document-upload -> extract-rules flow actually needs.
+  3. Any markdown heading, any level ("## SECTION 8.14 ...") — Docling's own
      structural markers, independent of numbering scheme.
-  3. "SECTION 8.14 ...", "CHAPTER 3 ...", "PART II ..." style plain-text
+  4. "SECTION 8.14 ...", "CHAPTER 3 ...", "PART II ..." style plain-text
      headings, for documents whose PDF backend didn't preserve markdown "#".
 
 Documents whose PDF extraction collapses to too few line breaks for any of
@@ -47,10 +52,18 @@ OBC_SECTION_NAMES = {
 _OBC_MD_HEADING = re.compile(r"^#{1,3}\s+(1[0-3]|[1-9])\s+.+")
 _OBC_TXT_HEADING = re.compile(r"^(1[0-3]|[1-9])[\s\.].+")
 
-# ── 2. Any markdown heading, any level, any numbering scheme ─────────────────
+# ── 2. Real OBC dotted-decimal Article numbering, e.g. "9.8.2.1.  Stair Width"
+# or "9.8.2.  Stair Dimensions" — 3 to 5 dot-separated components. Requires
+# >=2 dots so a bare decimal mid-prose ("3.7 m") can't false-match, and a
+# capitalised title after the number so a numbered clause ("(1) Except...",
+# which starts with "(" anyway) or a table data row ("1.  Private stairs(1)
+# 200 125...", which has no further dotted digits after "1.") can't either.
+_OBC_DOTTED_HEADING = re.compile(r"^(\d+(?:\.\d+){2,4})\.?\s+[A-Z].+")
+
+# ── 3. Any markdown heading, any level, any numbering scheme ─────────────────
 _MD_ANY_HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
 
-# ── 3. "SECTION 8.14 ...", "CHAPTER 3 ...", "PART II ..." plain-text headings.
+# ── 4. "SECTION 8.14 ...", "CHAPTER 3 ...", "PART II ..." plain-text headings.
 # Requires the line to start with the keyword — real prose essentially never
 # opens a line this way, so this is a low false-positive-risk pattern.
 _SECTION_WORD_HEADING = re.compile(
@@ -79,6 +92,10 @@ class SectionChunker:
                 candidate = m.group(1)
                 if s[len(candidate) : len(candidate) + 1] == " ":
                     return candidate, OBC_SECTION_NAMES.get(candidate, "Unknown")
+
+        m = _OBC_DOTTED_HEADING.match(s)
+        if m:
+            return m.group(1), s[:100]
 
         m = _MD_ANY_HEADING.match(s)
         if m:

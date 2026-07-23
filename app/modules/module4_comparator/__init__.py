@@ -62,11 +62,12 @@ class Module4_Comparator:
         elements  = item.get("elements", [])
 
         if not elements:
-            return self._result(item, "NO_ELEMENTS", 0, 0, 0, 0, [], [])
+            return self._result(item, "NO_ELEMENTS", 0, 0, 0, 0, [], [], [])
 
         pass_count = fail_count = missing_count = 0
         failures: list[dict] = []
         missing_elements: list[dict] = []
+        all_elements: list[dict] = []
 
         for el in elements:
             actual = el.get("actual_value")
@@ -76,11 +77,12 @@ class Module4_Comparator:
                 wanted  = operator == "exists"
                 if present == wanted:
                     pass_count += 1
+                    all_elements.append(self._entry(el, actual, "PASS", ""))
                 else:
+                    reason = "property missing" if wanted else "property should not exist"
                     fail_count += 1
-                    failures.append(self._failure(
-                        el, actual,
-                        "property missing" if wanted else "property should not exist"))
+                    failures.append(self._failure(el, actual, reason))
+                    all_elements.append(self._entry(el, actual, "FAIL", reason))
                 continue
 
             if actual is None:
@@ -91,6 +93,7 @@ class Module4_Comparator:
                     "storey": el.get("storey") or "—",
                     "space": el.get("space") or "—",
                 })
+                all_elements.append(self._entry(el, actual, "MISSING", "property not found"))
                 continue
 
             # Property-referencing bounds (value_min_property / value_max_property)
@@ -107,9 +110,11 @@ class Module4_Comparator:
             passed, reason = self._compare(operator, actual, check_val, el_val_min, el_val_max, unit)
             if passed:
                 pass_count += 1
+                all_elements.append(self._entry(el, actual, "PASS", ""))
             else:
                 fail_count += 1
                 failures.append(self._failure(el, actual, reason))
+                all_elements.append(self._entry(el, actual, "FAIL", reason))
 
         if fail_count > 0:
             status = "FAIL"
@@ -121,7 +126,8 @@ class Module4_Comparator:
             status = "PASS"
 
         return self._result(item, status, pass_count, fail_count,
-                            missing_count, len(elements), failures, missing_elements)
+                            missing_count, len(elements), failures, missing_elements,
+                            all_elements)
 
     def _compare(self, operator, actual, check_val, val_min, val_max, unit):
         try:
@@ -179,7 +185,21 @@ class Module4_Comparator:
         }
 
     @staticmethod
-    def _result(item, status, pass_count, fail_count, missing_count, total, failures, missing_elements=None) -> dict:
+    def _entry(el, actual, status, reason) -> dict:
+        """Per-element record kept for every evaluated element (pass, fail, or missing)."""
+        return {
+            "element_name": el.get("name"),
+            "guid": el.get("guid"),
+            "storey": el.get("storey") or "—",
+            "space": el.get("space") or "—",
+            "actual": actual,
+            "status": status,
+            "reason": reason,
+        }
+
+    @staticmethod
+    def _result(item, status, pass_count, fail_count, missing_count, total, failures,
+                missing_elements=None, all_elements=None) -> dict:
         return {
             "rule_ref":        item.get("rule_ref", ""),
             "rule_desc":       item.get("rule_desc", ""),
@@ -199,4 +219,5 @@ class Module4_Comparator:
             "total_count":     total,
             "failures":        failures,
             "missing_elements": missing_elements or [],
+            "all_elements":    all_elements or [],
         }
