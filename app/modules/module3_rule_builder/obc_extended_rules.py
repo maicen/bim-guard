@@ -59,6 +59,37 @@ OBC_EXTENDED_RULES = [
         "severity": "informational",
         "desc": "All doors must declare IsExternal to classify as exit or interior",
     },
+    # Spatial-relationship checks (ConnectedSpaceCount is derived from
+    # IfcRelSpaceBoundary, not a Pset property — see ifc_spatial.py's
+    # check_door_space_connection). Scoped by applies_when.location so each
+    # rule only evaluates its own subset of doors; requires IfcSpace/space
+    # boundary data in the model to resolve at all.
+    {
+        "ref": "BIMGuard QA",
+        "rule_type": "numeric_comparison",
+        "target": "IfcDoor",
+        "property_name": "ConnectedSpaceCount",
+        "property_set": "",
+        "operator": "==",
+        "check_value": 2,
+        "unit": "count",
+        "severity": "mandatory",
+        "applies_when": {"location": "interior"},
+        "desc": "Interior doors must connect exactly two modeled spaces",
+    },
+    {
+        "ref": "BIMGuard QA",
+        "rule_type": "numeric_comparison",
+        "target": "IfcDoor",
+        "property_name": "ConnectedSpaceCount",
+        "property_set": "",
+        "operator": "==",
+        "check_value": 1,
+        "unit": "count",
+        "severity": "mandatory",
+        "applies_when": {"location": "exterior"},
+        "desc": "Exterior doors must connect exactly one modeled interior space",
+    },
     # ── WINDOW PROPERTIES ─────────────────────────────────────────────────────
     {
         "ref": "BIMGuard QA",

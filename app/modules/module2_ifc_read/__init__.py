@@ -53,6 +53,8 @@ try:
         check_daylight_ratios,
         check_fire_separation,
         check_garage_separation,
+        check_door_space_connection,
+        _element_matches_location,
     )
     _SPATIAL_AVAILABLE = True
 except ImportError:
@@ -689,6 +691,23 @@ class Module2_IFCRead:
                     return v, ps_name
         return None, None
 
+    @staticmethod
+    def _door_space_rich_detail(door_space_connection: dict | None) -> dict:
+        """Rich-metadata payload for ConnectedSpaces/ConnectedSpaceCount, for
+        future display/debugging — the resolver only surfaces this data, it
+        never uses it to decide pass/fail (the rule's own operator does)."""
+        d = door_space_connection or {}
+        return {
+            "source": "IfcRelSpaceBoundary",
+            "connected_space_guids": d.get("connected_space_guids", []),
+            "connected_space_names": d.get("connected_space_names", []),
+            "connected_space_count": d.get("connected_space_count", 0),
+            "expected_count": d.get("expected_count"),
+            "is_external": d.get("is_external"),
+            "has_data": d.get("has_data", False),
+            "spatial_status": d.get("status"),
+        }
+
     # ── Reusable single-property resolution cascade ──────────────────────────
 
     def _resolve_element_property(
@@ -699,6 +718,7 @@ class Module2_IFCRead:
         fallback_prop: str = "",
         spatial: dict | None = None,
         material_info: dict | None = None,
+        door_space_connection: dict | None = None,
         unit_scale_mm: float = 1.0,
     ) -> tuple[object, "str | None", dict]:
         """
@@ -738,6 +758,15 @@ class Module2_IFCRead:
             materials = (material_info or {}).get("materials") or []
             if materials:
                 return ", ".join(materials), "material:relationship", rich_detail
+        elif prop_lower_name in ("connectedspaces", "spaceconnection", "connectedspacenames", "doorconnectedspaces"):
+            names = (door_space_connection or {}).get("connected_space_names") or []
+            if names:
+                dsc_rich = self._door_space_rich_detail(door_space_connection)
+                return ", ".join(names), "spatial:door_space_connection", dsc_rich
+        elif prop_lower_name in ("connectedspacecount", "spaceconnectioncount", "numberofconnectedspaces", "connectedspacescount"):
+            if door_space_connection is not None:
+                dsc_rich = self._door_space_rich_detail(door_space_connection)
+                return door_space_connection.get("connected_space_count", 0), "spatial:door_space_connection", dsc_rich
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -919,6 +948,20 @@ class Module2_IFCRead:
         # Pre-compute once; 1.0 means model is already in mm → no scaling needed
         _unit_scale_mm = self._get_length_unit_scale_mm()
 
+        # Door → connected-space data, computed once regardless of whether any
+        # rule in this batch actually needs it (cheap — reuses the already-built
+        # spatial_adjacency, no re-parsing). Feeds the ConnectedSpaces /
+        # ConnectedSpaceCount Pass 0 shortcut below.
+        door_space_lookup: dict[str, dict] = {}
+        if _SPATIAL_AVAILABLE and self.spatial_adjacency:
+            try:
+                door_space_lookup = {
+                    r["door_guid"]: r
+                    for r in check_door_space_connection(self.spatial_adjacency, self.ifc_file)
+                }
+            except Exception:
+                door_space_lookup = {}
+
         results = []
         for rule in rules:
             target = str(rule.get("target_ifc_class") or "").strip()
@@ -953,6 +996,22 @@ class Module2_IFCRead:
             # Use class fallback so IfcStair containers resolve to IfcStairFlight, etc.
             elements = self._get_elements_with_fallback(target)
 
+            # applies_when.location — a rule can scope itself to only interior
+            # or only exterior elements (e.g. "interior doors must connect two
+            # spaces" vs "exterior doors must connect one"). General: any rule
+            # with this condition gets filtered here, not special-cased per rule.
+            try:
+                applies_when = rule.get("applies_when")
+                if isinstance(applies_when, str):
+                    applies_when = json.loads(applies_when) if applies_when else {}
+                if not isinstance(applies_when, dict):
+                    applies_when = {}
+            except (json.JSONDecodeError, TypeError):
+                applies_when = {}
+            location_filter = str(applies_when.get("location") or "any").strip().lower()
+            if location_filter in ("interior", "exterior") and _SPATIAL_AVAILABLE:
+                elements = [el for el in elements if _element_matches_location(el, location_filter)]
+
             element_results = []
             for el in elements:
                 # Spatial + material context fetched early — floor_z needed for
@@ -966,6 +1025,7 @@ class Module2_IFCRead:
                     mat_info = self.get_material_info(el)
                 except Exception:
                     mat_info = {}
+                door_space = door_space_lookup.get(getattr(el, "GlobalId", None))
 
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
@@ -974,6 +1034,7 @@ class Module2_IFCRead:
                     fallback_prop=fallback_prop,
                     spatial=spatial,
                     material_info=mat_info,
+                    door_space_connection=door_space,
                     unit_scale_mm=_unit_scale_mm,
                 )
 
@@ -1405,6 +1466,7 @@ class Module2_IFCRead:
         daylight = check_daylight_ratios(adj)
         fire_sep = check_fire_separation(adj)
         garage_sep = check_garage_separation(adj)
+        space_connection = check_door_space_connection(adj, self.ifc_file)
 
         daylight_fails = sum(1 for r in daylight if not r["passes"])
         fire_fails = sum(1 for r in fire_sep if not r["passes"])
@@ -1432,6 +1494,7 @@ class Module2_IFCRead:
             "daylight": daylight,
             "fire_separation": fire_sep,
             "garage_separation": garage_sep,
+            "space_connection": space_connection,
             "warnings": warnings,
         }
 

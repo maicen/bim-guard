@@ -118,7 +118,7 @@ def _seed_library() -> None:
                     value_min=rule.get("value_min"),
                     value_max=rule.get("value_max"),
                     unit=str(rule.get("unit") or ""),
-                    applies_when={},
+                    applies_when=rule.get("applies_when") or {},
                     severity=str(rule.get("severity") or "informational"),
                     keyword="",
                     compliance_type="",

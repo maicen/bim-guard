@@ -76,6 +76,58 @@ def _get_fire_rating(element) -> tuple[str | None, float | None]:
     return None, None
 
 
+def _is_exterior_door(element) -> bool | None:
+    """Classify an element (typically an IfcDoor) as exterior/interior from
+    IsExternal. Checks Pset_DoorCommon first, then any other pset. Returns
+    None (not False) when no reliable IsExternal data exists at all — callers
+    must not silently treat "unknown" as "interior".
+    """
+    if not _IFC_AVAILABLE:
+        return None
+    try:
+        psets = ifcopenshell.util.element.get_psets(element, psets_only=False)
+    except Exception:
+        return None
+
+    def _as_bool(v):
+        if isinstance(v, bool):
+            return v
+        if v is None:
+            return None
+        s = str(v).strip().upper()
+        if s in ("TRUE", "1", "YES", "T"):
+            return True
+        if s in ("FALSE", "0", "NO", "F"):
+            return False
+        return None
+
+    door_common = psets.get("Pset_DoorCommon")
+    if isinstance(door_common, dict) and "IsExternal" in door_common:
+        result = _as_bool(door_common.get("IsExternal"))
+        if result is not None:
+            return result
+
+    for ps in psets.values():
+        if isinstance(ps, dict) and "IsExternal" in ps:
+            result = _as_bool(ps.get("IsExternal"))
+            if result is not None:
+                return result
+
+    return None
+
+
+def _element_matches_location(element, location: str) -> bool:
+    """True if an element's IsExternal classification matches an
+    applies_when.location condition ("interior" or "exterior"). An element
+    with no verifiable IsExternal data (_is_exterior_door returns None) is
+    excluded — never guessed into either bucket.
+    """
+    is_ext = _is_exterior_door(element)
+    if is_ext is None:
+        return False
+    return is_ext if location == "exterior" else not is_ext
+
+
 # ── Core adjacency builder ────────────────────────────────────────────────────
 
 class IFCSpatialAdjacency:
@@ -92,6 +144,7 @@ class IFCSpatialAdjacency:
         self.ifc_file = ifc_file
         self._space_data: dict[str, dict] = {}
         self._wall_spaces: dict[str, list[str]] = {}
+        self._door_to_spaces: dict[str, list[str]] | None = None
         self.has_boundaries = False
         self._built = False
 
@@ -195,6 +248,30 @@ class IFCSpatialAdjacency:
 
     def party_wall_count(self) -> int:
         return len(self.get_party_walls())
+
+    def get_door_to_spaces(self) -> dict[str, list[str]]:
+        """Return {door_guid -> sorted [space_guid, ...]}, lazily built and
+        cached. Was previously duplicated independently in
+        check_garage_separation() and IFCEgressGraph.build() — this is the
+        one shared source of truth both now use. A set is used while
+        accumulating so a door/space pair boundary emitted more than once by
+        an exporter can't inflate the connected-space count.
+        """
+        if self._door_to_spaces is not None:
+            return self._door_to_spaces
+
+        mapping: dict[str, set[str]] = {}
+        for sguid, data in self._space_data.items():
+            for b in data["boundaries"]:
+                if b["element_type"] != "IfcDoor" or not b["physical"]:
+                    continue
+                dguid = b["element_guid"]
+                mapping.setdefault(dguid, set()).add(sguid)
+
+        self._door_to_spaces = {
+            dguid: sorted(sguids) for dguid, sguids in mapping.items()
+        }
+        return self._door_to_spaces
 
 
 # ── Tier 2 checks ─────────────────────────────────────────────────────────────
@@ -406,19 +483,8 @@ def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
             ],
         }
 
-    # ── Build door → spaces map (walls already exist in _wall_spaces) ─────────
-    door_to_spaces: dict[str, list[str]] = {}
-    door_elements: dict[str, object] = {}
-    for sguid, data in adjacency._space_data.items():
-        for b in data["boundaries"]:
-            if b["element_type"] != "IfcDoor" or not b["physical"]:
-                continue
-            dguid = b["element_guid"]
-            if dguid not in door_to_spaces:
-                door_to_spaces[dguid] = []
-                door_elements[dguid] = b["element"]
-            if sguid not in door_to_spaces[dguid]:
-                door_to_spaces[dguid].append(sguid)
+    # ── Door → spaces map (walls already exist in _wall_spaces) ───────────────
+    door_to_spaces = adjacency.get_door_to_spaces()
 
     results: list[dict] = []
     warnings: list[str] = []
@@ -480,7 +546,10 @@ def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
         if not garage_side or not living_side:
             continue
 
-        door_el = door_elements.get(door_guid)
+        try:
+            door_el = adjacency.ifc_file.by_guid(door_guid)
+        except Exception:
+            door_el = None
         if door_el is None:
             continue
 
@@ -528,3 +597,78 @@ def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
         "results": results,
         "warnings": warnings,
     }
+
+
+def check_door_space_connection(adjacency: IFCSpatialAdjacency, ifc_file) -> list[dict]:
+    """
+    BIMGuard QA — a door should bound the number of modeled spaces consistent
+    with its IsExternal classification: an interior door bounds exactly two
+    spaces; an exterior door bounds exactly one (the other side is "outside",
+    which is never modeled as an IfcSpace).
+
+    Returns one record per IfcDoor in the file. Empty list if the file has no
+    usable IfcRelSpaceBoundary data at all (mirrors how daylight/fire-separation
+    already degrade for such files).
+    """
+    if not adjacency.has_boundaries:
+        return []
+
+    door_to_spaces = adjacency.get_door_to_spaces()
+
+    space_names: dict[str, str] = {}
+    try:
+        for space in ifc_file.by_type("IfcSpace"):
+            space_names[space.GlobalId] = (
+                getattr(space, "LongName", None)
+                or getattr(space, "Name", None)
+                or space.GlobalId
+            )
+    except Exception:
+        pass
+
+    results: list[dict] = []
+    try:
+        doors = sorted(ifc_file.by_type("IfcDoor"), key=lambda d: d.GlobalId)
+    except Exception:
+        doors = []
+
+    for door in doors:
+        guid = door.GlobalId
+        space_guids = door_to_spaces.get(guid, [])
+        connected_names = [space_names.get(sg, sg) for sg in space_guids]
+        has_data = len(space_guids) > 0
+
+        is_external = _is_exterior_door(door)
+        if is_external is None:
+            expected_count = None
+            status = "indeterminate"
+            passes = None
+            reason = "The door could not be classified reliably as interior or exterior (no IsExternal data)."
+        else:
+            expected_count = 1 if is_external else 2
+            if not has_data:
+                status = "missing_boundary_data"
+                passes = False
+                reason = "No IfcRelSpaceBoundary relationship was found for this door."
+            else:
+                passes = len(space_guids) == expected_count
+                status = "pass" if passes else "fail"
+                reason = None if passes else (
+                    f"Connects {len(space_guids)} space(s); expected {expected_count}."
+                )
+
+        results.append({
+            "door_guid": guid,
+            "door_name": getattr(door, "Name", None) or getattr(door, "Tag", None) or guid,
+            "is_external": is_external,
+            "connected_space_guids": space_guids,
+            "connected_space_names": connected_names,
+            "connected_space_count": len(space_guids),
+            "expected_count": expected_count,
+            "passes": passes,
+            "has_data": has_data,
+            "status": status,
+            "reason": reason,
+        })
+
+    return results

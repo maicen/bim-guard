@@ -34,6 +34,8 @@ try:
 except ImportError:
     _IFC_AVAILABLE = False
 
+from .ifc_spatial import _is_exterior_door
+
 
 # OBC Part 9 residential limits
 OBC_MAX_TRAVEL_DISTANCE_M = 25.0  # 9.9.10.1 — max walking distance to exit
@@ -56,21 +58,12 @@ _NON_HABITABLE_KW = frozenset([
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _is_exterior_door(door_element) -> bool:
-    """Return True when a door has IsExternal=True in any Pset."""
-    if not _IFC_AVAILABLE:
-        return False
-    try:
-        psets = ifcopenshell.util.element.get_psets(door_element, psets_only=False)
-        for ps in psets.values():
-            if isinstance(ps, dict):
-                v = ps.get("IsExternal")
-                if v is True or str(v).upper() in ("TRUE", "1", "YES"):
-                    return True
-    except Exception:
-        pass
-    return False
+# _is_exterior_door is now shared from ifc_spatial (tri-state: True/False/None
+# — None means "no reliable IsExternal data", not "interior"). Both call
+# sites below were audited for this: an indeterminate door is treated as
+# NOT exterior (conservative — it won't be miscounted as an exit), matching
+# this module's pre-existing behavior of defaulting to non-exterior when
+# uncertain.
 
 
 def _get_area_m2(space) -> float | None:
@@ -190,24 +183,17 @@ class IFCEgressGraph:
             if _is_habitable(name):
                 self._habitable_spaces.add(sguid)
 
-        # ── Step 2: map door GUIDs → space GUIDs and detect exterior doors ────
-        door_to_spaces: dict[str, list[str]] = {}
+        # ── Step 2: door → spaces map (shared with garage-separation and the
+        # new SpaceConnection check) + detect exterior doors ───────────────
+        door_to_spaces = adj.get_door_to_spaces()
         exterior_door_guids: set[str] = set()
-
-        for sguid, data in adj._space_data.items():
-            for b in data["boundaries"]:
-                if b["element_type"] != "IfcDoor" or not b["physical"]:
-                    continue
-                door_guid = b["element_guid"]
-                door_el = b["element"]
-
-                if door_guid not in door_to_spaces:
-                    door_to_spaces[door_guid] = []
-                    if _is_exterior_door(door_el):
-                        exterior_door_guids.add(door_guid)
-
-                if sguid not in door_to_spaces[door_guid]:
-                    door_to_spaces[door_guid].append(sguid)
+        for door_guid in door_to_spaces:
+            try:
+                door_el = adj.ifc_file.by_guid(door_guid)
+            except Exception:
+                door_el = None
+            if door_el is not None and _is_exterior_door(door_el):
+                exterior_door_guids.add(door_guid)
 
         # ── Step 3: add edges and mark exit spaces ────────────────────────────
         for door_guid, space_guids in door_to_spaces.items():
