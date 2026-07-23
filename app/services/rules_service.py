@@ -279,6 +279,29 @@ class RuleService:
         """Delete a rule by primary key."""
         self._rules.delete(rule_id)
 
+    def set_rule_parameter(self, rule_id: int, key: str, value) -> None:
+        """Merge one key into a rule's `parameters` JSON blob.
+
+        Used for small per-rule interpretation settings (e.g. egress_direction)
+        that don't warrant a dedicated column/migration — `parameters` already
+        exists as a free-form JSON bag for exactly this kind of engine data.
+        Leaves every other field untouched.
+        """
+        rule = self.get_rule(rule_id)
+        if rule is None:
+            return
+        try:
+            params = json.loads(rule.get("parameters") or "{}")
+            if not isinstance(params, dict):
+                params = {}
+        except json.JSONDecodeError:
+            params = {}
+        params[key] = value
+        self._rules.update(
+            updates={"parameters": json.dumps(params), "updated_at": now_iso_utc()},
+            pk_values=rule_id,
+        )
+
     # ── Classification queries ────────────────────────────────────────────────
 
     def has_ruleset(self, ruleset_id: str) -> bool:

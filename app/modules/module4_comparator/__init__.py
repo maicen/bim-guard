@@ -13,6 +13,10 @@ Operators: >= <= > < == != between exists not_exists matches
 
 import re
 
+# Case-insensitive string forms a rule's check_value might use for a boolean
+# IFC property (IsExternal, SelfClosing, SmokeStop, HandicapAccessible, …).
+_BOOL_ALIASES = {"true": True, "false": False, "yes": True, "no": False}
+
 
 class Module4_Comparator:
     """Validates IFC model data against the BIMGuard rule library."""
@@ -130,6 +134,22 @@ class Module4_Comparator:
                             all_elements)
 
     def _compare(self, operator, actual, check_val, val_min, val_max, unit):
+        # Boolean-aware ==/!= — ifcopenshell returns real Python bool for any
+        # IfcBoolean property, but rule check_values are usually authored as
+        # text ("TRUE"/"FALSE", any case) straight from spec wording. A literal
+        # string match ("True" == "TRUE") fails despite meaning the same thing,
+        # so compare as booleans whenever both sides normalize to one — this
+        # covers every boolean property/rule, not just one specific case.
+        if isinstance(actual, bool) and operator in ("==", "!="):
+            check_bool = (
+                check_val if isinstance(check_val, bool)
+                else _BOOL_ALIASES.get(str(check_val).strip().lower()) if check_val is not None
+                else None
+            )
+            if check_bool is not None:
+                ok = (actual == check_bool) if operator == "==" else (actual != check_bool)
+                return ok, ("" if ok else f"{actual} fails {operator} {check_val}")
+
         try:
             a = float(str(actual).replace(",", "").strip())
         except (ValueError, TypeError):
@@ -147,29 +167,36 @@ class Module4_Comparator:
             return ok, ("" if ok else f'"{actual}" fails {operator} "{check_val}"')
 
         u = f" {unit}" if unit else ""
-        if operator == ">=":
-            ok, reason = check_val is not None and a >= check_val, \
-                         f"{a}{u} < required {check_val}{u}"
-        elif operator == "<=":
-            ok, reason = check_val is not None and a <= check_val, \
-                         f"{a}{u} > maximum {check_val}{u}"
-        elif operator == ">":
-            ok, reason = check_val is not None and a > check_val, \
-                         f"{a}{u} ≤ required {check_val}{u}"
-        elif operator == "<":
-            ok, reason = check_val is not None and a < check_val, \
-                         f"{a}{u} ≥ maximum {check_val}{u}"
-        elif operator == "==":
-            ok, reason = check_val is not None and a == check_val, \
-                         f"{a}{u} ≠ {check_val}{u}"
-        elif operator == "!=":
-            ok, reason = check_val is not None and a != check_val, \
-                         f"{a}{u} equals excluded value {check_val}{u}"
-        elif operator == "between":
-            ok = val_min is not None and val_max is not None and val_min <= a <= val_max
-            reason = f"{a}{u} outside [{val_min}{u}–{val_max}{u}]"
-        else:
-            ok, reason = True, ""
+        try:
+            if operator == ">=":
+                ok, reason = check_val is not None and a >= check_val, \
+                             f"{a}{u} < required {check_val}{u}"
+            elif operator == "<=":
+                ok, reason = check_val is not None and a <= check_val, \
+                             f"{a}{u} > maximum {check_val}{u}"
+            elif operator == ">":
+                ok, reason = check_val is not None and a > check_val, \
+                             f"{a}{u} ≤ required {check_val}{u}"
+            elif operator == "<":
+                ok, reason = check_val is not None and a < check_val, \
+                             f"{a}{u} ≥ maximum {check_val}{u}"
+            elif operator == "==":
+                ok, reason = check_val is not None and a == check_val, \
+                             f"{a}{u} ≠ {check_val}{u}"
+            elif operator == "!=":
+                ok, reason = check_val is not None and a != check_val, \
+                             f"{a}{u} equals excluded value {check_val}{u}"
+            elif operator == "between":
+                ok = val_min is not None and val_max is not None and val_min <= a <= val_max
+                reason = f"{a}{u} outside [{val_min}{u}–{val_max}{u}]"
+            else:
+                ok, reason = True, ""
+        except TypeError:
+            # check_val/val_min/val_max is a non-numeric string against a
+            # numeric actual (e.g. a malformed rule) — ordering operators
+            # can't compare mixed types; fail cleanly instead of crashing
+            # the whole compliance run.
+            ok, reason = False, f"{a}{u} cannot be compared to non-numeric threshold {check_val!r}"
 
         return ok, ("" if ok else reason)
 
@@ -201,11 +228,13 @@ class Module4_Comparator:
     def _result(item, status, pass_count, fail_count, missing_count, total, failures,
                 missing_elements=None, all_elements=None) -> dict:
         return {
+            "rule_id":         item.get("rule_id"),
             "rule_ref":        item.get("rule_ref", ""),
             "rule_desc":       item.get("rule_desc", ""),
             "target":          item.get("target_ifc_class", ""),
             "property_name":   item.get("property_name", ""),
             "property_set":    item.get("property_set", ""),
+            "egress_direction": item.get("egress_direction", "outside"),
             "operator":        item.get("operator", ""),
             "check_value":     item.get("check_value"),
             "value_min":       item.get("value_min"),

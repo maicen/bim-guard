@@ -84,6 +84,8 @@ _GEOMETRY_PROPERTY_MAP: dict[str, str] = {
     # Sill / bottom-above-floor
     "sillheight":          "sill_height",
     "windowsillheight":    "sill_height",
+    "thresholdheight":     "sill_height",
+    "doorthreshold":       "sill_height",
     # Top-above-floor (handrail / guard)
     "handrailheight":      "handrail_height",
     "railingheight":       "handrail_height",

@@ -1045,13 +1045,19 @@ def _collapsible_card(title: str, *content, subtitle: str = "", open: bool = Tru
     )
 
 
-def _collapsible_section(title: str, *content, badge: str = "", open: bool = True):
-    """Collapsible sub-section inside a card (smaller heading)."""
+def _collapsible_section(title: str, *content, badge: str = "", open: bool = True, extra=None):
+    """Collapsible sub-section inside a card (smaller heading).
+
+    `extra` is an optional control (e.g. a select) shown at the right edge of
+    the header — wrapped with a click-stop so interacting with it doesn't
+    toggle the surrounding <details>/<summary>.
+    """
     return Details(
         Summary(
             Div(
                 Span(title, cls="text-sm font-semibold"),
                 Span(badge, cls="ml-2 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground") if badge else "",
+                Div(extra, cls="ml-auto", onclick="event.stopPropagation()") if extra else "",
                 cls="flex items-center",
             ),
             cls="cursor-pointer select-none py-1 list-none",
@@ -1805,6 +1811,31 @@ def _simple_summary_table(category: str, rule_results: list):
     )
 
 
+def _egress_direction_select(rule_id, current: str):
+    """Dropdown letting the user specify which direction the code treats as
+    'egress' for door-swing-direction rules — no geometric swing-vs-path
+    computation exists yet, so this just records the interpretation setting
+    on the rule for that check to use once it's built."""
+    current = (current or "outside").strip().lower()
+    dom_id = f"egress-dir-{rule_id}"
+    return Div(
+        Span("Egress = ", cls="text-[11px] text-muted-foreground"),
+        Select(
+            Option("Outside", value="outside", selected=(current == "outside")),
+            Option("Inside", value="inside", selected=(current == "inside")),
+            id=dom_id,
+            name="direction",
+            cls="text-xs py-0.5",
+            hx_post=f"/api/rules/{rule_id}/egress-direction",
+            hx_trigger="change",
+            hx_target=f"#{dom_id}-wrap",
+            hx_swap="outerHTML",
+        ),
+        id=f"{dom_id}-wrap",
+        cls="flex items-center gap-1",
+    )
+
+
 def _simple_rule_section(rule: dict):
     """Collapsible sub-section for one Module 4 rule check."""
     status = rule.get("status", "NO_ELEMENTS")
@@ -1826,10 +1857,15 @@ def _simple_rule_section(rule: dict):
     )
     label = f"{ref}  {desc}" if ref else desc
 
+    extra = None
+    if rule.get("rule_id") and (rule.get("property_name") or "").strip().lower() == "openingdirection":
+        extra = _egress_direction_select(rule["rule_id"], rule.get("egress_direction"))
+
     return _collapsible_section(
         label, _simple_full_elem_tbl(all_els, rule),
         badge=f"{summary_txt}  ·  {req_str}",
         open=status in ("FAIL", "MISSING_DATA"),
+        extra=extra,
     )
 
 
@@ -2249,6 +2285,18 @@ def setup_routes(rt):
             _simple_garage_card(spatial_checks),
         ]
         return Div(*sections, cls="space-y-4")
+
+    @rt("/api/rules/{rule_id}/egress-direction", methods=["POST"])
+    async def api_set_egress_direction(rule_id: int, req: Request):
+        """Save which direction ('outside'/'inside') a door-swing-direction
+        rule should treat as egress. Interpretation setting only — no
+        geometric swing-vs-path check consumes it yet."""
+        form = await req.form()
+        direction = (form.get("direction") or "outside").strip().lower()
+        if direction not in ("outside", "inside"):
+            direction = "outside"
+        _rule_service.set_rule_parameter(rule_id, "egress_direction", direction)
+        return _egress_direction_select(rule_id, direction)
 
     @rt("/analysis/initial")
     def analysis_initial():

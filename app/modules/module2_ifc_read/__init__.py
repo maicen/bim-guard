@@ -119,6 +119,8 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
     "PitchAngle":       ["Slope", "RequiredSlope", "SlopeAngle", "Gradient"],
     "FireRating":       ["FireResistanceRating", "FireResistance", "REI", "FRR"],
     "LongName":         ["Name", "SpaceName", "RoomName"],
+    "ModelNumber":      ["ModelReference", "ModelLabel"],
+    "OpeningDirection": ["OperationType"],
 }
 
 
@@ -696,12 +698,14 @@ class Module2_IFCRead:
         prop_set: str = "",
         fallback_prop: str = "",
         spatial: dict | None = None,
+        material_info: dict | None = None,
         unit_scale_mm: float = 1.0,
     ) -> tuple[object, "str | None", dict]:
         """
-        Resolve one property value for one element via the 8-pass cascade
-        (instance Pset -> rich metadata -> direct attribute -> type-level Pset
-        -> alias -> fallback_property -> geometry -> unit conversion).
+        Resolve one property value for one element via the resolution cascade
+        (relationship shortcut -> instance Pset -> rich metadata -> direct
+        attribute -> type-level Pset -> alias -> fallback_property ->
+        geometry -> unit conversion).
 
         Used both for a rule's main property and for property-referencing
         bounds (value_min_property / value_max_property), which is why this
@@ -716,6 +720,24 @@ class Module2_IFCRead:
 
         if not prop_name:
             return actual_value, found_pset, rich_detail
+
+        # ── Pass 0: relationship-derived properties ────────────────────────
+        # Storey containment (IfcRelContainedInSpatialStructure) and material
+        # assignment (IfcRelAssociatesMaterial) are IFC *relationships*, not
+        # Pset properties — no amount of Pset searching below would ever find
+        # a rule asking for "Storey" or "Material". get_spatial_location() /
+        # get_material_info() already resolve these for the same element
+        # elsewhere in extract_for_compliance(); short-circuit to that data
+        # instead of falling through to passes that can never succeed.
+        prop_lower_name = prop_name.strip().lower()
+        if prop_lower_name in ("storey", "level", "buildingstorey", "floor"):
+            storey_name = spatial.get("storey_name")
+            if storey_name:
+                return storey_name, "spatial:storey", rich_detail
+        elif prop_lower_name == "material":
+            materials = (material_info or {}).get("materials") or []
+            if materials:
+                return ", ".join(materials), "material:relationship", rich_detail
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -781,6 +803,21 @@ class Module2_IFCRead:
 
         # ── Pass 5: property aliases (name variations) ────────────
         if actual_value is None:
+            # Fetch the type once (not per-alias) so aliases can also check
+            # IfcDoorType/IfcWindowType — many Revit-exported attributes
+            # (e.g. OperationType) only ever live on the type, never the
+            # instance, same as Pass 4 does for the un-aliased prop_name.
+            el_type_for_alias = None
+            type_psets_for_alias = None
+            try:
+                el_type_for_alias = ifcopenshell.util.element.get_type(el)
+                if el_type_for_alias:
+                    type_psets_for_alias = ifcopenshell.util.element.get_psets(
+                        el_type_for_alias, psets_only=False
+                    )
+            except Exception:
+                pass
+
             for alias in _PROPERTY_ALIASES.get(prop_name, []):
                 v, ps = self._lookup_in_psets(psets_simple, alias)
                 if v is not None:
@@ -795,6 +832,21 @@ class Module2_IFCRead:
                         break
                 except Exception:
                     pass
+                if type_psets_for_alias:
+                    v, ps = self._lookup_in_psets(type_psets_for_alias, alias)
+                    if v is not None:
+                        actual_value, found_pset = v, f"alias:type:{ps}"
+                        break
+                if el_type_for_alias:
+                    try:
+                        type_direct = self.get_direct_attributes(el_type_for_alias)
+                        v = type_direct.get(alias)
+                        if v is not None:
+                            actual_value = v
+                            found_pset = "alias:type:direct_attribute"
+                            break
+                    except Exception:
+                        pass
 
         # ── Pass 6: rule's fallback_property field ────────────────
         if actual_value is None and fallback_prop:
@@ -884,6 +936,17 @@ class Module2_IFCRead:
             value_min_offset = self._decode_json_val(rule.get("value_min_offset")) or 0.0
             value_max_offset = self._decode_json_val(rule.get("value_max_offset")) or 0.0
 
+            # User-configurable interpretation settings stored in the rule's
+            # free-form `parameters` JSON blob (no dedicated column — avoids a
+            # schema migration for settings that only a few rule types need).
+            try:
+                rule_params = json.loads(rule.get("parameters") or "{}")
+                if not isinstance(rule_params, dict):
+                    rule_params = {}
+            except (json.JSONDecodeError, TypeError):
+                rule_params = {}
+            egress_direction = str(rule_params.get("egress_direction") or "outside").strip().lower()
+
             if not target or (not prop_name and operator not in ("exists", "not_exists")):
                 continue
 
@@ -892,11 +955,17 @@ class Module2_IFCRead:
 
             element_results = []
             for el in elements:
-                # Spatial context fetched early — floor_z needed for Pass 7
+                # Spatial + material context fetched early — floor_z needed for
+                # Pass 7 geometry, and both feed the Pass 0 relationship shortcut
+                # for "Storey"/"Material" rules.
                 try:
                     spatial = self.get_spatial_location(el)
                 except Exception:
                     spatial = {}
+                try:
+                    mat_info = self.get_material_info(el)
+                except Exception:
+                    mat_info = {}
 
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
@@ -904,6 +973,7 @@ class Module2_IFCRead:
                     prop_set=prop_set,
                     fallback_prop=fallback_prop,
                     spatial=spatial,
+                    material_info=mat_info,
                     unit_scale_mm=_unit_scale_mm,
                 )
 
@@ -925,12 +995,11 @@ class Module2_IFCRead:
                     if isinstance(max_val, (int, float)):
                         resolved_value_max = round(max_val + value_max_offset, 4)
 
-                # ── Type, material context ────────────────────────────────
+                # ── Type context ────────────────────────────────
                 try:
                     type_inf = self.get_type_info(el)
-                    mat_info = self.get_material_info(el)
                 except Exception:
-                    type_inf = mat_info = {}
+                    type_inf = {}
 
                 element_results.append(
                     {
@@ -977,6 +1046,7 @@ class Module2_IFCRead:
                     "value_max_offset": value_max_offset,
                     "unit": str(rule.get("unit") or ""),
                     "severity": str(rule.get("severity") or "mandatory"),
+                    "egress_direction": egress_direction,
                     "elements": element_results,
                 }
             )
@@ -1504,13 +1574,30 @@ class Module2_IFCRead:
 
     @staticmethod
     def _decode_json_val(v):
-        """Decode DB JSON-encoded check_value / value_min / value_max."""
+        """Decode a DB JSON-encoded check_value / value_min / value_max.
+
+        value_min/value_max/offsets are always numeric, but check_value can
+        legitimately be a string or boolean (e.g. IsExternal == "TRUE") —
+        forcing float() on those silently discarded them as None, which broke
+        both the "Required" display text and the actual == / != / matches
+        comparison (Module 4 always compared against None instead of the
+        real value). Only coerce to float when the decoded value is numeric.
+        """
         if v is None:
             return None
         if isinstance(v, (int, float)):
             return float(v)
         try:
             decoded = json.loads(str(v))
-            return float(decoded) if decoded is not None else None
         except (json.JSONDecodeError, ValueError, TypeError):
             return None
+        if isinstance(decoded, bool):
+            return decoded
+        if isinstance(decoded, (int, float)):
+            return float(decoded)
+        if isinstance(decoded, str):
+            try:
+                return float(decoded)
+            except ValueError:
+                return decoded  # genuinely non-numeric, e.g. "TRUE" / an enum value
+        return decoded
