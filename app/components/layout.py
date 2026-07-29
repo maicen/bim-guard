@@ -27,9 +27,9 @@ NAV_ICONS = {
     "Dashboard": "layout-dashboard",
     "Projects": "folder-open",
     "Viewer": "scan-eye",
-    "Simple Analysis": "layout-list",
+    "Architectural Analysis": "layout-list",
     "Initial Analysis": "cpu",
-    "Model Vs Rules Analysis": "cpu",
+    "MEP Analysis": "cpu",
     "Reports": "file-text",
     "Documents": "book-open",
     "Rule Extraction Studio": "list-checks",
@@ -134,9 +134,9 @@ def AppSidebar():
         (
             "Analysis",
             [
-                ("Simple Analysis", "/analysis/simple"),
+                ("Architectural Analysis", "/analysis/simple"),
                 ("Initial Analysis", "/analysis/initial"),
-                ("Model Vs Rules Analysis", "/analysis/run"),
+                ("MEP Analysis", "/analysis/run"),
                 ("Reports", "/reports"),
             ],
         ),

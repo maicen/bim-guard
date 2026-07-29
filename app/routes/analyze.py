@@ -217,7 +217,7 @@ def _analysis_form(projects, documents, mode: str):
         submit_label = "Run Simple Analysis"
         results_id = "simple-analysis-results"
         hx_post = "/analysis/simple/results"
-        card_title = "Simple Analysis"
+        card_title = "Architectural Analysis"
         helper_copy = (
             "Check the IFC model against OBC Part 9 building code categories: "
             "Windows, Doors, Stairs, Egress, Fire Protection, Garage, and more."
@@ -227,12 +227,14 @@ def _analysis_form(projects, documents, mode: str):
         results_id = "initial-analysis-results"
         hx_post = "/analysis/initial/results"
         card_title = "Initial Analysis"
-        helper_copy = "Inspect the IFC model structure, counts, and quality signals before checking rules."
+        helper_copy = (
+            "Inspect the IFC model structure, counts, and quality signals before checking rules."
+        )
     else:
         submit_label = "Run Model Vs Rules Analysis"
         results_id = "model-rules-results"
         hx_post = "/analysis/results"
-        card_title = "Model Vs Rules Analysis"
+        card_title = "MEP Analysis"
         helper_copy = "Compare the selected IFC model against the saved rules in the library."
 
     loader_id = f"{results_id}-loader"
@@ -272,20 +274,24 @@ def _analysis_form(projects, documents, mode: str):
                     hx_post=hx_post,
                     hx_target=f"#{results_id}",
                     hx_swap="innerHTML",
-                    **{"hx-on:htmx:before-request": before_js,
-                       "hx-on:htmx:after-request": after_js},
+                    **{
+                        "hx-on:htmx:before-request": before_js,
+                        "hx-on:htmx:after-request": after_js,
+                    },
                 ),
             ),
         ),
         # Hidden loading card — cloned into results area when request starts
         Div(
             Div(
-                Div(style=(
-                    "width:40px;height:40px;border-radius:50%;"
-                    "border:4px solid #e2e8f0;border-top-color:#3b82f6;"
-                    "animation:bimguard-spin .75s linear infinite;"
-                    "margin:0 auto 16px;"
-                )),
+                Div(
+                    style=(
+                        "width:40px;height:40px;border-radius:50%;"
+                        "border:4px solid #e2e8f0;border-top-color:#3b82f6;"
+                        "animation:bimguard-spin .75s linear infinite;"
+                        "margin:0 auto 16px;"
+                    )
+                ),
                 P("Analysing model…", cls="text-base font-semibold"),
                 P(
                     "Loading IFC · Extracting properties · Running compliance checks",
@@ -297,9 +303,11 @@ def _analysis_form(projects, documents, mode: str):
             id=loader_id,
             style="display:none",
         ),
-        Script("(function(){var s=document.createElement('style');"
-               "s.textContent='@keyframes bimguard-spin{to{transform:rotate(360deg)}}';"
-               "document.head.appendChild(s);})();"),
+        Script(
+            "(function(){var s=document.createElement('style');"
+            "s.textContent='@keyframes bimguard-spin{to{transform:rotate(360deg)}}';"
+            "document.head.appendChild(s);})();"
+        ),
         Div(id=results_id),
     )
 
@@ -380,9 +388,15 @@ def _build_ifc_summary_content(result: dict, project_id: int):
             "IFC Quality",
             P(f"Overall score: {overall.get('score', 0):.1f}%", cls="text-sm font-medium"),
             Div(
-                P(f"Labeling: {labeling.get('score', 0):.1f}%", cls="text-xs text-muted-foreground"),
+                P(
+                    f"Labeling: {labeling.get('score', 0):.1f}%",
+                    cls="text-xs text-muted-foreground",
+                ),
                 P(f"GUIDs: {guids.get('score', 0):.1f}%", cls="text-xs text-muted-foreground"),
-                P(f"Properties: {properties.get('score', 0):.1f}%", cls="text-xs text-muted-foreground"),
+                P(
+                    f"Properties: {properties.get('score', 0):.1f}%",
+                    cls="text-xs text-muted-foreground",
+                ),
                 cls="space-y-1 mt-2",
             ),
             *quality_alerts,
@@ -396,7 +410,10 @@ def _build_ifc_summary_content(result: dict, project_id: int):
         _collapsible_card(
             "Improvement Summary",
             Div(
-                *[P(message, cls="text-sm text-muted-foreground") for message in ifc_quality_improvements],
+                *[
+                    P(message, cls="text-sm text-muted-foreground")
+                    for message in ifc_quality_improvements
+                ],
                 cls="space-y-1",
             ),
             open=False,
@@ -467,7 +484,11 @@ def _build_document_cards(result: dict):
 
 def _build_ifc_graph_card(result: dict, project_id: int):
     """Embed the PyVis IFC relationship graph (containment/aggregation/connectivity)."""
-    if not project_id or result.get("ifc_error") or not _projects_service.resolve_ifc_file(project_id):
+    if (
+        not project_id
+        or result.get("ifc_error")
+        or not _projects_service.resolve_ifc_file(project_id)
+    ):
         return Card(
             CardHeader(CardTitle("IFC Relationship Graph")),
             CardContent(
@@ -492,10 +513,7 @@ def _build_ifc_graph_card(result: dict, project_id: int):
             ),
             Iframe(
                 src=src,
-                style=(
-                    "width:100%;height:720px;border:1px solid var(--border);"
-                    "border-radius:8px;"
-                ),
+                style=("width:100%;height:720px;border:1px solid var(--border);border-radius:8px;"),
             ),
         ),
     )
@@ -782,25 +800,26 @@ def _rule_compliance_card(
 
     _IFC_LABELS = {
         "IfcStairFlight": "Stairs",
-        "IfcDoor":        "Doors",
-        "IfcWindow":      "Windows",
-        "IfcRailing":     "Railings & Guards",
-        "IfcRamp":        "Ramps",
-        "IfcSlab":        "Slabs & Landings",
-        "IfcWall":        "Walls",
-        "IfcSpace":       "Spaces & Rooms",
-        "IfcZone":        "Zones",
-        "IfcColumn":      "Columns",
-        "IfcBeam":        "Beams",
-        "IfcFooting":     "Footings & Foundations",
-        "IfcPipeSegment":      "Pipes",
-        "IfcDuctSegment":      "Ducts",
+        "IfcDoor": "Doors",
+        "IfcWindow": "Windows",
+        "IfcRailing": "Railings & Guards",
+        "IfcRamp": "Ramps",
+        "IfcSlab": "Slabs & Landings",
+        "IfcWall": "Walls",
+        "IfcSpace": "Spaces & Rooms",
+        "IfcZone": "Zones",
+        "IfcColumn": "Columns",
+        "IfcBeam": "Beams",
+        "IfcFooting": "Footings & Foundations",
+        "IfcPipeSegment": "Pipes",
+        "IfcDuctSegment": "Ducts",
         "IfcSanitaryTerminal": "Plumbing Fixtures",
-        "IfcAlarm":            "Alarms & Detectors",
+        "IfcAlarm": "Alarms & Detectors",
     }
 
     # Group results by IFC class, preserving order of first appearance
     from collections import defaultdict
+
     grouped: dict[str, list[dict]] = defaultdict(list)
     seen_targets: list[str] = []
     for r in compliance_results:
@@ -820,21 +839,27 @@ def _rule_compliance_card(
         group_results = grouped[target]
 
         # Count group-level status summary
-        g_pass   = sum(1 for r in group_results if r.get("status") == "PASS")
-        g_fail   = sum(1 for r in group_results if r.get("status") == "FAIL")
-        g_miss   = sum(1 for r in group_results if r.get("status") in ("MISSING_DATA", "PARTIAL"))
+        g_pass = sum(1 for r in group_results if r.get("status") == "PASS")
+        g_fail = sum(1 for r in group_results if r.get("status") == "FAIL")
+        g_miss = sum(1 for r in group_results if r.get("status") in ("MISSING_DATA", "PARTIAL"))
         g_noelem = sum(1 for r in group_results if r.get("status") == "NO_ELEMENTS")
 
         badge_cls = (
-            "bg-red-100 text-red-700" if g_fail
-            else "bg-yellow-100 text-yellow-700" if g_miss
-            else "bg-gray-100 text-gray-500" if g_noelem
+            "bg-red-100 text-red-700"
+            if g_fail
+            else "bg-yellow-100 text-yellow-700"
+            if g_miss
+            else "bg-gray-100 text-gray-500"
+            if g_noelem
             else "bg-green-100 text-green-700"
         )
         badge_txt = (
-            f"{g_fail} failed" if g_fail
-            else f"{g_miss} missing" if g_miss
-            else "no elements" if g_noelem
+            f"{g_fail} failed"
+            if g_fail
+            else f"{g_miss} missing"
+            if g_miss
+            else "no elements"
+            if g_noelem
             else "all pass"
         )
 
@@ -844,7 +869,10 @@ def _rule_compliance_card(
                     Div(
                         Span(label, cls="font-semibold text-sm text-foreground"),
                         Span(target, cls="text-xs text-muted-foreground font-mono ml-2"),
-                        Span(badge_txt, cls=f"ml-auto text-xs px-2 py-0.5 rounded-full font-medium {badge_cls}"),
+                        Span(
+                            badge_txt,
+                            cls=f"ml-auto text-xs px-2 py-0.5 rounded-full font-medium {badge_cls}",
+                        ),
                         cls="flex items-center gap-2",
                     ),
                     colspan="6",
@@ -875,6 +903,7 @@ def _rule_compliance_card(
             failures = r.get("failures", [])
             fail_detail = ""
             if failures:
+
                 def _fmt_actual(v):
                     if isinstance(v, float):
                         return f"{v:,.2f}" if v >= 1 else f"{v:.4f}"
@@ -891,7 +920,10 @@ def _rule_compliance_card(
                         Td(_fmt_actual(f.get("actual")), cls="px-2 py-1 text-xs font-mono"),
                         Td(f.get("reason", ""), cls="px-2 py-1 text-xs text-red-700"),
                         Td(
-                            Span((f.get("guid") or "")[:12], cls="text-xs text-muted-foreground font-mono"),
+                            Span(
+                                (f.get("guid") or "")[:12],
+                                cls="text-xs text-muted-foreground font-mono",
+                            ),
                             cls="px-2 py-1",
                         ),
                     )
@@ -929,7 +961,10 @@ def _rule_compliance_card(
                         Td(m.get("element_name", "")[:35], cls="px-2 py-1 text-xs font-mono"),
                         Td(m.get("storey") or "—", cls="px-2 py-1 text-xs"),
                         Td(m.get("space") or "—", cls="px-2 py-1 text-xs text-muted-foreground"),
-                        Td(m.get("guid", "")[:16], cls="px-2 py-1 text-xs text-muted-foreground font-mono"),
+                        Td(
+                            m.get("guid", "")[:16],
+                            cls="px-2 py-1 text-xs text-muted-foreground font-mono",
+                        ),
                     )
                     for m in missing_elements[:20]
                 ]
@@ -938,7 +973,8 @@ def _rule_compliance_card(
                         f"... and {len(missing_elements) - 20} more elements",
                         cls="text-xs text-muted-foreground px-2 py-1",
                     )
-                    if len(missing_elements) > 20 else ""
+                    if len(missing_elements) > 20
+                    else ""
                 )
                 missing_detail = Details(
                     Summary(
@@ -1007,24 +1043,24 @@ def _rule_compliance_card(
 
 
 _ELEM_LABELS = {
-    "IfcDoor":             "Doors",
-    "IfcWindow":           "Windows",
-    "IfcWall":             "Walls",
-    "IfcCurtainWall":      "Curtain Walls",
-    "IfcSlab":             "Slabs",
-    "IfcRoof":             "Roofs",
-    "IfcCovering":         "Ceilings",
-    "IfcStairFlight":      "Stair Flights",
-    "IfcRamp":             "Ramps",
-    "IfcRampFlight":       "Ramp Flights",
-    "IfcRailing":          "Railings",
-    "IfcColumn":           "Columns",
-    "IfcBeam":             "Beams",
-    "IfcMember":           "Structural Members",
+    "IfcDoor": "Doors",
+    "IfcWindow": "Windows",
+    "IfcWall": "Walls",
+    "IfcCurtainWall": "Curtain Walls",
+    "IfcSlab": "Slabs",
+    "IfcRoof": "Roofs",
+    "IfcCovering": "Ceilings",
+    "IfcStairFlight": "Stair Flights",
+    "IfcRamp": "Ramps",
+    "IfcRampFlight": "Ramp Flights",
+    "IfcRailing": "Railings",
+    "IfcColumn": "Columns",
+    "IfcBeam": "Beams",
+    "IfcMember": "Structural Members",
     "IfcSanitaryTerminal": "Fixtures",
-    "IfcAlarm":            "Alarms",
-    "IfcSensor":           "Sensors",
-    "IfcFurnishingElement":"Furniture",
+    "IfcAlarm": "Alarms",
+    "IfcSensor": "Sensors",
+    "IfcFurnishingElement": "Furniture",
 }
 
 
@@ -1056,7 +1092,12 @@ def _collapsible_section(title: str, *content, badge: str = "", open: bool = Tru
         Summary(
             Div(
                 Span(title, cls="text-sm font-semibold"),
-                Span(badge, cls="ml-2 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground") if badge else "",
+                Span(
+                    badge,
+                    cls="ml-2 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground",
+                )
+                if badge
+                else "",
                 Div(extra, cls="ml-auto", onclick="event.stopPropagation()") if extra else "",
                 cls="flex items-center",
             ),
@@ -1072,18 +1113,18 @@ def _building_summary_card(summary: dict):
     if not summary:
         return ""
 
-    storey_count   = summary.get("storey_count", 0)
-    room_count     = summary.get("room_count", 0)
-    gfa            = summary.get("total_gfa_m2", 0.0)
-    ext_doors      = summary.get("external_door_count", 0)
+    storey_count = summary.get("storey_count", 0)
+    room_count = summary.get("room_count", 0)
+    gfa = summary.get("total_gfa_m2", 0.0)
+    ext_doors = summary.get("external_door_count", 0)
     element_counts = summary.get("element_counts", {})
     fixture_counts = summary.get("fixture_counts", {})
-    alarm_counts   = summary.get("alarm_counts", {})
-    floor_heights  = summary.get("floor_heights", [])
+    alarm_counts = summary.get("alarm_counts", {})
+    floor_heights = summary.get("floor_heights", [])
     rooms_per_storey = summary.get("rooms_per_storey", {})
-    storeys        = summary.get("storeys", [])
-    unplaced       = summary.get("unplaced_rooms", [])
-    unnamed        = summary.get("unnamed_elements", [])
+    storeys = summary.get("storeys", [])
+    unplaced = summary.get("unplaced_rooms", [])
+    unnamed = summary.get("unnamed_elements", [])
 
     # ── Stat strip ────────────────────────────────────────────────────────────
     def _stat(label, value):
@@ -1107,21 +1148,25 @@ def _building_summary_card(summary: dict):
         fh_by_from = {h["from"]: h["height_mm"] for h in floor_heights}
         floor_rows = []
         for s in storeys:
-            name   = s["name"]
-            ri     = rooms_per_storey.get(name, {})
-            r_cnt  = ri.get("count", 0)
+            name = s["name"]
+            ri = rooms_per_storey.get(name, {})
+            r_cnt = ri.get("count", 0)
             r_area = ri.get("total_area_m2", 0.0)
-            h_mm   = fh_by_from.get(name)
+            h_mm = fh_by_from.get(name)
             floor_rows.append(
                 Tr(
                     Td(name, cls="px-3 py-2 text-sm font-medium"),
                     Td(
                         (f"{h_mm / 1000:.2f} m" if h_mm >= 1000 else f"{h_mm:,} mm")
-                        if h_mm else "—",
+                        if h_mm
+                        else "—",
                         cls="px-3 py-2 text-sm font-mono",
                     ),
                     Td(str(r_cnt) if r_cnt else "—", cls="px-3 py-2 text-sm text-center"),
-                    Td(f"{r_area:,.1f}" if r_area else "—", cls="px-3 py-2 text-sm font-mono text-right"),
+                    Td(
+                        f"{r_area:,.1f}" if r_area else "—",
+                        cls="px-3 py-2 text-sm font-mono text-right",
+                    ),
                     cls="border-b border-muted last:border-0",
                 )
             )
@@ -1129,12 +1174,26 @@ def _building_summary_card(summary: dict):
             H3("Floor Breakdown", cls="text-sm font-semibold mb-2"),
             Div(
                 Table(
-                    Thead(Tr(
-                        Th("Storey",          cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Floor-to-Floor",  cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Rooms",           cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Area m²",         cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
-                    )),
+                    Thead(
+                        Tr(
+                            Th(
+                                "Storey",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Floor-to-Floor",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Rooms",
+                                cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Area m²",
+                                cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                        )
+                    ),
                     Tbody(*floor_rows),
                     cls="w-full text-sm",
                 ),
@@ -1153,7 +1212,9 @@ def _building_summary_card(summary: dict):
                         f"{_ELEM_LABELS.get(k, k)}: {v}",
                         cls="inline-block px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-800 border border-blue-200 font-medium",
                     )
-                    for k, v in sorted(element_counts.items(), key=lambda x: _ELEM_LABELS.get(x[0], x[0]))
+                    for k, v in sorted(
+                        element_counts.items(), key=lambda x: _ELEM_LABELS.get(x[0], x[0])
+                    )
                 ],
                 cls="flex flex-wrap gap-2 mb-5",
             ),
@@ -1166,8 +1227,10 @@ def _building_summary_card(summary: dict):
             H3("Plumbing Fixtures", cls="text-sm font-semibold mb-2"),
             Div(
                 *[
-                    Span(f"{k}: {v}",
-                         cls="inline-block px-2 py-1 rounded-full text-xs bg-cyan-50 text-cyan-800 border border-cyan-200 font-medium")
+                    Span(
+                        f"{k}: {v}",
+                        cls="inline-block px-2 py-1 rounded-full text-xs bg-cyan-50 text-cyan-800 border border-cyan-200 font-medium",
+                    )
                     for k, v in sorted(fixture_counts.items())
                 ],
                 cls="flex flex-wrap gap-2 mb-5",
@@ -1181,8 +1244,10 @@ def _building_summary_card(summary: dict):
             H3("Fire / CO Alarms", cls="text-sm font-semibold mb-2"),
             Div(
                 *[
-                    Span(f"{k}: {v}",
-                         cls="inline-block px-2 py-1 rounded-full text-xs bg-red-50 text-red-800 border border-red-200 font-medium")
+                    Span(
+                        f"{k}: {v}",
+                        cls="inline-block px-2 py-1 rounded-full text-xs bg-red-50 text-red-800 border border-red-200 font-medium",
+                    )
                     for k, v in sorted(alarm_counts.items())
                 ],
                 cls="flex flex-wrap gap-2 mb-5",
@@ -1193,13 +1258,17 @@ def _building_summary_card(summary: dict):
     qa_items = []
     if unplaced:
         qa_items.append(
-            P(f"⚠ {len(unplaced)} unplaced room(s) — not assigned to any storey",
-              cls="text-xs text-yellow-700")
+            P(
+                f"⚠ {len(unplaced)} unplaced room(s) — not assigned to any storey",
+                cls="text-xs text-yellow-700",
+            )
         )
     for u in unnamed:
         qa_items.append(
-            P(f"⚠ {u['count']} {_ELEM_LABELS.get(u['type'], u['type'])} element(s) missing Name property",
-              cls="text-xs text-yellow-700")
+            P(
+                f"⚠ {u['count']} {_ELEM_LABELS.get(u['type'], u['type'])} element(s) missing Name property",
+                cls="text-xs text-yellow-700",
+            )
         )
     qa_block = ""
     if qa_items:
@@ -1231,16 +1300,17 @@ def _spatial_checks_card(spatial: dict):
     garage_sep = spatial.get("garage_separation", {})
 
     if not has_boundaries:
-        msg = (warnings[0] if warnings else
-               "No IfcRelSpaceBoundary data — re-export with Space Boundaries enabled.")
+        msg = (
+            warnings[0]
+            if warnings
+            else "No IfcRelSpaceBoundary data — re-export with Space Boundaries enabled."
+        )
         return _collapsible_card(
             "Spatial Compliance — Tier 2",
             Span(msg, cls="text-sm text-yellow-700"),
         )
 
-    warning_items = [
-        Span(w, cls="block text-xs text-yellow-700") for w in warnings
-    ]
+    warning_items = [Span(w, cls="block text-xs text-yellow-700") for w in warnings]
 
     # ── Daylight ratio table ──────────────────────────────────────────────────
     daylight_section = ""
@@ -1250,15 +1320,22 @@ def _spatial_checks_card(spatial: dict):
         rate_cls = "bg-green-100 text-green-800" if d_fail == 0 else "bg-red-100 text-red-800"
         d_rows = []
         for r in sorted(daylight, key=lambda x: x["passes"]):
-            status_cls = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            status_cls = (
+                "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            )
             d_rows.append(
                 Tr(
                     Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
                     Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
                     Td(f"{r['floor_area_m2']:.1f}", cls="px-3 py-2 text-xs font-mono text-right"),
-                    Td(f"{r['total_window_area_m2']:.2f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td(
+                        f"{r['total_window_area_m2']:.2f}",
+                        cls="px-3 py-2 text-xs font-mono text-right",
+                    ),
                     Td(f"{r['daylight_ratio']:.3f}", cls="px-3 py-2 text-xs font-mono text-right"),
-                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {status_cls}"),
+                    Td(
+                        "✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {status_cls}"
+                    ),
                     cls="border-b border-muted last:border-0",
                 )
             )
@@ -1266,14 +1343,34 @@ def _spatial_checks_card(spatial: dict):
             "Daylight Ratio — OBC 9.7.2",
             Div(
                 Table(
-                    Thead(Tr(
-                        Th("Floor", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Room", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Floor m²", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Window m²", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Ratio", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                    )),
+                    Thead(
+                        Tr(
+                            Th(
+                                "Floor",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Room",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Floor m²",
+                                cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Window m²",
+                                cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Ratio",
+                                cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Status",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                        )
+                    ),
                     Tbody(*d_rows),
                     cls="w-full text-sm",
                 ),
@@ -1291,8 +1388,10 @@ def _spatial_checks_card(spatial: dict):
         f_rows = []
         for r in sorted(fire_sep, key=lambda x: x["passes"]):
             rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
-            rating_cls = "text-red-700" if r["missing_rating"] else (
-                "text-green-700" if r["passes"] else "text-orange-700"
+            rating_cls = (
+                "text-red-700"
+                if r["missing_rating"]
+                else ("text-green-700" if r["passes"] else "text-orange-700")
             )
             spaces_txt = ", ".join(r["adjacent_spaces"][:2])
             if len(r["adjacent_spaces"]) > 2:
@@ -1302,7 +1401,9 @@ def _spatial_checks_card(spatial: dict):
                     Td(r["wall_name"][:35], cls="px-3 py-2 text-xs font-mono"),
                     Td(spaces_txt[:50], cls="px-3 py-2 text-xs"),
                     Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rating_cls}"),
-                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rating_cls}"),
+                    Td(
+                        "✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rating_cls}"
+                    ),
                     cls="border-b border-muted last:border-0",
                 )
             )
@@ -1310,12 +1411,26 @@ def _spatial_checks_card(spatial: dict):
             "Fire Separation — OBC 9.10.9",
             Div(
                 Table(
-                    Thead(Tr(
-                        Th("Wall", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Between Spaces", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Fire Rating", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                    )),
+                    Thead(
+                        Tr(
+                            Th(
+                                "Wall",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Between Spaces",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Fire Rating",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Status",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                        )
+                    ),
                     Tbody(*f_rows),
                     cls="w-full text-sm",
                 ),
@@ -1336,8 +1451,10 @@ def _spatial_checks_card(spatial: dict):
             g_rows = []
             for r in sorted(g_results, key=lambda x: x["passes"]):
                 rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
-                rating_cls = "text-red-700" if r["missing_rating"] else (
-                    "text-green-700" if r["passes"] else "text-orange-700"
+                rating_cls = (
+                    "text-red-700"
+                    if r["missing_rating"]
+                    else ("text-green-700" if r["passes"] else "text-orange-700")
                 )
                 req_txt = f"≥ {r['required_min']} min"
                 g_rows.append(
@@ -1348,22 +1465,47 @@ def _spatial_checks_card(spatial: dict):
                         Td(r["adjacent_space"][:25], cls="px-3 py-2 text-xs"),
                         Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rating_cls}"),
                         Td(req_txt, cls="px-3 py-2 text-xs font-mono"),
-                        Td("✓ Pass" if r["passes"] else "✗ Fail",
-                           cls=f"px-3 py-2 text-xs {rating_cls}"),
+                        Td(
+                            "✓ Pass" if r["passes"] else "✗ Fail",
+                            cls=f"px-3 py-2 text-xs {rating_cls}",
+                        ),
                         cls="border-b border-muted last:border-0",
                     )
                 )
             garage_content = Div(
                 Table(
-                    Thead(Tr(
-                        Th("Type", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Element", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Garage Space", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Adjacent Space", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Fire Rating", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Required", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                    )),
+                    Thead(
+                        Tr(
+                            Th(
+                                "Type",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Element",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Garage Space",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Adjacent Space",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Fire Rating",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Required",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Status",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                        )
+                    ),
                     Tbody(*g_rows),
                     cls="w-full text-sm",
                 ),
@@ -1384,12 +1526,13 @@ def _spatial_checks_card(spatial: dict):
         )
 
     subtitle = (
-        f"{spatial.get('space_count', 0)} spaces · "
-        f"{spatial.get('party_wall_count', 0)} party walls"
+        f"{spatial.get('space_count', 0)} spaces · {spatial.get('party_wall_count', 0)} party walls"
     )
     return _collapsible_card(
         "Spatial Compliance — Tier 2",
-        Div(*[Span(w, cls="block text-xs text-yellow-700") for w in warnings], cls="space-y-1") if warnings else "",
+        Div(*[Span(w, cls="block text-xs text-yellow-700") for w in warnings], cls="space-y-1")
+        if warnings
+        else "",
         daylight_section,
         fire_section,
         garage_section,
@@ -1432,21 +1575,44 @@ def _egress_checks_card(egress: dict):
             P(f"Total exterior doors detected: {total_exits}", cls="text-sm mb-2"),
             Div(
                 Table(
-                    Thead(Tr(
-                        Th("Storey", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Exits", cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Required", cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                    )),
-                    Tbody(*exit_rows) if exit_rows else Tbody(
-                        Tr(Td("No exterior doors found — tag doors as IsExternal=True",
-                              cls="px-3 py-2 text-xs text-yellow-700", colspan="4"))
+                    Thead(
+                        Tr(
+                            Th(
+                                "Storey",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Exits",
+                                cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Required",
+                                cls="px-3 py-2 text-center text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Status",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                        )
+                    ),
+                    Tbody(*exit_rows)
+                    if exit_rows
+                    else Tbody(
+                        Tr(
+                            Td(
+                                "No exterior doors found — tag doors as IsExternal=True",
+                                cls="px-3 py-2 text-xs text-yellow-700",
+                                colspan="4",
+                            )
+                        )
                     ),
                     cls="w-full text-sm",
                 ),
                 cls="overflow-auto border rounded-md",
             ),
-        ) if exit_results else P(
+        )
+        if exit_results
+        else P(
             "No exterior doors found — tag doors as IsExternal=True in the authoring tool.",
             cls="text-sm text-yellow-700",
         ),
@@ -1465,15 +1631,21 @@ def _egress_checks_card(egress: dict):
                 if r.get("travel_distance_m") is not None
                 else "No path"
             )
-            status_cls = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            status_cls = (
+                "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
+            )
             td_rows.append(
                 Tr(
                     Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
                     Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
                     Td(dist_txt, cls="px-3 py-2 text-xs font-mono text-right"),
                     Td(r.get("nearest_exit") or "—", cls="px-3 py-2 text-xs"),
-                    Td("✓ Pass" if r["passes"] else ("✗ No path" if r.get("no_path") else "✗ Exceeds"),
-                       cls=f"px-3 py-2 text-xs {status_cls}"),
+                    Td(
+                        "✓ Pass"
+                        if r["passes"]
+                        else ("✗ No path" if r.get("no_path") else "✗ Exceeds"),
+                        cls=f"px-3 py-2 text-xs {status_cls}",
+                    ),
                     cls="border-b border-muted last:border-0",
                 )
             )
@@ -1481,13 +1653,30 @@ def _egress_checks_card(egress: dict):
             "Travel Distance — OBC 9.9.10.1",
             Div(
                 Table(
-                    Thead(Tr(
-                        Th("Floor", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Room", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Distance", cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Nearest Exit", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                        Th("Status", cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted"),
-                    )),
+                    Thead(
+                        Tr(
+                            Th(
+                                "Floor",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Room",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Distance",
+                                cls="px-3 py-2 text-right text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Nearest Exit",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Status",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                        )
+                    ),
                     Tbody(*td_rows),
                     cls="w-full text-sm",
                 ),
@@ -1525,18 +1714,19 @@ _last_compliance_results: list[dict] = []
 _last_simple_compliance: list[dict] = []
 
 _SIMPLE_CATEGORY_TARGETS: dict[str, list[str]] = {
-    "windows":   ["IfcWindow"],
-    "doors":     ["IfcDoor"],
-    "stairs":    ["IfcStairFlight", "IfcRailing"],
-    "ramps":     ["IfcRamp", "IfcRampFlight"],
+    "windows": ["IfcWindow"],
+    "doors": ["IfcDoor"],
+    "stairs": ["IfcStairFlight", "IfcRailing"],
+    "ramps": ["IfcRamp", "IfcRampFlight"],
     "washrooms": ["IfcSanitaryTerminal"],
-    "fire":      ["IfcAlarm"],
+    "fire": ["IfcAlarm"],
 }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Simple Analysis — domain-based compliance card helpers
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _fmt_val_s(v) -> str:
     """Format a numeric compliance value for display."""
@@ -1582,36 +1772,59 @@ def _simple_full_elem_tbl(all_elements: list, rule: dict):
         guid = (el.get("guid") or "")[:14]
         name = (el.get("element_name") or "—")[:32]
         if status == "FAIL":
-            status_txt, status_cls, row_cls = el.get("reason") or "fail", "text-red-700 font-semibold", "bg-red-50"
+            status_txt, status_cls, row_cls = (
+                el.get("reason") or "fail",
+                "text-red-700 font-semibold",
+                "bg-red-50",
+            )
         elif status == "MISSING":
-            status_txt, status_cls, row_cls = "missing", "text-yellow-700 font-semibold", "bg-yellow-50"
+            status_txt, status_cls, row_cls = (
+                "missing",
+                "text-yellow-700 font-semibold",
+                "bg-yellow-50",
+            )
         else:
             status_txt, status_cls, row_cls = "✓ pass", "text-green-700", ""
-        rows.append(Tr(
-            Td(Span(name, cls="text-xs font-mono"), cls="px-3 py-2"),
-            Td(
-                Span(storey, cls="text-xs block"),
-                Span(space, cls="text-xs text-muted-foreground block") if space and space != "—" else "",
-                cls="px-3 py-2",
-            ),
-            Td(Span(guid, cls="text-xs font-mono text-muted-foreground"), cls="px-3 py-2"),
-            Td(actual_txt, cls="px-3 py-2 text-xs font-mono"),
-            Td(required, cls="px-3 py-2 text-xs text-muted-foreground"),
-            Td(Span(status_txt, cls=f"text-xs {status_cls}"), cls="px-3 py-2"),
-            cls=f"border-b border-muted last:border-0 {row_cls}",
-        ))
+        rows.append(
+            Tr(
+                Td(Span(name, cls="text-xs font-mono"), cls="px-3 py-2"),
+                Td(
+                    Span(storey, cls="text-xs block"),
+                    Span(space, cls="text-xs text-muted-foreground block")
+                    if space and space != "—"
+                    else "",
+                    cls="px-3 py-2",
+                ),
+                Td(Span(guid, cls="text-xs font-mono text-muted-foreground"), cls="px-3 py-2"),
+                Td(actual_txt, cls="px-3 py-2 text-xs font-mono"),
+                Td(required, cls="px-3 py-2 text-xs text-muted-foreground"),
+                Td(Span(status_txt, cls=f"text-xs {status_cls}"), cls="px-3 py-2"),
+                cls=f"border-b border-muted last:border-0 {row_cls}",
+            )
+        )
     if len(ordered) > 50:
-        rows.append(Tr(Td(
-            f"… and {len(ordered) - 50} more",
-            cls="px-3 py-2 text-xs text-muted-foreground italic",
-            colspan="6",
-        )))
+        rows.append(
+            Tr(
+                Td(
+                    f"… and {len(ordered) - 50} more",
+                    cls="px-3 py-2 text-xs text-muted-foreground italic",
+                    colspan="6",
+                )
+            )
+        )
     return Div(
         Table(
-            Thead(Tr(*[
-                Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-                for h in ("Element", "Floor / Room", "GUID", "Actual", "Required", "Status")
-            ])),
+            Thead(
+                Tr(
+                    *[
+                        Th(
+                            h,
+                            cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                        )
+                        for h in ("Element", "Floor / Room", "GUID", "Actual", "Required", "Status")
+                    ]
+                )
+            ),
             Tbody(*rows),
             cls="w-full text-xs",
         ),
@@ -1624,11 +1837,16 @@ def _rule_required_text(rule: dict) -> str:
     operator = rule.get("operator", "")
     check_val = rule.get("check_value")
     unit = rule.get("unit", "") or ""
-    if operator == ">=":        return f"≥ {check_val} {unit}".strip()
-    if operator == "<=":        return f"≤ {check_val} {unit}".strip()
-    if operator == "between":   return f"{rule.get('value_min')}–{rule.get('value_max')} {unit}".strip()
-    if operator == "exists":    return "must be present"
-    if operator == "not_exists": return "must not be present"
+    if operator == ">=":
+        return f"≥ {check_val} {unit}".strip()
+    if operator == "<=":
+        return f"≤ {check_val} {unit}".strip()
+    if operator == "between":
+        return f"{rule.get('value_min')}–{rule.get('value_max')} {unit}".strip()
+    if operator == "exists":
+        return "must be present"
+    if operator == "not_exists":
+        return "must not be present"
     return f"{operator} {check_val} {unit}".strip() if check_val is not None else "—"
 
 
@@ -1712,8 +1930,10 @@ def _simple_summary_table(category: str, rule_results: list):
 
     if not rows:
         return Div(
-            P("No elements found in the model for this category.",
-              cls="text-xs text-muted-foreground italic mb-2"),
+            P(
+                "No elements found in the model for this category.",
+                cls="text-xs text-muted-foreground italic mb-2",
+            ),
             cls="mb-4",
         )
 
@@ -1723,23 +1943,46 @@ def _simple_summary_table(category: str, rule_results: list):
         return f"sticky left-[{_STICKY_COL_OFFSETS[i]}px] z-20"
 
     row1 = [
-        Th(h, rowspan="2",
-           cls=f"px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted align-bottom {_sticky(i)}")
+        Th(
+            h,
+            rowspan="2",
+            cls=f"px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted align-bottom {_sticky(i)}",
+        )
         for i, h in enumerate(id_headers)
     ]
     row2 = []
     for rule in columns:
         label = rule.get("property_name") or rule.get("rule_ref") or "?"
-        row1.append(Th(
-            Span(label, cls="block"),
-            Span(rule.get("rule_ref", ""), cls="block text-[10px] font-normal text-muted-foreground"),
-            colspan="2",
-            cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted border-l-2 border-slate-300",
-        ))
-        row2.append(Th("Actual", cls="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground bg-muted border-l-2 border-slate-300"))
-        row2.append(Th("Required", cls="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground bg-muted"))
-    row1.append(Th("Issues", rowspan="2",
-                    cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted align-bottom"))
+        row1.append(
+            Th(
+                Span(label, cls="block"),
+                Span(
+                    rule.get("rule_ref", ""),
+                    cls="block text-[10px] font-normal text-muted-foreground",
+                ),
+                colspan="2",
+                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted border-l-2 border-slate-300",
+            )
+        )
+        row2.append(
+            Th(
+                "Actual",
+                cls="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground bg-muted border-l-2 border-slate-300",
+            )
+        )
+        row2.append(
+            Th(
+                "Required",
+                cls="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground bg-muted",
+            )
+        )
+    row1.append(
+        Th(
+            "Issues",
+            rowspan="2",
+            cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted align-bottom",
+        )
+    )
 
     body_rows = []
     display_rows = rows[:50]
@@ -1747,15 +1990,24 @@ def _simple_summary_table(category: str, rule_results: list):
         row_has_issue = bool(r["issues"])
         row_bg = "bg-red-50/60" if row_has_issue else "bg-white"
         id_cells = [
-            Td(Span(r["name"][:32], cls="text-xs font-mono"),
-               cls=f"px-3 py-2 {_sticky(0)} {row_bg}", style=f"width:{_STICKY_COL_WIDTHS[0]}px"),
+            Td(
+                Span(r["name"][:32], cls="text-xs font-mono"),
+                cls=f"px-3 py-2 {_sticky(0)} {row_bg}",
+                style=f"width:{_STICKY_COL_WIDTHS[0]}px",
+            ),
             Td(
                 Span(r["storey"], cls="text-xs block"),
-                Span(r["space"], cls="text-xs text-muted-foreground block") if r["space"] not in ("", "—") else "",
-                cls=f"px-3 py-2 {_sticky(1)} {row_bg}", style=f"width:{_STICKY_COL_WIDTHS[1]}px",
+                Span(r["space"], cls="text-xs text-muted-foreground block")
+                if r["space"] not in ("", "—")
+                else "",
+                cls=f"px-3 py-2 {_sticky(1)} {row_bg}",
+                style=f"width:{_STICKY_COL_WIDTHS[1]}px",
             ),
-            Td(Span(r["guid"][:14], cls="text-xs font-mono text-muted-foreground"),
-               cls=f"px-3 py-2 {_sticky(2)} {row_bg}", style=f"width:{_STICKY_COL_WIDTHS[2]}px"),
+            Td(
+                Span(r["guid"][:14], cls="text-xs font-mono text-muted-foreground"),
+                cls=f"px-3 py-2 {_sticky(2)} {row_bg}",
+                style=f"width:{_STICKY_COL_WIDTHS[2]}px",
+            ),
         ]
         tds = list(id_cells)
         for rule in columns:
@@ -1767,33 +2019,49 @@ def _simple_summary_table(category: str, rule_results: list):
                 actual_txt = "—"
             else:
                 actual_v = entry.get("actual")
-                actual_txt = _fmt_val_s(actual_v) + (f" {unit}" if unit and actual_v is not None else "")
+                actual_txt = _fmt_val_s(actual_v) + (
+                    f" {unit}" if unit and actual_v is not None else ""
+                )
             cell_cls = (
-                "bg-red-100 text-red-800 font-semibold" if status == "FAIL"
-                else "bg-yellow-100 text-yellow-800 font-semibold" if status == "MISSING"
+                "bg-red-100 text-red-800 font-semibold"
+                if status == "FAIL"
+                else "bg-yellow-100 text-yellow-800 font-semibold"
+                if status == "MISSING"
                 else ""
             )
-            tds.append(Td(actual_txt, cls=f"px-3 py-2 text-xs font-mono border-l-2 border-slate-300 {cell_cls}"))
+            tds.append(
+                Td(
+                    actual_txt,
+                    cls=f"px-3 py-2 text-xs font-mono border-l-2 border-slate-300 {cell_cls}",
+                )
+            )
             tds.append(Td(_rule_required_text(rule), cls="px-3 py-2 text-xs text-muted-foreground"))
         issues_txt = "; ".join(r["issues"]) if r["issues"] else "✓ none"
-        tds.append(Td(
-            issues_txt,
-            cls=f"px-3 py-2 text-xs {'text-red-700 font-medium' if r['issues'] else 'text-green-700'}",
-        ))
+        tds.append(
+            Td(
+                issues_txt,
+                cls=f"px-3 py-2 text-xs {'text-red-700 font-medium' if r['issues'] else 'text-green-700'}",
+            )
+        )
         body_rows.append(Tr(*tds, cls="border-b border-muted last:border-0"))
 
     note = (
-        P(f"Showing 50 of {len(rows)} elements — download for the full list.",
-          cls="text-xs text-muted-foreground italic mt-2")
-        if len(rows) > 50 else ""
+        P(
+            f"Showing 50 of {len(rows)} elements — download for the full list.",
+            cls="text-xs text-muted-foreground italic mt-2",
+        )
+        if len(rows) > 50
+        else ""
     )
 
     return Div(
         Div(
             Div(
                 H3("Summary — all elements tested", cls="text-sm font-semibold"),
-                P("Red = fails its rule · Yellow = property missing · rows with any issue are tinted and sorted first.",
-                  cls="text-[11px] text-muted-foreground"),
+                P(
+                    "Red = fails its rule · Yellow = property missing · rows with any issue are tinted and sorted first.",
+                    cls="text-[11px] text-muted-foreground",
+                ),
             ),
             download_btns,
             cls="flex items-start justify-between mb-2 gap-4",
@@ -1853,16 +2121,21 @@ def _simple_rule_section(rule: dict):
 
     summary_txt = (
         f"{fail_c} fail · {pass_c} pass · {miss_c} missing"
-        if fail_c or miss_c else f"{pass_c}/{total} pass"
+        if fail_c or miss_c
+        else f"{pass_c}/{total} pass"
     )
     label = f"{ref}  {desc}" if ref else desc
 
     extra = None
-    if rule.get("rule_id") and (rule.get("property_name") or "").strip().lower() == "openingdirection":
+    if (
+        rule.get("rule_id")
+        and (rule.get("property_name") or "").strip().lower() == "openingdirection"
+    ):
         extra = _egress_direction_select(rule["rule_id"], rule.get("egress_direction"))
 
     return _collapsible_section(
-        label, _simple_full_elem_tbl(all_els, rule),
+        label,
+        _simple_full_elem_tbl(all_els, rule),
         badge=f"{summary_txt}  ·  {req_str}",
         open=status in ("FAIL", "MISSING_DATA"),
         extra=extra,
@@ -1884,7 +2157,11 @@ def _simple_domain_card(
 
     rule_secs = [_simple_rule_section(r) for r in rule_results]
     summary_tbl = _simple_summary_table(category, rule_results) if category else ""
-    all_content = ([summary_tbl] if summary_tbl else []) + [s for s in rule_secs if s] + (extra_sections or [])
+    all_content = (
+        ([summary_tbl] if summary_tbl else [])
+        + [s for s in rule_secs if s]
+        + (extra_sections or [])
+    )
 
     has_fail = any(r.get("status") == "FAIL" for r in rule_results)
     if override_badge and "fail" in (override_badge[0] or "").lower():
@@ -1892,15 +2169,19 @@ def _simple_domain_card(
 
     if not all_content:
         all_content = [
-            P("No applicable checks found in the rule library for this category.",
-              cls="text-sm text-muted-foreground italic")
+            P(
+                "No applicable checks found in the rule library for this category.",
+                cls="text-sm text-muted-foreground italic",
+            )
         ]
 
     return _collapsible_card(
         title,
         Div(
-            Span(status_label,
-                 cls=f"inline-block px-2 py-0.5 rounded text-xs font-semibold {badge_cls}"),
+            Span(
+                status_label,
+                cls=f"inline-block px-2 py-0.5 rounded text-xs font-semibold {badge_cls}",
+            ),
             cls="flex items-center mb-4",
         ),
         *all_content,
@@ -1909,6 +2190,7 @@ def _simple_domain_card(
 
 
 # ── Domain card builders ───────────────────────────────────────────────────────
+
 
 def _simple_windows_card(by_class: dict, spatial_checks: dict):
     rules = by_class.get("IfcWindow", [])
@@ -1922,44 +2204,71 @@ def _simple_windows_card(by_class: dict, spatial_checks: dict):
         d_rows = []
         for r in sorted(daylight, key=lambda x: x["passes"]):
             sc = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
-            d_rows.append(Tr(
-                Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
-                Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
-                Td(f"{r['floor_area_m2']:.1f}", cls="px-3 py-2 text-xs font-mono text-right"),
-                Td(f"{r['total_window_area_m2']:.2f}", cls="px-3 py-2 text-xs font-mono text-right"),
-                Td(f"{r['daylight_ratio']:.3f}", cls="px-3 py-2 text-xs font-mono text-right"),
-                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {sc}"),
-                cls="border-b border-muted last:border-0",
-            ))
-        extra.append(_collapsible_section(
-            "Daylight Ratio — OBC 9.7.2.1 (≥ 1/10 floor area)",
-            Div(
-                Table(
-                    Thead(Tr(*[
-                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-                        for h in ("Floor", "Room", "Floor m²", "Window m²", "Ratio", "Status")
-                    ])),
-                    Tbody(*d_rows),
-                    cls="w-full text-xs",
+            d_rows.append(
+                Tr(
+                    Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
+                    Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
+                    Td(f"{r['floor_area_m2']:.1f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td(
+                        f"{r['total_window_area_m2']:.2f}",
+                        cls="px-3 py-2 text-xs font-mono text-right",
+                    ),
+                    Td(f"{r['daylight_ratio']:.3f}", cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {sc}"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        extra.append(
+            _collapsible_section(
+                "Daylight Ratio — OBC 9.7.2.1 (≥ 1/10 floor area)",
+                Div(
+                    Table(
+                        Thead(
+                            Tr(
+                                *[
+                                    Th(
+                                        h,
+                                        cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                                    )
+                                    for h in (
+                                        "Floor",
+                                        "Room",
+                                        "Floor m²",
+                                        "Window m²",
+                                        "Ratio",
+                                        "Status",
+                                    )
+                                ]
+                            )
+                        ),
+                        Tbody(*d_rows),
+                        cls="w-full text-xs",
+                    ),
+                    cls="overflow-auto border rounded-md max-h-64",
                 ),
-                cls="overflow-auto border rounded-md max-h-64",
-            ),
-            badge=f"{d_pass}/{len(daylight)} pass",
-            open=d_fail > 0,
-        ))
+                badge=f"{d_pass}/{len(daylight)} pass",
+                open=d_fail > 0,
+            )
+        )
         if d_fail > 0 and not any(r.get("status") == "FAIL" for r in rules):
             override = (f"{d_fail} room(s) below daylight ratio", "bg-red-100 text-red-800")
 
-    return _simple_domain_card("Windows & Glazing", "OBC 9.7 · 9.8", rules, extra, override, category="windows")
+    return _simple_domain_card(
+        "Windows & Glazing", "OBC 9.7 · 9.8", rules, extra, override, category="windows"
+    )
 
 
 def _simple_doors_card(by_class: dict):
-    return _simple_domain_card("Doors", "OBC 9.5 · 9.9.5", by_class.get("IfcDoor", []), category="doors")
+    return _simple_domain_card(
+        "Doors", "OBC 9.5 · 9.9.5", by_class.get("IfcDoor", []), category="doors"
+    )
 
 
 def _simple_stairs_card(by_class: dict):
     rules = by_class.get("IfcStairFlight", []) + by_class.get("IfcRailing", [])
-    return _simple_domain_card("Stairs, Guards & Handrails", "OBC 9.8.1 · 9.8.7", rules, category="stairs")
+    return _simple_domain_card(
+        "Stairs, Guards & Handrails", "OBC 9.8.1 · 9.8.7", rules, category="stairs"
+    )
 
 
 def _simple_ramps_card(by_class: dict):
@@ -1991,99 +2300,141 @@ def _simple_egress_card(egress: dict):
         e_rows = []
         for r in exit_results:
             sc = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
-            e_rows.append(Tr(
-                Td(r["storey"], cls="px-3 py-2 text-xs"),
-                Td(str(r["exit_count"]), cls="px-3 py-2 text-xs font-mono text-center"),
-                Td(str(r["required_min"]), cls="px-3 py-2 text-xs font-mono text-center"),
-                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {sc}"),
-                cls="border-b border-muted last:border-0",
-            ))
-        extra.append(_collapsible_section(
-            f"Exit Count — OBC 9.9.4.1  ({total_exits} exterior door(s))",
-            Div(
-                Table(
-                    Thead(Tr(*[
-                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-                        for h in ("Storey", "Exits", "Required", "Status")
-                    ])),
-                    Tbody(*e_rows),
-                    cls="w-full text-xs",
+            e_rows.append(
+                Tr(
+                    Td(r["storey"], cls="px-3 py-2 text-xs"),
+                    Td(str(r["exit_count"]), cls="px-3 py-2 text-xs font-mono text-center"),
+                    Td(str(r["required_min"]), cls="px-3 py-2 text-xs font-mono text-center"),
+                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {sc}"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        extra.append(
+            _collapsible_section(
+                f"Exit Count — OBC 9.9.4.1  ({total_exits} exterior door(s))",
+                Div(
+                    Table(
+                        Thead(
+                            Tr(
+                                *[
+                                    Th(
+                                        h,
+                                        cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                                    )
+                                    for h in ("Storey", "Exits", "Required", "Status")
+                                ]
+                            )
+                        ),
+                        Tbody(*e_rows),
+                        cls="w-full text-xs",
+                    ),
+                    cls="overflow-auto border rounded-md",
                 ),
-                cls="overflow-auto border rounded-md",
-            ),
-            badge=f"{sum(1 for r in exit_results if r['passes'])}/{len(exit_results)} pass",
-            open=any(not r["passes"] for r in exit_results),
-        ))
+                badge=f"{sum(1 for r in exit_results if r['passes'])}/{len(exit_results)} pass",
+                open=any(not r["passes"] for r in exit_results),
+            )
+        )
     else:
-        extra.append(_collapsible_section(
-            "Exit Count — OBC 9.9.4.1",
-            P("No exterior doors found. Tag doors as IsExternal=True in your authoring tool.",
-              cls="text-xs text-yellow-700"),
-            open=True,
-        ))
+        extra.append(
+            _collapsible_section(
+                "Exit Count — OBC 9.9.4.1",
+                P(
+                    "No exterior doors found. Tag doors as IsExternal=True in your authoring tool.",
+                    cls="text-xs text-yellow-700",
+                ),
+                open=True,
+            )
+        )
 
     if travel:
         td_pass = sum(1 for r in travel if r["passes"])
         td_rows = []
         for r in sorted(travel, key=lambda x: (x["passes"], -(x.get("travel_distance_m") or 0))):
-            dist = f"{r['travel_distance_m']:.1f} m" if r.get("travel_distance_m") is not None else "No path"
+            dist = (
+                f"{r['travel_distance_m']:.1f} m"
+                if r.get("travel_distance_m") is not None
+                else "No path"
+            )
             sc = "text-green-700 font-semibold" if r["passes"] else "text-red-700 font-semibold"
-            td_rows.append(Tr(
-                Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
-                Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
-                Td(dist, cls="px-3 py-2 text-xs font-mono text-right"),
-                Td(r.get("nearest_exit") or "—", cls="px-3 py-2 text-xs"),
-                Td(
-                    "✓ Pass" if r["passes"] else ("✗ No path" if r.get("no_path") else "✗ Exceeds"),
-                    cls=f"px-3 py-2 text-xs {sc}",
+            td_rows.append(
+                Tr(
+                    Td(r.get("storey_name") or "—", cls="px-3 py-2 text-xs text-muted-foreground"),
+                    Td(r["space_name"][:35], cls="px-3 py-2 text-xs"),
+                    Td(dist, cls="px-3 py-2 text-xs font-mono text-right"),
+                    Td(r.get("nearest_exit") or "—", cls="px-3 py-2 text-xs"),
+                    Td(
+                        "✓ Pass"
+                        if r["passes"]
+                        else ("✗ No path" if r.get("no_path") else "✗ Exceeds"),
+                        cls=f"px-3 py-2 text-xs {sc}",
+                    ),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        extra.append(
+            _collapsible_section(
+                "Travel Distance — OBC 9.9.10.1",
+                Div(
+                    Table(
+                        Thead(
+                            Tr(
+                                *[
+                                    Th(
+                                        h,
+                                        cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                                    )
+                                    for h in ("Floor", "Room", "Distance", "Nearest Exit", "Status")
+                                ]
+                            )
+                        ),
+                        Tbody(*td_rows),
+                        cls="w-full text-xs",
+                    ),
+                    cls="overflow-auto border rounded-md max-h-64",
                 ),
-                cls="border-b border-muted last:border-0",
-            ))
-        extra.append(_collapsible_section(
-            "Travel Distance — OBC 9.9.10.1",
-            Div(
-                Table(
-                    Thead(Tr(*[
-                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-                        for h in ("Floor", "Room", "Distance", "Nearest Exit", "Status")
-                    ])),
-                    Tbody(*td_rows),
-                    cls="w-full text-xs",
-                ),
-                cls="overflow-auto border rounded-md max-h-64",
-            ),
-            badge=f"{td_pass}/{len(travel)} pass",
-            open=td_pass < len(travel),
-        ))
+                badge=f"{td_pass}/{len(travel)} pass",
+                open=td_pass < len(travel),
+            )
+        )
 
     return _simple_domain_card("Means of Egress", "OBC 9.9 · 9.10", [], extra, override)
 
 
 def _simple_washrooms_card(by_class: dict, building_summary: dict):
     rules = by_class.get("IfcSanitaryTerminal", [])
-    return _simple_domain_card("Washrooms & Accessibility", "OBC 9.5 · 3.8.3", rules, category="washrooms")
+    return _simple_domain_card(
+        "Washrooms & Accessibility", "OBC 9.5 · 3.8.3", rules, category="washrooms"
+    )
 
 
 def _simple_plumbing_card(building_summary: dict):
     fixture_counts = (building_summary or {}).get("fixture_counts", {})
     if not fixture_counts:
         return _simple_domain_card(
-            "Plumbing Fixture Counts", "OBC 9.32 · NBC", [],
+            "Plumbing Fixture Counts",
+            "OBC 9.32 · NBC",
+            [],
             override_badge=("N/A — no fixtures found", "bg-gray-100 text-gray-500"),
         )
     badges = [
-        Span(f"{k}: {v}",
-             cls="inline-block px-2 py-1 rounded-full text-xs bg-cyan-50 text-cyan-800 border border-cyan-200 font-medium")
+        Span(
+            f"{k}: {v}",
+            cls="inline-block px-2 py-1 rounded-full text-xs bg-cyan-50 text-cyan-800 border border-cyan-200 font-medium",
+        )
         for k, v in sorted(fixture_counts.items())
     ]
     return _simple_domain_card(
-        "Plumbing Fixture Counts", "OBC 9.32 · NBC", [],
-        extra_sections=[_collapsible_section(
-            "Fixture Inventory",
-            Div(*badges, cls="flex flex-wrap gap-2"),
-            badge=f"{sum(fixture_counts.values())} fixtures",
-            open=True,
-        )],
+        "Plumbing Fixture Counts",
+        "OBC 9.32 · NBC",
+        [],
+        extra_sections=[
+            _collapsible_section(
+                "Fixture Inventory",
+                Div(*badges, cls="flex flex-wrap gap-2"),
+                badge=f"{sum(fixture_counts.values())} fixtures",
+                open=True,
+            )
+        ],
         override_badge=("Inventory only", "bg-blue-100 text-blue-800"),
     )
 
@@ -2102,53 +2453,76 @@ def _simple_fire_card(by_class: dict, spatial_checks: dict, building_summary: di
         f_rows = []
         for r in sorted(fire_sep, key=lambda x: x["passes"]):
             rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
-            rc = "text-red-700" if r["missing_rating"] else (
-                "text-green-700" if r["passes"] else "text-orange-700"
+            rc = (
+                "text-red-700"
+                if r["missing_rating"]
+                else ("text-green-700" if r["passes"] else "text-orange-700")
             )
             spaces_txt = ", ".join(r["adjacent_spaces"][:2])
             if len(r["adjacent_spaces"]) > 2:
                 spaces_txt += f" +{len(r['adjacent_spaces']) - 2}"
-            f_rows.append(Tr(
-                Td(r["wall_name"][:35], cls="px-3 py-2 text-xs font-mono"),
-                Td(spaces_txt[:50], cls="px-3 py-2 text-xs"),
-                Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rc}"),
-                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rc}"),
-                cls="border-b border-muted last:border-0",
-            ))
-        extra.append(_collapsible_section(
-            "Fire Separation — OBC 9.10.9",
-            Div(
-                Table(
-                    Thead(Tr(*[
-                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-                        for h in ("Wall", "Between Spaces", "Fire Rating", "Status")
-                    ])),
-                    Tbody(*f_rows),
-                    cls="w-full text-xs",
+            f_rows.append(
+                Tr(
+                    Td(r["wall_name"][:35], cls="px-3 py-2 text-xs font-mono"),
+                    Td(spaces_txt[:50], cls="px-3 py-2 text-xs"),
+                    Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rc}"),
+                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rc}"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        extra.append(
+            _collapsible_section(
+                "Fire Separation — OBC 9.10.9",
+                Div(
+                    Table(
+                        Thead(
+                            Tr(
+                                *[
+                                    Th(
+                                        h,
+                                        cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                                    )
+                                    for h in ("Wall", "Between Spaces", "Fire Rating", "Status")
+                                ]
+                            )
+                        ),
+                        Tbody(*f_rows),
+                        cls="w-full text-xs",
+                    ),
+                    cls="overflow-auto border rounded-md max-h-64",
                 ),
-                cls="overflow-auto border rounded-md max-h-64",
-            ),
-            badge=f"{f_pass}/{len(fire_sep)} pass",
-            open=f_fail > 0,
-        ))
+                badge=f"{f_pass}/{len(fire_sep)} pass",
+                open=f_fail > 0,
+            )
+        )
         if f_fail > 0:
             override = (f"{f_fail} separation issue(s)", "bg-red-100 text-red-800")
 
     if alarm_counts:
         alarm_badges = [
-            Span(f"{k}: {v}",
-                 cls="inline-block px-2 py-1 rounded-full text-xs bg-red-50 text-red-800 border border-red-200 font-medium")
+            Span(
+                f"{k}: {v}",
+                cls="inline-block px-2 py-1 rounded-full text-xs bg-red-50 text-red-800 border border-red-200 font-medium",
+            )
             for k, v in sorted(alarm_counts.items())
         ]
-        extra.append(_collapsible_section(
-            "Alarm Inventory",
-            Div(*alarm_badges, cls="flex flex-wrap gap-2"),
-            badge=f"{sum(alarm_counts.values())} alarms",
-            open=False,
-        ))
+        extra.append(
+            _collapsible_section(
+                "Alarm Inventory",
+                Div(*alarm_badges, cls="flex flex-wrap gap-2"),
+                badge=f"{sum(alarm_counts.values())} alarms",
+                open=False,
+            )
+        )
 
-    return _simple_domain_card("Fire Protection (House-Level)", "OBC 9.10 · NBC 3.2",
-                                rules, extra, override, category="fire")
+    return _simple_domain_card(
+        "Fire Protection (House-Level)",
+        "OBC 9.10 · NBC 3.2",
+        rules,
+        extra,
+        override,
+        category="fire",
+    )
 
 
 def _simple_garage_card(spatial_checks: dict):
@@ -2156,7 +2530,9 @@ def _simple_garage_card(spatial_checks: dict):
     garage_sep = spatial.get("garage_separation", {})
     if not garage_sep:
         return _simple_domain_card(
-            "Garage / Carport", "OBC 9.10.14", [],
+            "Garage / Carport",
+            "OBC 9.10.14",
+            [],
             override_badge=("N/A — no garage detected", "bg-gray-100 text-gray-500"),
         )
 
@@ -2171,43 +2547,66 @@ def _simple_garage_card(spatial_checks: dict):
         g_rows = []
         for r in sorted(g_results, key=lambda x: x["passes"]):
             rating_txt = r["fire_rating_raw"] or "⚠ Not declared"
-            rc = "text-red-700" if r["missing_rating"] else (
-                "text-green-700" if r["passes"] else "text-orange-700"
+            rc = (
+                "text-red-700"
+                if r["missing_rating"]
+                else ("text-green-700" if r["passes"] else "text-orange-700")
             )
-            g_rows.append(Tr(
-                Td(r["element_type"], cls="px-3 py-2 text-xs font-semibold"),
-                Td(r["element_name"][:35], cls="px-3 py-2 text-xs font-mono"),
-                Td(r["garage_space"][:25], cls="px-3 py-2 text-xs"),
-                Td(r["adjacent_space"][:25], cls="px-3 py-2 text-xs"),
-                Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rc}"),
-                Td(f"≥ {r['required_min']} min", cls="px-3 py-2 text-xs font-mono"),
-                Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rc}"),
-                cls="border-b border-muted last:border-0",
-            ))
-        extra.append(_collapsible_section(
-            "Garage Fire Separation — OBC 9.10.14.2",
-            Div(
-                Table(
-                    Thead(Tr(*[
-                        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-                        for h in ("Type", "Element", "Garage Space", "Adjacent", "Rating", "Required", "Status")
-                    ])),
-                    Tbody(*g_rows),
-                    cls="w-full text-xs",
+            g_rows.append(
+                Tr(
+                    Td(r["element_type"], cls="px-3 py-2 text-xs font-semibold"),
+                    Td(r["element_name"][:35], cls="px-3 py-2 text-xs font-mono"),
+                    Td(r["garage_space"][:25], cls="px-3 py-2 text-xs"),
+                    Td(r["adjacent_space"][:25], cls="px-3 py-2 text-xs"),
+                    Td(rating_txt, cls=f"px-3 py-2 text-xs font-mono {rc}"),
+                    Td(f"≥ {r['required_min']} min", cls="px-3 py-2 text-xs font-mono"),
+                    Td("✓ Pass" if r["passes"] else "✗ Fail", cls=f"px-3 py-2 text-xs {rc}"),
+                    cls="border-b border-muted last:border-0",
+                )
+            )
+        extra.append(
+            _collapsible_section(
+                "Garage Fire Separation — OBC 9.10.14.2",
+                Div(
+                    Table(
+                        Thead(
+                            Tr(
+                                *[
+                                    Th(
+                                        h,
+                                        cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                                    )
+                                    for h in (
+                                        "Type",
+                                        "Element",
+                                        "Garage Space",
+                                        "Adjacent",
+                                        "Rating",
+                                        "Required",
+                                        "Status",
+                                    )
+                                ]
+                            )
+                        ),
+                        Tbody(*g_rows),
+                        cls="w-full text-xs",
+                    ),
+                    cls="overflow-auto border rounded-md max-h-64",
                 ),
-                cls="overflow-auto border rounded-md max-h-64",
-            ),
-            badge=f"{g_pass}/{len(g_results)} pass",
-            open=g_fail > 0,
-        ))
+                badge=f"{g_pass}/{len(g_results)} pass",
+                open=g_fail > 0,
+            )
+        )
         if g_fail > 0:
             override = (f"{g_fail} separation issue(s)", "bg-red-100 text-red-800")
     elif g_warnings:
-        extra.append(_collapsible_section(
-            "Garage Fire Separation — OBC 9.10.14.2",
-            Div(*[Span(w, cls="block text-xs text-yellow-700") for w in g_warnings]),
-            open=True,
-        ))
+        extra.append(
+            _collapsible_section(
+                "Garage Fire Separation — OBC 9.10.14.2",
+                Div(*[Span(w, cls="block text-xs text-yellow-700") for w in g_warnings]),
+                open=True,
+            )
+        )
 
     return _simple_domain_card("Garage / Carport", "OBC 9.10.14", [], extra, override)
 
@@ -2248,6 +2647,7 @@ def setup_routes(rt):
             return Alert(result["error"], cls=AlertT.error)
 
         from collections import defaultdict
+
         project = result["project"]
         rule_compliance = result.get("rule_compliance", [])
         spatial_checks = result.get("spatial_checks", {})
@@ -2267,11 +2667,15 @@ def setup_routes(rt):
 
         sections = [
             Card(
-                CardHeader(CardTitle(f"{project.get('name', 'Project')} — Simple Analysis{folder_note}")),
-                CardContent(P(
-                    "Domain-based compliance check against OBC Part 9.",
-                    cls="text-sm text-muted-foreground",
-                )),
+                CardHeader(
+                    CardTitle(f"{project.get('name', 'Project')} — Simple Analysis{folder_note}")
+                ),
+                CardContent(
+                    P(
+                        "Domain-based compliance check against OBC Part 9.",
+                        cls="text-sm text-muted-foreground",
+                    )
+                ),
             ),
             *(([bldg_card]) if bldg_card else []),
             _simple_windows_card(by_class, spatial_checks),
@@ -2327,7 +2731,9 @@ def setup_routes(rt):
         project = result["project"]
         selected_theme = result.get("analysis_theme", "Architecture")
         rule_folder = result.get("rule_folder", "")
-        theme_label = f"{selected_theme} Theme" + (f" · Folder: {rule_folder}" if rule_folder else "")
+        theme_label = f"{selected_theme} Theme" + (
+            f" · Folder: {rule_folder}" if rule_folder else ""
+        )
 
         _last_initial_rule_compliance[project_id] = result.get("rule_compliance", [])
 
@@ -2358,7 +2764,9 @@ def setup_routes(rt):
         project = result["project"]
         selected_theme = result.get("analysis_theme", "Architecture")
         rule_folder = result.get("rule_folder", "")
-        theme_label = f"{selected_theme} Theme" + (f" · Folder: {rule_folder}" if rule_folder else "")
+        theme_label = f"{selected_theme} Theme" + (
+            f" · Folder: {rule_folder}" if rule_folder else ""
+        )
 
         compliance_card = _compliance_card(
             results=result.get("compliance_results", []),
@@ -2467,7 +2875,9 @@ def setup_routes(rt):
                     actual_txt = "—"
                 else:
                     actual_v = entry.get("actual")
-                    actual_txt = _fmt_val_s(actual_v) + (f" {unit}" if unit and actual_v is not None else "")
+                    actual_txt = _fmt_val_s(actual_v) + (
+                        f" {unit}" if unit and actual_v is not None else ""
+                    )
                 row += [actual_txt, _rule_required_text(rule)]
                 statuses.append(entry.get("status") if entry else None)
             row.append("; ".join(r["issues"]) if r["issues"] else "")
@@ -2495,7 +2905,9 @@ def setup_routes(rt):
         return StarletteResponse(
             content=buf.getvalue(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="{category or "summary"}_summary.xlsx"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{category or "summary"}_summary.xlsx"'
+            },
         )
 
     @rt("/reports/simple-summary-pdf/{category}")
@@ -2512,7 +2924,14 @@ def setup_routes(rt):
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
         from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import (
+            KeepTogether,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
 
         targets = _SIMPLE_CATEGORY_TARGETS.get(category, [])
         rule_results = [r for r in _last_simple_compliance if r.get("target") in targets]
@@ -2522,8 +2941,12 @@ def setup_routes(rt):
         order = {"FAIL": 0, "MISSING": 1, "PASS": 2}
 
         story = [
-            Paragraph(f"{(category or 'Summary').title()} — Compliance Summary", styles["Heading1"]),
-            Paragraph(f"{len(rows)} element(s) tested against {len(columns)} rule(s).", styles["Normal"]),
+            Paragraph(
+                f"{(category or 'Summary').title()} — Compliance Summary", styles["Heading1"]
+            ),
+            Paragraph(
+                f"{len(rows)} element(s) tested against {len(columns)} rule(s).", styles["Normal"]
+            ),
             Spacer(1, 10),
         ]
 
@@ -2539,11 +2962,18 @@ def setup_routes(rt):
                 entry = r["cells"].get(rule_key)
                 status = entry.get("status") if entry else "MISSING"
                 unit = rule.get("unit", "") or ""
-                actual_txt = "—" if entry is None else (
-                    _fmt_val_s(entry.get("actual")) + (f" {unit}" if unit and entry.get("actual") is not None else "")
+                actual_txt = (
+                    "—"
+                    if entry is None
+                    else (
+                        _fmt_val_s(entry.get("actual"))
+                        + (f" {unit}" if unit and entry.get("actual") is not None else "")
+                    )
                 )
                 label = rule.get("property_name") or rule_key
-                status_txt = {"PASS": "Pass", "FAIL": "Fail", "MISSING": "Missing"}.get(status, status)
+                status_txt = {"PASS": "Pass", "FAIL": "Fail", "MISSING": "Missing"}.get(
+                    status, status
+                )
                 props.append((label, actual_txt, _rule_required_text(rule), status_txt, status))
             props.sort(key=lambda p: order.get(p[4], 3))
 
@@ -2565,23 +2995,36 @@ def setup_routes(rt):
                     style_cmds.append(("TEXTCOLOR", (0, i), (-1, i), colors.HexColor("#9C6500")))
             tbl.setStyle(TableStyle(style_cmds))
 
-            story.append(KeepTogether([
-                Paragraph(header_txt, styles["Heading3"]),
-                tbl,
-                Spacer(1, 12),
-            ]))
+            story.append(
+                KeepTogether(
+                    [
+                        Paragraph(header_txt, styles["Heading3"]),
+                        tbl,
+                        Spacer(1, 12),
+                    ]
+                )
+            )
 
         if not rows:
-            story.append(Paragraph("No elements found in the model for this category.", styles["Normal"]))
+            story.append(
+                Paragraph("No elements found in the model for this category.", styles["Normal"])
+            )
 
         buf = io.BytesIO()
         SimpleDocTemplate(
-            buf, pagesize=letter, topMargin=36, bottomMargin=36, leftMargin=36, rightMargin=36,
+            buf,
+            pagesize=letter,
+            topMargin=36,
+            bottomMargin=36,
+            leftMargin=36,
+            rightMargin=36,
         ).build(story)
         return StarletteResponse(
             content=buf.getvalue(),
             media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{category or "summary"}_summary.pdf"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{category or "summary"}_summary.pdf"'
+            },
         )
 
     @rt("/reports/bcf/{project_id}")
