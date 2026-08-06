@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -299,7 +299,6 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "docling" },
-    { name = "fastlite" },
     { name = "ifcopenshell" },
     { name = "litellm" },
     { name = "monsterui" },
@@ -331,7 +330,6 @@ ml-pipeline = [
 [package.metadata]
 requires-dist = [
     { name = "docling", specifier = ">=2.0.0" },
-    { name = "fastlite", specifier = ">=0.2.4" },
     { name = "ifcopenshell", specifier = ">=0.8.4.post1" },
     { name = "litellm", specifier = ">=1.0.0" },
     { name = "monsterui", specifier = ">=1.0.45" },

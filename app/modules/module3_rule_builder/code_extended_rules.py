@@ -1,28 +1,14 @@
-"""Load extended building-code rules from canonical JSON rulesets."""
+"""Load extended building-code rules from database static assets."""
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-
-_RULESETS_DIR = Path(__file__).resolve().parents[3] / "data" / "rulesets"
-_RULESET_CANDIDATES = (
-    _RULESETS_DIR / "building_code_part9_ext_ruleset.json",
-)
-
-
-def _resolve_ruleset_path() -> Path:
-    """Return the first available extended ruleset path."""
-    for path in _RULESET_CANDIDATES:
-        if path.exists():
-            return path
-    return _RULESET_CANDIDATES[0]
-
+from app.services.static_data_service import StaticDataService
 
 def _load_extended_rules() -> list[dict]:
-    """Read extended code rules from the JSON ruleset file."""
-    payload = json.loads(_resolve_ruleset_path().read_text(encoding="utf-8"))
+    """Read extended code rules from database static assets."""
+    payload = StaticDataService().get_asset_json("ruleset:BUILDING-CODE-PART9-EXT")
+    if not isinstance(payload, dict):
+        raise ValueError("Missing static asset ruleset:BUILDING-CODE-PART9-EXT")
     rules = payload.get("rules")
     if not isinstance(rules, list):
         raise ValueError("Invalid extended ruleset: expected a 'rules' array")

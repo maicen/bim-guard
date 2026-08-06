@@ -16,14 +16,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sqlite3
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from app.services.persistence import PersistenceService
+from app.services.rules_service import RuleService
 
 RENAMES = [
     # (old_name,             new_name,          reason)
@@ -39,38 +34,32 @@ RENAMES = [
 
 
 def run(dry_run: bool) -> None:
-    db_path = Path(PersistenceService.DB_PATH)
-    if not db_path.exists():
-        print(f"DB not found at {db_path}")
-        sys.exit(1)
-
     now = datetime.now(timezone.utc).isoformat()
-    conn = sqlite3.connect(db_path)
-    try:
-        total = 0
-        for old, new, reason in RENAMES:
-            cur = conn.execute(
-                "SELECT COUNT(*) FROM rules WHERE property_name = ?", (old,)
-            )
-            count = cur.fetchone()[0]
-            if count == 0:
-                print(f"  SKIP  {old!r:30} — no rows found")
-                continue
-            print(f"  {'DRY ' if dry_run else ''}UPDATE  {old!r:25} -> {new!r:20}  ({count} row(s))  [{reason}]")
-            if not dry_run:
-                conn.execute(
-                    "UPDATE rules SET property_name = ?, updated_at = ? WHERE property_name = ?",
-                    (new, now, old),
-                )
-            total += count
+    service = RuleService()
+    rules_table = service._rules  # uses shared adapter interface
 
+    total = 0
+    for old, new, reason in RENAMES:
+        rows = list(rules_table.rows_where("property_name = ?", [old]))
+        count = len(rows)
+        if count == 0:
+            print(f"  SKIP  {old!r:30} — no rows found")
+            continue
+        print(
+            f"  {'DRY ' if dry_run else ''}UPDATE  {old!r:25} -> {new!r:20}  ({count} row(s))  [{reason}]"
+        )
         if not dry_run:
-            conn.commit()
-            print(f"\nDone — {total} rule(s) updated in {db_path}")
-        else:
-            print(f"\nDry run — {total} rule(s) would be updated. Re-run without --dry-run to apply.")
-    finally:
-        conn.close()
+            for row in rows:
+                rules_table.update(
+                    updates={"property_name": new, "updated_at": now},
+                    pk_values=row["id"],
+                )
+        total += count
+
+    if not dry_run:
+        print(f"\nDone — {total} rule(s) updated in supabase:public.rules")
+    else:
+        print(f"\nDry run — {total} rule(s) would be updated. Re-run without --dry-run to apply.")
 
 
 def main() -> None:

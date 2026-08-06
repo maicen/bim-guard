@@ -161,7 +161,7 @@ ratio, band = extractor.calculate_area_ratio(
 
 Tracks issues across multiple compliance runs — recording when each element
 was first flagged, how its risk band has changed over time, and when it was
-resolved. Persists history to a local JSON file (`bimguard_issue_history.json`)
+resolved. Persists history to the database table (`public.issue_history`)
 between Streamlit sessions. Provides the data source for the BCF issue history
 field in markup.bcf.
 

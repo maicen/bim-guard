@@ -3,19 +3,14 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
 from threading import Lock
-
-from app.services.persistence import PersistenceService
 
 _SPACY_DOWNLOAD_LOCK = Lock()
 
 
 def describe_rule_store() -> str:
     """Return a human-readable label for the active rule storage backend."""
-    if PersistenceService.DB_BACKEND == "supabase":
-        return "supabase:public.rules"
-    return str(Path(PersistenceService.DB_PATH))
+    return "supabase:public.rules"
 
 
 @lru_cache(maxsize=1)

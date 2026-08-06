@@ -23,7 +23,7 @@ alternative data source.
 ### 2. Wrong IFC property names in seed rules (8 rules)
 - **Problem:** Rules used custom property names that don't exist in standard
   buildingSMART Psets, causing permanent `MISSING_DATA` on every analysis.
-- **Fix:** Updated `code_seed_rules.py` AND migrated `data/bimguard.sqlite` via
+- **Fix:** Updated `code_seed_rules.py` and migrated the `public.rules` table via
   `scripts/fix_property_names.py`.
 
 | Old name | New name | Reason |
@@ -38,9 +38,8 @@ alternative data source.
 | `MaxSlope` | `PitchAngle` | Pset_SlabCommon standard name |
 
 ### 3. Missing `.env` file — app wouldn't start
-- **Problem:** No `.env` file → `BIM_GUARD_DB_BACKEND` defaulted to `"supabase"`
-  → startup crash without Supabase credentials.
-- **Fix:** Copied `example.env` → `.env` (SQLite mode, local storage).
+- **Problem:** No `.env` file → startup crash without Supabase credentials.
+- **Fix:** Copied `example.env` → `.env` and configured Supabase credentials.
 
 ### 4. Compliance results UI — no per-element drill-down
 - **Problem:** `MISSING_DATA` rows showed `0 / 0 / 167` but no way to see
@@ -66,27 +65,27 @@ alternative data source.
 **File:** `scripts/inspect_ifc_properties.py`
 
 Runs `Module2_IFCRead.extract_for_compliance()` against any IFC file and diffs
-the results against the rules in `rules.db`. Reports per target class:
+the results against rules in `public.rules`. Reports per target class:
 - `[OK]` — property found (shows which Pset it came from)
 - `[NEAR-MISS]` — property not found but a similarly named one exists (fuzzy match)
 - `[MISSING]` — property genuinely absent
 - `NO ELEMENTS` — IFC class not present in the file at all
 
 ```bash
-BIM_GUARD_DB_BACKEND=sqlite uv run python scripts/inspect_ifc_properties.py path/to/model.ifc
-BIM_GUARD_DB_BACKEND=sqlite uv run python scripts/inspect_ifc_properties.py path/to/model.ifc --target IfcWall
-BIM_GUARD_DB_BACKEND=sqlite uv run python scripts/inspect_ifc_properties.py path/to/model.ifc --theme MEP
+uv run python scripts/inspect_ifc_properties.py path/to/model.ifc
+uv run python scripts/inspect_ifc_properties.py path/to/model.ifc --target IfcWall
+uv run python scripts/inspect_ifc_properties.py path/to/model.ifc --theme MEP
 ```
 
 ### 2. Property Name Migration Script
 **File:** `scripts/fix_property_names.py`
 
 One-time and re-runnable migration that renames `property_name` values in
-`rules.db` to match standard IFC Pset names. Supports `--dry-run`.
+`public.rules` to match standard IFC Pset names. Supports `--dry-run`.
 
 ```bash
-BIM_GUARD_DB_BACKEND=sqlite uv run python scripts/fix_property_names.py --dry-run
-BIM_GUARD_DB_BACKEND=sqlite uv run python scripts/fix_property_names.py
+uv run python scripts/fix_property_names.py --dry-run
+uv run python scripts/fix_property_names.py
 ```
 
 ### 3. BIMGuard IFC4 Export Config for Revit
@@ -212,8 +211,8 @@ uv run uvicorn main:app --reload
 # → http://localhost:8000
 
 # Run IFC diagnostic on an uploaded file
-BIM_GUARD_DB_BACKEND=sqlite uv run python scripts/inspect_ifc_properties.py data/uploads/ifc/YOUR_FILE.ifc
+uv run python scripts/inspect_ifc_properties.py data/uploads/ifc/YOUR_FILE.ifc
 
 # Preview property name DB fixes
-BIM_GUARD_DB_BACKEND=sqlite uv run python scripts/fix_property_names.py --dry-run
+uv run python scripts/fix_property_names.py --dry-run
 ```

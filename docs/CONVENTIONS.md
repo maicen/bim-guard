@@ -26,7 +26,7 @@ When in doubt, the project-specific instructions file is authoritative.
 ## Database Access
 
 - Single accessor: `PersistenceService.get_table(...)` in `app/services/persistence.py`.
-- Runtime default is Supabase (`BIM_GUARD_DB_BACKEND=supabase`), with SQLite as optional fallback.
+- Runtime database is Supabase only.
 - Do not query Supabase directly from routes; keep DB access inside services.
 - Table adapters expose a unified interface for `projects`, `documents`, and `rules`.
 

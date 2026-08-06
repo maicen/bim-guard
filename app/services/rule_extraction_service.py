@@ -30,6 +30,7 @@ from app.modules.module1_doc_parser.section_chunker import SectionChunker
 from app.services.llm_client import LiteLLMClient
 from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
 from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
+from app.services.settings_service import SettingsService
 
 # ── Optional module flags ─────────────────────────────────────────────────────
 
@@ -117,8 +118,13 @@ class RuleExtractionService:
     ):
         """Initialize document parser and extraction provider dependencies."""
         self._doc_reader = doc_reader or Module1_DocReader()
+        settings = SettingsService()
+        default_model = settings.get(
+            "BIM_GUARD_RULE_MODEL",
+            os.getenv("BIM_GUARD_RULE_MODEL", "gpt-4o-mini"),
+        )
         self._provider = provider or LiteLLMRuleExtractor(
-            client=LiteLLMClient(model=os.getenv("BIM_GUARD_RULE_MODEL", "gpt-4o-mini"))
+            client=LiteLLMClient(model=default_model)
         )
 
     # ── Public API ────────────────────────────────────────────────────────────

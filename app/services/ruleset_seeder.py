@@ -5,11 +5,10 @@ The seeding operations are idempotent: each routine checks whether its
 """
 
 import json
-from pathlib import Path
 
 from app.services.rules_service import RuleService
+from app.services.static_data_service import StaticDataService
 
-_RULESETS_DIR = Path("data/rulesets")
 _DEFAULT_CODE_RULESET_FILES = (
     "building_code_part9_ruleset.json",
     "building_code_part9_ext_ruleset.json",
@@ -19,8 +18,20 @@ _DEFAULT_CODE_RULESET_FILES = (
 
 
 def _load(filename: str) -> dict:
-    path = _RULESETS_DIR / filename
-    return json.loads(path.read_text(encoding="utf-8"))
+    asset_key_map = {
+        "building_code_part9_ruleset.json": "ruleset:BUILDING-CODE-PART9",
+        "building_code_part9_ext_ruleset.json": "ruleset:BUILDING-CODE-PART9-EXT",
+        "galvanic_corrosion_ruleset.json": "ruleset:BIMGUARD-GC-001",
+        "crevice_corrosion_ruleset.json": "ruleset:BIMGUARD-CC-001",
+        "mic_corrosion_ruleset.json": "ruleset:BIMGUARD-MC-001",
+    }
+
+    asset_key = asset_key_map.get(filename)
+    if asset_key:
+        payload = StaticDataService().get_asset_json(asset_key)
+        if isinstance(payload, dict):
+            return payload
+    raise RuntimeError(f"Missing static ruleset asset: {filename}")
 
 
 def _create(svc: RuleService, **kwargs) -> None:

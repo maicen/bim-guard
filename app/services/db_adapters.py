@@ -1,8 +1,7 @@
-"""Database adapters exposing a fastlite-like table API."""
+"""Database adapters exposing a table API backed by Supabase."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -46,57 +45,6 @@ def parse_where(where_sql: str, params: list[Any] | None = None) -> _WhereExpr:
         return _WhereExpr(field=field.strip(), operator="eq", value=value)
 
     raise ValueError(f"Unsupported where expression: {where_sql}")
-
-
-class SQLiteTableAdapter:
-    """Expose a thin compatibility layer around a fastlite table object."""
-
-    def __init__(self, table: Any):
-        """Store underlying fastlite table reference."""
-        self._table = table
-
-    @property
-    def columns_dict(self) -> dict[str, Any]:
-        """Return table columns map."""
-        return self._table.columns_dict
-
-    @property
-    def rows(self) -> Iterable[dict[str, Any]]:
-        """Return all table rows."""
-        return self._table.rows
-
-    def create(self, schema: dict[str, Any], *, pk: str, if_not_exists: bool = True) -> None:
-        """Create table if missing."""
-        self._table.create(schema, pk=pk, if_not_exists=if_not_exists)
-
-    def add_column(self, column_name: str, column_type: Any) -> None:
-        """Add table column."""
-        self._table.add_column(column_name, column_type)
-
-    def get(self, pk_value: Any) -> dict[str, Any] | None:
-        """Get one row by primary key."""
-        return self._table.get(pk_value)
-
-    def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Insert one row."""
-        return self._table.insert(payload)
-
-    def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
-        """Update one row by primary key."""
-        self._table.update(updates=updates, pk_values=pk_values)
-
-    def delete(self, pk_value: Any) -> None:
-        """Delete one row by primary key."""
-        self._table.delete(pk_value)
-
-    def rows_where(
-        self,
-        where_sql: str,
-        params: list[Any] | None = None,
-        limit: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """Filter rows using fastlite's native rows_where."""
-        return list(self._table.rows_where(where_sql, params or [], limit=limit))
 
 
 class SupabaseTableAdapter:

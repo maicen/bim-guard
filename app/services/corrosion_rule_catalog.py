@@ -2,20 +2,16 @@
 
 These helpers turn the seeded rule rows back into the lookup tables used by
 the corrosion engines and the module 4 compliance runner. The database is the
-source of truth; JSON files under ``data/rulesets`` are only used as a fallback
-when the catalog has not been seeded yet.
+source of truth, including static ruleset payloads stored in static_data_assets.
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from app.services.rules_service import RuleService
-
-_RULESETS_DIR = Path(__file__).resolve().parents[2] / "data" / "rulesets"
-
+from app.services.static_data_service import StaticDataService
 
 def _coerce_float(value: Any, default: float | None = None) -> float | None:
     """Return ``value`` as ``float`` when possible, otherwise ``default``."""
@@ -41,8 +37,18 @@ def _decode_json(value: Any) -> dict[str, Any]:
 
 
 def _load_json_ruleset(filename: str) -> dict[str, Any]:
-    """Load a canonical ruleset JSON file from ``data/rulesets``."""
-    return json.loads((_RULESETS_DIR / filename).read_text(encoding="utf-8"))
+    """Load a canonical ruleset JSON payload from database static assets."""
+    asset_map = {
+        "galvanic_corrosion_ruleset.json": "ruleset:BIMGUARD-GC-001",
+        "crevice_corrosion_ruleset.json": "ruleset:BIMGUARD-CC-001",
+        "mic_corrosion_ruleset.json": "ruleset:BIMGUARD-MC-001",
+    }
+    asset_key = asset_map.get(filename)
+    if asset_key:
+        payload = StaticDataService().get_asset_json(asset_key)
+        if isinstance(payload, dict):
+            return payload
+    raise RuntimeError(f"Missing static ruleset asset: {filename}")
 
 
 def _rules_for(ruleset_id: str) -> list[dict[str, Any]]:

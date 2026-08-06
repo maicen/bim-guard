@@ -3,24 +3,18 @@ BIMGUARD AI — Issue History Tracker
 modules/issue_tracker.py
 
 Tracks when issues were raised, updated, and closed across compliance runs.
-Persists history to a JSON file in the working directory.
+Persists history to the shared Supabase-backed issue_history table.
 Provides the data source for the BCF issue history field.
-
-Usage in Streamlit:
-  from modules.issue_tracker import IssueTracker
-  tracker = IssueTracker()
-  tracker.record_run(results)
-  history = tracker.get_history(global_id)
 """
 
 import json
-import os
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Optional
 
-HISTORY_FILE = "bimguard_issue_history.json"
+from app.services.persistence import PersistenceService
+
 ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"
 
 
@@ -59,36 +53,56 @@ class IssueRecord:
 class IssueTracker:
     """
     Persistent issue history tracker for BIMGUARD AI compliance runs.
-    Stores history in a local JSON file between Streamlit sessions.
+    Stores history in the shared issue_history table.
     """
 
-    def __init__(self, history_path: str = HISTORY_FILE):
-        self.history_path = history_path
+    def __init__(self):
         self._records: dict[str, IssueRecord] = {}
+        self._issues = PersistenceService.get_table(
+            "issue_history",
+            {
+                "global_id": str,
+                "payload_json": str,
+                "updated_at": str,
+            },
+            pk="global_id",
+        )
         self._load()
 
     def _load(self):
-        """Load existing history from JSON file."""
-        if os.path.exists(self.history_path):
+        """Load existing history from the issue_history table."""
+        rows = list(self._issues.rows)
+        self._records = {}
+        for row in rows:
+            raw = row.get("payload_json") or ""
+            if not raw:
+                continue
             try:
-                with open(self.history_path, "r", encoding="utf-8") as f:
-                    raw = json.load(f)
-                for gid, data in raw.items():
-                    events = [IssueEvent(**e) for e in data.get("events", [])]
-                    data["events"] = events
-                    self._records[gid] = IssueRecord(**data)
-            except Exception:
-                self._records = {}
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            gid = str(data.get("global_id") or "")
+            if not gid:
+                continue
+            events = [IssueEvent(**e) for e in data.get("events", [])]
+            data["events"] = events
+            self._records[gid] = IssueRecord(**data)
 
     def _save(self):
-        """Persist current history to JSON file."""
+        """Persist current history to the issue_history table."""
         try:
-            serialisable = {}
             for gid, record in self._records.items():
                 d = asdict(record)
-                serialisable[gid] = d
-            with open(self.history_path, "w", encoding="utf-8") as f:
-                json.dump(serialisable, f, indent=2)
+
+                existing = self._issues.get(gid)
+                payload = {
+                    "payload_json": json.dumps(d),
+                    "updated_at": _now(),
+                }
+                if existing is None:
+                    self._issues.insert({"global_id": gid, **payload})
+                else:
+                    self._issues.update(updates=payload, pk_values=gid)
         except Exception:
             pass
 

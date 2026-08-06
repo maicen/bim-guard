@@ -8,16 +8,23 @@ Imported by rule_generator.py, rule_converter.py, and seed-rule loaders.
 import os
 
 from app.services.persistence import PersistenceService
+from app.services.settings_service import SettingsService
+
+_settings = SettingsService()
 
 # ── Database ──────────────────────────────────────────────────────────────────
-DB_PATH = PersistenceService.DB_PATH
-# Runtime backend is selected via BIM_GUARD_DB_BACKEND (sqlite or supabase).
+# Supabase is the sole runtime database backend.
+DB_BACKEND = PersistenceService.DB_BACKEND
+DB_PATH = "supabase://public.rules"
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL = _settings.get("OPENAI_MODEL", os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL = _settings.get(
+    "GEMINI_MODEL",
+    os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
+)
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "BuildingCode_PDF"
 SOURCE_DOC_SEED = "BuildingCode_Seed"

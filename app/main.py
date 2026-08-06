@@ -21,7 +21,16 @@ except ImportError:  # pragma: no cover - non-POSIX platforms
 
 load_env_file()
 
-from app.routes import analyze, dashboard, library, modeling_manual, projects, revit_sync, viewer
+from app.routes import (
+    analyze,
+    dashboard,
+    library,
+    modeling_manual,
+    projects,
+    revit_sync,
+    settings,
+    viewer,
+)
 
 APP_HEADERS = SiteTheme()
 
@@ -38,6 +47,7 @@ _ROUTE_INSTALLERS = (
     modeling_manual.setup_routes,
     projects.setup_routes,
     revit_sync.setup_routes,
+    settings.setup_routes,
 )
 _ROUTES_REGISTERED = False
 

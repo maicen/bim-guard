@@ -43,15 +43,13 @@ def _sha256_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-def _iter_files(source_dir: Path, include_db_file: bool) -> list[Path]:
+def _iter_files(source_dir: Path) -> list[Path]:
     """Collect files from source directory recursively."""
     files: list[Path] = []
     for path in source_dir.rglob("*"):
         if not path.is_file():
             continue
         if path.suffix in {".shm", ".wal"}:
-            continue
-        if not include_db_file and path.name == "bimguard.sqlite":
             continue
         files.append(path)
     return files
@@ -93,11 +91,6 @@ def parse_args() -> argparse.Namespace:
         "--skip-existing",
         action="store_true",
         help="Skip upload when object key already exists.",
-    )
-    parser.add_argument(
-        "--include-db-file",
-        action="store_true",
-        help="Include SQLite db file in artifact upload.",
     )
     return parser.parse_args()
 
@@ -141,7 +134,7 @@ def main() -> int:
         return 1
 
     client = _build_client()
-    files = _iter_files(source_dir, include_db_file=args.include_db_file)
+    files = _iter_files(source_dir)
     existing_keys: set[str] = set()
 
     if args.skip_existing and not args.dry_run:
