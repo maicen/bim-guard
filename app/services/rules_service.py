@@ -1,6 +1,9 @@
 """Rule persistence service for CRUD, lookup, and ruleset import operations."""
 
 import json
+from typing import Any
+
+from postgrest.exceptions import APIError
 
 from app.services.persistence import PersistenceService
 from app.utils import now_iso_utc, rows_desc_by_id
@@ -48,6 +51,16 @@ _META_COLUMNS = {
     # | "scoring_model" | "mitigation" | "reference_config"
 }
 
+_FOLDER_COLUMNS = {
+    "id": int,
+    "ruleset_id": str,
+    "display_name": str,
+    "description": str,
+    "mechanism_scope": str,
+    "created_at": str,
+    "updated_at": str,
+}
+
 # ── Valid controlled vocabulary ───────────────────────────────────────────────
 
 MECHANISMS = {"OBC", "GC-001", "CC-001", "MC-001", "IFC"}
@@ -75,6 +88,8 @@ _MEP_IFC_PREFIXES = (
     "IfcUnitary",
     "IfcSanitary",
 )
+
+FOLDER_MECHANISM_SCOPES = {"", *MECHANISMS}
 
 
 class RuleService:
@@ -105,6 +120,158 @@ class RuleService:
             },
             required_columns=all_required,
         )
+        self._folders = PersistenceService.get_table(
+            "rule_folders",
+            _FOLDER_COLUMNS,
+        )
+        self._folders_enabled = True
+        self._sync_folders_from_rules()
+
+    @staticmethod
+    def normalize_ruleset_id(value: str | None) -> str:
+        """Normalize ruleset identifiers to a stable whitespace-collapsed form."""
+        return " ".join((value or "").split())
+
+    @staticmethod
+    def _normalize_mechanism_scope(value: str | None) -> str:
+        """Normalize folder scope to known mechanism values (or blank)."""
+        normalized = (value or "").strip().upper()
+        if normalized in FOLDER_MECHANISM_SCOPES:
+            return normalized
+        return ""
+
+    def _disable_folders_if_missing(self, exc: APIError) -> bool:
+        """Disable folder-table operations when Supabase schema lacks rule_folders."""
+        code = str(getattr(exc, "code", "") or "")
+        message = str(getattr(exc, "message", "") or exc)
+        if code == "PGRST205" or "rule_folders" in message:
+            self._folders_enabled = False
+            return True
+        return False
+
+    def _folder_rows(self) -> list[dict[str, Any]]:
+        """Return folder rows, or an empty list when folder table is unavailable."""
+        if not self._folders_enabled:
+            return []
+        try:
+            return list(self._folders.rows)
+        except APIError as exc:
+            if self._disable_folders_if_missing(exc):
+                return []
+            raise
+
+    def _folder_insert(self, payload: dict[str, Any]) -> None:
+        """Insert into folder table when available."""
+        if not self._folders_enabled:
+            return
+        try:
+            self._folders.insert(payload)
+        except APIError as exc:
+            if not self._disable_folders_if_missing(exc):
+                raise
+
+    def _folder_update(self, folder_id: int, updates: dict[str, Any]) -> None:
+        """Update a folder row when available."""
+        if not self._folders_enabled:
+            return
+        try:
+            self._folders.update(updates=updates, pk_values=folder_id)
+        except APIError as exc:
+            if not self._disable_folders_if_missing(exc):
+                raise
+
+    def _folder_delete(self, folder_id: int) -> None:
+        """Delete a folder row when available."""
+        if not self._folders_enabled:
+            return
+        try:
+            self._folders.delete(folder_id)
+        except APIError as exc:
+            if not self._disable_folders_if_missing(exc):
+                raise
+
+    def _sync_folders_from_rules(self) -> None:
+        """Backfill folder rows from existing rule records during startup."""
+        existing = {
+            self.normalize_ruleset_id(row.get("ruleset_id") or "")
+            for row in self._folder_rows()
+            if self.normalize_ruleset_id(row.get("ruleset_id") or "")
+        }
+        now = now_iso_utc()
+        for rule in self._rules.rows:
+            ruleset_id = self.normalize_ruleset_id(rule.get("ruleset_id") or "")
+            if not ruleset_id or ruleset_id in existing:
+                continue
+            self._folder_insert(
+                {
+                    "ruleset_id": ruleset_id,
+                    "display_name": ruleset_id,
+                    "description": "",
+                    "mechanism_scope": self._normalize_mechanism_scope(rule.get("mechanism")),
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+            existing.add(ruleset_id)
+
+    def _ensure_folder(
+        self,
+        ruleset_id: str,
+        display_name: str = "",
+        description: str = "",
+        mechanism_scope: str = "",
+    ) -> None:
+        """Ensure a folder row exists for a non-empty ruleset_id."""
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized:
+            return
+        scope = self._normalize_mechanism_scope(mechanism_scope)
+        for row in self._folder_rows():
+            row_id = self.normalize_ruleset_id(row.get("ruleset_id") or "")
+            if row_id != normalized:
+                continue
+
+            updates: dict[str, Any] = {}
+            incoming_name = (display_name or "").strip()
+            incoming_desc = (description or "").strip()
+
+            if incoming_name and not (row.get("display_name") or "").strip():
+                updates["display_name"] = incoming_name
+            if incoming_desc and not (row.get("description") or "").strip():
+                updates["description"] = incoming_desc
+            if scope and not (row.get("mechanism_scope") or "").strip():
+                updates["mechanism_scope"] = scope
+
+            if updates:
+                updates["updated_at"] = now_iso_utc()
+                self._folder_update(row["id"], updates)
+            return
+
+        now = now_iso_utc()
+        self._folder_insert(
+            {
+                "ruleset_id": normalized,
+                "display_name": (display_name or normalized).strip() or normalized,
+                "description": (description or "").strip(),
+                "mechanism_scope": scope,
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+
+    def _drop_folder_if_orphan(self, ruleset_id: str) -> None:
+        """Delete a folder row when no rules reference its ruleset_id anymore."""
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized:
+            return
+        if self.has_ruleset(normalized):
+            return
+
+        for folder in self._folder_rows():
+            if self.normalize_ruleset_id(folder.get("ruleset_id") or "") != normalized:
+                continue
+            self._folder_delete(folder["id"])
+            break
 
     # ── Web CRUD ──────────────────────────────────────────────────────────────
 
@@ -154,7 +321,7 @@ class RuleService:
     ):
         """Insert a rule row into the rules table."""
         now = now_iso_utc()
-        return self._rules.insert(
+        saved = self._rules.insert(
             {
                 "reference": reference.strip(),
                 "rule_type": rule_type.strip() or "numeric_comparison",
@@ -185,12 +352,14 @@ class RuleService:
                 "extraction_method": extraction_method or "manual",
                 "needs_review": int(needs_review),
                 "mechanism": mechanism or "",
-                "ruleset_id": ruleset_id or "",
+                "ruleset_id": self.normalize_ruleset_id(ruleset_id),
                 "rule_category": rule_category or "property_check",
                 "created_at": now,
                 "updated_at": now,
             }
         )
+        self._ensure_folder(ruleset_id, mechanism_scope=mechanism)
+        return saved
 
     def update_rule(
         self,
@@ -229,6 +398,9 @@ class RuleService:
         needs_review: bool = False,
     ):
         """Update editable fields for an existing rule."""
+        existing = self.get_rule(rule_id)
+        old_ruleset_id = (existing or {}).get("ruleset_id") or ""
+
         self._rules.update(
             updates={
                 "reference": reference.strip(),
@@ -237,7 +409,7 @@ class RuleService:
                 "target_ifc_class": target_ifc_class.strip(),
                 "parameters": self._norm_json(parameters),
                 "mechanism": mechanism or "",
-                "ruleset_id": ruleset_id or "",
+                "ruleset_id": self.normalize_ruleset_id(ruleset_id),
                 "rule_category": rule_category or "",
                 "property_set": property_set or "",
                 "property_name": property_name or "",
@@ -262,6 +434,12 @@ class RuleService:
             pk_values=rule_id,
         )
 
+        self._ensure_folder(ruleset_id, mechanism_scope=mechanism)
+        old_normalized = self.normalize_ruleset_id(old_ruleset_id)
+        new_normalized = self.normalize_ruleset_id(ruleset_id)
+        if old_normalized and old_normalized != new_normalized:
+            self._drop_folder_if_orphan(old_normalized)
+
     @staticmethod
     def _parse_numeric(value):
         """Convert a form string value to float, or None if blank/invalid."""
@@ -277,7 +455,10 @@ class RuleService:
 
     def delete_rule(self, rule_id: int):
         """Delete a rule by primary key."""
+        existing = self.get_rule(rule_id)
+        old_ruleset_id = (existing or {}).get("ruleset_id") or ""
         self._rules.delete(rule_id)
+        self._drop_folder_if_orphan(old_ruleset_id)
 
     def set_rule_parameter(self, rule_id: int, key: str, value) -> None:
         """Merge one key into a rule's `parameters` JSON blob.
@@ -306,7 +487,79 @@ class RuleService:
 
     def has_ruleset(self, ruleset_id: str) -> bool:
         """Return True if at least one rule with this ruleset_id exists."""
-        return len(list(self._rules.rows_where("ruleset_id = ?", [ruleset_id], limit=1))) > 0
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized:
+            return False
+        return len(list(self._rules.rows_where("ruleset_id = ?", [normalized], limit=1))) > 0
+
+    def folder_exists(self, ruleset_id: str) -> bool:
+        """Return True if a folder row exists or any rule references the ruleset_id."""
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized:
+            return False
+        if self.has_ruleset(normalized):
+            return True
+        return any(
+            self.normalize_ruleset_id(row.get("ruleset_id") or "") == normalized
+            for row in self._folder_rows()
+        )
+
+    def create_folder(
+        self,
+        ruleset_id: str,
+        display_name: str = "",
+        description: str = "",
+        mechanism_scope: str = "",
+    ) -> bool:
+        """Create an empty folder row for later rule assignment."""
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized or self.folder_exists(normalized):
+            return False
+
+        self._ensure_folder(
+            normalized,
+            display_name=display_name,
+            description=description,
+            mechanism_scope=mechanism_scope,
+        )
+        return self.folder_exists(normalized)
+
+    def update_folder_metadata(
+        self,
+        ruleset_id: str,
+        display_name: str,
+        description: str,
+        mechanism_scope: str,
+    ) -> bool:
+        """Update metadata fields for an existing folder by ruleset_id."""
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized:
+            return False
+
+        for folder in self._folder_rows():
+            if self.normalize_ruleset_id(folder.get("ruleset_id") or "") != normalized:
+                continue
+            self._folder_update(
+                folder["id"],
+                {
+                    "display_name": (display_name or "").strip(),
+                    "description": (description or "").strip(),
+                    "mechanism_scope": self._normalize_mechanism_scope(mechanism_scope),
+                    "updated_at": now_iso_utc(),
+                },
+            )
+            return True
+
+        if self.has_ruleset(normalized):
+            self._ensure_folder(
+                normalized,
+                display_name=display_name,
+                description=description,
+                mechanism_scope=mechanism_scope,
+            )
+            return True
+
+        return False
 
     def list_by_mechanism(self, mechanism: str) -> list[dict]:
         """Return all rules for a corrosion or code-check mechanism."""
@@ -314,25 +567,59 @@ class RuleService:
 
     def list_by_ruleset(self, ruleset_id: str) -> list[dict]:
         """Return all rules that belong to a ruleset identifier."""
-        return list(self._rules.rows_where("ruleset_id = ?", [ruleset_id]))
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized:
+            return []
+        return list(self._rules.rows_where("ruleset_id = ?", [normalized]))
 
     def list_folders(self) -> list[dict]:
-        """Return distinct non-empty ruleset_id values with rule counts, A-Z."""
+        """Return folder rows with current rule counts, ordered by ruleset_id."""
         counts: dict[str, int] = {}
         for r in self._rules.rows:
-            ruleset_id = (r.get("ruleset_id") or "").strip()
+            ruleset_id = self.normalize_ruleset_id(r.get("ruleset_id") or "")
             if not ruleset_id:
                 continue
             counts[ruleset_id] = counts.get(ruleset_id, 0) + 1
-        return [
-            {"ruleset_id": ruleset_id, "count": count}
-            for ruleset_id, count in sorted(counts.items())
-        ]
+
+        rows: list[dict] = []
+        seen: set[str] = set()
+        for folder in self._folder_rows():
+            ruleset_id = self.normalize_ruleset_id(folder.get("ruleset_id") or "")
+            if not ruleset_id or ruleset_id in seen:
+                continue
+            seen.add(ruleset_id)
+            rows.append(
+                {
+                    "ruleset_id": ruleset_id,
+                    "display_name": (folder.get("display_name") or "").strip() or ruleset_id,
+                    "description": (folder.get("description") or "").strip(),
+                    "mechanism_scope": self._normalize_mechanism_scope(
+                        folder.get("mechanism_scope")
+                    ),
+                    "count": counts.get(ruleset_id, 0),
+                }
+            )
+
+        for ruleset_id, count in counts.items():
+            if ruleset_id in seen:
+                continue
+            rows.append(
+                {
+                    "ruleset_id": ruleset_id,
+                    "display_name": ruleset_id,
+                    "description": "",
+                    "mechanism_scope": "",
+                    "count": count,
+                }
+            )
+
+        rows.sort(key=lambda row: ((row.get("display_name") or "").lower(), row["ruleset_id"]))
+        return rows
 
     def rename_folder(self, old_id: str, new_id: str) -> int:
         """Bulk-rename a ruleset_id across every rule that has it. Returns rows updated."""
-        old_id = old_id.strip()
-        new_id = new_id.strip()
+        old_id = self.normalize_ruleset_id(old_id)
+        new_id = self.normalize_ruleset_id(new_id)
         if not old_id or not new_id or old_id == new_id:
             return 0
 
@@ -344,11 +631,23 @@ class RuleService:
                 pk_values=rule["id"],
             )
             updated += 1
+
+        for folder in self._folder_rows():
+            if self.normalize_ruleset_id(folder.get("ruleset_id") or "") != old_id:
+                continue
+            display_name = (folder.get("display_name") or "").strip()
+            updates = {"ruleset_id": new_id, "updated_at": now}
+            if not display_name or display_name == old_id:
+                updates["display_name"] = new_id
+            self._folder_update(folder["id"], updates)
+            break
+        self._ensure_folder(new_id)
+        self._drop_folder_if_orphan(old_id)
         return updated
 
     def delete_folder(self, ruleset_id: str) -> int:
         """Delete every rule that belongs to a ruleset_id. Returns rows deleted."""
-        ruleset_id = ruleset_id.strip()
+        ruleset_id = self.normalize_ruleset_id(ruleset_id)
         if not ruleset_id:
             return 0
 
@@ -356,6 +655,7 @@ class RuleService:
         for rule in self.list_by_ruleset(ruleset_id):
             self._rules.delete(rule["id"])
             deleted += 1
+        self._drop_folder_if_orphan(ruleset_id)
         return deleted
 
     def delete_rules(self, rule_ids: list[int]) -> int:

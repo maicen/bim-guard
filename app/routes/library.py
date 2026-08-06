@@ -27,11 +27,11 @@ from monsterui.all import (
 from app.components.documents_ui import document_edit_form, documents_panel
 from app.components.layout import DashboardLayout
 from app.components.rule_extraction_ui import (
+    provider_model_select_fragment,
     rule_extraction_empty_file_result,
     rule_extraction_free_result,
     rule_extraction_page_content,
     rule_extraction_results,
-    provider_model_select_fragment,
 )
 from app.components.rules_ui import _decode_json_field, rule_form, rules_folders_panel, rules_panel
 from app.components.ui import (
@@ -62,8 +62,8 @@ from app.modules.module1_doc_parser import Module1_DocReader
 from app.services.documents_service import DocumentService
 from app.services.llm_client import LiteLLMClient
 from app.services.object_storage import ObjectStorage
-from app.services.rule_extractor import LiteLLMRuleExtractor
 from app.services.rule_extraction_service import RuleExtractionService
+from app.services.rule_extractor import LiteLLMRuleExtractor
 from app.services.rules_service import RuleService
 from app.utils import (
     md5_hex,
@@ -265,6 +265,7 @@ def setup_routes(rt):
         rows = (
             _rule_service.fetch_needs_review() if needs_review_only else _rule_service.list_rules()
         )
+        folders = _folders_with_rules()
         return Title("Rules - BIM Guard"), DashboardLayout(
             Container(
                 DivLAligned(
@@ -284,9 +285,9 @@ def setup_routes(rt):
                     ),
                     cls="justify-end",
                 ),
-                rules_folders_panel(_folders_with_rules()),
                 rules_panel(
                     rows,
+                    folders,
                     message=message or None,
                     needs_review_only=needs_review_only,
                     needs_review_count=_rule_service.count_needs_review(),
@@ -571,13 +572,13 @@ def setup_routes(rt):
                 message="No folder specified.",
                 level="warning",
             )
-        count = _rule_service.delete_folder(ruleset_id)
-        if count == 0:
+        if not _rule_service.folder_exists(ruleset_id):
             return rules_folders_panel(
                 _folders_with_rules(),
                 message=f"Folder '{ruleset_id}' was not found.",
                 level="warning",
             )
+        count = _rule_service.delete_folder(ruleset_id)
         return rules_folders_panel(
             _folders_with_rules(),
             message=f"Deleted folder '{ruleset_id}' ({count} rule(s) removed).",
@@ -593,16 +594,79 @@ def setup_routes(rt):
                 message="Enter a new, different folder name to rename.",
                 level="warning",
             )
-        count = _rule_service.rename_folder(old_id, new_id)
-        if count == 0:
+        if not _rule_service.folder_exists(old_id):
             return rules_folders_panel(
                 _folders_with_rules(),
                 message=f"Folder '{old_id}' was not found.",
                 level="warning",
             )
+        count = _rule_service.rename_folder(old_id, new_id)
         return rules_folders_panel(
             _folders_with_rules(),
             message=f"Renamed '{old_id}' to '{new_id}' ({count} rule(s)).",
+        )
+
+    @rt("/api/rules/folders/create", methods=["POST"])
+    def rules_folder_create(
+        ruleset_id: str = "",
+        display_name: str = "",
+        description: str = "",
+        mechanism_scope: str = "",
+    ):
+        ruleset_id = RuleService.normalize_ruleset_id(ruleset_id)
+        if not ruleset_id:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message="Folder ID is required.",
+                level="warning",
+            )
+        if _rule_service.folder_exists(ruleset_id):
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message=f"Folder '{ruleset_id}' already exists.",
+                level="warning",
+            )
+        _rule_service.create_folder(
+            ruleset_id=ruleset_id,
+            display_name=display_name,
+            description=description,
+            mechanism_scope=mechanism_scope,
+        )
+        return rules_folders_panel(
+            _folders_with_rules(),
+            message=f"Created folder '{ruleset_id}'.",
+        )
+
+    @rt("/api/rules/folders/update", methods=["POST"])
+    def rules_folder_update(
+        ruleset_id: str = "",
+        display_name: str = "",
+        description: str = "",
+        mechanism_scope: str = "",
+    ):
+        ruleset_id = RuleService.normalize_ruleset_id(ruleset_id)
+        if not ruleset_id:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message="No folder specified.",
+                level="warning",
+            )
+
+        if not _rule_service.update_folder_metadata(
+            ruleset_id=ruleset_id,
+            display_name=display_name,
+            description=description,
+            mechanism_scope=mechanism_scope,
+        ):
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message=f"Folder '{ruleset_id}' was not found.",
+                level="warning",
+            )
+
+        return rules_folders_panel(
+            _folders_with_rules(),
+            message=f"Updated folder '{ruleset_id}'.",
         )
 
     @rt("/api/rules/save-extracted", methods=["POST"])
@@ -722,6 +786,7 @@ def setup_routes(rt):
     def rules_export_json():
         """Download the last extraction as a JSON file \u2014 no data passed through UI."""
         import json as _json
+
         from fasthtml.common import Response
 
         global _last_extracted, _last_extracted_filename
