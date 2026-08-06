@@ -16,14 +16,14 @@ alternative data source.
 - **Fix:** Created `app/modules/module3_rule_builder/regex_rule_converter.py`
   with a `RegexRuleConverter` class that matches the same `extract_rules(chunk)`
   interface as the GPT-4o converter.
-- **How it works:** Pattern-matches OBC prose phrasings ("not less than X mm",
+- **How it works:** Pattern-matches CODE prose phrasings ("not less than X mm",
   "between X and Y mm", "shall not…") on HIGH/MEDIUM confidence paragraphs only.
   Tags results `extraction_method: "regex"`, `confidence: 0.5`, `needs_review: True`.
 
 ### 2. Wrong IFC property names in seed rules (8 rules)
 - **Problem:** Rules used custom property names that don't exist in standard
   buildingSMART Psets, causing permanent `MISSING_DATA` on every analysis.
-- **Fix:** Updated `obc_seed_rules.py` AND migrated `data/bimguard.sqlite` via
+- **Fix:** Updated `code_seed_rules.py` AND migrated `data/bimguard.sqlite` via
   `scripts/fix_property_names.py`.
 
 | Old name | New name | Reason |

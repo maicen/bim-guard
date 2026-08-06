@@ -1,6 +1,7 @@
 """Analysis routes for orchestrating compliance checks and rendering results."""
 
 import os
+from functools import lru_cache
 
 from fasthtml.common import (
     A,
@@ -62,6 +63,151 @@ _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 _last_initial_rule_compliance: dict[int, list[dict]] = {}
 
 
+@lru_cache(maxsize=1)
+def _code_rule_context() -> dict:
+    """Return cached code-reference labels/limits resolved from saved code rules."""
+    context = {
+        "daylight_ref": "applicable code rule",
+        "daylight_ratio_label": "1/10",
+        "fire_ref": "applicable code rule",
+        "fire_min_label": "45 min",
+        "garage_ref": "applicable code rule",
+        "exit_ref": "applicable code rule",
+        "travel_ref": "applicable code rule",
+        "travel_max_label": "25 m",
+        "refs_by_target": {},
+    }
+
+    try:
+        rules = _rule_service.list_code_rules()
+    except Exception:
+        return context
+
+    def _as_float(value):
+        if isinstance(value, (int, float)):
+            return float(value)
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    refs_by_target: dict[str, list[str]] = {}
+    for row in rules:
+        target = str(row.get("target_ifc_class") or "").strip()
+        ref = str(row.get("reference") or "").strip()
+        if not target or not ref:
+            continue
+        bucket = refs_by_target.setdefault(target, [])
+        if ref not in bucket:
+            bucket.append(ref)
+    context["refs_by_target"] = refs_by_target
+
+    for row in rules:
+        ref = str(row.get("reference") or "")
+        if "9.7.2" not in ref:
+            continue
+        context["daylight_ref"] = ref
+        ratio = _as_float(row.get("check_value"))
+        unit = str(row.get("unit") or "").strip().lower()
+        if ratio and unit == "ratio" and ratio > 0:
+            context["daylight_ratio_label"] = f"1/{int(round(1 / ratio))}"
+            break
+
+    for row in rules:
+        ref = str(row.get("reference") or "")
+        if "9.10.9" not in ref:
+            continue
+        if str(row.get("target_ifc_class") or "") != "IfcWall":
+            continue
+        if str(row.get("operator") or "") != ">=":
+            continue
+        if str(row.get("property_name") or "") not in (
+            "FireRating",
+            "FireResistanceRating",
+            "FireResistance",
+            "REI",
+            "FRR",
+        ):
+            continue
+        min_v = _as_float(row.get("check_value"))
+        if min_v is None:
+            continue
+        context["fire_ref"] = ref
+        min_label = str(int(min_v)) if float(min_v).is_integer() else str(min_v)
+        unit = str(row.get("unit") or "min").strip() or "min"
+        context["fire_min_label"] = f"{min_label} {unit}"
+        break
+
+    for row in rules:
+        ref = str(row.get("reference") or "")
+        if "9.10.14.2" in ref:
+            context["garage_ref"] = ref
+            break
+
+    for row in rules:
+        ref = str(row.get("reference") or "")
+        if "9.9.4.1" in ref:
+            context["exit_ref"] = ref
+            break
+
+    for row in rules:
+        ref = str(row.get("reference") or "")
+        if "9.9.10.1" not in ref:
+            continue
+        context["travel_ref"] = ref
+        max_v = _as_float(row.get("check_value"))
+        if max_v is not None:
+            max_label = str(int(max_v)) if float(max_v).is_integer() else str(max_v)
+            unit = str(row.get("unit") or "m").strip() or "m"
+            context["travel_max_label"] = f"{max_label} {unit}"
+        break
+
+    return context
+
+
+def _section_title(label: str, ref: str) -> str:
+    """Return a standard section title suffixing a resolved code reference."""
+    return f"{label} - {ref}" if ref else label
+
+
+def _result_ref(result: dict) -> str:
+    """Read a normalized rule reference from module outputs."""
+    return str(result.get("code_ref") or "").strip()
+
+
+def _domain_ref_for_targets(targets: list[str], fallback: str = "") -> str:
+    """Return a combined code-reference label for one or more IFC targets."""
+    refs_by_target = _code_rule_context().get("refs_by_target") or {}
+    refs: list[str] = []
+    for target in targets:
+        for ref in refs_by_target.get(target, []):
+            if ref not in refs:
+                refs.append(ref)
+    return " · ".join(refs) if refs else fallback
+
+
+def _active_code_refs_summary() -> str:
+    """Return a short, user-facing summary of active code references."""
+    ctx = _code_rule_context()
+    refs: list[str] = []
+    for ref in (
+        ctx.get("daylight_ref"),
+        ctx.get("fire_ref"),
+        ctx.get("garage_ref"),
+        ctx.get("exit_ref"),
+        ctx.get("travel_ref"),
+    ):
+        ref_s = str(ref or "").strip()
+        if not ref_s or ref_s == "applicable code rule" or ref_s in refs:
+            continue
+        refs.append(ref_s)
+    if not refs:
+        return "saved code references"
+    return " · ".join(refs[:3]) + (" · ..." if len(refs) > 3 else "")
+
+
 def _analysis_form(projects, documents, mode: str):
     """Build the analysis form for the requested workflow mode."""
     is_simple = mode == "simple"
@@ -84,7 +230,7 @@ def _analysis_form(projects, documents, mode: str):
 
     # Rule Folder — shown for every mode, right under the project picker, so
     # you can scope a check to rules you extracted yourself instead of the
-    # built-in OBC rules seeded from source (obc_seed_rules.py).
+    # built-in default code rules seeded from source (code_seed_rules.py).
     folders = _rule_service.list_folders()
     folder_options = [Option("All folders", value="", selected=True)] + [
         Option(f"{f['ruleset_id']} ({f['count']})", value=f["ruleset_id"]) for f in folders
@@ -92,8 +238,8 @@ def _analysis_form(projects, documents, mode: str):
     if is_simple:
         folder_help = (
             "Narrow the check to one saved folder of rules — only that folder's rules "
-            "are used, the built-in seeded OBC rules are excluded. Leave on 'All "
-            "folders' to test everything, including the built-in OBC rules."
+            "are used, the built-in seeded default code rules are excluded. Leave "
+            "on 'All folders' to test everything, including the built-in defaults."
         )
     elif mode == "model-rules":
         folder_help = (
@@ -104,9 +250,9 @@ def _analysis_form(projects, documents, mode: str):
     else:
         folder_help = (
             "Narrow the check to one saved folder of rules — only that folder's "
-            "rules are used, the built-in seeded OBC rules are excluded. Leave on "
+            "rules are used, the built-in seeded default code rules are excluded. Leave on "
             "'All folders' to test every rule in the theme above, including "
-            "built-in OBC rules."
+            "built-in defaults."
         )
     form_sections.append(
         Div(
@@ -252,8 +398,9 @@ def _analysis_form(projects, documents, mode: str):
         hx_post = "/analysis/ARCH/results"
         card_title = "ARCH"
         helper_copy = (
-            "Check the IFC model against OBC Part 9 building code categories: "
-            "Windows, Doors, Stairs, Egress, Fire Protection, Garage, and more."
+            "Check the IFC model against saved code categories: "
+            "Windows, Doors, Stairs, Egress, Fire Protection, Garage, and more. "
+            f"Active references: {_active_code_refs_summary()}."
         )
     elif is_initial:
         submit_label = "Run Initial Analysis"
@@ -1419,6 +1566,7 @@ def _spatial_checks_card(spatial: dict):
     daylight = spatial.get("daylight", [])
     fire_sep = spatial.get("fire_separation", [])
     garage_sep = spatial.get("garage_separation", {})
+    code_ctx = _code_rule_context()
 
     if not has_boundaries:
         msg = (
@@ -1436,6 +1584,10 @@ def _spatial_checks_card(spatial: dict):
     # ── Daylight ratio table ──────────────────────────────────────────────────
     daylight_section = ""
     if daylight:
+        daylight_ref = next(
+            (_result_ref(r) for r in daylight if _result_ref(r)),
+            code_ctx["daylight_ref"],
+        )
         d_pass = sum(1 for r in daylight if r["passes"])
         d_fail = len(daylight) - d_pass
         rate_cls = "bg-green-100 text-green-800" if d_fail == 0 else "bg-red-100 text-red-800"
@@ -1461,7 +1613,7 @@ def _spatial_checks_card(spatial: dict):
                 )
             )
         daylight_section = _collapsible_section(
-            "Daylight Ratio — OBC 9.7.2",
+            _section_title("Daylight Ratio", daylight_ref),
             Div(
                 Table(
                     Thead(
@@ -1503,6 +1655,10 @@ def _spatial_checks_card(spatial: dict):
     # ── Fire separation table ─────────────────────────────────────────────────
     fire_section = ""
     if fire_sep:
+        fire_ref = next(
+            (_result_ref(r) for r in fire_sep if _result_ref(r)),
+            code_ctx["fire_ref"],
+        )
         f_pass = sum(1 for r in fire_sep if r["passes"])
         f_fail = len(fire_sep) - f_pass
         f_rate_cls = "bg-green-100 text-green-800" if f_fail == 0 else "bg-red-100 text-red-800"
@@ -1529,7 +1685,7 @@ def _spatial_checks_card(spatial: dict):
                 )
             )
         fire_section = _collapsible_section(
-            "Fire Separation — OBC 9.10.9",
+            _section_title("Fire Separation", fire_ref),
             Div(
                 Table(
                     Thead(
@@ -1566,6 +1722,10 @@ def _spatial_checks_card(spatial: dict):
         g_results = garage_sep.get("results", [])
         g_warnings = garage_sep.get("warnings", [])
         g_found = garage_sep.get("garage_spaces_found", 0)
+        garage_ref = next(
+            (_result_ref(r) for r in g_results if _result_ref(r)),
+            code_ctx["garage_ref"],
+        )
 
         if g_results:
             g_pass = sum(1 for r in g_results if r["passes"])
@@ -1641,7 +1801,7 @@ def _spatial_checks_card(spatial: dict):
             badge = f"{g_found} garage(s)"
 
         garage_section = _collapsible_section(
-            "Garage Separation — OBC 9.10.14.2",
+            _section_title("Garage Separation", garage_ref),
             garage_content,
             badge=badge,
         )
@@ -1675,6 +1835,11 @@ def _egress_checks_card(egress: dict):
     exit_results = exit_data.get("results", [])
     exit_warnings = exit_data.get("warnings", [])
     all_warnings = exit_warnings + warnings
+    code_ctx = _code_rule_context()
+    exit_ref = next(
+        (_result_ref(r) for r in exit_results if _result_ref(r)),
+        code_ctx["exit_ref"],
+    )
 
     # ── Exit count section ────────────────────────────────────────────────────
     exit_rows = []
@@ -1691,7 +1856,7 @@ def _egress_checks_card(egress: dict):
         )
 
     exit_section = _collapsible_section(
-        "Exit Count — OBC 9.9.4.1",
+        _section_title("Exit Count", exit_ref),
         Div(
             P(f"Total exterior doors detected: {total_exits}", cls="text-sm mb-2"),
             Div(
@@ -1743,6 +1908,10 @@ def _egress_checks_card(egress: dict):
     # ── Travel distance section ───────────────────────────────────────────────
     travel_section = ""
     if travel:
+        travel_ref = next(
+            (_result_ref(r) for r in travel if _result_ref(r)),
+            code_ctx["travel_ref"],
+        )
         td_pass = sum(1 for r in travel if r["passes"])
         td_fail = len(travel) - td_pass
         td_rows = []
@@ -1771,7 +1940,7 @@ def _egress_checks_card(egress: dict):
                 )
             )
         travel_section = _collapsible_section(
-            "Travel Distance — OBC 9.9.10.1",
+            _section_title("Travel Distance", travel_ref),
             Div(
                 Table(
                     Thead(
@@ -1806,8 +1975,9 @@ def _egress_checks_card(egress: dict):
             badge=f"{td_pass}/{len(travel)} pass",
         )
     elif not has_graph:
+        travel_ref = code_ctx["travel_ref"]
         travel_section = _collapsible_section(
-            "Travel Distance — OBC 9.9.10.1",
+            _section_title("Travel Distance", travel_ref),
             P(
                 "Space boundary data required. Re-export the IFC model with "
                 "Space Boundaries enabled to activate this check.",
@@ -2265,7 +2435,7 @@ def _simple_rule_section(rule: dict):
 
 def _simple_domain_card(
     title: str,
-    obc_ref: str,
+    code_ref: str,
     rule_results: list,
     extra_sections: list | None = None,
     override_badge: tuple | None = None,
@@ -2305,6 +2475,7 @@ def _simple_domain_card(
             ),
             cls="flex items-center mb-4",
         ),
+        P(code_ref, cls="text-xs text-muted-foreground -mt-2 mb-2") if code_ref else "",
         *all_content,
         open=has_fail,
     )
@@ -2318,8 +2489,13 @@ def _simple_windows_card(by_class: dict, spatial_checks: dict):
     daylight = (spatial_checks or {}).get("daylight", [])
     extra = []
     override = None
+    code_ctx = _code_rule_context()
 
     if daylight:
+        daylight_ref = next(
+            (_result_ref(r) for r in daylight if _result_ref(r)),
+            code_ctx["daylight_ref"],
+        )
         d_pass = sum(1 for r in daylight if r["passes"])
         d_fail = len(daylight) - d_pass
         d_rows = []
@@ -2341,7 +2517,10 @@ def _simple_windows_card(by_class: dict, spatial_checks: dict):
             )
         extra.append(
             _collapsible_section(
-                "Daylight Ratio — OBC 9.7.2.1 (≥ 1/10 floor area)",
+                _section_title(
+                    "Daylight Ratio",
+                    f"{daylight_ref} (>= {code_ctx['daylight_ratio_label']} floor area)",
+                ),
                 Div(
                     Table(
                         Thead(
@@ -2375,37 +2554,66 @@ def _simple_windows_card(by_class: dict, spatial_checks: dict):
             override = (f"{d_fail} room(s) below daylight ratio", "bg-red-100 text-red-800")
 
     return _simple_domain_card(
-        "Windows & Glazing", "OBC 9.7 · 9.8", rules, extra, override, category="windows"
+        "Windows & Glazing",
+        code_ctx["daylight_ref"],
+        rules,
+        extra,
+        override,
+        category="windows",
     )
 
 
 def _simple_doors_card(by_class: dict):
+    code_ctx = _code_rule_context()
     return _simple_domain_card(
-        "Doors", "OBC 9.5 · 9.9.5", by_class.get("IfcDoor", []), category="doors"
+        "Doors",
+        _domain_ref_for_targets(["IfcDoor"], code_ctx["exit_ref"]),
+        by_class.get("IfcDoor", []),
+        category="doors",
     )
 
 
 def _simple_stairs_card(by_class: dict):
     rules = by_class.get("IfcStairFlight", []) + by_class.get("IfcRailing", [])
+    code_ctx = _code_rule_context()
     return _simple_domain_card(
-        "Stairs, Guards & Handrails", "OBC 9.8.1 · 9.8.7", rules, category="stairs"
+        "Stairs, Guards & Handrails",
+        _domain_ref_for_targets(["IfcStairFlight", "IfcRailing"], code_ctx["daylight_ref"]),
+        rules,
+        category="stairs",
     )
 
 
 def _simple_ramps_card(by_class: dict):
     rules = by_class.get("IfcRamp", []) + by_class.get("IfcRampFlight", [])
-    return _simple_domain_card("Ramps", "OBC 9.8.8", rules, category="ramps")
+    code_ctx = _code_rule_context()
+    return _simple_domain_card(
+        "Ramps",
+        _domain_ref_for_targets(["IfcRamp", "IfcRampFlight"], code_ctx["daylight_ref"]),
+        rules,
+        category="ramps",
+    )
 
 
 def _simple_egress_card(egress: dict):
     """Egress domain card built from Tier 3 egress check results."""
     if not egress:
-        return _simple_domain_card("Means of Egress", "OBC 9.9 · 9.10", [])
+        code_ctx = _code_rule_context()
+        return _simple_domain_card("Means of Egress", code_ctx["travel_ref"], [])
 
     exit_data = egress.get("exit_count", {})
     travel = egress.get("travel_distance", [])
     total_exits = exit_data.get("total_exterior_doors", 0)
     exit_results = exit_data.get("results", [])
+    code_ctx = _code_rule_context()
+    exit_ref = next(
+        (_result_ref(r) for r in exit_results if _result_ref(r)),
+        code_ctx["exit_ref"],
+    )
+    travel_ref = next(
+        (_result_ref(r) for r in travel if _result_ref(r)),
+        code_ctx["travel_ref"],
+    )
 
     all_passes = [r["passes"] for r in exit_results] + [r["passes"] for r in travel]
     if not all_passes:
@@ -2432,7 +2640,7 @@ def _simple_egress_card(egress: dict):
             )
         extra.append(
             _collapsible_section(
-                f"Exit Count — OBC 9.9.4.1  ({total_exits} exterior door(s))",
+                f"{_section_title('Exit Count', exit_ref)}  ({total_exits} exterior door(s))",
                 Div(
                     Table(
                         Thead(
@@ -2458,7 +2666,7 @@ def _simple_egress_card(egress: dict):
     else:
         extra.append(
             _collapsible_section(
-                "Exit Count — OBC 9.9.4.1",
+                _section_title("Exit Count", exit_ref),
                 P(
                     "No exterior doors found. Tag doors as IsExternal=True in your authoring tool.",
                     cls="text-xs text-yellow-700",
@@ -2494,7 +2702,7 @@ def _simple_egress_card(egress: dict):
             )
         extra.append(
             _collapsible_section(
-                "Travel Distance — OBC 9.9.10.1",
+                _section_title("Travel Distance", travel_ref),
                 Div(
                     Table(
                         Thead(
@@ -2518,22 +2726,27 @@ def _simple_egress_card(egress: dict):
             )
         )
 
-    return _simple_domain_card("Means of Egress", "OBC 9.9 · 9.10", [], extra, override)
+    return _simple_domain_card("Means of Egress", travel_ref, [], extra, override)
 
 
 def _simple_washrooms_card(by_class: dict, building_summary: dict):
     rules = by_class.get("IfcSanitaryTerminal", [])
+    code_ctx = _code_rule_context()
     return _simple_domain_card(
-        "Washrooms & Accessibility", "OBC 9.5 · 3.8.3", rules, category="washrooms"
+        "Washrooms & Accessibility",
+        _domain_ref_for_targets(["IfcSanitaryTerminal"], code_ctx["daylight_ref"]),
+        rules,
+        category="washrooms",
     )
 
 
 def _simple_plumbing_card(building_summary: dict):
     fixture_counts = (building_summary or {}).get("fixture_counts", {})
+    code_ctx = _code_rule_context()
     if not fixture_counts:
         return _simple_domain_card(
             "Plumbing Fixture Counts",
-            "OBC 9.32 · NBC",
+            _domain_ref_for_targets(["IfcSanitaryTerminal"], code_ctx["daylight_ref"]),
             [],
             override_badge=("N/A — no fixtures found", "bg-gray-100 text-gray-500"),
         )
@@ -2546,7 +2759,7 @@ def _simple_plumbing_card(building_summary: dict):
     ]
     return _simple_domain_card(
         "Plumbing Fixture Counts",
-        "OBC 9.32 · NBC",
+        _domain_ref_for_targets(["IfcSanitaryTerminal"], code_ctx["daylight_ref"]),
         [],
         extra_sections=[
             _collapsible_section(
@@ -2567,8 +2780,13 @@ def _simple_fire_card(by_class: dict, spatial_checks: dict, building_summary: di
     alarm_counts = (building_summary or {}).get("alarm_counts", {})
     extra = []
     override = None
+    code_ctx = _code_rule_context()
 
     if fire_sep:
+        fire_ref = next(
+            (_result_ref(r) for r in fire_sep if _result_ref(r)),
+            code_ctx["fire_ref"],
+        )
         f_pass = sum(1 for r in fire_sep if r["passes"])
         f_fail = len(fire_sep) - f_pass
         f_rows = []
@@ -2593,7 +2811,7 @@ def _simple_fire_card(by_class: dict, spatial_checks: dict, building_summary: di
             )
         extra.append(
             _collapsible_section(
-                "Fire Separation — OBC 9.10.9",
+                _section_title("Fire Separation", fire_ref),
                 Div(
                     Table(
                         Thead(
@@ -2638,7 +2856,7 @@ def _simple_fire_card(by_class: dict, spatial_checks: dict, building_summary: di
 
     return _simple_domain_card(
         "Fire Protection (House-Level)",
-        "OBC 9.10 · NBC 3.2",
+        _domain_ref_for_targets(["IfcAlarm", "IfcWall"], code_ctx["fire_ref"]),
         rules,
         extra,
         override,
@@ -2649,10 +2867,11 @@ def _simple_fire_card(by_class: dict, spatial_checks: dict, building_summary: di
 def _simple_garage_card(spatial_checks: dict):
     spatial = spatial_checks or {}
     garage_sep = spatial.get("garage_separation", {})
+    code_ctx = _code_rule_context()
     if not garage_sep:
         return _simple_domain_card(
             "Garage / Carport",
-            "OBC 9.10.14",
+            code_ctx["garage_ref"],
             [],
             override_badge=("N/A — no garage detected", "bg-gray-100 text-gray-500"),
         )
@@ -2663,6 +2882,10 @@ def _simple_garage_card(spatial_checks: dict):
     override = None
 
     if g_results:
+        garage_ref = next(
+            (_result_ref(r) for r in g_results if _result_ref(r)),
+            code_ctx["garage_ref"],
+        )
         g_pass = sum(1 for r in g_results if r["passes"])
         g_fail = len(g_results) - g_pass
         g_rows = []
@@ -2687,7 +2910,7 @@ def _simple_garage_card(spatial_checks: dict):
             )
         extra.append(
             _collapsible_section(
-                "Garage Fire Separation — OBC 9.10.14.2",
+                _section_title("Garage Fire Separation", garage_ref),
                 Div(
                     Table(
                         Thead(
@@ -2721,15 +2944,16 @@ def _simple_garage_card(spatial_checks: dict):
         if g_fail > 0:
             override = (f"{g_fail} separation issue(s)", "bg-red-100 text-red-800")
     elif g_warnings:
+        garage_ref = code_ctx["garage_ref"]
         extra.append(
             _collapsible_section(
-                "Garage Fire Separation — OBC 9.10.14.2",
+                _section_title("Garage Fire Separation", garage_ref),
                 Div(*[Span(w, cls="block text-xs text-yellow-700") for w in g_warnings]),
                 open=True,
             )
         )
 
-    return _simple_domain_card("Garage / Carport", "OBC 9.10.14", [], extra, override)
+    return _simple_domain_card("Garage / Carport", code_ctx["garage_ref"], [], extra, override)
 
 
 def setup_routes(rt):
@@ -2793,7 +3017,7 @@ def setup_routes(rt):
                 ),
                 CardContent(
                     P(
-                        "Domain-based compliance check against OBC Part 9.",
+                        f"Domain-based compliance check against {_active_code_refs_summary()}.",
                         cls="text-sm text-muted-foreground",
                     )
                 ),

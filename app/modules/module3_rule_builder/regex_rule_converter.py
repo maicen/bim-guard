@@ -5,7 +5,7 @@ Free, offline alternative to rule_converter.py (GPT-4o). Same public
 interface (extract_rules(chunk) -> list[dict]) so orchestrator.py can
 swap between the two via the USE_GPT4O flag with no other changes.
 
-Pattern-matches the common OBC prose phrasings ("shall be at least
+Pattern-matches common code-document prose phrasings ("shall be at least
 X mm", "between X and Y mm", "shall not...") instead of calling an LLM.
 Trades recall for zero cost: anything it can't confidently parse is
 simply skipped rather than guessed at.
@@ -19,9 +19,9 @@ Usage:
 import re
 
 try:
-    from config import OBC_TO_IFC_MAP
+    from config import CODE_TO_IFC_MAP
 except ImportError:
-    from app.modules.config import OBC_TO_IFC_MAP
+    from app.modules.config import CODE_TO_IFC_MAP
 
 
 # ── Property name keywords ───────────────────────────────────────────────────
@@ -125,7 +125,7 @@ UNIT_ALIASES = {
 }
 # Longest alias first so "mm" / "millimetres" win over a bare "m" at the same position.
 _UNIT_PATTERN = "|".join(re.escape(u) for u in sorted(UNIT_ALIASES, key=len, reverse=True))
-# OBC/SBC text formats large numbers with a space as the thousands separator
+# Many code documents format large numbers with a space as thousands separator
 # (e.g. "2 050 mm" for 2050mm) instead of a comma. Try the grouped form first
 # so "2 050" is captured whole; falls back to a plain run of digits otherwise.
 _NUM = r"(\d{1,3}(?:[ ,]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
@@ -171,7 +171,7 @@ _PROHIBITION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# OBC-style section references, e.g. "9.8.2.1.(2)"
+# Code-style section references, e.g. "9.8.2.1.(2)"
 _REF_PATTERN = re.compile(r"\b\d+(?:\.\d+){2,}(?:\.\(\d+\))?\b")
 
 
@@ -189,7 +189,7 @@ class RegexRuleConverter:
 
     def _detect_target(self, text: str) -> str | None:
         lowered = text.lower()
-        for keyword, ifc_class in OBC_TO_IFC_MAP.items():
+        for keyword, ifc_class in CODE_TO_IFC_MAP.items():
             if keyword in lowered:
                 return ifc_class
         return None
@@ -297,8 +297,8 @@ class RegexRuleConverter:
 
             rule = self._build_rule(paragraph, chunk)
             if rule:
-                rule["obc_section_number"] = chunk.get("section_number")
-                rule["obc_section_name"] = chunk.get("section_name")
+                rule["code_section_number"] = chunk.get("section_number")
+                rule["code_section_name"] = chunk.get("section_name")
                 rules.append(rule)
 
         print(f"  [RegexRuleConverter] Section {section}: extracted {len(rules)} rules")

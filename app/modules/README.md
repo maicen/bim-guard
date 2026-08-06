@@ -1,10 +1,10 @@
-# BIMGuard Modules — Module 1 + 3 (OBC Example)
+# BIMGuard Modules — Module 1 + 3 (CODE Example)
 
-Automated OBC Part 9 compliance rule extraction pipeline.
+Automated CODE Part 9 compliance rule extraction pipeline.
 Converts Ontario Building Code PDFs into structured rules stored in `rules.db`,
 ready for IFC model compliance checking in Module 4.
 
-This module documentation uses an OBC example dataset, but the BIM-Guard app architecture is domain-agnostic and supports other standards/rulesets.
+This module documentation uses an CODE example dataset, but the BIM-Guard app architecture is domain-agnostic and supports other standards/rulesets.
 
 ---
 
@@ -83,7 +83,7 @@ OUT
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/__init__.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/__pycache__
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/module3_rule_builder_mock.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/obc_seed_rules.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/code_seed_rules.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_converter.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_generator.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_store.py
@@ -152,7 +152,7 @@ app/modules/
 │   ├── rule_generator.py
 │   ├── rule_converter.py        — OpenAI GPT-4o rule extractor
 │   ├── rule_store.py            — shared rule persistence via app services
-│   ├── obc_seed_rules.py        — 25+ OBC baseline rules
+│   ├── code_seed_rules.py        — 25+ CODE baseline rules
 │   └── module3_rule_builder_mock.py
 │
 ├── module4_comparator/          — IFC data vs rule library validation
@@ -223,11 +223,11 @@ GEMINI_API_KEY=your_key_here
 ## Run the Pipeline
 
 ```bash
-# Full pipeline — all 13 OBC sections
-uv run python -m app.modules.orchestrator data/input_docs/OBC_Part9.pdf
+# Full pipeline — all 13 CODE sections
+uv run python -m app.modules.orchestrator data/input_docs/BuildingCode_Part9.pdf
 
 # Test on one section first (recommended)
-uv run python -m app.modules.orchestrator data/input_docs/OBC_Part9.pdf
+uv run python -m app.modules.orchestrator data/input_docs/BuildingCode_Part9.pdf
 ```
 
 Or from Python:
@@ -236,7 +236,7 @@ Or from Python:
 from app.modules.orchestrator import run_pipeline
 
 result = run_pipeline(
-    pdf_path      = "data/input_docs/OBC_Part9.pdf",
+    pdf_path      = "data/input_docs/BuildingCode_Part9.pdf",
     run_sections  = ["4"],   # test Section 4 (Stairs) first
     seed_db_first = True,
 )
@@ -247,11 +247,11 @@ print(result)
 
 ## Seed Pre-built Rules
 
-25 pre-built OBC Part 9 rules are included.
+25 pre-built CODE Part 9 rules are included.
 Seed them without uploading a PDF:
 
 ```bash
-uv run python -m app.modules.module3_rule_builder.obc_seed_rules
+uv run python -m app.modules.module3_rule_builder.code_seed_rules
 ```
 
 ---
@@ -287,7 +287,7 @@ bim-guard/
 │       │   ├── rule_generator.py           ← validate + save rules
 │       │   ├── rule_converter.py           ← GPT-4o + RAG NLP engine
 │       │   ├── regex_rule_converter.py     ← regex engine (default)
-│       │   └── obc_seed_rules.py           ← 25 pre-built OBC rules
+│       │   └── code_seed_rules.py           ← 25 pre-built CODE rules
 │       └── orchestrator.py                 ← single entry point
 ├── data/
 │   └── cache/                              ← runtime local cache for remote storage objects
@@ -302,8 +302,8 @@ bim-guard/
 | Field | Type | Description |
 |---|---|---|
 | rule_id | TEXT | UUID primary key |
-| source_doc | TEXT | OBC_Part9_PDF / OBC_Table_Direct / OBC_Part9_Seed |
-| section_ref | TEXT | OBC section e.g. 9.8.2.1.(2) |
+| source_doc | TEXT | BuildingCode_Part9_PDF / BuildingCode_Table_Direct / BuildingCode_Part9_Seed |
+| section_ref | TEXT | CODE section e.g. 9.8.2.1.(2) |
 | rule_type | TEXT | json_check / range_check / regex / exists_check |
 | entity_type | TEXT | IFC class e.g. IfcStairFlight |
 | property_name | TEXT | IFC property name |

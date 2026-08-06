@@ -10,7 +10,7 @@ First run downloads vision models (~2 min, one-time only).
 Usage:
     from module1_doc_parser.docling_extractor import DoclingExtractor
     extractor = DoclingExtractor()
-    text, tables = extractor.extract("data/input_docs/OBC_Part9.pdf")
+    text, tables = extractor.extract("data/input_docs/BuildingCode_Part9.pdf")
 """
 
 from pathlib import Path
@@ -19,7 +19,7 @@ from pathlib import Path
 class DoclingExtractor:
     """
     Wraps Docling DocumentConverter to extract prose text
-    and tables from an OBC PDF in a single call.
+    and tables from an CODE PDF in a single call.
     """
 
     def __init__(self):
@@ -36,7 +36,7 @@ class DoclingExtractor:
         Extract text and tables from a PDF.
 
         Args:
-            pdf_path (str): path to the OBC PDF
+            pdf_path (str): path to the CODE PDF
 
         Returns:
             text   (str):        full markdown text in reading order
@@ -53,7 +53,7 @@ class DoclingExtractor:
         # Full prose text as clean markdown
         text = result.document.export_to_markdown()
 
-        # Tables as DataFrames — critical OBC tables come out clean
+        # Tables as DataFrames — critical CODE tables come out clean
         tables = []
         for i, table in enumerate(result.document.tables):
             df = table.export_to_dataframe()

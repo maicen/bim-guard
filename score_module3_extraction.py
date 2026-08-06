@@ -2,7 +2,7 @@
 score_module3_extraction.py
 ------------------------------------------------
 Phase-1 eval harness for Module 3 rule extraction accuracy, scored against
-eval_gold_obc_9_8_stairs.py (hand-annotated ground truth for OBC 9.8.2-9.8.4.7,
+eval_gold_code_9_8_stairs.py (hand-annotated ground truth for CODE 9.8.2-9.8.4.7,
 data/uploads/..._pdf_stairs_mock.pdf).
 
 Mirrors score_module1b.py's style (plain script, print()-based, no pytest).
@@ -11,7 +11,7 @@ Runs the REAL PDF through the REAL extraction primitives — not a hand-typed
 stand-in — so results reflect what actually happens today, not a best case.
 
   PART A - structural diagnostics (free, no API key, always runs):
-    A1. Heading detection   - does SectionChunker recognise OBC numbering in
+    A1. Heading detection   - does SectionChunker recognise CODE numbering in
                                the text the live document-upload flow actually
                                stores (pypdf), vs. the Docling markdown path?
     A2. sendable-chunk prep - replicate rule_extraction_service.py's chunk
@@ -39,7 +39,7 @@ import glob
 import os
 import sys
 
-from eval_gold_obc_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
+from eval_gold_code_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
 
 sys.path.insert(0, "app/modules")
 
@@ -118,9 +118,9 @@ def _score(label: str, extracted: list[dict]):
 def prepare_sendable_chunks(text: str) -> list[dict]:
     """Replicates rule_extraction_service.py's steps 3-7 (deterministic part,
     BERT/Module1b omitted — no fine-tuned model on disk / annotation-only)."""
-    obc_chunks = SectionChunker().chunk(text)
-    if obc_chunks:
-        chunks_to_process = obc_chunks
+    code_chunks = SectionChunker().chunk(text)
+    if code_chunks:
+        chunks_to_process = code_chunks
     else:
         generic = Module1_DocReader().extract_text_sections(text)
         chunks_to_process = [
@@ -158,7 +158,7 @@ def part_a():
           f"{len(chunks_docling)} sections detected")
     if len(chunks_pypdf) == 0 and len(chunks_docling) > 0:
         print("     -> CONFIRMED: the live document-upload -> extract-rules flow stores pypdf text,")
-        print("        whose OBC headings ('9.8.2.  Stair Dimensions') match none of SectionChunker's")
+        print("        whose CODE headings ('9.8.2.  Stair Dimensions') match none of SectionChunker's")
         print("        3 heading patterns (needs markdown '#', a bare top-level digit+space, or the")
         print("        literal word 'SECTION'/'CHAPTER'/'PART'). It silently falls back to the")
         print("        generic size-bounded chunker, losing real section_number/section_name context.")

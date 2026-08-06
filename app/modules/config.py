@@ -2,7 +2,7 @@
 app/modules/config.py
 ----------------------
 Shared constants for Module 1 and Module 3 pipeline components.
-Imported by rule_generator.py, rule_converter.py, and obc_seed_rules.py.
+Imported by rule_generator.py, rule_converter.py, and seed-rule loaders.
 """
 
 import os
@@ -19,8 +19,8 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
 # ── Source document labels ────────────────────────────────────────────────────
-SOURCE_DOC_PDF = "OBC_Part9_PDF"
-SOURCE_DOC_SEED = "OBC_Part9_Seed"
+SOURCE_DOC_PDF = "BuildingCode_PDF"
+SOURCE_DOC_SEED = "BuildingCode_Seed"
 
 # ── Operators ─────────────────────────────────────────────────────────────────
 VALID_OPERATORS = [
@@ -51,7 +51,7 @@ VALID_RULE_TYPES = [
 # ── IFC class → plain-language keyword mapping ────────────────────────────────
 # Used by _enrich_target() to auto-correct free-text entity names.
 # Multi-word phrases must come before their component words so they win first.
-OBC_TO_IFC_MAP = {
+CODE_TO_IFC_MAP = {
     # Stairs
     "stair": "IfcStairFlight",
     "step": "IfcStairFlight",

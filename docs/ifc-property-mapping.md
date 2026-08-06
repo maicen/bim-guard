@@ -103,12 +103,12 @@ what action maps it correctly.*
 |---|---|
 | `TreadDepth` → `TreadLength` | Table 9.8.4.1 |
 | `HeadroomClearance` → `RequiredHeadroom` | 9.8.2.2.(3) |
-| `ClearWidth` → `OverallWidth` | OBC 9.6.4 |
-| `Slope` → `RequiredSlope` | OBC 3.8.3.4 |
+| `ClearWidth` → `OverallWidth` | CODE 9.6.4 |
+| `Slope` → `RequiredSlope` | CODE 3.8.3.4 |
 | `MaxSlope` → `PitchAngle` | 9.8.6.3 |
-| `ClearOpeningHeight` → `OverallHeight` | OBC 9.7.2 |
-| `ClearOpeningWidth` → `OverallWidth` | OBC 9.7.2 |
-| `ClearOpeningArea` → `Area` | OBC 9.7.2 |
+| `ClearOpeningHeight` → `OverallHeight` | CODE 9.7.2 |
+| `ClearOpeningWidth` → `OverallWidth` | CODE 9.7.2 |
+| `ClearOpeningArea` → `Area` | CODE 9.7.2 |
 
 ### Fix in Revit (add Shared Parameters → export via user-defined Psets file)
 

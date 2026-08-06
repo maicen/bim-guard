@@ -1,5 +1,5 @@
 import * as THREE from 'https://esm.sh/three@0.175.0';
-import * as OBC from 'https://esm.sh/@thatopen/components@3.3.3?deps=three@0.175.0,web-ifc@0.0.74,@thatopen/fragments@3.3.0';
+import * as TOC from 'https://esm.sh/@thatopen/components@3.3.3?deps=three@0.175.0,web-ifc@0.0.74,@thatopen/fragments@3.3.0';
 
 export async function initViewer(containerId) {
     const container = document.getElementById(containerId);
@@ -9,15 +9,15 @@ export async function initViewer(containerId) {
     }
 
     // 1. Initialize core components
-    const components = new OBC.Components();
+    const components = new TOC.Components();
 
     // 2. Set up the World (Scene, Renderer, Camera)
-    const worlds = components.get(OBC.Worlds);
+    const worlds = components.get(TOC.Worlds);
     const world = worlds.create();
 
-    world.scene = new OBC.SimpleScene(components);
-    world.renderer = new OBC.SimpleRenderer(components, container);
-    world.camera = new OBC.SimpleCamera(components);
+    world.scene = new TOC.SimpleScene(components);
+    world.renderer = new TOC.SimpleRenderer(components, container);
+    world.camera = new TOC.SimpleCamera(components);
 
     // 3. Initialize the viewer
     components.init();
@@ -27,15 +27,15 @@ export async function initViewer(containerId) {
     world.camera.controls.setLookAt(74, 16, 0.2, 30, -4, 27);
 
     // 4. Add Grids
-    const grids = components.get(OBC.Grids);
+    const grids = components.get(TOC.Grids);
     grids.create(world);
 
     // 5. Setup Fragments and IFC Loader
-    const fragments = components.get(OBC.FragmentsManager);
+    const fragments = components.get(TOC.FragmentsManager);
     const workerBlob = await fetch("https://unpkg.com/@thatopen/fragments@3.3.0/dist/Worker/worker.mjs").then(r => r.blob());
     fragments.init(URL.createObjectURL(workerBlob));
 
-    const fragmentIfcLoader = components.get(OBC.IfcLoader);
+    const fragmentIfcLoader = components.get(TOC.IfcLoader);
     await fragmentIfcLoader.setup({
         autoSetWasm: false,
         wasm: {

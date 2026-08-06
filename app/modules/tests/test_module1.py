@@ -7,8 +7,8 @@ DoclingExtractor (PDF parsing), and regression snapshots.
 Run with: pytest tests/test_module1.py -v
 
 SETUP:
-  Place 1-3 real OBC PDF pages in tests/fixtures/
-  e.g.  tests/fixtures/sample_obc_stairs.pdf
+  Place 1-3 real CODE PDF pages in tests/fixtures/
+  e.g.  tests/fixtures/sample_code_stairs.pdf
 """
 
 import json
@@ -374,7 +374,7 @@ def _fixture_pdf(name):
 
 
 # ── Adjust the PDF name below to match your actual fixture file ──
-SAMPLE_PDF = "sample_obc_stairs.pdf"
+SAMPLE_PDF = "sample_code_stairs.pdf"
 
 
 @pytest.fixture

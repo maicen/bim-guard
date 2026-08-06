@@ -4,7 +4,7 @@ Step  Description                         Status
 ────  ──────────────────────────────────  ──────────────────────────────────────
   1   Docling + pypdf (parallel)          Active — Docling primary, pypdf standby
   2   Table Builder (no LLM)              Active
-  3   Section Chunker (13 OBC sections)   Active
+    3   Section Chunker (structured sections) Active
   4   Keyword Filter                      Optional — active when spaCy installed
   5   TF-IDF Keyword Discovery            Optional — active when spaCy installed
   6   Dependency Parser                   Optional — active when spaCy installed
@@ -74,7 +74,20 @@ except Exception:
     _NLP_ANNOTATOR_AVAILABLE = False
 
 # Step 8: BERT classifier (optional — requires transformers + fine-tuned model)
-_BERT_MODEL_PATH = Path("models/bert_obc_classifier")
+_BERT_MODEL_CANDIDATES = (
+    Path("models/bert_code_classifier"),
+)
+
+
+def _resolve_bert_model_path() -> Path:
+    """Return the first available fine-tuned BERT model directory."""
+    for candidate in _BERT_MODEL_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    return _BERT_MODEL_CANDIDATES[0]
+
+
+_BERT_MODEL_PATH = _resolve_bert_model_path()
 try:
     from app.modules.module1_doc_parser.bert_classifier import BERTClassifier
 
@@ -153,9 +166,9 @@ class RuleExtractionService:
         warnings: list[str],
     ) -> ExtractionResult:
         # ── Step 3: Section Chunker ────────────────────────────────────────
-        obc_chunks = SectionChunker().chunk(text)
-        if obc_chunks:
-            chunks_to_process = obc_chunks
+        structured_chunks = SectionChunker().chunk(text)
+        if structured_chunks:
+            chunks_to_process = structured_chunks
         else:
             generic = self._doc_reader.extract_text_sections(text)
             chunks_to_process = [

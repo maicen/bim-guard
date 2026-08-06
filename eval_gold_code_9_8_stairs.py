@@ -1,9 +1,9 @@
 """
-eval_gold_obc_9_8_stairs.py
+eval_gold_code_9_8_stairs.py
 ------------------------------------------------
-Hand-annotated ground truth for OBC Part 9, Sections 9.8.2-9.8.4.7 (stairs),
+Hand-annotated ground truth for CODE Part 9, Sections 9.8.2-9.8.4.7 (stairs),
 sourced verbatim from data/uploads/..._pdf_stairs_mock.pdf — the same document
-obc_seed_rules.py's stair entries were originally derived from, extended here
+code_seed_rules.py's stair entries were originally derived from, extended here
 to cover the WHOLE section (table rows, relative-bound tread rules, tolerances,
 winders, spiral stairs) rather than just the ~10 clauses seeded so far.
 

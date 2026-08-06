@@ -12,7 +12,7 @@ from app.engines.bimguard_corrosion_engine import (
 )
 from app.engines.bimguard_crevice_engine import (
     CCElement,
-    MITIGATIONS as MITIGATIONS_CC,
+    MITIGATIONS_CC,
     assess_crevice_risk,
 )
 from app.engines.bimguard_mic_engine import (

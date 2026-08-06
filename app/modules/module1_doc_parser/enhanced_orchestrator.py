@@ -7,7 +7,7 @@ Pipeline flow:
     PDF
       ↓ Docling Extractor         → prose text + table DataFrames
       ↓ Table Rule Builder        → tables → rules.db (no LLM)
-      ↓ Section Chunker           → 13 OBC section chunks
+    ↓ Section Chunker           → 13 code section chunks
       ↓ Keyword Filter            → scored paragraphs (existing)
       ↓ TF-IDF Analyzer           → IMPROVEMENT 1: discovers missing keywords
       ↓ Dependency Parser         → IMPROVEMENT 2: upgrades missed obligations
@@ -20,12 +20,12 @@ Pipeline flow:
 USAGE:
 
     # Full enhanced pipeline
-    python enhanced_orchestrator.py data/input_docs/OBC_Part9.pdf
+    python enhanced_orchestrator.py data/input_docs/BuildingCode_Part9.pdf
 
     # Or import:
     from enhanced_orchestrator import run_enhanced_pipeline
     result = run_enhanced_pipeline(
-        pdf_path       = "data/input_docs/OBC_Part9.pdf",
+        pdf_path       = "data/input_docs/BuildingCode_Part9.pdf",
         run_sections   = ["4"],           # test one section first
         use_bert       = False,           # set True after training
         discover_keywords = True,         # run TF-IDF keyword discovery
@@ -49,7 +49,7 @@ try:
     from module3_rule_builder.rule_store import RuleStore
     from module3_rule_builder.rule_generator import RuleGenerator
     from module3_rule_builder.rule_converter import RuleConverter
-    from module3_rule_builder.obc_seed_rules import seed_rules
+    from module3_rule_builder.code_seed_rules import seed_rules
 except ImportError:
     from app.modules.config import DB_PATH
     from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
@@ -61,7 +61,7 @@ except ImportError:
     from app.modules.module3_rule_builder.rule_store import RuleStore
     from app.modules.module3_rule_builder.rule_generator import RuleGenerator
     from app.modules.module3_rule_builder.rule_converter import RuleConverter
-    from app.modules.module3_rule_builder.obc_seed_rules import seed_rules
+    from app.modules.module3_rule_builder.code_seed_rules import seed_rules
 
 # TF-IDF requires scikit-learn — optional
 try:
@@ -89,7 +89,7 @@ def run_enhanced_pipeline(
     Run the full enhanced Module 1 + 3 pipeline.
 
     Args:
-        pdf_path          (str):        path to OBC PDF
+        pdf_path          (str):        path to building code PDF
         run_sections      (str|list):   "all" or ["4","6"]
         seed_db_first     (bool):       seed 25 pre-built rules first
         use_bert          (bool):       enable BERT classifier (requires install)
@@ -247,7 +247,7 @@ def run_enhanced_pipeline(
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python enhanced_orchestrator.py <pdf_path>")
-        print("Example: python enhanced_orchestrator.py data/input_docs/OBC_Part9.pdf")
+        print("Example: python enhanced_orchestrator.py data/input_docs/BuildingCode_Part9.pdf")
         sys.exit(1)
 
     run_enhanced_pipeline(

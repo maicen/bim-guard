@@ -12,5 +12,6 @@
         "ConvertFrom-Json": true,
         "ForEach-Object": true
     },
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "workbench.browser.dataStorage": "workspace"
 }

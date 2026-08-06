@@ -19,13 +19,13 @@ Usage:
 
     store     = RuleStore(DB_PATH)
     generator = RuleGenerator(store)
-    generator.save_batch(rules, source_doc="OBC_Part9_PDF")
+    generator.save_batch(rules, source_doc="BuildingCode_PDF")
 """
 
 try:
     from config import (
+        CODE_TO_IFC_MAP,
         IFC_PROPERTY_SET_MAP,
-        OBC_TO_IFC_MAP,
         RULE_TYPE_REQUIRED_FIELDS,
         SOURCE_DOC_PDF,
         VALID_OPERATORS,
@@ -33,8 +33,8 @@ try:
     )
 except ImportError:
     from app.modules.config import (
+        CODE_TO_IFC_MAP,
         IFC_PROPERTY_SET_MAP,
-        OBC_TO_IFC_MAP,
         RULE_TYPE_REQUIRED_FIELDS,
         SOURCE_DOC_PDF,
         VALID_OPERATORS,
@@ -75,9 +75,9 @@ class RuleGenerator:
         if str(target).startswith("Ifc"):
             return rule
 
-        # Try to match against the OBC → IFC map
+        # Try to match against the shared code-text to IFC map
         target_lower = target.lower()
-        for keyword, ifc_class in OBC_TO_IFC_MAP.items():
+        for keyword, ifc_class in CODE_TO_IFC_MAP.items():
             if keyword in target_lower:
                 rule["target"] = ifc_class
                 return rule

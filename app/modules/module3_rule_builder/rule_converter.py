@@ -36,13 +36,13 @@ except ImportError:
 # so the LLM always outputs the exact schema — not a guessed version.
 
 RAG_SYSTEM_PROMPT = """\
-You are a BIM compliance rule extraction engine for the Ontario Building Code (OBC) Part 9.
+You are a BIM compliance rule extraction engine for building regulations.
 
 Extract every discrete checkable requirement as a JSON rule object.
 
 SCHEMA — every rule must have ALL these fields:
 {{
-  "ref":               "OBC section number e.g. 9.8.2.1.(2), or empty string",
+    "ref":               "Regulation section number e.g. 9.8.2.1.(2), or empty string",
   "desc":              "short plain-English rule description",
   "source_text":       "exact quote or close paraphrase from the regulation",
 
@@ -199,7 +199,10 @@ class RuleConverter:
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Extract all rules from this OBC section:\n\n{text}"},
+                {
+                    "role": "user",
+                    "content": f"Extract all rules from this regulation section:\n\n{text}",
+                },
             ],
             temperature=0.1,
         )
@@ -209,7 +212,7 @@ class RuleConverter:
 
         # Tag each rule with its source section
         for rule in rules:
-            rule["obc_section_number"] = chunk.get("section_number")
-            rule["obc_section_name"] = chunk.get("section_name")
+            rule["code_section_number"] = chunk.get("section_number")
+            rule["code_section_name"] = chunk.get("section_name")
 
         return rules

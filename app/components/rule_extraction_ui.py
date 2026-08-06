@@ -202,9 +202,10 @@ def rule_extraction_page_content(documents: list[dict]):
                     CardHeader(CardTitle("Or: Free Offline Extraction")),
                     CardContent(
                         P(
-                            "Runs the offline OBC pipeline (Docling table extraction + "
+                            "Runs the offline code-rule pipeline (Docling table extraction + "
                             "section-aware regex rule conversion) locally — no API key, "
-                            "no LLM calls. Best on OBC Part 9-formatted PDFs. Rules are saved "
+                            "no LLM calls. Best on structured code PDFs with numbered sections. "
+                            "Rules are saved "
                             "straight to the library, skipping the review step.",
                             cls="text-xs text-muted-foreground mb-3",
                         ),
@@ -620,7 +621,7 @@ def rule_extraction_free_result(summary: dict, filename: str, ruleset_id: str = 
             cls="mb-1 text-amber-700 border-amber-400 [&>svg]:text-amber-700",
         )
         outcome_detail = P(
-            "This usually means the document doesn't have OBC Part 9-style numbered "
+            "This usually means the document doesn't have code-style numbered "
             "sections or tables with Min/Max columns, which is what this offline "
             "pipeline looks for. Try the AI Extraction Studio above instead — it reads "
             "the document's meaning rather than its formatting.",

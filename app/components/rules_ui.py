@@ -97,7 +97,7 @@ IFC_CLASS_OPTIONS = [
 
 MECHANISM_OPTIONS = [
     SelectOptionSpec(label="— Any —", value=""),
-    SelectOptionSpec(label="OBC", value="OBC"),
+    SelectOptionSpec(label="Building Code", value="CODE"),
     SelectOptionSpec(label="GC-001", value="GC-001"),
     SelectOptionSpec(label="CC-001", value="CC-001"),
     SelectOptionSpec(label="MC-001", value="MC-001"),
@@ -135,7 +135,7 @@ SEVERITY_OPTIONS = [
 ]
 
 _MECHANISM_BADGE = {
-    "OBC": "bg-blue-100 text-blue-800",
+    "CODE": "bg-blue-100 text-blue-800",
     "GC-001": "bg-amber-100 text-amber-800",
     "CC-001": "bg-rose-100 text-rose-800",
     "MC-001": "bg-green-100 text-green-800",
@@ -144,7 +144,7 @@ _MECHANISM_BADGE = {
 
 _FOLDER_SCOPE_OPTIONS = [
     ("", "Any"),
-    ("OBC", "OBC"),
+    ("CODE", "Building Code"),
     ("GC-001", "GC-001"),
     ("CC-001", "CC-001"),
     ("MC-001", "MC-001"),
@@ -301,7 +301,7 @@ def _rules_data_table(rows: list[dict], empty_message: str):
                 ),
                 Select(
                     Option("All mechanisms", value=""),
-                    Option("OBC", value="OBC"),
+                    Option("Building Code", value="CODE"),
                     Option("GC-001", value="GC-001"),
                     Option("CC-001", value="CC-001"),
                     Option("MC-001", value="MC-001"),
@@ -602,7 +602,7 @@ def rules_folders_panel(
     create_form = Form(
         Input(
             name="ruleset_id",
-            placeholder="Folder ID (ruleset_id), e.g. OBC-PART9",
+            placeholder="Folder ID (ruleset_id), e.g. BUILDING-CODE-PART9",
             required=True,
             cls="text-xs h-8 w-full md:w-[280px]",
         ),
@@ -986,7 +986,7 @@ def rule_form(title: str, action: str, rule: dict | None = None):
                         field_id="ruleset_id",
                         name="ruleset_id",
                         value=rule.get("ruleset_id", ""),
-                        placeholder="e.g. OBC-PART9",
+                        placeholder="e.g. BUILDING-CODE-PART9",
                     )
                 ),
                 SelectField(

@@ -5,7 +5,7 @@ Adapter that forwards all reads/writes to the web app's RuleService so the
 CLI pipeline and the web app share the same configured rules table.
 
 Public interface is identical to the original standalone RuleStore, so
-RuleGenerator, TableRuleBuilder, RuleConverter, obc_seed_rules, orchestrator,
+RuleGenerator, TableRuleBuilder, RuleConverter, code_seed_rules, orchestrator,
 and enhanced_orchestrator need no changes.
 
 Field-name mapping (CLI → web):

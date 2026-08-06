@@ -20,7 +20,7 @@ from .cross_ref_resolver import CrossRefResolver
 
 
 # Clause terminator: stop only at a sentence-ending period (period + space or
-# period at end-of-string), NOT at dots inside OBC section numbers like 9.8.3.(1).
+# period at end-of-string), NOT at dots inside CODE section numbers like 9.8.3.(1).
 # Section numbers end with a digit or ')'; sentence-ending periods are followed
 # by whitespace+capital or nothing.
 _T = r'(?:,\s+(?=[A-Z(])|\.(?:\s+[A-Z]|\s*$)|$)'   # full clause boundary

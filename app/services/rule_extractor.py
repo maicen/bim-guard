@@ -33,7 +33,7 @@ class RuleExtractionProvider(Protocol):
 # ── System prompt ─────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """\
-You are a BIM compliance rule extraction engine for building regulations (e.g. OBC Part 9).
+You are a BIM compliance rule extraction engine for building regulations.
 
 Extract every discrete, checkable requirement from the text and return a JSON object with
 a top-level "rules" array. Each rule MUST have ALL of the following fields:
@@ -102,7 +102,7 @@ Instead:
 - Only set the side(s) that are actually relative; a rule can mix a relative bound on
   one side with a fixed value_min/value_max on the other, or use only one side.
 
-Example — OBC 9.8.4.3.(3): "Depth of a tapered tread must be between its run and its
+Example — Section 9.8.4.3.(3): "Depth of a tapered tread must be between its run and its
 run plus 25 mm.":
 {
   "ref": "9.8.4.3.(3)", "desc": "Tapered tread depth must be between its run and run + 25mm",

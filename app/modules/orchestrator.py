@@ -11,7 +11,7 @@ Pipeline flow:
         ↓  Module 1 — Step 2
     TableRuleBuilder          → tables → rules.db directly (no LLM)
         ↓  Module 1 — Step 3
-    SectionChunker            → 13 OBC section chunks
+    SectionChunker            → structured section chunks
         ↓  Module 1 — Step 4
     KeywordFilter             → scored + confidence-labelled paragraphs
         ↓  Handoff M1 → M3
@@ -29,11 +29,11 @@ SWITCHING BETWEEN REGEX AND GPT-4o:
 
 Usage:
     # Run from project root
-    python orchestrator.py data/input_docs/OBC_Part9.pdf
+    python orchestrator.py data/input_docs/building_code.pdf
 
     # Or import and call:
     from orchestrator import run_pipeline
-    result = run_pipeline("data/input_docs/OBC_Part9.pdf")
+    result = run_pipeline("data/input_docs/building_code.pdf")
 """
 
 import os
@@ -71,7 +71,7 @@ try:
     from .module1_doc_parser.keyword_filter import KeywordFilter
     from .module1_doc_parser.section_chunker import SectionChunker
     from .module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from .module3_rule_builder.obc_seed_rules import seed_rules
+    from .module3_rule_builder.code_seed_rules import seed_rules
     from .module3_rule_builder.rule_generator import RuleGenerator
     from .module3_rule_builder.rule_store import RuleStore
 
@@ -91,13 +91,13 @@ def run_pipeline(
     ruleset_id: str = "",
 ) -> dict:
     """
-    Run the full Module 1 → Module 3 pipeline on an OBC PDF.
+    Run the full Module 1 → Module 3 pipeline on a building-code PDF.
 
     Args:
-        pdf_path      (str | Path): path to the OBC PDF file
+        pdf_path      (str | Path): path to the building-code PDF file
         run_sections  (str | list): "all" or list e.g. ["4", "6"]
                                     Use a single section to test first.
-        seed_db_first (bool):       seed 25 pre-built OBC rules before processing
+        seed_db_first (bool):       seed baseline rules before processing
         ruleset_id    (str):        folder/group name tagged onto rules newly
                                      extracted by this run (table + prose rules).
                                      Seeded baseline rules are left untouched.
@@ -140,7 +140,7 @@ def run_pipeline(
 
     # ── Seed pre-built rules ──────────────────────────────────────────────────
     if seed_db_first:
-        print("── SEEDING DB WITH PRE-BUILT OBC RULES ──")
+        print("── SEEDING DB WITH PRE-BUILT CODE RULES ──")
         seed_rules(store, generator)
 
     rules_before = store.count()
@@ -525,8 +525,8 @@ class BIMGuard_App:
 # ── CLI entry point ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python orchestrator.py <path_to_obc_pdf>")
-        print("Example: python orchestrator.py data/input_docs/OBC_Part9.pdf")
+        print("Usage: python orchestrator.py <path_to_code_pdf>")
+        print("Example: python orchestrator.py data/input_docs/building_code.pdf")
         print(f"\nCurrent converter: {'GPT-4o' if USE_GPT4O else 'Regex'}")
         print("To switch: change USE_GPT4O = True/False at top of file")
         sys.exit(1)

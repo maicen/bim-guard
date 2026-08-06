@@ -62,7 +62,7 @@ where rf.id = r.id and r.rn > 1;
 -- Normalize/validate mechanism scope.
 update public.rule_folders
 set mechanism_scope = ''
-where mechanism_scope not in ('', 'OBC', 'GC-001', 'CC-001', 'MC-001', 'IFC');
+where mechanism_scope not in ('', 'CODE', 'GC-001', 'CC-001', 'MC-001', 'IFC');
 
 -- Fill missing display_name with ruleset_id.
 update public.rule_folders
@@ -90,7 +90,7 @@ from (
         lower(r.ruleset_id) as norm_key,
         r.ruleset_id as canonical_ruleset_id,
         case
-            when upper(trim(coalesce(r.mechanism, ''))) in ('OBC', 'GC-001', 'CC-001', 'MC-001', 'IFC')
+            when upper(trim(coalesce(r.mechanism, ''))) in ('CODE', 'GC-001', 'CC-001', 'MC-001', 'IFC')
                 then upper(trim(coalesce(r.mechanism, '')))
             else ''
         end as mechanism_scope,

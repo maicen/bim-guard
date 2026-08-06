@@ -45,8 +45,8 @@ _RICH_COLUMNS = {
 # Columns that classify a rule within the broader multi-mechanism schema.
 # Added via required_columns so existing DBs migrate automatically.
 _META_COLUMNS = {
-    "mechanism": str,  # "OBC" | "GC-001" | "CC-001" | "MC-001"
-    "ruleset_id": str,  # "OBC-PART9" | "BIMGUARD-GC-001" | …
+    "mechanism": str,  # "CODE" | "GC-001" | "CC-001" | "MC-001"
+    "ruleset_id": str,  # "BUILDING-CODE-PART9" | "BIMGUARD-GC-001" | …
     "rule_category": str,  # "property_check" | "threshold_band" | "material_property"
     # | "scoring_model" | "mitigation" | "reference_config"
 }
@@ -63,10 +63,10 @@ _FOLDER_COLUMNS = {
 
 # ── Valid controlled vocabulary ───────────────────────────────────────────────
 
-MECHANISMS = {"OBC", "GC-001", "CC-001", "MC-001", "IFC"}
+MECHANISMS = {"GC-001", "CC-001", "MC-001", "IFC", "CODE"}
 
 RULE_CATEGORIES = {
-    "property_check",  # IFC element property assertion (OBC, building code)
+    "property_check",  # IFC element property assertion (building code)
     "scoring_model",  # Composite score formula + weights
     "threshold_band",  # Classification band with risk score
     "material_property",  # Material-level data (galvanic potential, CCT, MIC susceptibility)
@@ -90,6 +90,7 @@ _MEP_IFC_PREFIXES = (
 )
 
 FOLDER_MECHANISM_SCOPES = {"", *MECHANISMS}
+_DEFAULT_CODE_MECHANISMS = {"", "IFC", "CODE"}
 
 
 class RuleService:
@@ -97,7 +98,7 @@ class RuleService:
     Encapsulates CRUD + query operations for compliance rules.
 
     The single 'rules' table stores all rule types across mechanisms:
-    - OBC property checks (property_check)
+    - Building code property checks (property_check)
     - Engine lookup tables (threshold_band, reference_config, material_property)
     - Scoring formulae (scoring_model)
     - Mitigation catalogue (mitigation)
@@ -565,6 +566,17 @@ class RuleService:
         """Return all rules for a corrosion or code-check mechanism."""
         return list(self._rules.rows_where("mechanism = ?", [mechanism]))
 
+    def list_code_rules(self) -> list[dict]:
+        """Return rule rows that represent generic building-code/property checks."""
+        rows = list(self._rules.rows)
+        selected: list[dict] = []
+        for row in rows:
+            category = str(row.get("rule_category") or "").strip().lower()
+            mechanism = str(row.get("mechanism") or "").strip().upper()
+            if category == "property_check" or mechanism in _DEFAULT_CODE_MECHANISMS:
+                selected.append(row)
+        return selected
+
     def list_by_ruleset(self, ruleset_id: str) -> list[dict]:
         """Return all rules that belong to a ruleset identifier."""
         normalized = self.normalize_ruleset_id(ruleset_id)
@@ -686,7 +698,7 @@ class RuleService:
         mechanism = (rule.get("mechanism") or "").strip().upper()
         if mechanism in {"GC-001", "CC-001", "MC-001"}:
             return "MEP"
-        if mechanism in {"OBC", "IFC"}:
+        if mechanism in {"CODE", "IFC"}:
             return "Architecture"
 
         target = (rule.get("target_ifc_class") or "").strip()

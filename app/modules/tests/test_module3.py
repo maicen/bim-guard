@@ -385,9 +385,9 @@ def test_generator_save_batch_counts_saved(gen, store):
 
 def test_seed_rules_schema(gen, store):
     """All seed rules should pass schema validation."""
-    from module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
+    from module3_rule_builder.code_seed_rules import BASELINE_CODE_RULES
 
-    saved = gen.save_batch(OBC_SEED_RULES, source_doc="OBC_Part9_Seed")
+    saved = gen.save_batch(BASELINE_CODE_RULES, source_doc="BuildingCode_Part9_Seed")
     assert len(saved) > 0, "At least some seed rules should save successfully"
 
     for rule in store.get_all_rules():
@@ -547,9 +547,9 @@ class TestModule3Snapshots:
 
     def test_seed_rules_snapshot(self, gen, store):
         """Seed rules count and targets should not change unexpectedly."""
-        from module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
+        from module3_rule_builder.code_seed_rules import BASELINE_CODE_RULES
 
-        gen.save_batch(OBC_SEED_RULES, source_doc="OBC_Part9_Seed")
+        gen.save_batch(BASELINE_CODE_RULES, source_doc="BuildingCode_Part9_Seed")
 
         snap_file = self._snapshot_path("seed_rules_summary")
         current = store.summary()

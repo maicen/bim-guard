@@ -10,6 +10,10 @@ from pathlib import Path
 from app.services.rules_service import RuleService
 
 _RULESETS_DIR = Path("data/rulesets")
+_DEFAULT_CODE_RULESET_FILES = (
+    "building_code_part9_ruleset.json",
+    "building_code_part9_ext_ruleset.json",
+)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +28,27 @@ def _create(svc: RuleService, **kwargs) -> None:
     kwargs.setdefault("extraction_method", "seed")
     kwargs.setdefault("severity", "mandatory")
     svc.create_rule(**kwargs)
+
+
+def _seed_json_ruleset(svc: RuleService, filename: str) -> int:
+    """Seed one ruleset JSON document via RuleService.import_ruleset()."""
+    payload = _load(filename)
+    ruleset_id = str(payload.get("ruleset_id") or "").strip()
+    if not ruleset_id:
+        raise ValueError(f"Ruleset file '{filename}' is missing ruleset_id")
+    if svc.has_ruleset(ruleset_id):
+        return 0
+    return svc.import_ruleset(payload)
+
+
+def seed_default_code_rulesets(svc: RuleService) -> dict[str, int]:
+    """Seed baseline/extended building-code rulesets from JSON files."""
+    seeded: dict[str, int] = {}
+    for filename in _DEFAULT_CODE_RULESET_FILES:
+        payload = _load(filename)
+        ruleset_id = str(payload.get("ruleset_id") or "").strip() or filename
+        seeded[ruleset_id] = _seed_json_ruleset(svc, filename)
+    return seeded
 
 
 def _seed_risk_bands(

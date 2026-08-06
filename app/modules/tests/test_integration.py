@@ -37,9 +37,9 @@ RESULTS_DIR = os.path.join(os.path.dirname(__file__), "integration_results")
 
 INTEGRATION_CASES = [
     {
-        "id": "obc_stairs",
-        "pdf": "sample_obc_stairs.pdf",
-        "description": "OBC Part 9 — Stairs section",
+        "id": "code_stairs",
+        "pdf": "sample_code_stairs.pdf",
+        "description": "CODE Part 9 — Stairs section",
         # Module 1 expectations
         "expect_sections": ["4"],  # section numbers that should appear
         "expect_terms": ["stair", "shall", "860", "mm"],
@@ -51,8 +51,8 @@ INTEGRATION_CASES = [
     },
     # ── Add more cases as you add fixture PDFs ──
     # {
-    #     "id":   "obc_fire_safety",
-    #     "pdf":  "sample_obc_fire.pdf",
+    #     "id": "code_fire_safety",
+    #     "pdf":  "sample_code_fire.pdf",
     #     "expect_sections": ["3"],
     #     "expect_terms":    ["fire", "rating", "hour"],
     #     "min_chunks":      1,
