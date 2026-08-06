@@ -1,4 +1,8 @@
 import uvicorn
+from app.compat.monsterui import ensure_monsterui_compat
+
+ensure_monsterui_compat()
+
 from app.main import app
 
 

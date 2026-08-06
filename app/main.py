@@ -1,6 +1,10 @@
 from pathlib import Path
 
 from fasthtml.common import FileResponse, Title, fast_app
+
+from app.compat.monsterui import ensure_monsterui_compat
+
+ensure_monsterui_compat()
 from monsterui.all import (
     H1,
     Container,
