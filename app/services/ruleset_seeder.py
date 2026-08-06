@@ -26,12 +26,50 @@ def _create(svc: RuleService, **kwargs) -> None:
     svc.create_rule(**kwargs)
 
 
+def _seed_risk_bands(
+    svc: RuleService,
+    *,
+    ruleset_id: str,
+    prefix: str,
+    bands: dict,
+    target_ifc_class: str = "IfcPipeSegment",
+) -> None:
+    """Seed composite-score threshold rows for a ruleset."""
+    for band_name, band_data in bands.items():
+        if band_name not in {"Medium", "High", "Critical"}:
+            continue
+        range_text = str((band_data or {}).get("range") or "")
+        threshold = None
+        if "-" in range_text:
+            threshold = range_text.split("-", 1)[0].strip().strip("<>")
+        elif ">" in range_text:
+            threshold = range_text.replace(">", "").strip()
+        _create(
+            svc,
+            reference=f"{prefix}.BAND.{band_name.upper()}",
+            rule_type="risk_band",
+            rule_category="threshold_band",
+            description=band_data.get("bcf_action", band_name),
+            check_value=threshold,
+            keyword=band_name,
+            ruleset_id=ruleset_id,
+            target_ifc_class=target_ifc_class,
+            parameters=json.dumps({"band": band_name, **band_data}),
+        )
+
+
 # ── GC-001 — Galvanic Corrosion ───────────────────────────────────────────────
 
 
 def _seed_gc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-GC-001"
     if svc.has_ruleset(RULESET_ID):
+        _seed_risk_bands(
+            svc,
+            ruleset_id=RULESET_ID,
+            prefix="GC-001",
+            bands=_load("galvanic_corrosion_ruleset.json")["risk_bands"],
+        )
         return 0
 
     gc = _load("galvanic_corrosion_ruleset.json")
@@ -53,6 +91,8 @@ def _seed_gc001(svc: RuleService) -> int:
         description=sm["formula"],
         parameters=json.dumps(sm),
     )
+
+    _seed_risk_bands(svc, ruleset_id=RULESET_ID, prefix="GC-001", bands=gc["risk_bands"])
 
     # ── Environment classes (E1–E7) ───────────────────────────────────────────
     env_src = gc["environment_classes"].get("source", "NASA-STD-6012")
@@ -141,6 +181,12 @@ def _seed_gc001(svc: RuleService) -> int:
 def _seed_cc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-CC-001"
     if svc.has_ruleset(RULESET_ID):
+        _seed_risk_bands(
+            svc,
+            ruleset_id=RULESET_ID,
+            prefix="CC-001",
+            bands=_load("crevice_corrosion_ruleset.json")["risk_bands"],
+        )
         return 0
 
     cc = _load("crevice_corrosion_ruleset.json")
@@ -162,6 +208,8 @@ def _seed_cc001(svc: RuleService) -> int:
         description=sm["formula"],
         parameters=json.dumps(sm),
     )
+
+    _seed_risk_bands(svc, ruleset_id=RULESET_ID, prefix="CC-001", bands=cc["risk_bands"])
 
     # ── CCT grades ────────────────────────────────────────────────────────────
     cct = cc["cct_table"]
@@ -241,6 +289,12 @@ def _seed_cc001(svc: RuleService) -> int:
 def _seed_mc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-MC-001"
     if svc.has_ruleset(RULESET_ID):
+        _seed_risk_bands(
+            svc,
+            ruleset_id=RULESET_ID,
+            prefix="MC-001",
+            bands=_load("mic_corrosion_ruleset.json")["risk_bands"],
+        )
         return 0
 
     mc = _load("mic_corrosion_ruleset.json")
@@ -262,6 +316,8 @@ def _seed_mc001(svc: RuleService) -> int:
         description=sm["formula"],
         parameters=json.dumps(sm),
     )
+
+    _seed_risk_bands(svc, ruleset_id=RULESET_ID, prefix="MC-001", bands=mc["risk_bands"])
 
     # ── Flow velocity classes ─────────────────────────────────────────────────
     for fv_key, data in mc["flow_velocity_classes"].items():

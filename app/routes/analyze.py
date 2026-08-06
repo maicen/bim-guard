@@ -89,18 +89,25 @@ def _analysis_form(projects, documents, mode: str):
     folder_options = [Option("All folders", value="", selected=True)] + [
         Option(f"{f['ruleset_id']} ({f['count']})", value=f["ruleset_id"]) for f in folders
     ]
-    folder_help = (
-        "Narrow the check to one saved folder of rules — only that folder's rules "
-        "are used, the built-in seeded OBC rules are excluded. Leave on 'All "
-        "folders' to test everything, including the built-in OBC rules."
-        if is_simple
-        else (
+    if is_simple:
+        folder_help = (
+            "Narrow the check to one saved folder of rules — only that folder's rules "
+            "are used, the built-in seeded OBC rules are excluded. Leave on 'All "
+            "folders' to test everything, including the built-in OBC rules."
+        )
+    elif mode == "model-rules":
+        folder_help = (
+            "Narrow the check to one saved MEP ruleset folder (for example GC-001, "
+            "CC-001, or MC-001). Leave on 'All folders' to run against all MEP "
+            "rules available in the library."
+        )
+    else:
+        folder_help = (
             "Narrow the check to one saved folder of rules — only that folder's "
             "rules are used, the built-in seeded OBC rules are excluded. Leave on "
             "'All folders' to test every rule in the theme above, including "
             "built-in OBC rules."
         )
-    )
     form_sections.append(
         Div(
             FormLabel("Rule Folder", fr="rule_folder"),
@@ -129,12 +136,25 @@ def _analysis_form(projects, documents, mode: str):
     elif mode == "model-rules":
         form_sections.append(
             Div(
-                FormLabel("Analysis Theme", fr="analysis_theme"),
-                Select(
-                    Option("MEP", value="MEP", selected=True),
-                    id="analysis_theme",
-                    name="analysis_theme",
-                    required=True,
+                FormLabel("MEP Engines"),
+                Div(
+                    Span(
+                        "GC-001 Galvanic",
+                        cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800",
+                    ),
+                    Span(
+                        "CC-001 Crevice",
+                        cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-teal-100 text-teal-800",
+                    ),
+                    Span(
+                        "MC-001 MIC",
+                        cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-800",
+                    ),
+                    cls="flex flex-wrap items-center gap-2",
+                ),
+                P(
+                    "All three MEP corrosion engines are included in this workflow.",
+                    cls="text-xs text-muted-foreground mt-1",
                 ),
             )
         )
@@ -248,7 +268,10 @@ def _analysis_form(projects, documents, mode: str):
         results_id = "model-rules-results"
         hx_post = "/analysis/results"
         card_title = "MEP"
-        helper_copy = "Compare the selected IFC model against the saved rules in the library."
+        helper_copy = (
+            "Run MEP corrosion-focused analysis using the saved MEP rules in the "
+            "library (GC-001, CC-001, and MC-001)."
+        )
 
     loader_id = f"{results_id}-loader"
 
@@ -549,7 +572,7 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
     """Build the corrosion compliance results card for the analysis results page."""
     if error:
         return Card(
-            CardHeader(CardTitle("Corrosion Compliance — GC-001 / CC-001")),
+            CardHeader(CardTitle("Corrosion Compliance — GC-001 / CC-001 / MC-001")),
             CardContent(P(f"Compliance engine error: {error}", cls="text-sm text-destructive")),
         )
 
@@ -609,7 +632,15 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
     if flagged:
         header_cells = [
             Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-            for h in ("Element", "Floor", "Material", "Band", "Score", "Required Action")
+            for h in (
+                "Element",
+                "Floor",
+                "Material",
+                "Engine",
+                "Band",
+                "Score",
+                "Required Action",
+            )
         ]
         data_rows = []
         for r in flagged[:20]:
@@ -618,6 +649,13 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
                     Td(r.get("name", "—")[:40], cls="px-3 py-2 text-sm"),
                     Td(r.get("floor", "—"), cls="px-3 py-2 text-sm"),
                     Td(r.get("material_a", "—")[:22], cls="px-3 py-2 text-sm"),
+                    Td(
+                        Span(
+                            str(r.get("dominant_mechanism", "—")).upper(),
+                            cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700",
+                        ),
+                        cls="px-3 py-2",
+                    ),
                     Td(_band_badge(r.get("risk_band", "Low")), cls="px-3 py-2"),
                     Td(f"{r.get('overall_score', 0):.3f}", cls="px-3 py-2 text-sm font-mono"),
                     Td(r.get("action", "—")[:70], cls="px-3 py-2 text-xs"),
@@ -630,7 +668,7 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
                     Td(
                         f"… and {len(flagged) - 20} more flagged elements",
                         cls="px-3 py-2 text-xs text-muted-foreground italic",
-                        colspan="6",
+                        colspan="7",
                     )
                 )
             )
@@ -661,13 +699,83 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
     )
 
     return _collapsible_card(
-        "Corrosion Compliance — GC-001 / CC-001",
+        "Corrosion Compliance — GC-001 / CC-001 / MC-001",
         demo_notice,
         badge_row,
         cost_line,
         tracker_line,
         results_table,
         bcf_btn,
+    )
+
+
+def _mep_engine_rules_card():
+    """Show MEP engine and ruleset coverage for the MEP analysis page."""
+    engines = [
+        ("GC-001", "Galvanic Corrosion", "BIMGUARD-GC-001", "bg-blue-100 text-blue-800"),
+        ("CC-001", "Crevice Corrosion", "BIMGUARD-CC-001", "bg-teal-100 text-teal-800"),
+        (
+            "MC-001",
+            "Microbially Influenced Corrosion",
+            "BIMGUARD-MC-001",
+            "bg-indigo-100 text-indigo-800",
+        ),
+    ]
+
+    rows = []
+    for mech, label, ruleset_id, badge_cls in engines:
+        count = len(_rule_service.list_by_ruleset(ruleset_id))
+        rows.append(
+            Tr(
+                Td(
+                    Span(
+                        mech,
+                        cls=f"inline-block px-2 py-0.5 rounded text-xs font-semibold {badge_cls}",
+                    ),
+                    cls="px-3 py-2",
+                ),
+                Td(label, cls="px-3 py-2 text-sm"),
+                Td(ruleset_id, cls="px-3 py-2 text-xs font-mono"),
+                Td(str(count), cls="px-3 py-2 text-sm font-semibold"),
+                cls="border-b border-muted last:border-0",
+            )
+        )
+
+    return Card(
+        CardHeader(CardTitle("MEP Engines and Rule Coverage")),
+        CardContent(
+            P(
+                "MEP analysis runs corrosion, crevice, and MIC engines using their saved rule libraries.",
+                cls="text-sm text-muted-foreground mb-3",
+            ),
+            Div(
+                Table(
+                    Thead(
+                        Tr(
+                            Th(
+                                "Engine",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Scope",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Ruleset",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                            Th(
+                                "Rules",
+                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
+                            ),
+                        )
+                    ),
+                    Tbody(*rows),
+                    cls="w-full text-sm",
+                ),
+                cls="overflow-auto border rounded-md",
+            ),
+        ),
     )
 
 
@@ -2725,7 +2833,11 @@ def setup_routes(rt):
         documents = _documents_service.list_documents()
 
         return Title("MEP Analysis - BIM Guard"), DashboardLayout(
-            Container(_analysis_form(projects, documents, mode="model-rules"), cls="space-y-4")
+            Container(
+                _mep_engine_rules_card(),
+                _analysis_form(projects, documents, mode="model-rules"),
+                cls="space-y-4",
+            )
         )
 
     @rt("/analysis/initial/results", methods=["POST"])
@@ -2770,7 +2882,7 @@ def setup_routes(rt):
 
         result = analysis_data["result"]
         project = result["project"]
-        selected_theme = result.get("analysis_theme", "Architecture")
+        selected_theme = result.get("analysis_theme", "MEP")
         rule_folder = result.get("rule_folder", "")
         theme_label = f"{selected_theme} Theme" + (
             f" · Folder: {rule_folder}" if rule_folder else ""
@@ -2799,23 +2911,17 @@ def setup_routes(rt):
 
         rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error, theme_label)
 
-        bldg_card = _building_summary_card(result.get("building_summary", {}))
-        spatial_card = _spatial_checks_card(result.get("spatial_checks", {}))
-        egress_card = _egress_checks_card(result.get("egress_checks", {}))
-
         sections = [
             Card(
                 CardHeader(CardTitle(f"{project.get('name', 'Project')} — {theme_label}")),
                 CardContent(
                     P(
-                        "Model loaded and ready for rule comparison against the saved library rules.",
+                        "Model loaded and ready for MEP corrosion analysis against the "
+                        "saved MEP rule library.",
                         cls="text-sm text-muted-foreground",
                     )
                 ),
             ),
-            *(([bldg_card]) if bldg_card else []),
-            *(([spatial_card]) if spatial_card else []),
-            *(([egress_card]) if egress_card else []),
             rule_validation_card,
         ]
         if rule_compliance_card:
