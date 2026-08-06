@@ -25,6 +25,7 @@ from fasthtml.common import (
     Tr,
 )
 from monsterui.all import H1, Container
+from starlette.responses import RedirectResponse
 
 from app.components.layout import DashboardLayout
 from app.components.ui import (
@@ -112,13 +113,25 @@ def _analysis_form(projects, documents, mode: str):
         )
     )
 
-    if not is_simple:
+    if mode == "initial":
         form_sections.append(
             Div(
                 FormLabel("Analysis Theme", fr="analysis_theme"),
                 Select(
                     Option("Architecture", value="Architecture", selected=True),
                     Option("MEP", value="MEP"),
+                    id="analysis_theme",
+                    name="analysis_theme",
+                    required=True,
+                ),
+            )
+        )
+    elif mode == "model-rules":
+        form_sections.append(
+            Div(
+                FormLabel("Analysis Theme", fr="analysis_theme"),
+                Select(
+                    Option("MEP", value="MEP", selected=True),
                     id="analysis_theme",
                     name="analysis_theme",
                     required=True,
@@ -214,10 +227,10 @@ def _analysis_form(projects, documents, mode: str):
         )
 
     if mode == "simple":
-        submit_label = "Run Simple Analysis"
+        submit_label = "Run ARCH Analysis"
         results_id = "simple-analysis-results"
-        hx_post = "/analysis/simple/results"
-        card_title = "Architectural Analysis"
+        hx_post = "/analysis/ARCH/results"
+        card_title = "ARCH"
         helper_copy = (
             "Check the IFC model against OBC Part 9 building code categories: "
             "Windows, Doors, Stairs, Egress, Fire Protection, Garage, and more."
@@ -231,10 +244,10 @@ def _analysis_form(projects, documents, mode: str):
             "Inspect the IFC model structure, counts, and quality signals before checking rules."
         )
     else:
-        submit_label = "Run Model Vs Rules Analysis"
+        submit_label = "Run MEP Analysis"
         results_id = "model-rules-results"
         hx_post = "/analysis/results"
-        card_title = "MEP Analysis"
+        card_title = "MEP"
         helper_copy = "Compare the selected IFC model against the saved rules in the library."
 
     loader_id = f"{results_id}-loader"
@@ -312,7 +325,7 @@ def _analysis_form(projects, documents, mode: str):
     )
 
 
-async def _run_analysis_request(req: Request):
+async def _run_analysis_request(req: Request, forced_theme: str | None = None):
     """Parse and validate the analysis request, then run the orchestrator."""
     form = await req.form()
     project_id_raw = form.get("project_id") or ""
@@ -324,7 +337,7 @@ async def _run_analysis_request(req: Request):
         return None, Alert("Invalid project selection.", cls=AlertT.error)
 
     doc_ids = [int(v) for v in form.getlist("document_ids") if v]
-    analysis_theme = (form.get("analysis_theme") or "Architecture").strip()
+    analysis_theme = (forced_theme or form.get("analysis_theme") or "Architecture").strip()
     rule_folder = (form.get("rule_folder") or "").strip()
     include_openings = bool(form.get("include_openings"))
     include_spaces = bool(form.get("include_spaces"))
@@ -2614,15 +2627,15 @@ def _simple_garage_card(spatial_checks: dict):
 def setup_routes(rt):
     """Register analysis workflow routes."""
 
-    @rt("/analysis/simple")
+    @rt("/analysis/ARCH")
     def analysis_simple():
         projects = _projects_service.list_projects()
         documents = _documents_service.list_documents()
-        return Title("Simple Analysis - BIM Guard"), DashboardLayout(
+        return Title("ARCH Analysis - BIM Guard"), DashboardLayout(
             Container(_analysis_form(projects, documents, mode="simple"), cls="space-y-4")
         )
 
-    @rt("/analysis/simple/results", methods=["POST"])
+    @rt("/analysis/ARCH/results", methods=["POST"])
     async def analysis_simple_post(req: Request):
         form = await req.form()
         project_id_raw = form.get("project_id") or ""
@@ -2668,7 +2681,7 @@ def setup_routes(rt):
         sections = [
             Card(
                 CardHeader(
-                    CardTitle(f"{project.get('name', 'Project')} — Simple Analysis{folder_note}")
+                    CardTitle(f"{project.get('name', 'Project')} — ARCH Analysis{folder_note}")
                 ),
                 CardContent(
                     P(
@@ -2704,19 +2717,14 @@ def setup_routes(rt):
 
     @rt("/analysis/initial")
     def analysis_initial():
-        projects = _projects_service.list_projects()
-        documents = _documents_service.list_documents()
+        return RedirectResponse(url="/analysis/ARCH", status_code=303)
 
-        return Title("Initial Analysis - BIM Guard"), DashboardLayout(
-            Container(_analysis_form(projects, documents, mode="initial"), cls="space-y-4")
-        )
-
-    @rt("/analysis/run")
+    @rt("/analysis/MEP")
     def analysis_run():
         projects = _projects_service.list_projects()
         documents = _documents_service.list_documents()
 
-        return Title("Model Vs Rules Analysis - BIM Guard"), DashboardLayout(
+        return Title("MEP Analysis - BIM Guard"), DashboardLayout(
             Container(_analysis_form(projects, documents, mode="model-rules"), cls="space-y-4")
         )
 
@@ -2756,7 +2764,7 @@ def setup_routes(rt):
 
     @rt("/analysis/results", methods=["POST"])
     async def analysis_run_post(req: Request):
-        analysis_data, error_response = await _run_analysis_request(req)
+        analysis_data, error_response = await _run_analysis_request(req, forced_theme="MEP")
         if error_response:
             return error_response
 
