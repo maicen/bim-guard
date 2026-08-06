@@ -1,7 +1,8 @@
 # app\components\layout.py
 import time
+from functools import lru_cache
 
-from fasthtml.common import H2, Div, Main, Span
+from fasthtml.common import H2, Div, Main, NotStr, Span, to_xml
 from monsterui.all import DivLAligned, TextT, UkIcon
 
 from app.components.themed_ui import SiteStyles
@@ -43,6 +44,39 @@ _DB_HEALTH_CACHE = {
     "ok": False,
 }
 
+_NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        "Platform",
+        (
+            ("Dashboard", "/dashboard"),
+            ("Projects", "/projects"),
+            ("Viewer", "/viewer"),
+        ),
+    ),
+    (
+        "Library",
+        (
+            ("Documents", "/library/documents"),
+            ("Rule Extraction Studio", "/library/rules/extract"),
+            ("Rules", "/library/rules"),
+        ),
+    ),
+    (
+        "Analysis",
+        (
+            ("ARCH", "/analysis/ARCH"),
+            ("MEP", "/analysis/MEP"),
+            ("Reports", "/reports"),
+        ),
+    ),
+    (
+        "3D Modeling Manual",
+        (
+            ("Modeling Manual", "/modeling-manual"),
+        ),
+    ),
+)
+
 
 def _probe_db_health() -> bool:
     """Probe DB connectivity with short-lived caching to avoid per-request churn."""
@@ -74,6 +108,13 @@ def _sidebar_db_status():
     """Render compact DB status in sidebar footer."""
     backend = PersistenceService.DB_BACKEND.upper()
     ok = _probe_db_health()
+
+    return _cached_sidebar_db_status(backend, ok)
+
+
+@lru_cache(maxsize=8)
+def _cached_sidebar_db_status(backend: str, ok: bool):
+    """Cache status snippets by backend and connectivity state."""
     dot_cls = "bg-emerald-500" if ok else "bg-rose-500"
     text = "Connected" if ok else "Degraded"
 
@@ -84,7 +125,8 @@ def _sidebar_db_status():
     )
 
 
-def NavItem(title, url):
+@lru_cache(maxsize=64)
+def NavItem(title: str, url: str):
     """Sidebar menu item using shared sidebar primitives."""
     icon = NAV_ICONS.get(title, "circle")
     return SidebarMenuItem(
@@ -103,7 +145,8 @@ def NavItem(title, url):
     )
 
 
-def NavSection(title, items):
+@lru_cache(maxsize=16)
+def NavSection(title: str, items: tuple[tuple[str, str], ...]):
     """Section group using shared sidebar primitives."""
     return SidebarGroup(
         SidebarGroupLabel(title, cls=SiteStyles.caption + " px-3 mb-2 mt-2"),
@@ -111,78 +154,54 @@ def NavSection(title, items):
     )
 
 
+_SIDEBAR_BRAND_HTML = NotStr(
+    to_xml(
+        H2(
+            "BIM Guard",
+            cls="font-bold tracking-tighter text-2xl px-3 pb-2 group-data-[sidebar-state=collapsed]/sidebar-wrapper:hidden",
+        )
+    )
+)
+
+_SIDEBAR_SETTINGS_HTML = NotStr(
+    to_xml(
+        SidebarMenu(
+            SidebarMenuItem(
+                SidebarMenuButton(
+                    DivLAligned(
+                        UkIcon("settings", height=16, width=16, cls="opacity-70 shrink-0"),
+                        Span(
+                            "Settings",
+                            cls="group-data-[sidebar-state=collapsed]/sidebar-wrapper:hidden",
+                        ),
+                        cls="gap-3 justify-start w-full",
+                    ),
+                    href="/settings",
+                    cls="text-sm font-medium text-muted-foreground hover:text-foreground",
+                )
+            )
+        )
+    )
+)
+
+_SIDEBAR_NAV_GROUPS_HTML = tuple(
+    NotStr(to_xml(NavSection(section_title, items))) for section_title, items in _NAV_SECTIONS
+)
+
+
 def AppSidebar():
     """Sidebar built from reusable UI sidebar components."""
-    nav_sections = [
-        (
-            "Platform",
-            [
-                ("Dashboard", "/dashboard"),
-                ("Projects", "/projects"),
-                ("Viewer", "/viewer"),
-            ],
-        ),
-        (
-            "Library",
-            [
-                ("Documents", "/library/documents"),
-                ("Rule Extraction Studio", "/library/rules/extract"),
-                ("Rules", "/library/rules"),
-            ],
-        ),
-        (
-            "Analysis",
-            [
-                ("ARCH", "/analysis/ARCH"),
-                ("MEP", "/analysis/MEP"),
-                ("Reports", "/reports"),
-            ],
-        ),
-        (
-            "3D Modeling Manual",
-            [
-                ("Modeling Manual", "/modeling-manual"),
-            ],
-        ),
-    ]
-
-    # Flatten sections into a list of MonsterUI nav components
-    nav_groups = [NavSection(section_title, items) for section_title, items in nav_sections]
-
     return Sidebar(cls="apple-blur bg-sidebar border-r border-border h-svh")(
         SidebarTrigger(cls="self-end mb-1 border-border bg-background hover:bg-muted"),
         SidebarInset(
             SidebarContent(
-                H2(
-                    "BIM Guard",
-                    cls="font-bold tracking-tighter text-2xl px-3 pb-2 group-data-[sidebar-state=collapsed]/sidebar-wrapper:hidden",
-                ),
-                *nav_groups,
+                _SIDEBAR_BRAND_HTML,
+                *_SIDEBAR_NAV_GROUPS_HTML,
                 cls="px-2",
             ),
             SidebarFooter(
                 _sidebar_db_status(),
-                SidebarMenu(
-                    SidebarMenuItem(
-                        SidebarMenuButton(
-                            DivLAligned(
-                                UkIcon(
-                                    "settings",
-                                    height=16,
-                                    width=16,
-                                    cls="opacity-70 shrink-0",
-                                ),
-                                Span(
-                                    "Settings",
-                                    cls="group-data-[sidebar-state=collapsed]/sidebar-wrapper:hidden",
-                                ),
-                                cls="gap-3 justify-start w-full",
-                            ),
-                            href="/settings",
-                            cls="text-sm font-medium text-muted-foreground hover:text-foreground",
-                        )
-                    )
-                ),
+                _SIDEBAR_SETTINGS_HTML,
                 cls="border-t border-border pt-3",
             ),
             cls="flex h-full flex-col",

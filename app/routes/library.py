@@ -1,5 +1,6 @@
 """Document and rule library routes, including extraction/import endpoints."""
 
+import json
 from pathlib import Path
 
 from fasthtml.common import (
@@ -23,6 +24,7 @@ from monsterui.all import (
     FormLabel,
     Input,
 )
+from starlette.responses import StreamingResponse
 
 from app.components.documents_ui import document_edit_form, documents_panel
 from app.components.layout import DashboardLayout
@@ -785,14 +787,19 @@ def setup_routes(rt):
     @rt("/api/rules/export-json")
     def rules_export_json():
         """Download the last extraction as a JSON file \u2014 no data passed through UI."""
-        import json as _json
-
-        from fasthtml.common import Response
-
         global _last_extracted, _last_extracted_filename
         safe = (_last_extracted_filename or "rules").replace(".pdf", "").replace(" ", "_")
-        return Response(
-            content=_json.dumps(_last_extracted, indent=2),
+
+        # Snapshot current extraction payload so streaming is consistent.
+        payload = list(_last_extracted)
+
+        def _iter_json_payload():
+            encoder = json.JSONEncoder(indent=2)
+            yield from encoder.iterencode(payload)
+            yield "\n"
+
+        return StreamingResponse(
+            _iter_json_payload(),
             media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="{safe}_rules.json"'},
         )

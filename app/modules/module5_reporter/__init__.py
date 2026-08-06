@@ -57,6 +57,60 @@ class Module5_Reporter:
             ])
         return output.getvalue()
 
+    def iter_csv_summary(self, compliance_results: list[dict]):
+        """Yield CSV data incrementally for streaming downloads."""
+        # Reuse one in-memory row buffer and flush it per emitted CSV row.
+        row_buffer = io.StringIO()
+        writer = csv.writer(row_buffer)
+
+        writer.writerow(
+            [
+                "Rule Ref",
+                "Description",
+                "Target IFC Class",
+                "Property Name",
+                "Operator",
+                "Expected Value",
+                "Unit",
+                "Severity",
+                "Status",
+                "Pass",
+                "Fail",
+                "Missing",
+                "Total Elements",
+            ]
+        )
+        yield row_buffer.getvalue()
+        row_buffer.seek(0)
+        row_buffer.truncate(0)
+
+        for r in compliance_results:
+            if r.get("operator") == "between":
+                expected = f"{r.get('value_min')}–{r.get('value_max')}"
+            else:
+                expected = str(r.get("check_value") or "")
+
+            writer.writerow(
+                [
+                    r.get("rule_ref", ""),
+                    r.get("rule_desc", ""),
+                    r.get("target", ""),
+                    r.get("property_name", ""),
+                    r.get("operator", ""),
+                    expected,
+                    r.get("unit", ""),
+                    r.get("severity", ""),
+                    r.get("status", ""),
+                    r.get("pass_count", 0),
+                    r.get("fail_count", 0),
+                    r.get("missing_count", 0),
+                    r.get("total_count", 0),
+                ]
+            )
+            yield row_buffer.getvalue()
+            row_buffer.seek(0)
+            row_buffer.truncate(0)
+
     def create_bcf_topic(self, failure: dict, rule: dict) -> dict:
         """
         Create a BCF-compatible topic dict for one element failure.

@@ -30,6 +30,17 @@ app, rt = fast_app(
     cls="antialiased",
 )
 
+_ROUTE_INSTALLERS = (
+    viewer.setup_routes,
+    analyze.setup_routes,
+    dashboard.setup_routes,
+    library.setup_routes,
+    modeling_manual.setup_routes,
+    projects.setup_routes,
+    revit_sync.setup_routes,
+)
+_ROUTES_REGISTERED = False
+
 
 # Serve static files
 @rt("/static/{path:path}")
@@ -101,13 +112,13 @@ def _seed_library_once_per_host() -> None:
 
 
 def _setup_routes() -> None:
-    viewer.setup_routes(rt)
-    analyze.setup_routes(rt)
-    dashboard.setup_routes(rt)
-    library.setup_routes(rt)
-    modeling_manual.setup_routes(rt)
-    projects.setup_routes(rt)
-    revit_sync.setup_routes(rt)
+    """Register all routes exactly once during process startup."""
+    global _ROUTES_REGISTERED
+    if _ROUTES_REGISTERED:
+        return
+    for installer in _ROUTE_INSTALLERS:
+        installer(rt)
+    _ROUTES_REGISTERED = True
 
 
 _seed_library_once_per_host()

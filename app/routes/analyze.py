@@ -7,6 +7,7 @@ from fasthtml.common import (
     A,
     Details,
     Div,
+    FileResponse,
     Form,
     H3,
     Iframe,
@@ -26,7 +27,7 @@ from fasthtml.common import (
     Tr,
 )
 from monsterui.all import H1, Container
-from starlette.responses import RedirectResponse
+from starlette.responses import RedirectResponse, StreamingResponse
 
 from app.components.layout import DashboardLayout
 from app.components.ui import (
@@ -3158,12 +3159,10 @@ def setup_routes(rt):
     @rt("/reports/compliance-csv")
     def compliance_csv_download():
         """Download the last rule compliance check as a CSV file."""
-        from starlette.responses import Response as StarletteResponse
         from app.modules.module5_reporter import Module5_Reporter
 
-        csv_content = Module5_Reporter().generate_csv_summary(_last_compliance_results)
-        return StarletteResponse(
-            content=csv_content,
+        return StreamingResponse(
+            Module5_Reporter().iter_csv_summary(_last_compliance_results),
             media_type="text/csv",
             headers={"Content-Disposition": 'attachment; filename="compliance_results.csv"'},
         )
@@ -3367,18 +3366,14 @@ def setup_routes(rt):
 
     @rt("/reports/bcf/{project_id}")
     def bcf_download(project_id: int):
-        from starlette.responses import Response as StarletteResponse
-
         bcf_file = os.path.join(_DATA_DIR, f"compliance_project_{project_id}.bcf")
         if not os.path.exists(bcf_file):
             return Alert(
                 "BCF file not found. Run the analysis first to generate the report.",
                 cls=AlertT.error,
             )
-        with open(bcf_file, "rb") as fh:
-            bcf_bytes = fh.read()
-        return StarletteResponse(
-            content=bcf_bytes,
+        return FileResponse(
+            bcf_file,
             media_type="application/octet-stream",
             headers={
                 "Content-Disposition": (
