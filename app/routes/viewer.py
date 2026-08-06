@@ -2,8 +2,8 @@
 
 import json
 
-from fasthtml.common import Div, Script, Title
-from monsterui.all import H2, Container
+from fasthtml.common import Div, Option, Script, Title
+from monsterui.all import Button, ButtonT, Container, Form, FormLabel, H2, Select
 
 from app.components.layout import DashboardLayout
 from app.components.ui import BackAction, NotFoundBlock
@@ -17,6 +17,7 @@ def setup_routes(rt):
 
     @rt("/viewer")
     def viewer_page(project_id: int | None = None):
+        projects = [row for row in _projects_service.list_projects() if row.get("ifc_file_path")]
         project = _projects_service.get_project(project_id) if project_id is not None else None
 
         if project_id is not None and project is None:
@@ -31,6 +32,17 @@ def setup_routes(rt):
         if project is not None:
             viewer_title = f"3D Viewer - {project.get('name', 'Project')}"
         preload_ifc_url = json.dumps(ifc_url)
+        project_options = [
+            Option("Select a project", value="", selected=project_id is None),
+            *[
+                Option(
+                    item.get("name", f"Project {item['id']}"),
+                    value=str(item["id"]),
+                    selected=item["id"] == project_id,
+                )
+                for item in projects
+            ],
+        ]
 
         return Title("Viewer - BIM Guard"), DashboardLayout(
             Div(
@@ -41,10 +53,27 @@ def setup_routes(rt):
                         cls="text-primary-foreground bg-primary px-4 py-2 rounded-md font-semibold",
                     ),
                     Div(
+                        Form(
+                            Div(
+                                FormLabel("Project", fr="viewer-project-id", cls="text-sm"),
+                                Select(
+                                    *project_options,
+                                    id="viewer-project-id",
+                                    name="project_id",
+                                    onchange="this.form.requestSubmit()",
+                                    cls="min-w-64",
+                                ),
+                                cls="space-y-1",
+                            ),
+                            Button("View Project", type="submit", cls=ButtonT.primary),
+                            action="/viewer",
+                            method="get",
+                            cls="flex flex-col gap-2 sm:flex-row sm:items-end",
+                        ),
                         BackAction(href="javascript:history.back()", title="Back"),
-                        cls="flex gap-2",
+                        cls="flex flex-col gap-3 sm:flex-row sm:items-end",
                     ),
-                    cls="flex justify-between items-center mb-4",
+                    cls="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between",
                 ),
                 # Viewer Container
                 Div(
