@@ -3,7 +3,23 @@
   "mechanism": "MM-001",
   "rule_category": "material_property",
   "schema_version": "1.0.0",
-  "status": "DRAFT - NOT APPROVED FOR USE",
+  "status": "APPROVED v1.0",
+  "approval": {
+    "approved_by": "Mark Shane Haines",
+    "version": "v1.0",
+    "amendments_at_approval": [
+      "SS316/pool_water raised 0.55 -> 0.85 so the thesis case study clears the High band on its own arithmetic (0.7075). SS304 held at 0.90; IMOA ordering preserved.",
+      "GalvanisedSteel/stagnant_water held at 0.70. The fire loop is a negative control for XM-001 only; Medium under MM-001 is correct behaviour.",
+      "kinetics_guard added - see that block. Prevents operating temperature alone escalating a benign material-media pairing.",
+      "environment_severity and temperature_stress tables added with per-cell citations."
+    ],
+    "carried_limitations": [
+      "T5_industrial severity 0.85 remains PROVISIONAL: it is the only environment value with no CC-001 wetting-class counterpart, so it is interpolated rather than borrowed. Pinned by the COND-01 fixture scenario so a future edit cannot move it unnoticed.",
+      "Water chemistry (chloride ppm, pH, hardness, dissolved oxygen) is absent from PipingElement. Cells assume typical UK potable chemistry. Copper Type 2 pitting in soft-water regions is understated. Chemistry-aware scoring is Phase 2.",
+      "Velocity is absent from PipingElement. Copper erosion-corrosion above ~1.5 m/s and CuNi minimum-flow film maintenance are not modelled.",
+      "The digits remain a calibration authored for this ruleset, not values quoted from the cited standards. Citations name the standard governing each mechanism."
+    ]
+  },
   "metadata": {
     "title": "Material-Media Compatibility Matrix (MM-001)",
     "purpose": "Scores the degradation risk of a piping material carrying a given medium, before environment and temperature modifiers are applied.",
@@ -89,7 +105,7 @@
 
       "Copper_C12200": {
         "cold_water":      {"score": 0.15, "years": 50, "mech": "type1_pitting_in_hard_cold_water", "cite": "CDA Copper Tube Handbook", "conf": "established"},
-        "hot_water":       {"score": 0.30, "years": 25, "mech": "type2_pitting_soft_water_above_60C", "cite": "CDA Copper Tube Handbook", "conf": "established"},
+        "hot_water":       {"score": 0.30, "years": 25, "mech": "type2_pitting_soft_water_above_60C", "cite": "CDA Copper Tube Handbook", "conf": "established", "note": "Soft-water regions: Type 2 pitting risk understated under the typical-UK-chemistry assumption; chemistry-aware scoring is Phase 2. This cell is below the kinetics_guard threshold, so 60C storage does not escalate it - see kinetics_guard."},
         "chilled_water":   {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "CDA Copper Tube Handbook", "conf": "established"},
         "condenser_water": {"score": 0.35, "years": 25, "mech": "erosion_corrosion_above_1_5_m_s", "cite": "CDA Copper Tube Handbook", "conf": "established"},
         "pool_water":      {"score": 0.75, "years": 8,  "mech": "free_chlorine_attack_and_green_staining", "cite": "CDA Technical Note", "conf": "established"},
@@ -136,7 +152,7 @@
         "hot_water":       {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
         "chilled_water":   {"score": 0.10, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
         "condenser_water": {"score": 0.30, "years": 30, "mech": "chloride_concentration_pitting", "cite": "ASTM G48", "conf": "established"},
-        "pool_water":      {"score": 0.55, "years": 15, "mech": "chloride_pitting_and_SCC", "cite": "ASTM G48; IMOA Design Manual", "conf": "established"},
+        "pool_water":      {"score": 0.85, "years": 8,  "mech": "chloride_pitting_and_SCC", "cite": "IMOA pool-environment guidance; ASTM G48", "conf": "established", "note": "Raised from 0.55 on review. IMOA classes BOTH 304 and 316 as unsuitable for chlorinated pool-hall atmospheres - the SCC failure mode behind the Uster (1985) and Steenwijk (2001) pool roof collapses - and directs designers to duplex or 6Mo. The narrow 0.85/0.90 gap against SS304 is engineering-true, not a calibration compromise: in pool service both fail, differing in rate rather than in kind. IMOA ordering (304 worse than 316) is preserved."},
         "steam":           {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "EN 12952-12", "conf": "established"},
         "condensate":      {"score": 0.22, "years": 40, "mech": "chloride_concentration_at_phase_change", "cite": "ASTM G48", "conf": "provisional"},
         "stagnant_water":  {"score": 0.40, "years": 25, "mech": "crevice_corrosion_under_stagnation", "cite": "ASTM G48", "conf": "established"}
@@ -176,10 +192,89 @@
       }
     },
 
+    "environment_severity": {
+      "_basis": [
+        "Severity VALUES are taken directly from the CC-001 crevice engine's",
+        "ENVIRONMENT_SEVERITY ladder (0.05 / 0.20 / 0.40 / 0.60 / 0.80 / 1.00), itself",
+        "built on the EN ISO 15329:2007 wetting-class framework. Reusing that ladder",
+        "avoids a second severity philosophy for the same physical question.",
+        "",
+        "CAUTION - THE TWO TAXONOMIES ARE NOT THE SAME AXIS. CC-001 keys on wetting",
+        "FREQUENCY (T0 dry ... T5 immersion). EnvironmentClass keys on humidity for",
+        "T0-T2 and then on CHEMISTRY for T3-T5. They agree up to T2 and diverge above it:",
+        "CC-001's T5 is immersion and it maps 'pool' there, while EnvironmentClass's T5",
+        "is industrial. Aligning by POSITION would rank industrial above marine, which is",
+        "wrong. These cells therefore align by MEANING, quoting the CC-001 wetting class",
+        "whose description matches, and each cell records which one it borrowed."
+      ],
+      "T0_dry":           {"severity": 0.05, "maps_to_cc001": "T0_DRY", "cite": "EN ISO 15329:2007 T0", "conf": "established", "note": "Identical meaning in both taxonomies."},
+      "T1_indoor_damp":   {"severity": 0.20, "maps_to_cc001": "T1_OCCASIONAL", "cite": "EN ISO 15329:2007 T1", "conf": "established", "note": "Occasional condensation, <10 mg/l chloride, <10% annual wetness."},
+      "T2_humid":         {"severity": 0.40, "maps_to_cc001": "T2_INTERMITTENT", "cite": "EN ISO 15329:2007 T2", "conf": "established", "note": "Intermittent wetting, <50 mg/l chloride, 10-50% annual wetness."},
+      "T3_chloride":      {"severity": 0.80, "maps_to_cc001": "T4_PERSISTENT", "cite": "EN ISO 15329:2007 T4; IMOA pool-environment guidance", "conf": "established", "note": "Borrows T4 (200-1000 mg/l chloride, >75% wetness), NOT T3. Pool halls and coastal interiors are chloride-dominated; CC-001 itself maps 'pool' to its most severe class. Using CC-001's positional T3 (0.60) would understate the case study."},
+      "T4_marine":        {"severity": 1.00, "maps_to_cc001": "T5_IMMERSION", "cite": "EN ISO 15329:2007 T5; ASTM B117", "conf": "established", "note": "Direct spray zone, >1000 mg/l chloride, continuous wetness. The most severe class in both taxonomies."},
+      "T5_industrial":    {"severity": 0.85, "maps_to_cc001": "(none - no CC-001 equivalent)", "cite": "ASTM B117", "conf": "provisional", "note": "Aggressive chemical atmosphere. Ranked below marine because chloride remains the dominant driver of pitting and SCC in the alloys covered here; marine > industrial is the standard ordering. No CC-001 wetting class corresponds, so this value is interpolated rather than borrowed - the weakest cell in this table."},
+      "unclassified":     {"severity": null, "maps_to_cc001": null, "cite": null, "conf": "n/a", "note": "MUST emit a data-quality Issue, never a numeric severity. UNCLASSIFIED means the environment was not determined; scoring it as benign would silently suppress findings on every element the producer could not classify."}
+    },
+
+    "temperature_stress": {
+      "_basis": [
+        "Two effects are combined into one 0-1 stress term:",
+        "",
+        "1. CORROSION KINETICS. Reaction rate for actively corroding metals rises",
+        "   roughly twofold per 10 C (Arrhenius). CIBSE Guide G carries this for water",
+        "   systems. The bands below step accordingly rather than interpolating, so a",
+        "   reviewer can see which threshold a given temperature crossed.",
+        "",
+        "2. ZINC POLARITY REVERSAL. Above approximately 60 C the zinc coating on",
+        "   galvanised steel turns cathodic to the steel substrate and accelerates",
+        "   pitting instead of protecting it. That is a step change, not a gradient,",
+        "   and it is why the 60 C boundary is a band edge rather than a midpoint.",
+        "",
+        "Bands are inclusive of their lower bound and exclusive of their upper."
+      ],
+      "bands": [
+        {"min_c": null,  "max_c": 10.0,  "stress": 0.05, "cite": "CIBSE Guide G", "conf": "established", "note": "Chilled and cold services. Kinetics substantially suppressed."},
+        {"min_c": 10.0,  "max_c": 25.0,  "stress": 0.20, "cite": "CIBSE Guide G", "conf": "established", "note": "Ambient reference band - the Arrhenius baseline the others double from."},
+        {"min_c": 25.0,  "max_c": 40.0,  "stress": 0.35, "cite": "CIBSE Guide G", "conf": "established", "note": "Pool circulation and tempered services."},
+        {"min_c": 40.0,  "max_c": 60.0,  "stress": 0.55, "cite": "CIBSE Guide G", "conf": "established", "note": "Below the zinc reversal threshold."},
+        {"min_c": 60.0,  "max_c": 80.0,  "stress": 0.80, "cite": "CIBSE Guide G (zinc polarity reversal); EN 12952-12", "conf": "established", "note": "Domestic hot water storage and distribution. Zinc reversal band - step, not gradient."},
+        {"min_c": 80.0,  "max_c": 100.0, "stress": 0.90, "cite": "EN 12952-12", "conf": "established", "note": "LTHW heating flow."},
+        {"min_c": 100.0, "max_c": null,  "stress": 1.00, "cite": "EN 12952-12", "conf": "provisional", "note": "Steam and pressurised HTHW. Above this the governing concern shifts from aqueous corrosion to creep and oxidation, which MM-001 does not model."}
+      ],
+      "missing_temperature_policy": "operating_temperature_c is Optional in PipingElement and frequently absent. When None, emit a data-quality Issue and omit the temperature term rather than substituting a default - a default would be a fabricated input to a compliance verdict."
+    },
+
+    "kinetics_guard": {
+      "cell_below": 0.35,
+      "cap_temperature_stress_at": 0.35,
+      "rationale": [
+        "Temperature acceleration applies to active mechanisms (Arrhenius); benign",
+        "pairings have no dominant mechanism to accelerate. Guard prevents operating",
+        "temperature alone from escalating a compatible material.",
+        "",
+        "The additive score lets the temperature term act as an independent hazard,",
+        "which is wrong: Arrhenius MULTIPLIES an existing corrosion rate. A small base",
+        "rate doubled per 10 C is still small. Without the guard no cell value can",
+        "rescue a benign pairing from a hot-media Medium - even dropping",
+        "Copper/hot_water to 0.10 gives 0.04 + 0.07 + 0.20 = 0.31, still above the",
+        "Medium floor on the temperature and environment terms alone.",
+        "",
+        "The concrete case: copper in domestic hot water at 60 C. That storage",
+        "temperature is mandated by HSE HSG274 for Legionella control and is required",
+        "by the MC-001 engine in this same codebase. MM-001 flagging what MC-001",
+        "mandates would make the tool internally contradictory."
+      ],
+      "cite": "CIBSE Guide G (corrosion kinetics basis); HSE HSG274 Part 2 (60 C storage requirement)",
+      "conf": "established",
+      "worked_example": "Copper/hot_water: unguarded 0.40x0.30 + 0.35x0.20 + 0.25x0.80 = 0.3900 (Medium). Guarded, temperature capped 0.80 -> 0.35: 0.12 + 0.07 + 0.0875 = 0.2775 (Low).",
+      "scope_note": "Applies to the temperature term only. Environment severity is NOT capped: a benign pairing in a marine splash zone is still exposed to an external driver that does not depend on the material-media mechanism."
+    },
+
     "risk_band_thresholds": {
       "medium": 0.35,
       "high": 0.65,
-      "critical": 0.85
+      "critical": 0.85,
+      "_note": "Unchanged on review. Rescuing one cell by shifting global thresholds would move every other verdict in the pack."
     },
 
     "weights": {

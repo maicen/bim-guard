@@ -17,3 +17,5 @@ tmp_sig_check.sqlite
 data/cache/
 .DS_Store
 docs/MonsterUI/
+
+apply_benchmark_patch*.ps1

@@ -1,0 +1,174 @@
+{
+  "ruleset_id": "BIMGUARD-XM-001",
+  "mechanism": "XM-001",
+  "rule_category": "threshold_band",
+  "schema_version": "1.0.0",
+  "status": "DRAFT - NOT APPROVED FOR USE",
+  "metadata": {
+    "title": "Cross-Material Contamination (XM-001)",
+    "purpose": "Scores galvanic couples formed where dissimilar materials meet, either in direct contact or through shared media in the same loop.",
+    "standards": [
+      "BS 8539 - Code of practice for the selection and installation of post-installed anchors (bi-metallic assembly guidance)",
+      "NASA-STD-6012 - Corrosion Prevention and Control (galvanic voltage thresholds)",
+      "EN ISO 15329:2007 - wetting classes, via the MM-001 environment table",
+      "IMOA Design Manual - stainless grade selection"
+    ],
+
+    "NO_GALVANIC_SERIES_IN_THIS_FILE": [
+      "This pack deliberately contains NO material potentials.",
+      "",
+      "The project's galvanic series lives in exactly one place: the GC-001 catalogue,",
+      "loaded by app.services.corrosion_rule_catalog.load_gc_catalog() from the",
+      "Supabase static asset 'ruleset:BIMGUARD-GC-001'. load_rule_pack() in",
+      "cross_material.py injects it at runtime.",
+      "",
+      "Copying the values here would create a second table that can drift from the",
+      "first - the same failure already present between ifc_parser's material keys",
+      "and CANONICAL_MATERIALS. There is one series; this pack points at it."
+    ],
+
+    "NO_ENVIRONMENT_TABLE_IN_THIS_FILE": [
+      "Environment severity is reused from the approved MM-001 pack",
+      "(data/rulesets/mm_001_material_media.json, parameters.environment_severity),",
+      "injected by load_rule_pack(). Same reasoning: one table, one place."
+    ],
+
+    "ANODE_IDENTIFICATION": [
+      "The finding must name which material sacrifices - that is the actionable",
+      "information for substitution.",
+      "",
+      "WARNING - the two existing engines disagree about the sign convention of the",
+      "shared series. app/modules/module4_comparator/galvanic.py:190 treats the MORE",
+      "NEGATIVE potential as anodic (standard electrochemistry). ",
+      "app/engines/bimguard_corrosion_engine.py:353 comments 'less noble = higher",
+      "potential' and swaps so the anode has the HIGHER value. Both read the same",
+      "table, so one of them names the wrong victim. That is an existing defect,",
+      "unresolved at the time this pack was written.",
+      "",
+      "XM-001 therefore does NOT infer direction from the potential sign. It uses the",
+      "'noble' boolean each series entry carries (see ruleset_seeder.py:169), which is",
+      "unambiguous, and uses abs(gap) for magnitude, which is convention-independent.",
+      "When nobility cannot be resolved for a pair, XM-001 emits a data-quality Issue",
+      "rather than guessing which element corrodes."
+    ],
+
+    "PROVENANCE_WARNING": [
+      "As with MM-001: the separation, mitigation, and normalisation values below are",
+      "a calibration authored for this ruleset, not values quoted from the cited",
+      "standards. Citations name the standard governing each mechanism.",
+      "A corrosion engineer must verify before this pack drives a verdict."
+    ]
+  },
+
+  "parameters": {
+    "weights": {
+      "voltage": 0.50,
+      "separation": 0.30,
+      "environment": 0.20
+    },
+
+    "environment_threshold_class": {
+      "_basis": [
+        "Maps EnvironmentClass onto the GC-001 environment classes that carry the",
+        "NASA-STD-6012 compatibility thresholds. The THRESHOLD VOLTAGES are not",
+        "listed here - load_rule_pack() injects them from the GC-001 catalogue,",
+        "same single-source rule as the galvanic series.",
+        "",
+        "This mapping is XM-001's own concern because the two taxonomies differ:",
+        "GC-001 classes describe electrolyte aggressiveness (controlled/normal/harsh)",
+        "while EnvironmentClass describes humidity then chemistry. Mapped by meaning."
+      ],
+      "T0_dry": "controlled",
+      "T1_indoor_damp": "normal",
+      "T2_humid": "normal",
+      "T3_chloride": "harsh",
+      "T4_marine": "harsh",
+      "T5_industrial": "harsh",
+      "cite": "NASA-STD-6012",
+      "conf": "established"
+    },
+
+    "compatibility_floor": {
+      "enabled": true,
+      "rationale": [
+        "A couple whose potential gap is below the environment's compatibility",
+        "threshold emits NO finding at all - not a Low-band finding.",
+        "",
+        "Without it the 0.30 separation weight fires on any direct contact",
+        "regardless of voltage: naval brass against copper, a 0.05 V gap that is",
+        "compatible in every environment NASA-STD-6012 defines, scored 0.365 and",
+        "banded Medium purely because the two elements touch.",
+        "",
+        "Structurally the same defect as MM-001's temperature term before the",
+        "kinetics guard: separation AMPLIFIES galvanic risk, it is not an",
+        "independent hazard. With no meaningful driving voltage there is nothing",
+        "for contact to amplify.",
+        "",
+        "Suppression rather than downgrade is deliberate here, unlike the mitigated",
+        "couples which stay visible. A dielectric union is a design decision worth",
+        "showing a modeller; a compatible material pair is not a couple at all."
+      ],
+      "cite": "NASA-STD-6012 (galvanic compatibility definition)",
+      "conf": "established"
+    },
+
+    "series_convention": {
+      "value": "more_negative_is_anodic",
+      "note": "Tiebreaker used ONLY when the two series entries carry no differing 'noble' flag - which happens whenever both materials are noble (copper against stainless, brass against copper) yet still form a couple. Declaring the convention here makes it reviewable data rather than an inference buried in code.",
+      "MUST_VERIFY": "This value must be checked against the real GC-001 series before approval. galvanic.py:190 assumes more-negative-is-anodic; bimguard_corrosion_engine.py:353 assumes the opposite on the same table. Whichever is right, this declaration must match it or XM-001 will name the wrong victim for noble-noble pairs.",
+      "cite": "Standard electrochemical series convention",
+      "conf": "provisional"
+    },
+
+    "voltage_normalisation_v": {
+      "value": 1.0,
+      "note": "Potential gap in volts that maps to voltage_risk 1.0. Gaps above this clamp. A 1.0 V spread spans the practical range from the most active to the most noble material in building services.",
+      "cite": "NASA-STD-6012",
+      "conf": "provisional"
+    },
+
+    "separation_factors": {
+      "direct_contact": {
+        "factor": 1.00,
+        "note": "Elements share a joint. Metal-to-metal continuity plus a shared electrolyte - the full couple.",
+        "cite": "BS 8539 (bi-metallic assembly)",
+        "conf": "established"
+      },
+      "same_loop": {
+        "factor": 0.80,
+        "note": "Not touching, but on the same system and connected through the piping graph, so a shared electrolyte path exists without direct metallic contact. Attack is real but slower than direct contact.",
+        "cite": "BS 8539 (bi-metallic assembly)",
+        "conf": "provisional"
+      }
+    },
+
+    "mitigation_factors": {
+      "JT-014_dielectric_union": {
+        "factor": 0.10,
+        "label": "dielectric union",
+        "note": "Union breaks metallic continuity, so no galvanic cell can form across the joint. Residual 0.10 rather than 0.00 is deliberate: the credit depends on the union being installed and remaining intact, which is a commissioning check, not a design guarantee.",
+        "cite": "BS 8539; dielectric union practice",
+        "conf": "established"
+      },
+      "_default": {
+        "factor": 1.00,
+        "label": "unmitigated",
+        "note": "No electrical separation identified at the joint.",
+        "cite": "BS 8539",
+        "conf": "established"
+      }
+    },
+
+    "report_all_couples": {
+      "value": true,
+      "note": "Every dissimilar-material couple produces an Issue, including mitigated ones banded Low. The audience is modellers who do not routinely consider dissimilar metals: showing a mitigated couple teaches the pattern, hiding it teaches nothing. Mitigated findings carry a commissioning-verification note rather than a design action."
+    },
+
+    "risk_band_thresholds": {
+      "medium": 0.35,
+      "high": 0.65,
+      "critical": 0.85,
+      "_note": "Matched to MM-001 and GC-001 so bands mean the same thing across mechanisms."
+    }
+  }
+}

@@ -25,10 +25,12 @@ NETWORK LAYOUT
         y= 6   Chilled water        6 elements  carbon steel, one SS316
         y=12   Pool plant room      5 elements  SS316 throughout, T3_CHLORIDE
         y=18   Fire protection      4 elements  galvanised, no couples
-        y=24   Connectivity probes  3 elements  2 port-linked, 1 geometry-less
+        y=24   Industrial condenser 1 element   pins T5_INDUSTRIAL severity
+        y=30   Connectivity probes  3 elements  2 port-linked, 1 geometry-less
 
-    Total 26 elements. The issue text says 25; the per-group counts sum to 26
-    and are what the scenarios depend on, so the counts win.
+    Total 27 elements. The issue text said 25; the per-group counts summed to 26
+    and COND-01 was added on matrix approval to pin the provisional
+    T5_INDUSTRIAL cell. The per-group counts are what the scenarios depend on.
 """
 
 from __future__ import annotations
@@ -142,9 +144,27 @@ EXPECTED_SCENARIOS: tuple[Scenario, ...] = (
         expected_band="None",
         element_ids=("FIRE-P01", "FIRE-P02", "FIRE-P03", "FIRE-P04"),
         rationale=(
-            "Uniform galvanised steel with no other material in contact. The "
-            "negative control for XM-001. See MATRIX_CONFLICT below: this is NOT "
-            "a negative control for MM-001 under the current draft matrix."
+            "Uniform galvanised steel with no other material in contact. Uniform "
+            "material IS the control condition for XM-001: there is no galvanic "
+            "driving voltage, so the mechanism must stay silent. The elements are "
+            "genuinely adjacent, so this passes for the right reason rather than "
+            "by being disconnected."
+        ),
+    ),
+    Scenario(
+        name="Galvanised fire loop under MM-001",
+        mechanism="MM-001",
+        expected_band="Medium",
+        element_ids=("FIRE-P01", "FIRE-P02", "FIRE-P03", "FIRE-P04"),
+        rationale=(
+            "DO NOT 'FIX' THIS TO None. An earlier draft of the fixture spec called "
+            "the fire loop an all-mechanisms negative control. That was wrong and "
+            "was corrected on review. FIRE_SPRINKLER resolves to media "
+            "'stagnant_water', and GalvanisedSteel in stagnant water scores 0.70 - "
+            "corrosion and MIC in wet sprinkler systems is a documented failure mode "
+            "with published guidance from FM Global and VdS. A tool that blessed "
+            "stagnant galvanised fire mains would be broken. The loop is a negative "
+            "control for XM-001 only; Medium here is correct behaviour, not a bug."
         ),
     ),
     Scenario(
@@ -169,18 +189,39 @@ EXPECTED_SCENARIOS: tuple[Scenario, ...] = (
             "joined_to == [] as proof of isolation."
         ),
     ),
+    Scenario(
+        name="Carbon steel condenser main in industrial atmosphere",
+        mechanism="MM-001",
+        expected_band="High",
+        element_ids=("COND-01",),
+        rationale=(
+            "Pins T5_INDUSTRIAL, the only environment severity with no CC-001 "
+            "wetting-class counterpart - it is interpolated at 0.85 rather than "
+            "borrowed, and carries a provisional flag. Carbon steel in open-loop "
+            "condenser water is already an oxygenated-corrosion case (cell 0.70); "
+            "the industrial atmosphere compounds it. Expected 0.40x0.70 + 0.35x0.85 "
+            "+ 0.25x0.35 = 0.6650, just clearing High. Sitting close to the "
+            "threshold is deliberate: any future movement of the provisional 0.85 "
+            "changes the band and fails this scenario rather than passing silently."
+        ),
+    ),
 )
 
-# Flagged during fixture construction, before the matrix was finalised.
+# Raised during fixture construction, resolved on review. Retained because the
+# resolution is counter-intuitive and a future reader is likely to re-litigate it.
 MATRIX_CONFLICT = (
-    "The fire-protection loop is specified as a negative control, and it is a "
-    "clean one for XM-001 (uniform material, no couples). It is NOT one for "
-    "MM-001: FIRE_SPRINKLER maps to media 'stagnant_water', and the draft matrix "
-    "scores GalvanisedSteel/stagnant_water at 0.70, which lands in the High band. "
-    "That is arguably correct engineering - corrosion and MIC in wet sprinkler "
-    "systems is a documented failure mode - but it means the loop cannot serve as "
-    "an all-mechanisms negative control. Resolve by either scoping the control to "
-    "XM-001, or revisiting that cell."
+    "RESOLVED - the matrix was right and the original fixture spec was wrong.\n\n"
+    "The fire-protection loop was specified as an all-mechanisms negative control. "
+    "It is a clean control for XM-001 only: uniform GalvanisedSteel means no "
+    "galvanic couple exists, so that mechanism must return nothing.\n\n"
+    "It is NOT a control for MM-001. FIRE_SPRINKLER resolves to media "
+    "'stagnant_water', and GalvanisedSteel/stagnant_water scores 0.70 - stagnation "
+    "corrosion and MIC in wet sprinkler systems is a documented failure mode with "
+    "published guidance from FM Global and VdS. The cell stays at 0.70 and the "
+    "loop is expected to return Medium under MM-001. A tool that reported stagnant "
+    "galvanised fire mains as clean would be broken.\n\n"
+    "See the two FIRE scenarios in EXPECTED_SCENARIOS: XM-001 expects None, "
+    "MM-001 expects Medium. Neither is a defect."
 )
 
 
@@ -328,15 +369,21 @@ def _domestic_hot_water() -> list[PipingElement]:
     copper, giving two dissimilar junctions with no dielectric break.
     """
     lane = 0.0
-    spec: tuple[tuple[str, str, str, ElementSubtype, str], ...] = (
-        ("DHW-P01", "DHW riser seg 1", "Copper_C12200", "pipe_segment", "IfcPipeSegment"),
-        ("DHW-V02", "DHW isolation valve", "Brass_C46400", "valve", "IfcValve"),
-        ("DHW-P03", "DHW riser seg 2", "Copper_C12200", "pipe_segment", "IfcPipeSegment"),
-        ("DHW-P04", "DHW riser seg 3", "Copper_C12200", "pipe_segment", "IfcPipeSegment"),
-        ("DHW-S05", "DHW steel section", "CarbonSteel", "pipe_segment", "IfcPipeSegment"),
-        ("DHW-P06", "DHW riser seg 4", "Copper_C12200", "pipe_segment", "IfcPipeSegment"),
-        ("DHW-V07", "DHW regulating valve", "Brass_C46400", "valve", "IfcValve"),
-        ("DHW-P08", "DHW riser seg 5", "Copper_C12200", "pipe_segment", "IfcPipeSegment"),
+    # DHW-P06 carries a dielectric union; DHW-P04 does not. That makes the two
+    # sides of DHW-S05 the SAME copper/carbon-steel couple, one mitigated and
+    # one not — the pair XM-001's mitigation credit has to distinguish. Without
+    # both, the mitigation factor is untested against a like-for-like control.
+    threaded = JointType.JT003_THREADED
+    union = JointType.JT014_DIELECTRIC_UNION
+    spec: tuple[tuple[str, str, str, ElementSubtype, str, JointType], ...] = (
+        ("DHW-P01", "DHW riser seg 1", "Copper_C12200", "pipe_segment", "IfcPipeSegment", threaded),
+        ("DHW-V02", "DHW isolation valve", "Brass_C46400", "valve", "IfcValve", threaded),
+        ("DHW-P03", "DHW riser seg 2", "Copper_C12200", "pipe_segment", "IfcPipeSegment", threaded),
+        ("DHW-P04", "DHW riser seg 3", "Copper_C12200", "pipe_segment", "IfcPipeSegment", threaded),
+        ("DHW-S05", "DHW steel section", "CarbonSteel", "pipe_segment", "IfcPipeSegment", threaded),
+        ("DHW-P06", "DHW riser seg 4", "Copper_C12200", "pipe_segment", "IfcPipeSegment", union),
+        ("DHW-V07", "DHW regulating valve", "Brass_C46400", "valve", "IfcValve", threaded),
+        ("DHW-P08", "DHW riser seg 5", "Copper_C12200", "pipe_segment", "IfcPipeSegment", threaded),
     )
     return [
         _segment(
@@ -350,10 +397,11 @@ def _domestic_hot_water() -> list[PipingElement]:
             position=index,
             subtype=subtype,
             ifc_class=ifc_class,
+            joint_type=joint,
             temperature_c=60.0,
             space_name="RISER-01",
         )
-        for index, (element_id, name, material, subtype, ifc_class) in enumerate(spec)
+        for index, (element_id, name, material, subtype, ifc_class, joint) in enumerate(spec)
     ]
 
 
@@ -445,9 +493,34 @@ def _fire_protection() -> list[PipingElement]:
     ]
 
 
+def _industrial_condenser() -> list[PipingElement]:
+    """Lane 6 — carbon steel condenser pipework in an industrial atmosphere.
+
+    Exists solely to pin T5_INDUSTRIAL, the one environment severity with no
+    CC-001 wetting-class counterpart and therefore interpolated rather than
+    borrowed. An untested cell is a silent gap: without this element a future
+    edit could move 0.85 with nothing failing.
+    """
+    lane = LANE_SPACING_M * 5
+    return [
+        _segment(
+            "COND-01",
+            name="Condenser water main, process hall",
+            material="CarbonSteel",
+            system=PipingSystem.CONDENSER_WATER,
+            environment=EnvironmentClass.T5_INDUSTRIAL,
+            diameter_mm=100.0,
+            lane_y=lane,
+            position=0,
+            temperature_c=32.0,
+            space_name="PROCESS-HALL-01",
+        )
+    ]
+
+
 def _connectivity_probes() -> list[PipingElement]:
     """Lane 5 — two port-linked elements far apart, plus one with no geometry."""
-    lane = LANE_SPACING_M * 4
+    lane = LANE_SPACING_M * 6
     port_a = _segment(
         "PORT-A",
         name="Port-linked segment A",
@@ -495,7 +568,7 @@ def generate_synthetic_piping_network(
     *,
     adjacency_tolerance_m: float = 0.05,
 ) -> list[PipingElement]:
-    """Build the 26-element scenario network with adjacency resolved.
+    """Build the 27-element scenario network with adjacency resolved.
 
     Deterministic — no randomness, so scenario assertions are stable.
 
@@ -503,7 +576,7 @@ def generate_synthetic_piping_network(
         adjacency_tolerance_m: Tier 2 endpoint tolerance, default 50 mm.
 
     Returns:
-        26 PipingElement instances with joined_to and connectivity tier
+        27 PipingElement instances with joined_to and connectivity tier
         markers populated, ordered by group.
     """
     elements = (
@@ -511,6 +584,7 @@ def generate_synthetic_piping_network(
         + _chilled_water()
         + _pool_plant_room()
         + _fire_protection()
+        + _industrial_condenser()
         + _connectivity_probes()
     )
     model = SyntheticPortModel(connected_pairs=(("PORT-A", "PORT-B"),))

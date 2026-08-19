@@ -51,7 +51,8 @@ class TestNetworkShape:
             assert actual == expected, f"{prefix}: expected {expected}, got {actual}"
         probes = sum(1 for e in network if e.id.startswith(("PORT", "NOGEO")))
         assert probes == 3
-        assert len(network) == 26
+        assert sum(1 for e in network if e.id.startswith("COND")) == 1
+        assert len(network) == 27
 
     def test_deterministic(self):
         """Repeat calls produce identical networks."""
@@ -165,6 +166,18 @@ class TestScenarioPreconditions:
         ]
         assert dissimilar == []
 
+    def test_industrial_condenser_pins_provisional_cell(self, by_id):
+        """COND-01 exists solely to pin the interpolated T5_INDUSTRIAL severity.
+
+        That value has no CC-001 counterpart and is flagged provisional. Without
+        an element exercising it, a future edit could move it unnoticed.
+        """
+        element = by_id["COND-01"]
+        assert element.material == "CarbonSteel"
+        assert element.system is PipingSystem.CONDENSER_WATER
+        assert element.environment_class is EnvironmentClass.T5_INDUSTRIAL
+        assert element.operating_temperature_c == 32.0
+
     def test_matrix_conflict_is_documented(self):
         """The fire loop is not an MM-001 control, and that must be recorded."""
         assert "MM-001" in fx.MATRIX_CONFLICT
@@ -274,25 +287,73 @@ class TestExpectedVerdicts:
         for scenario in fx.EXPECTED_SCENARIOS:
             assert len(scenario.rationale) > 80, scenario.name
 
-    @pytest.mark.xfail(reason="XM-001 not implemented - awaiting matrix approval", strict=True)
-    def test_copper_steel_couple_flagged_high(self):
-        """Cu/carbon-steel in a wet system must reach High or Critical."""
-        raise NotImplementedError("XM-001 engine not built")
+    def test_copper_steel_couple_flagged(self, network):
+        """Cu/carbon-steel in a wet system must be flagged, steel as anode."""
+        from app.modules.module4_comparator.cross_material import compare, load_rule_pack
+        from tests.test_cross_material import TEST_SERIES, TEST_THRESHOLDS
 
-    @pytest.mark.xfail(reason="MM-001 not implemented - awaiting matrix approval", strict=True)
-    def test_ss316_in_chloride_flagged(self):
-        """SS316 in T3_CHLORIDE pool service must be flagged."""
-        raise NotImplementedError("MM-001 engine not built")
+        issues = compare(network, load_rule_pack(
+            galvanic_series=TEST_SERIES, compatibility_thresholds=TEST_THRESHOLDS
+        ))
+        couples = [
+            i
+            for i in issues
+            if i.mechanism != "data_quality"
+            and {i.metadata["anode_material"], i.metadata["cathode_material"]}
+            == {"CarbonSteel", "Copper_C12200"}
+            and "DHW-S05" in (i.metadata["anode_id"], i.metadata["cathode_id"])
+        ]
+        assert len(couples) == 2
+        assert all(c.metadata["anode_material"] == "CarbonSteel" for c in couples)
 
-    @pytest.mark.xfail(reason="XM-001 not implemented - awaiting matrix approval", strict=True)
-    def test_fire_loop_clean_under_xm001(self):
-        """The uniform galvanised loop must produce no XM-001 finding."""
-        raise NotImplementedError("XM-001 engine not built")
+    def test_ss316_in_chloride_flagged(self, network):
+        """SS316 in T3_CHLORIDE pool service must reach High under MM-001."""
+        import json
+        from pathlib import Path
 
-    @pytest.mark.xfail(reason="XM-001 not implemented - awaiting matrix approval", strict=True)
-    def test_nogeo_excluded_with_data_quality_issue(self):
+        from app.modules.module4_comparator.issue_schema import RiskBand
+        from app.modules.module4_comparator.material_media import compare
+
+        pack = json.loads(
+            Path("data/rulesets/mm_001_material_media.json").read_text(encoding="utf-8")
+        )
+        findings = {
+            i.element_id: i for i in compare(network, pack) if i.mechanism != "data_quality"
+        }
+        for element_id in ("POOL-P01", "POOL-F02", "POOL-P03", "POOL-F04", "POOL-P05"):
+            assert findings[element_id].band is RiskBand.HIGH
+
+    def test_fire_loop_clean_under_xm001(self, network):
+        """The uniform galvanised loop must produce no XM-001 couple."""
+        from app.modules.module4_comparator.cross_material import compare, load_rule_pack
+        from tests.test_cross_material import TEST_SERIES, TEST_THRESHOLDS
+
+        issues = compare(network, load_rule_pack(
+            galvanic_series=TEST_SERIES, compatibility_thresholds=TEST_THRESHOLDS
+        ))
+        fire = [
+            i
+            for i in issues
+            if i.mechanism != "data_quality"
+            and (
+                i.metadata["anode_id"].startswith("FIRE")
+                or i.metadata["cathode_id"].startswith("FIRE")
+            )
+        ]
+        assert fire == []
+
+    def test_nogeo_excluded_with_data_quality_issue(self, network):
         """NOGEO-01 must be skipped with a data-quality issue, not passed."""
-        raise NotImplementedError("XM-001 engine not built")
+        from app.modules.module4_comparator.cross_material import compare, load_rule_pack
+        from tests.test_cross_material import TEST_SERIES, TEST_THRESHOLDS
+
+        issues = compare(network, load_rule_pack(
+            galvanic_series=TEST_SERIES, compatibility_thresholds=TEST_THRESHOLDS
+        ))
+        nogeo = [i for i in issues if i.element_id == "NOGEO-01"]
+        assert len(nogeo) == 1
+        assert nogeo[0].mechanism == "data_quality"
+        assert nogeo[0].metadata["check"] == "connectivity_indeterminable"
 
 
 if __name__ == "__main__":
