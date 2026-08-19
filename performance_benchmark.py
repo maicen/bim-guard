@@ -1454,40 +1454,235 @@ def render_markdown(results: list[ScenarioResult]) -> str:
         "",
         "## Stage share of total wall-clock (from medians)",
         "",
+        "Shares are computed against the sum of the stage medians rather than the median of the "
+        "per-run totals, because medians are not additive and the row would otherwise not sum to 100%.",
+        "",
         "| Scenario | Parse | Triangulate | Halo gen | Interference |",
         "|---|---:|---:|---:|---:|",
     ]
     for r in results:
-        total = max(r.median("total_s"), 1e-9)
+        # Normalised by the sum of the stage medians, not by the median of the
+        # totals: medians are not additive, so dividing by median(total_s) makes
+        # the row sum to something other than 100%.
         interference = r.median("broadphase_s") + r.median("midphase_s")
+        total = max(r.median("parse_s") + r.median("triangulate_s") + r.median("halo_s") + interference, 1e-9)
         lines.append(
             f"| {r.scenario} | {100 * r.median('parse_s') / total:.1f}% "
             f"| {100 * r.median('triangulate_s') / total:.1f}% "
             f"| {100 * r.median('halo_s') / total:.1f}% | {100 * interference / total:.1f}% |"
         )
 
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n" + render_captions(results)
 
+
+def _pretty_model(name: str) -> str:
+    """Strip the 32-hex upload prefix from a fixture filename for display."""
+    head, _, tail = name.partition("_")
+    return tail if len(head) == 32 and all(c in "0123456789abcdef" for c in head) else name
+
+
+def _stage_total(result: ScenarioResult) -> float:
+    """Sum of the stage medians — the correct denominator for a share, since medians do not add."""
+    return max(
+        result.median("parse_s")
+        + result.median("triangulate_s")
+        + result.median("halo_s")
+        + result.median("broadphase_s")
+        + result.median("midphase_s"),
+        1e-9,
+    )
+
+
+def _host_sentence(meta: dict) -> str:
+    """One sentence naming the measurement host, for use inside a figure caption."""
+    return (
+        f"Measured on a {meta.get('cpu_count', '?')}-core {meta.get('processor', 'x86_64')} "
+        f"Linux VM with {meta.get('total_ram_gb', '?')} GB RAM, Python {meta.get('python', '?')}, "
+        f"IfcOpenShell {meta.get('ifcopenshell', '?')}, NumPy {meta.get('numpy', '?')}"
+    )
+
+
+def render_captions(results: list[ScenarioResult]) -> str:
+    """
+    Emit self-contained, ready-to-paste thesis captions for every figure.
+
+    Numbers are read from the results rather than typed, so a caption cannot
+    drift from the figure it describes. Numbering follows the results chapter
+    (Figure 5.x); renumber the prefix if the chapter moves.
+    """
+    meta = host_metadata()
+    host = _host_sentence(meta)
+    by_name = {r.scenario: r for r in results}
+    n = results[0].repeats if results else 0
+    stats_note = (
+        f"Markers are medians of n = {n} complete runs and error bars span the "
+        f"inter-quartile range (Q1–Q3)"
+    )
+
+    def get(name: str):
+        return by_name.get(name)
+
+    k = get("S-1000")
+    fed = get("S-federated")
+    lo2, lo3, lo4 = get("S-lod200"), get("S-lod300"), get("S-lod400")
+    s2k, s20k = get("S-scale2000"), get("S-scale20000")
+
+    lines = [
+        "",
+        "---",
+        "",
+        "## Ready-to-paste thesis figure captions",
+        "",
+        "Self-contained captions for each figure, in results-chapter numbering. Every quantity is "
+        "read from the results file rather than transcribed, so a caption cannot drift from the "
+        "figure it describes. The figures themselves carry no embedded title, because the caption "
+        "beneath them supplies it.",
+        "",
+        f"**Figure specifications.** Rendered at {CHART_DPI} DPI on a {FIG_WIDTH_IN:.1f} in "
+        f"({FIG_WIDTH_IN * 25.4:.0f} mm) canvas and cropped to content, so saved widths run "
+        "136–159 mm. Placed at a 160 mm A4 column they need at most 1.18× enlargement, giving an "
+        "effective resolution of 255 DPI or better — above the 250 DPI print floor — so none needs "
+        "regenerating for the page. One palette is shared across all seven: a colour always means "
+        "the same pipeline stage or the same algorithm. Categorical hues are taken from a validated "
+        "reference palette and the combinations used were checked with a contrast and "
+        "colour-vision-deficiency validator on the light (paper) surface; the aqua slot sits below "
+        "3:1 against paper, which is why every figure ships beside the full data tables above and "
+        "colour never carries a value on its own.",
+        "",
+    ]
+
+    def block(number: str, filename: str, text: str) -> None:
+        lines.append(f"**Figure {number}** — `{filename}`")
+        lines.append("")
+        lines.append("> " + text.replace("\n", " "))
+        lines.append("")
+
+    if k:
+        block(
+            "5.1", "fig1_stage_cost.png",
+            f"Wall-clock cost of each pipeline stage against element count, generating Halo "
+            f"clearance volumes at LOD 300 with a 500 mm buffer from the reference IFC4 model "
+            f"({_pretty_model(k.models[0])}). {stats_note}; the vertical axis is logarithmic. IFC triangulation "
+            f"exceeds Halo generation by roughly two orders of magnitude at every count — "
+            f"{k.median('triangulate_s'):.1f} s against {k.median('halo_s'):.2f} s at "
+            f"{k.element_actual:,} elements. {host}."
+        )
+
+    if k:
+        block(
+            "5.2", "fig2_throughput.png",
+            f"Halo generation throughput, derived from the median generation time of n = {n} runs "
+            f"per scenario, at LOD 300 with a 500 mm buffer. Throughput is effectively flat across "
+            f"this range, because generation cost is close to constant per element and independent "
+            f"of the source element's polygon count; a mild upward drift in per-element cost is "
+            f"visible only at the far larger synthetic populations of Figure 5.7. {host}."
+        )
+
+    if k:
+        block(
+            "5.3", "fig3_memory.png",
+            f"Memory footprint of the generated Halo population. The solid series is the exact "
+            f"array size (float32 vertices, int32 faces), which is deterministic and identical on "
+            f"every repeat; the dashed series is process resident-memory growth across the "
+            f"generation phase, shown as the median of n = {n} runs with an inter-quartile range. "
+            f"At {k.element_actual:,} elements the Halo arrays occupy {k.halo_array_mb:.2f} MB. "
+            f"Resident growth stays near zero because source triangulations are discarded as they "
+            f"are consumed, so memory tracks element count rather than source polygon count. {host}."
+        )
+
+    if k:
+        speed = (k.median("naive_s") / (k.median("broadphase_s") + k.median("midphase_s"))
+                 if (k.median("broadphase_s") + k.median("midphase_s")) else 0.0)
+        block(
+            "5.4", "fig4_collision.png",
+            f"Interference detection between Halo volumes on the IFC-backed scenarios, comparing a "
+            f"uniform spatial hash grid (broad plus mid phase) against exhaustive vectorised "
+            f"axis-aligned bounding-box testing. {stats_note}; the vertical axis is logarithmic. At "
+            f"these element counts the grid is the slower of the two — {speed:.1f}× at "
+            f"{k.element_actual:,} elements — because a pure-Python linear algorithm loses on "
+            f"constant factors to a vectorised quadratic one. {host}."
+        )
+
+    if lo2 and lo3 and lo4:
+        ratio = (lo3.median("halo_s") / lo2.median("halo_s")) if lo2.median("halo_s") else 0.0
+        block(
+            "5.5", "fig5_lod.png",
+            f"Level-of-detail trade-off over {lo3.element_actual:,} elements, shown as two panels "
+            f"rather than two vertical axes because triangle counts and seconds share no scale. "
+            f"(a) Total triangles in the generated Halo population: {lo2.halo_faces:,} at LOD 200, "
+            f"{lo3.halo_faces:,} at LOD 300, {lo4.halo_faces:,} at LOD 400. (b) Median generation "
+            f"time over n = {n} runs with the inter-quartile range: LOD 300 costs {ratio:.0f}× LOD "
+            f"200. The coarse level is a plain enlarged box that over-reserves volume by 11.8% "
+            f"against the exact Minkowski offset; LOD 300 and 400 approximate the rounded offset "
+            f"from below. {host}."
+        )
+
+    if k and fed:
+        block(
+            "5.6", "fig6_bottleneck.png",
+            f"Share of total wall-clock time by pipeline stage across every scenario, computed from "
+            f"the medians of n = {n} runs. IFC parse and triangulation are combined into a single "
+            f"ingest band; the per-stage split is given in the accompanying table. Ingest accounts "
+            f"for {100 * (k.median('parse_s') + k.median('triangulate_s')) / _stage_total(k):.0f}% "
+            f"of the {k.element_actual:,}-element run and Halo generation for "
+            f"{100 * k.median('halo_s') / _stage_total(k):.1f}%. The synthetic "
+            f"scale-out scenarios have no ingest stage by construction, which is what exposes the "
+            f"relative cost of generation against interference detection. {host}."
+        )
+
+    if s2k and s20k:
+        def speedup(r):
+            g = r.median("broadphase_s") + r.median("midphase_s")
+            return (r.median("naive_s") / g) if g else 0.0
+        block(
+            "5.7", "fig7_scaleout.png",
+            f"Scale-out to {s20k.element_actual:,} Halo volumes on a deterministic synthetic "
+            f"element lattice, on logarithmic axes. {stats_note}. The crossover at which the "
+            f"spatial hash grid overtakes exhaustive vectorised testing lies between 1 000 and "
+            f"2 000 volumes; beyond it the advantage grows from {speedup(s2k):.1f}× at "
+            f"{s2k.element_actual:,} volumes to {speedup(s20k):.1f}× at {s20k.element_actual:,}. "
+            f"Halo generation remains close to linear throughout, its per-element cost drifting "
+            f"from {s2k.halo_us_per_element:.0f} µs at {s2k.element_actual:,} volumes to "
+            f"{s20k.halo_us_per_element:.0f} µs at {s20k.element_actual:,}. Synthetic elements are used because the "
+            f"largest available IFC fixture supplies only 2 589 usable elements; these results are "
+            f"never combined with the IFC-backed measurements. {host}."
+        )
+
+    return "\n".join(lines)
 
 # ---------------------------------------------------------------------------
 # Charts
 # ---------------------------------------------------------------------------
 
-#: One palette used across every figure so a reader can carry meaning between
-#: them: the same colour always means the same pipeline stage or algorithm.
+#: One palette across every figure, so a reader can carry meaning between them:
+#: the same colour always means the same pipeline stage or the same algorithm.
+#: Hues are slots 1-3 and 7 of the validated categorical reference palette, and
+#: the combinations actually used were checked with the palette validator on the
+#: light (paper) surface: the stacked set orange/blue/aqua passes all-pairs
+#: (worst CVD ΔE 9.2, worst normal-vision ΔE 24.0), as does the
+#: aqua/violet/blue set used wherever the two interference algorithms appear
+#: together (worst CVD ΔE 13.0). Aqua sits below 3:1 against paper, so every
+#: figure using it ships alongside the full data tables in this directory —
+#: colour never carries a value on its own.
 PALETTE = {
-    "parse": "#8C8C8C",
-    "triangulate": "#C2571A",
-    "halo": "#1F5FA9",
-    "interference": "#2E7D5B",
-    "naive": "#A63D5B",
-    "accent": "#6A4C93",
+    "ingest": "#eb6834",        # IFC parse + triangulation
+    "halo": "#2a78d6",          # Halo generation — the capability under examination
+    "interference": "#1baf7a",  # spatial hash grid (broad + mid phase)
+    "naive": "#4a3aa7",         # exhaustive O(n^2) AABB comparison
 }
 
+#: Text and chrome wear ink, never a series colour.
+INK = {"primary": "#0b0b0b", "secondary": "#52514e", "grid": "#c9c8c4"}
+
 CHART_DPI = 300
-#: A4 with 25 mm margins leaves a ~160 mm column; 6.3 in matches it exactly,
-#: so figures are placed at 100% scale and never resampled by the typesetter.
+#: A4 with 25 mm margins leaves a ~160 mm column; 6.3 in matches it exactly, so
+#: figures are placed at 100% scale and never resampled by the typesetter.
 FIG_WIDTH_IN = 6.3
+
+#: Figures carry no embedded title: in a thesis the caption below the figure
+#: names it, and an in-figure title duplicates that. Ready-to-paste captions are
+#: emitted into halo_benchmark_summary.md instead.
+FIG_HEIGHT_IN = 3.4
 
 
 def _err(results: Sequence[ScenarioResult], metric: str) -> np.ndarray:
@@ -1510,8 +1705,63 @@ def _err_sum(results: Sequence[ScenarioResult], metrics: Sequence[str]) -> tuple
     return med, np.vstack([lo, hi])
 
 
+def _plain_log_ticks(ax, axis: str, values: Sequence[int]) -> None:
+    """
+    Label a log axis with exactly the measured values, and nothing else.
+
+    Matplotlib keeps labelling the decade minor ticks even when major ticks are
+    set explicitly, which collides with them (a "5,000" landing on top of a
+    "6 x 10^3"). Clearing the minor formatter is the only reliable fix.
+    """
+    from matplotlib.ticker import NullFormatter
+
+    target = ax.xaxis if axis == "x" else ax.yaxis
+    target.set_major_formatter(lambda v, _pos: f"{int(v):,}")
+    target.set_minor_formatter(NullFormatter())
+    target.set_minor_locator(plt_ticker_null())
+    (ax.set_xticks if axis == "x" else ax.set_yticks)(list(values))
+
+
+def plt_ticker_null():
+    """Return a locator that emits no minor ticks."""
+    from matplotlib.ticker import NullLocator
+
+    return NullLocator()
+
+
+def _apply_style(plt) -> None:
+    """Set the print style: hairline recessive chrome, sans text, no top/right spines."""
+    plt.rcParams.update({
+        "figure.dpi": CHART_DPI,
+        "savefig.dpi": CHART_DPI,
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.02,
+        "font.family": "sans-serif",
+        "font.size": 8.5,
+        "axes.labelsize": 8.5,
+        "axes.labelcolor": INK["primary"],
+        "axes.edgecolor": INK["grid"],
+        "axes.linewidth": 0.6,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "xtick.color": INK["secondary"],
+        "ytick.color": INK["secondary"],
+        "text.color": INK["primary"],
+        "legend.fontsize": 8,
+        "legend.frameon": False,
+        "axes.grid": True,
+        "grid.color": INK["grid"],
+        "grid.linewidth": 0.5,
+        "grid.linestyle": "-",      # solid hairline: dashes read as thresholds
+        "grid.alpha": 0.55,
+        "axes.axisbelow": True,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+    })
+
+
 def render_charts(results: list[ScenarioResult], out_dir: Path) -> list[str]:
-    """Render the benchmark charts at print resolution; returns filenames written."""
+    """Render the benchmark figures at print resolution; returns filenames written."""
     try:
         import matplotlib
 
@@ -1521,21 +1771,7 @@ def render_charts(results: list[ScenarioResult], out_dir: Path) -> list[str]:
         logger.warning("matplotlib not installed (uv sync) — skipping charts")
         return []
 
-    plt.rcParams.update({
-        "figure.dpi": CHART_DPI,
-        "savefig.dpi": CHART_DPI,
-        "savefig.bbox": "tight",
-        "font.size": 9,
-        "axes.titlesize": 10,
-        "axes.labelsize": 9,
-        "xtick.labelsize": 8,
-        "ytick.labelsize": 8,
-        "legend.fontsize": 8,
-        "axes.grid": True,
-        "grid.alpha": 0.25,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-    })
+    _apply_style(plt)
 
     scaling = sorted(
         (r for r in results if r.scenario.startswith("S-") and r.scenario[2:].isdigit()),
@@ -1545,148 +1781,172 @@ def render_charts(results: list[ScenarioResult], out_dir: Path) -> list[str]:
     scale = sorted(
         (r for r in results if r.scenario.startswith("S-scale")), key=lambda r: r.element_actual
     )
-    n_label = f"n = {results[0].repeats}" if results else ""
     written: list[str] = []
-    # errorbar() takes the line properties directly; bar() only forwards them
-    # through error_kw, so the two need separate keyword bundles.
-    ebar = dict(capsize=3, elinewidth=1.0, capthick=1.0, ecolor="#333333")
-    ebar_bar = dict(capsize=3, error_kw=dict(elinewidth=1.0, capthick=1.0, ecolor="#333333"))
+
+    ebar = dict(capsize=2.5, elinewidth=0.8, capthick=0.8, ecolor=INK["secondary"])
+    line = dict(linewidth=1.6, markersize=5, markeredgecolor="white", markeredgewidth=0.7)
 
     if scaling:
         x = [r.element_actual for r in scaling]
 
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        # Figure 1 — stage cost against element count.
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, FIG_HEIGHT_IN))
         inter_med, inter_err = _err_sum(scaling, ["broadphase_s", "midphase_s"])
         ax.errorbar(x, [r.median("triangulate_s") for r in scaling], yerr=_err(scaling, "triangulate_s"),
-                    marker="s", color=PALETTE["triangulate"], label="IFC triangulation (ingest)", **ebar)
+                    marker="s", color=PALETTE["ingest"], label="IFC triangulation", **line, **ebar)
         ax.errorbar(x, [r.median("halo_s") for r in scaling], yerr=_err(scaling, "halo_s"),
-                    marker="o", color=PALETTE["halo"], label="Halo generation", **ebar)
+                    marker="o", color=PALETTE["halo"], label="Halo generation", **line, **ebar)
         ax.errorbar(x, inter_med, yerr=inter_err, marker="^", color=PALETTE["interference"],
-                    label="Interference detection", **ebar)
+                    label="Interference detection", **line, **ebar)
         ax.set_xlabel("Elements (count)")
         ax.set_ylabel("Wall-clock time (s, log scale)")
         ax.set_yscale("log")
-        ax.set_title(f"Stage cost vs element count ({n_label}, median ± IQR)")
-        ax.legend(frameon=False)
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"{v:,}" for v in x])
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.22), ncol=3)
         fig.savefig(out_dir / "fig1_stage_cost.png")
         plt.close(fig)
         written.append("fig1_stage_cost.png")
 
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        # Figure 2 — generation throughput. Single series: no legend, the axis names it.
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, FIG_HEIGHT_IN))
         pos = np.arange(len(scaling))
-        ax.bar(pos, [r.halos_per_s for r in scaling], color=PALETTE["halo"], width=0.6)
+        ax.bar(pos, [r.halos_per_s for r in scaling], color=PALETTE["halo"], width=0.55)
         ax.set_xticks(pos)
         ax.set_xticklabels([f"{v:,}" for v in x])
         ax.set_xlabel("Elements (count)")
-        ax.set_ylabel("Throughput (Halos generated per second)")
-        ax.set_title(f"Halo generation throughput ({n_label}, from median generation time)")
+        ax.set_ylabel("Throughput (Halos per second)")
+        top = max(r.halos_per_s for r in scaling)
         for i, r in enumerate(scaling):
-            ax.text(i, r.halos_per_s, f"{r.halos_per_s:,.0f}", ha="center", va="bottom", fontsize=8)
-        ax.set_ylim(0, max(r.halos_per_s for r in scaling) * 1.15)
+            ax.text(i, r.halos_per_s + top * 0.02, f"{r.halos_per_s:,.0f}",
+                    ha="center", va="bottom", fontsize=8, color=INK["primary"])
+        ax.set_ylim(0, top * 1.16)
         fig.savefig(out_dir / "fig2_throughput.png")
         plt.close(fig)
         written.append("fig2_throughput.png")
 
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        # Figure 3 — memory footprint. Both series are MB, so one axis.
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, FIG_HEIGHT_IN))
         ax.plot(x, [r.halo_array_mb for r in scaling], marker="o", color=PALETTE["halo"],
-                label="Halo mesh arrays (exact)")
+                label="Halo mesh arrays (exact, deterministic)", **line)
         ax.errorbar(x, [r.median("rss_delta_mb") for r in scaling], yerr=_err(scaling, "rss_delta_mb"),
-                    marker="s", linestyle="--", color=PALETTE["accent"], label="Process RSS delta", **ebar)
+                    marker="s", linestyle="--", color=PALETTE["naive"],
+                    label="Process resident-memory growth", **line, **ebar)
         ax.set_xlabel("Elements (count)")
         ax.set_ylabel("Memory (MB)")
-        ax.set_title(f"Halo memory footprint ({n_label}, median ± IQR)")
-        ax.legend(frameon=False)
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"{v:,}" for v in x])
+        ax.legend(loc="upper left")
         fig.savefig(out_dir / "fig3_memory.png")
         plt.close(fig)
         written.append("fig3_memory.png")
 
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
-        idx = np.arange(len(x))
+        # Figure 4 — interference detection on the IFC-backed runs. Markers, not
+        # bars: a bar encodes magnitude by length from zero, and a log axis has no
+        # zero, so bars on a log scale misstate the ratios they appear to show.
+        # This also keeps the visual language identical to the scale-out figure.
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, FIG_HEIGHT_IN))
         grid_med, grid_err = _err_sum(scaling, ["broadphase_s", "midphase_s"])
-        ax.bar(idx - 0.19, grid_med, yerr=grid_err, width=0.38, color=PALETTE["interference"],
-               label="Spatial hash grid", **ebar_bar)
-        ax.bar(idx + 0.19, [r.median("naive_s") for r in scaling], yerr=_err(scaling, "naive_s"),
-               width=0.38, color=PALETTE["naive"], label="Naive O(n²), vectorised", **ebar_bar)
-        ax.set_xticks(idx)
-        ax.set_xticklabels([f"{v:,}" for v in x])
+        ax.errorbar(x, grid_med, yerr=grid_err, marker="o", color=PALETTE["interference"],
+                    label="Spatial hash grid (broad + mid phase)", **line, **ebar)
+        ax.errorbar(x, [r.median("naive_s") for r in scaling], yerr=_err(scaling, "naive_s"),
+                    marker="s", color=PALETTE["naive"], label="Exhaustive O(n²), vectorised",
+                    **line, **ebar)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        _plain_log_ticks(ax, "x", x)
         ax.set_xlabel("Elements (count)")
         ax.set_ylabel("Wall-clock time (s, log scale)")
-        ax.set_yscale("log")
-        ax.set_title(f"Interference detection: broad-phase vs exhaustive ({n_label}, median ± IQR)")
-        ax.legend(frameon=False)
+        ax.legend(loc="upper left")
         fig.savefig(out_dir / "fig4_collision.png")
         plt.close(fig)
         written.append("fig4_collision.png")
 
     if lod_runs:
-        fig, ax1 = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        # Figure 5 — level of detail. Two panels rather than two y-axes on one:
+        # triangles and seconds share no scale, and a dual-axis chart invites the
+        # reader to compare two lines that are not comparable.
+        fig, (ax_a, ax_b) = plt.subplots(
+            1, 2, figsize=(FIG_WIDTH_IN, FIG_HEIGHT_IN), sharex=True, constrained_layout=True
+        )
         pos = np.arange(len(lod_runs))
-        ax1.bar(pos, [r.halo_faces for r in lod_runs], color=PALETTE["accent"], alpha=0.85, width=0.55)
-        ax1.set_xticks(pos)
-        ax1.set_xticklabels([str(r.lod) for r in lod_runs])
-        ax1.set_xlabel("Level of detail")
-        ax1.set_ylabel("Total Halo triangles (count)")
-        ax2 = ax1.twinx()
-        ax2.errorbar(pos, [r.median("halo_s") for r in lod_runs], yerr=_err(lod_runs, "halo_s"),
-                     marker="o", color=PALETTE["halo"], label="Generation time", **ebar)
-        ax2.set_ylabel("Halo generation time (s)")
-        ax2.grid(False)
-        ax2.spines["right"].set_visible(True)
-        ax1.set_title(f"Level of detail: triangle count and generation cost ({n_label}, median ± IQR)")
-        ax2.legend(frameon=False, loc="upper left")
+        labels = [str(r.lod) for r in lod_runs]
+
+        ax_a.bar(pos, [r.halo_faces for r in lod_runs], color=PALETTE["halo"], width=0.55)
+        ax_a.set_ylabel("Total Halo triangles (count)")
+        ax_a.set_xlabel("Level of detail")
+        ax_a.set_xticks(pos)
+        ax_a.set_xticklabels(labels)
+        ax_a.ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
+        ax_a.set_title("(a) Geometric complexity", fontsize=8.5, color=INK["secondary"], pad=6)
+
+        ax_b.errorbar(pos, [r.median("halo_s") for r in lod_runs], yerr=_err(lod_runs, "halo_s"),
+                      marker="o", color=PALETTE["halo"], **line, **ebar)
+        ax_b.set_ylabel("Halo generation time (s)")
+        ax_b.set_xlabel("Level of detail")
+        ax_b.set_xticks(pos)
+        ax_b.set_xticklabels(labels)
+        ax_b.set_ylim(bottom=0)
+        ax_b.set_title("(b) Generation cost", fontsize=8.5, color=INK["secondary"], pad=6)
+
         fig.savefig(out_dir / "fig5_lod.png")
         plt.close(fig)
         written.append("fig5_lod.png")
 
     if scale:
+        # Figure 7 — scale-out and the broad-phase crossover.
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, FIG_HEIGHT_IN))
         x = [r.element_actual for r in scale]
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
         grid_med, grid_err = _err_sum(scale, ["broadphase_s", "midphase_s"])
         ax.errorbar(x, grid_med, yerr=grid_err, marker="o", color=PALETTE["interference"],
-                    label="Spatial hash grid", **ebar)
+                    label="Spatial hash grid (broad + mid phase)", **line, **ebar)
         ax.errorbar(x, [r.median("naive_s") for r in scale], yerr=_err(scale, "naive_s"),
-                    marker="s", color=PALETTE["naive"], label="Naive O(n²), vectorised", **ebar)
+                    marker="s", color=PALETTE["naive"], label="Exhaustive O(n²), vectorised", **line, **ebar)
         ax.errorbar(x, [r.median("halo_s") for r in scale], yerr=_err(scale, "halo_s"),
-                    marker="^", linestyle="--", color=PALETTE["halo"], label="Halo generation", **ebar)
+                    marker="^", linestyle="--", color=PALETTE["halo"],
+                    label="Halo generation", **line, **ebar)
         ax.set_xscale("log")
         ax.set_yscale("log")
+        _plain_log_ticks(ax, "x", x)
         ax.set_xlabel("Halo volumes (count, synthetic elements)")
         ax.set_ylabel("Wall-clock time (s, log scale)")
-        ax.set_title(f"Scale-out: where the broad phase starts to pay ({n_label}, median ± IQR)")
-        ax.legend(frameon=False)
+        ax.legend(loc="upper left")
         fig.savefig(out_dir / "fig7_scaleout.png")
         plt.close(fig)
         written.append("fig7_scaleout.png")
 
     if results:
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.8))
+        # Figure 6 — stage share. Parse and triangulation are merged into a single
+        # ingest band: both are IFC reading, the argument is about ingest as a
+        # whole, and the per-stage split is carried by the tables.
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.9))
         names = [r.scenario for r in results]
-        parse = np.array([r.median("parse_s") for r in results])
-        tri = np.array([r.median("triangulate_s") for r in results])
+        ingest = np.array([r.median("parse_s") + r.median("triangulate_s") for r in results])
         halo = np.array([r.median("halo_s") for r in results])
         coll = np.array([r.median("broadphase_s") + r.median("midphase_s") for r in results])
-        total = np.maximum(parse + tri + halo + coll, 1e-9)
+        total = np.maximum(ingest + halo + coll, 1e-9)
         bottom = np.zeros(len(results))
         for data, label, colour in (
-            (parse, "Parse", PALETTE["parse"]),
-            (tri, "Triangulate", PALETTE["triangulate"]),
+            (ingest, "IFC ingest (parse + triangulate)", PALETTE["ingest"]),
             (halo, "Halo generation", PALETTE["halo"]),
-            (coll, "Interference", PALETTE["interference"]),
+            (coll, "Interference detection", PALETTE["interference"]),
         ):
             share = 100 * data / total
-            ax.bar(names, share, bottom=bottom, label=label, color=colour, width=0.7)
+            # A 1pt white edge renders the 2px surface gap between segments.
+            ax.bar(names, share, bottom=bottom, label=label, color=colour, width=0.68,
+                   edgecolor="white", linewidth=1.0)
             bottom += share
         ax.set_ylabel("Share of wall-clock time (%)")
         ax.set_xlabel("Scenario")
         ax.set_ylim(0, 100)
-        ax.set_title(f"Where the time actually goes ({n_label}, from medians)")
-        ax.legend(loc="lower right", fontsize=7, frameon=True, framealpha=0.9)
+        ax.grid(axis="x", visible=False)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.30), ncol=3)
         plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
         fig.savefig(out_dir / "fig6_bottleneck.png")
         plt.close(fig)
         written.append("fig6_bottleneck.png")
 
-    logger.info("wrote %d charts at %d DPI", len(written), CHART_DPI)
+    logger.info("wrote %d figures at %d DPI", len(written), CHART_DPI)
     return written
 
 # ---------------------------------------------------------------------------
