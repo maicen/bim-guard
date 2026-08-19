@@ -97,7 +97,7 @@ high-confidence, and wrong.
 | Action | Owner | Status |
 |---|---|---|
 | Order `CODE_TO_IFC_MAP` longest-key-first, or match on word boundaries, so a specific keyword cannot be pre-empted by a generic one | Process Owner → `app/modules/config.py` | **[open]** — the defect is verified and unfixed |
-| Add MEP property sets (`Pset_PipeSegmentTypeCommon`, `Pset_DuctSegmentTypeCommon`) to `IFC_PROPERTY_SET_MAP`, which today contains 15 keys, **all architectural** [verified] | Process Owner | **[open]** |
+| Add MEP property sets (`Pset_PipeSegmentTypeCommon`, `Pset_DuctSegmentTypeCommon`, `Pset_ValveTypeCommon`, `Pset_PumpTypeCommon`, `Pset_PipeFittingTypeCommon`) to `IFC_PROPERTY_SET_MAP`, which today carries **no property set for any distribution element** [verified] | Process Owner | **[open]** — work order in `docs/defects/defect_report_map_ordering.md` |
 | Instruct the LLM to emit a bare element noun as `target`, never a locative phrase | Prompt | **[designed]** |
 
 ---
@@ -262,4 +262,6 @@ weld, coastal, 20°C — expected: Medium") [verified].
 human doing something the codebase does not yet record — assigning a review, scoring a rubric,
 tagging a failure class, and promoting an amended rule into the RAG pool. Those four gaps are
 precisely the "minimum viable implementation" list in section 6 of the Expert Review process
-document, and this case study is the argument for building them.
+document, and this case study is the argument for building them. The two enrichment defects it
+exposed are written up separately as [`defect_report_map_ordering.md`](defects/defect_report_map_ordering.md),
+with a runnable reproduction, a staged fix and the invariants that would stop them recurring.
