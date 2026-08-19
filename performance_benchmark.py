@@ -36,24 +36,46 @@ S4  2000 elements federated across four separate IFC files, including
 S5  LOD sweep — 1000 elements at LOD 200 / 300 / 400, to quantify the
     geometric-complexity cost of detail level.
 
+Statistics
+----------
+Every scenario can be repeated with ``--repeats N``; the reported figures use
+n = 7. Results are summarised by the **median and inter-quartile range**, not
+the mean and standard deviation: a benchmark timing is bounded below by the
+true cost of the work and unbounded above by scheduler interference on a
+shared host, so the distribution is right-skewed and a single stall drags the
+mean while leaving the median untouched. Any metric whose IQR exceeds 20% of
+its median is flagged as unstable in the output rather than quietly reported.
+
+Counts that should not vary between repeats — triangles, volumes, interfering
+pairs — are checked for agreement across every repeat instead of being
+averaged, so a non-deterministic result is surfaced as a defect rather than
+smoothed into a mean.
+
 Outputs (written to ``docs/benchmarks/`` by default)
 ----------------------------------------------------
-* ``halo_benchmark_results.json``  — full structured record, including host
-  metadata, for reproducibility.
-* ``halo_benchmark_results.csv``   — flat table for spreadsheet/thesis use.
-* ``halo_benchmark_summary.md``    — rendered Markdown tables.
-* ``fig_*.png``                    — charts (matplotlib), if available.
+* ``halo_benchmark_results.json``      — full structured record: host metadata,
+  per-metric median/quartiles, and the raw per-repeat samples.
+* ``halo_benchmark_results.csv``       — one row per scenario, median and IQR
+  per metric.
+* ``halo_benchmark_raw_repeats.csv``   — one row per (scenario, repeat) with
+  the raw timings behind those medians.
+* ``halo_benchmark_summary.md``        — rendered Markdown tables.
+* ``fig*.png``                         — charts at 300 DPI, sized for a 160 mm
+  thesis column, with median ± IQR error bars.
 
 Usage
 -----
-    uv run python performance_benchmark.py
-    uv run python performance_benchmark.py --out docs/benchmarks
-    uv run python performance_benchmark.py --scenarios 100,500
-    uv run python performance_benchmark.py --synthetic     # no IFC needed
-    uv run python performance_benchmark.py --no-charts
+    uv run python performance_benchmark.py --repeats 7
+    uv run python performance_benchmark.py --validate
+    uv run python performance_benchmark.py --scenarios 100,500 --repeats 3
+    uv run python performance_benchmark.py --synthetic           # no IFC needed
+    uv run python performance_benchmark.py --from-json docs/benchmarks/halo_benchmark_results.json
 
-Dependencies live in the ``bench`` group of ``pyproject.toml``
-(``uv sync --group bench``).
+The last form re-renders tables and figures from a completed run without
+re-measuring, so presentation changes cannot move a published number.
+
+Dependencies (``matplotlib``, ``psutil``) are declared in ``pyproject.toml``;
+install with ``uv sync``.
 """
 
 from __future__ import annotations
@@ -654,31 +676,124 @@ def synthetic_elements(count: int, model: str = "synthetic") -> list[ElementReco
 # Measurement
 # ---------------------------------------------------------------------------
 
+#: Wall-clock and memory metrics aggregated across repeats. Everything else a
+#: scenario reports (triangle counts, volumes, pair counts) is deterministic
+#: and is verified to be identical on every repeat rather than averaged.
+TIMING_METRICS = [
+    "parse_s",
+    "triangulate_s",
+    "halo_s",
+    "broadphase_s",
+    "midphase_s",
+    "naive_s",
+    "total_s",
+    "rss_delta_mb",
+]
+
+#: A metric whose inter-quartile range exceeds this fraction of its median is
+#: reported as unstable. Timing distributions on a shared virtual host are
+#: right-skewed, so the median and IQR are used throughout in preference to
+#: the mean and standard deviation, which a single scheduling stall distorts.
+UNSTABLE_IQR_FRACTION = 0.20
+
+#: Physical unit per metric. Everything is seconds except resident-memory
+#: growth, which is megabytes — the distinction matters because the two need
+#: different thresholds below which a large *relative* spread is meaningless.
+METRIC_UNITS = {"rss_delta_mb": "MB"}
+DEFAULT_METRIC_UNIT = "s"
+
+#: Medians below these are reported as unstable-but-negligible: at this
+#: magnitude the spread is measurement noise rather than a property of the
+#: algorithm, and no conclusion in the analysis rests on it.
+NEGLIGIBLE_MEDIAN = {"s": 0.01, "MB": 1.0}
+NEGLIGIBLE_LABEL = {"s": "negligible (<10 ms)", "MB": "negligible (<1 MB)"}
+
 
 @dataclass
-class ScenarioResult:
-    """All measurements for one benchmark scenario."""
+class MetricStats:
+    """Robust summary of one metric across repeated runs of a scenario."""
 
-    scenario: str
-    element_target: int
-    element_actual: int
-    models: list[str]
-    lod: int
-    buffer_m: float
+    metric: str
+    unit: str
+    n: int
+    median: float
+    q1: float
+    q3: float
+    iqr: float
+    iqr_pct_of_median: float
+    minimum: float
+    maximum: float
+    unstable: bool
+    raw: list[float]
+
+    @classmethod
+    def summarise(cls, metric: str, values: Sequence[float]) -> "MetricStats":
+        """
+        Build robust statistics for one metric.
+
+        Uses the median and inter-quartile range rather than the mean and
+        standard deviation: benchmark timings are bounded below by the true
+        cost and unbounded above by scheduler interference, so the
+        distribution is right-skewed and the mean is pulled by outliers the
+        median ignores. Quartiles use the inclusive method, which is defined
+        for the small sample sizes a benchmark can afford.
+        """
+        ordered = [float(v) for v in values]      # run order — preserved for the raw record
+        data = sorted(ordered)                       # sorted copy — used for the quantiles
+        n = len(data)
+        median = statistics.median(data) if n else 0.0
+        if n >= 2:
+            q1, _, q3 = statistics.quantiles(data, n=4, method="inclusive")
+        else:
+            q1 = q3 = median
+        iqr = q3 - q1
+        pct = (100.0 * iqr / median) if median > 0 else 0.0
+        return cls(
+            metric=metric,
+            unit=METRIC_UNITS.get(metric, DEFAULT_METRIC_UNIT),
+            n=n,
+            median=round(median, 4),
+            q1=round(q1, 4),
+            q3=round(q3, 4),
+            iqr=round(iqr, 4),
+            iqr_pct_of_median=round(pct, 1),
+            minimum=round(data[0], 4) if n else 0.0,
+            maximum=round(data[-1], 4) if n else 0.0,
+            unstable=bool(n >= 2 and median > 0 and iqr > UNSTABLE_IQR_FRACTION * median),
+            # Raw samples stay in run order, not sorted: the per-repeat CSV joins
+            # metrics by row index, so sorting each metric independently would
+            # fabricate runs that never happened.
+            raw=[round(v, 4) for v in ordered],
+        )
+
+    @property
+    def negligible(self) -> bool:
+        """True when the median is small enough that its spread carries no argument."""
+        return self.median < NEGLIGIBLE_MEDIAN.get(self.unit, 0.0)
+
+    @property
+    def magnitude_label(self) -> str:
+        """Human-readable verdict on whether an unstable metric actually matters."""
+        return NEGLIGIBLE_LABEL[self.unit] if self.negligible else "**material**"
+
+
+@dataclass
+class SingleRun:
+    """One complete measurement of one scenario — the unit that gets repeated."""
+
     parse_s: float
     triangulate_s: float
     halo_s: float
     broadphase_s: float
     midphase_s: float
     naive_s: float
-    total_s: float
     rss_delta_mb: float
-    halo_us_per_element: float
-    halo_array_mb: float
+    element_actual: int
     source_faces: int
     source_vertices: int
     halo_faces: int
     halo_vertices: int
+    halo_array_mb: float
     mean_halo_volume_m3: float
     median_halo_volume_m3: float
     total_halo_volume_m3: float
@@ -686,9 +801,81 @@ class ScenarioResult:
     interfering_pairs: int
     naive_pairs: int
     cross_model_pairs: int
+
+    @property
+    def total_s(self) -> float:
+        return (
+            self.parse_s
+            + self.triangulate_s
+            + self.halo_s
+            + self.broadphase_s
+            + self.midphase_s
+        )
+
+    def timing(self, metric: str) -> float:
+        return self.total_s if metric == "total_s" else float(getattr(self, metric))
+
+
+#: Fields that must be identical on every repeat. Any variation means the
+#: benchmark is not measuring what it claims to, so it is reported rather
+#: than averaged away.
+DETERMINISTIC_FIELDS = [
+    "element_actual",
+    "source_faces",
+    "source_vertices",
+    "halo_faces",
+    "halo_vertices",
+    "halo_array_mb",
+    "mean_halo_volume_m3",
+    "median_halo_volume_m3",
+    "total_halo_volume_m3",
+    "candidate_pairs",
+    "interfering_pairs",
+    "naive_pairs",
+    "cross_model_pairs",
+]
+
+
+@dataclass
+class ScenarioResult:
+    """Aggregated measurements for one benchmark scenario across all repeats."""
+
+    scenario: str
+    element_target: int
+    element_actual: int
+    models: list[str]
+    lod: int
+    buffer_m: float
+    repeats: int
+    stats: dict[str, MetricStats]
     halos_per_s: float
+    halo_us_per_element: float
     ingest_elements_per_s: float
+    source_faces: int
+    source_vertices: int
+    halo_faces: int
+    halo_vertices: int
+    halo_array_mb: float
+    mean_halo_volume_m3: float
+    median_halo_volume_m3: float
+    total_halo_volume_m3: float
+    candidate_pairs: int
+    interfering_pairs: int
+    naive_pairs: int
+    cross_model_pairs: int
+    nondeterministic_fields: list[str] = field(default_factory=list)
+    unstable_metrics: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+
+    def median(self, metric: str) -> float:
+        """Median of one timing metric, or 0.0 if the metric was not collected."""
+        stat = self.stats.get(metric)
+        return stat.median if stat else 0.0
+
+    @property
+    def synthetic(self) -> bool:
+        """True when every source model is a synthetic lattice rather than an IFC file."""
+        return all(m.startswith("synthetic") for m in self.models)
 
 
 def _rss_mb() -> float:
@@ -698,19 +885,15 @@ def _rss_mb() -> float:
     return psutil.Process().memory_info().rss / 1024 / 1024
 
 
-def run_scenario(
-    name: str,
+def measure_once(
     records: list[ElementRecord],
     parse_s: float,
     triangulate_s: float,
     lod: int,
     buffer_m: float,
-    models: list[str],
-    target: int,
     run_naive: bool = True,
-) -> ScenarioResult:
-    """Generate Halos for ``records`` and measure every stage of the process."""
-    warnings: list[str] = []
+) -> SingleRun:
+    """Generate Halos for ``records`` once and time every stage of the process."""
     gc.collect()
     rss_start = _rss_mb()
 
@@ -741,38 +924,22 @@ def run_scenario(
 
     model_of = [r.model for r in records]
     cross = sum(1 for i, j in hits if model_of[i] != model_of[j])
-
     volumes = [h.volume_m3() for h in halos]
-    if halo_s > 5.0:
-        warnings.append(f"Halo generation exceeded 5 s wall-clock ({halo_s:.2f} s)")
-    if rss_delta > 512:
-        warnings.append(f"Resident memory grew by {rss_delta:.0f} MB during Halo generation")
-    if len(records) < target:
-        warnings.append(
-            f"Only {len(records)} elements with usable geometry were available against a target of {target}"
-        )
 
-    return ScenarioResult(
-        scenario=name,
-        element_target=target,
+    return SingleRun(
+        parse_s=parse_s,
+        triangulate_s=triangulate_s,
+        halo_s=halo_s,
+        broadphase_s=broadphase_s,
+        midphase_s=midphase_s,
+        naive_s=naive_s,
+        rss_delta_mb=rss_delta,
         element_actual=len(records),
-        models=models,
-        lod=lod,
-        buffer_m=buffer_m,
-        parse_s=round(parse_s, 4),
-        triangulate_s=round(triangulate_s, 4),
-        halo_s=round(halo_s, 4),
-        broadphase_s=round(broadphase_s, 4),
-        midphase_s=round(midphase_s, 4),
-        naive_s=round(naive_s, 4),
-        total_s=round(parse_s + triangulate_s + halo_s + broadphase_s + midphase_s, 4),
-        rss_delta_mb=round(rss_delta, 2),
-        halo_us_per_element=round(1e6 * halo_s / len(halos), 1) if halos else 0.0,
-        halo_array_mb=round(halo_array_mb, 2),
         source_faces=sum(r.source_faces for r in records),
         source_vertices=sum(r.source_vertices for r in records),
         halo_faces=sum(h.face_count for h in halos),
         halo_vertices=sum(h.vertex_count for h in halos),
+        halo_array_mb=round(halo_array_mb, 2),
         mean_halo_volume_m3=round(statistics.fmean(volumes), 3) if volumes else 0.0,
         median_halo_volume_m3=round(statistics.median(volumes), 3) if volumes else 0.0,
         total_halo_volume_m3=round(sum(volumes), 2),
@@ -780,11 +947,92 @@ def run_scenario(
         interfering_pairs=len(hits),
         naive_pairs=naive_count,
         cross_model_pairs=cross,
-        halos_per_s=round(len(halos) / halo_s, 1) if halo_s > 0 else 0.0,
-        ingest_elements_per_s=round(len(records) / triangulate_s, 1) if triangulate_s > 0 else 0.0,
-        warnings=warnings,
     )
 
+
+def aggregate(
+    name: str,
+    runs: list[SingleRun],
+    lod: int,
+    buffer_m: float,
+    models: list[str],
+    target: int,
+) -> ScenarioResult:
+    """
+    Reduce the repeats of one scenario to medians, IQRs and integrity checks.
+
+    Timing metrics are summarised robustly; deterministic fields are checked
+    for agreement across repeats and reported verbatim from the first run.
+    """
+    assert runs, "aggregate() requires at least one run"
+    first = runs[0]
+
+    stats = {m: MetricStats.summarise(m, [r.timing(m) for r in runs]) for m in TIMING_METRICS}
+
+    nondeterministic = [
+        f for f in DETERMINISTIC_FIELDS if len({getattr(r, f) for r in runs}) > 1
+    ]
+
+    halo_median = stats["halo_s"].median
+    tri_median = stats["triangulate_s"].median
+    n = first.element_actual
+
+    warnings: list[str] = []
+    if n < target:
+        warnings.append(
+            f"Only {n} elements with usable geometry were available against a target of {target}"
+        )
+    if halo_median > 5.0:
+        warnings.append(f"Median Halo generation exceeded 5 s wall-clock ({halo_median:.2f} s)")
+    if stats["rss_delta_mb"].median > 512:
+        warnings.append(
+            f"Median resident memory grew by {stats['rss_delta_mb'].median:.0f} MB during Halo generation"
+        )
+    for f in nondeterministic:
+        warnings.append(
+            f"Field '{f}' varied across repeats — it was expected to be deterministic"
+        )
+
+    unstable = []
+    for metric, stat in stats.items():
+        if not stat.unstable:
+            continue
+        unstable.append(metric)
+        floor = NEGLIGIBLE_MEDIAN.get(stat.unit, 0.0)
+        qualifier = f" (median below {floor:g} {stat.unit} — noise, not signal)" if stat.negligible else ""
+        warnings.append(
+            f"Unstable timing: {metric} IQR is {stat.iqr_pct_of_median:.0f}% of its "
+            f"{stat.median:.4f} {stat.unit} median across n={stat.n}{qualifier}"
+        )
+
+    return ScenarioResult(
+        scenario=name,
+        element_target=target,
+        element_actual=n,
+        models=models,
+        lod=lod,
+        buffer_m=buffer_m,
+        repeats=len(runs),
+        stats=stats,
+        halos_per_s=round(n / halo_median, 1) if halo_median > 0 else 0.0,
+        halo_us_per_element=round(1e6 * halo_median / n, 1) if n else 0.0,
+        ingest_elements_per_s=round(n / tri_median, 1) if tri_median > 0 else 0.0,
+        source_faces=first.source_faces,
+        source_vertices=first.source_vertices,
+        halo_faces=first.halo_faces,
+        halo_vertices=first.halo_vertices,
+        halo_array_mb=first.halo_array_mb,
+        mean_halo_volume_m3=first.mean_halo_volume_m3,
+        median_halo_volume_m3=first.median_halo_volume_m3,
+        total_halo_volume_m3=first.total_halo_volume_m3,
+        candidate_pairs=first.candidate_pairs,
+        interfering_pairs=first.interfering_pairs,
+        naive_pairs=first.naive_pairs,
+        cross_model_pairs=first.cross_model_pairs,
+        nondeterministic_fields=nondeterministic,
+        unstable_metrics=unstable,
+        warnings=warnings,
+    )
 
 # ---------------------------------------------------------------------------
 # Scenario orchestration
@@ -800,36 +1048,38 @@ def _resolve(name: str) -> Path:
 
 
 def run_single_model_scenarios(
-    counts: Sequence[int], lod: int, buffer_m: float, synthetic: bool
+    counts: Sequence[int], lod: int, buffer_m: float, synthetic: bool, repeats: int = 1
 ) -> list[ScenarioResult]:
-    """Run the single-model scaling scenarios (S1-S3) at the given element counts."""
+    """
+    Run the single-model scaling scenarios (S1-S3) at the given element counts.
+
+    Every repeat re-parses and re-triangulates the source model rather than
+    reusing a cached ingestion, so the ingestion figures carry the same
+    statistical treatment as the generation figures. That is deliberately the
+    expensive choice: ingestion is the dominant cost, and a median over
+    repeats of the whole pipeline is the only honest way to report it.
+    """
     results: list[ScenarioResult] = []
     for n in counts:
         label = f"S-{n}"
-        logger.info("scenario %s: %d elements", label, n)
-        if synthetic:
-            records = synthetic_elements(n)
-            parse_s = triangulate_s = 0.0
-            models = ["synthetic"]
-        else:
-            path = _resolve(PRIMARY_MODEL)
-            records, parse_s, triangulate_s = ingest_elements(path, n)
-            models = [path.name]
-        results.append(
-            run_scenario(label, records, parse_s, triangulate_s, lod, buffer_m, models, n)
-        )
+        runs: list[SingleRun] = []
+        models = ["synthetic"] if synthetic else [PRIMARY_MODEL]
+        for rep in range(repeats):
+            logger.info("scenario %s: %d elements (repeat %d/%d)", label, n, rep + 1, repeats)
+            if synthetic:
+                records, parse_s, triangulate_s = synthetic_elements(n), 0.0, 0.0
+            else:
+                path = _resolve(PRIMARY_MODEL)
+                records, parse_s, triangulate_s = ingest_elements(path, n)
+                models = [path.name]
+            runs.append(measure_once(records, parse_s, triangulate_s, lod, buffer_m))
+        results.append(aggregate(label, runs, lod, buffer_m, models, n))
     return results
 
 
-def run_federated_scenario(
-    total: int, lod: int, buffer_m: float, synthetic: bool
-) -> ScenarioResult:
+def _federated_records(total: int) -> tuple[list[ElementRecord], float, float, list[str]]:
     """
-    Run the federated coordination scenario (S4).
-
-    Four separate IFC files are loaded and merged into one Halo population, so
-    that interference detection runs across model boundaries as it would in a
-    real multi-discipline coordination review.
+    Load one federated element population across the four fixture models.
 
     Element quotas are allocated in proportion to what each model can actually
     supply, rather than split evenly. An even split silently under-fills the
@@ -839,17 +1089,8 @@ def run_federated_scenario(
     records: list[ElementRecord] = []
     parse_s = triangulate_s = 0.0
     models: list[str] = []
-
-    if synthetic:
-        per_model = math.ceil(total / 4)
-        for k in range(4):
-            records.extend(synthetic_elements(per_model, model=f"synthetic-{k}"))
-            models.append(f"synthetic-{k}")
-        return run_scenario(
-            "S-federated", records[:total], 0.0, 0.0, lod, buffer_m, models, total
-        )
-
     opened = []
+
     for name in FEDERATED_MODELS:
         path = _resolve(name)
         t0 = time.perf_counter()
@@ -858,7 +1099,6 @@ def run_federated_scenario(
         available = _select_products(model, limit=10**9)
         opened.append((path, model, available))
         models.append(path.name)
-        logger.info("federated: %s offers %d candidate elements", path.name, len(available))
 
     supply = sum(len(a) for _, _, a in opened)
     if supply < total:
@@ -889,15 +1129,40 @@ def run_federated_scenario(
         recs, t_s = _triangulate(path, model, available[:quota])
         triangulate_s += t_s
         records.extend(recs)
-        logger.info("federated: %s contributed %d elements", path.name, len(recs))
 
-    return run_scenario(
-        "S-federated", records[:total], parse_s, triangulate_s, lod, buffer_m, models, total
-    )
+    return records[:total], parse_s, triangulate_s, models
+
+
+def run_federated_scenario(
+    total: int, lod: int, buffer_m: float, synthetic: bool, repeats: int = 1
+) -> ScenarioResult:
+    """
+    Run the federated coordination scenario (S4).
+
+    Four separate IFC files are loaded and merged into one Halo population, so
+    that interference detection runs across model boundaries as it would in a
+    real multi-discipline coordination review.
+    """
+    runs: list[SingleRun] = []
+    models: list[str] = []
+    for rep in range(repeats):
+        logger.info("scenario S-federated: %d elements (repeat %d/%d)", total, rep + 1, repeats)
+        if synthetic:
+            per_model = math.ceil(total / 4)
+            records: list[ElementRecord] = []
+            models = []
+            for k in range(4):
+                records.extend(synthetic_elements(per_model, model=f"synthetic-{k}"))
+                models.append(f"synthetic-{k}")
+            records, parse_s, triangulate_s = records[:total], 0.0, 0.0
+        else:
+            records, parse_s, triangulate_s, models = _federated_records(total)
+        runs.append(measure_once(records, parse_s, triangulate_s, lod, buffer_m))
+    return aggregate("S-federated", runs, lod, buffer_m, models, total)
 
 
 def run_scaleout_scenarios(
-    counts: Sequence[int], lod: int, buffer_m: float
+    counts: Sequence[int], lod: int, buffer_m: float, repeats: int = 1
 ) -> list[ScenarioResult]:
     """
     Run the synthetic scale-out scenarios (S6) beyond what the fixtures supply.
@@ -911,42 +1176,45 @@ def run_scaleout_scenarios(
     """
     results = []
     for n in counts:
-        logger.info("scale-out scenario: %d synthetic elements", n)
-        records = synthetic_elements(n)
-        results.append(
-            run_scenario(f"S-scale{n}", records, 0.0, 0.0, lod, buffer_m, ["synthetic"], n)
-        )
+        runs: list[SingleRun] = []
+        for rep in range(repeats):
+            logger.info("scale-out scenario: %d synthetic elements (repeat %d/%d)", n, rep + 1, repeats)
+            runs.append(measure_once(synthetic_elements(n), 0.0, 0.0, lod, buffer_m))
+        results.append(aggregate(f"S-scale{n}", runs, lod, buffer_m, ["synthetic"], n))
     return results
 
 
 def run_lod_sweep(
-    count: int, buffer_m: float, synthetic: bool
+    count: int, buffer_m: float, synthetic: bool, repeats: int = 1
 ) -> list[ScenarioResult]:
     """
     Run the LOD sweep (S5) — the same element population at LOD 200/300/400.
 
-    Ingestion is performed once and reused, because the source triangulation is
-    identical across levels of detail; only Halo generation is re-measured.
+    Within a repeat, ingestion happens once and is shared by all three levels,
+    because the source triangulation is identical across levels of detail;
+    only Halo generation and interference detection are re-measured per level.
+    Each repeat re-ingests, so the shared parse and triangulate figures still
+    carry a distribution rather than a single sample.
     """
-    if synthetic:
-        records = synthetic_elements(count)
-        parse_s = triangulate_s = 0.0
-        models = ["synthetic"]
-    else:
-        path = _resolve(PRIMARY_MODEL)
-        records, parse_s, triangulate_s = ingest_elements(path, count)
-        models = [path.name]
+    lods = (200, 300, 400)
+    runs: dict[int, list[SingleRun]] = {lod: [] for lod in lods}
+    models = ["synthetic"] if synthetic else [PRIMARY_MODEL]
 
-    results = []
-    for lod in (200, 300, 400):
-        logger.info("LOD sweep: LOD %d over %d elements", lod, len(records))
-        results.append(
-            run_scenario(
-                f"S-lod{lod}", records, parse_s, triangulate_s, lod, buffer_m, models, count
+    for rep in range(repeats):
+        if synthetic:
+            records, parse_s, triangulate_s = synthetic_elements(count), 0.0, 0.0
+        else:
+            path = _resolve(PRIMARY_MODEL)
+            records, parse_s, triangulate_s = ingest_elements(path, count)
+            models = [path.name]
+        for lod in lods:
+            logger.info(
+                "LOD sweep: LOD %d over %d elements (repeat %d/%d)",
+                lod, len(records), rep + 1, repeats,
             )
-        )
-    return results
+            runs[lod].append(measure_once(records, parse_s, triangulate_s, lod, buffer_m))
 
+    return [aggregate(f"S-lod{lod}", runs[lod], lod, buffer_m, models, count) for lod in lods]
 
 # ---------------------------------------------------------------------------
 # Reporting
@@ -970,51 +1238,127 @@ def host_metadata() -> dict:
     return meta
 
 
-CSV_FIELDS = [
-    "scenario", "element_target", "element_actual", "lod", "buffer_m",
-    "parse_s", "triangulate_s", "halo_s", "broadphase_s", "midphase_s", "naive_s", "total_s",
-    "rss_delta_mb", "halo_array_mb", "halo_us_per_element",
-    "source_faces", "source_vertices", "halo_faces", "halo_vertices",
+def _stats_from_dict(d: dict) -> MetricStats:
+    """Rebuild a :class:`MetricStats` from its serialised form."""
+    return MetricStats(**d)
+
+
+def _result_from_dict(d: dict) -> ScenarioResult:
+    """Rebuild a :class:`ScenarioResult` from its serialised form."""
+    payload = dict(d)
+    payload["stats"] = {k: _stats_from_dict(v) for k, v in payload["stats"].items()}
+    return ScenarioResult(**payload)
+
+
+def load_results(path: Path) -> tuple[list[ScenarioResult], dict]:
+    """
+    Load a previous run's results so charts and tables can be re-rendered.
+
+    Re-rendering from saved data rather than re-measuring keeps presentation
+    changes free of measurement drift: the figures in the report are provably
+    the same numbers as the ones in the JSON.
+    """
+    payload = json.loads(Path(path).read_text())
+    return [_result_from_dict(s) for s in payload["scenarios"]], payload.get("host", {})
+
+
+#: Median/IQR columns emitted per timing metric in the summary CSV.
+_STAT_SUFFIXES = ("median", "q1", "q3", "iqr", "iqr_pct_of_median")
+
+CSV_HEAD = ["scenario", "source", "element_target", "element_actual", "lod", "buffer_m", "repeats"]
+CSV_TAIL = [
+    "halos_per_s", "halo_us_per_element", "ingest_elements_per_s",
+    "source_faces", "source_vertices", "halo_faces", "halo_vertices", "halo_array_mb",
     "mean_halo_volume_m3", "median_halo_volume_m3", "total_halo_volume_m3",
     "candidate_pairs", "interfering_pairs", "naive_pairs", "cross_model_pairs",
-    "halos_per_s", "ingest_elements_per_s",
+    "unstable_metrics",
 ]
 
 
+def _csv_fields() -> list[str]:
+    """Column order for the aggregated results CSV."""
+    stat_cols = [f"{m}_{s}" for m in TIMING_METRICS for s in _STAT_SUFFIXES]
+    return CSV_HEAD + stat_cols + CSV_TAIL
+
+
 def write_outputs(results: list[ScenarioResult], out_dir: Path) -> None:
-    """Write the JSON record, the flat CSV and the Markdown summary."""
+    """Write the JSON record, both CSVs and the Markdown summary."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
     payload = {
         "generated_by": "performance_benchmark.py",
+        "statistics": {
+            "central_tendency": "median",
+            "spread": "inter-quartile range (Q3 - Q1), inclusive method",
+            "rationale": (
+                "Benchmark timings are bounded below by the true cost and unbounded above "
+                "by scheduler interference, so the distribution is right-skewed; the median "
+                "and IQR are robust to that where the mean and standard deviation are not."
+            ),
+            "unstable_threshold": f"IQR > {UNSTABLE_IQR_FRACTION:.0%} of median",
+            "negligible_median_by_unit": NEGLIGIBLE_MEDIAN,
+        },
         "host": host_metadata(),
         "scenarios": [asdict(r) for r in results],
     }
     (out_dir / "halo_benchmark_results.json").write_text(json.dumps(payload, indent=2))
 
+    fields = _csv_fields()
     with (out_dir / "halo_benchmark_results.csv").open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
+        writer = csv.DictWriter(fh, fieldnames=fields)
         writer.writeheader()
         for r in results:
-            row = asdict(r)
-            writer.writerow({k: row[k] for k in CSV_FIELDS})
+            row = {
+                "scenario": r.scenario,
+                "source": "synthetic" if r.synthetic else "IFC",
+                "element_target": r.element_target,
+                "element_actual": r.element_actual,
+                "lod": r.lod,
+                "buffer_m": r.buffer_m,
+                "repeats": r.repeats,
+                "unstable_metrics": ";".join(r.unstable_metrics),
+            }
+            for metric, stat in r.stats.items():
+                for suffix in _STAT_SUFFIXES:
+                    row[f"{metric}_{suffix}"] = getattr(stat, suffix)
+            for key in CSV_TAIL[:-1]:
+                row[key] = getattr(r, key)
+            writer.writerow(row)
+
+    # Per-repeat raw timings, one row per (scenario, repeat, metric sample).
+    with (out_dir / "halo_benchmark_raw_repeats.csv").open("w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["scenario", "source", "element_actual", "lod", "repeat"] + TIMING_METRICS)
+        for r in results:
+            for i in range(r.repeats):
+                writer.writerow(
+                    [r.scenario, "synthetic" if r.synthetic else "IFC", r.element_actual, r.lod, i + 1]
+                    + [r.stats[m].raw[i] if i < len(r.stats[m].raw) else "" for m in TIMING_METRICS]
+                )
 
     (out_dir / "halo_benchmark_summary.md").write_text(render_markdown(results))
     logger.info("wrote results to %s", out_dir)
 
 
-def _source_label(result: ScenarioResult) -> str:
-    """Return "IFC" or "synthetic", so measured and modelled runs are never conflated."""
-    return "synthetic" if all(m.startswith("synthetic") for m in result.models) else "IFC"
+def _md(stat: MetricStats, places: int = 2) -> str:
+    """Render one metric as ``median (IQR)`` for a Markdown table cell."""
+    return f"{stat.median:.{places}f} ({stat.iqr:.{places}f})"
 
 
 def render_markdown(results: list[ScenarioResult]) -> str:
     """Render the benchmark results as Markdown tables for the thesis."""
     meta = host_metadata()
+    n_values = sorted({r.repeats for r in results})
+    n_label = str(n_values[0]) if len(n_values) == 1 else "varies: " + ", ".join(map(str, n_values))
+
     lines: list[str] = [
         "# Halo volume generation — measured performance",
         "",
-        "Generated by `performance_benchmark.py`. Every figure below is measured, not estimated.",
+        f"Generated by `performance_benchmark.py`. Every figure below is measured, not estimated. "
+        f"Each scenario was run **n = {n_label}** times; cells report the **median with the "
+        f"inter-quartile range in parentheses**. The median and IQR are used rather than the mean "
+        f"and standard deviation because benchmark timings are bounded below by the true cost and "
+        f"unbounded above by scheduler interference, making the distribution right-skewed.",
         "",
         "## Host",
         "",
@@ -1026,206 +1370,324 @@ def render_markdown(results: list[ScenarioResult]) -> str:
 
     lines += [
         "",
-        "## Table A — end-to-end scaling",
+        "## Table A — end-to-end scaling (median, IQR in parentheses)",
         "",
-        "| Scenario | Source | Elements | LOD | Parse (s) | Triangulate (s) | Halo gen (s) | Halos/s | us/Halo | RSS delta (MB) | Halo arrays (MB) |",
+        "| Scenario | Source | Elements | LOD | Parse (s) | Triangulate (s) | Halo gen (s) | Halos/s | µs/Halo | RSS Δ (MB) | Halo arrays (MB) |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for r in results:
         lines.append(
-            f"| {r.scenario} | {_source_label(r)} | {r.element_actual:,} | {r.lod} | {r.parse_s:.2f} | {r.triangulate_s:.2f} "
-            f"| {r.halo_s:.3f} | {r.halos_per_s:,.0f} | {r.halo_us_per_element:.1f} | {r.rss_delta_mb:.1f} | {r.halo_array_mb:.2f} |"
+            f"| {r.scenario} | {'synthetic' if r.synthetic else 'IFC'} | {r.element_actual:,} | {r.lod} "
+            f"| {_md(r.stats['parse_s'])} | {_md(r.stats['triangulate_s'])} | {_md(r.stats['halo_s'], 3)} "
+            f"| {r.halos_per_s:,.0f} | {r.halo_us_per_element:.1f} | {_md(r.stats['rss_delta_mb'], 1)} "
+            f"| {r.halo_array_mb:.2f} |"
         )
 
     lines += [
         "",
-        "## Table B — geometric complexity",
+        "## Table B — geometric complexity (deterministic; identical on every repeat)",
         "",
-        "| Scenario | Source triangles | Halo triangles | Halo vertices | Amplification | Mean Halo volume (m3) | Total reserved (m3) |",
+        "| Scenario | Source triangles | Halo triangles | Halo vertices | Amplification | Mean Halo volume (m³) | Total reserved (m³) |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
     for r in results:
         amp = (r.halo_faces / r.source_faces) if r.source_faces else 0.0
         lines.append(
             f"| {r.scenario} | {r.source_faces:,} | {r.halo_faces:,} | {r.halo_vertices:,} "
-            f"| {amp:.2f}x | {r.mean_halo_volume_m3:,.2f} | {r.total_halo_volume_m3:,.0f} |"
+            f"| {amp:.2f}× | {r.mean_halo_volume_m3:,.2f} | {r.total_halo_volume_m3:,.0f} |"
         )
 
     lines += [
         "",
-        "## Table C — interference detection",
+        "## Table C — interference detection (median, IQR in parentheses)",
         "",
-        "| Scenario | Halos | Broad-phase (s) | Mid-phase (s) | Naive O(n2) (s) | Speed-up | Candidate pairs | Interfering pairs | Cross-model |",
+        "| Scenario | Halos | Broad-phase (s) | Mid-phase (s) | Naive O(n²) (s) | Speed-up | Candidate pairs | Interfering pairs | Cross-model |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for r in results:
-        speed = (r.naive_s / (r.broadphase_s + r.midphase_s)) if (r.broadphase_s + r.midphase_s) > 0 and r.naive_s else 0.0
+        grid = r.median("broadphase_s") + r.median("midphase_s")
+        speed = (r.median("naive_s") / grid) if grid > 0 and r.median("naive_s") else 0.0
         lines.append(
-            f"| {r.scenario} | {r.element_actual:,} | {r.broadphase_s:.3f} | {r.midphase_s:.3f} "
-            f"| {r.naive_s:.3f} | {speed:.1f}x | {r.candidate_pairs:,} | {r.interfering_pairs:,} | {r.cross_model_pairs:,} |"
+            f"| {r.scenario} | {r.element_actual:,} | {_md(r.stats['broadphase_s'], 3)} "
+            f"| {_md(r.stats['midphase_s'], 3)} | {_md(r.stats['naive_s'], 3)} | {speed:.1f}× "
+            f"| {r.candidate_pairs:,} | {r.interfering_pairs:,} | {r.cross_model_pairs:,} |"
         )
 
-    warned = [(r.scenario, w) for r in results for w in r.warnings]
-    lines += ["", "## Warnings raised during the run", ""]
-    if warned:
-        lines += [f"* **{s}** — {w}" for s, w in warned]
-    else:
-        lines.append("* None. No scenario exceeded the wall-clock or memory thresholds.")
-
-    lines += ["", "## Stage share of total wall-clock", "",
-              "| Scenario | Parse | Triangulate | Halo gen | Interference |", "|---|---:|---:|---:|---:|"]
+    lines += [
+        "",
+        "## Table D — measurement stability",
+        "",
+        "Metrics whose IQR exceeds 20% of their median. A large relative spread on a "
+        "sub-10 ms median (or a sub-1 MB memory delta) is measurement noise; a large spread on a "
+        "multi-second median is not, and no conclusion should rest on it without more repeats.",
+        "",
+        "| Scenario | Metric | Unit | Median | IQR | IQR as % of median | Min | Max | Magnitude |",
+        "|---|---|---|---:|---:|---:|---:|---:|---|",
+    ]
+    any_unstable = False
     for r in results:
-        total = max(r.total_s, 1e-9)
+        for metric in r.unstable_metrics:
+            s = r.stats[metric]
+            any_unstable = True
+            lines.append(
+                f"| {r.scenario} | `{metric}` | {s.unit} | {s.median:.4f} | {s.iqr:.4f} "
+                f"| {s.iqr_pct_of_median:.0f}% | {s.minimum:.4f} | {s.maximum:.4f} | {s.magnitude_label} |"
+            )
+    if not any_unstable:
+        lines.append("| — | — | — | — | — | — | — | — | No metric exceeded the threshold |")
+
+    warned = [(r.scenario, w) for r in results for w in r.warnings if not w.startswith("Unstable timing")]
+    lines += ["", "## Warnings raised during the run", ""]
+    lines += [f"* **{s}** — {w}" for s, w in warned] or ["* None."]
+
+    nondet = [(r.scenario, f) for r in results for f in r.nondeterministic_fields]
+    lines += ["", "## Determinism check", ""]
+    if nondet:
+        lines += [f"* **{s}** — field `{f}` varied across repeats" for s, f in nondet]
+    else:
         lines.append(
-            f"| {r.scenario} | {100 * r.parse_s / total:.1f}% | {100 * r.triangulate_s / total:.1f}% "
-            f"| {100 * r.halo_s / total:.1f}% | {100 * (r.broadphase_s + r.midphase_s) / total:.1f}% |"
+            "* Passed. Every triangle count, volume and pair count was identical on all repeats "
+            "of every scenario, confirming that only wall-clock and resident memory vary between runs."
+        )
+
+    lines += [
+        "",
+        "## Stage share of total wall-clock (from medians)",
+        "",
+        "| Scenario | Parse | Triangulate | Halo gen | Interference |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for r in results:
+        total = max(r.median("total_s"), 1e-9)
+        interference = r.median("broadphase_s") + r.median("midphase_s")
+        lines.append(
+            f"| {r.scenario} | {100 * r.median('parse_s') / total:.1f}% "
+            f"| {100 * r.median('triangulate_s') / total:.1f}% "
+            f"| {100 * r.median('halo_s') / total:.1f}% | {100 * interference / total:.1f}% |"
         )
 
     return "\n".join(lines) + "\n"
 
 
+# ---------------------------------------------------------------------------
+# Charts
+# ---------------------------------------------------------------------------
+
+#: One palette used across every figure so a reader can carry meaning between
+#: them: the same colour always means the same pipeline stage or algorithm.
+PALETTE = {
+    "parse": "#8C8C8C",
+    "triangulate": "#C2571A",
+    "halo": "#1F5FA9",
+    "interference": "#2E7D5B",
+    "naive": "#A63D5B",
+    "accent": "#6A4C93",
+}
+
+CHART_DPI = 300
+#: A4 with 25 mm margins leaves a ~160 mm column; 6.3 in matches it exactly,
+#: so figures are placed at 100% scale and never resampled by the typesetter.
+FIG_WIDTH_IN = 6.3
+
+
+def _err(results: Sequence[ScenarioResult], metric: str) -> np.ndarray:
+    """Return asymmetric (lower, upper) error bars spanning Q1 to Q3."""
+    med = np.array([r.stats[metric].median for r in results])
+    q1 = np.array([r.stats[metric].q1 for r in results])
+    q3 = np.array([r.stats[metric].q3 for r in results])
+    return np.vstack([np.maximum(med - q1, 0.0), np.maximum(q3 - med, 0.0)])
+
+
+def _err_sum(results: Sequence[ScenarioResult], metrics: Sequence[str]) -> tuple[np.ndarray, np.ndarray]:
+    """Return the summed medians and combined error bars for several metrics."""
+    med = np.zeros(len(results))
+    lo = np.zeros(len(results))
+    hi = np.zeros(len(results))
+    for m in metrics:
+        med += np.array([r.stats[m].median for r in results])
+        lo += np.array([max(r.stats[m].median - r.stats[m].q1, 0.0) for r in results])
+        hi += np.array([max(r.stats[m].q3 - r.stats[m].median, 0.0) for r in results])
+    return med, np.vstack([lo, hi])
+
+
 def render_charts(results: list[ScenarioResult], out_dir: Path) -> list[str]:
-    """Render the benchmark charts; returns the filenames written."""
+    """Render the benchmark charts at print resolution; returns filenames written."""
     try:
         import matplotlib
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
-        logger.warning("matplotlib not installed (uv sync --group bench) — skipping charts")
+        logger.warning("matplotlib not installed (uv sync) — skipping charts")
         return []
 
-    scaling = [r for r in results if r.scenario.startswith("S-") and r.scenario[2:].isdigit()]
-    scaling.sort(key=lambda r: r.element_actual)
-    lod_runs = sorted((r for r in results if r.scenario.startswith("S-lod")), key=lambda r: r.lod)
-    written: list[str] = []
+    plt.rcParams.update({
+        "figure.dpi": CHART_DPI,
+        "savefig.dpi": CHART_DPI,
+        "savefig.bbox": "tight",
+        "font.size": 9,
+        "axes.titlesize": 10,
+        "axes.labelsize": 9,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "legend.fontsize": 8,
+        "axes.grid": True,
+        "grid.alpha": 0.25,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+    })
 
-    plt.rcParams.update({"figure.dpi": 150, "font.size": 9, "axes.grid": True, "grid.alpha": 0.3})
+    scaling = sorted(
+        (r for r in results if r.scenario.startswith("S-") and r.scenario[2:].isdigit()),
+        key=lambda r: r.element_actual,
+    )
+    lod_runs = sorted((r for r in results if r.scenario.startswith("S-lod")), key=lambda r: r.lod)
+    scale = sorted(
+        (r for r in results if r.scenario.startswith("S-scale")), key=lambda r: r.element_actual
+    )
+    n_label = f"n = {results[0].repeats}" if results else ""
+    written: list[str] = []
+    # errorbar() takes the line properties directly; bar() only forwards them
+    # through error_kw, so the two need separate keyword bundles.
+    ebar = dict(capsize=3, elinewidth=1.0, capthick=1.0, ecolor="#333333")
+    ebar_bar = dict(capsize=3, error_kw=dict(elinewidth=1.0, capthick=1.0, ecolor="#333333"))
 
     if scaling:
         x = [r.element_actual for r in scaling]
-        fig, ax = plt.subplots(figsize=(6, 3.6))
-        ax.plot(x, [r.halo_s for r in scaling], "o-", label="Halo generation")
-        ax.plot(x, [r.triangulate_s for r in scaling], "s-", label="IFC triangulation (ingest)")
-        ax.plot(x, [r.broadphase_s + r.midphase_s for r in scaling], "^-", label="Interference detection")
-        ax.set_xlabel("Elements")
-        ax.set_ylabel("Wall-clock (s)")
+
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        inter_med, inter_err = _err_sum(scaling, ["broadphase_s", "midphase_s"])
+        ax.errorbar(x, [r.median("triangulate_s") for r in scaling], yerr=_err(scaling, "triangulate_s"),
+                    marker="s", color=PALETTE["triangulate"], label="IFC triangulation (ingest)", **ebar)
+        ax.errorbar(x, [r.median("halo_s") for r in scaling], yerr=_err(scaling, "halo_s"),
+                    marker="o", color=PALETTE["halo"], label="Halo generation", **ebar)
+        ax.errorbar(x, inter_med, yerr=inter_err, marker="^", color=PALETTE["interference"],
+                    label="Interference detection", **ebar)
+        ax.set_xlabel("Elements (count)")
+        ax.set_ylabel("Wall-clock time (s, log scale)")
         ax.set_yscale("log")
-        ax.set_title("Figure 1 — Stage cost vs element count")
-        ax.legend()
-        fig.tight_layout()
+        ax.set_title(f"Stage cost vs element count ({n_label}, median ± IQR)")
+        ax.legend(frameon=False)
         fig.savefig(out_dir / "fig1_stage_cost.png")
         plt.close(fig)
         written.append("fig1_stage_cost.png")
 
-        fig, ax = plt.subplots(figsize=(6, 3.6))
-        ax.bar([str(v) for v in x], [r.halos_per_s for r in scaling], color="#2b6cb0")
-        ax.set_xlabel("Elements")
-        ax.set_ylabel("Halos generated per second")
-        ax.set_title("Figure 2 — Halo generation throughput")
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        pos = np.arange(len(scaling))
+        ax.bar(pos, [r.halos_per_s for r in scaling], color=PALETTE["halo"], width=0.6)
+        ax.set_xticks(pos)
+        ax.set_xticklabels([f"{v:,}" for v in x])
+        ax.set_xlabel("Elements (count)")
+        ax.set_ylabel("Throughput (Halos generated per second)")
+        ax.set_title(f"Halo generation throughput ({n_label}, from median generation time)")
         for i, r in enumerate(scaling):
             ax.text(i, r.halos_per_s, f"{r.halos_per_s:,.0f}", ha="center", va="bottom", fontsize=8)
-        fig.tight_layout()
+        ax.set_ylim(0, max(r.halos_per_s for r in scaling) * 1.15)
         fig.savefig(out_dir / "fig2_throughput.png")
         plt.close(fig)
         written.append("fig2_throughput.png")
 
-        fig, ax = plt.subplots(figsize=(6, 3.6))
-        ax.plot(x, [r.halo_array_mb for r in scaling], "o-", label="Halo mesh arrays")
-        ax.plot(x, [r.rss_delta_mb for r in scaling], "s--", label="Process RSS delta")
-        ax.set_xlabel("Elements")
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        ax.plot(x, [r.halo_array_mb for r in scaling], marker="o", color=PALETTE["halo"],
+                label="Halo mesh arrays (exact)")
+        ax.errorbar(x, [r.median("rss_delta_mb") for r in scaling], yerr=_err(scaling, "rss_delta_mb"),
+                    marker="s", linestyle="--", color=PALETTE["accent"], label="Process RSS delta", **ebar)
+        ax.set_xlabel("Elements (count)")
         ax.set_ylabel("Memory (MB)")
-        ax.set_title("Figure 3 — Halo memory footprint")
-        ax.legend()
-        fig.tight_layout()
+        ax.set_title(f"Halo memory footprint ({n_label}, median ± IQR)")
+        ax.legend(frameon=False)
         fig.savefig(out_dir / "fig3_memory.png")
         plt.close(fig)
         written.append("fig3_memory.png")
 
-        fig, ax = plt.subplots(figsize=(6, 3.6))
-        grid = [r.broadphase_s + r.midphase_s for r in scaling]
-        naive = [r.naive_s for r in scaling]
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
         idx = np.arange(len(x))
-        ax.bar(idx - 0.18, grid, width=0.36, label="Spatial hash grid")
-        ax.bar(idx + 0.18, naive, width=0.36, label="Naive O(n^2)")
+        grid_med, grid_err = _err_sum(scaling, ["broadphase_s", "midphase_s"])
+        ax.bar(idx - 0.19, grid_med, yerr=grid_err, width=0.38, color=PALETTE["interference"],
+               label="Spatial hash grid", **ebar_bar)
+        ax.bar(idx + 0.19, [r.median("naive_s") for r in scaling], yerr=_err(scaling, "naive_s"),
+               width=0.38, color=PALETTE["naive"], label="Naive O(n²), vectorised", **ebar_bar)
         ax.set_xticks(idx)
-        ax.set_xticklabels([str(v) for v in x])
-        ax.set_xlabel("Elements")
-        ax.set_ylabel("Wall-clock (s)")
+        ax.set_xticklabels([f"{v:,}" for v in x])
+        ax.set_xlabel("Elements (count)")
+        ax.set_ylabel("Wall-clock time (s, log scale)")
         ax.set_yscale("log")
-        ax.set_title("Figure 4 — Interference detection: broad-phase vs exhaustive")
-        ax.legend()
-        fig.tight_layout()
+        ax.set_title(f"Interference detection: broad-phase vs exhaustive ({n_label}, median ± IQR)")
+        ax.legend(frameon=False)
         fig.savefig(out_dir / "fig4_collision.png")
         plt.close(fig)
         written.append("fig4_collision.png")
 
     if lod_runs:
-        fig, ax1 = plt.subplots(figsize=(6, 3.6))
-        labels = [str(r.lod) for r in lod_runs]
-        ax1.bar(labels, [r.halo_faces for r in lod_runs], color="#805ad5", alpha=0.85)
+        fig, ax1 = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        pos = np.arange(len(lod_runs))
+        ax1.bar(pos, [r.halo_faces for r in lod_runs], color=PALETTE["accent"], alpha=0.85, width=0.55)
+        ax1.set_xticks(pos)
+        ax1.set_xticklabels([str(r.lod) for r in lod_runs])
         ax1.set_xlabel("Level of detail")
-        ax1.set_ylabel("Total Halo triangles")
+        ax1.set_ylabel("Total Halo triangles (count)")
         ax2 = ax1.twinx()
-        ax2.plot(labels, [r.halo_s for r in lod_runs], "ko-", label="Generation time")
-        ax2.set_ylabel("Halo generation (s)")
+        ax2.errorbar(pos, [r.median("halo_s") for r in lod_runs], yerr=_err(lod_runs, "halo_s"),
+                     marker="o", color=PALETTE["halo"], label="Generation time", **ebar)
+        ax2.set_ylabel("Halo generation time (s)")
         ax2.grid(False)
-        ax1.set_title("Figure 5 — Level of detail: triangles and cost")
-        fig.tight_layout()
+        ax2.spines["right"].set_visible(True)
+        ax1.set_title(f"Level of detail: triangle count and generation cost ({n_label}, median ± IQR)")
+        ax2.legend(frameon=False, loc="upper left")
         fig.savefig(out_dir / "fig5_lod.png")
         plt.close(fig)
         written.append("fig5_lod.png")
 
-    scale = sorted(
-        (r for r in results if r.scenario.startswith("S-scale")), key=lambda r: r.element_actual
-    )
     if scale:
         x = [r.element_actual for r in scale]
-        fig, ax = plt.subplots(figsize=(6, 3.6))
-        ax.plot(x, [r.broadphase_s + r.midphase_s for r in scale], "o-", label="Spatial hash grid")
-        ax.plot(x, [r.naive_s for r in scale], "s-", label="Naive O(n^2), vectorised")
-        ax.plot(x, [r.halo_s for r in scale], "^--", label="Halo generation")
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5))
+        grid_med, grid_err = _err_sum(scale, ["broadphase_s", "midphase_s"])
+        ax.errorbar(x, grid_med, yerr=grid_err, marker="o", color=PALETTE["interference"],
+                    label="Spatial hash grid", **ebar)
+        ax.errorbar(x, [r.median("naive_s") for r in scale], yerr=_err(scale, "naive_s"),
+                    marker="s", color=PALETTE["naive"], label="Naive O(n²), vectorised", **ebar)
+        ax.errorbar(x, [r.median("halo_s") for r in scale], yerr=_err(scale, "halo_s"),
+                    marker="^", linestyle="--", color=PALETTE["halo"], label="Halo generation", **ebar)
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.set_xlabel("Halo volumes (synthetic elements)")
-        ax.set_ylabel("Wall-clock (s)")
-        ax.set_title("Figure 7 — Scale-out: where the broad phase starts to pay")
-        ax.legend()
-        fig.tight_layout()
+        ax.set_xlabel("Halo volumes (count, synthetic elements)")
+        ax.set_ylabel("Wall-clock time (s, log scale)")
+        ax.set_title(f"Scale-out: where the broad phase starts to pay ({n_label}, median ± IQR)")
+        ax.legend(frameon=False)
         fig.savefig(out_dir / "fig7_scaleout.png")
         plt.close(fig)
         written.append("fig7_scaleout.png")
 
     if results:
-        fig, ax = plt.subplots(figsize=(7, 3.6))
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.8))
         names = [r.scenario for r in results]
-        parse = np.array([r.parse_s for r in results])
-        tri = np.array([r.triangulate_s for r in results])
-        halo = np.array([r.halo_s for r in results])
-        coll = np.array([r.broadphase_s + r.midphase_s for r in results])
+        parse = np.array([r.median("parse_s") for r in results])
+        tri = np.array([r.median("triangulate_s") for r in results])
+        halo = np.array([r.median("halo_s") for r in results])
+        coll = np.array([r.median("broadphase_s") + r.median("midphase_s") for r in results])
         total = np.maximum(parse + tri + halo + coll, 1e-9)
         bottom = np.zeros(len(results))
-        for data, label in (
-            (parse, "Parse"),
-            (tri, "Triangulate"),
-            (halo, "Halo generation"),
-            (coll, "Interference"),
+        for data, label, colour in (
+            (parse, "Parse", PALETTE["parse"]),
+            (tri, "Triangulate", PALETTE["triangulate"]),
+            (halo, "Halo generation", PALETTE["halo"]),
+            (coll, "Interference", PALETTE["interference"]),
         ):
             share = 100 * data / total
-            ax.bar(names, share, bottom=bottom, label=label)
+            ax.bar(names, share, bottom=bottom, label=label, color=colour, width=0.7)
             bottom += share
-        ax.set_ylabel("Share of wall-clock (%)")
-        ax.set_title("Figure 6 — Where the time actually goes")
-        ax.legend(loc="lower right", fontsize=8)
-        plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
-        fig.tight_layout()
+        ax.set_ylabel("Share of wall-clock time (%)")
+        ax.set_xlabel("Scenario")
+        ax.set_ylim(0, 100)
+        ax.set_title(f"Where the time actually goes ({n_label}, from medians)")
+        ax.legend(loc="lower right", fontsize=7, frameon=True, framealpha=0.9)
+        plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
         fig.savefig(out_dir / "fig6_bottleneck.png")
         plt.close(fig)
         written.append("fig6_bottleneck.png")
 
-    logger.info("wrote %d charts", len(written))
+    logger.info("wrote %d charts at %d DPI", len(written), CHART_DPI)
     return written
-
 
 # ---------------------------------------------------------------------------
 # Generator self-validation
@@ -1339,7 +1801,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--synthetic", action="store_true", help="use synthetic elements, no IFC required")
     parser.add_argument("--no-charts", action="store_true", help="skip matplotlib chart rendering")
     parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help="run each scenario this many times and report the median with its IQR (7 for the reported figures)",
+    )
+    parser.add_argument(
         "--validate", action="store_true", help="verify the Halo generator against analytic volumes and exit"
+    )
+    parser.add_argument(
+        "--from-json",
+        metavar="PATH",
+        help="re-render tables and charts from a previous run's halo_benchmark_results.json without re-measuring",
     )
     args = parser.parse_args(argv)
 
@@ -1348,17 +1821,35 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.validate:
         return validate_generator()
 
-    counts = [int(c) for c in args.scenarios.split(",") if c.strip()]
     out_dir = Path(args.out)
 
-    results = run_single_model_scenarios(counts, args.lod, args.buffer, args.synthetic)
+    if args.from_json:
+        # Presentation-only path: the numbers are provably the ones already
+        # measured, so a figure or caption change cannot silently move a result.
+        results, host = load_results(Path(args.from_json))
+        logger.info("re-rendering %d scenarios from %s (host: %s)",
+                    len(results), args.from_json, host.get("platform", "unknown"))
+        (out_dir / "halo_benchmark_summary.md").write_text(render_markdown(results))
+        if not args.no_charts:
+            render_charts(results, out_dir)
+        print()
+        print(render_markdown(results))
+        return 0
+
+    if args.repeats < 1:
+        parser.error("--repeats must be at least 1")
+
+    counts = [int(c) for c in args.scenarios.split(",") if c.strip()]
+    n = args.repeats
+
+    results = run_single_model_scenarios(counts, args.lod, args.buffer, args.synthetic, n)
     if args.federated:
-        results.append(run_federated_scenario(args.federated, args.lod, args.buffer, args.synthetic))
+        results.append(run_federated_scenario(args.federated, args.lod, args.buffer, args.synthetic, n))
     if args.lod_sweep:
-        results.extend(run_lod_sweep(args.lod_sweep, args.buffer, args.synthetic))
+        results.extend(run_lod_sweep(args.lod_sweep, args.buffer, args.synthetic, n))
     scaleout = [int(c) for c in args.scaleout.split(",") if c.strip()]
     if scaleout:
-        results.extend(run_scaleout_scenarios(scaleout, args.lod, args.buffer))
+        results.extend(run_scaleout_scenarios(scaleout, args.lod, args.buffer, n))
 
     write_outputs(results, out_dir)
     if not args.no_charts:
