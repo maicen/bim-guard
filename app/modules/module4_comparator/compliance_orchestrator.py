@@ -149,3 +149,10 @@ class ComplianceOrchestrator:
     def get_last_run_issues(self):
         """Retrieve issues from last compliance run."""
         return self._last_run_issues
+if __name__ == "__main__":
+    from app.modules.module2_ifc_read.ifc_parser import parse_ifc
+    
+    elements = parse_ifc("data/uploads/ifc/f4c3f1b8390a4183b599323799caae83_Infra-Plumbing.ifc")
+    orchestrator = ComplianceOrchestrator()
+    result = orchestrator.run_and_log_compliance(elements, "Tier 1 Validation")
+    print(result['summary - compliance_orchestrator.py:158'])

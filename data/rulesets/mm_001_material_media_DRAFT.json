@@ -1,0 +1,199 @@
+{
+  "ruleset_id": "BIMGUARD-MM-001",
+  "mechanism": "MM-001",
+  "rule_category": "material_property",
+  "schema_version": "1.0.0",
+  "status": "DRAFT - NOT APPROVED FOR USE",
+  "metadata": {
+    "title": "Material-Media Compatibility Matrix (MM-001)",
+    "purpose": "Scores the degradation risk of a piping material carrying a given medium, before environment and temperature modifiers are applied.",
+    "standards": [
+      "ASTM B117 - Standard Practice for Operating Salt Spray (Fog) Apparatus",
+      "ASTM G48 - Pitting and Crevice Corrosion Resistance of Stainless Steels and Related Alloys by Use of Ferric Chloride Solution",
+      "CIBSE Guide G - Public Health and Plumbing Engineering",
+      "EN 12952-12 - Water-tube boilers: Requirements for boiler feedwater and boiler water quality",
+      "IMOA - Practical Guidelines for the Fabrication of Duplex Stainless Steel / IMOA Design Manual",
+      "CDA - Copper Development Association, Copper Tube Handbook and Technical Notes"
+    ],
+    "PROVENANCE_WARNING": [
+      "The RANKINGS in this matrix reflect established corrosion-engineering consensus:",
+      "which material/media pairings are benign and which are known failure modes.",
+      "",
+      "The NUMBERS - compatibility_score to two decimals and predicted_lifespan_years -",
+      "are a calibration authored for this ruleset. They are NOT quoted from the cited",
+      "standards. The citation on each cell identifies the standard that GOVERNS THAT",
+      "MECHANISM, not a document from which the digit was read.",
+      "",
+      "A corrosion engineer must verify every cell against the cited source, and against",
+      "project water chemistry, before this pack drives any compliance verdict.",
+      "Water chemistry (chloride, pH, hardness, dissolved oxygen, velocity) dominates",
+      "several of these cells and is not represented in PipingElement at all."
+    ],
+    "cell_key": {
+      "score": "compatibility_score 0.0-1.0, HIGHER = WORSE (more corrosive pairing)",
+      "years": "predicted_lifespan_years at this pairing alone, before environment/temperature modifiers",
+      "mech": "dominant failure mechanism",
+      "cite": "standard governing this mechanism",
+      "conf": "established = broad consensus | provisional = needs project-specific verification"
+    },
+    "scoring_note": "MM-001 composite = 0.40*score + 0.35*environment_severity + 0.25*temperature_stress, per Issue #16. This file supplies only the first term.",
+    "unmapped_pairing_policy": "A material/media pairing absent from this matrix MUST emit a data-quality Issue, never a default score. Silent defaulting would report unverified pairings as compliant."
+  },
+
+  "parameters": {
+    "compatibility_matrix": {
+
+      "CarbonSteel": {
+        "cold_water":      {"score": 0.65, "years": 15, "mech": "uniform_corrosion_and_tuberculation", "cite": "CIBSE Guide G", "conf": "established"},
+        "hot_water":       {"score": 0.75, "years": 10, "mech": "accelerated_uniform_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "chilled_water":   {"score": 0.45, "years": 25, "mech": "oxygen_depletion_limited_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "condenser_water": {"score": 0.70, "years": 12, "mech": "oxygenated_open_loop_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "pool_water":      {"score": 0.95, "years": 3,  "mech": "chloride_and_hypochlorite_attack", "cite": "ASTM B117", "conf": "established"},
+        "steam":           {"score": 0.40, "years": 30, "mech": "feedwater_chemistry_dependent", "cite": "EN 12952-12", "conf": "provisional"},
+        "condensate":      {"score": 0.80, "years": 8,  "mech": "carbonic_acid_condensate_grooving", "cite": "EN 12952-12", "conf": "established"},
+        "stagnant_water":  {"score": 0.85, "years": 8,  "mech": "under_deposit_pitting_and_MIC", "cite": "CIBSE Guide G", "conf": "established"}
+      },
+
+      "GalvanisedSteel": {
+        "cold_water":      {"score": 0.35, "years": 30, "mech": "sacrificial_zinc_depletion", "cite": "CIBSE Guide G", "conf": "established"},
+        "hot_water":       {"score": 0.70, "years": 12, "mech": "zinc_polarity_reversal_above_60C", "cite": "CIBSE Guide G", "conf": "established"},
+        "chilled_water":   {"score": 0.30, "years": 30, "mech": "sacrificial_zinc_depletion", "cite": "CIBSE Guide G", "conf": "established"},
+        "condenser_water": {"score": 0.60, "years": 12, "mech": "zinc_dissolution_open_loop", "cite": "CIBSE Guide G", "conf": "provisional"},
+        "pool_water":      {"score": 0.95, "years": 2,  "mech": "rapid_zinc_attack_in_chlorinated_water", "cite": "ASTM B117", "conf": "established"},
+        "steam":           {"score": 0.90, "years": 2,  "mech": "zinc_coating_breakdown_at_temperature", "cite": "EN 12952-12", "conf": "established"},
+        "condensate":      {"score": 0.85, "years": 5,  "mech": "acidic_condensate_zinc_loss", "cite": "EN 12952-12", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.70, "years": 10, "mech": "zinc_depletion_then_substrate_pitting", "cite": "CIBSE Guide G", "conf": "established"}
+      },
+
+      "CastIron": {
+        "cold_water":      {"score": 0.45, "years": 40, "mech": "graphitic_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "hot_water":       {"score": 0.55, "years": 25, "mech": "graphitic_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "chilled_water":   {"score": 0.40, "years": 40, "mech": "graphitic_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "condenser_water": {"score": 0.60, "years": 20, "mech": "graphitic_corrosion_oxygenated", "cite": "CIBSE Guide G", "conf": "provisional"},
+        "pool_water":      {"score": 0.90, "years": 5,  "mech": "chloride_accelerated_graphitisation", "cite": "ASTM B117", "conf": "established"},
+        "steam":           {"score": 0.60, "years": 20, "mech": "thermal_cycling_and_scale", "cite": "EN 12952-12", "conf": "provisional"},
+        "condensate":      {"score": 0.75, "years": 12, "mech": "carbonic_acid_attack", "cite": "EN 12952-12", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.65, "years": 20, "mech": "MIC_and_tuberculation", "cite": "CIBSE Guide G", "conf": "established"}
+      },
+
+      "DuctileIron": {
+        "cold_water":      {"score": 0.40, "years": 45, "mech": "graphitic_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "hot_water":       {"score": 0.50, "years": 30, "mech": "graphitic_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "chilled_water":   {"score": 0.35, "years": 45, "mech": "graphitic_corrosion", "cite": "CIBSE Guide G", "conf": "established"},
+        "condenser_water": {"score": 0.55, "years": 22, "mech": "graphitic_corrosion_oxygenated", "cite": "CIBSE Guide G", "conf": "provisional"},
+        "pool_water":      {"score": 0.88, "years": 6,  "mech": "chloride_accelerated_graphitisation", "cite": "ASTM B117", "conf": "established"},
+        "steam":           {"score": 0.55, "years": 22, "mech": "thermal_cycling_and_scale", "cite": "EN 12952-12", "conf": "provisional"},
+        "condensate":      {"score": 0.72, "years": 14, "mech": "carbonic_acid_attack", "cite": "EN 12952-12", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.60, "years": 22, "mech": "MIC_and_tuberculation", "cite": "CIBSE Guide G", "conf": "established"}
+      },
+
+      "Copper_C12200": {
+        "cold_water":      {"score": 0.15, "years": 50, "mech": "type1_pitting_in_hard_cold_water", "cite": "CDA Copper Tube Handbook", "conf": "established"},
+        "hot_water":       {"score": 0.30, "years": 25, "mech": "type2_pitting_soft_water_above_60C", "cite": "CDA Copper Tube Handbook", "conf": "established"},
+        "chilled_water":   {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "CDA Copper Tube Handbook", "conf": "established"},
+        "condenser_water": {"score": 0.35, "years": 25, "mech": "erosion_corrosion_above_1_5_m_s", "cite": "CDA Copper Tube Handbook", "conf": "established"},
+        "pool_water":      {"score": 0.75, "years": 8,  "mech": "free_chlorine_attack_and_green_staining", "cite": "CDA Technical Note", "conf": "established"},
+        "steam":           {"score": 0.55, "years": 15, "mech": "strength_loss_at_temperature", "cite": "EN 12952-12", "conf": "provisional"},
+        "condensate":      {"score": 0.45, "years": 20, "mech": "carbonic_acid_attack", "cite": "CDA Technical Note", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.45, "years": 20, "mech": "pitting_under_stagnation", "cite": "CDA Copper Tube Handbook", "conf": "established"}
+      },
+
+      "Brass_C46400": {
+        "cold_water":      {"score": 0.30, "years": 35, "mech": "dezincification_in_aggressive_water", "cite": "CDA Technical Note", "conf": "established"},
+        "hot_water":       {"score": 0.45, "years": 20, "mech": "dezincification_accelerated_by_temperature", "cite": "CDA Technical Note", "conf": "established"},
+        "chilled_water":   {"score": 0.30, "years": 35, "mech": "dezincification", "cite": "CDA Technical Note", "conf": "established"},
+        "condenser_water": {"score": 0.40, "years": 20, "mech": "dezincification_and_erosion", "cite": "CDA Technical Note", "conf": "provisional"},
+        "pool_water":      {"score": 0.80, "years": 6,  "mech": "chloride_dezincification", "cite": "ASTM B117", "conf": "established"},
+        "steam":           {"score": 0.60, "years": 12, "mech": "stress_corrosion_cracking", "cite": "EN 12952-12", "conf": "provisional"},
+        "condensate":      {"score": 0.55, "years": 15, "mech": "ammoniacal_stress_corrosion_cracking", "cite": "CDA Technical Note", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.55, "years": 15, "mech": "dezincification_under_stagnation", "cite": "CDA Technical Note", "conf": "established"}
+      },
+
+      "CuNi_9010": {
+        "cold_water":      {"score": 0.12, "years": 50, "mech": "none_dominant", "cite": "CDA Technical Note", "conf": "established"},
+        "hot_water":       {"score": 0.18, "years": 40, "mech": "none_dominant", "cite": "CDA Technical Note", "conf": "established"},
+        "chilled_water":   {"score": 0.12, "years": 50, "mech": "none_dominant", "cite": "CDA Technical Note", "conf": "established"},
+        "condenser_water": {"score": 0.15, "years": 40, "mech": "designed_service_erosion_limited", "cite": "CDA Technical Note", "conf": "established"},
+        "pool_water":      {"score": 0.45, "years": 20, "mech": "chlorine_attack_moderate", "cite": "CDA Technical Note", "conf": "provisional"},
+        "steam":           {"score": 0.35, "years": 25, "mech": "erosion_at_high_velocity", "cite": "EN 12952-12", "conf": "provisional"},
+        "condensate":      {"score": 0.30, "years": 30, "mech": "ammoniacal_attack", "cite": "CDA Technical Note", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.40, "years": 25, "mech": "protective_film_breakdown_without_flow", "cite": "CDA Technical Note", "conf": "established"}
+      },
+
+      "SS304": {
+        "cold_water":      {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "hot_water":       {"score": 0.25, "years": 40, "mech": "chloride_pitting_if_above_50_ppm", "cite": "IMOA Design Manual", "conf": "established"},
+        "chilled_water":   {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "condenser_water": {"score": 0.45, "years": 20, "mech": "chloride_concentration_pitting", "cite": "ASTM G48", "conf": "established"},
+        "pool_water":      {"score": 0.90, "years": 3,  "mech": "chloride_pitting_and_SCC", "cite": "ASTM G48; IMOA Design Manual", "conf": "established"},
+        "steam":           {"score": 0.20, "years": 40, "mech": "none_dominant", "cite": "EN 12952-12", "conf": "established"},
+        "condensate":      {"score": 0.30, "years": 30, "mech": "chloride_concentration_at_phase_change", "cite": "ASTM G48", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.55, "years": 20, "mech": "crevice_corrosion_under_stagnation", "cite": "ASTM G48", "conf": "established"}
+      },
+
+      "SS316": {
+        "cold_water":      {"score": 0.10, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "hot_water":       {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "chilled_water":   {"score": 0.10, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "condenser_water": {"score": 0.30, "years": 30, "mech": "chloride_concentration_pitting", "cite": "ASTM G48", "conf": "established"},
+        "pool_water":      {"score": 0.55, "years": 15, "mech": "chloride_pitting_and_SCC", "cite": "ASTM G48; IMOA Design Manual", "conf": "established"},
+        "steam":           {"score": 0.15, "years": 50, "mech": "none_dominant", "cite": "EN 12952-12", "conf": "established"},
+        "condensate":      {"score": 0.22, "years": 40, "mech": "chloride_concentration_at_phase_change", "cite": "ASTM G48", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.40, "years": 25, "mech": "crevice_corrosion_under_stagnation", "cite": "ASTM G48", "conf": "established"}
+      },
+
+      "Duplex2205": {
+        "cold_water":      {"score": 0.08, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "hot_water":       {"score": 0.10, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "chilled_water":   {"score": 0.08, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "condenser_water": {"score": 0.15, "years": 40, "mech": "chloride_pitting_at_high_concentration", "cite": "ASTM G48", "conf": "established"},
+        "pool_water":      {"score": 0.20, "years": 40, "mech": "chloride_pitting_at_high_concentration", "cite": "IMOA Design Manual", "conf": "established"},
+        "steam":           {"score": 0.12, "years": 50, "mech": "885F_embrittlement_above_280C", "cite": "IMOA Design Manual", "conf": "established"},
+        "condensate":      {"score": 0.15, "years": 45, "mech": "none_dominant", "cite": "ASTM G48", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.20, "years": 40, "mech": "crevice_corrosion_under_stagnation", "cite": "ASTM G48", "conf": "established"}
+      },
+
+      "Titanium": {
+        "cold_water":      {"score": 0.03, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "hot_water":       {"score": 0.03, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "chilled_water":   {"score": 0.03, "years": 60, "mech": "none_dominant", "cite": "IMOA Design Manual", "conf": "established"},
+        "condenser_water": {"score": 0.05, "years": 60, "mech": "none_dominant", "cite": "ASTM G48", "conf": "established"},
+        "pool_water":      {"score": 0.05, "years": 60, "mech": "none_dominant", "cite": "ASTM G48", "conf": "established"},
+        "steam":           {"score": 0.10, "years": 55, "mech": "hydrogen_embrittlement_risk", "cite": "EN 12952-12", "conf": "provisional"},
+        "condensate":      {"score": 0.08, "years": 55, "mech": "none_dominant", "cite": "ASTM G48", "conf": "provisional"},
+        "stagnant_water":  {"score": 0.10, "years": 55, "mech": "none_dominant", "cite": "ASTM G48", "conf": "established"}
+      },
+
+      "PVC": {
+        "cold_water":      {"score": 0.05, "years": 50, "mech": "none_dominant", "cite": "CIBSE Guide G", "conf": "established"},
+        "hot_water":       {"score": 0.85, "years": 3,  "mech": "thermal_deformation_above_60C", "cite": "CIBSE Guide G", "conf": "established"},
+        "chilled_water":   {"score": 0.05, "years": 50, "mech": "none_dominant", "cite": "CIBSE Guide G", "conf": "established"},
+        "condenser_water": {"score": 0.15, "years": 40, "mech": "UV_embrittlement_if_exposed", "cite": "CIBSE Guide G", "conf": "provisional"},
+        "pool_water":      {"score": 0.10, "years": 40, "mech": "none_dominant", "cite": "CIBSE Guide G", "conf": "established"},
+        "steam":           {"score": 1.00, "years": 0,  "mech": "unsuitable_immediate_failure", "cite": "CIBSE Guide G", "conf": "established"},
+        "condensate":      {"score": 0.80, "years": 4,  "mech": "thermal_deformation", "cite": "CIBSE Guide G", "conf": "established"},
+        "stagnant_water":  {"score": 0.20, "years": 40, "mech": "biofilm_accumulation", "cite": "CIBSE Guide G", "conf": "provisional"}
+      }
+    },
+
+    "risk_band_thresholds": {
+      "medium": 0.35,
+      "high": 0.65,
+      "critical": 0.85
+    },
+
+    "weights": {
+      "material_media": 0.40,
+      "environment_severity": 0.35,
+      "temperature_stress": 0.25
+    },
+
+    "OPEN_QUESTIONS_FOR_REVIEW": [
+      "Media coverage: gases (oxygen, nitrous_oxide, vacuum, compressed_air, natural_gas), foul_water and rainwater are NOT in this matrix. Gas service is a materials-compatibility question of a different kind (cleanliness, ignition, permeation) and may warrant its own mechanism rather than MM-001 cells.",
+      "Materials not covered: SS304L, SS316L, SS316Ti, SuperDuplex2507, BlackSteel, CuNi_7030, Aluminium, PEX, HDPE, PPR. The L and Ti stainless variants can likely alias to their base grade; the rest need their own rows.",
+      "Water chemistry is absent from PipingElement. Chloride ppm, pH, hardness and dissolved oxygen drive several cells (copper Type 1 vs Type 2 pitting, SS304 chloride threshold). Without them these scores assume typical UK potable chemistry.",
+      "Velocity is absent from PipingElement. Copper erosion-corrosion is velocity-driven above roughly 1.5 m/s and CuNi requires minimum flow to maintain its film.",
+      "predicted_lifespan_years is capped at 60 as a design-life ceiling rather than a material limit."
+    ]
+  }
+}

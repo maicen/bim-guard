@@ -29,6 +29,7 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
         ("gpt-3.5-turbo", "GPT-3.5 Turbo"),
     ],
     "gemini": [
+        ("gemini/gemini-2.0-flash", "Gemini 2.0 Flash"),
         ("gemini/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
         ("gemini/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
         ("gemini/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
@@ -42,8 +43,8 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def _model_select(provider: str = "openai"):
-    models = PROVIDER_MODELS.get(provider, PROVIDER_MODELS["openai"])
+def _model_select(provider: str = "gemini"):
+    models = PROVIDER_MODELS.get(provider, PROVIDER_MODELS["gemini"])
     return Select(
         *[
             Option(label, value=value, selected=(idx == 0))
@@ -55,7 +56,7 @@ def _model_select(provider: str = "openai"):
     )
 
 
-def provider_model_select_fragment(provider: str = "openai"):
+def provider_model_select_fragment(provider: str = "gemini"):
     """HTMX fragment: the model <select> wrapper, swapped when provider changes."""
     return Div(_model_select(provider), id="model-select-container")
 
@@ -85,7 +86,7 @@ def rule_extraction_page_content(documents: list[dict]):
     ]
 
     provider_options = [
-        Option(label, value=slug, selected=(slug == "openai"))
+        Option(label, value=slug, selected=(slug == "gemini"))
         for slug, label in PROVIDER_LABELS.items()
     ]
 

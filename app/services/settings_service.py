@@ -14,11 +14,21 @@ DEFAULT_SETTINGS = [
         "description": "Object storage backend selector: local | supabase.",
     },
     {
+        "key": "BIM_GUARD_LLM_MODEL",
+        "value": "gemini/gemini-2.0-flash",
+        "value_type": "string",
+        "scope": "runtime",
+        "description": (
+            "Unified default LiteLLM model for extraction, rule building, and compliance "
+            "(Issue #17). Supersedes BIM_GUARD_RULE_MODEL."
+        ),
+    },
+    {
         "key": "BIM_GUARD_RULE_MODEL",
         "value": "gpt-4o-mini",
         "value_type": "string",
-        "scope": "runtime",
-        "description": "Default LiteLLM model used for rule extraction.",
+        "scope": "legacy",
+        "description": "Legacy rule-extraction model. Superseded by BIM_GUARD_LLM_MODEL.",
     },
     {
         "key": "OPENAI_MODEL",

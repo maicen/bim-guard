@@ -26,9 +26,19 @@ import json
 import openai
 
 try:
-    from config import OPENAI_API_KEY, OPENAI_MODEL
+    from config import (
+        COMPLIANCE_TEMPERATURE,
+        MAX_TOKENS_RULE_EXTRACTION,
+        OPENAI_API_KEY,
+        OPENAI_MODEL,
+    )
 except ImportError:
-    from app.modules.config import OPENAI_API_KEY, OPENAI_MODEL
+    from app.modules.config import (
+        COMPLIANCE_TEMPERATURE,
+        MAX_TOKENS_RULE_EXTRACTION,
+        OPENAI_API_KEY,
+        OPENAI_MODEL,
+    )
 
 
 # ── SYSTEM PROMPT ─────────────────────────────────────────────────────────────
@@ -204,7 +214,10 @@ class RuleConverter:
                     "content": f"Extract all rules from this regulation section:\n\n{text}",
                 },
             ],
-            temperature=0.1,
+            # Deterministic: the reply is parsed as strict JSON by
+            # _parse_response(), so schema drift matters more than variety.
+            temperature=COMPLIANCE_TEMPERATURE,
+            max_tokens=MAX_TOKENS_RULE_EXTRACTION,
         )
 
         raw = response.choices[0].message.content.strip()
