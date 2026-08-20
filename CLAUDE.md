@@ -102,7 +102,7 @@ The viewer route (`app/routes/viewer.py`) loads a 3D model in-browser using `@th
 - Page structure: `DashboardLayout` wraps all pages, with `AppSidebar` and `AppHeader` from `app/components/layout.py`
 - Action icon buttons (`ViewAction`, `EditAction`, `CreateAction`, `BackAction`) are in `app/components/ui.py`
 - Each domain has a `*_ui.py` component file and a `*_service.py` service file
-- File uploads are stored under `data/uploads/` with UUID-prefixed filenames
+- File uploads are stored in Supabase Storage with UUID-prefixed object keys; downloaded objects are cached under `data/cache/supabase-storage/`
 
 ## Coding Guidelines
 

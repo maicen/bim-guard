@@ -34,8 +34,8 @@ When in doubt, the project-specific instructions file is authoritative.
 
 - Handler must be `async def` and accept `UploadFile`.
 - Save through `ObjectStorage.save_upload(...)` in `app/services/object_storage.py`.
-- Runtime default is Supabase Storage (`BIM_GUARD_STORAGE_BACKEND=supabase`), with local storage as optional fallback.
-- Store returned references (`sb://bucket/key` or local path) in DB records instead of constructing paths in routes.
+- Runtime storage is Supabase Storage. Local disk is used only as a disposable cache under `data/cache/supabase-storage`.
+- Store returned Supabase references (`sb://bucket/key`) in DB records instead of constructing paths in routes.
 
 ## Naming Conventions
 

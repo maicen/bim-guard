@@ -1,18 +1,14 @@
-"""Persistence bootstrap utilities for Supabase tables and upload directories."""
+"""Persistence bootstrap utilities for Supabase tables."""
 
 import os
-from pathlib import Path
-
-from supabase import create_client
 
 from app.services.db_adapters import SupabaseTableAdapter
+from supabase import create_client
 
 
 class PersistenceService:
-    """Centralizes database and storage path bootstrap for route modules."""
+    """Centralize Supabase database bootstrap for route modules."""
 
-    DATA_DIR = Path("data")
-    UPLOADS_DIR = DATA_DIR / "uploads"
     DB_BACKEND = "supabase"
     _db = None
 
@@ -49,10 +45,3 @@ class PersistenceService:
         for column_name, column_type in (required_columns or {}).items():
             table.add_column(column_name, column_type)
         return table
-
-    @classmethod
-    def uploads_dir(cls, *parts: str) -> Path:
-        """Return an uploads subdirectory, creating it when missing."""
-        path = cls.UPLOADS_DIR.joinpath(*parts)
-        path.mkdir(parents=True, exist_ok=True)
-        return path

@@ -245,26 +245,19 @@ File upload routes must be `async` and accept `UploadFile` from `fasthtml.common
 
 ```python
 from fasthtml.common import UploadFile
-from pathlib import Path
-import uuid
-
-UPLOAD_DIR = Path("data/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 @rt("/api/upload", methods=["POST"])
 async def upload_handler(document: UploadFile):
     contents = await document.read()           # bytes
-    original_name = document.filename or "upload.bin"
-    safe_base = Path(original_name).name       # strips path traversal segments
-    safe_name = f"{uuid.uuid4().hex}_{safe_base}"
-    save_path = UPLOAD_DIR / safe_name
-    save_path.write_bytes(contents)            # save to disk
-    # Return HTMX fragment
-    return Div(P(f"Uploaded: {safe_name}"), cls="...")
+    storage_ref = ObjectStorage().save_upload(
+        document.filename or "upload.bin", contents, "uploads"
+    )
+    # Store storage_ref in Supabase and return an HTMX fragment.
+    return Div(P(f"Uploaded: {storage_ref}"), cls="...")
 ```
 
 - Always use `async def` for upload handlers
-- Save files under a dedicated directory (e.g. `data/uploads/`), never in `static/`
+- Save files through `ObjectStorage.save_upload(...)`; local disk is only a cache for downloaded Supabase objects
 - The form must include `enctype="multipart/form-data"` for uploads to work
 - Never trust client filenames directly; normalize with `Path(name).name` and add a server-generated prefix
 

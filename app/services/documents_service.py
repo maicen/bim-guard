@@ -9,9 +9,8 @@ class DocumentService:
     """Encapsulates CRUD and lookup operations for uploaded documents."""
 
     def __init__(self):
-        """Initialize the documents table and upload storage directory."""
+        """Initialize the documents table and Supabase Storage adapter."""
         self._storage = ObjectStorage()
-        self.upload_dir = PersistenceService.uploads_dir()
         self._documents = PersistenceService.get_table(
             "documents",
             {

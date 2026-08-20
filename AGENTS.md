@@ -21,7 +21,7 @@ The app is available at `http://127.0.0.1:8000`.
 - `app/services/` — persistence, storage, and extraction services
 - `app/modules/` — five-stage compliance pipeline
 - `supabase/migrations/` — schema changes tracked in-repo
-- `data/uploads/` — uploaded files and generated artifacts
+- `data/cache/supabase-storage/` — disposable cache for downloaded Supabase Storage objects
 - `static/` — CSS, JS, and viewer assets
 
 ## Working rules

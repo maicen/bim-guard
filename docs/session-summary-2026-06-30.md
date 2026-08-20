@@ -211,7 +211,7 @@ uv run uvicorn main:app --reload
 # → http://localhost:8000
 
 # Run IFC diagnostic on an uploaded file
-uv run python scripts/inspect_ifc_properties.py data/uploads/ifc/YOUR_FILE.ifc
+uv run python scripts/inspect_ifc_properties.py data/cache/supabase-storage/uploads/ifc/YOUR_FILE.ifc
 
 # Preview property name DB fixes
 uv run python scripts/fix_property_names.py --dry-run

@@ -4,15 +4,7 @@ from __future__ import annotations
 
 from app.services.static_data_service import StaticDataService
 
-
 DEFAULT_SETTINGS = [
-    {
-        "key": "BIM_GUARD_STORAGE_BACKEND",
-        "value": "supabase",
-        "value_type": "string",
-        "scope": "runtime",
-        "description": "Object storage backend selector: local | supabase.",
-    },
     {
         "key": "BIM_GUARD_RULE_MODEL",
         "value": "gpt-4o-mini",

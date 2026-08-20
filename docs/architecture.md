@@ -308,7 +308,7 @@ Services are the only components that perform I/O (besides reading uploaded file
 | --- | --- | --- |
 | `persistence.py` | Supabase client and table bootstrap | `get_db()`, `get_table(...)` |
 | `db_adapters.py` | Table API over Supabase Postgres | `SupabaseTableAdapter` |
-| `object_storage.py` | Unified object storage API over local filesystem and Supabase Storage | `save_upload(...)`, `materialize_local_path(...)`, `delete(...)` |
+| `object_storage.py` | Supabase Storage API with local materialization cache | `save_upload(...)`, `materialize_local_path(...)`, `delete(...)` |
 | `gemini_rule_extractor.py` | Extract candidate rules from standards text using Gemini | `extract_rules(...)`, validation helpers |
 
 ### 9.1 Persistence schema (current)
