@@ -6,7 +6,10 @@ import os
 import uuid
 from pathlib import Path
 
+from app.logging_config import get_logger
 from supabase import Client, create_client
+
+logger = get_logger(__name__)
 
 
 class ObjectStorage:
@@ -26,11 +29,16 @@ class ObjectStorage:
         key = "/".join(part.strip("/") for part in [subdir, object_name] if part).strip("/")
 
         object_key = self._apply_prefix(key)
-        self._supabase_client().storage.from_(self._bucket).upload(
-            path=object_key,
-            file=content,
-            file_options={"upsert": "true"},
-        )
+        try:
+            self._supabase_client().storage.from_(self._bucket).upload(
+                path=object_key,
+                file=content,
+                file_options={"upsert": "true"},
+            )
+        except Exception:
+            logger.exception("Storage upload failed bucket=%s key=%s bytes=%d", self._bucket, object_key, len(content))
+            raise
+        logger.info("Storage upload complete bucket=%s key=%s bytes=%d", self._bucket, object_key, len(content))
         return f"sb://{self._bucket}/{object_key}"
 
     def materialize_local_path(self, reference: str) -> Path | None:
@@ -50,13 +58,20 @@ class ObjectStorage:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
 
         if cache_file.exists() and cache_file.is_file():
+            logger.debug("Storage cache hit bucket=%s key=%s", bucket, key)
             return cache_file
 
-        content = self._supabase_client().storage.from_(bucket).download(key)
+        try:
+            content = self._supabase_client().storage.from_(bucket).download(key)
+        except Exception:
+            logger.exception("Storage download failed bucket=%s key=%s", bucket, key)
+            raise
         if not content:
+            logger.warning("Storage download returned no content bucket=%s key=%s", bucket, key)
             return None
 
         cache_file.write_bytes(content)
+        logger.info("Storage object cached bucket=%s key=%s bytes=%d", bucket, key, len(content))
         return cache_file
 
     def delete(self, reference: str) -> None:
@@ -72,11 +87,16 @@ class ObjectStorage:
             return
 
         bucket, key = parsed
-        self._supabase_client().storage.from_(bucket).remove([key])
+        try:
+            self._supabase_client().storage.from_(bucket).remove([key])
+        except Exception:
+            logger.exception("Storage deletion failed bucket=%s key=%s", bucket, key)
+            raise
 
         cache_file = self._cache_dir / key
         if cache_file.exists() and cache_file.is_file():
             cache_file.unlink()
+        logger.info("Storage object deleted bucket=%s key=%s", bucket, key)
 
     def _apply_prefix(self, key: str) -> str:
         """Prefix object keys when SUPABASE_STORAGE_PREFIX is configured."""

@@ -118,7 +118,17 @@ def configure_logging(level: str | int | None = None, *, force: bool = False) ->
 
     # Keep third-party chatter one degree quieter than the app itself.
     noisy_floor = max(effective, logging.INFO)
-    for name in ("httpx", "httpcore", "urllib3", "litellm", "LiteLLM", "watchfiles"):
+    for name in (
+        "httpx",
+        "httpcore",
+        "hpack",
+        "hpack.hpack",
+        "h2",
+        "urllib3",
+        #"litellm",
+        #"LiteLLM",
+        "watchfiles",
+    ):
         logging.getLogger(name).setLevel(noisy_floor)
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
         uvicorn_logger = logging.getLogger(name)

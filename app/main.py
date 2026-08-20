@@ -1,6 +1,9 @@
 from pathlib import Path
+from threading import Thread
+from time import perf_counter
 
 from fasthtml.common import FileResponse, Title, fast_app
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.compat.monsterui import ensure_monsterui_compat
 
@@ -16,7 +19,6 @@ from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
 from app.logging_config import configure_logging, get_logger
-from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
 from app.utils import load_env_file
 
 try:
@@ -65,6 +67,38 @@ app, rt = fast_app(
     hdrs=APP_HEADERS,
     cls="antialiased",
 )
+
+
+class PageLoadLoggingMiddleware(BaseHTTPMiddleware):
+    """Log browser page responses at DEBUG level with status and latency."""
+
+    async def dispatch(self, request, call_next):
+        started = perf_counter()
+        response = await call_next(request)
+
+        if request.method != "GET":
+            return response
+
+        path = request.url.path
+        if path.startswith("/static/") or path in {"/live-reload", "/favicon.ico"}:
+            return response
+
+        content_type = (response.headers.get("content-type") or "").lower()
+        if "text/html" not in content_type:
+            return response
+
+        duration_ms = (perf_counter() - started) * 1000
+        logger.debug(
+            "Page loaded method=%s path=%s status=%d duration_ms=%.1f",
+            request.method,
+            path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
+
+
+app.add_middleware(PageLoadLoggingMiddleware)
 
 _ROUTE_INSTALLERS = (
     viewer.setup_routes,
@@ -148,6 +182,11 @@ def _seed_library_once_per_host() -> None:
         logger.warning("Could not acquire seeding lock; skipping seed", exc_info=True)
 
 
+def _schedule_seed_library_once_per_host() -> None:
+    """Kick off library seeding in the background so startup can return quickly."""
+    Thread(target=_seed_library_once_per_host, daemon=True).start()
+
+
 def _setup_routes() -> None:
     """Register all routes exactly once during process startup."""
     global _ROUTES_REGISTERED
@@ -159,11 +198,7 @@ def _setup_routes() -> None:
     _ROUTES_REGISTERED = True
 
 
-_seed_library_once_per_host()
-try:
-    warm_optional_rule_pipeline_dependencies()
-except Exception:
-    logger.debug("Optional rule pipeline dependencies unavailable", exc_info=True)
+_schedule_seed_library_once_per_host()
 _setup_routes()
 logger.info("BIM Guard startup complete")
 

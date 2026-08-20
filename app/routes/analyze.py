@@ -45,6 +45,7 @@ from app.components.ui import (
     Select,
     SubmitButton,
 )
+from app.logging_config import get_logger
 from app.modules.orchestrator import BIMGuard_App
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
@@ -54,6 +55,7 @@ _bim_guard_app = BIMGuard_App()
 _projects_service = ProjectsService()
 _documents_service = DocumentService()
 _rule_service = RuleService()
+logger = get_logger(__name__)
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
 
@@ -501,10 +503,12 @@ async def _run_analysis_request(req: Request, forced_theme: str | None = None):
     form = await req.form()
     project_id_raw = form.get("project_id") or ""
     if not project_id_raw:
+        logger.warning("Rejected analysis request without a project ID")
         return None, Alert("Please select a project.", cls=AlertT.error)
     try:
         project_id = int(project_id_raw)
     except ValueError:
+        logger.warning("Rejected analysis request with invalid project ID=%r", project_id_raw)
         return None, Alert("Invalid project selection.", cls=AlertT.error)
 
     doc_ids = [int(v) for v in form.getlist("document_ids") if v]
@@ -513,6 +517,13 @@ async def _run_analysis_request(req: Request, forced_theme: str | None = None):
     include_openings = bool(form.get("include_openings"))
     include_spaces = bool(form.get("include_spaces"))
     include_type_definitions = bool(form.get("include_type_definitions"))
+    logger.info(
+        "Starting analysis request project_id=%d theme=%s documents=%d rule_folder=%s",
+        project_id,
+        analysis_theme,
+        len(doc_ids),
+        rule_folder or "all",
+    )
     result = _bim_guard_app.orchestrate_workflow(
         project_id,
         doc_ids,
@@ -524,8 +535,15 @@ async def _run_analysis_request(req: Request, forced_theme: str | None = None):
     )
 
     if "error" in result:
+        logger.warning("Analysis request failed project_id=%d error=%s", project_id, result["error"])
         return None, Alert(result["error"], cls=AlertT.error)
 
+    logger.info(
+        "Analysis request complete project_id=%d ifc_elements=%d rule_results=%d",
+        project_id,
+        result.get("ifc_element_count", 0),
+        len(result.get("rule_compliance", [])),
+    )
     return {"project_id": project_id, "result": result}, None
 
 

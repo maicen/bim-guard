@@ -53,10 +53,41 @@ DEFAULT_SETTINGS = [
 class SettingsService:
     """Expose DB-backed application settings with seeded defaults."""
 
+    _defaults_seeded = False
+    _values_cache: dict[str, str] | None = None
+
     def __init__(self) -> None:
         """Initialize settings tables and insert missing default settings."""
         self._static = StaticDataService()
-        self._static.seed_default_settings(DEFAULT_SETTINGS)
+        if not self.__class__._defaults_seeded:
+            self.__class__._values_cache = self._static.seed_default_settings_with_snapshot(
+                DEFAULT_SETTINGS
+            )
+            self.__class__._defaults_seeded = True
+        elif self.__class__._values_cache is None:
+            self.__class__._values_cache = {
+                str(row.get("key") or "").strip(): str(row.get("value") or "")
+                for row in self._static.list_settings()
+                if str(row.get("key") or "").strip()
+            }
+
+    @classmethod
+    def _cache(cls) -> dict[str, str]:
+        """Return the in-process settings cache, loading from DB on first read."""
+        if cls._values_cache is None:
+            svc = StaticDataService()
+            cls._values_cache = {
+                str(row.get("key") or "").strip(): str(row.get("value") or "")
+                for row in svc.list_settings()
+                if str(row.get("key") or "").strip()
+            }
+        return cls._values_cache
+
+    @classmethod
+    def _refresh_cache(cls) -> None:
+        """Refresh the in-process settings cache from persistent storage."""
+        cls._values_cache = None
+        cls._cache()
 
     def list_settings(self) -> list[dict]:
         """Return all stored settings rows."""
@@ -64,13 +95,17 @@ class SettingsService:
 
     def get(self, key: str, default: str = "") -> str:
         """Return one setting value."""
-        return self._static.get_setting(key, default)
+        normalized = key.strip()
+        if not normalized:
+            return default
+        return self._cache().get(normalized, default)
 
     def set(self, key: str, value: str) -> None:
         """Persist one setting value while preserving metadata defaults."""
         existing = next((row for row in self.list_settings() if row.get("key") == key), None)
         if existing is None:
             self._static.upsert_setting(key=key, value=value)
+            self._cache()[key] = value
             return
 
         self._static.upsert_setting(
@@ -81,3 +116,4 @@ class SettingsService:
             is_secret=bool(existing.get("is_secret") or 0),
             description=str(existing.get("description") or ""),
         )
+        self._cache()[key] = value

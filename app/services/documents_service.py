@@ -1,8 +1,11 @@
 """Document persistence service for uploaded source files and extracted text."""
 
+from app.logging_config import get_logger
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import find_row_by_field, now_iso_utc, rows_desc_by_id
+
+logger = get_logger(__name__)
 
 
 class DocumentService:
@@ -37,7 +40,7 @@ class DocumentService:
 
     def create_document(self, md5_hash: str, filename: str, file_path: str, extracted_text: str):
         """Create and persist a new uploaded document record."""
-        return self._documents.insert(
+        document = self._documents.insert(
             {
                 "md5_hash": md5_hash,
                 "filename": filename,
@@ -46,10 +49,19 @@ class DocumentService:
                 "upload_date": now_iso_utc(),
             }
         )
+        logger.info(
+            "Document created document_id=%s filename=%s extracted_chars=%d",
+            document.get("id"),
+            filename,
+            len(extracted_text),
+        )
+        return document
 
     def store_document_file(self, filename: str, content: bytes) -> str:
         """Persist document bytes and return the durable storage reference."""
-        return self._storage.save_upload(filename, content, "uploads")
+        storage_ref = self._storage.save_upload(filename, content, "uploads")
+        logger.info("Document file stored filename=%s bytes=%d", filename, len(content))
+        return storage_ref
 
     def update_document(self, document_id: int, filename: str, extracted_text: str):
         """Update mutable document metadata and extracted text."""
@@ -57,15 +69,18 @@ class DocumentService:
             updates={"filename": filename, "extracted_text": extracted_text},
             pk_values=document_id,
         )
+        logger.info("Document updated document_id=%d extracted_chars=%d", document_id, len(extracted_text))
 
     def delete_document(self, document_id: int):
         """Delete a document row by primary key."""
         self._documents.delete(document_id)
+        logger.info("Document deleted document_id=%d", document_id)
 
     def delete_document_with_file(self, document_id: int):
         """Delete a document and best-effort remove its stored file from disk."""
         document = self.get_document(document_id)
         if document is None:
+            logger.warning("Skipped deletion for missing document_id=%d", document_id)
             return
 
         file_path = document.get("file_path")
@@ -74,6 +89,7 @@ class DocumentService:
                 self._storage.delete(file_path)
             except OSError:
                 # Keep DB deletion resilient even when file cleanup fails.
+                logger.warning("Document file cleanup failed document_id=%d", document_id, exc_info=True)
                 pass
 
         self.delete_document(document_id)

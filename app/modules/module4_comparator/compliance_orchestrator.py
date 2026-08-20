@@ -1,16 +1,15 @@
 """Compliance Orchestrator - wires runner, tracker, and BCF exporter."""
-
-import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List, Optional
 
+from app.logging_config import get_logger
 from app.modules.module4_comparator.compliance_runner import run_compliance
 from app.modules.module4_comparator.issue_schema import Issue, RiskBand
 from app.modules.module4_comparator.issue_tracker import IssueTracker
 from app.services.bcf_exporter import BCFExporter
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ComplianceOrchestrator:
@@ -23,8 +22,12 @@ class ComplianceOrchestrator:
 
     def run_and_log_compliance(self, elements, run_name="Compliance Run", export_bcf_path=None):
         """Execute full pipeline: run -> convert -> log -> export."""
-        logger.info(f"Starting compliance run: {run_name}")
-        raw_results = run_compliance(elements)
+        logger.info("Starting compliance run name=%s elements=%d", run_name, len(elements))
+        try:
+            raw_results = run_compliance(elements)
+        except Exception:
+            logger.exception("Compliance runner failed name=%s", run_name)
+            raise
         issues = self._results_to_issues(raw_results, run_name)
         self._log_issues_to_tracker(issues)
         bcf_path = None
@@ -32,6 +35,13 @@ class ComplianceOrchestrator:
             bcf_path = self._export_to_bcf(issues, export_bcf_path)
         self._last_run_issues = issues
         summary = self._summarize_issues(issues)
+        logger.info(
+            "Compliance run complete name=%s raw_results=%d issues=%d bcf_exported=%s",
+            run_name,
+            len(raw_results),
+            len(issues),
+            bcf_path is not None,
+        )
         return {
             "issues": issues,
             "run_name": run_name,
@@ -126,6 +136,7 @@ class ComplianceOrchestrator:
             run_comment="Compliance run via ComplianceOrchestrator",
         )
         self._tracker._save()
+        logger.debug("Compliance issues recorded issues=%d", len(issues))
 
     def _export_to_bcf(self, issues, output_path):
         """Export issues to BCF format."""
@@ -134,6 +145,7 @@ class ComplianceOrchestrator:
         markup_xml = self._exporter.generate_bcf_markup_xml(issues)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(markup_xml)
+        logger.info("BCF export complete path=%s issues=%d", output_path, len(issues))
         return output_path
 
     def _summarize_issues(self, issues):

@@ -9,7 +9,6 @@ from typing import Any
 from app.services.persistence import PersistenceService
 from app.utils import now_iso_utc
 
-
 _STATIC_ASSET_SCHEMA = {
     "id": int,
     "asset_key": str,
@@ -159,14 +158,48 @@ class StaticDataService:
         rows = list(self._settings.rows)
         return sorted(rows, key=lambda row: str(row.get("key") or ""))
 
+    def seed_default_settings_with_snapshot(self, defaults: list[dict[str, Any]]) -> dict[str, str]:
+        """Ensure defaults exist and return a key/value snapshot with one initial read."""
+        rows = self.list_settings()
+        existing_values: dict[str, str] = {
+            str(row.get("key") or "").strip(): str(row.get("value") or "")
+            for row in rows
+            if str(row.get("key") or "").strip()
+        }
+
+        for item in defaults:
+            key = str(item.get("key") or "").strip()
+            if not key or key in existing_values:
+                continue
+            value = str(item.get("value") or "")
+            self._settings.insert(
+                {
+                    "key": key,
+                    "value": value,
+                    "value_type": str(item.get("value_type") or "string"),
+                    "scope": str(item.get("scope") or "runtime"),
+                    "is_secret": int(bool(item.get("is_secret") or False)),
+                    "description": str(item.get("description") or ""),
+                    "updated_at": now_iso_utc(),
+                }
+            )
+            existing_values[key] = value
+
+        return existing_values
+
     def seed_default_settings(self, defaults: list[dict[str, Any]]) -> int:
         """Insert missing settings from defaults without overwriting values."""
+        existing_keys = {
+            str(row.get("key") or "").strip()
+            for row in self.list_settings()
+            if str(row.get("key") or "").strip()
+        }
         inserted = 0
         for item in defaults:
             key = str(item.get("key") or "").strip()
             if not key:
                 continue
-            if self._settings.get(key) is not None:
+            if key in existing_keys:
                 continue
             self._settings.insert(
                 {
@@ -179,5 +212,6 @@ class StaticDataService:
                     "updated_at": now_iso_utc(),
                 }
             )
+            existing_keys.add(key)
             inserted += 1
         return inserted

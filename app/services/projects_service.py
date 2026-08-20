@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from app.logging_config import get_logger
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import (
@@ -10,6 +11,8 @@ from app.utils import (
     rows_desc_by_id,
     safe_upload_name,
 )
+
+logger = get_logger(__name__)
 
 
 class ProjectsService:
@@ -48,18 +51,22 @@ class ProjectsService:
     async def prepare_ifc_upload(self, ifc_file) -> tuple[str, str]:
         """Validate and persist an uploaded IFC file, returning path and MD5 hash."""
         if not ifc_file or not getattr(ifc_file, "filename", None):
+            logger.warning("Skipped IFC upload because no file was supplied")
             return "", ""
 
         filename = safe_upload_name(ifc_file.filename)
         if not filename.lower().endswith(".ifc"):
+            logger.warning("Rejected non-IFC project upload filename=%s", filename)
             return "", ""
 
         content = await ifc_file.read()
         if not content:
+            logger.warning("Rejected empty IFC upload filename=%s", filename)
             return "", ""
 
         ifc_md5_hash = md5_hex(content)
         storage_ref = self._storage.save_upload(filename, content, "uploads/ifc")
+        logger.info("IFC upload prepared filename=%s bytes=%d", filename, len(content))
         return storage_ref, ifc_md5_hash
 
     def create_project(
@@ -72,7 +79,7 @@ class ProjectsService:
     ):
         """Insert a new project record into the database."""
         now = now_iso_utc()
-        return self._projects.insert(
+        project = self._projects.insert(
             {
                 "name": name.strip(),
                 "description": description.strip(),
@@ -83,6 +90,8 @@ class ProjectsService:
                 "updated_at": now,
             }
         )
+        logger.info("Project created project_id=%s status=%s has_ifc=%s", project.get("id"), status, bool(ifc_file_path))
+        return project
 
     def update_project(
         self, project_id: int, name: str, description: str = "", status: str = "Draft"
@@ -97,6 +106,7 @@ class ProjectsService:
             },
             pk_values=project_id,
         )
+        logger.info("Project updated project_id=%d status=%s", project_id, status)
 
     def delete_project(self, project_id: int):
         """Delete a project row by primary key."""
@@ -104,6 +114,7 @@ class ProjectsService:
         if project is not None:
             self._storage.delete(project.get("ifc_file_path") or "")
         self._projects.delete(project_id)
+        logger.info("Project deleted project_id=%d existed=%s", project_id, project is not None)
 
     def resolve_ifc_file(self, project_id: int) -> Path | None:
         """Return an existing IFC file path for a project, if present."""
@@ -113,6 +124,9 @@ class ProjectsService:
 
         ifc_file_path = project.get("ifc_file_path") or ""
         if not ifc_file_path:
+            logger.debug("Project has no IFC file project_id=%d", project_id)
             return None
 
-        return self._storage.materialize_local_path(ifc_file_path)
+        local_path = self._storage.materialize_local_path(ifc_file_path)
+        logger.debug("Resolved project IFC project_id=%d available=%s", project_id, local_path is not None)
+        return local_path
