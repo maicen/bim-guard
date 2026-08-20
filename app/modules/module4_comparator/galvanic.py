@@ -14,7 +14,7 @@ the input/output contracts are adapted to the repo's schema.
 
 INPUT
     elements   — list[PipingElement] from Module2
-    rule_pack  — dict loaded from the rules SQLite table (or a JSON file
+    rule_pack  — dict loaded from the Supabase rules table (or a JSON file
                  during development). Expected keys documented below.
 
 OUTPUT

@@ -54,7 +54,7 @@ BIM-Guard is a FastHTML + MonsterUI web application for BIM (Building Informatio
 
 ```text
 Routes (app/routes/)       → HTTP handlers, HTMX responses
-Services (app/services/)   → Business logic, SQLite persistence
+Services (app/services/)   → Business logic, Supabase persistence
 Components (app/components/) → Reusable FastHTML UI elements
 Modules (app/modules/)     → 5-step compliance pipeline
 ```
@@ -63,19 +63,19 @@ Modules (app/modules/)     → 5-step compliance pipeline
 
 - **FastHTML** — Python framework where HTML is generated programmatically as Python objects (no template files). Every UI element is a Python function returning HTML nodes.
 - **MonsterUI** — Tailwind-based component library layered on top of FastHTML. Components like `Card`, `Button`, `Grid` are imported and used directly.
-- **fastlite** — Thin SQLite ORM. Tables are accessed as `db.t.projects`, `db.t.documents`, `db.t.rules`. Schema is defined in `app/services/persistence.py`.
+- **Supabase** — Managed Postgres persistence accessed through `PersistenceService` and the table adapters in `app/services/persistence.py`.
 - **HTMX** — Used via FastHTML's `hx_*` attributes for partial page updates without full reloads.
 
 ### Data Flow
 
 1. `main.py` (root) → boots uvicorn
 2. `app/main.py` → initializes FastHTML app, mounts all routes
-3. Routes call services for data; services call fastlite tables directly
+3. Routes call services for data; services call Supabase through the shared persistence layer
 4. Routes return FastHTML components (which become HTML) or trigger HTMX swaps
 
 ### Database
 
-SQLite at `data/bim_guard.db`. Three tables:
+Supabase Postgres stores the application data. The primary tables are:
 
 - `projects` — IFC project metadata + file paths
 - `documents` — Uploaded PDFs with extracted text

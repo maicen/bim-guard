@@ -14,6 +14,8 @@ wheels/
 tmp_sig_check.sqlite
 .playwright-mcp/
 .sesskey
-data/cache/
+# data/cache/
 .DS_Store
 docs/MonsterUI/
+data/cache/supabase-storage/uploads/
+data/cache/supabase-storage/migration/uploads/
