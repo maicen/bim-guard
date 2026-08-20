@@ -15,6 +15,7 @@ from monsterui.all import (
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
+from app.logging_config import configure_logging, get_logger
 from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
 from app.utils import load_env_file
 
@@ -24,6 +25,28 @@ except ImportError:  # pragma: no cover - non-POSIX platforms
     fcntl = None
 
 load_env_file()
+configure_logging()
+logger = get_logger(__name__)
+
+
+def _apply_persisted_log_level() -> None:
+    """Let the DB-backed log level win when no env override is present."""
+    import os
+
+    if os.environ.get("BIM_GUARD_LOG_LEVEL") or os.environ.get("LOG_LEVEL"):
+        return
+    try:
+        from app.logging_config import set_log_level
+        from app.services.settings_service import SettingsService
+
+        level = SettingsService().get("BIM_GUARD_LOG_LEVEL", "")
+        if level:
+            set_log_level(level)
+    except Exception:
+        logger.debug("Could not load persisted log level", exc_info=True)
+
+
+_apply_persisted_log_level()
 
 from app.routes import (
     analyze,
@@ -105,7 +128,7 @@ def _seed_library() -> None:
         seed_engine_rulesets(svc)
 
     except Exception:
-        pass  # never crash startup over seeding
+        logger.warning("Rule library seeding failed; continuing startup", exc_info=True)
 
 
 def _seed_library_once_per_host() -> None:
@@ -122,7 +145,7 @@ def _seed_library_once_per_host() -> None:
                     return
             _seed_library()
     except Exception:
-        pass
+        logger.warning("Could not acquire seeding lock; skipping seed", exc_info=True)
 
 
 def _setup_routes() -> None:
@@ -131,6 +154,7 @@ def _setup_routes() -> None:
     if _ROUTES_REGISTERED:
         return
     for installer in _ROUTE_INSTALLERS:
+        logger.debug("Registering routes from %s", installer.__module__)
         installer(rt)
     _ROUTES_REGISTERED = True
 
@@ -139,8 +163,9 @@ _seed_library_once_per_host()
 try:
     warm_optional_rule_pipeline_dependencies()
 except Exception:
-    pass
+    logger.debug("Optional rule pipeline dependencies unavailable", exc_info=True)
 _setup_routes()
+logger.info("BIM Guard startup complete")
 
 
 @rt("/")
@@ -157,4 +182,4 @@ def get():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host="0.0.0.0", reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", reload=True, log_config=None)

@@ -48,6 +48,13 @@ DEFAULT_SETTINGS = [
         "scope": "runtime",
         "description": "Optional key prefix for artifacts in Supabase Storage.",
     },
+    {
+        "key": "BIM_GUARD_LOG_LEVEL",
+        "value": "WARNING",
+        "value_type": "string",
+        "scope": "runtime",
+        "description": "Log verbosity: 0-4 or ERROR | WARNING | INFO | DEBUG | TRACE.",
+    },
 ]
 
 

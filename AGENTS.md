@@ -1,37 +1,47 @@
 # AGENTS.md
 
-## Architecture
+## Project overview
 
-BIM-Guard is a **FastHTML full-stack application**. The UI and backend routes are served together from a single ASGI process — there is no separate frontend project, no React build step, and no `frontend/` folder. UI elements are generated as Python FastTags (FT) and delivered through HTMX partial swaps.
+This repository is a single-process FastHTML + MonsterUI application for BIM compliance workflows. The backend, UI, and HTMX interactions live together in Python under `app/`; there is no separate React or frontend build.
 
-## Setup commands
+## Essential commands
 
-- Install deps: `uv sync`
-- Install optional ML deps group: `uv sync --group ml-pipeline`
-- Start server: `uv run uvicorn main:app --reload`
-
-## Dependency Management Rule
-
-All Python dependencies must be managed via `uv` and declared in `pyproject.toml` (including optional dependency groups). Do not add or maintain separate `requirements.txt` files.
+- Install dependencies: `uv sync`
+- Install optional ML pipeline: `uv sync --group ml-pipeline`
+- Run locally: `uv run uvicorn main:app --reload`
+- Lint: `uv run ruff check .`
 
 The app is available at `http://127.0.0.1:8000`.
 
-## Docstring and API Documentation Rule
+## Repo structure
 
-- Follow [PEP 257](https://peps.python.org/pep-0257/) for Python docstrings.
-- Use Python [pydoc](https://docs.python.org/3/library/pydoc.html) when validating or generating API docs.
-- For new public modules/classes/functions, add or update docstrings as part of the same change.
+- `app/main.py` — bootstrap and route registration
+- `app/routes/` — HTTP handlers and HTMX endpoints
+- `app/components/` — reusable UI building blocks
+- `app/services/` — persistence, storage, and extraction services
+- `app/modules/` — five-stage compliance pipeline
+- `supabase/migrations/` — schema changes tracked in-repo
+- `data/uploads/` — uploaded files and generated artifacts
+- `static/` — CSS, JS, and viewer assets
 
-Useful commands:
+## Working rules
 
-- `uv run ruff check .`
-- `uv run python -m pydoc app.modules.orchestrator`
-- `uv run python -m pydoc -w app.modules.orchestrator`
+- Use `uv` and `pyproject.toml` for dependency management; do not add or maintain a separate `requirements.txt`.
+- Prefer the existing FastHTML + MonsterUI patterns already used in `app/components/` and `app/routes/` instead of inventing ad hoc HTML.
+- Keep route files focused on composition; move repeated UI patterns into shared components in `app/components/`.
+- For code under `app/**`, follow the detailed conventions in [.github/instructions/project-specific.instructions.md](.github/instructions/project-specific.instructions.md).
+- Read [docs/README.md](docs/README.md) for the authoritative markdown index before adding new documentation.
+- For public modules, classes, and functions, add or update PEP 257 docstrings when changing behavior.
 
-## Instructions Files Map
+## Documentation map
 
-| File | Who reads it | What it defines |
-| --- | --- | --- |
-| README.md | Humans | What the project is |
-| AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
-| DESIGN.md | Design agents | How the project should look and feel |
+- [README.md](README.md) — overview and local setup
+- [docs/README.md](docs/README.md) — documentation index
+- [.github/instructions/project-specific.instructions.md](.github/instructions/project-specific.instructions.md) — app-specific coding conventions
+- [DESIGN.md](DESIGN.md) — design direction
+
+## Quality bar
+
+- Keep changes consistent with the repo’s FastHTML architecture and reuse existing service/component boundaries.
+- Prefer small, targeted edits over broad rewrites.
+- Validate with the smallest relevant command, typically `uv run ruff check .` for Python changes.
