@@ -6,7 +6,6 @@ from app.services.static_data_service import StaticDataService
 
 DEFAULT_SETTINGS = [
     {
-<<<<<<< HEAD
         "key": "BIM_GUARD_STORAGE_BACKEND",
         "value": "supabase",
         "value_type": "string",
@@ -24,8 +23,6 @@ DEFAULT_SETTINGS = [
         ),
     },
     {
-=======
->>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d
         "key": "BIM_GUARD_RULE_MODEL",
         "value": "gpt-4o-mini",
         "value_type": "string",
