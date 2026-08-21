@@ -17,10 +17,6 @@ tmp_sig_check.sqlite
 # data/cache/
 .DS_Store
 docs/MonsterUI/
-<<<<<<< HEAD
-
 apply_benchmark_patch*.ps1
-=======
 data/cache/supabase-storage/uploads/
 data/cache/supabase-storage/migration/uploads/
->>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d

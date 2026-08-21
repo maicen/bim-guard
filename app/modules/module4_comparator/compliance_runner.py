@@ -1,18 +1,111 @@
 from typing import Any
-from pathlib import Path
 
-from app.engines.bimguard_galvanic_engine import (
-    run_galvanic_compliance_check,
-)
-from app.engines.bimguard_crevice_engine import (
-    run_crevice_compliance_check,
-)
-from app.engines.bimguard_corrosion_engine import (
-    run_corrosion_check,
-)
-from app.engines.bimguard_mic_engine import (
-    run_mic_compliance_check,
-)
+from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_risk
+from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
+from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
+from app.modules.module4_comparator.engine_registry import DEFAULT_ENGINE_REGISTRY, register_default_engines
+
+
+def _coerce_gc_element(element: Any) -> GCElement:
+    info = getattr(element, "get_info", lambda: {})()
+    material = info.get("material") or getattr(element, "material", "") or "carbon_steel"
+    paired = info.get("paired_material") or getattr(element, "paired_material", "") or material
+    return GCElement(
+        global_id_anode=str(getattr(element, "GlobalId", "anode")),
+        global_id_cathode=str(getattr(element, "GlobalId", "cathode")),
+        material_anode=str(material),
+        material_cathode=str(paired),
+        anode_area_m2=float(info.get("anode_area_m2", 1.0) or 1.0),
+        cathode_area_m2=float(info.get("cathode_area_m2", 1.0) or 1.0),
+        zone_category=str(info.get("zone_category") or getattr(element, "zone_category", "") or ""),
+        floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
+        system_type=str(info.get("system_type") or getattr(element, "system_type", "Unknown") or "Unknown"),
+    )
+
+
+def _coerce_cc_element(element: Any) -> CCElement:
+    info = getattr(element, "get_info", lambda: {})()
+    return CCElement(
+        global_id=str(getattr(element, "GlobalId", None) or getattr(element, "global_id", "")),
+        element_type=str(getattr(element, "is_a", lambda: getattr(element, "element_type", ""))() or "IfcPipeSegment"),
+        material=str(info.get("material") or getattr(element, "material", "") or "stainless_steel"),
+        joint_description=str(info.get("joint_description") or getattr(element, "joint_description", "") or "tight"),
+        operating_temp_c=float(info.get("operating_temp_c") or getattr(element, "operating_temp_c", 20.0) or 20.0),
+        zone_category=str(info.get("zone_category") or getattr(element, "zone_category", "") or ""),
+        system_type=str(info.get("system_type") or getattr(element, "system_type", "Unknown") or "Unknown"),
+        floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
+    )
+
+
+def _coerce_mic_element(element: Any) -> MICElement:
+    info = getattr(element, "get_info", lambda: {})()
+    return MICElement(
+        global_id=str(getattr(element, "GlobalId", None) or getattr(element, "global_id", "")),
+        element_type=str(getattr(element, "is_a", lambda: getattr(element, "element_type", ""))() or "IfcPipeSegment"),
+        system_type=str(info.get("system_type") or getattr(element, "system_type", "Unknown") or "Unknown"),
+        material=str(info.get("material") or getattr(element, "material", "") or "carbon_steel"),
+        nominal_diameter_m=float(info.get("nominal_diameter_m") or getattr(element, "nominal_diameter_m", 0.1) or 0.1),
+        flow_velocity_ms=info.get("flow_velocity_ms", getattr(element, "flow_velocity_ms", None)),
+        operating_temp_c=info.get("operating_temp_c", getattr(element, "operating_temp_c", None)),
+        dead_leg_length_m=info.get("dead_leg_length_m", getattr(element, "dead_leg_length_m", None)),
+        insulation_condition=str(info.get("insulation_condition") or getattr(element, "insulation_condition", "unknown") or "unknown"),
+        floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
+        zone=str(info.get("zone") or getattr(element, "zone", "Unknown") or "Unknown"),
+    )
+
+
+def run_galvanic_compliance_check(element: Any) -> dict[str, Any]:
+    """Compatibility wrapper returning the runner payload used by Module 4."""
+    result = assess_galvanic_risk(_coerce_gc_element(element))
+    return {
+        "band": result.risk_band,
+        "score": result.composite_score,
+        "details": {
+            "voltage_gap_V": result.voltage_gap_v,
+            "voltage_threshold": result.env_threshold_v,
+            "area_ratio": result.area_ratio,
+            "environment_class": result.environment_class,
+            "pren_adequate": result.pren_adequate,
+            "material_anode": result.material_anode_label,
+            "material_cathode": result.material_cathode_label,
+            "crevice_geometry": "",
+        },
+    }
+
+
+def run_crevice_compliance_check(element: Any) -> dict[str, Any]:
+    """Compatibility wrapper returning the runner payload used by Module 4."""
+    result = assess_crevice_risk(_coerce_cc_element(element))
+    return {
+        "band": result.risk_band,
+        "score": result.composite_score,
+        "details": {
+            "crevice_geometry": result.geometry_class,
+            "joint_type": result.joint_type_code,
+            "cct_adequate": result.cct_adequacy_score,
+            "environment_severity": result.environment_severity_key,
+        },
+    }
+
+
+def run_mic_compliance_check(element: Any) -> dict[str, Any]:
+    """Compatibility wrapper returning the runner payload used by Module 4."""
+    result = assess_mic_risk(_coerce_mic_element(element))
+    return {
+        "band": result.risk_band,
+        "score": result.composite_score,
+        "details": {
+            "flow_class": result.flow_velocity_class,
+            "temperature_class": result.temperature_class,
+            "dead_leg_class": result.dead_leg_class,
+            "material_susceptibility": result.material_susceptibility_score,
+        },
+    }
+
+
+def run_compliance(elements: list[Any]) -> list[dict]:
+    """Compatibility wrapper used by the orchestrator and legacy callers."""
+    return run_compliance_checks(elements)
 
 
 def _band_int(b: str) -> int:
@@ -62,6 +155,12 @@ def _join_mitigations(codes: list[str], catalogue: dict[str, str]) -> str:
     return "; ".join(catalogue.get(c, "") for c in codes if c in catalogue)
 
 
+# Ensure the default registry is populated once the runner's own evaluator
+# functions are available. This preserves the current public API while avoiding
+# module import cycles during package load.
+register_default_engines()
+
+
 def run_compliance_checks(elements: list[Any]) -> list[dict]:
     """Run the five corrosion engines against a list of IFC elements.
 
@@ -72,15 +171,35 @@ def run_compliance_checks(elements: list[Any]) -> list[dict]:
     - mic_band, mic_score, mic_details
     - dominant_mechanism (the worst-case engine)
     - mitigation, action (combined across all three)
+
+    The per-engine calls are resolved through a shared registry so future rule
+    families can be added without expanding this function with more conditionals.
     """
     results = []
 
     for element in elements:
-        g_result = run_galvanic_compliance_check(element)
-        c_result = run_crevice_compliance_check(element)
-        m_result = run_mic_compliance_check(element)
+        g_result = DEFAULT_ENGINE_REGISTRY.evaluate("GC-001", element)
+        c_result = DEFAULT_ENGINE_REGISTRY.evaluate("CC-001", element)
+        m_result = DEFAULT_ENGINE_REGISTRY.evaluate("MC-001", element)
 
-        # Determine dominant mechanism
+        info = getattr(element, "get_info", lambda: {})()
+        details = info if isinstance(info, dict) else {}
+        material = (
+            details.get("material")
+            or getattr(element, "material", None)
+            or getattr(element, "Material", None)
+            or ""
+        )
+        environment = (
+            details.get("environment")
+            or getattr(element, "environment", None)
+            or getattr(element, "Environment", None)
+            or ""
+        )
+        guid = getattr(element, "GlobalId", None) or getattr(element, "global_id", None) or getattr(element, "id", "")
+        name = getattr(element, "Name", None) or getattr(element, "name", None) or "Unknown"
+        element_type = getattr(element, "is_a", lambda: getattr(element, "element_type", ""))()
+
         bands = [
             (g_result.get("band", "LOW"), "galvanic"),
             (c_result.get("band", "LOW"), "crevice"),
@@ -89,9 +208,9 @@ def run_compliance_checks(elements: list[Any]) -> list[dict]:
         dominant_band, dominant_mechanism = max(bands, key=lambda x: _band_int(x[0]))
 
         result = {
-            "guid": element.GlobalId,
-            "name": element.Name,
-            "element_type": element.is_a(),
+            "guid": guid,
+            "name": name,
+            "element_type": element_type,
             "galvanic_band": g_result.get("band", "LOW"),
             "galvanic_score": g_result.get("score", 0.0),
             "galvanic_details": g_result.get("details", {}),
@@ -107,8 +226,8 @@ def run_compliance_checks(elements: list[Any]) -> list[dict]:
                 g_result.get("details", {}).get("voltage_gap_V", 0),
                 c_result.get("band", "LOW"),
                 c_result.get("details", {}).get("crevice_geometry", ""),
-                element.get_info().get("material", ""),
-                element.get_info().get("environment", ""),
+                material,
+                environment,
             ),
             "action": _action(dominant_band),
         }

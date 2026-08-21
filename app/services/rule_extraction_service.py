@@ -25,15 +25,12 @@ import os
 import tempfile
 from pathlib import Path
 
-<<<<<<< HEAD
+from app.logging_config import get_logger
 from app.modules.config import (
     COMPLIANCE_TEMPERATURE,
     DEFAULT_LLM_MODEL,
     MAX_TOKENS_RULE_EXTRACTION,
 )
-=======
-from app.logging_config import get_logger
->>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.modules.module1_doc_parser.section_chunker import SectionChunker
 from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry

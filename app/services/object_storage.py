@@ -7,9 +7,59 @@ import uuid
 from pathlib import Path
 
 from app.logging_config import get_logger
+from app.utils import load_env_file
 from supabase import Client, create_client
 
+load_env_file()
 logger = get_logger(__name__)
+
+
+class _LocalStorageBucket:
+    """Fallback backend used when Supabase credentials are not configured."""
+
+    def __init__(self, root_dir: Path, bucket: str):
+        self._root_dir = root_dir / bucket
+        self._root_dir.mkdir(parents=True, exist_ok=True)
+
+    def upload(self, *, path: str, file: bytes | str, file_options: dict | None = None):
+        target = self._root_dir / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = file if isinstance(file, (bytes, bytearray)) else str(file).encode("utf-8")
+        target.write_bytes(content)
+        return {"path": path}
+
+    def download(self, key: str) -> bytes:
+        target = self._root_dir / key
+        if not target.exists():
+            raise FileNotFoundError(f"Missing local object: {key}")
+        return target.read_bytes()
+
+    def remove(self, keys: list[str]):
+        for key in keys:
+            target = self._root_dir / key
+            if target.exists():
+                target.unlink()
+        return {"deleted": keys}
+
+
+class _LocalStorageNamespace:
+    """Object that exposes the same .from_() API that Supabase storage uses."""
+
+    def __init__(self, base_dir: Path):
+        self._base_dir = base_dir
+        self._base_dir.mkdir(parents=True, exist_ok=True)
+
+    def from_(self, bucket: str):
+        return _LocalStorageBucket(self._base_dir, bucket)
+
+
+class _LocalStorageClient:
+    """Single-bucket local backend compatible with the Supabase storage API."""
+
+    def __init__(self, base_dir: Path):
+        self._base_dir = base_dir
+        self._base_dir.mkdir(parents=True, exist_ok=True)
+        self.storage = _LocalStorageNamespace(self._base_dir)
 
 
 class ObjectStorage:
@@ -114,8 +164,8 @@ class ObjectStorage:
             return None
         return bucket, key
 
-    def _supabase_client(self) -> Client:
-        """Return a lazy-initialized Supabase client for storage operations."""
+    def _supabase_client(self) -> Client | _LocalStorageClient:
+        """Return a lazy-initialized client or a safe local fallback."""
         if self._client is not None:
             return self._client
 
@@ -124,13 +174,13 @@ class ObjectStorage:
             os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
             or os.getenv("SUPABASE_KEY", "").strip()
         )
-        if not url:
-            raise ValueError("SUPABASE_URL is required for Supabase Storage")
-        if not key:
-            raise ValueError(
-                "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY is required "
-                "for Supabase Storage"
+        if not url or not key:
+            logger.warning(
+                "Supabase Storage credentials missing; using local filesystem cache for %s",
+                self._cache_dir,
             )
+            self._client = _LocalStorageClient(self._cache_dir)
+            return self._client
 
         self._client = create_client(url, key)
         return self._client
