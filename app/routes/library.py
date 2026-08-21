@@ -42,7 +42,6 @@ from app.components.ui import (
     Alert,
     AlertT,
     BackAction,
-    CreateAction,
     EditAction,
     HtmxSpinner,
     LinkButton,
@@ -61,7 +60,6 @@ from app.components.ui import (
 from app.components.ui import (
     CardTitle as UICardTitle,
 )
-from app.modules import orchestrator
 from app.modules.config import (
     COMPLIANCE_TEMPERATURE,
     DEFAULT_LLM_MODEL,
@@ -280,28 +278,34 @@ def setup_routes(rt):
     @rt("/library/rules")
     def rules_list(message: str = "", needs_review: int = 0):
         needs_review_only = bool(needs_review)
-        rows = (
-            _rule_service.fetch_needs_review() if needs_review_only else _rule_service.list_rules()
-        )
+        all_rows = _rule_service.list_rules()
+        rows = _rule_service.fetch_needs_review() if needs_review_only else all_rows
         folders = _folders_with_rules()
         return Title("Rules - BIM Guard"), DashboardLayout(
             Container(
                 DivLAligned(
-                    H1("Rule Library", cls="text-3xl font-bold tracking-tight"),
-                    CreateAction(href="/library/rules/new", title="Create Rule"),
-                    cls="justify-between",
-                ),
-                P(
-                    "Create, update, and manage compliance rules used during analysis.",
-                    cls="text-muted-foreground",
-                ),
-                DivLAligned(
-                    LinkButton(
-                        "Open Extraction Studio",
-                        href="/library/rules/extract",
-                        variant="secondary",
+                    Div(
+                        H1("Rule Library", cls="text-3xl font-bold tracking-tight"),
+                        P(
+                            "Create, update, and manage compliance rules used during analysis.",
+                            cls="text-muted-foreground",
+                        ),
+                        cls="space-y-1",
                     ),
-                    cls="justify-end",
+                    Div(
+                        LinkButton(
+                            "Open Extraction Studio",
+                            href="/library/rules/extract",
+                            variant="secondary",
+                        ),
+                        LinkButton(
+                            "New Rule",
+                            href="/library/rules/new",
+                            variant="primary",
+                        ),
+                        cls="flex items-center gap-2 flex-wrap",
+                    ),
+                    cls="justify-between items-start gap-3 flex-wrap",
                 ),
                 rules_panel(
                     rows,
@@ -309,6 +313,7 @@ def setup_routes(rt):
                     message=message or None,
                     needs_review_only=needs_review_only,
                     needs_review_count=_rule_service.count_needs_review(),
+                    total_rules=len(all_rows),
                 ),
                 cls=(ContainerT.expand, "space-y-4"),
             ),

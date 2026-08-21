@@ -2,6 +2,7 @@ from fasthtml.common import (
     Button,
     Details,
     Div,
+    Label,
     Option,
     P,
     Script,
@@ -13,7 +14,8 @@ from fasthtml.common import (
     Thead,
     Tr,
 )
-from monsterui.all import Form, Input, Select, Table
+from fasthtml.common import Select as HtmlSelect
+from monsterui.all import Form, Input, Table
 
 from app.components.ui import (
     ActionRow,
@@ -152,6 +154,43 @@ _FOLDER_SCOPE_OPTIONS = [
 ]
 
 
+# Inline resets beat the theme's element-level <button> styling (basecoat/franken),
+# which otherwise paints unstyled buttons as full primary buttons.
+_SORT_BTN_STYLE = (
+    "background:transparent;border:0;box-shadow:none;padding:0;"
+    "width:auto;min-width:0;height:auto;color:inherit;"
+)
+_GHOST_BTN_STYLE = "background:transparent;box-shadow:none;width:auto;min-width:0;color:inherit;"
+
+_TOOLBAR_SELECT_CLS = (
+    "h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+)
+
+
+def _toolbar_select(*children, cls: str = "", **attrs):
+    """Native <select> for toolbars — fires real change events and shows its first option."""
+    return HtmlSelect(*children, cls=f"{_TOOLBAR_SELECT_CLS} {cls}".strip(), **attrs)
+
+
+def _format_timestamp(value: str) -> str:
+    """Render an ISO timestamp as 'YYYY-MM-DD HH:MM' for table display."""
+    raw = (value or "").strip()
+    if not raw:
+        return "-"
+    return raw[:16].replace("T", " ")
+
+
+def _stat_tile(label: str, value, accent: bool = False):
+    value_cls = "text-2xl font-semibold tabular-nums"
+    if accent:
+        value_cls += " text-amber-500"
+    return Div(
+        P(label, cls="text-xs font-medium uppercase tracking-wide text-muted-foreground"),
+        P(str(value), cls=value_cls),
+        cls="rounded-lg border bg-card px-4 py-3 space-y-1",
+    )
+
+
 def _mechanism_badge(mechanism: str):
     mech = (mechanism or "").upper()
     css = _MECHANISM_BADGE.get(mech, "bg-muted text-muted-foreground")
@@ -220,7 +259,9 @@ def _rules_data_row(row: dict):
         ),
         TableCell(_needs_review_badge(row), **{"data-col": "review"}),
         TableCell(
-            updated_at or "-", cls="text-sm text-muted-foreground", **{"data-col": "updated"}
+            _format_timestamp(updated_at),
+            cls="text-sm text-muted-foreground whitespace-nowrap",
+            **{"data-col": "updated"},
         ),
         TableCell(
             _short_description(description),
@@ -250,14 +291,23 @@ def _rules_data_row(row: dict):
     )
 
 
+_STICKY_TH_CLS = "sticky top-0 z-10 bg-card"
+
+
 def _rules_table_header_cell(label: str, sort_key: str, data_col: str):
     return TableHead(
         Button(
-            label,
+            Span(label),
+            Span("", cls="text-[10px] leading-none", **{"data-sort-indicator": sort_key}),
             type="button",
-            cls="text-xs font-medium text-muted-foreground hover:text-foreground",
+            style=_SORT_BTN_STYLE,
+            cls=(
+                "inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide "
+                "text-muted-foreground hover:text-foreground cursor-pointer"
+            ),
             **{"data-sort": sort_key},
         ),
+        cls=_STICKY_TH_CLS,
         **{"data-col": data_col},
     )
 
@@ -284,144 +334,107 @@ def _rules_data_table(rows: list[dict], empty_message: str):
         }
     )
 
+    column_toggles = [
+        ("reference", "Reference"),
+        ("folder", "Folder"),
+        ("mechanism", "Mechanism"),
+        ("type", "Type"),
+        ("target_class", "Target Class"),
+        ("category", "Category"),
+        ("review", "Review"),
+        ("updated", "Updated"),
+        ("description", "Description"),
+    ]
+    column_toggle_items = [
+        Label(
+            Input(
+                type="checkbox",
+                checked=True,
+                cls="h-4 w-4",
+                **{"data-column-toggle": col},
+            ),
+            Span(label, cls="text-xs"),
+            cls="flex items-center gap-2 cursor-pointer",
+        )
+        for col, label in column_toggles
+    ]
+
+    delete_selected_button = Button(
+        Span("Delete Selected"),
+        Span("(0)", **{"data-selected-count": "true"}),
+        type="submit",
+        disabled=True,
+        style=_GHOST_BTN_STYLE,
+        cls=(
+            "h-9 inline-flex items-center gap-1 rounded-md border border-destructive/40 px-3 "
+            "text-sm font-medium text-destructive hover:bg-destructive/10 "
+            "disabled:opacity-50 disabled:pointer-events-none"
+        ),
+        **{"data-bulk-delete": "true"},
+    )
+
     return Div(
         Div(
             Div(
                 Input(
                     type="search",
-                    placeholder="Search reference, folder, type, class, category, description...",
-                    cls="h-8 w-full md:w-[340px]",
+                    placeholder="Search reference, folder, type, class, description...",
+                    cls="h-9 w-full md:w-[320px]",
                     **{"data-table-search": "rules"},
                 ),
-                Select(
+                _toolbar_select(
                     Option("All folders", value=""),
                     *[Option(folder, value=folder) for folder in folder_values],
-                    cls="h-8 w-[220px]",
+                    cls="w-full md:w-[200px]",
+                    title="Filter by folder",
                     **{"data-filter-folder": "true"},
                 ),
-                Select(
+                _toolbar_select(
                     Option("All mechanisms", value=""),
                     Option("Building Code", value="CODE"),
                     Option("GC-001", value="GC-001"),
                     Option("CC-001", value="CC-001"),
                     Option("MC-001", value="MC-001"),
                     Option("IFC", value="IFC"),
-                    cls="h-8 w-[180px]",
+                    cls="w-full md:w-[170px]",
+                    title="Filter by mechanism",
                     **{"data-filter-mechanism": "true"},
-                ),
-                Select(
-                    Option("10 rows", value="10"),
-                    Option("25 rows", value="25", selected=True),
-                    Option("50 rows", value="50"),
-                    cls="h-8 w-[120px]",
-                    **{"data-page-size": "true"},
                 ),
                 cls="flex flex-wrap items-center gap-2",
             ),
-            Details(
-                Summary("Columns", cls="cursor-pointer text-sm text-muted-foreground"),
-                Div(
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "folder"},
+            Div(
+                delete_selected_button,
+                Details(
+                    Summary(
+                        "Columns",
+                        cls=(
+                            "cursor-pointer select-none list-none h-9 inline-flex items-center "
+                            "rounded-md border border-input bg-background px-3 text-sm "
+                            "text-muted-foreground hover:text-foreground"
                         ),
-                        Span("Folder", cls="text-xs"),
-                        cls="flex items-center gap-2",
                     ),
                     Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "reference"},
+                        *column_toggle_items,
+                        cls=(
+                            "absolute right-0 z-20 mt-2 w-72 grid grid-cols-2 gap-2 "
+                            "rounded-md border bg-card p-3 shadow-lg"
                         ),
-                        Span("Reference", cls="text-xs"),
-                        cls="flex items-center gap-2",
                     ),
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "mechanism"},
-                        ),
-                        Span("Mechanism", cls="text-xs"),
-                        cls="flex items-center gap-2",
-                    ),
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "type"},
-                        ),
-                        Span("Type", cls="text-xs"),
-                        cls="flex items-center gap-2",
-                    ),
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "target_class"},
-                        ),
-                        Span("Target Class", cls="text-xs"),
-                        cls="flex items-center gap-2",
-                    ),
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "category"},
-                        ),
-                        Span("Category", cls="text-xs"),
-                        cls="flex items-center gap-2",
-                    ),
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "review"},
-                        ),
-                        Span("Review", cls="text-xs"),
-                        cls="flex items-center gap-2",
-                    ),
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "updated"},
-                        ),
-                        Span("Updated", cls="text-xs"),
-                        cls="flex items-center gap-2",
-                    ),
-                    Div(
-                        Input(
-                            type="checkbox",
-                            checked=True,
-                            cls="h-4 w-4",
-                            **{"data-column-toggle": "description"},
-                        ),
-                        Span("Description", cls="text-xs"),
-                        cls="flex items-center gap-2",
-                    ),
-                    cls="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2",
+                    cls="relative",
                 ),
-                cls="rounded-md border px-3 py-2",
+                cls="flex items-center gap-2",
             ),
-            cls="flex flex-col gap-3 md:flex-row md:items-start md:justify-between",
+            cls="flex flex-col gap-3 md:flex-row md:items-center md:justify-between",
         ),
         Div(
             UITable(
                 TableHeader(
                     TableRow(
-                        TableHead(_select_all_checkbox(), **{"data-col": "select"}),
+                        TableHead(
+                            _select_all_checkbox(),
+                            cls=_STICKY_TH_CLS,
+                            **{"data-col": "select"},
+                        ),
                         _rules_table_header_cell("Reference", "reference", "reference"),
                         _rules_table_header_cell("Folder", "folder", "folder"),
                         _rules_table_header_cell("Mechanism", "mechanism", "mechanism"),
@@ -431,14 +444,23 @@ def _rules_data_table(rows: list[dict], empty_message: str):
                         _rules_table_header_cell("Review", "review", "review"),
                         _rules_table_header_cell("Updated", "updated", "updated"),
                         _rules_table_header_cell("Description", "description", "description"),
-                        TableHead("Actions", **{"data-col": "actions"}),
+                        TableHead(
+                            "Actions",
+                            cls=f"{_STICKY_TH_CLS} text-xs font-medium uppercase tracking-wide",
+                            **{"data-col": "actions"},
+                        ),
                     )
                 ),
                 TableBody(*body_rows),
                 cls="min-w-[1200px]",
                 **{"data-rules-table": "true"},
             ),
-            cls="w-full min-w-0 max-h-[65vh] overflow-auto border rounded-md",
+            # [&>div] neutralizes UITable's inner overflow wrapper so the sticky
+            # header sticks to this scroll container instead.
+            cls=(
+                "w-full min-w-0 max-h-[65vh] overflow-auto border rounded-md "
+                "[&>div]:!overflow-visible"
+            ),
         ),
         Div(
             P(
@@ -454,21 +476,39 @@ def _rules_data_table(rows: list[dict], empty_message: str):
                     **{"data-row-count": "true"},
                 ),
                 Div(
+                    Span("Rows per page", cls="text-xs text-muted-foreground"),
+                    _toolbar_select(
+                        Option("10", value="10"),
+                        Option("25", value="25", selected=True),
+                        Option("50", value="50"),
+                        Option("100", value="100"),
+                        cls="h-8 w-[76px] text-xs",
+                        title="Rows per page",
+                        **{"data-page-size": "true"},
+                    ),
                     Button(
                         "Previous",
                         type="button",
-                        cls="h-8 px-3 border rounded-md",
+                        style=_GHOST_BTN_STYLE,
+                        cls=(
+                            "h-8 px-3 rounded-md border border-input text-xs "
+                            "hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+                        ),
                         **{"data-page-prev": "true"},
                     ),
                     Span(
                         "Page 1 of 1",
-                        cls="text-xs text-muted-foreground",
+                        cls="text-xs text-muted-foreground whitespace-nowrap",
                         **{"data-page-label": "true"},
                     ),
                     Button(
                         "Next",
                         type="button",
-                        cls="h-8 px-3 border rounded-md",
+                        style=_GHOST_BTN_STYLE,
+                        cls=(
+                            "h-8 px-3 rounded-md border border-input text-xs "
+                            "hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+                        ),
                         **{"data-page-next": "true"},
                     ),
                     cls="flex items-center gap-2",
@@ -497,7 +537,24 @@ def _rules_data_table(rows: list[dict], empty_message: str):
             "var noMatch=root.querySelector('[data-no-matches=true]');"
             "var sortButtons=Array.from(root.querySelectorAll('[data-sort]'));"
             "var toggles=Array.from(root.querySelectorAll('[data-column-toggle]'));"
+            "var form=root.closest('form');"
+            "var delBtn=root.querySelector('[data-bulk-delete=true]');"
             "var state={query:'',folder:'',mechanism:'',sortKey:'updated',sortDir:'desc',page:1,pageSize:25};"
+            "function updateSortIndicators(){"
+            "sortButtons.forEach(function(btn){"
+            "var ind=btn.querySelector('[data-sort-indicator]');"
+            "if(!ind){return;}"
+            "var key=btn.getAttribute('data-sort');"
+            "ind.textContent=state.sortKey===key?(state.sortDir==='asc'?'\\u25B2':'\\u25BC'):'';"
+            "});"
+            "}"
+            "function updateSelection(){"
+            "if(!delBtn||!form){return;}"
+            "var n=form.querySelectorAll('input[name=rule_ids]:checked').length;"
+            "var cnt=delBtn.querySelector('[data-selected-count]');"
+            "if(cnt){cnt.textContent='('+n+')';}"
+            "delBtn.disabled=n===0;"
+            "}"
             "function bySort(a,b){"
             "var key=state.sortKey;"
             "var av=(a.dataset[key]||'').toString();"
@@ -531,6 +588,7 @@ def _rules_data_table(rows: list[dict], empty_message: str):
             "if(pageLabel){pageLabel.textContent='Page '+state.page+' of '+totalPages;}"
             "if(prev){prev.disabled=state.page<=1;prev.classList.toggle('opacity-50',prev.disabled);}"
             "if(next){next.disabled=state.page>=totalPages;next.classList.toggle('opacity-50',next.disabled);}"
+            "updateSortIndicators();"
             "}"
             "if(search){search.addEventListener('input',function(e){state.query=(e.target.value||'').trim().toLowerCase();state.page=1;render();});}"
             "if(folder){folder.addEventListener('change',function(e){state.folder=(e.target.value||'').trim().toLowerCase();state.page=1;render();});}"
@@ -540,6 +598,8 @@ def _rules_data_table(rows: list[dict], empty_message: str):
             "if(next){next.addEventListener('click',function(){state.page+=1;render();});}"
             "sortButtons.forEach(function(btn){btn.addEventListener('click',function(){var key=btn.getAttribute('data-sort');if(!key){return;}if(state.sortKey===key){state.sortDir=state.sortDir==='asc'?'desc':'asc';}else{state.sortKey=key;state.sortDir='asc';}state.page=1;render();});});"
             "toggles.forEach(function(toggle){toggle.addEventListener('change',function(){var col=toggle.getAttribute('data-column-toggle');if(!col){return;}var visible=!!toggle.checked;root.querySelectorAll('[data-col='+col+']').forEach(function(cell){cell.style.display=visible?'':'none';});});});"
+            "if(form){form.addEventListener('change',function(e){var t=e.target;if(t&&(t.name==='rule_ids'||t.title==='Select all')){updateSelection();}});}"
+            "updateSelection();"
             "render();"
             "}"
             "function initAll(scope){"
@@ -599,37 +659,71 @@ def rules_folders_panel(
     """
     alert = MessageAlert(AlertSpec(message=message, level=level))
 
-    create_form = Form(
-        Input(
-            name="ruleset_id",
-            placeholder="Folder ID (ruleset_id), e.g. BUILDING-CODE-PART9",
-            required=True,
-            cls="text-xs h-8 w-full md:w-[280px]",
+    def _labeled(label_text: str, control):
+        return Div(
+            Span(label_text, cls="text-xs font-medium text-muted-foreground"),
+            control,
+            cls="space-y-1",
+        )
+
+    create_form = Details(
+        Summary(
+            "+ New Folder",
+            cls=(
+                "cursor-pointer select-none list-none inline-flex h-9 items-center "
+                "rounded-md border border-input bg-background px-3 text-sm font-medium "
+                "text-foreground hover:bg-muted"
+            ),
         ),
-        Input(
-            name="display_name",
-            placeholder="Display name",
-            cls="text-xs h-8 w-full md:w-[220px]",
+        Form(
+            _labeled(
+                "Folder ID (ruleset_id)",
+                Input(
+                    name="ruleset_id",
+                    placeholder="e.g. BUILDING-CODE-PART9",
+                    required=True,
+                    cls="text-xs h-9",
+                ),
+            ),
+            _labeled(
+                "Display name",
+                Input(
+                    name="display_name",
+                    placeholder="Human-friendly name",
+                    cls="text-xs h-9",
+                ),
+            ),
+            _labeled(
+                "Description",
+                Input(
+                    name="description",
+                    placeholder="What this folder contains",
+                    cls="text-xs h-9",
+                ),
+            ),
+            _labeled(
+                "Mechanism scope",
+                _toolbar_select(
+                    *[Option(label, value=value) for value, label in _FOLDER_SCOPE_OPTIONS],
+                    name="mechanism_scope",
+                    cls="text-xs h-9 w-full",
+                ),
+            ),
+            Button(
+                "Create Folder",
+                type="submit",
+                style=_GHOST_BTN_STYLE,
+                cls=(
+                    "h-9 inline-flex items-center rounded-md bg-primary px-4 text-sm "
+                    "font-medium text-primary-foreground hover:opacity-90"
+                ),
+            ),
+            hx_post="/api/rules/folders/create",
+            hx_target="#rule-folders-panel",
+            hx_swap="outerHTML",
+            cls="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-5 items-end",
         ),
-        Input(
-            name="description",
-            placeholder="Description",
-            cls="text-xs h-8 w-full md:w-[280px]",
-        ),
-        Select(
-            *[Option(label, value=value) for value, label in _FOLDER_SCOPE_OPTIONS],
-            name="mechanism_scope",
-            cls="text-xs h-8 w-full md:w-[160px]",
-        ),
-        Button(
-            "Create Folder",
-            type="submit",
-            cls="text-xs px-3 py-1 rounded bg-primary text-primary-foreground hover:opacity-90",
-        ),
-        hx_post="/api/rules/folders/create",
-        hx_target="#rule-folders-panel",
-        hx_swap="outerHTML",
-        cls="flex flex-wrap items-center gap-2",
+        cls="rounded-md border border-dashed px-3 py-2",
     )
 
     if not folders:
@@ -681,13 +775,13 @@ def rules_folders_panel(
                     placeholder="Description",
                     cls="text-xs h-8 w-full md:w-[300px]",
                 ),
-                Select(
+                HtmlSelect(
                     *[
                         Option(label, value=value, selected=value == mechanism_scope)
                         for value, label in _FOLDER_SCOPE_OPTIONS
                     ],
                     name="mechanism_scope",
-                    cls="text-xs h-8 w-full md:w-[160px]",
+                    cls=f"{_TOOLBAR_SELECT_CLS} text-xs h-8 w-full md:w-[160px]",
                 ),
                 Button(
                     "Save Metadata",
@@ -776,6 +870,9 @@ def rules_folders_panel(
                             f"{f['count']} rule(s)",
                             cls="text-xs text-muted-foreground ml-2",
                         ),
+                        Span(_mechanism_badge(mechanism_scope), cls="ml-2")
+                        if mechanism_scope
+                        else None,
                         cls="cursor-pointer select-none py-2 list-none",
                     ),
                     P(description, cls="text-xs text-muted-foreground mb-2")
@@ -816,12 +913,13 @@ def rules_panel(
     level: str = "success",
     needs_review_only: bool = False,
     needs_review_count: int = 0,
+    total_rules: int | None = None,
 ):
     alert = MessageAlert(AlertSpec(message=message, level=level))
 
     if needs_review_only:
         filter_toggle = LinkButton(
-            "All Rules",
+            "Show All Rules",
             href="/library/rules",
             variant="secondary",
             cls="text-sm",
@@ -837,68 +935,87 @@ def rules_panel(
         )
         empty_message = "No rules available yet."
 
+    total = total_rules if total_rules is not None else len(rows)
+    stats = Div(
+        _stat_tile("Total Rules", total),
+        _stat_tile("Folders", len(folders)),
+        _stat_tile("Needs Review", needs_review_count, accent=needs_review_count > 0),
+        cls="grid grid-cols-1 gap-3 sm:grid-cols-3",
+    )
+
+    folders_card = Card(
+        CardHeader(
+            Div(
+                CardTitle("Rule Folders"),
+                P(
+                    "Folders group rules by ruleset_id. Expand a folder to manage its "
+                    "metadata, export IDS, or edit member rules.",
+                    cls="text-sm text-muted-foreground",
+                ),
+                cls="space-y-1",
+            )
+        ),
+        CardContent(
+            rules_folders_panel(
+                folders,
+                message=folders_message,
+                level=level,
+            )
+        ),
+        cls="w-full max-w-full",
+    )
+
+    rules_card = Card(
+        CardHeader(
+            Div(
+                Div(
+                    CardTitle("Needs Review" if needs_review_only else "All Rules"),
+                    P(
+                        "Rules flagged by extraction for manual verification."
+                        if needs_review_only
+                        else "Search, filter, and manage every compliance rule.",
+                        cls="text-sm text-muted-foreground",
+                    ),
+                    cls="space-y-1",
+                ),
+                Div(
+                    filter_toggle,
+                    LinkButton(
+                        "Import JSON",
+                        href="/library/rules/import-json",
+                        variant="secondary",
+                        cls="text-sm",
+                    ),
+                    LinkButton(
+                        "Import IDS",
+                        href="/library/rules/import-ids",
+                        variant="secondary",
+                        cls="text-sm",
+                    ),
+                    cls="flex items-center gap-2 flex-wrap",
+                ),
+                cls="flex items-start justify-between gap-2 flex-wrap",
+            )
+        ),
+        CardContent(
+            Form(
+                _rules_data_table(rows, empty_message),
+                method="post",
+                action="/api/rules/bulk-delete",
+                onsubmit=(
+                    "return confirm('Delete the selected rule(s)? This cannot be undone.')"
+                ),
+                cls="w-full min-w-0 pt-0",
+            )
+        ),
+        cls="w-full max-w-full h-full min-h-0 overflow-hidden",
+    )
+
     return Div(
         *alert,
-        Card(
-            CardHeader(
-                Div(
-                    CardTitle("Rule Library" + (" — Needs Review" if needs_review_only else "")),
-                    Div(
-                        filter_toggle,
-                        LinkButton(
-                            "Import JSON Ruleset",
-                            href="/library/rules/import-json",
-                            variant="secondary",
-                            cls="text-sm",
-                        ),
-                        LinkButton(
-                            "Import IDS",
-                            href="/library/rules/import-ids",
-                            variant="secondary",
-                            cls="text-sm",
-                        ),
-                        cls="flex items-center gap-2",
-                    ),
-                    cls="flex items-center justify-between gap-2 flex-wrap",
-                )
-            ),
-            CardContent(
-                Div(
-                    Div(
-                        Span("Rule Folders", cls="text-sm font-semibold"),
-                        P(
-                            "Folders map to ruleset_id and can be renamed or deleted in-place.",
-                            cls="text-xs text-muted-foreground",
-                        ),
-                        cls="space-y-1",
-                    ),
-                    rules_folders_panel(
-                        folders,
-                        message=folders_message,
-                        level=level,
-                    ),
-                    Form(
-                        Div(
-                            SubmitButton(
-                                "Delete Selected",
-                                variant="secondary",
-                                cls="text-sm text-destructive",
-                            ),
-                            cls="flex justify-end mb-2",
-                        ),
-                        _rules_data_table(rows, empty_message),
-                        method="post",
-                        action="/api/rules/bulk-delete",
-                        onsubmit=(
-                            "return confirm('Delete the selected rule(s)? This cannot be undone.')"
-                        ),
-                        cls="w-full min-w-0 pt-0",
-                    ),
-                    cls="space-y-4",
-                ),
-            ),
-            cls="w-full max-w-full h-full min-h-0 overflow-hidden",
-        ),
+        stats,
+        folders_card,
+        rules_card,
         cls="space-y-4",
     )
 

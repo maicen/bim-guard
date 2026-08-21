@@ -21,3 +21,4 @@ docs/MonsterUI/
 apply_benchmark_patch*.ps1
 data/cache/supabase-storage/uploads/
 data/cache/supabase-storage/migration/uploads/
+data/bimguard.sqlite-wal
