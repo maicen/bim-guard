@@ -15,6 +15,7 @@ spliting the
 
 - The process to be developed (activate use of LLM and confusion matrix)
 - UX/UI enhancement
+- Add `_severity_badge` to the Rules Library table (`/library/rules`) as a new column — colour-coded badge (red/mandatory, amber/recommended, blue/informational) using the `severity` field already stored on each rule row.
 
 ## Reporting
 
