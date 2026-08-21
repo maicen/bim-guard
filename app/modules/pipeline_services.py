@@ -31,9 +31,14 @@ class AnalysisService:
         rows: list[dict[str, Any]] = []
         for element in elements:
             info = getattr(element, "get_info", lambda: {})()
-            element_id = str(getattr(element, "GlobalId", None) or getattr(element, "global_id", None) or getattr(element, "id", "unknown"))
+            element_id = str(
+                getattr(element, "GlobalId", None)
+                or getattr(element, "global_id", None)
+                or getattr(element, "id", "unknown")
+            )
             rows.append(
                 {
+                    "guid": element_id,
                     "element_id": element_id,
                     "name": getattr(element, "Name", None) or getattr(element, "name", None) or "Unknown",
                     "band": "LOW",
@@ -74,3 +79,21 @@ class EnhancementService:
             "version": version,
             "items": items,
         }
+
+
+def run_compliance_analysis(elements: list[Any], *, service: AnalysisService | None = None) -> dict[str, Any]:
+    """Explicit read-only Phase 1 analysis entry point."""
+    analysis_service = service or AnalysisService()
+    return analysis_service.run(elements)
+
+
+def enhance_model(
+    elements: list[Any],
+    *,
+    changes: dict[str, Any] | None = None,
+    version: int = 1,
+    service: EnhancementService | None = None,
+) -> dict[str, Any]:
+    """Explicit versioned enhancement entry point for Phase 1 model improvement work."""
+    enhancement_service = service or EnhancementService()
+    return enhancement_service.plan(elements, changes=changes, version=version)
