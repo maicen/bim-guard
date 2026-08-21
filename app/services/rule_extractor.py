@@ -133,10 +133,11 @@ class LiteLLMRuleExtractor:
 
     Example::
 
+        from app.modules.config import DEFAULT_LLM_MODEL
         from app.services.llm_client import LiteLLMClient
         from app.services.rule_extractor import LiteLLMRuleExtractor
 
-        client = LiteLLMClient(model="gpt-4o-mini")
+        client = LiteLLMClient(model=DEFAULT_LLM_MODEL)
         extractor = LiteLLMRuleExtractor(client=client)
         rules = await extractor.extract_rules_from_text(text)
     """

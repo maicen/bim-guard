@@ -6,11 +6,31 @@ from app.services.static_data_service import StaticDataService
 
 DEFAULT_SETTINGS = [
     {
+<<<<<<< HEAD
+        "key": "BIM_GUARD_STORAGE_BACKEND",
+        "value": "supabase",
+        "value_type": "string",
+        "scope": "runtime",
+        "description": "Object storage backend selector: local | supabase.",
+    },
+    {
+        "key": "BIM_GUARD_LLM_MODEL",
+        "value": "gemini/gemini-2.0-flash",
+        "value_type": "string",
+        "scope": "runtime",
+        "description": (
+            "Unified default LiteLLM model for extraction, rule building, and compliance "
+            "(Issue #17). Supersedes BIM_GUARD_RULE_MODEL."
+        ),
+    },
+    {
+=======
+>>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d
         "key": "BIM_GUARD_RULE_MODEL",
         "value": "gpt-4o-mini",
         "value_type": "string",
-        "scope": "runtime",
-        "description": "Default LiteLLM model used for rule extraction.",
+        "scope": "legacy",
+        "description": "Legacy rule-extraction model. Superseded by BIM_GUARD_LLM_MODEL.",
     },
     {
         "key": "OPENAI_MODEL",

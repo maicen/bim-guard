@@ -176,19 +176,19 @@ class Module4_Comparator:
                              f"{a}{u} > maximum {check_val}{u}"
             elif operator == ">":
                 ok, reason = check_val is not None and a > check_val, \
-                             f"{a}{u} ≤ required {check_val}{u}"
+                             f"{a}{u} <= required {check_val}{u}"
             elif operator == "<":
                 ok, reason = check_val is not None and a < check_val, \
-                             f"{a}{u} ≥ maximum {check_val}{u}"
+                             f"{a}{u} >= maximum {check_val}{u}"
             elif operator == "==":
                 ok, reason = check_val is not None and a == check_val, \
-                             f"{a}{u} ≠ {check_val}{u}"
+                             f"{a}{u} != {check_val}{u}"
             elif operator == "!=":
                 ok, reason = check_val is not None and a != check_val, \
                              f"{a}{u} equals excluded value {check_val}{u}"
             elif operator == "between":
                 ok = val_min is not None and val_max is not None and val_min <= a <= val_max
-                reason = f"{a}{u} outside [{val_min}{u}–{val_max}{u}]"
+                reason = f"{a}{u} outside [{val_min}{u} - {val_max}{u}]"
             else:
                 ok, reason = True, ""
         except TypeError:

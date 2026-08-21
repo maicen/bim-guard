@@ -25,6 +25,52 @@ GEMINI_MODEL = _settings.get(
     "GEMINI_MODEL",
     os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
 )
+# ── LLM Standardization (Issue #17) ───────────────────────────────────────────
+# Unified LLM configuration for all extraction, rule building, and compliance work.
+# All modules use these constants instead of hardcoded values.
+
+# Default model: Gemini 2.0-flash (via LiteLLM).
+# The "gemini/" prefix is the LiteLLM provider route — without it litellm cannot
+# resolve which backend to call. Precedence matches the API-key block above:
+# DB setting > environment variable > literal default.
+DEFAULT_LLM_MODEL = _settings.get(
+    "BIM_GUARD_LLM_MODEL",
+    os.environ.get("BIM_GUARD_LLM_MODEL", "gemini/gemini-2.0-flash"),
+)
+
+# Temperature by use case
+# 0.1 = deterministic (compliance, rule validation, structured output)
+# 0.3 = balanced (free-text summarisation, pattern matching)
+#
+# Note: every LLM call in the pipeline today parses its reply with json.loads
+# against a fixed schema, so all of them use COMPLIANCE_TEMPERATURE — the
+# "structured output" arm of the rule above wins over the "extraction" arm.
+# Reproducibility matters here: the same source document must yield the same
+# rule set across runs for the output to be auditable.
+# RULE_EXTRACTION_TEMPERATURE is reserved for future prose-generating calls.
+COMPLIANCE_TEMPERATURE = 0.1  # For compliance validation, BCF decisions
+RULE_EXTRACTION_TEMPERATURE = 0.3  # Reserved: non-JSON, free-text generation
+
+# Max tokens by context
+MAX_TOKENS_RULE_EXTRACTION = 2000  # Rule definitions are concise
+MAX_TOKENS_DOCUMENT_PARSING = 4000  # Documents can be larger
+MAX_TOKENS_COMPLIANCE = 1000  # Compliance output is structured
+
+# Retry configuration
+RETRY_MAX_ATTEMPTS = 3
+RETRY_INITIAL_DELAY_SECONDS = 1.0
+RETRY_BACKOFF_MULTIPLIER = 2.0  # Exponential backoff: 1s, 2s, 4s
+
+# ── Path B feature flags ─────────────────────────────────────────────────
+# Gate the MM-001 and XM-001 comparators independently. Both default OFF.
+#
+# Two flags, not one: MM-001 is APPROVED v1.0 and runs entirely from disk,
+# while XM-001 is still DRAFT and its loader reaches the database for the
+# GC-001 galvanic series. They must not be wired on the same switch.
+# Set to the string "1" to enable; any other value reads as off.
+FEATURE_PATH_B_MM = _settings.get("FEATURE_PATH_B_MM", os.environ.get("FEATURE_PATH_B_MM", "0")) == "1"
+FEATURE_PATH_B_XM = _settings.get("FEATURE_PATH_B_XM", os.environ.get("FEATURE_PATH_B_XM", "0")) == "1"
+
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "BuildingCode_PDF"
 SOURCE_DOC_SEED = "BuildingCode_Seed"

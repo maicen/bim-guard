@@ -60,9 +60,18 @@ from app.components.ui import (
 from app.components.ui import (
     CardTitle as UICardTitle,
 )
+<<<<<<< HEAD
+from app.modules import orchestrator
+from app.modules.config import (
+    COMPLIANCE_TEMPERATURE,
+    DEFAULT_LLM_MODEL,
+    MAX_TOKENS_RULE_EXTRACTION,
+)
+=======
+>>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.services.documents_service import DocumentService
-from app.services.llm_client import LiteLLMClient
+from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.object_storage import ObjectStorage
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rule_extractor import LiteLLMRuleExtractor
@@ -836,14 +845,14 @@ def setup_routes(rt):
         )
 
     @rt("/api/rules/provider-models")
-    def api_provider_models(provider: str = "openai"):
+    def api_provider_models(provider: str = "gemini"):
         return provider_model_select_fragment(provider)
 
     @rt("/api/rules/extract", methods=["POST"])
     async def rules_extract_api(
         document_id: int = 0,
-        provider: str = "openai",
-        model: str = "gpt-4o-mini",
+        provider: str = "gemini",
+        model: str = DEFAULT_LLM_MODEL,
         api_key: str = "",
     ):
         global _last_extracted, _last_extracted_filename
@@ -859,7 +868,16 @@ def setup_routes(rt):
         if not extracted_text:
             return rule_extraction_empty_file_result()
 
-        extractor = LiteLLMRuleExtractor(client=LiteLLMClient(model=model, api_key=api_key or None))
+        extractor = LiteLLMRuleExtractor(
+            client=LiteLLMClientWithRetry(
+                LiteLLMClient(
+                    model=model,
+                    api_key=api_key or None,
+                    temperature=COMPLIANCE_TEMPERATURE,
+                    max_tokens=MAX_TOKENS_RULE_EXTRACTION,
+                )
+            )
+        )
         svc = RuleExtractionService(provider=extractor)
 
         try:

@@ -25,13 +25,20 @@ import os
 import tempfile
 from pathlib import Path
 
+<<<<<<< HEAD
+from app.modules.config import (
+    COMPLIANCE_TEMPERATURE,
+    DEFAULT_LLM_MODEL,
+    MAX_TOKENS_RULE_EXTRACTION,
+)
+=======
 from app.logging_config import get_logger
+>>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.modules.module1_doc_parser.section_chunker import SectionChunker
-from app.services.llm_client import LiteLLMClient
+from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
 from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
-from app.services.settings_service import SettingsService
 
 logger = get_logger(__name__)
 
@@ -121,13 +128,17 @@ class RuleExtractionService:
     ):
         """Initialize document parser and extraction provider dependencies."""
         self._doc_reader = doc_reader or Module1_DocReader()
-        settings = SettingsService()
-        default_model = settings.get(
-            "BIM_GUARD_RULE_MODEL",
-            os.getenv("BIM_GUARD_RULE_MODEL", "gpt-4o-mini"),
-        )
+        # Model, temperature, token cap, and retry all come from the shared
+        # config (Issue #17). DEFAULT_LLM_MODEL already performs the
+        # settings-then-environment lookup this used to do inline.
         self._provider = provider or LiteLLMRuleExtractor(
-            client=LiteLLMClient(model=default_model)
+            client=LiteLLMClientWithRetry(
+                LiteLLMClient(
+                    model=DEFAULT_LLM_MODEL,
+                    temperature=COMPLIANCE_TEMPERATURE,
+                    max_tokens=MAX_TOKENS_RULE_EXTRACTION,
+                )
+            )
         )
 
     # ── Public API ────────────────────────────────────────────────────────────
