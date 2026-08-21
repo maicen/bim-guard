@@ -52,7 +52,7 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
                 path_b_issues.extend(mm_issues)
         except Exception as e:
             # Log but don't crash; MM-001 offline fallback
-            print(f"MM001 error: {e} - compliance_orchestrator.py:55")
+            print(f"MM-001 error: {e}")
     
     # ========== XM-001: Cross-Material Galvanic ==========
     if feature_xm:
@@ -63,7 +63,7 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
                 path_b_issues.extend(xm_issues)
         except Exception as e:
             # Log but don't crash; XM-001 requires DB
-            print(f"XM001 error: {e} - compliance_orchestrator.py:66")
+            print(f"XM-001 error: {e}")
     
     # ========== PROJECT: Path A + Path B onto UI dicts ==========
     # Convert Path A results to Issues, then project back with Path B findings merged
