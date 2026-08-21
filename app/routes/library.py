@@ -1,6 +1,7 @@
 """Document and rule library routes, including extraction/import endpoints."""
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -67,6 +68,7 @@ from app.modules.config import (
     MAX_TOKENS_RULE_EXTRACTION,
 )
 from app.modules.module1_doc_parser import Module1_DocReader
+from app.modules.module3_rule_builder.ids_exporter import export_ids_for_ruleset, import_ids_ruleset
 from app.services.documents_service import DocumentService
 from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.object_storage import ObjectStorage
@@ -369,6 +371,43 @@ def setup_routes(rt):
                             ),
                             SubmitButton("Import Ruleset", variant="primary"),
                             hx_post="/api/rules/import-json",
+                            hx_target="#import-result",
+                            enctype="multipart/form-data",
+                            cls="space-y-4",
+                        ),
+                        Div(id="import-result"),
+                    ),
+                ),
+                cls="space-y-4",
+            )
+        )
+
+    @rt("/library/rules/import-ids")
+    def rules_import_ids_page():
+        return Title("Import IDS Ruleset - BIM Guard"), DashboardLayout(
+            Container(
+                H1("Import IDS Ruleset", cls="text-3xl font-bold tracking-tight"),
+                P(
+                    "Upload a buildingSMART IDS XML document to import compatible property assertions into BIMGuard.",
+                    cls="text-muted-foreground",
+                ),
+                UICard(
+                    UICardHeader(UICardTitle("Upload IDS XML")),
+                    UICardContent(
+                        Form(
+                            Div(
+                                FormLabel("IDS file (.ids, .xml)", fr="ids_file"),
+                                Input(
+                                    id="ids_file",
+                                    type="file",
+                                    name="ids_file",
+                                    accept=".ids,.xml",
+                                    required=True,
+                                ),
+                                cls="space-y-1",
+                            ),
+                            SubmitButton("Import IDS", variant="primary"),
+                            hx_post="/api/rules/import-ids",
                             hx_target="#import-result",
                             enctype="multipart/form-data",
                             cls="space-y-4",
@@ -818,6 +857,31 @@ def setup_routes(rt):
             headers={"Content-Disposition": f'attachment; filename="{safe}_rules.json"'},
         )
 
+    @rt("/api/rules/export-ids")
+    def rules_export_ids(ruleset_id: str = ""):
+        """Download an IDS XML document for the selected ruleset."""
+        ruleset_id = RuleService.normalize_ruleset_id(ruleset_id)
+        if not ruleset_id:
+            return Alert("No ruleset selected for IDS export.", cls=AlertT.warning)
+
+        rows = _rule_service.list_by_ruleset(ruleset_id)
+        if not rows:
+            return Alert(f"No rules were found for ruleset '{ruleset_id}'.", cls=AlertT.warning)
+
+        payload = export_ids_for_ruleset(ruleset_id, rows)
+        if not payload.strip():
+            return Alert(
+                f"No exportable IDS property checks were found for ruleset '{ruleset_id}'.",
+                cls=AlertT.warning,
+            )
+
+        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", ruleset_id).strip("_") or "ruleset"
+        return StreamingResponse(
+            iter([payload]),
+            media_type="application/xml",
+            headers={"Content-Disposition": f'attachment; filename="{safe}_ids.xml"'},
+        )
+
     @rt("/api/rules/import-json", methods=["POST"])
     async def rules_import_json_api(ruleset_file: UploadFile):
         import json as _json
@@ -838,6 +902,70 @@ def setup_routes(rt):
         ruleset_id = json_data.get("ruleset_id", "")
         return Span(
             f"Imported {count} rules from '{ruleset_id}' ✓",
+            cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium",
+        )
+
+    @rt("/api/rules/import-ids", methods=["POST"])
+    async def rules_import_ids_api(ids_file: UploadFile):
+        file_content = await ids_file.read()
+        if not file_content:
+            return Alert("No IDS file received.", cls=AlertT.error)
+
+        try:
+            xml_text = file_content.decode("utf-8")
+        except UnicodeDecodeError:
+            return Alert("IDS file must be UTF-8 encoded XML.", cls=AlertT.error)
+
+        try:
+            rows = import_ids_ruleset(xml_text)
+        except ValueError as exc:
+            return Alert(str(exc), cls=AlertT.error)
+
+        if not rows:
+            return Alert(
+                "No compatible property assertions were found in the IDS file.",
+                cls=AlertT.warning,
+            )
+
+        created = 0
+        for row in rows:
+            try:
+                _rule_service.create_rule(
+                    reference=row.get("reference") or "",
+                    rule_type=row.get("rule_type") or "numeric_comparison",
+                    description=row.get("description") or "Imported from IDS",
+                    target_ifc_class=row.get("target_ifc_class") or "Unspecified",
+                    source_text=row.get("source_text") or "",
+                    property_set=row.get("property_set") or "",
+                    property_name=row.get("property_name") or "",
+                    fallback_property="",
+                    operator=row.get("operator") or "=",
+                    check_value=row.get("check_value"),
+                    value_min=row.get("value_min"),
+                    value_max=row.get("value_max"),
+                    unit="",
+                    applies_when={},
+                    severity=row.get("severity") or "mandatory",
+                    keyword="",
+                    compliance_type="",
+                    exceptions=[],
+                    related_refs=[],
+                    overridden_by="",
+                    confidence=None,
+                    extraction_method="ids_import",
+                    needs_review=False,
+                    mechanism=row.get("mechanism") or "CODE",
+                    ruleset_id=row.get("ruleset_id") or "IMPORTED-IDS",
+                    rule_category=row.get("rule_category") or "property_check",
+                    parameters=json.dumps({}),
+                )
+                created += 1
+            except Exception as exc:  # pragma: no cover - surfaced to UI if DB write fails
+                return Alert(f"Import failed while saving rule: {exc}", cls=AlertT.error)
+
+        ruleset_id = rows[0].get("ruleset_id") or "IMPORTED-IDS"
+        return Span(
+            f"Imported {created} IDS rule(s) into '{ruleset_id}' ✓",
             cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium",
         )
 

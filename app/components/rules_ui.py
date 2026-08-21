@@ -702,6 +702,12 @@ def rules_folders_panel(
                 hx_swap="outerHTML",
                 cls="flex flex-wrap items-center gap-2",
             )
+            export_link = LinkButton(
+                "Download IDS",
+                href=f"/api/rules/export-ids?ruleset_id={ruleset_id}",
+                variant="secondary",
+                cls="text-xs",
+            )
             delete_folder_form = Form(
                 Input(type="hidden", name="ruleset_id", value=ruleset_id),
                 Button(
@@ -778,6 +784,7 @@ def rules_folders_panel(
                     Div(
                         metadata_form,
                         rename_form,
+                        export_link,
                         delete_folder_form,
                         cls="flex flex-wrap items-center gap-3 mb-3",
                     ),
@@ -841,6 +848,12 @@ def rules_panel(
                         LinkButton(
                             "Import JSON Ruleset",
                             href="/library/rules/import-json",
+                            variant="secondary",
+                            cls="text-sm",
+                        ),
+                        LinkButton(
+                            "Import IDS",
+                            href="/library/rules/import-ids",
                             variant="secondary",
                             cls="text-sm",
                         ),
