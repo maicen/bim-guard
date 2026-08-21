@@ -109,12 +109,12 @@ Still pending:
 
 ### Current state
 
-- SQLite/fastlite remains suitable for local/dev workflows.
+- Supabase remains the persistence backend for local, staging, and production workflows.
 
 ### Remaining enhancements
 
 - Introduce explicit migrations instead of opportunistic startup column adds.
-- Improve rule parameter storage/queryability (SQLite JSON functions or structured columns).
+- Improve rule parameter storage/queryability with Supabase Postgres JSONB operators and appropriate indexes.
 - Add relational links for run history (project + documents + ruleset + output artifacts).
 
 ## 7) Performance and Architecture

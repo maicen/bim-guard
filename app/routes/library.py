@@ -1,6 +1,7 @@
 """Document and rule library routes, including extraction/import endpoints."""
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from fasthtml.common import (
@@ -59,12 +60,15 @@ from app.components.ui import (
 from app.components.ui import (
     CardTitle as UICardTitle,
 )
+<<<<<<< HEAD
 from app.modules import orchestrator
 from app.modules.config import (
     COMPLIANCE_TEMPERATURE,
     DEFAULT_LLM_MODEL,
     MAX_TOKENS_RULE_EXTRACTION,
 )
+=======
+>>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.services.documents_service import DocumentService
 from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
@@ -82,6 +86,14 @@ from app.utils import (
 _document_service = DocumentService()
 _rule_service = RuleService()
 _rule_extraction_service = RuleExtractionService()
+
+
+@lru_cache(maxsize=1)
+def _orchestrator_module():
+    """Import the offline pipeline orchestrator lazily on first use."""
+    from app.modules import orchestrator
+
+    return orchestrator
 
 
 def _folders_with_rules() -> list[dict]:
@@ -897,6 +909,8 @@ def setup_routes(rt):
     @rt("/api/rules/extract-free", methods=["POST"])
     def rules_extract_free_api(document_id: int = 0, folder_name: str = ""):
         """Run the free/offline CLI pipeline (Docling + regex, no LLM) on an uploaded PDF."""
+        orchestrator = _orchestrator_module()
+
         if not document_id:
             return Alert("Please select a document.", cls=AlertT.warning)
 

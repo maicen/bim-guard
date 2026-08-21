@@ -135,6 +135,93 @@ feature flag; XM-001 must stay behind a second flag that defaults off until the 
 and its loader failure must degrade to "not assessed", never to an empty result that reads as "no
 couples found". Section 5 specifies this.
 
+### Known issues — recorded, not scheduled
+
+Present-tense defects found while implementing the numbered steps, each verified at the commit
+noted. None is scheduled, and none blocks the step it surfaced in — they are recorded here so the
+work that does touch this code inherits the knowledge rather than rediscovering it. Grouped by the
+step that surfaced them.
+
+**From F1 (B1 fix), verified at `4edba3a`.** Both are in `compliance_orchestrator.py` and both are
+**downstream of B1**: the module has never imported, so neither has ever executed. Neither is
+scheduled because section 8 already rules that this file is not extended beyond F1 — it is
+rewritten on top of the F4 adapter, or deleted.
+
+- **Mechanism inference is case-mismatched against the runner, silently voiding every citation.**
+  `compliance_runner.py:174-182` emits `dominant_mechanism` lowercase (`"galvanic"`, `"crevice"`,
+  `"mic"`); `_results_to_issues()` compares against `"Galvanic"` / `"Crevice"` / `"MIC"`
+  (`compliance_orchestrator.py:58-63`, and again at `:73-78` for citations). Confirmed by calling the
+  adapter directly with a runner-shaped dict: `dominant_mechanism="galvanic"` yields
+  `rule_id="UNKNOWN.01"`, `mechanism="UNKNOWN galvanic"`, `assignee_role="Lead Engineer"` and
+  `citations=[]`. Every issue lands unattributed, so a BCF built from this path would carry no
+  standards reference at all — the failure is silent, not an exception. This is the concrete instance
+  of the "mechanism-inference chain needs review rather than adoption" warning in B1; F4 must key off
+  a shared constant, not repeated string literals.
+- **The `__main__` smoke-test block raises `KeyError` on its last line.**
+  `compliance_orchestrator.py:158` reads `result['summary - compliance_orchestrator.py:158']`, but
+  `run_and_log_compliance()` returns keys `issues` / `run_name` / `timestamp` / `summary` /
+  `bcf_path`. An editor or logging artifact was pasted into the subscript. The block is also the only
+  caller of the hardcoded IFC path `data/uploads/ifc/f4c3f1b8...Infra-Plumbing.ifc`, so it is not a
+  usable smoke test regardless — delete it with the file, or replace it with the F13/F14 tests.
+
+**From F3 (MM-001 loader), verified at `4edba3a` plus the F3 working tree.** Both are consequences
+of adding `load_rule_pack()` to `material_media.py`, not defects in it. Neither affects MM-001
+behaviour today; both are maintenance hazards the F4/F6 wiring will touch.
+
+- **`MM_PACK_PATH` is now defined twice, in both comparators.** F3 added it at
+  `material_media.py:67`; `cross_material.py:67` already carried the same literal, which it reads at
+  `:139` to borrow MM-001's `environment_severity` (see 4.1). Two copies of one path is drift
+  waiting to happen: move the pack file and one comparator keeps working while the other stops.
+  `material_media.py` is the correct owner, so `cross_material.py` should import the constant from
+  it rather than restate it. Not done in F3 because F3's scope was additive — editing
+  `cross_material.py` would have put a second module in the diff for no functional gain.
+- **Ruleset paths are CWD-relative, and the project already has the fix elsewhere.**
+  `Path("data/rulesets/...")` resolves against the working directory, not the repo, so every caller
+  must be launched from the repository root. Five call sites share the pattern:
+  `material_media.py:67`, `cross_material.py:66-67`, `bert_classifier.py:319-320`. This is fragile
+  rather than wrong — it works today because uvicorn is started from the root — but it breaks any
+  test runner, cron job or worker with a different CWD, and the failure is a bare
+  `FileNotFoundError` far from the cause. F3's loader raises a message naming the CWD assumption,
+  which mitigates the symptom, not the cause. Note that `analyze.py:58` already anchors `_DATA_DIR`
+  off `__file__` — the convention exists in the codebase and these call sites simply predate it.
+  The fix is one shared root constant, applied to all five; it is a cross-cutting change and does
+  not belong inside an MM/XM feature step.
+
+**From F7 (Path B feature flags), verified at `4edba3a` plus the F7 working tree.** This one is a
+binding design constraint on F6, not a cleanup item — read it before wiring the orchestrator.
+
+- **The Path B flags carry a database dependency, and deferring the import does not shed it.**
+  `config.py:13` runs `_settings = SettingsService()` at module level; that constructs
+  `StaticDataService()`, which calls `PersistenceService.get_table()` and raises
+  `ValueError("SUPABASE_URL is required")` with no database. So **any** module that reads
+  `FEATURE_PATH_B_MM` through `app.modules.config` inherits a Supabase requirement — which lands
+  squarely on MM-001, whose distinction from XM-001 (B4) is that it runs offline from disk. The
+  gate would defeat the property it gates.
+
+  Moving the import inside `orchestrate_workflow()` is **necessary but not sufficient**, and this
+  is the part that is easy to get wrong. A function-level `from app.modules.config import
+  FEATURE_PATH_B_MM` still executes the module body on first import; it relocates the failure from
+  process start to the moment the MEP branch runs, and MM-001 remains unable to run without a
+  database. Measured with `SUPABASE_*` unset: the enclosing module imports cleanly, then the call
+  raises `ValueError: SUPABASE_URL is required`. Deferring buys a later, more confusing failure —
+  not an offline path.
+
+  F6 therefore needs one of these, not merely a deferred import:
+  1. **Read the environment directly in the MEP branch**, bypassing `config.py`:
+     `os.environ.get("FEATURE_PATH_B_MM", "0") == "1"`, held in a local. Verified offline: the flag
+     reads `True` and `load_rule_pack()` returns `BIMGUARD-MM-001` with no database present. Costs
+     the DB-backed settings override for these two keys.
+  2. **Make `config.py` lazy** — build `_settings` on first use behind a helper rather than at
+     import. Keeps the settings override and fixes the problem for every future flag, but it edits
+     a module the whole pipeline imports, so it wants its own step and its own test.
+  3. **Tolerate the failure** — read through `config.py` inside a `try/except` that falls back to
+     the environment. Preserves the override where a database exists and degrades where it does
+     not; the cost is a swallowed exception that hides genuine misconfiguration.
+
+  Option 1 is the smallest change that keeps MM-001 offline and is the recommendation for F6.
+  Whichever is chosen, XM-001 is unaffected — it needs the database anyway for the GC-001 series,
+  so reading its flag through `config.py` costs it nothing.
+
 ---
 
 ## 3. Decisions to make before writing code

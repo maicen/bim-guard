@@ -17,6 +17,7 @@ from monsterui.all import (
 
 from app.components.layout import DashboardLayout
 from app.components.ui import Alert, AlertT, SubmitButton
+from app.logging_config import current_level_name, set_log_level
 from app.services.settings_service import SettingsService
 from app.utils import redirect_see_other
 
@@ -75,6 +76,10 @@ def setup_routes(rt):
                     "Manage runtime backend, storage, and model settings persisted in the database.",
                     cls="text-muted-foreground",
                 ),
+                P(
+                    f"Active log level: {current_level_name()}",
+                    cls="text-xs text-muted-foreground",
+                ),
                 *alert,
                 _settings_form(),
                 cls="space-y-4",
@@ -88,6 +93,9 @@ def setup_routes(rt):
             key = str(item.get("key") or "")
             if not key:
                 continue
-            _settings.set(key, str(form.get(key) or ""))
+            value = str(form.get(key) or "")
+            _settings.set(key, value)
+            if key == "BIM_GUARD_LOG_LEVEL" and value:
+                set_log_level(value)
 
         return redirect_see_other("/settings?message=saved")

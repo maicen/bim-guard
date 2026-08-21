@@ -1,6 +1,9 @@
 from pathlib import Path
+from threading import Thread
+from time import perf_counter
 
 from fasthtml.common import FileResponse, Title, fast_app
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.compat.monsterui import ensure_monsterui_compat
 
@@ -15,7 +18,7 @@ from monsterui.all import (
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
-from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
+from app.logging_config import configure_logging, get_logger
 from app.utils import load_env_file
 
 try:
@@ -24,6 +27,28 @@ except ImportError:  # pragma: no cover - non-POSIX platforms
     fcntl = None
 
 load_env_file()
+configure_logging()
+logger = get_logger(__name__)
+
+
+def _apply_persisted_log_level() -> None:
+    """Let the DB-backed log level win when no env override is present."""
+    import os
+
+    if os.environ.get("BIM_GUARD_LOG_LEVEL") or os.environ.get("LOG_LEVEL"):
+        return
+    try:
+        from app.logging_config import set_log_level
+        from app.services.settings_service import SettingsService
+
+        level = SettingsService().get("BIM_GUARD_LOG_LEVEL", "")
+        if level:
+            set_log_level(level)
+    except Exception:
+        logger.debug("Could not load persisted log level", exc_info=True)
+
+
+_apply_persisted_log_level()
 
 from app.routes import (
     analyze,
@@ -42,6 +67,38 @@ app, rt = fast_app(
     hdrs=APP_HEADERS,
     cls="antialiased",
 )
+
+
+class PageLoadLoggingMiddleware(BaseHTTPMiddleware):
+    """Log browser page responses at DEBUG level with status and latency."""
+
+    async def dispatch(self, request, call_next):
+        started = perf_counter()
+        response = await call_next(request)
+
+        if request.method != "GET":
+            return response
+
+        path = request.url.path
+        if path.startswith("/static/") or path in {"/live-reload", "/favicon.ico"}:
+            return response
+
+        content_type = (response.headers.get("content-type") or "").lower()
+        if "text/html" not in content_type:
+            return response
+
+        duration_ms = (perf_counter() - started) * 1000
+        logger.debug(
+            "Page loaded method=%s path=%s status=%d duration_ms=%.1f",
+            request.method,
+            path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
+
+
+app.add_middleware(PageLoadLoggingMiddleware)
 
 _ROUTE_INSTALLERS = (
     viewer.setup_routes,
@@ -105,7 +162,7 @@ def _seed_library() -> None:
         seed_engine_rulesets(svc)
 
     except Exception:
-        pass  # never crash startup over seeding
+        logger.warning("Rule library seeding failed; continuing startup", exc_info=True)
 
 
 def _seed_library_once_per_host() -> None:
@@ -122,7 +179,12 @@ def _seed_library_once_per_host() -> None:
                     return
             _seed_library()
     except Exception:
-        pass
+        logger.warning("Could not acquire seeding lock; skipping seed", exc_info=True)
+
+
+def _schedule_seed_library_once_per_host() -> None:
+    """Kick off library seeding in the background so startup can return quickly."""
+    Thread(target=_seed_library_once_per_host, daemon=True).start()
 
 
 def _setup_routes() -> None:
@@ -131,16 +193,14 @@ def _setup_routes() -> None:
     if _ROUTES_REGISTERED:
         return
     for installer in _ROUTE_INSTALLERS:
+        logger.debug("Registering routes from %s", installer.__module__)
         installer(rt)
     _ROUTES_REGISTERED = True
 
 
-_seed_library_once_per_host()
-try:
-    warm_optional_rule_pipeline_dependencies()
-except Exception:
-    pass
+_schedule_seed_library_once_per_host()
 _setup_routes()
+logger.info("BIM Guard startup complete")
 
 
 @rt("/")
@@ -157,4 +217,4 @@ def get():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host="0.0.0.0", reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", reload=True, log_config=None)

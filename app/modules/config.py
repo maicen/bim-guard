@@ -61,6 +61,16 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_INITIAL_DELAY_SECONDS = 1.0
 RETRY_BACKOFF_MULTIPLIER = 2.0  # Exponential backoff: 1s, 2s, 4s
 
+# ── Path B feature flags ─────────────────────────────────────────────────
+# Gate the MM-001 and XM-001 comparators independently. Both default OFF.
+#
+# Two flags, not one: MM-001 is APPROVED v1.0 and runs entirely from disk,
+# while XM-001 is still DRAFT and its loader reaches the database for the
+# GC-001 galvanic series. They must not be wired on the same switch.
+# Set to the string "1" to enable; any other value reads as off.
+FEATURE_PATH_B_MM = _settings.get("FEATURE_PATH_B_MM", os.environ.get("FEATURE_PATH_B_MM", "0")) == "1"
+FEATURE_PATH_B_XM = _settings.get("FEATURE_PATH_B_XM", os.environ.get("FEATURE_PATH_B_XM", "0")) == "1"
+
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "BuildingCode_PDF"
 SOURCE_DOC_SEED = "BuildingCode_Seed"

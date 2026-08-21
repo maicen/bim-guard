@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-try:
-    from config import DB_PATH, SOURCE_DOC_SEED
-    from module3_rule_builder.rule_generator import RuleGenerator
-    from module3_rule_builder.rule_store import RuleStore
-    from app.services.static_data_service import StaticDataService
-except ImportError:
-    from app.modules.config import DB_PATH, SOURCE_DOC_SEED
-    from app.modules.module3_rule_builder.rule_generator import RuleGenerator
-    from app.modules.module3_rule_builder.rule_store import RuleStore
-    from app.services.static_data_service import StaticDataService
+from app.modules.config import DB_PATH, SOURCE_DOC_SEED
+from app.modules.module3_rule_builder.rule_generator import RuleGenerator
+from app.modules.module3_rule_builder.rule_store import RuleStore
+from app.services.static_data_service import StaticDataService
+
 
 def _load_seed_rules() -> list[dict]:
     """Read baseline code rules from database static assets."""

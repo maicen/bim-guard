@@ -19,7 +19,7 @@ applyTo: "app/**"
 
 **BIM Guard** is a BIM compliance application built with FastHTML (Python) and MonsterUI. It lets users upload IFC models, define compliance rules from documents, and generate reports.
 
-**Tech stack:** FastHTML · MonsterUI · FastLite (SQLite) · IfcOpenShell · HTMX
+**Tech stack:** FastHTML · MonsterUI · Supabase (Postgres) · IfcOpenShell · HTMX
 
 **IfcOpenShell** is the server-side IFC parsing library (used in `app/modules/module2_ifc_read.py`). It is not yet integrated — module stubs await implementation. Do not import it in route files; all IFC processing goes through the orchestrator.
 
@@ -245,26 +245,19 @@ File upload routes must be `async` and accept `UploadFile` from `fasthtml.common
 
 ```python
 from fasthtml.common import UploadFile
-from pathlib import Path
-import uuid
-
-UPLOAD_DIR = Path("data/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 @rt("/api/upload", methods=["POST"])
 async def upload_handler(document: UploadFile):
     contents = await document.read()           # bytes
-    original_name = document.filename or "upload.bin"
-    safe_base = Path(original_name).name       # strips path traversal segments
-    safe_name = f"{uuid.uuid4().hex}_{safe_base}"
-    save_path = UPLOAD_DIR / safe_name
-    save_path.write_bytes(contents)            # save to disk
-    # Return HTMX fragment
-    return Div(P(f"Uploaded: {safe_name}"), cls="...")
+    storage_ref = ObjectStorage().save_upload(
+        document.filename or "upload.bin", contents, "uploads"
+    )
+    # Store storage_ref in Supabase and return an HTMX fragment.
+    return Div(P(f"Uploaded: {storage_ref}"), cls="...")
 ```
 
 - Always use `async def` for upload handlers
-- Save files under a dedicated directory (e.g. `data/uploads/`), never in `static/`
+- Save files through `ObjectStorage.save_upload(...)`; local disk is only a cache for downloaded Supabase objects
 - The form must include `enctype="multipart/form-data"` for uploads to work
 - Never trust client filenames directly; normalize with `Path(name).name` and add a server-generated prefix
 
@@ -340,26 +333,18 @@ if not name.strip():
 
 ---
 
-## Database (FastLite)
+## Database (Supabase)
 
-Use `fastlite` exclusively — never SQLAlchemy, Pydantic models, or other ORMs.
+Use the shared Supabase persistence service and table adapters exclusively — never a local database, FastLite, SQLAlchemy, Pydantic models, or other ORMs.
 
 ```python
-from pathlib import Path
-from fastlite import database
+from app.services.persistence import PersistenceService
 
-# DB_PATH is defined at the top of each route file that needs DB access:
-DB_DIR = Path("data")
-DB_DIR.mkdir(exist_ok=True)
-DB_PATH = DB_DIR / "bimguard.sqlite"
-
-_db = database(str(DB_PATH))
-_table = _db["table_name"]
-_table.create({
-    "id": int,
-    "name": str,
-    "status": str,
-}, pk="id", if_not_exists=True)
+_table = PersistenceService.get_table(
+    "table_name",
+    {"id": int, "name": str, "status": str},
+    pk="id",
+)
 
 # CRUD
 _table.insert({"name": "...", "status": "Draft"})
@@ -369,7 +354,7 @@ _table.delete(id)
 list(_table.rows)  # all rows
 ```
 
-Verified in this project environment: `Table.update` supports `updates=` keyword argument.
+The Supabase table adapter supports the same `updates=` keyword argument for updates.
 
 Timestamps are ISO 8601 strings:
 ```python
@@ -380,23 +365,20 @@ def _now_iso() -> str:
 
 **Never use `datetime.utcnow()`** — deprecated in Python 3.12+. Always use `datetime.now(timezone.utc)`.
 
-**Prefer a shared DB accessor for new work.** Route-level DB initialization is currently scattered across service files, but new work should use a shared accessor to avoid duplicated path/bootstrap logic:
+**Prefer the shared DB accessor for all work.** Route-level database initialization must not be duplicated in route or service files:
 
 ```python
 # app/db.py (create if it doesn't exist)
-from pathlib import Path
-from fastlite import database
+from app.services.persistence import PersistenceService
 
-_DB_PATH = Path("data") / "bimguard.sqlite"
-_DB_PATH.parent.mkdir(exist_ok=True)
-
-db = database(str(_DB_PATH))
+db = PersistenceService.get_db
 ```
 
 Then import in service files:
 ```python
 from app.db import db
-_projects = db["projects"]
+_supabase = db()
+_projects = PersistenceService.get_table("projects", PROJECT_SCHEMA)
 ```
 
 ---
@@ -496,7 +478,7 @@ Automated tests are not currently required. Use manual browser verification by d
 
 - **No type annotation required** on return types, but annotate parameters
 - Use Python 3.10+ union syntax: `dict | None` not `Optional[dict]`
-- Database path via `pathlib.Path` — never hardcode strings
+- Database access via `app.db` and `PersistenceService` — never create a local database in a route or service
 - Functional style preferred; no unnecessary abstractions
 
 ---
@@ -508,11 +490,11 @@ Never use any of the following:
 | Forbidden | Use instead |
 |---|---|
 | `datetime.utcnow()` | `datetime.now(timezone.utc)` |
-| `from sqlalchemy import ...` | `from fastlite import database` |
-| `from pydantic import BaseModel` | plain `dict` or FastLite schema |
+| `from sqlalchemy import ...` | `PersistenceService` and `SupabaseTableAdapter` |
+| `from pydantic import BaseModel` | plain `dict` or the existing table schema |
 | `from flask import ...` / `@app.route(...)` | FastHTML `@rt(...)` inside `setup_routes(rt)` |
 | `from typing import Optional` | `X | None` (Python 3.10+ union syntax) |
 | Returning raw HTML strings | Return FastHTML component trees |
 | `raise HTTPException(...)` | Return component with `Alert(cls=AlertT.danger)` |
 | Registering routes globally outside `setup_routes` | Always use `setup_routes(rt)` pattern |
-| Hardcoding `"data/bimguard.sqlite"` string | Use `Path("data") / "bimguard.sqlite"` |
+| Creating a local database or hardcoding database paths | Use `PersistenceService.get_table(...)` |
