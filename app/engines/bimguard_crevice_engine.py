@@ -126,14 +126,17 @@ def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
     Map a joint description string to a joint type and geometry class.
     Returns (joint_type_code, geometry_class, risk_score).
     """
-    desc_lower = joint_description.lower().strip()
+    desc_lower = (joint_description or "").lower().strip()
     for code, jt in JOINT_TYPES.items():
         if code == "JT-014":
             continue
-        for ifc_type in jt["ifc_types"]:
-            if ifc_type in desc_lower:
-                geo = jt["geometry"]
-                return code, geo, GEOMETRY_CLASSES[geo]["risk"]
+        ifc_types = jt.get("ifc_types") or []
+        if not isinstance(ifc_types, (list, tuple, set)):
+            ifc_types = [ifc_types]
+        for ifc_type in ifc_types:
+            if str(ifc_type).lower() in desc_lower:
+                geo = jt.get("geometry", "Tight")
+                return code, geo, GEOMETRY_CLASSES.get(geo, GEOMETRY_CLASSES["Tight"])["risk"]
     # Default to Tight (JT-014) — conservative
     return "JT-014", "Tight", GEOMETRY_CLASSES["Tight"]["risk"]
 
@@ -403,7 +406,7 @@ def assess_crevice_risk(element: CCElement) -> CCResult:
 
     # Joint type classification
     jt_code, geo_class, geo_risk = classify_joint_type(element.joint_description)
-    jt_label = JOINT_TYPES[jt_code]["label"]
+    jt_label = JOINT_TYPES.get(jt_code, {"label": "Unknown joint type"})["label"]
 
     # CCT adequacy
     env_sev_key, env_sev_data = classify_environment_severity(

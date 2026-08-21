@@ -149,7 +149,6 @@ def test_orchestrator_wires_both_paths(orchestrator_source):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason=_IMPORT_REASON)
 def test_orchestrator_module_imports(run_probe):
     """The entry point must be reachable before anything else can be true."""
     verdict = run_probe(_RUN_PROBE)

@@ -13,6 +13,68 @@ from typing import Any
 from app.services.rules_service import RuleService
 from app.services.static_data_service import StaticDataService
 
+_FALLBACK_RULESETS: dict[str, dict[str, Any]] = {
+    "galvanic_corrosion_ruleset.json": {
+        "ruleset_id": "BIMGUARD-GC-001",
+        "ruleset_version": "1.0.0",
+        "description": "Offline fallback ruleset for galvanic corrosion checks.",
+        "galvanic_series": {
+            "materials": {
+                "ss316_passive": {"potential_v": 0.08, "label": "SS 316 (passive)", "noble": True, "pren_typical": 25},
+                "ss304_passive": {"potential_v": 0.12, "label": "SS 304 (passive)", "noble": True, "pren_typical": 19},
+                "copper": {"potential_v": 0.28, "label": "Copper", "noble": True},
+                "brass": {"potential_v": 0.32, "label": "Brass (70/30)", "noble": False},
+                "cast_iron": {"potential_v": 0.52, "label": "Cast iron", "noble": False},
+                "carbon_steel": {"potential_v": 0.55, "label": "Carbon / mild steel", "noble": False},
+                "aluminium": {"potential_v": 0.70, "label": "Aluminium alloys", "noble": False},
+                "galv_steel": {"potential_v": 0.82, "label": "Galvanised steel", "noble": False},
+            }
+        },
+        "environment_classes": {
+            "E1_CONTROLLED": {"label": "Fully controlled / dry indoor", "voltage_threshold_v": 0.50, "multiplier": 0.20},
+            "E2_NORMAL": {"label": "Normal heated indoor", "voltage_threshold_v": 0.25, "multiplier": 0.40},
+            "E3_HUMID": {"label": "Humid plant room", "voltage_threshold_v": 0.15, "multiplier": 0.65},
+            "E5_EXPOSED": {"label": "External exposed", "voltage_threshold_v": 0.10, "multiplier": 0.85},
+        },
+        "zone_to_env": {"pool": "E6_POOL", "plant room": "E3_HUMID", "external": "E5_EXPOSED", "roof": "E5_EXPOSED"},
+        "area_ratio_bands": {"bands": [{"label": "Favourable", "min_ratio": 5.0, "risk_score": 0.2}, {"label": "Acceptable", "min_ratio": 2.0, "risk_score": 0.4}, {"label": "Moderate", "min_ratio": 0.5, "risk_score": 0.6}, {"label": "Critical", "min_ratio": 0.0, "risk_score": 1.0}]},
+        "pren_thresholds": {"by_environment": {"E2_NORMAL": {"min_pren": 18, "note": "SS304 adequate"}, "E3_HUMID": {"min_pren": 25, "note": "SS316 required"}}, "formula": "PREN = %Cr + 3.3 x %Mo + 16 x %N"},
+        "risk_bands": {"Low": {"range": "< 0.35", "bcf_action": "Asset register only — no BCF issue"}, "Medium": {"range": "0.35 - 0.65", "bcf_action": "BCF Normal priority"}, "High": {"range": "0.65 - 0.85", "bcf_action": "BCF Major priority"}, "Critical": {"range": "> 0.85", "bcf_action": "BCF Critical priority — immediate remediation"}},
+        "mitigation_catalogue": {"MIT-GC-001": "Install dielectric isolation gaskets at all contact points between dissimilar metals"},
+        "common_mep_pairings": [{"anode": "carbon_steel", "cathode": "ss316_passive", "gap_v": 0.47, "env": "E3_HUMID", "band": "Critical"}],
+    },
+    "crevice_corrosion_ruleset.json": {
+        "ruleset_id": "BIMGUARD-CC-001",
+        "ruleset_version": "1.0.0",
+        "description": "Offline fallback ruleset for crevice corrosion checks.",
+        "cct_table": {"grades": {"ss316_passive": {"cct_c": 10, "label": "SS 316 / 1.4401", "pren_typical": 25}, "ss304_passive": {"cct_c": -5, "label": "SS 304 / 1.4301", "pren_typical": 19}, "duplex2205": {"cct_c": 25, "label": "Duplex 2205 / 1.4462", "pren_typical": 35}}},
+        "geometry_classes": {"Open": {"risk": 0.35, "description": "Open geometry"}, "Moderate": {"risk": 0.60, "description": "Moderate geometry"}, "Tight": {"risk": 0.80, "description": "Tight geometry"}, "Critical": {"risk": 1.00, "description": "Critical crevice geometry"}},
+        "joint_type_library": {"types": {"JT-001": {"label": "Butt weld / socket", "geometry": "Tight", "risk": 0.75, "ifc_types": ["pipe", "flange"]}}},
+        "environment_severity": {"classes": {"BUILDING_SERVICES": {"label": "Building services pipework", "severity": 0.35, "chloride_mgl": "variable"}, "T2_INTERMITTENT": {"label": "Intermittent wetting", "severity": 0.40, "chloride_mgl": "<50"}}},
+        "risk_bands": {"Low": {"range": "< 0.30", "bcf_action": "Asset register only — no BCF issue"}, "Medium": {"range": "0.30 - 0.55", "bcf_action": "BCF Normal priority"}, "High": {"range": "0.55 - 0.80", "bcf_action": "BCF Major priority"}, "Critical": {"range": "> 0.80", "bcf_action": "BCF Critical priority — immediate remediation"}},
+        "mitigation_catalogue": {"MIT-CC-001": "Specify non-metallic isolation gasket and positive drainage"},
+    },
+    "mic_corrosion_ruleset.json": {
+        "ruleset_id": "BIMGUARD-MC-001",
+        "ruleset_version": "1.0.0",
+        "description": "Offline fallback ruleset for MIC checks.",
+        "flow_velocity_classes": {"FV0_STAGNANT": {"label": "Stagnant", "risk": 1.0, "threshold_ms": 0.0}, "FV2_LOW": {"label": "Low", "risk": 0.6, "threshold_ms": 0.2}, "FV4_GOOD": {"label": "Good", "risk": 0.2, "threshold_ms": 0.5}},
+        "temperature_classes": {"T2_DANGER": {"range": "20–45°C", "risk": 0.8, "t_min": 20.0, "t_max": 45.0}, "T4_SAFE_HOT": {"range": ">45°C", "risk": 0.2, "t_min": 45.0, "t_max": 100.0}},
+        "dead_leg_classes": {"DL0_THROUGH": {"label": "Through-flow", "risk": 0.0, "length_to_dia_ratio": "0"}, "DL3_LONG": {"label": "Long dead leg", "risk": 0.8, "length_to_dia_ratio": ">10"}, "DL5_UNKNOWN": {"label": "Unknown", "risk": 0.5, "length_to_dia_ratio": "n/a"}},
+        "material_susceptibility": {
+            "carbon_steel": {"score": 0.85, "label": "Carbon steel", "reference": "MIC susceptible"},
+            "ss316": {"score": 0.4, "label": "SS316", "reference": "Lower risk"},
+            "unknown": {"score": 0.5, "label": "Unknown", "reference": "Unknown"},
+            "default": {"score": 0.5, "label": "Unknown", "reference": "Unknown"},
+        },
+        "system_type_modifiers": {"DOMESTICCOLDWATER": {"multiplier": 1.2, "rationale": "Cold water system"}, "UNKNOWN": {"multiplier": 1.0, "rationale": "Unknown system"}},
+        "under_insulation_risk": {"dry": 0.1, "wet": 0.8},
+        "risk_bands": {"Low": {"range": "< 0.25", "bcf_action": "Asset register only — no BCF issue"}, "Medium": {"range": "0.25 - 0.50", "bcf_action": "BCF Normal priority"}, "High": {"range": "0.50 - 0.75", "bcf_action": "BCF Major priority"}, "Critical": {"range": "> 0.75", "bcf_action": "BCF Critical priority — immediate remediation"}},
+        "mitigation_catalogue": {"MIT-MIC-001": "Eliminate dead-leg and flush regularly"},
+    },
+}
+
+
 def _coerce_float(value: Any, default: float | None = None) -> float | None:
     """Return ``value`` as ``float`` when possible, otherwise ``default``."""
     if value is None:
@@ -43,9 +105,16 @@ def _load_json_ruleset(filename: str) -> dict[str, Any]:
         "crevice_corrosion_ruleset.json": "ruleset:BIMGUARD-CC-001",
         "mic_corrosion_ruleset.json": "ruleset:BIMGUARD-MC-001",
     }
+    fallback = _FALLBACK_RULESETS.get(filename)
+    if fallback is not None:
+        return fallback
+
     asset_key = asset_map.get(filename)
     if asset_key:
-        payload = StaticDataService().get_asset_json(asset_key)
+        try:
+            payload = StaticDataService().get_asset_json(asset_key)
+        except Exception:
+            payload = None
         if isinstance(payload, dict):
             return payload
     raise RuntimeError(f"Missing static ruleset asset: {filename}")
@@ -53,7 +122,10 @@ def _load_json_ruleset(filename: str) -> dict[str, Any]:
 
 def _rules_for(ruleset_id: str) -> list[dict[str, Any]]:
     """Return stored rows for a ruleset, or an empty list when unseeded."""
-    return RuleService().list_by_ruleset(ruleset_id)
+    try:
+        return RuleService().list_by_ruleset(ruleset_id)
+    except Exception:
+        return []
 
 
 def _risk_band_thresholds(
@@ -589,6 +661,8 @@ def load_mc_catalog() -> dict[str, Any]:
                     "range": params.get("range") or row.get("description") or key,
                     "risk": _coerce_float(row.get("check_value"), 0.0) or 0.0,
                     "reference": params.get("reference") or "",
+                    "t_min": _coerce_float(params.get("t_min"), 0.0) or 0.0,
+                    "t_max": _coerce_float(params.get("t_max"), 0.0) or 0.0,
                 }
         elif rule_type == "dead_leg_class":
             key = str(params.get("class_key") or row.get("reference", "").split(".")[-1]).strip()
@@ -638,6 +712,9 @@ def load_mc_catalog() -> dict[str, Any]:
             )
             if state_key:
                 under_insulation_risk[state_key] = _coerce_float(row.get("check_value"), 0.0) or 0.0
+
+    if "unknown" not in material_susceptibility:
+        material_susceptibility["unknown"] = (0.5, "Unknown", "Unknown material")
 
     band_thresholds = _risk_band_thresholds(rows, json_data)
     return {

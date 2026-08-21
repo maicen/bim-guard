@@ -101,9 +101,13 @@ MATERIAL_SUSCEPTIBILITY = _MC_CATALOG["material_susceptibility"]
 
 
 def get_material_susceptibility(material_key: str) -> tuple[float, str, str]:
-    """Return (score, label, notes) for a material key."""
-    key = material_key.lower().replace(" ", "_").replace("-", "_")
-    # Normalise common variants
+    """Return (score, label, notes) for a material key.
+
+    The catalog is intentionally tolerant: missing or partial material entries
+    must degrade to a safe unknown default rather than raising KeyError during a
+    compliance run.
+    """
+    key = (material_key or "").lower().replace(" ", "_").replace("-", "_")
     aliases = {
         "carbon steel": "carbon_steel",
         "mild steel": "carbon_steel",
@@ -124,7 +128,12 @@ def get_material_susceptibility(material_key: str) -> tuple[float, str, str]:
         "copper tube": "copper",
     }
     resolved = aliases.get(key, key)
-    return MATERIAL_SUSCEPTIBILITY.get(resolved, MATERIAL_SUSCEPTIBILITY["unknown"])
+    payload = MATERIAL_SUSCEPTIBILITY.get(resolved)
+    if payload is None:
+        payload = MATERIAL_SUSCEPTIBILITY.get("unknown")
+    if payload is None:
+        payload = (0.5, "Unknown", "Material not recognised; defaulted to unknown MIC susceptibility")
+    return payload
 
 
 UNDER_INSULATION_RISK = _MC_CATALOG["under_insulation_risk"]
