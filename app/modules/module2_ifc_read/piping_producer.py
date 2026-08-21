@@ -1024,15 +1024,23 @@ def _build_element(model: Any, entity: Any, unit_scale: float) -> Optional[Pipin
     )
 
 
-def produce_piping_elements(
-    ifc_path: str,
+def produce_piping_elements_from_model(
+    model: Any,
     *,
+    source_path: Optional[str] = None,
     adjacency_tolerance_m: float = 0.05,
 ) -> list[PipingElement]:
-    """Read an IFC file and emit the canonical PipingElement list.
+    """Emit the canonical PipingElement list from an already-open IFC model.
+
+    Preferred entry point when the caller already holds an open model: it
+    avoids a second ifcopenshell.open of the same file, which dominates
+    runtime on large models.
 
     Args:
-        ifc_path: Path to the IFC file.
+        model: An open ifcopenshell.file object.
+        source_path: Originating file path, carried for logging and
+            diagnostics only. Never read from — the model is the sole
+            source of data.
         adjacency_tolerance_m: Tier 2 endpoint separation counting as
             joined, in metres. Ignored for elements resolved by Tier 1
             ports. Defaults to 50 mm.
@@ -1040,11 +1048,9 @@ def produce_piping_elements(
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
         Returns an empty list when the model holds no piping entities.
-
-    Raises:
-        OSError: If the file cannot be opened by ifcopenshell.
     """
-    model = ifcopenshell.open(ifc_path)
+    del source_path  # Diagnostics-only; the model is already open.
+
     unit_scale = _unit_scale_to_metres(model)
 
     seen: set[str] = set()
@@ -1072,6 +1078,38 @@ def produce_piping_elements(
 
     _build_adjacency(model, elements, adjacency_tolerance_m)
     return elements
+
+
+def produce_piping_elements(
+    ifc_path: str,
+    *,
+    adjacency_tolerance_m: float = 0.05,
+) -> list[PipingElement]:
+    """Read an IFC file and emit the canonical PipingElement list.
+
+    Thin wrapper that opens the file and delegates to
+    produce_piping_elements_from_model. Callers that already hold an open
+    model should call that function directly rather than reopening the file.
+
+    Args:
+        ifc_path: Path to the IFC file.
+        adjacency_tolerance_m: Tier 2 endpoint separation counting as
+            joined, in metres. Ignored for elements resolved by Tier 1
+            ports. Defaults to 50 mm.
+
+    Returns:
+        One PipingElement per piping entity found, with joined_to populated.
+        Returns an empty list when the model holds no piping entities.
+
+    Raises:
+        OSError: If the file cannot be opened by ifcopenshell.
+    """
+    model = ifcopenshell.open(ifc_path)
+    return produce_piping_elements_from_model(
+        model,
+        source_path=ifc_path,
+        adjacency_tolerance_m=adjacency_tolerance_m,
+    )
 
 
 def summarise(elements: list[PipingElement]) -> str:
