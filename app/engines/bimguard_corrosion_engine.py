@@ -356,12 +356,21 @@ def assess_galvanic_risk(element: GCElement) -> GCResult:
         and cathode_potential is not None
         and anode_potential < cathode_potential
     ):
-        # Swap so anode is always the less noble (higher potential)
+        # Swap so anode is always the less noble (higher potential).
+        # Every per-side attribute has to move together: the areas included.
+        # Leaving them behind pairs the swapped materials with the original
+        # side's areas, which inverts the area ratio that classify_area_ratio()
+        # reads below — a small anode against a large cathode is the dangerous
+        # case, and the inverted ratio reports it as the safe one.
         anode_key, cathode_key = cathode_key, anode_key
         anode_potential, cathode_potential = cathode_potential, anode_potential
         element.global_id_anode, element.global_id_cathode = (
             element.global_id_cathode,
             element.global_id_anode,
+        )
+        element.anode_area_m2, element.cathode_area_m2 = (
+            element.cathode_area_m2,
+            element.anode_area_m2,
         )
 
     # Environment classification

@@ -5,10 +5,23 @@ Two engines read that series with opposite conventions for which end is the
 anode, so one of them names the wrong corroding material. See
 docs/defects/defect_report_anode_convention.md.
 
-This script settles it from the data. It needs database access, since the
-series lives only in the Supabase static asset 'ruleset:BIMGUARD-GC-001'.
+This script settles it from the data, in either of two modes.
 
-    uv run python scripts/verify_anode_convention.py
+    uv run python scripts/verify_anode_convention.py                # live DB
+    uv run python scripts/verify_anode_convention.py --from-seeder  # offline
+
+The live mode reads the Supabase static asset 'ruleset:BIMGUARD-GC-001', which
+is the running system's source of truth.
+
+The offline mode resolves what the seeder feeds that asset from. Note that
+ruleset_seeder.py holds no series literals of its own: it calls
+StaticDataService().get_asset_json('ruleset:BIMGUARD-GC-001'), so it is a
+consumer of the same asset, not its origin. The origin is the JSON payload
+that was uploaded to it, checked in at data/rulesets/galvanic_corrosion_ruleset.json
+until it was deleted from the tree. Offline mode recovers that payload from git
+history and reports the full provenance chain, including its drift caveat: if
+anyone edited the asset in the database after it was seeded, the recovered file
+no longer matches what the engines actually read.
 
 Two independent checks are run:
 
@@ -25,6 +38,10 @@ that is a bigger problem than the convention.
 
 from __future__ import annotations
 
+import argparse
+import ast
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -123,30 +140,176 @@ def check_zinc_copper(series: dict) -> str | None:
     return MORE_POSITIVE
 
 
-def main() -> int:
-    """Run both checks and report the convention."""
+# ---------------------------------------------------------------------------
+# Series loading
+# ---------------------------------------------------------------------------
+
+SEEDER_PATH = Path("app/services/ruleset_seeder.py")
+GC_ASSET_KEY = "ruleset:BIMGUARD-GC-001"
+
+
+def _seeder_asset_key_for_galvanic() -> tuple[str | None, str | None]:
+    """
+    Read the seeder's own asset map to learn where its galvanic series comes from.
+
+    Parsed with ast rather than imported: ruleset_seeder.py reaches the database
+    at import time, which is exactly the condition the offline mode exists for.
+
+    Returns:
+        (filename, asset_key) as the seeder declares them, or (None, None).
+    """
+    if not SEEDER_PATH.exists():
+        return None, None
+    tree = ast.parse(SEEDER_PATH.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(getattr(t, "id", "") == "asset_key_map" for t in node.targets):
+            continue
+        if not isinstance(node.value, ast.Dict):
+            continue
+        for key_node, value_node in zip(node.value.keys, node.value.values):
+            try:
+                filename = ast.literal_eval(key_node)
+                asset_key = ast.literal_eval(value_node)
+            except ValueError:
+                continue
+            if asset_key == GC_ASSET_KEY:
+                return filename, asset_key
+    return None, None
+
+
+def _git(*args: str) -> str | None:
+    """Run a git command, returning stdout or None if it fails."""
+    try:
+        result = subprocess.run(
+            ["git", *args], capture_output=True, text=True, timeout=30, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def _recover_from_git(path: str) -> tuple[str | None, str | None]:
+    """
+    Recover the last tracked content of a file deleted from the tree.
+
+    Returns:
+        (content, commit) where commit is the revision the content was read
+        from, or (None, None) if the file was never tracked.
+    """
+    log = _git("log", "--all", "--diff-filter=D", "--format=%H", "--", path)
+    if log and log.strip():
+        deleting = log.split()[0]
+        content = _git("show", f"{deleting}^:{path}")
+        if content:
+            return content, f"{deleting[:7]}^"
+
+    log = _git("log", "--all", "--format=%H", "-1", "--", path)
+    if log and log.strip():
+        commit = log.split()[0]
+        content = _git("show", f"{commit}:{path}")
+        if content:
+            return content, commit[:7]
+    return None, None
+
+
+def load_series_from_seeder_source() -> tuple[dict, list[str]]:
+    """
+    Load the galvanic series the seeder feeds into the GC-001 asset.
+
+    Follows the provenance chain rather than assuming it: reads the seeder's
+    own asset map, resolves the payload filename, then finds that payload on
+    disk or recovers it from git history.
+
+    Returns:
+        (materials, provenance) — the series entries and the human-readable
+        chain of where they came from, including caveats.
+
+    Raises:
+        RuntimeError: If the payload cannot be located at all.
+    """
+    provenance: list[str] = []
+
+    filename, asset_key = _seeder_asset_key_for_galvanic()
+    if asset_key:
+        provenance.append(f"{SEEDER_PATH} maps {filename!r} -> asset {asset_key!r}")
+    else:
+        filename = "galvanic_corrosion_ruleset.json"
+        provenance.append(
+            f"{SEEDER_PATH} did not declare an asset map entry; assuming {filename!r}"
+        )
+    provenance.append(
+        "ruleset_seeder.py holds no series literals: it reads that asset via "
+        "StaticDataService, so it consumes the payload rather than defining it"
+    )
+
+    repo_path = f"data/rulesets/{filename}"
+    on_disk = Path(repo_path)
+    if on_disk.exists():
+        payload = json.loads(on_disk.read_text(encoding="utf-8"))
+        provenance.append(f"payload read from the working tree at {repo_path}")
+    else:
+        content, commit = _recover_from_git(repo_path)
+        if content is None:
+            raise RuntimeError(
+                f"{repo_path} is not in the working tree and has no git history. "
+                "The series exists only in the database; run without --from-seeder."
+            )
+        payload = json.loads(content)
+        provenance.append(f"payload recovered from git at {commit}:{repo_path}")
+        provenance.append(
+            "CAVEAT - this is the payload as last committed. If the database asset "
+            "was edited after seeding, the engines read something else and this "
+            "verdict does not describe the running system"
+        )
+
+    series = payload.get("galvanic_series") or {}
+    materials = series.get("materials") or {}
+    if not materials:
+        raise RuntimeError(f"{repo_path} carries no galvanic_series.materials")
+
+    for field in ("source", "reference_electrode", "reference_electrolyte", "note"):
+        value = series.get(field)
+        if value:
+            provenance.append(f"series {field}: {value}")
+
+    return materials, provenance
+
+
+def load_series_from_database() -> tuple[dict, list[str]]:
+    """
+    Load the galvanic series the engines actually read at runtime.
+
+    Returns:
+        (materials, provenance).
+
+    Raises:
+        RuntimeError: If the catalogue cannot be reached or is empty.
+    """
     try:
         from app.services.corrosion_rule_catalog import load_gc_catalog
     except ImportError as exc:
-        print(f"Cannot import the catalogue loader: {exc}")
-        return 2
+        raise RuntimeError(f"cannot import the catalogue loader: {exc}") from exc
 
     try:
         catalogue = load_gc_catalog()
     except Exception as exc:
-        print(f"Cannot read the GC-001 catalogue: {type(exc).__name__}: {exc}")
-        print()
-        print("This script needs database access. The galvanic series lives only in")
-        print("the Supabase static asset 'ruleset:BIMGUARD-GC-001'; it is in no")
-        print("repository file. Set SUPABASE_URL and the service key, then re-run.")
-        return 2
+        raise RuntimeError(f"{type(exc).__name__}: {exc}") from exc
 
     series = catalogue.get("galvanic_series") or {}
     materials = series.get("materials", series)
     if not materials:
-        print("The catalogue returned an empty galvanic series.")
-        return 2
+        raise RuntimeError("the catalogue returned an empty galvanic series")
+    return materials, [f"live Supabase static asset {GC_ASSET_KEY!r}"]
 
+
+def report(materials: dict, provenance: list[str]) -> int:
+    """Run both checks against a loaded series and print the verdict."""
+    print("Provenance")
+    for line in provenance:
+        print(f"  {line}")
+    print()
     print(f"GC-001 galvanic series: {len(materials)} entries")
     print()
     print("Check 1 - noble flag")
@@ -184,6 +347,33 @@ def main() -> int:
     print(f"Set series_convention in xm_001_cross_material.json to: {convention}")
     print("Paste the values above into the defect report as evidence.")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Load the series from the chosen source and report the convention."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
+    parser.add_argument(
+        "--from-seeder",
+        action="store_true",
+        help="resolve the series from the seeder's source payload instead of the live database",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        if args.from_seeder:
+            materials, provenance = load_series_from_seeder_source()
+        else:
+            materials, provenance = load_series_from_database()
+    except RuntimeError as exc:
+        print(f"Cannot read the GC-001 galvanic series: {exc}")
+        if not args.from_seeder:
+            print()
+            print("The live series is the Supabase static asset "
+                  f"{GC_ASSET_KEY!r}. Set SUPABASE_URL and the service key, or")
+            print("re-run with --from-seeder to verify against the seeder's source payload.")
+        return 2
+
+    return report(materials, provenance)
 
 
 if __name__ == "__main__":

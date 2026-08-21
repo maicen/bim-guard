@@ -33,15 +33,26 @@ from app.modules.module4_comparator.cross_material import compare, load_rule_pac
 from app.modules.module4_comparator.issue_schema import RiskBand
 
 # TEST DATA ONLY - see module docstring. Not a published galvanic series.
+# Values mirror the real GC-001 series, which is an ANODIC INDEX: every entry is
+# positive and ascends from the noble end (titanium 0.05) to the active end
+# (galvanised steel 0.82), so HIGHER is more anodic. Verified against the seeded
+# payload by scripts/verify_anode_convention.py; see
+# docs/defects/defect_report_anode_convention.md.
+#
+# An earlier version of this fixture was authored in electrode-potential form
+# (all negative, more-negative-is-anodic), which is the opposite convention from
+# the data the engines actually read. The ordering was right and every relative
+# verdict held, but a fixture in the wrong convention cannot catch a convention
+# defect - which is the one thing this file most needs to catch.
 TEST_SERIES = {
-    "GalvanisedSteel": {"potential_v": -1.00, "noble": False, "label": "Galvanised steel"},
-    "CarbonSteel": {"potential_v": -0.60, "noble": False, "label": "Carbon steel"},
-    "CastIron": {"potential_v": -0.55, "noble": False, "label": "Cast iron"},
-    "Brass_C46400": {"potential_v": -0.25, "noble": True, "label": "Naval brass"},
-    "Copper_C12200": {"potential_v": -0.20, "noble": True, "label": "Copper"},
-    "SS304": {"potential_v": -0.10, "noble": True, "label": "SS304 passive"},
-    "SS316": {"potential_v": -0.05, "noble": True, "label": "SS316 passive"},
-    "Titanium": {"potential_v": 0.00, "noble": True, "label": "Titanium"},
+    "GalvanisedSteel": {"potential_v": 0.82, "noble": False, "label": "Galvanised steel"},
+    "CarbonSteel": {"potential_v": 0.55, "noble": False, "label": "Carbon steel"},
+    "CastIron": {"potential_v": 0.52, "noble": False, "label": "Cast iron"},
+    "Brass_C46400": {"potential_v": 0.32, "noble": True, "label": "Naval brass"},
+    "Copper_C12200": {"potential_v": 0.28, "noble": True, "label": "Copper"},
+    "SS304": {"potential_v": 0.12, "noble": True, "label": "SS304 passive"},
+    "SS316": {"potential_v": 0.08, "noble": True, "label": "SS316 passive"},
+    "Titanium": {"potential_v": 0.05, "noble": True, "label": "Titanium"},
 }
 
 
@@ -168,9 +179,10 @@ class TestAnodeIdentification:
         """Two noble materials still form a couple and must be resolvable.
 
         Nobility alone cannot separate brass from stainless, so the pack's
-        declared series_convention breaks the tie. Placed in T3_CHLORIDE so
-        the 0.20 V gap clears the harsh threshold (0.15) and survives the
-        compatibility floor — indoors it would correctly be suppressed.
+        declared series_convention breaks the tie. Brass 0.32 against SS316
+        0.08 is a 0.24 V gap, placed in T3_CHLORIDE so it clears the harsh
+        threshold (0.15) and survives the compatibility floor — indoors it
+        would correctly be suppressed.
         """
         issue = compare(
             linked(
@@ -205,7 +217,13 @@ class TestAnodeIdentification:
         assert issues[0].metadata["check"] == "anode_unresolvable"
 
     def test_convention_direction_is_honoured(self, rule_pack):
-        """Flipping the declared convention must flip the named victim."""
+        """Flipping the declared convention must flip the named victim.
+
+        The local series is deliberately signed against TEST_SERIES: negative
+        values, no noble flags. That is the point — it proves the resolver
+        follows the pack's declaration rather than any property of the numbers
+        or a convention hardcoded in the engine.
+        """
         pack = json.loads(json.dumps(rule_pack))
         pack["parameters"]["series_convention"]["value"] = "more_positive_is_anodic"
         pack["parameters"]["galvanic_series"] = {
@@ -494,6 +512,9 @@ class TestCompatibilityFloor:
         """A gap can be compatible indoors and a couple in a harsh space.
 
         0.20 V sits between the harsh threshold (0.15) and normal (0.25).
+        The local series is contrived to hit that gap exactly; direction comes
+        from the noble flags and magnitude from abs(gap), so its sign does not
+        matter here.
         """
         gap_series = {
             "CarbonSteel": {"potential_v": -0.40, "noble": False},

@@ -1,185 +1,250 @@
 # Defect Report — Galvanic Anode Convention Contradiction
 
-**Status:** OPEN — reported, not fixed (fix deferred until XM-001 lands)
-**Severity:** HIGH if confirmed — every GC-001 BCF issue would name the wrong victim
-**Confidence:** Evidence is strong but **circumstantial**. The decisive check requires
-database access and has not been run. See [Verification](#verification-not-yet-run).
+**Status:** RESOLVED — verified against data, both engines corrected, regression tests added.
+**Severity as found:** HIGH if the live engine had been wrong. It was not.
+**Evidence level:** **verified against the seeded GC-001 payload** (recovered from git history),
+not inference. See [Verification](#verification--run-and-decisive) for the drift caveat.
 
 ---
 
-## Summary
+## Verdict
 
-Two engines read the **same** galvanic series and apply **opposite** conventions for
-deciding which material is the anode. They cannot both be right.
+**The live engine was right. The dormant one was wrong.** This is the opposite of what the first
+version of this report concluded from circumstantial evidence, and the correction is recorded in
+full below rather than quietly replaced.
 
-| Location | Logic | Implies |
+| Location | Convention it applied | Verdict |
 |---|---|---|
-| [`galvanic.py:190`](../../app/modules/module4_comparator/galvanic.py) | `if v_a < v_b: anode = a` — comment: "Identify anode (more negative)" | **more negative = anodic** |
-| [`bimguard_corrosion_engine.py:353`](../../app/engines/bimguard_corrosion_engine.py) | swaps so `anode_potential > cathode_potential` — comment: "less noble = higher potential" | **more positive = anodic** |
+| [`bimguard_corrosion_engine.py:353`](../../app/engines/bimguard_corrosion_engine.py) — **live** | more positive = anodic | **CORRECT** |
+| [`galvanic.py:190`](../../app/modules/module4_comparator/galvanic.py) — dormant, Path B | more negative = anodic | **WRONG — fixed** |
 
-The anode is the material that **corrodes**. Naming it backwards inverts the finding:
-the report tells the engineer to protect or substitute the component that was never at
-risk, while the one actually dissolving is described as the safe half of the couple.
+Because the wrong engine was never wired up, **no user-facing galvanic finding ever named the wrong
+material**, and no previously issued report needs reissuing. The earlier draft's worst case did not
+happen.
 
-## Why this matters more than a normal defect
+A **separate, real defect in the live engine** was found while confirming this, and is fixed here
+too: the anode/cathode swap moved materials, potentials and GUIDs but left the surface areas
+behind, inverting the area ratio. See [The area defect](#the-area-defect--separate-and-real).
 
-`bimguard_corrosion_engine.py` is the **live** GC-001 engine. It is wired into
-[`compliance_runner.py:112`](../../app/modules/module4_comparator/compliance_runner.py)
-via `assess_galvanic_risk` and produces the BCF issues that reach users.
+---
 
-`galvanic.py` is the Path B comparator. Nothing calls it — no rule-pack loader exists
-for it yet. It is dormant.
+## Summary of the original contradiction
 
-So the two outcomes are not symmetric:
+Two engines read the **same** galvanic series and applied **opposite** conventions for deciding
+which material is the anode. They could not both be right.
 
-- **If the live engine is right** — no user-facing defect. Dormant `galvanic.py` carries
-  a latent bug to fix before Path B is wired up.
-- **If the live engine is wrong** — every galvanic BCF issue ever exported names the
-  wrong material. That is a pre-submission MUST-FIX, and previously issued reports may
-  need reissuing.
+The anode is the material that **corrodes**. Naming it backwards inverts the finding: the report
+tells the engineer to protect or substitute the component that was never at risk, while the one
+actually dissolving is described as the safe half of the couple.
 
-## Evidence that the LIVE engine is the wrong one
+---
 
-This is the direction the available evidence points, and it is the worse case.
-
-**1. The series source uses electrode potentials, not anodic indices.**
-
-[`bimguard_corrosion_engine.py:6-8`](../../app/engines/bimguard_corrosion_engine.py)
-names the series sources:
-
-> WorldStainless / Euro Inox (2025) — galvanic series, corrosion rate data
-> AUCSC Basic Corrosion Course (2024) — galvanic series, electrolyte conductivity
-
-Both publish galvanic series as **electrode potentials measured in seawater**
-(V vs SCE or Ag/AgCl), where **more negative is more anodic** — zinc around −1.0 V,
-carbon steel around −0.6 V, copper around −0.36 V, passive 316 around −0.05 V.
-
-[`ruleset_seeder.py:167`](../../app/services/ruleset_seeder.py) confirms the attribution:
-`mat_src = gc["galvanic_series"].get("source", "WorldStainless / Euro Inox")`.
-
-**2. NASA-STD-6012 is cited for thresholds only, not for the series.**
-
-The engine header attributes NASA-STD-6012 specifically to "voltage thresholds by
-environment class". NASA-STD-6012 / MIL-STD-889 use an *anodic index* where a **higher**
-number is more anodic — the convention `bimguard_corrosion_engine.py:353` appears to
-assume. But that standard is not the source of this table; the seeder attributes the
-series to WorldStainless / Euro Inox.
-
-**A plausible origin for the defect:** the author had NASA-STD-6012 open for the
-threshold values and carried its anodic-index convention across to a table that is not
-built on it.
-
-**3. Material keys read as electrode potentials.**
-
-Series keys are `ss316_passive`, `ss304_passive`
-([`bimguard_corrosion_engine.py:47-70`](../../app/engines/bimguard_corrosion_engine.py)).
-"Passive" describes a measured electrode state — the vocabulary of a potential series,
-not of an anodic index table.
-
-**Conclusion from evidence:** the table is most likely in electrode-potential convention
-(more negative = anodic), which makes **`galvanic.py:190` correct** and the **live
-`bimguard_corrosion_engine.py:353` wrong**.
-
-**This remains an inference.** It has not been confirmed against the data.
-
-## Verification (NOT YET RUN)
-
-The check requires reading the series, which lives only in the Supabase static asset
-`ruleset:BIMGUARD-GC-001`. It is in no repository file.
-
-Attempted and failed:
-
-```
-uv run python -c "from app.services.corrosion_rule_catalog import load_gc_catalog; load_gc_catalog()"
-ValueError: SUPABASE_URL is required
-```
-
-There is no `.env` in the repository, and placeholder credentials fail DNS resolution.
-
-### Test 1 — the `noble` flag (decisive, no physics needed)
-
-Every series entry carries **both** `potential_v` and a `noble` boolean
-([`ruleset_seeder.py:169`](../../app/services/ruleset_seeder.py):
-`noble_label = "noble (cathodic)" if mat.get("noble") else "active (anodic)"`).
-
-`noble` states the answer directly. Whether noble materials hold higher or lower
-`potential_v` settles the convention outright.
-
-### Test 2 — zinc against copper (physics anchor)
-
-Zinc sacrifices to copper. That is what galvanising *is*. Whichever sign reading names
-zinc as the anode is the correct convention.
-
-### Runnable check
-
-With credentials present:
+## Verification — run, and decisive
 
 ```bash
-uv run python scripts/verify_anode_convention.py
+uv run python scripts/verify_anode_convention.py --from-seeder
 ```
 
-The script is committed at
-[`scripts/verify_anode_convention.py`](../../scripts/verify_anode_convention.py) and
-prints the convention plus the observed values as evidence to paste back into this
-report.
+### Provenance of the data
 
-## Fix (one line, once verified)
+`ruleset_seeder.py` holds **no series literals**. It calls
+`StaticDataService().get_asset_json("ruleset:BIMGUARD-GC-001")`, so it consumes the same database
+asset the engines read rather than defining it. The origin of that asset is the JSON payload
+uploaded to it, checked in at `data/rulesets/galvanic_corrosion_ruleset.json` until it was deleted
+from the tree in commit `ebb0e83`. The script recovers it from git at `ebb0e83^`.
 
-If the live engine is confirmed wrong, at
-[`bimguard_corrosion_engine.py:353-361`](../../app/engines/bimguard_corrosion_engine.py):
+> **Drift caveat.** This is the payload as last committed. If anyone edited the database asset
+> after seeding, the engines read something else and this verdict does not describe the running
+> system. The live-database mode of the script (no `--from-seeder`) settles that when credentials
+> are available, and remains in place for exactly that purpose. Nothing observed suggests drift —
+> the recovered payload's own note matches the live engine's behaviour — but it has not been
+> excluded.
 
-```python
-# WRONG if series is in electrode-potential convention:
-if anode_potential < cathode_potential:      # swaps so anode has HIGHER potential
+### The series is an anodic index, not an electrode-potential table
 
-# CORRECT for electrode-potential convention:
-if anode_potential > cathode_potential:      # swaps so anode has LOWER (more negative) potential
-```
+This is what the first version of this report got wrong. All 20 entries are **positive**, ascending
+from platinum at 0.00 to magnesium at 0.95, and the payload carries its own convention note:
 
-Update the adjacent comment too — `"less noble = higher potential"` is the assertion
-under test and must not survive the fix unchanged.
+> `"note": "Lower potential = more noble (cathodic). Higher potential = more active (anodic) — corrodes preferentially."`
 
-### Regression test to add
+### Check 1 — the `noble` flag
 
-```python
-def test_zinc_sacrifices_to_copper():
-    """Physics anchor: galvanising works because zinc is anodic to copper.
+| Group | n | Mean potential |
+|---|---:|---:|
+| noble (cathodic) | 9 | **+0.100 V** |
+| active (anodic) | 11 | **+0.577 V** |
 
-    Pins the sign convention of the shared series. If this fails, every
-    galvanic finding names the wrong victim.
-    """
-    result = assess_galvanic_risk(GCElement(
-        material_anode="Zinc", material_cathode="Copper", ...
-    ))
-    assert result.anode_material == "Zinc"
-```
+Active materials sit **higher**. → more positive is anodic.
 
-The test must assert on the **resolved** anode after the engine's internal swap, not on
-the input ordering, or it will pass regardless of the bug.
+### Check 2 — zinc against copper (physics anchor)
 
-## Impact if confirmed
+| Material | Potential | Role |
+|---|---:|---|
+| `zinc` | **+0.800 V** | known anode — galvanising sacrifices it |
+| `copper` | **+0.280 V** | known cathode |
 
-- Every galvanic BCF issue exported to date names the wrong material.
-- Mitigation text is inverted — it recommends protecting the cathode.
-- Area-ratio risk is computed from a swapped anode/cathode pair
-  ([`_compute_area_ratio`](../../app/modules/module4_comparator/galvanic.py)), so the
-  small-anode/large-cathode amplification is applied backwards, which changes the
-  *score*, not only the label.
-- Any reports already issued to a client would need reissuing.
+The known anode sits **higher**. → more positive is anodic.
 
-## Not affected
+Both checks agree: **`more_positive_is_anodic`**.
 
-**XM-001** ([`cross_material.py`](../../app/modules/module4_comparator/cross_material.py))
-does not depend on the outcome. It resolves the anode from the `noble` flag first, which
-is convention-independent, and falls back to a `series_convention` **declared in the rule
-pack** rather than assumed in code. Magnitude uses `abs(gap)`, which is unaffected by
-sign. Where neither discriminator resolves, XM-001 emits a data-quality issue instead of
-guessing.
+### Why the original inference was wrong
 
-Once the convention is confirmed, `series_convention` in
-[`xm_001_cross_material.json`](../../data/rulesets/xm_001_cross_material.json) must be
-set to match and its `MUST_VERIFY` note cleared.
+The first version argued that WorldStainless / Euro Inox and AUCSC publish galvanic series as
+electrode potentials in seawater, where more negative is more anodic — which is true of those
+publications. The reasoning failed at the next step: **the table in this project is not in the form
+its sources publish.** Whoever authored it converted the ordering into an all-positive ascending
+index and wrote a note saying so. The cited source tells you where the ordering came from, not what
+sign convention the transcription used. Reading the note, or the values, would have settled it in
+seconds; reading the citation could not.
+
+The lesson generalises past this defect: for a table whose convention is ambiguous, the data
+carries the answer and the provenance does not.
 
 ---
 
-*Raised during XM-001 implementation. Fix deferred by agreement until XM-001 lands.*
+## A genuine inconsistency in the series, recorded
+
+One adjacent pair disagrees with itself:
+
+| Material | Potential | `noble` |
+|---|---:|---|
+| `ss316_active` | +0.22 | `false` (active) |
+| `copper` | +0.28 | `true` (noble) |
+
+By the potential ordering, copper (0.28) is **more anodic** than active 316 (0.22). By the flags,
+active 316 is the anodic one. For this specific couple the two discriminators give opposite
+answers.
+
+This does not affect the verdict — the group means are far apart (0.100 against 0.577) and the
+zinc/copper anchor is unambiguous — but it does mean the series has a narrow overlap band where the
+flag and the number disagree. It is logged here as a data-quality finding for the corrosion
+reviewer, not fixed: changing a published series entry is an engineering decision, not a code fix.
+
+It also **vindicates XM-001's design**. `cross_material.py` resolves the anode from the `noble`
+flag first and only falls back to the declared convention, so it is unaffected by this overlap
+where a potential-sign comparison would silently pick the wrong side.
+
+---
+
+## Fixes applied
+
+### 1. `galvanic.py` — wrong convention (dormant Path B comparator)
+
+```python
+# Before — assumed an electrode-potential series
+if v_a < v_b:
+    anode, cathode = element_a, element_b
+    voltage_v = abs(v_b - v_a)
+else:
+    anode, cathode = element_b, element_a
+    voltage_v = abs(v_a - v_b)
+
+# After — the series is an anodic index; higher is the anode
+if v_a > v_b:
+    anode, cathode = element_a, element_b
+else:
+    anode, cathode = element_b, element_a
+voltage_v = abs(v_a - v_b)
+```
+
+The magnitude is hoisted out of the branches: `abs()` makes it convention-independent, so it should
+never have been computed twice. The comment that asserted the old convention was replaced, not
+left standing — it was the claim under test.
+
+**The area ratio needed no separate fix here.** `_compute_area_ratio(anode, cathode)` reads the
+areas off the resolved element *objects*, so correcting the direction carries the areas with it.
+
+### 2. `bimguard_corrosion_engine.py` — the area defect (live engine)
+
+See below. One addition to the existing swap block.
+
+### 3. Regression tests
+
+`tests/test_anode_convention.py`, 8 tests:
+
+| Test | Pins |
+|---|---|
+| `test_galvanised_steel_is_the_anode_against_copper` (×2 orders) | The physics anchor, independent of argument order |
+| `test_copper_is_the_anode_against_stainless` | A second pair, so it cannot pass by always picking one material |
+| `test_voltage_gap_is_direction_independent` | Magnitude does not depend on order |
+| `test_area_ratio_follows_the_resolved_anode` | The ratio tracks the resolved anode, not the caller's labelling |
+| `test_seeded_series_still_says_higher_is_anodic` | The convention **at the data**, so re-authoring the series in the other convention fails the build |
+| `test_verify_script_runs_and_reports_the_expected_convention` | The verification script's own verdict |
+| `test_live_engine_swaps_areas_with_materials` | The area fix — skips without database credentials |
+
+The last test asserts on the **resolved** anode after the engine's internal swap, not on the input
+ordering, or it would pass regardless of the bug.
+
+### 4. `tests/test_cross_material.py` — fixture authored in the wrong convention
+
+Approving the pack turned one XM-001 test red, which is exactly what an approval should do if
+something downstream disagreed with it. `TEST_SERIES` was authored in electrode-potential form —
+all negative, galvanised steel at −1.00 down to titanium at 0.00 — the opposite convention from the
+data the engines read.
+
+The relative ordering was right, so every verdict in the file held and nothing was mis-tested. But
+**a fixture in the wrong convention cannot catch a convention defect**, which is the one thing that
+file most needs to catch. It was re-authored onto the real values (galvanised steel 0.82 down to
+titanium 0.05), and all 39 tests in the file passed unchanged — confirming the ordering, not the
+signs, was carrying them.
+
+Three tests keep deliberately contrary-signed local series, now commented as such:
+`test_convention_direction_is_honoured` proves the resolver follows the pack's declaration rather
+than any property of the numbers, and two others rely only on `abs(gap)` and the noble flags. Those
+are correct as contrived values.
+
+---
+
+## The area defect — separate, and real
+
+Found while confirming the convention. Independent of it, and in the **live** engine.
+
+`assess_galvanic_risk()` reorders the couple when the caller's labelling disagrees with the series.
+It swapped the material keys, the potentials and the GUIDs — but not the areas:
+
+```python
+anode_key, cathode_key = cathode_key, anode_key
+anode_potential, cathode_potential = cathode_potential, anode_potential
+element.global_id_anode, element.global_id_cathode = (...)
+# element.anode_area_m2 / cathode_area_m2 left untouched
+...
+ar_band, ar_risk = classify_area_ratio(element.anode_area_m2, element.cathode_area_m2)
+```
+
+After a swap the areas belong to the original assignment while the materials belong to the swapped
+one, so `classify_area_ratio()` receives the ratio inverted. A small anode against a large cathode
+is the dangerous case and carries the highest area-ratio risk; inverted, it reports as the safe
+one. Because area ratio carries a **0.30 weight** in the GC-001 composite, this moves the *score*
+and therefore the risk band, not just a label.
+
+**Fix:** swap the areas alongside everything else.
+
+```python
+element.anode_area_m2, element.cathode_area_m2 = (
+    element.cathode_area_m2,
+    element.anode_area_m2,
+)
+```
+
+**Live exposure is currently limited but not zero.** `compliance_runner.py` builds every `GCElement`
+from a single `ServiceElement`, with `global_id_anode == global_id_cathode` and both areas taken
+from the same element, so today the swap usually moves identical values. The moment real pairwise
+data flows — which is exactly what `piping_producer` plus XM-001 deliver — the two areas differ and
+the defect bites. Fixing it now is cheaper than finding it then.
+
+---
+
+## Consequences for XM-001
+
+`series_convention` in [`xm_001_cross_material.json`](../../data/rulesets/xm_001_cross_material.json)
+is set to `more_positive_is_anodic`, its `MUST_VERIFY` note replaced by the verification record,
+and the pack moved from DRAFT to APPROVED v1.0 with the drift caveat carried as a limitation.
+
+XM-001's behaviour is unchanged by all of this: it resolves direction from the `noble` flag and
+takes magnitude from `abs(gap)`, both convention-independent. The declared convention is only the
+tiebreaker for couples where both materials carry the same flag.
+
+---
+
+*Raised during XM-001 implementation. Verified and fixed once the seeded payload was recovered from
+git history, after the live database proved unreachable.*
