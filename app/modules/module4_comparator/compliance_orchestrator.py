@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """
 Compliance orchestrator: coordinates corrosion engines and Path B (MM/XM) via feature flags.
 
@@ -75,7 +74,6 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
     output = path_a_view(all_issues, path_a_results)
     
     return output
-=======
 """Compliance Orchestrator - wires runner, tracker, and BCF exporter."""
 from datetime import datetime, timezone
 from pathlib import Path
@@ -239,4 +237,3 @@ class ComplianceOrchestrator:
     def get_last_run_issues(self):
         """Retrieve issues from last compliance run."""
         return self._last_run_issues
->>>>>>> b682e7f622e1e2ce2c17b794a989d5f0829a433d
