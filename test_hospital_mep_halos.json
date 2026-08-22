@@ -1,0 +1,130 @@
+{
+  "0NZ34oqSTTyBSJPT5Cw1AX": {
+    "Pset_HaloReservation": {
+      "SchemaVersion": "0.1.0",
+      "SourceElementGlobalId": "0NZ34oqSTTyBSJPT5Cw1AX",
+      "SourceIfcClass": "IfcPipeSegment",
+      "BraceType": "angle_iron",
+      "RuleVariant": "angle_fire",
+      "ClearanceMm": 200.0,
+      "HaloVolumeMm3": 688500000.0,
+      "ElementBBoxMinMm": [
+        0.0,
+        475.0,
+        975.0
+      ],
+      "ElementBBoxMaxMm": [
+        3000.0,
+        525.0,
+        1025.0
+      ],
+      "HaloBBoxMinMm": [
+        -200.0,
+        275.0,
+        775.0
+      ],
+      "HaloBBoxMaxMm": [
+        3200.0,
+        725.0,
+        1225.0
+      ],
+      "GeneratedAt": "2026-08-22T17:26:57Z"
+    }
+  },
+  "1h8Om82ovOQwaLzjgOtw0y": {
+    "Pset_HaloReservation": {
+      "SchemaVersion": "0.1.0",
+      "SourceElementGlobalId": "1h8Om82ovOQwaLzjgOtw0y",
+      "SourceIfcClass": "IfcPipeSegment",
+      "BraceType": "angle_iron",
+      "RuleVariant": "angle_fire",
+      "ClearanceMm": 200.0,
+      "HaloVolumeMm3": 460425600.0,
+      "ElementBBoxMinMm": [
+        2481.0,
+        0.0,
+        981.0
+      ],
+      "ElementBBoxMaxMm": [
+        2519.0,
+        2000.0,
+        1018.9999999999999
+      ],
+      "HaloBBoxMinMm": [
+        2281.0,
+        -200.0,
+        781.0
+      ],
+      "HaloBBoxMaxMm": [
+        2719.0,
+        2200.0,
+        1219.0
+      ],
+      "GeneratedAt": "2026-08-22T17:26:57Z"
+    }
+  },
+  "0CCaRDl7PGav91kwXZIizp": {
+    "Pset_HaloReservation": {
+      "SchemaVersion": "0.1.0",
+      "SourceElementGlobalId": "0CCaRDl7PGav91kwXZIizp",
+      "SourceIfcClass": "IfcPipeSegment",
+      "BraceType": "angle_iron",
+      "RuleVariant": "angle_fire",
+      "ClearanceMm": 200.0,
+      "HaloVolumeMm3": 658240000.0,
+      "ElementBBoxMinMm": [
+        5260.0,
+        -20.0,
+        0.0
+      ],
+      "ElementBBoxMaxMm": [
+        5300.0,
+        20.0,
+        3000.0
+      ],
+      "HaloBBoxMinMm": [
+        5060.0,
+        -220.0,
+        -200.0
+      ],
+      "HaloBBoxMaxMm": [
+        5500.0,
+        220.0,
+        3200.0
+      ],
+      "GeneratedAt": "2026-08-22T17:26:57Z"
+    }
+  },
+  "0ofHWhBlHI7wRekoFS0Xtk": {
+    "Pset_HaloReservation": {
+      "SchemaVersion": "0.1.0",
+      "SourceElementGlobalId": "0ofHWhBlHI7wRekoFS0Xtk",
+      "SourceIfcClass": "IfcDuctSegment",
+      "BraceType": "angle_iron",
+      "RuleVariant": "angle_fire",
+      "ClearanceMm": 200.0,
+      "HaloVolumeMm3": 14364000000.0,
+      "ElementBBoxMinMm": [
+        0.0,
+        6250.0,
+        1750.0
+      ],
+      "ElementBBoxMaxMm": [
+        8000.0,
+        7750.0,
+        2250.0
+      ],
+      "HaloBBoxMinMm": [
+        -200.0,
+        6050.0,
+        1550.0
+      ],
+      "HaloBBoxMaxMm": [
+        8200.0,
+        7950.0,
+        2450.0
+      ],
+      "GeneratedAt": "2026-08-22T17:26:57Z"
+    }
+  }
+}

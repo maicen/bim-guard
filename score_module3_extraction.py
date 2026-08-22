@@ -25,10 +25,13 @@ stand-in — so results reflect what actually happens today, not a best case.
     A5. Regex baseline      - free-extractor recall/precision vs gold, on the
                                real sendable chunks from A2.
 
-  PART B - LLM accuracy (needs OPENAI_API_KEY / GEMINI_API_KEY; skipped with
+  PART B - LLM accuracy (needs a local Ollama daemon; skipped with
     instructions if absent):
     Runs LiteLLMRuleExtractor over the same real sendable chunks from A2 and
     scores per-field precision/recall + property-name grounding against gold.
+    Scored against local Ollama (qwen3:14b) by default, so the whole 29-gold-rule
+    sweep costs nothing and needs no vendor API key. Set BIM_GUARD_RULE_MODEL to
+    score a hosted model instead (the live app default is "gpt-4o-mini").
 
 Usage:
     uv run python score_module3_extraction.py
@@ -36,8 +39,12 @@ Usage:
 
 import asyncio
 import glob
+import json
 import os
+import re
 import sys
+import urllib.error
+import urllib.request
 
 from eval_gold_code_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
 
@@ -54,6 +61,19 @@ from module3_rule_builder.regex_rule_converter import RegexRuleConverter  # noqa
 from module2_ifc_read import _PROPERTY_ALIASES  # noqa: E402
 
 PDF_PATH = glob.glob("data/uploads/*pdf_stairs_mock.pdf")[0]
+
+# ── Part-B model: local Ollama by default (free, no vendor key) ────────────
+# LiteLLMClient takes no base_url argument, so the endpoint is handed to litellm
+# the way litellm expects for the ollama provider: the OLLAMA_API_BASE env var
+# (see litellm/llms/ollama/common_utils.py). Set it before the client is built.
+#
+# "ollama_chat/" not "ollama/": the plain "ollama/" prefix routes to /api/generate,
+# where litellm flattens the system+user messages into one prompt. Measured on this
+# box, qwen3:14b then answers "{}" to every chunk — a false 0% score. "ollama_chat/"
+# routes to /api/chat, keeps the roles intact, and returns well-formed rule JSON.
+OLLAMA_MODEL = "ollama_chat/qwen3:14b"
+OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_API_KEY = "ollama"  # placeholder — Ollama ignores it; litellm just wants a value
 
 # ── Property-name equivalence (mirrors module2_ifc_read's alias table) ──────
 _ALIAS_GROUPS: list[set[str]] = [{canon, *aliases} for canon, aliases in _PROPERTY_ALIASES.items()]
@@ -225,24 +245,77 @@ def part_a():
 # PART B
 # ══════════════════════════════════════════════════════════════════════════
 
+def _ollama_models() -> list[str] | None:
+    """Return the model tags the local Ollama daemon serves, or None if it is down."""
+    try:
+        with urllib.request.urlopen(f"{OLLAMA_BASE_URL}/api/tags", timeout=5) as resp:
+            return [m.get("name", "") for m in json.load(resp).get("models", [])]
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+class StripThinkingClient:
+    """Decorator that drops a reasoning model's <think>...</think> preamble.
+
+    qwen3 is a thinking model.  ``response_format={"type": "json_object"}`` maps to
+    Ollama's ``format: "json"`` grammar, which normally suppresses the block, but
+    ``rule_extractor._parse`` fails closed (silently returns zero rules) on any
+    non-JSON prefix — so strip it defensively rather than mis-score a run as 0%.
+
+    Satisfies the LLMClient protocol, so it substitutes anywhere a client is taken.
+    """
+
+    def __init__(self, inner) -> None:
+        """Wrap *inner*, any object satisfying the LLMClient protocol."""
+        self._inner = inner
+        self.unparseable = 0
+
+    async def complete(self, messages: list[dict], *, response_format: dict | None = None) -> str:
+        """Delegate to the wrapped client and return its reply without think tags."""
+        raw = await self._inner.complete(messages, response_format=response_format)
+        cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+        try:
+            json.loads(cleaned)
+        except json.JSONDecodeError:
+            # Usually max_tokens truncation mid-object. Counted so a run that scores
+            # 0% for transport reasons is distinguishable from one the model failed.
+            self.unparseable += 1
+        return cleaned
+
+
 async def part_b(sendable: list[dict]):
     print("\n" + "=" * 70)
-    print("  PART B - LLM extraction accuracy (needs an API key)")
+    print("  PART B - LLM extraction accuracy (local Ollama, no API key)")
     print("=" * 70)
 
-    model = os.getenv("BIM_GUARD_RULE_MODEL", "gpt-4o-mini")
-    key_present = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY"))
-    if not key_present:
-        print(f"\n     SKIPPED — no OPENAI_API_KEY/GEMINI_API_KEY in the environment.")
-        print(f"     Live app default model is {model!r}. To run this part:")
-        print(f"       set OPENAI_API_KEY=sk-...   (PowerShell: $env:OPENAI_API_KEY = 'sk-...')")
+    model = os.getenv("BIM_GUARD_RULE_MODEL", OLLAMA_MODEL)
+    tag = model.split("/", 1)[1] if "/" in model else model
+
+    served = _ollama_models()
+    if served is None:
+        print(f"\n     SKIPPED — no Ollama daemon answering at {OLLAMA_BASE_URL}.")
+        print(f"     To run this part:")
+        print(f"       ollama serve")
+        print(f"       ollama pull {tag}")
         print(f"       uv run python score_module3_extraction.py")
         return
+    if tag not in served:
+        print(f"\n     SKIPPED — Ollama is up at {OLLAMA_BASE_URL} but does not serve {tag!r}.")
+        print(f"     Models currently served: {served or '(none)'}")
+        print(f"     Pull it with:  ollama pull {tag}")
+        return
 
+    # litellm resolves the ollama endpoint from this env var; LiteLLMClient exposes
+    # no base_url argument to pass it through directly.  setdefault so an already-set
+    # OLLAMA_API_BASE (e.g. a remote box) still wins.
+    os.environ.setdefault("OLLAMA_API_BASE", OLLAMA_BASE_URL)
+
+    from app.modules.config import MAX_TOKENS_COMPLIANCE
     from app.services.rule_extractor import LiteLLMRuleExtractor
     from app.services.llm_client import LiteLLMClient
 
-    extractor = LiteLLMRuleExtractor(client=LiteLLMClient(model=model))
+    client = StripThinkingClient(LiteLLMClient(model=model, api_key=OLLAMA_API_KEY))
+    extractor = LiteLLMRuleExtractor(client=client)
     llm_rules = []
     for idx, chunk in enumerate(sendable, start=1):
         rules = await extractor.extract_rules_from_text(
@@ -250,7 +323,10 @@ async def part_b(sendable: list[dict]):
         )
         llm_rules.extend(rules)
 
-    print(f"\n     model={model}  chunks_sent={len(sendable)}  rules_returned={len(llm_rules)}")
+    print(f"\n     model={model}  endpoint={os.environ['OLLAMA_API_BASE']}  chunks_sent={len(sendable)}  rules_returned={len(llm_rules)}")
+    if client.unparseable:
+        print(f"     WARNING: {client.unparseable}/{len(sendable)} replies were not valid JSON "
+              f"(likely max_tokens={MAX_TOKENS_COMPLIANCE} truncation) and scored as zero rules")
     _score(f"LiteLLMRuleExtractor ({model}) — live-path chunks", llm_rules)
 
     canonical = {c.lower() for group in _ALIAS_GROUPS for c in group}
