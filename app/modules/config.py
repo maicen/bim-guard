@@ -7,24 +7,18 @@ Imported by rule_generator.py, rule_converter.py, and seed-rule loaders.
 
 import os
 
+from app.environment import load_env_file
 from app.services.persistence import PersistenceService
-from app.services.settings_service import SettingsService
 
-_settings = SettingsService()
+load_env_file()
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Supabase is the sole runtime database backend.
 DB_BACKEND = PersistenceService.DB_BACKEND
-DB_PATH = "supabase://public.rules"
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = _settings.get("OPENAI_MODEL", os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = _settings.get(
-    "GEMINI_MODEL",
-    os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
-)
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 # ── LLM Standardization (Issue #17) ───────────────────────────────────────────
 # Unified LLM configuration for all extraction, rule building, and compliance work.
 # All modules use these constants instead of hardcoded values.
@@ -32,10 +26,9 @@ GEMINI_MODEL = _settings.get(
 # Default model: Gemini 2.0-flash (via LiteLLM).
 # The "gemini/" prefix is the LiteLLM provider route — without it litellm cannot
 # resolve which backend to call. Precedence matches the API-key block above:
-# DB setting > environment variable > literal default.
-DEFAULT_LLM_MODEL = _settings.get(
-    "BIM_GUARD_LLM_MODEL",
-    os.environ.get("BIM_GUARD_LLM_MODEL", "gemini/gemini-2.0-flash"),
+# Environment variable > literal default.
+DEFAULT_LLM_MODEL = os.environ.get(
+    "BIM_GUARD_LLM_MODEL", "gemini/gemini-2.0-flash"
 )
 
 # Temperature by use case
@@ -68,8 +61,8 @@ RETRY_BACKOFF_MULTIPLIER = 2.0  # Exponential backoff: 1s, 2s, 4s
 # while XM-001 is still DRAFT and its loader reaches the database for the
 # GC-001 galvanic series. They must not be wired on the same switch.
 # Set to the string "1" to enable; any other value reads as off.
-FEATURE_PATH_B_MM = _settings.get("FEATURE_PATH_B_MM", os.environ.get("FEATURE_PATH_B_MM", "0")) == "1"
-FEATURE_PATH_B_XM = _settings.get("FEATURE_PATH_B_XM", os.environ.get("FEATURE_PATH_B_XM", "0")) == "1"
+FEATURE_PATH_B_MM = os.environ.get("FEATURE_PATH_B_MM", "0") == "1"
+FEATURE_PATH_B_XM = os.environ.get("FEATURE_PATH_B_XM", "0") == "1"
 
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "BuildingCode_PDF"

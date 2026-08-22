@@ -31,12 +31,6 @@ ORCHESTRATOR_PATH = (
     REPO_ROOT / "app" / "modules" / "module4_comparator" / "compliance_orchestrator.py"
 )
 
-_IMPORT_REASON = (
-    "DEFECT: compliance_orchestrator cannot be imported - compliance_runner "
-    "imports app.engines.bimguard_galvanic_engine, a module that has never "
-    "existed (regression at 68d4cdb). Nothing downstream of it can run."
-)
-
 # Drives one full orchestrate_workflow() call and reports how far it got.
 _RUN_PROBE = r"""
 import json, sys, types
@@ -145,7 +139,7 @@ def test_orchestrator_wires_both_paths(orchestrator_source):
 
 
 # ---------------------------------------------------------------------------
-# Behavioural contract - blocked on the import regression
+# Behavioural contract
 # ---------------------------------------------------------------------------
 
 
@@ -155,7 +149,6 @@ def test_orchestrator_module_imports(run_probe):
     assert verdict["imported"], verdict.get("error")
 
 
-@pytest.mark.xfail(strict=True, reason=_IMPORT_REASON)
 @pytest.mark.parametrize(("mm", "xm"), FLAG_COMBOS, ids=FLAG_COMBO_IDS)
 def test_orchestrate_workflow_runs_under_every_flag_combination(
     run_probe, flag_env, mm, xm
@@ -166,7 +159,6 @@ def test_orchestrate_workflow_runs_under_every_flag_combination(
     assert verdict["ran"], verdict.get("error")
 
 
-@pytest.mark.xfail(strict=True, reason=_IMPORT_REASON)
 def test_orchestrate_workflow_returns_one_row_per_element(run_probe, flag_env):
     """The output keeps the per-element spine, compliant elements included.
 
@@ -179,7 +171,6 @@ def test_orchestrate_workflow_returns_one_row_per_element(run_probe, flag_env):
     assert verdict["rows"] == 1, f"expected 1 row for 1 element, got {verdict['rows']}"
 
 
-@pytest.mark.xfail(strict=True, reason=_IMPORT_REASON)
 def test_orchestrate_workflow_projects_the_path_b_columns(run_probe, flag_env):
     """Every row carries the projection keys the analyze card reads."""
     verdict = run_probe(_RUN_PROBE, flag_env("0", "0"))

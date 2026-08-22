@@ -6,58 +6,6 @@ from app.services.static_data_service import StaticDataService
 
 DEFAULT_SETTINGS = [
     {
-        "key": "BIM_GUARD_STORAGE_BACKEND",
-        "value": "supabase",
-        "value_type": "string",
-        "scope": "runtime",
-        "description": "Object storage backend selector: local | supabase.",
-    },
-    {
-        "key": "BIM_GUARD_LLM_MODEL",
-        "value": "gemini/gemini-2.0-flash",
-        "value_type": "string",
-        "scope": "runtime",
-        "description": (
-            "Unified default LiteLLM model for extraction, rule building, and compliance "
-            "(Issue #17). Supersedes BIM_GUARD_RULE_MODEL."
-        ),
-    },
-    {
-        "key": "BIM_GUARD_RULE_MODEL",
-        "value": "gpt-4o-mini",
-        "value_type": "string",
-        "scope": "legacy",
-        "description": "Legacy rule-extraction model. Superseded by BIM_GUARD_LLM_MODEL.",
-    },
-    {
-        "key": "OPENAI_MODEL",
-        "value": "gpt-4o-mini",
-        "value_type": "string",
-        "scope": "legacy",
-        "description": "Legacy Module 3 model fallback.",
-    },
-    {
-        "key": "GEMINI_MODEL",
-        "value": "gemini-1.5-flash",
-        "value_type": "string",
-        "scope": "legacy",
-        "description": "Legacy Gemini model fallback.",
-    },
-    {
-        "key": "SUPABASE_STORAGE_BUCKET",
-        "value": "bim-guard-artifacts",
-        "value_type": "string",
-        "scope": "runtime",
-        "description": "Supabase bucket used for artifact uploads.",
-    },
-    {
-        "key": "SUPABASE_STORAGE_PREFIX",
-        "value": "",
-        "value_type": "string",
-        "scope": "runtime",
-        "description": "Optional key prefix for artifacts in Supabase Storage.",
-    },
-    {
         "key": "BIM_GUARD_LOG_LEVEL",
         "value": "WARNING",
         "value_type": "string",
@@ -65,6 +13,7 @@ DEFAULT_SETTINGS = [
         "description": "Log verbosity: 0-4 or ERROR | WARNING | INFO | DEBUG | TRACE.",
     },
 ]
+_MANAGED_SETTING_KEYS = {item["key"] for item in DEFAULT_SETTINGS}
 
 
 class SettingsService:
@@ -107,8 +56,12 @@ class SettingsService:
         cls._cache()
 
     def list_settings(self) -> list[dict]:
-        """Return all stored settings rows."""
-        return self._static.list_settings()
+        """Return database-managed settings, excluding environment-owned values."""
+        return [
+            row
+            for row in self._static.list_settings()
+            if row.get("key") in _MANAGED_SETTING_KEYS
+        ]
 
     def get(self, key: str, default: str = "") -> str:
         """Return one setting value."""

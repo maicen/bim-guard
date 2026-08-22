@@ -6,6 +6,7 @@ from fasthtml.common import FileResponse, Title, fast_app
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.compat.monsterui import ensure_monsterui_compat
+from app.environment import load_env_file
 
 ensure_monsterui_compat()
 from monsterui.all import (
@@ -19,7 +20,6 @@ from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
 from app.logging_config import configure_logging, get_logger
-from app.utils import load_env_file
 
 try:
     import fcntl

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.modules.config import DB_PATH, SOURCE_DOC_SEED
+from app.modules.config import SOURCE_DOC_SEED
 from app.modules.module3_rule_builder.rule_generator import RuleGenerator
 from app.modules.module3_rule_builder.rule_store import RuleStore
 from app.services.static_data_service import StaticDataService
@@ -38,7 +38,7 @@ def seed_rules(store: RuleStore, generator: RuleGenerator) -> int:
 
 
 if __name__ == "__main__":
-    store = RuleStore(DB_PATH)
+    store = RuleStore()
     generator = RuleGenerator(store)
     seed_rules(store, generator)
 

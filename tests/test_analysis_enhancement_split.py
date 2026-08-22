@@ -1,11 +1,14 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 from app.modules.pipeline_services import (
     AnalysisService,
     EnhancementService,
     enhance_model,
+    execute_model_enhancement,
     run_compliance_analysis,
 )
+from app.services.persistence import PersistenceService, _MemoryClient
 
 
 def test_analysis_and_enhancement_services_are_separated():
@@ -69,3 +72,94 @@ def test_phase_1_analysis_and_enhancement_entry_points_are_explicit():
     assert enhancement["pipeline"] == "enhancement"
     assert enhancement["version"] == 2
     assert enhancement["items"][0]["changes"]["material"] == "duplex_steel"
+
+
+def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
+    source_path = tmp_path / "source.ifc"
+    source_content = b"ISO-10303-21;SOURCE"
+    source_path.write_bytes(source_content)
+
+    class FakeStorage:
+        def __init__(self):
+            self.upload = None
+
+        def materialize_local_path(self, reference: str) -> Path | None:
+            assert reference == "sb://models/source.ifc"
+            return source_path
+
+        def save_upload(self, filename: str, content: bytes, subdir: str) -> str:
+            self.upload = (filename, content, subdir)
+            return f"sb://models/{subdir}/{filename}"
+
+    class FakeLineageLedger:
+        def __init__(self):
+            self.payload = None
+
+        def record(self, **payload):
+            self.payload = payload
+            return {"id": 41, **payload}
+
+    def fake_improver(input_path: str, output_path: str):
+        assert Path(input_path).read_bytes() == source_content
+        Path(output_path).write_bytes(b"ISO-10303-21;ENHANCED")
+        return {"names_added": 3}
+
+    storage = FakeStorage()
+    ledger = FakeLineageLedger()
+    service = EnhancementService(
+        storage=storage,
+        lineage_ledger=ledger,
+        improver=fake_improver,
+    )
+
+    result = execute_model_enhancement(
+        project_id=7,
+        source_reference="sb://models/source.ifc",
+        version=2,
+        service=service,
+    )
+
+    assert source_path.read_bytes() == source_content
+    assert storage.upload == (
+        "source_v2.ifc",
+        b"ISO-10303-21;ENHANCED",
+        "enhancements/7",
+    )
+    assert ledger.payload == {
+        "project_id": 7,
+        "source_reference": "sb://models/source.ifc",
+        "output_reference": "sb://models/enhancements/7/source_v2.ifc",
+        "version": 2,
+        "summary": {"names_added": 3},
+    }
+    assert result["lineage"]["id"] == 41
+
+
+def test_enhancement_execution_rejects_non_positive_version():
+    service = EnhancementService(storage=object(), lineage_ledger=object(), improver=lambda *_: {})
+
+    try:
+        service.execute(project_id=7, source_reference="sb://models/source.ifc", version=0)
+    except ValueError as exc:
+        assert str(exc) == "version must be greater than zero"
+    else:
+        raise AssertionError("Expected a non-positive model version to be rejected")
+
+
+def test_lineage_repository_uses_offline_persistence_fallback(monkeypatch):
+    from app.services.model_lineage import SupabaseModelLineageRepository
+
+    monkeypatch.setattr(PersistenceService, "_db", _MemoryClient())
+    repository = SupabaseModelLineageRepository()
+
+    row = repository.record(
+        project_id=3,
+        source_reference="sb://models/source.ifc",
+        output_reference="sb://models/output.ifc",
+        version=1,
+        summary={"names_added": 2},
+    )
+
+    assert row["id"] == 1
+    assert row["project_id"] == 3
+    assert row["summary"] == {"names_added": 2}

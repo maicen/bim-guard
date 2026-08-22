@@ -14,10 +14,10 @@ Responsibilities:
 Usage:
     from module3_rule_builder.rule_converter import RuleConverter
     from module3_rule_builder.rule_store import RuleStore
-    from config import DB_PATH, GEMINI_API_KEY
+    from config import OPENAI_API_KEY
 
-    store     = RuleStore(DB_PATH)
-    converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
+    store     = RuleStore()
+    converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
     rules     = converter.extract_rules(chunk)
 """
 

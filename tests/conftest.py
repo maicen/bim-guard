@@ -54,19 +54,7 @@ KNOWN_IMPORT_FAILURES: dict[str, str] = {
     ),
 }
 
-IMPORT_REGRESSIONS: dict[str, str] = {
-    "app.modules.module4_comparator.compliance_runner": (
-        "REGRESSION at 68d4cdb: the commit is labelled 'Fix band casing' but "
-        "rewrote the module (97+/220-) and swapped a working import of "
-        "app.engines.bimguard_corrosion_engine for app.engines."
-        "bimguard_galvanic_engine, which has never existed. It also imports "
-        "run_galvanic_compliance_check, which exists nowhere in the tree."
-    ),
-    "app.modules.module4_comparator.compliance_orchestrator": (
-        "Downstream of the compliance_runner regression: this module imports "
-        "run_compliance_checks from it, so it cannot load either."
-    ),
-}
+IMPORT_REGRESSIONS: dict[str, str] = {}
 
 # The two Path B feature flags, exercised over every on/off combination so a
 # test can prove they are independent rather than assuming it.

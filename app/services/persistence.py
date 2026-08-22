@@ -3,8 +3,8 @@
 import os
 from typing import Any
 
+from app.environment import load_env_file
 from app.services.db_adapters import SupabaseTableAdapter
-from app.utils import load_env_file
 from supabase import create_client
 
 load_env_file()
@@ -97,9 +97,7 @@ class _MemoryTable:
         return _MemoryQuery(self._client, self._table_name).select(*cols)
 
     def insert(self, payload: dict[str, Any]):
-        rows = self._client._tables.setdefault(self._table_name, [])
-        rows.append(dict(payload))
-        return payload
+        return _MemoryInsertQuery(self._client, self._table_name, payload)
 
     def update(self, updates: dict[str, Any]):
         return _MemoryQueryWithMutation(self._client, self._table_name, updates=updates)
@@ -114,6 +112,22 @@ class _MemoryTable:
         if name in {"rows", "rows_where"}:
             raise AttributeError(name)
         raise AttributeError(f"{self.__class__.__name__} has no attribute {name}")
+
+
+class _MemoryInsertQuery:
+    """Query object that appends one row when executed."""
+
+    def __init__(self, client: "_MemoryClient", table_name: str, payload: dict[str, Any]):
+        self._client = client
+        self._table_name = table_name
+        self._payload = dict(payload)
+
+    def execute(self):
+        rows = self._client._tables.setdefault(self._table_name, [])
+        if "id" not in self._payload:
+            self._payload["id"] = max((int(row.get("id", 0)) for row in rows), default=0) + 1
+        rows.append(self._payload)
+        return _MemoryResult([dict(self._payload)])
 
 
 class _MemoryQueryWithMutation(_MemoryQuery):

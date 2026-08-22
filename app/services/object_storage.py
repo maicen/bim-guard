@@ -6,8 +6,8 @@ import os
 import uuid
 from pathlib import Path
 
+from app.environment import load_env_file
 from app.logging_config import get_logger
-from app.utils import load_env_file
 from supabase import Client, create_client
 
 load_env_file()

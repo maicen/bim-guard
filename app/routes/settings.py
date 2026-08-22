@@ -73,7 +73,8 @@ def setup_routes(rt):
         return Title("Settings - BIM Guard"), DashboardLayout(
             Container(
                 P(
-                    "Manage runtime backend, storage, and model settings persisted in the database.",
+                    "Manage application settings persisted in the database. Environment-owned "
+                    "storage and model settings are configured at deployment time.",
                     cls="text-muted-foreground",
                 ),
                 P(

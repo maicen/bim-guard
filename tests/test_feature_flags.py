@@ -19,8 +19,7 @@ import pytest
 
 from tests.conftest import FLAG_COMBO_IDS, FLAG_COMBOS
 
-# Reads the flags the way the pipeline's shared config does: DB setting first,
-# then environment, then the literal default.
+# Reads the flags from the pipeline's environment-authoritative shared config.
 _CONFIG_PROBE = r"""
 import json, sys
 sys.path.insert(0, ".")
@@ -134,14 +133,6 @@ def test_only_the_literal_one_enables_a_flag(run_probe, value):
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: compliance_orchestrator.py reads os.environ directly and never "
-        "imports app.modules.config, so a flag set through SettingsService (the "
-        "database) is invisible to orchestrate_workflow(). One switch, two truths."
-    ),
-)
 def test_orchestrator_reads_the_shared_config_flags(run_probe):
     """The orchestrator should consult the same flags the rest of the pipeline does."""
     result = run_probe(_ORCHESTRATOR_PROBE)
@@ -151,15 +142,6 @@ def test_orchestrator_reads_the_shared_config_flags(run_probe):
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: app.modules.config instantiates SettingsService() at module "
-        "import time, which calls PersistenceService.get_db() and raises "
-        "ValueError('SUPABASE_URL is required'). The flags cannot be read "
-        "offline, which is why the orchestrator bypasses this module entirely."
-    ),
-)
 def test_config_imports_without_a_database(run_probe):
     """Reading a feature flag must not require a database round trip.
 

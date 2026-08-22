@@ -15,9 +15,8 @@ Responsibilities:
 Usage:
     from module3_rule_builder.rule_generator import RuleGenerator
     from module3_rule_builder.rule_store import RuleStore
-    from config import DB_PATH
 
-    store     = RuleStore(DB_PATH)
+    store     = RuleStore()
     generator = RuleGenerator(store)
     generator.save_batch(rules, source_doc="BuildingCode_PDF")
 """

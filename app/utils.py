@@ -3,45 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dotenv import load_dotenv
 from fasthtml.common import RedirectResponse
-
-
-def load_env_file(env_path: str = ".env") -> None:
-    """Load the project's .env file into process environment without overriding set vars."""
-    candidate = Path(env_path)
-    repo_root = Path(__file__).resolve().parents[1]
-    search_roots = []
-
-    if candidate.is_absolute():
-        search_roots.append(candidate)
-    else:
-        search_roots.extend(
-            [
-                Path.cwd() / candidate,
-                repo_root / candidate,
-            ]
-        )
-
-        for root in (Path.cwd(), repo_root):
-            current = root
-            while True:
-                search_roots.append(current / candidate)
-                parent = current.parent
-                if parent == current:
-                    break
-                current = parent
-
-    seen: set[Path] = set()
-    for path in search_roots:
-        normalized = path.resolve(strict=False)
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        if normalized.exists():
-            load_dotenv(dotenv_path=normalized, override=False)
-            return
-
 
 ALLOWED_DOCUMENT_SUFFIXES = {".pdf", ".md", ".txt"}
 ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {

@@ -20,7 +20,7 @@ Pipeline flow:
 USAGE:
 
     # Full enhanced pipeline
-    python enhanced_orchestrator.py data/input_docs/BuildingCode_Part9.pdf
+    python -m app.modules.module1_doc_parser.enhanced_orchestrator data/input_docs/BuildingCode_Part9.pdf
 
     # Or import:
     from enhanced_orchestrator import run_enhanced_pipeline
@@ -32,49 +32,27 @@ USAGE:
     )
 """
 
-import os
 import sys
 from pathlib import Path
 
-# Imports work both as a CLI script (python enhanced_orchestrator.py)
-# and when imported by the web app (from app.modules.module1_doc_parser...).
-try:
-    from config import DB_PATH
-    from module1_doc_parser.docling_extractor import DoclingExtractor
-    from module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from module1_doc_parser.section_chunker import SectionChunker
-    from module1_doc_parser.keyword_filter import KeywordFilter
-    from module1_doc_parser.dependency_parser import DependencyParser
-    from module1_doc_parser.confidence_scorer import ConfidenceScorer
-    from module3_rule_builder.rule_store import RuleStore
-    from module3_rule_builder.rule_generator import RuleGenerator
-    from module3_rule_builder.rule_converter import RuleConverter
-    from module3_rule_builder.code_seed_rules import seed_rules
-except ImportError:
-    from app.modules.config import DB_PATH
-    from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
-    from app.modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from app.modules.module1_doc_parser.section_chunker import SectionChunker
-    from app.modules.module1_doc_parser.keyword_filter import KeywordFilter
-    from app.modules.module1_doc_parser.dependency_parser import DependencyParser
-    from app.modules.module1_doc_parser.confidence_scorer import ConfidenceScorer
-    from app.modules.module3_rule_builder.rule_store import RuleStore
-    from app.modules.module3_rule_builder.rule_generator import RuleGenerator
-    from app.modules.module3_rule_builder.rule_converter import RuleConverter
-    from app.modules.module3_rule_builder.code_seed_rules import seed_rules
+from app.modules.config import OPENAI_API_KEY
+from app.modules.module1_doc_parser.confidence_scorer import ConfidenceScorer
+from app.modules.module1_doc_parser.dependency_parser import DependencyParser
+from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
+from app.modules.module1_doc_parser.keyword_filter import KeywordFilter
+from app.modules.module1_doc_parser.section_chunker import SectionChunker
+from app.modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
+from app.modules.module3_rule_builder.code_seed_rules import seed_rules
+from app.modules.module3_rule_builder.rule_converter import RuleConverter
+from app.modules.module3_rule_builder.rule_generator import RuleGenerator
+from app.modules.module3_rule_builder.rule_store import RuleStore
 
 # TF-IDF requires scikit-learn — optional
 try:
-    try:
-        from module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
-    except ImportError:
-        from app.modules.module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
+    from app.modules.module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
     _TFIDF_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     _TFIDF_AVAILABLE = False
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-
 
 def run_enhanced_pipeline(
     pdf_path: str,
@@ -109,14 +87,12 @@ def run_enhanced_pipeline(
     print(f"{'=' * 65}\n")
 
     # ── Initialise stores ─────────────────────────────────────────────────────
-    store = RuleStore(DB_PATH)
+    store = RuleStore()
     generator = RuleGenerator(store)
     converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
 
     if seed_db_first:
         seed_rules(store, generator)
-
-    rules_before = store.count()
 
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 1 — Docling extraction

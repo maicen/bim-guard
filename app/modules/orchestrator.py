@@ -36,13 +36,12 @@ Usage:
     result = run_pipeline("data/input_docs/building_code.pdf")
 """
 
-import os
 import re
 import sys
 from pathlib import Path
 
 from app.logging_config import get_logger
-from app.services.persistence import PersistenceService
+from app.modules.config import OPENAI_API_KEY
 from app.services.pipeline_dependencies import (
     describe_rule_store,
     warm_optional_rule_pipeline_dependencies,
@@ -59,8 +58,6 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, ValueError):
         pass
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # ── SWITCH HERE ───────────────────────────────────────────────────────────────
 # False = regex (free, no API key, works offline)
@@ -146,7 +143,7 @@ def run_pipeline(
     generator = RuleGenerator(store)
 
     if USE_GPT4O:
-        converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
+        converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
     else:
         converter = RuleConverter()  # regex needs no arguments
 
@@ -155,8 +152,6 @@ def run_pipeline(
         logger.info("Seeding baseline rules before extraction")
         print("── SEEDING DB WITH PRE-BUILT CODE RULES ──")
         seed_rules(store, generator)
-
-    rules_before = store.count()
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 1 — STEP 1: Docling extraction
@@ -347,6 +342,7 @@ class BIMGuard_App:
         from app.services.documents_service import DocumentService
         from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
+
         from .module2_ifc_read import Module2_IFCRead
         from .module2_ifc_read.ifc_parser import (
             generate_synthetic_elements,

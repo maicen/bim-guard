@@ -1,8 +1,8 @@
 """
 module3_rule_builder/rule_store.py
 -----------------------------------
-Adapter that forwards all reads/writes to the web app's RuleService so the
-CLI pipeline and the web app share the same configured rules table.
+Adapter that forwards all reads/writes to the web app's RuleService so every
+pipeline uses the same Supabase-backed rules table.
 
 Public interface is identical to the original standalone RuleStore, so
 RuleGenerator, TableRuleBuilder, RuleConverter, code_seed_rules, orchestrator,
@@ -13,21 +13,11 @@ Field-name mapping (CLI → web):
     desc   → description
     target → target_ifc_class
 
-The db_path constructor argument is accepted but ignored; PersistenceService
-owns the active backend connection.
 """
 
 import json
 
-try:
-    from app.services.rules_service import RuleService
-except ImportError:
-    # Running as a bare CLI script from app/modules/ — adjust sys.path first
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-    from app.services.rules_service import RuleService
+from app.services.rules_service import RuleService
 
 
 def _jload(value):
@@ -81,9 +71,8 @@ class RuleStore:
     Delegates all persistence to RuleService (shared web app table).
     """
 
-    def __init__(self, db_path=None):
-        # db_path accepted for backward compat but ignored — PersistenceService
-        # owns the connection.
+    def __init__(self):
+        """Connect to the shared rules service."""
         self._svc = RuleService()
         print(f"[RuleStore] Connected — {self.count()} existing rules")
 

@@ -9,7 +9,9 @@ version without mutating the original IFC source.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, Callable, Protocol
 
 
 @dataclass(frozen=True)
@@ -61,8 +63,45 @@ class EnhancementPlanItem:
     changes: dict[str, Any]
 
 
+class EnhancementArtifactStorage(Protocol):
+    """Storage operations required by the enhancement pipeline."""
+
+    def materialize_local_path(self, reference: str) -> Path | None:
+        """Materialize an immutable source artifact for local processing."""
+
+    def save_upload(self, filename: str, content: bytes, subdir: str) -> str:
+        """Persist a generated artifact and return its durable reference."""
+
+
+class ModelLineageLedger(Protocol):
+    """Persistence operations required to record model lineage."""
+
+    def record(
+        self,
+        *,
+        project_id: int,
+        source_reference: str,
+        output_reference: str,
+        version: int,
+        summary: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Record one immutable source-to-output enhancement edge."""
+
+
 class EnhancementService:
-    """Explicit enhancement pipeline that plans changes for a new model version."""
+    """Plan and execute enhancements against a new model version."""
+
+    def __init__(
+        self,
+        *,
+        storage: EnhancementArtifactStorage | None = None,
+        lineage_ledger: ModelLineageLedger | None = None,
+        improver: Callable[[str, str], dict[str, Any]] | None = None,
+    ) -> None:
+        """Initialize optional execution dependencies for explicit injection."""
+        self._storage = storage
+        self._lineage_ledger = lineage_ledger
+        self._improver = improver
 
     def plan(self, elements: list[Any], *, changes: dict[str, Any] | None = None, version: int = 1) -> dict[str, Any]:
         """Produce a planned enhancement set without mutating the input model."""
@@ -78,6 +117,44 @@ class EnhancementService:
             "pipeline": "enhancement",
             "version": version,
             "items": items,
+        }
+
+    def execute(self, *, project_id: int, source_reference: str, version: int) -> dict[str, Any]:
+        """Generate, store, and ledger a new IFC version without changing its source."""
+        if version < 1:
+            raise ValueError("version must be greater than zero")
+        if self._storage is None or self._lineage_ledger is None or self._improver is None:
+            raise RuntimeError("enhancement execution dependencies are not configured")
+
+        source_path = self._storage.materialize_local_path(source_reference)
+        if source_path is None:
+            raise FileNotFoundError(f"Unable to materialize source IFC: {source_reference}")
+
+        with TemporaryDirectory(prefix="bim-guard-enhancement-") as temp_dir:
+            output_name = f"{source_path.stem}_v{version}.ifc"
+            output_path = Path(temp_dir) / output_name
+            summary = self._improver(str(source_path), str(output_path))
+            output_reference = self._storage.save_upload(
+                output_name,
+                output_path.read_bytes(),
+                f"enhancements/{project_id}",
+            )
+
+        lineage = self._lineage_ledger.record(
+            project_id=project_id,
+            source_reference=source_reference,
+            output_reference=output_reference,
+            version=version,
+            summary=summary,
+        )
+        return {
+            "pipeline": "enhancement",
+            "project_id": project_id,
+            "version": version,
+            "source_reference": source_reference,
+            "output_reference": output_reference,
+            "summary": summary,
+            "lineage": lineage,
         }
 
 
@@ -97,3 +174,28 @@ def enhance_model(
     """Explicit versioned enhancement entry point for Phase 1 model improvement work."""
     enhancement_service = service or EnhancementService()
     return enhancement_service.plan(elements, changes=changes, version=version)
+
+
+def execute_model_enhancement(
+    *,
+    project_id: int,
+    source_reference: str,
+    version: int,
+    service: EnhancementService | None = None,
+) -> dict[str, Any]:
+    """Execute the production enhancement pipeline with repository dependencies."""
+    if service is None:
+        from app.modules.module2_ifc_read.ifc_quality.improver import improve_ifc_file
+        from app.services.model_lineage import SupabaseModelLineageRepository
+        from app.services.object_storage import ObjectStorage
+
+        service = EnhancementService(
+            storage=ObjectStorage(),
+            lineage_ledger=SupabaseModelLineageRepository(),
+            improver=improve_ifc_file,
+        )
+    return service.execute(
+        project_id=project_id,
+        source_reference=source_reference,
+        version=version,
+    )

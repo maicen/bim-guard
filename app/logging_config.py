@@ -20,6 +20,10 @@ import os
 import sys
 from pathlib import Path
 
+from app.environment import load_env_file
+
+load_env_file()
+
 __all__ = [
     "TRACE",
     "configure_logging",
