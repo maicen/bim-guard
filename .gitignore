@@ -19,6 +19,8 @@ tmp_sig_check.sqlite
 docs/MonsterUI/
 
 apply_benchmark_patch*.ps1
-data/cache/supabase-storage/uploads/
-data/cache/supabase-storage/migration/uploads/
+
+# Runtime artifacts are durable in Supabase Storage; local copies are disposable.
+data/cache/supabase-storage/
+data/uploads/ifc/
 data/bimguard.sqlite-wal

@@ -32,6 +32,7 @@ continues to work — it now additionally receives richer per-element metadata.
 
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 try:
     import ifcopenshell
@@ -210,21 +211,23 @@ class Module2_IFCRead:
             score = results.get("overall", {}).get("score", 100)
 
             if score < IFC_MIN_QUALITY_SCORE:
-                improved_path = load_path.with_stem(load_path.stem + "_improved")
-                improvement_summary = improve_ifc_file(str(load_path), str(improved_path))
-                load_path = improved_path
-                self.quality_warnings.append(
-                    f"Quality {score:.1f}% was below threshold; "
-                    f"auto-improved file used: {improved_path.name}"
-                )
-                self.quality_improvements = improvement_summary.get("improvements", [])
+                with TemporaryDirectory(prefix="bim-guard-analysis-") as temp_dir:
+                    improved_path = Path(temp_dir) / f"{load_path.stem}_improved.ifc"
+                    improvement_summary = improve_ifc_file(str(load_path), str(improved_path))
+                    self.ifc_file = ifcopenshell.open(str(improved_path))
+                    self.quality_warnings.append(
+                        f"Quality {score:.1f}% was below threshold; "
+                        "an ephemeral auto-improved model was used for analysis"
+                    )
+                    self.quality_improvements = improvement_summary.get("improvements", [])
             elif score < 80:
                 self.quality_warnings.append(
                     f"IFC quality is fair ({score:.1f}%). "
                     "Consider running the IFC improver for better results."
                 )
 
-        self.ifc_file = ifcopenshell.open(str(load_path))
+        if self.ifc_file is None:
+            self.ifc_file = ifcopenshell.open(str(load_path))
         if _GEOMETRY_AVAILABLE:
             self.geometry_extractor = IFCGeometryExtractor(self.ifc_file)
         if _SPATIAL_AVAILABLE:

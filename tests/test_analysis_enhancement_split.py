@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import app.modules.module2_ifc_read as ifc_read_module
 from app.modules.pipeline_services import (
     AnalysisService,
     EnhancementService,
@@ -9,6 +10,48 @@ from app.modules.pipeline_services import (
     run_compliance_analysis,
 )
 from app.services.persistence import PersistenceService, _MemoryClient
+
+
+def test_low_quality_analysis_uses_an_ephemeral_improved_copy(tmp_path, monkeypatch):
+    source_path = tmp_path / "source.ifc"
+    source_path.write_bytes(b"ISO-10303-21;SOURCE")
+    opened_paths = []
+
+    class FakeValidator:
+        def __init__(self, path):
+            assert Path(path) == source_path
+
+        def validate(self):
+            return {"overall": {"score": 42}}
+
+    def fake_improver(input_path, output_path):
+        assert Path(input_path) == source_path
+        Path(output_path).write_bytes(b"ISO-10303-21;IMPROVED")
+        return {"improvements": ["Names added: 1"]}
+
+    def fake_open(path):
+        opened_path = Path(path)
+        assert opened_path.exists()
+        assert opened_path.read_bytes() == b"ISO-10303-21;IMPROVED"
+        opened_paths.append(opened_path)
+        return object()
+
+    monkeypatch.setattr(ifc_read_module, "IFCValidator", FakeValidator)
+    monkeypatch.setattr(ifc_read_module, "improve_ifc_file", fake_improver)
+    monkeypatch.setattr(ifc_read_module, "ifcopenshell", SimpleNamespace(open=fake_open))
+    monkeypatch.setattr(ifc_read_module, "_IFCOPENSHELL_AVAILABLE", True)
+    monkeypatch.setattr(ifc_read_module, "_QUALITY_TOOLS_AVAILABLE", True)
+    monkeypatch.setattr(ifc_read_module, "_GEOMETRY_AVAILABLE", False)
+    monkeypatch.setattr(ifc_read_module, "_SPATIAL_AVAILABLE", False)
+    monkeypatch.setattr(ifc_read_module, "_EGRESS_AVAILABLE", False)
+
+    reader = ifc_read_module.Module2_IFCRead(source_path)
+
+    assert reader.quality_improvements == ["Names added: 1"]
+    assert "ephemeral auto-improved model" in reader.quality_warnings[0]
+    assert len(opened_paths) == 1
+    assert not opened_paths[0].exists()
+    assert not source_path.with_stem("source_improved").exists()
 
 
 def test_analysis_and_enhancement_services_are_separated():

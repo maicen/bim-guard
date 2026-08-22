@@ -10,9 +10,9 @@ This harness answers the examination question:
 
 It does so by measuring, not asserting. A prototype Halo generator
 (spatial-reservation / clearance volumes around IFC elements) is run against
-real IFC models drawn from ``data/uploads/ifc/`` at increasing element counts,
-and every stage is timed and memory-profiled separately so that the dominant
-cost can be attributed rather than guessed at.
+real IFC models materialized from Supabase Storage at increasing element
+counts, and every stage is timed and memory-profiled separately so that the
+dominant cost can be attributed rather than guessed at.
 
 Pipeline stages measured independently
 --------------------------------------
@@ -101,6 +101,7 @@ import numpy as np
 # the benchmark measures the same data contract the platform would use.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from app.modules.module2_ifc_read.piping_schema import BoundingBox, Point3D  # noqa: E402
+from app.services.object_storage import ObjectStorage  # noqa: E402
 
 logger = logging.getLogger("bimguard.benchmark")
 
@@ -127,7 +128,7 @@ except ImportError:  # pragma: no cover - ifcopenshell is a core dependency
 IFC_DIR = Path("data/uploads/ifc")
 
 #: Primary model for the single-file scenarios. Chosen because it is the
-#: largest real model in the repository (2 602 IfcProduct instances, IFC4).
+#: largest real benchmark model (2 602 IfcProduct instances, IFC4).
 PRIMARY_MODEL = "9152ac527a1844f69a73f73e77468326_BUILDING_R4.ifc"
 
 #: Four genuinely distinct models standing in for a federated coordination
@@ -138,6 +139,26 @@ FEDERATED_MODELS = [
     "7589fcfc61b849f38c286efebd251ec2_Pacific Continental Residence Sample IFC4.3 Reference View ARCH.ifc",
     "f4c3f1b8390a4183b599323799caae83_Infra-Plumbing.ifc",
 ]
+
+IFC_STORAGE_REFERENCES = {
+    "9152ac527a1844f69a73f73e77468326_BUILDING_R4.ifc": (
+        "sb://bim-guard-artifacts/uploads/ifc/"
+        "93ce691468c34b51955f5239bd33ec23_BUILDING_R4.ifc"
+    ),
+    "c243ce49cc834c47bad6f393bba1af4a_AC20-Institute-Var-2.ifc": (
+        "sb://bim-guard-artifacts/migration/uploads/ifc/"
+        "c243ce49cc834c47bad6f393bba1af4a_AC20-Institute-Var-2.ifc"
+    ),
+    "7589fcfc61b849f38c286efebd251ec2_Pacific Continental Residence Sample IFC4.3 Reference View ARCH.ifc": (
+        "sb://bim-guard-artifacts/migration/uploads/ifc/"
+        "7589fcfc61b849f38c286efebd251ec2_"
+        "Pacific Continental Residence Sample IFC4.3 Reference View ARCH.ifc"
+    ),
+    "f4c3f1b8390a4183b599323799caae83_Infra-Plumbing.ifc": (
+        "sb://bim-guard-artifacts/migration/uploads/ifc/"
+        "f4c3f1b8390a4183b599323799caae83_Infra-Plumbing.ifc"
+    ),
+}
 
 #: IFC classes that carry no meaningful clearance requirement of their own.
 EXCLUDED_TYPES = {
@@ -1040,11 +1061,18 @@ def aggregate(
 
 
 def _resolve(name: str) -> Path:
-    """Resolve an IFC fixture name to a path, raising if it is missing."""
+    """Resolve an IFC fixture from an explicit local copy or Supabase Storage."""
     path = IFC_DIR / name
-    if not path.exists():
-        raise FileNotFoundError(f"IFC fixture not found: {path}")
-    return path
+    if path.exists():
+        return path
+
+    reference = IFC_STORAGE_REFERENCES.get(name)
+    if reference is None:
+        raise FileNotFoundError(f"No IFC fixture reference configured for: {name}")
+    materialized = ObjectStorage().materialize_local_path(reference)
+    if materialized is None:
+        raise FileNotFoundError(f"Unable to materialize IFC fixture: {reference}")
+    return materialized
 
 
 def run_single_model_scenarios(
