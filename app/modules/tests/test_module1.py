@@ -365,16 +365,14 @@ def test_table_builder_multiple_tables(store_and_gen):
 # when fixtures are present (won't break CI if PDFs aren't committed).
 
 
-def _fixture_pdf(name):
+def _skip_if_missing_pdf(name):
     path = os.path.join(FIXTURES_DIR, name)
-    return pytest.param(
-        path,
-        marks=pytest.mark.skipif(not os.path.exists(path), reason=f"Fixture not found: {name}"),
-    )
+    return pytest.mark.skipif(not os.path.exists(path), reason=f"Fixture not found: {name}")
 
 
 # ── Adjust the PDF name below to match your actual fixture file ──
 SAMPLE_PDF = "sample_obc_stairs.pdf"
+SAMPLE_PDF_PATH = os.path.join(FIXTURES_DIR, SAMPLE_PDF)
 
 
 @pytest.fixture
@@ -396,20 +394,20 @@ class TestDoclingExtractor:
     Skip with: pytest tests/test_module1.py -m "not slow"
     """
 
-    @_fixture_pdf(SAMPLE_PDF)
-    def test_extraction_returns_text(self, pdf_path, docling_extractor):
+    @_skip_if_missing_pdf(SAMPLE_PDF)
+    def test_extraction_returns_text(self, docling_extractor):
         """PDF extraction must return non-empty text."""
-        result = docling_extractor.extract(pdf_path)
+        result = docling_extractor.extract(SAMPLE_PDF_PATH)
         text = result if isinstance(result, str) else result.get("text", "")
         assert len(text) > 100, "Extracted text is suspiciously short"
 
-    @_fixture_pdf(SAMPLE_PDF)
-    def test_extraction_contains_expected_terms(self, pdf_path, docling_extractor):
+    @_skip_if_missing_pdf(SAMPLE_PDF)
+    def test_extraction_contains_expected_terms(self, docling_extractor):
         """
         Extracted text should contain known terms from the fixture PDF.
         ── CUSTOMIZE these expected terms for your actual fixture PDF ──
         """
-        result = docling_extractor.extract(pdf_path)
+        result = docling_extractor.extract(SAMPLE_PDF_PATH)
         text = result if isinstance(result, str) else result.get("text", "")
         text_lower = text.lower()
 
@@ -417,17 +415,17 @@ class TestDoclingExtractor:
         for term in expected_terms:
             assert term in text_lower, f"Expected term '{term}' not found in extracted text"
 
-    @_fixture_pdf(SAMPLE_PDF)
-    def test_extraction_finds_tables(self, pdf_path, docling_extractor):
+    @_skip_if_missing_pdf(SAMPLE_PDF)
+    def test_extraction_finds_tables(self, docling_extractor):
         """If the PDF has tables, extraction should return table data."""
-        result = docling_extractor.extract(pdf_path)
+        result = docling_extractor.extract(SAMPLE_PDF_PATH)
         tables = result.get("tables", []) if isinstance(result, dict) else []
         # This is a soft check — skip if your fixture has no tables
         if tables:
             assert len(tables) >= 1
             assert tables[0].get("row_count", 0) > 0
 
-    @_fixture_pdf(SAMPLE_PDF)
+    @_skip_if_missing_pdf(SAMPLE_PDF)
     def test_extraction_handles_corrupt_pdf(self, docling_extractor):
         """Corrupt or missing files should raise cleanly, not crash."""
         with pytest.raises(Exception):

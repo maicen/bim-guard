@@ -5,21 +5,22 @@ Adapter that forwards all reads/writes to the web app's RuleService so the
 CLI pipeline and the web app share the same configured rules table.
 
 Public interface is identical to the original standalone RuleStore, so
-RuleGenerator, TableRuleBuilder, RuleConverter, obc_seed_rules, orchestrator,
-and enhanced_orchestrator need no changes.
+RuleGenerator, TableRuleBuilder, RuleConverter, orchestrator, and
+enhanced_orchestrator need no changes.
 
 Field-name mapping (CLI → web):
     ref    → reference
     desc   → description
     target → target_ifc_class
 
-The db_path constructor argument is accepted but ignored; PersistenceService
-owns the active backend connection.
+Pass a db_path to get a fully isolated, throwaway SQLite database instead of
+the shared app database — see RuleStore.__init__.
 """
 
 import json
 
 try:
+    from app.services.persistence import PersistenceService
     from app.services.rules_service import RuleService
 except ImportError:
     # Running as a bare CLI script from app/modules/ — adjust sys.path first
@@ -27,6 +28,7 @@ except ImportError:
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+    from app.services.persistence import PersistenceService
     from app.services.rules_service import RuleService
 
 
@@ -82,9 +84,22 @@ class RuleStore:
     """
 
     def __init__(self, db_path=None):
-        # db_path accepted for backward compat but ignored — PersistenceService
-        # owns the connection.
-        self._svc = RuleService()
+        """Connect to the shared app database, or an isolated one.
+
+        db_path: when given, this store is fully isolated — it opens (or
+        creates) a throwaway SQLite database at that path instead of the
+        shared app database, so tests (and the eval harness) can never read
+        or write live data. Omit for normal use (web app / CLI pipeline),
+        which intentionally shares the app's configured database so
+        CLI-extracted rules show up in the web UI.
+        """
+        self._isolated = db_path is not None
+        if self._isolated:
+            self._db = PersistenceService.get_isolated_sqlite_db(db_path)
+            self._svc = RuleService(db=self._db)
+        else:
+            self._db = None
+            self._svc = RuleService()
         print(f"[RuleStore] Connected — {self.count()} existing rules")
 
     # ── WRITE ─────────────────────────────────────────────────────────────────
@@ -137,7 +152,19 @@ class RuleStore:
         return str(getattr(row, "id", row))
 
     def clear_all_rules(self):
-        """Delete every rule from the shared table. Use in testing only."""
+        """Delete every rule from this store.
+
+        Refuses on a non-isolated store (RuleStore() with no db_path) so a
+        missing/forgotten db_path argument can never wipe the shared app
+        database — pass a db_path to RuleStore() to get an isolated database
+        that's safe to clear.
+        """
+        if not self._isolated:
+            raise RuntimeError(
+                "clear_all_rules() refused: this RuleStore is connected to the "
+                "shared app database, not an isolated one. Pass a db_path to "
+                "RuleStore() to get an isolated database safe to clear."
+            )
         for r in self._svc.list_rules():
             self._svc.delete_rule(r["id"])
         print("[RuleStore] All rules deleted")
@@ -217,4 +244,10 @@ class RuleStore:
         return self._svc.summary()
 
     def close(self):
-        pass  # PersistenceService owns the connection lifecycle
+        """Close this store's own connection, if it opened one.
+
+        A no-op for a shared-database store — PersistenceService owns that
+        connection's lifecycle for the life of the process.
+        """
+        if self._db is not None:
+            self._db.close()

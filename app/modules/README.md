@@ -151,9 +151,7 @@ app/modules/
 │   ├── __init__.py
 │   ├── rule_generator.py
 │   ├── rule_converter.py        — OpenAI GPT-4o rule extractor
-│   ├── rule_store.py            — shared rule persistence via app services
-│   ├── obc_seed_rules.py        — 25+ OBC baseline rules
-│   └── module3_rule_builder_mock.py
+│   └── rule_store.py            — shared rule persistence via app services
 │
 ├── module4_comparator/          — IFC data vs rule library validation
 │   ├── __init__.py              ← Module4_Comparator
@@ -236,22 +234,10 @@ Or from Python:
 from app.modules.orchestrator import run_pipeline
 
 result = run_pipeline(
-    pdf_path      = "data/input_docs/OBC_Part9.pdf",
-    run_sections  = ["4"],   # test Section 4 (Stairs) first
-    seed_db_first = True,
+    pdf_path      = "data/input_docs/your_code.pdf",
+    run_sections  = ["4"],   # test one section first
 )
 print(result)
-```
-
----
-
-## Seed Pre-built Rules
-
-25 pre-built OBC Part 9 rules are included.
-Seed them without uploading a PDF:
-
-```bash
-uv run python -m app.modules.module3_rule_builder.obc_seed_rules
 ```
 
 ---
@@ -286,8 +272,7 @@ bim-guard/
 │       │   ├── rule_store.py               ← shared CRUD via RuleService
 │       │   ├── rule_generator.py           ← validate + save rules
 │       │   ├── rule_converter.py           ← GPT-4o + RAG NLP engine
-│       │   ├── regex_rule_converter.py     ← regex engine (default)
-│       │   └── obc_seed_rules.py           ← 25 pre-built OBC rules
+│       │   └── regex_rule_converter.py     ← regex engine (default)
 │       └── orchestrator.py                 ← single entry point
 ├── data/
 │   └── cache/                              ← runtime local cache for remote storage objects

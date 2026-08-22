@@ -88,8 +88,14 @@ class RuleService:
     - Mitigation catalogue (mitigation)
     """
 
-    def __init__(self):
-        """Initialize the rules table with required schema columns."""
+    def __init__(self, *, db=None):
+        """Initialize the rules table with required schema columns.
+
+        db: optional isolated connection (from
+        PersistenceService.get_isolated_sqlite_db()) — when given, this
+        RuleService reads/writes only that connection, never the shared app
+        database. Used for test isolation.
+        """
         all_required = {**_RICH_COLUMNS, **_META_COLUMNS}
         self._rules = PersistenceService.get_table(
             "rules",
@@ -104,6 +110,7 @@ class RuleService:
                 "updated_at": str,
             },
             required_columns=all_required,
+            db=db,
         )
 
     # ── Web CRUD ──────────────────────────────────────────────────────────────

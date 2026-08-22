@@ -53,85 +53,23 @@ def _backfill_obc_metadata(svc) -> None:
 
 
 def _seed_library() -> None:
-    """Populate the rule library with OBC baseline rules and engine rulesets."""
+    """Populate the rule library with engine rulesets (corrosion mechanisms).
+
+    Does not seed any building-code rules — those only ever come from a
+    user-uploaded PDF (via AI extraction or the free offline pipeline).
+    """
     try:
-        from app.modules.module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
         from app.services.rules_service import RuleService
         from app.services.ruleset_seeder import seed_engine_rulesets
 
         svc = RuleService()
 
-        # Backfill any legacy OBC rules that lack classification metadata
+        # Backfill classification metadata on legacy OBC rules from before
+        # auto-seeding was removed, if any still exist in this database.
         _backfill_obc_metadata(svc)
-
-        # Seed OBC Part 9 property-check rules (idempotent via ruleset_id check)
-        if not svc.has_ruleset("OBC-PART9"):
-            for rule in OBC_SEED_RULES:
-                svc.create_rule(
-                    reference=str(rule.get("ref") or "OBC"),
-                    rule_type=str(rule.get("rule_type") or "numeric_comparison"),
-                    description=str(rule.get("desc") or ""),
-                    target_ifc_class=str(rule.get("target") or "Unspecified"),
-                    source_text=str(rule.get("source_text") or ""),
-                    property_set=str(rule.get("property_set") or ""),
-                    property_name=str(rule.get("property_name") or ""),
-                    fallback_property=str(rule.get("fallback_property") or ""),
-                    operator=str(rule.get("operator") or ""),
-                    check_value=rule.get("check_value"),
-                    value_min=rule.get("value_min"),
-                    value_max=rule.get("value_max"),
-                    unit=str(rule.get("unit") or ""),
-                    applies_when=rule.get("applies_when") or {},
-                    severity=str(rule.get("severity") or "mandatory"),
-                    keyword=str(rule.get("keyword") or ""),
-                    compliance_type=str(rule.get("compliance_type") or ""),
-                    exceptions=rule.get("exceptions") or [],
-                    related_refs=rule.get("related_refs") or [],
-                    overridden_by=str(rule.get("overridden_by") or ""),
-                    confidence=float(rule.get("confidence") or 0.8),
-                    extraction_method="seed",
-                    needs_review=bool(rule.get("needs_review", False)),
-                    mechanism="OBC",
-                    ruleset_id="OBC-PART9",
-                    rule_category="property_check",
-                )
 
         # Seed GC-001 / CC-001 / MC-001 engine rulesets (each idempotent)
         seed_engine_rulesets(svc)
-
-        # Seed extended OBC rules (NumberOfRiser, IsExternal, fixture checks, etc.)
-        if not svc.has_ruleset("OBC-PART9-EXT"):
-            from app.modules.module3_rule_builder.obc_extended_rules import OBC_EXTENDED_RULES
-
-            for rule in OBC_EXTENDED_RULES:
-                svc.create_rule(
-                    reference=str(rule.get("ref") or "OBC"),
-                    rule_type=str(rule.get("rule_type") or "numeric_comparison"),
-                    description=str(rule.get("desc") or ""),
-                    target_ifc_class=str(rule.get("target") or "Unspecified"),
-                    source_text="",
-                    property_set=str(rule.get("property_set") or ""),
-                    property_name=str(rule.get("property_name") or ""),
-                    fallback_property="",
-                    operator=str(rule.get("operator") or ""),
-                    check_value=rule.get("check_value"),
-                    value_min=rule.get("value_min"),
-                    value_max=rule.get("value_max"),
-                    unit=str(rule.get("unit") or ""),
-                    applies_when=rule.get("applies_when") or {},
-                    severity=str(rule.get("severity") or "informational"),
-                    keyword="",
-                    compliance_type="",
-                    exceptions=[],
-                    related_refs=[],
-                    overridden_by="",
-                    confidence=0.9,
-                    extraction_method="seed",
-                    needs_review=False,
-                    mechanism="OBC",
-                    ruleset_id="OBC-PART9-EXT",
-                    rule_category="property_check",
-                )
 
     except Exception:
         pass  # never crash startup over seeding

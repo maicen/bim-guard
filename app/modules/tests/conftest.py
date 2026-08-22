@@ -5,8 +5,19 @@ Shared fixtures and pytest configuration for all BIMGuard tests.
 """
 
 import os
+import sys
 
 import pytest
+
+# Test modules use bare imports (e.g. `from module1_doc_parser...`) written for
+# `python -m tests.x` run with cwd=app/modules/, while some of those modules in
+# turn use absolute imports (e.g. `from app.services...`) that need the repo
+# root on sys.path instead. Add both so either style resolves under pytest,
+# regardless of the cwd pytest itself was invoked from.
+_MODULES_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_REPO_ROOT = os.path.dirname(os.path.dirname(_MODULES_DIR))
+sys.path.insert(0, _MODULES_DIR)
+sys.path.insert(0, _REPO_ROOT)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Register custom markers so pytest doesn't warn about them

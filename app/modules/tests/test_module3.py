@@ -15,7 +15,6 @@ Test groups:
     Skip: pytest tests/test_module3.py -m "not llm" -v
 """
 
-import json
 import os
 
 import pytest
@@ -378,22 +377,6 @@ def test_generator_save_batch_counts_saved(gen, store):
     assert store.count() == 2
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Seed rules smoke test (no LLM, no I/O)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def test_seed_rules_schema(gen, store):
-    """All seed rules should pass schema validation."""
-    from module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
-
-    saved = gen.save_batch(OBC_SEED_RULES, source_doc="OBC_Part9_Seed")
-    assert len(saved) > 0, "At least some seed rules should save successfully"
-
-    for rule in store.get_all_rules():
-        issues = validate_rule_schema(rule)
-        assert not issues, f"Seed rule failed schema check: {issues} — {rule.get('ref')}"
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LLM tests — RuleConverter (require GEMINI_API_KEY or GEMINI_API_KEY)
@@ -532,39 +515,3 @@ class TestRuleConverterLLM:
         rules = converter.extract_rules(chunk)
         assert rules == []
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Snapshot regression for Module 3 (non-LLM)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
-
-
-class TestModule3Snapshots:
-    def _snapshot_path(self, name):
-        os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
-        return os.path.join(SNAPSHOTS_DIR, f"m3_{name}.json")
-
-    def test_seed_rules_snapshot(self, gen, store):
-        """Seed rules count and targets should not change unexpectedly."""
-        from module3_rule_builder.obc_seed_rules import OBC_SEED_RULES
-
-        gen.save_batch(OBC_SEED_RULES, source_doc="OBC_Part9_Seed")
-
-        snap_file = self._snapshot_path("seed_rules_summary")
-        current = store.summary()
-
-        if not os.path.exists(snap_file):
-            with open(snap_file, "w") as f:
-                json.dump(current, f, indent=2)
-            pytest.skip("Snapshot created — re-run to verify")
-
-        with open(snap_file) as f:
-            expected = json.load(f)
-
-        assert current["total"] == expected["total"], (
-            f"Seed rule count changed: {expected['total']} → {current['total']}"
-        )
-        assert set(current["by_entity"].keys()) == set(expected["by_entity"].keys()), (
-            "Seed rule IFC targets changed"
-        )

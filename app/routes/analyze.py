@@ -82,8 +82,8 @@ def _analysis_form(projects, documents, mode: str):
     ]
 
     # Rule Folder — shown for every mode, right under the project picker, so
-    # you can scope a check to rules you extracted yourself instead of the
-    # built-in OBC rules seeded from source (obc_seed_rules.py).
+    # you can scope a check to a specific set of rules you've extracted from
+    # an uploaded PDF (or an engine ruleset like GC-001/CC-001/MC-001).
     folders = _rule_service.list_folders()
     folder_options = [Option("All folders", value="", selected=True)] + [
         Option(f"{f['ruleset_id']} ({f['count']})", value=f["ruleset_id"]) for f in folders

@@ -102,6 +102,23 @@ _IFC_CLASS_FALLBACKS: dict[str, list[str]] = {
     "IfcCurtainWall":      ["IfcWall"],
     # Furniture may be exported as generic proxy elements
     "IfcFurnishingElement": ["IfcBuildingElementProxy"],
+    # Doors/windows are sometimes exported as generic proxies too — unlike the
+    # fallbacks above, IfcBuildingElementProxy is a catch-all bucket that can
+    # hold anything (furniture, MEP, unclassified junk), so treating every
+    # proxy in the model as a door would apply door-width/height checks to
+    # unrelated elements. _PROXY_RECLASSIFY_HINTS below filters this bucket
+    # down to only the proxies that actually look like the target class.
+    "IfcDoor":   ["IfcBuildingElementProxy"],
+    "IfcWindow": ["IfcBuildingElementProxy"],
+}
+
+# Name/ObjectType/Tag/PredefinedType keyword hints used to filter the generic
+# IfcBuildingElementProxy bucket down to elements that plausibly are the
+# target class, when the fallback class is that catch-all bucket. See
+# _matches_reclass_hint().
+_PROXY_RECLASSIFY_HINTS: dict[str, list[str]] = {
+    "IfcDoor":   ["door"],
+    "IfcWindow": ["window", "glazing", "glaze"],
 }
 
 # ── Property alias map ────────────────────────────────────────────────────────
@@ -230,7 +247,9 @@ class Module2_IFCRead:
         if _SPATIAL_AVAILABLE:
             self.spatial_adjacency = IFCSpatialAdjacency(self.ifc_file).build()
         if _EGRESS_AVAILABLE and self.spatial_adjacency is not None:
-            self.egress_graph = IFCEgressGraph(self.spatial_adjacency).build()
+            self.egress_graph = IFCEgressGraph(
+                self.spatial_adjacency, geometry_extractor=self.geometry_extractor
+            ).build()
         return self.ifc_file
 
     def get_all_elements(self, ifc_type: str = "IfcBuildingElement") -> list:
@@ -677,9 +696,46 @@ class Module2_IFCRead:
                 # No explicit flights found — use the stair containers themselves
                 return candidates
 
+            # Generic proxy bucket: filter down to elements that actually look
+            # like the target class instead of returning every proxy in the
+            # model (see _PROXY_RECLASSIFY_HINTS docstring above).
+            hint_keywords = _PROXY_RECLASSIFY_HINTS.get(target)
+            if fallback_cls == "IfcBuildingElementProxy" and hint_keywords:
+                matched = [c for c in candidates if self._matches_reclass_hint(c, hint_keywords)]
+                if matched:
+                    return matched
+                continue
+
             return candidates
 
         return []
+
+    def _matches_reclass_hint(self, element, keywords: list[str]) -> bool:
+        """Return True if element's name/type fields hint at one of *keywords*.
+
+        Checks Name/ObjectType/Tag/PredefinedType — or its type object's Name
+        (e.g. a Revit family/type like "Door-Single-36in") — for a
+        case-insensitive substring match against *keywords*.
+
+        Used to reclassify generic IfcBuildingElementProxy elements that a
+        model exported instead of the proper IfcDoor/IfcWindow class, so they
+        aren't silently dropped from compliance checks entirely.
+        """
+        fields = [
+            getattr(element, "Name", None),
+            getattr(element, "ObjectType", None),
+            getattr(element, "Tag", None),
+            getattr(element, "PredefinedType", None),
+        ]
+        try:
+            el_type = ifcopenshell.util.element.get_type(element)
+            if el_type:
+                fields.append(getattr(el_type, "Name", None))
+        except Exception:
+            pass
+
+        haystack = " ".join(str(f) for f in fields if f).lower()
+        return any(kw in haystack for kw in keywords)
 
     @staticmethod
     def _lookup_in_psets(psets: dict, prop_name: str):
@@ -706,6 +762,7 @@ class Module2_IFCRead:
             "is_external": d.get("is_external"),
             "has_data": d.get("has_data", False),
             "spatial_status": d.get("status"),
+            "interior_single_space_mismatch": d.get("interior_single_space_mismatch", False),
         }
 
     # ── Reusable single-property resolution cascade ──────────────────────────
@@ -767,6 +824,14 @@ class Module2_IFCRead:
             if door_space_connection is not None:
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
                 return door_space_connection.get("connected_space_count", 0), "spatial:door_space_connection", dsc_rich
+        elif prop_lower_name in ("interiorsinglespacemismatch", "interiorsinglespaceflag", "spaceconnectionmismatch"):
+            if door_space_connection is not None:
+                dsc_rich = self._door_space_rich_detail(door_space_connection)
+                return (
+                    bool(door_space_connection.get("interior_single_space_mismatch")),
+                    "spatial:door_space_connection",
+                    dsc_rich,
+                )
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:

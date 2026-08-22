@@ -27,6 +27,13 @@ TEST_DB = "tests/test_rules_integration.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "integration_results")
 
+# RuleStore now has an isolated test-DB mode (db_path is honored), so that's
+# no longer a blocker. Still skipped because every test below calls
+# `RuleGenerator.generate_rules(text)`, a method that doesn't exist
+# (RuleGenerator only exposes save_single/save_batch — the same stale-API bug
+# that was in eval_harness.py). Needs a rewrite against the real API.
+pytestmark = pytest.mark.skip(reason="needs a rewrite against RuleGenerator's real API (generate_rules doesn't exist)")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Integration test cases — CUSTOMIZE THESE FOR YOUR PDFS

@@ -51,8 +51,24 @@ class PersistenceService:
         schema: dict,
         pk: str = "id",
         required_columns: dict | None = None,
+        db=None,
     ):
-        """Create or migrate a table, then return the table handle."""
+        """Create or migrate a table, then return the table handle.
+
+        Pass db explicitly (from get_isolated_sqlite_db()) to bypass the
+        shared singleton and its configured backend entirely — always
+        creates a SQLite-backed table on that connection instead. Used to
+        give callers (tests, the eval harness) a database that is
+        structurally unable to reach the live Supabase/SQLite data.
+        """
+        if db is not None:
+            table = SQLiteTableAdapter(db[table_name])
+            table.create(schema, pk=pk, if_not_exists=True)
+            for column_name, column_type in (required_columns or {}).items():
+                if column_name not in table.columns_dict:
+                    table.add_column(column_name, column_type)
+            return table
+
         db = cls.get_db()
         if cls.DB_BACKEND == "supabase":
             table = SupabaseTableAdapter(db, table_name, schema, pk=pk)
@@ -68,6 +84,18 @@ class PersistenceService:
                 table.add_column(column_name, column_type)
 
         return table
+
+    @staticmethod
+    def get_isolated_sqlite_db(path: str):
+        """Return a brand-new, independent SQLite connection at *path*.
+
+        Unlike get_db(), this never touches the shared singleton or its
+        configured backend (sqlite or Supabase) — the connection it returns
+        is structurally incapable of reaching the live app database. Callers
+        own its lifecycle (close it themselves) since it isn't cached here.
+        """
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        return database(str(path))
 
     @classmethod
     def uploads_dir(cls, *parts: str) -> Path:

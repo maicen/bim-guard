@@ -435,6 +435,19 @@ class IFCGeometryExtractor:
         except Exception:
             return (0.0, 0.0, 0.0)
 
+    def get_centroid_or_none(self, element) -> tuple[float, float, float] | None:
+        """Return centroid (x, y, z) in world mm, or None if unresolvable.
+
+        Unlike get_centroid(), never silently substitutes (0, 0, 0) for a
+        failure — for callers that need to distinguish "no geometry
+        available" from "genuinely placed at the world origin" (e.g. to
+        fall back to a non-geometric estimate instead of computing a
+        meaningless distance from/to the origin).
+        """
+        if self._get_shape(element) is None:
+            return None
+        return self.get_centroid(element)
+
     # ── GEOMETRY VALUE DISPATCHER ─────────────────────────────────────────────
 
     def get_geometry_value(

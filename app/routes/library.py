@@ -842,7 +842,7 @@ def setup_routes(rt):
         ruleset_id = folder_name.strip() or Path(filename).stem
         try:
             summary = orchestrator.run_pipeline(
-                local_path, run_sections="all", seed_db_first=True, ruleset_id=ruleset_id
+                local_path, run_sections="all", ruleset_id=ruleset_id
             )
         except Exception as exc:
             return Alert(

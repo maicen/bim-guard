@@ -657,6 +657,14 @@ def check_door_space_connection(adjacency: IFCSpatialAdjacency, ifc_file) -> lis
                     f"Connects {len(space_guids)} space(s); expected {expected_count}."
                 )
 
+        # Declared-vs-observed mismatch: a door explicitly labeled interior
+        # (IsExternal=False) should bound two spaces; if it only bounds one,
+        # that's worth flagging — either the door is mislabeled (as happened
+        # in this exact test model) or boundary data is missing on one side.
+        # Deliberately one-directional per the request that introduced this:
+        # doesn't flag the opposite case (labeled exterior, bounds two spaces).
+        interior_single_space_mismatch = (is_external is False) and len(space_guids) == 1
+
         results.append({
             "door_guid": guid,
             "door_name": getattr(door, "Name", None) or getattr(door, "Tag", None) or guid,
@@ -669,6 +677,7 @@ def check_door_space_connection(adjacency: IFCSpatialAdjacency, ifc_file) -> lis
             "has_data": has_data,
             "status": status,
             "reason": reason,
+            "interior_single_space_mismatch": interior_single_space_mismatch,
         })
 
     return results

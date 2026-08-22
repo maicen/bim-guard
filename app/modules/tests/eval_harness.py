@@ -21,6 +21,7 @@ The harness:
 """
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -249,25 +250,30 @@ def parse_judge_response(raw):
 
 
 def generate_rule_from_text(text):
-    """Run Module 3 on a text chunk and return the first generated rule."""
-    from module3_rule_builder.rule_generator import RuleGenerator
-    from module3_rule_builder.rule_store import RuleStore
+    """Run Module 3's LLM rule extractor on a text chunk and return the first generated rule.
 
-    db_path = "tests/test_rules_eval_temp.db"
-    store = RuleStore(db_path)
-    store.clear_all_rules()
-    gen = RuleGenerator(store)
-
+    Calls LiteLLMRuleExtractor directly — the same extractor the web app's
+    RuleExtractionService uses per-chunk in production. It takes text in and
+    returns rule dicts out with no database involved, so this eval run never
+    touches the shared rules table (unlike the old RuleStore/RuleGenerator
+    path, whose db_path argument is ignored and which always wrote to and
+    cleared the live shared database).
+    """
     try:
-        rules = gen.generate_rules(text)
-        if not rules:
-            return None
-        rule = rules[0]
-        return rule if isinstance(rule, dict) else json.loads(rule)
-    finally:
-        store.close()
-        if os.path.exists(db_path):
-            os.remove(db_path)
+        from app.services.llm_client import LiteLLMClient
+        from app.services.rule_extractor import LiteLLMRuleExtractor
+    except ImportError:
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+        from app.services.llm_client import LiteLLMClient
+        from app.services.rule_extractor import LiteLLMRuleExtractor
+
+    extractor = LiteLLMRuleExtractor(
+        client=LiteLLMClient(model=os.getenv("BIM_GUARD_RULE_MODEL", "gpt-4o-mini"))
+    )
+    rules = asyncio.run(extractor.extract_rules_from_text(text))
+    return rules[0] if rules else None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

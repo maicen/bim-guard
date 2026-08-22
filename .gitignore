@@ -18,5 +18,11 @@ docs\MonsterUI\
 .playwright-mcp/
 .sesskey
 data/cache/
-=======
 .DS_Store
+
+# User-uploaded files and generated artifacts (not seed data)
+data/uploads/
+data/bimguard.sqlite
+data/bimguard_issue_history.json
+data/compliance_project_*.bcf
+data/BIMGuard_IFC4_Export.json

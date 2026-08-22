@@ -55,3 +55,11 @@ ml-pipeline = [
 dev = [
     "pytest>=8.0.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["app/modules/tests"]
+markers = [
+    "slow: marks tests that need real PDFs and are slow",
+    "llm: marks tests that call the LLM (slow, costs tokens)",
+    "integration: marks end-to-end pipeline tests",
+]

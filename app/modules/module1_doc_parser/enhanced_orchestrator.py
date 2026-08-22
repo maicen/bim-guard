@@ -49,7 +49,6 @@ try:
     from module3_rule_builder.rule_store import RuleStore
     from module3_rule_builder.rule_generator import RuleGenerator
     from module3_rule_builder.rule_converter import RuleConverter
-    from module3_rule_builder.obc_seed_rules import seed_rules
 except ImportError:
     from app.modules.config import DB_PATH
     from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
@@ -61,7 +60,6 @@ except ImportError:
     from app.modules.module3_rule_builder.rule_store import RuleStore
     from app.modules.module3_rule_builder.rule_generator import RuleGenerator
     from app.modules.module3_rule_builder.rule_converter import RuleConverter
-    from app.modules.module3_rule_builder.obc_seed_rules import seed_rules
 
 # TF-IDF requires scikit-learn — optional
 try:
@@ -79,7 +77,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 def run_enhanced_pipeline(
     pdf_path: str,
     run_sections: str | list = "all",
-    seed_db_first: bool = True,
     use_bert: bool = False,
     bert_mode: str = "zero_shot",
     bert_model_path: str = None,
@@ -89,9 +86,8 @@ def run_enhanced_pipeline(
     Run the full enhanced Module 1 + 3 pipeline.
 
     Args:
-        pdf_path          (str):        path to OBC PDF
+        pdf_path          (str):        path to the code PDF
         run_sections      (str|list):   "all" or ["4","6"]
-        seed_db_first     (bool):       seed 25 pre-built rules first
         use_bert          (bool):       enable BERT classifier (requires install)
         bert_mode         (str):        "zero_shot" or "fine_tuned"
         bert_model_path   (str):        path to fine-tuned model if mode=fine_tuned
@@ -112,9 +108,6 @@ def run_enhanced_pipeline(
     store = RuleStore(DB_PATH)
     generator = RuleGenerator(store)
     converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
-
-    if seed_db_first:
-        seed_rules(store, generator)
 
     rules_before = store.count()
 
@@ -253,7 +246,6 @@ if __name__ == "__main__":
     run_enhanced_pipeline(
         pdf_path=sys.argv[1],
         run_sections="all",
-        seed_db_first=True,
         use_bert=False,  # set True after: pip install transformers torch
         discover_keywords=True,
     )

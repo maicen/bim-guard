@@ -2,7 +2,7 @@
 app/modules/config.py
 ----------------------
 Shared constants for Module 1 and Module 3 pipeline components.
-Imported by rule_generator.py, rule_converter.py, and obc_seed_rules.py.
+Imported by rule_generator.py and rule_converter.py.
 """
 
 import os

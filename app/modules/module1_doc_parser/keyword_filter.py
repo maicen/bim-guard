@@ -67,6 +67,12 @@ class KeywordFilter:
         # Single keywords on lemmatized text
         for kw in ALL_SINGLE_KEYWORDS:
             if " " in kw:
+                # Multi-word entries (e.g. "deemed to comply") can't be matched
+                # via lemma tokens/inflection changes the surface form (e.g.
+                # "deemed" -> "deem"), so match the raw text like bigrams do.
+                if kw in original:
+                    score += KEYWORD_WEIGHTS.get(kw, 1)
+                    matched.append(kw)
                 continue
             if kw in lemma_tokens or kw in lemmatized:
                 score += KEYWORD_WEIGHTS.get(kw, 1)

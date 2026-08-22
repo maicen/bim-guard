@@ -71,7 +71,6 @@ try:
     from .module1_doc_parser.keyword_filter import KeywordFilter
     from .module1_doc_parser.section_chunker import SectionChunker
     from .module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from .module3_rule_builder.obc_seed_rules import seed_rules
     from .module3_rule_builder.rule_generator import RuleGenerator
     from .module3_rule_builder.rule_store import RuleStore
 
@@ -87,20 +86,17 @@ except ImportError:
 def run_pipeline(
     pdf_path: str | Path,
     run_sections: str | list = "all",
-    seed_db_first: bool = True,
     ruleset_id: str = "",
 ) -> dict:
     """
-    Run the full Module 1 → Module 3 pipeline on an OBC PDF.
+    Run the full Module 1 → Module 3 pipeline on an uploaded code PDF.
 
     Args:
-        pdf_path      (str | Path): path to the OBC PDF file
+        pdf_path      (str | Path): path to the PDF file
         run_sections  (str | list): "all" or list e.g. ["4", "6"]
                                     Use a single section to test first.
-        seed_db_first (bool):       seed 25 pre-built OBC rules before processing
         ruleset_id    (str):        folder/group name tagged onto rules newly
                                      extracted by this run (table + prose rules).
-                                     Seeded baseline rules are left untouched.
 
     Returns:
         dict: {
@@ -137,11 +133,6 @@ def run_pipeline(
         converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
     else:
         converter = RuleConverter()  # regex needs no arguments
-
-    # ── Seed pre-built rules ──────────────────────────────────────────────────
-    if seed_db_first:
-        print("── SEEDING DB WITH PRE-BUILT OBC RULES ──")
-        seed_rules(store, generator)
 
     rules_before = store.count()
 
@@ -534,5 +525,4 @@ if __name__ == "__main__":
     run_pipeline(
         pdf_path=sys.argv[1],
         run_sections="all",
-        seed_db_first=True,
     )

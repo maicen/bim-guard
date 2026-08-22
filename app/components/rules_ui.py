@@ -185,8 +185,8 @@ def rules_table_rows(rows: list[dict], empty_message: str = "No rules available 
 
 def rules_folders_panel(folders: list[dict], message: str | None = None, level: str = "success"):
     """Named rule folders (ruleset_id groups), expandable to show and manage
-    the rules inside — includes both webpage-extracted folders and built-in
-    seeded rulesets (e.g. OBC-PART9). Each folder dict should carry a "rules"
+    the rules inside — includes both PDF-extracted folders and built-in
+    engine rulesets (e.g. GC-001). Each folder dict should carry a "rules"
     key (list of rule rows) for the expanded table; falls back to empty."""
     alert = MessageAlert(AlertSpec(message=message, level=level))
 
@@ -500,7 +500,7 @@ def rule_form(title: str, action: str, rule: dict | None = None):
                         field_id="ruleset_id",
                         name="ruleset_id",
                         value=rule.get("ruleset_id", ""),
-                        placeholder="e.g. OBC-PART9",
+                        placeholder="e.g. MY-CODE-2024",
                     )
                 ),
                 SelectField(

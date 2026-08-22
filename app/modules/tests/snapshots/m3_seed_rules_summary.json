@@ -1,0 +1,20 @@
+{
+  "total": 31,
+  "mandatory_count": 23,
+  "by_entity": {
+    "IfcStairFlight": 10,
+    "IfcSlab": 3,
+    "IfcDoor": 3,
+    "IfcRailing": 2,
+    "IfcWindow": 3,
+    "IfcWall": 4,
+    "IfcRamp": 2,
+    "IfcSpace": 4
+  },
+  "by_source": {
+    "llm": 31
+  },
+  "by_mechanism": {
+    "\u2014": 31
+  }
+}

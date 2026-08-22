@@ -1,0 +1,44 @@
+[
+  {
+    "section_number": "4",
+    "section_name": "Stairs",
+    "text": "Every exit stair shall not be less than 860 mm in clear width.\n\nThe riser height shall be between 125 mm and 200 mm.",
+    "char_count": 120,
+    "scored_paragraphs": [
+      {
+        "text": "Every exit stair shall not be less than 860 mm in clear width.",
+        "score": 34,
+        "matched": [
+          "stair",
+          "exit",
+          "shall",
+          "clear width",
+          "mm",
+          "clear",
+          "shall not be",
+          "width"
+        ],
+        "confidence": "HIGH"
+      },
+      {
+        "text": "The riser height shall be between 125 mm and 200 mm.",
+        "score": 31,
+        "matched": [
+          "shall",
+          "rise",
+          "mm",
+          "between",
+          "riser",
+          "height",
+          "shall be"
+        ],
+        "confidence": "HIGH"
+      }
+    ],
+    "filtered_text": "Every exit stair shall not be less than 860 mm in clear width.\n\nThe riser height shall be between 125 mm and 200 mm.",
+    "count_high": 2,
+    "count_medium": 0,
+    "count_low": 0,
+    "total_paragraphs": 2
+  }
+]

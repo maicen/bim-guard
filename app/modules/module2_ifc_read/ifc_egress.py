@@ -36,6 +36,13 @@ except ImportError:
 
 from .ifc_spatial import _is_exterior_door
 
+try:
+    from .ifc_geometry import IFCGeometryExtractor
+
+    _GEOMETRY_AVAILABLE = True
+except ImportError:
+    _GEOMETRY_AVAILABLE = False
+
 
 # OBC Part 9 residential limits
 OBC_MAX_TRAVEL_DISTANCE_M = 25.0  # 9.9.10.1 — max walking distance to exit
@@ -110,6 +117,11 @@ def _is_habitable(name: str) -> bool:
     return True  # unknown → treat as habitable
 
 
+def _dist3(p, q) -> float:
+    """3D Euclidean distance between two (x, y, z) points."""
+    return math.sqrt((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2)
+
+
 def _get_storey_from_element(element) -> str:
     """Return the IfcBuildingStorey name for any element via ContainedInStructure."""
     try:
@@ -130,16 +142,24 @@ class IFCEgressGraph:
 
     Nodes  : IfcSpace GUIDs
     Edges  : space pairs that share a physical IfcDoor boundary
-    Weight : estimated traversal distance (m) = sqrt(floor area of the space being left)
+    Weight : real geometric travel distance (m) — centroid-to-door-to-centroid
+             — when geometry is resolvable for both spaces and the door;
+             falls back per-edge to sqrt(floor area) otherwise (missing
+             representation, ifcopenshell/geometry module unavailable, etc.)
     Exits  : spaces that contain at least one exterior door (IsExternal=True)
     """
 
-    def __init__(self, adjacency):
+    def __init__(self, adjacency, geometry_extractor: "IFCGeometryExtractor | None" = None):
         """
         Args:
             adjacency: IFCSpatialAdjacency instance (already built).
+            geometry_extractor: optional IFCGeometryExtractor bound to the
+                same ifc_file, reused for real centroid-based edge weights.
+                Omit to always use the sqrt(area) estimate (e.g. in tests
+                that build a graph without a full geometry pipeline).
         """
         self.adjacency = adjacency
+        self.geometry_extractor = geometry_extractor
         self.graph: "nx.Graph | None" = None
         self._exit_spaces: set[str] = set()
         self._habitable_spaces: set[str] = set()
@@ -159,6 +179,8 @@ class IFCEgressGraph:
             return self
 
         G: nx.Graph = nx.Graph()
+        geo = self.geometry_extractor if _GEOMETRY_AVAILABLE else None
+        space_centroids: dict[str, tuple | None] = {}
 
         # ── Step 1: add one node per IfcSpace ─────────────────────────────────
         from .ifc_spatial import _get_storey_name  # reuse existing helper
@@ -168,7 +190,7 @@ class IFCEgressGraph:
             name = _space_display_name(space)
             storey = _get_storey_name(space) or "—"
             area = _get_area_m2(space) or 9.0  # default 9 m² ≈ 3×3 room
-            traversal_m = max(1.5, math.sqrt(area))  # rough walk-through cost
+            traversal_m = max(1.5, math.sqrt(area))  # fallback walk-through cost
 
             G.add_node(
                 sguid,
@@ -180,13 +202,15 @@ class IFCEgressGraph:
             )
             self._space_names[sguid] = name
             self._space_storeys[sguid] = storey
+            space_centroids[sguid] = geo.get_centroid_or_none(space) if geo else None
             if _is_habitable(name):
                 self._habitable_spaces.add(sguid)
 
         # ── Step 2: door → spaces map (shared with garage-separation and the
-        # new SpaceConnection check) + detect exterior doors ───────────────
+        # new SpaceConnection check) + detect exterior doors + door centroids ──
         door_to_spaces = adj.get_door_to_spaces()
         exterior_door_guids: set[str] = set()
+        door_centroids: dict[str, tuple | None] = {}
         for door_guid in door_to_spaces:
             try:
                 door_el = adj.ifc_file.by_guid(door_guid)
@@ -194,6 +218,7 @@ class IFCEgressGraph:
                 door_el = None
             if door_el is not None and _is_exterior_door(door_el):
                 exterior_door_guids.add(door_guid)
+            door_centroids[door_guid] = geo.get_centroid_or_none(door_el) if geo and door_el else None
 
         # ── Step 3: add edges and mark exit spaces ────────────────────────────
         for door_guid, space_guids in door_to_spaces.items():
@@ -203,23 +228,44 @@ class IFCEgressGraph:
                         self._exit_spaces.add(sg)
                         G.nodes[sg]["is_exit"] = True
 
+            door_centroid = door_centroids.get(door_guid)
+
             # Connect every pair of spaces sharing this door
             for i in range(len(space_guids)):
                 for j in range(i + 1, len(space_guids)):
                     a, b_ = space_guids[i], space_guids[j]
                     if a not in G or b_ not in G:
                         continue
-                    # Edge weight = average traversal cost of both spaces
-                    w = (G.nodes[a]["traversal_m"] + G.nodes[b_]["traversal_m"]) / 2.0
+
+                    w, source = self._edge_weight_m(
+                        G, a, b_, door_centroid, space_centroids.get(a), space_centroids.get(b_)
+                    )
                     if G.has_edge(a, b_):
                         if G[a][b_]["weight"] > w:
                             G[a][b_]["weight"] = w
+                            G[a][b_]["weight_source"] = source
                     else:
-                        G.add_edge(a, b_, weight=w)
+                        G.add_edge(a, b_, weight=w, weight_source=source)
 
         self.graph = G
         self._built = True
         return self
+
+    @staticmethod
+    def _edge_weight_m(G, a, b_, door_centroid, centroid_a, centroid_b) -> tuple[float, str]:
+        """
+        Return (weight_m, source) for the edge between spaces a and b_.
+
+        Real geometric distance — centroid(a) -> door -> centroid(b_), in
+        metres — when all three centroids resolved; otherwise falls back to
+        the average of both spaces' sqrt(floor-area) traversal estimate.
+        """
+        if door_centroid is not None and centroid_a is not None and centroid_b is not None:
+            dist_mm = _dist3(centroid_a, door_centroid) + _dist3(door_centroid, centroid_b)
+            return max(0.5, dist_mm / 1000.0), "geometry"
+
+        w = (G.nodes[a]["traversal_m"] + G.nodes[b_]["traversal_m"]) / 2.0
+        return w, "estimate"
 
 
 # ── Check 1: exit count ────────────────────────────────────────────────────────
