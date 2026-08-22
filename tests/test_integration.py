@@ -116,16 +116,6 @@ def test_the_orchestrator_calls_both_comparators():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: compliance_orchestrator.py:51 and :62 call compare() with an "
-        "id_allocator keyword neither comparator accepts, and pass one element "
-        "where the signature takes a list. Both calls are inside a bare "
-        "`except Exception: print(...)`, so the flag turns on and silently "
-        "produces nothing."
-    ),
-)
 @pytest.mark.parametrize("alias", sorted(_PATH_B_ALIASES), ids=sorted(_PATH_B_ALIASES))
 def test_path_b_call_sites_bind_to_the_comparator_signature(alias):
     """The orchestrator's arguments must fit the function it is calling.
@@ -156,16 +146,6 @@ def test_path_b_call_sites_bind_to_the_comparator_signature(alias):
             )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: material_media and cross_material each mint 'BGR-%04d' from a "
-        "local counter, so MM-001 and XM-001 both restart at BGR-0001. A run "
-        "with both flags on emits duplicate Issue ids - the collision "
-        "IssueIdAllocator was written to prevent, and that one-BCF-topic-per-id "
-        "depends on."
-    ),
-)
 @pytest.mark.parametrize("module_name", ["material_media", "cross_material"])
 def test_path_b_accepts_the_run_wide_id_allocator(module_name):
     """Both comparators must take ids from the run, not from a local counter."""

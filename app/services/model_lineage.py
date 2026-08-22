@@ -19,6 +19,7 @@ class SupabaseModelLineageRepository:
                 "id": int,
                 "project_id": int,
                 "source_reference": str,
+                "source_version": int,
                 "output_reference": str,
                 "version": int,
                 "summary": dict,
@@ -31,6 +32,7 @@ class SupabaseModelLineageRepository:
         *,
         project_id: int,
         source_reference: str,
+        source_version: int,
         output_reference: str,
         version: int,
         summary: dict[str, Any],
@@ -40,9 +42,32 @@ class SupabaseModelLineageRepository:
             {
                 "project_id": project_id,
                 "source_reference": source_reference,
+                "source_version": source_version,
                 "output_reference": output_reference,
                 "version": version,
                 "summary": summary,
                 "created_at": now_iso_utc(),
             }
         )
+
+    def allocate_next_version(self, project_id: int) -> int:
+        """Atomically reserve the next model version through the database allocator."""
+        response = PersistenceService.get_db().rpc(
+            "allocate_model_enhancement_version",
+            {"target_project_id": project_id},
+        ).execute()
+        version = response.data
+        if isinstance(version, list):
+            version = version[0] if version else None
+        if not isinstance(version, int) or version < 1:
+            raise RuntimeError("Supabase did not return a valid enhancement version")
+        return version
+
+    def list_for_project(self, project_id: int) -> list[dict[str, Any]]:
+        """Return enhancement lineage for one project, newest version first."""
+        rows = self._lineage.rows_where("project_id = ?", [project_id])
+        return sorted(rows, key=lambda row: int(row.get("version") or 0), reverse=True)
+
+    def get(self, lineage_id: int) -> dict[str, Any] | None:
+        """Return one lineage record by primary key."""
+        return self._lineage.get(lineage_id)

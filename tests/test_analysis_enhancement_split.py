@@ -27,11 +27,15 @@ def test_analysis_and_enhancement_services_are_separated():
         insulation_condition="poor",
     )
 
+    source_before = dict(vars(element))
     analysis = AnalysisService().run([element])
-    assert analysis["pipeline"] == "analysis"
+    assert analysis["pipeline"] == "audit"
     assert analysis["element_count"] == 1
     assert "results" in analysis
     assert isinstance(analysis["results"], list)
+    assert isinstance(analysis["issues"], list)
+    assert len(analysis["bcf_topics"]) == len(analysis["issues"])
+    assert vars(element) == source_before
 
     enhancement = EnhancementService().plan(
         [element],
@@ -60,7 +64,7 @@ def test_phase_1_analysis_and_enhancement_entry_points_are_explicit():
     )
 
     analysis = run_compliance_analysis([element])
-    assert analysis["pipeline"] == "analysis"
+    assert analysis["pipeline"] == "audit"
     assert analysis["element_count"] == 1
     assert analysis["results"][0]["guid"] == "GUID-002"
 
@@ -95,6 +99,10 @@ def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
         def __init__(self):
             self.payload = None
 
+        def allocate_next_version(self, project_id: int) -> int:
+            assert project_id == 7
+            return 2
+
         def record(self, **payload):
             self.payload = payload
             return {"id": 41, **payload}
@@ -102,7 +110,10 @@ def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
     def fake_improver(input_path: str, output_path: str):
         assert Path(input_path).read_bytes() == source_content
         Path(output_path).write_bytes(b"ISO-10303-21;ENHANCED")
-        return {"names_added": 3}
+        return {
+            "names_added": 3,
+            "improvements": ["Names added: 3", f"Improved file saved: {output_path}"],
+        }
 
     storage = FakeStorage()
     ledger = FakeLineageLedger()
@@ -115,7 +126,6 @@ def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
     result = execute_model_enhancement(
         project_id=7,
         source_reference="sb://models/source.ifc",
-        version=2,
         service=service,
     )
 
@@ -128,22 +138,28 @@ def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
     assert ledger.payload == {
         "project_id": 7,
         "source_reference": "sb://models/source.ifc",
+        "source_version": 0,
         "output_reference": "sb://models/enhancements/7/source_v2.ifc",
         "version": 2,
-        "summary": {"names_added": 3},
+        "summary": {
+            "names_added": 3,
+            "improvements": ["Names added: 3"],
+            "generated_filename": "source_v2.ifc",
+        },
     }
     assert result["lineage"]["id"] == 41
+    assert "bim-guard-enhancement-" not in str(result["summary"])
 
 
-def test_enhancement_execution_rejects_non_positive_version():
+def test_enhancement_execution_does_not_accept_caller_version():
     service = EnhancementService(storage=object(), lineage_ledger=object(), improver=lambda *_: {})
 
     try:
-        service.execute(project_id=7, source_reference="sb://models/source.ifc", version=0)
-    except ValueError as exc:
-        assert str(exc) == "version must be greater than zero"
+        service.execute(project_id=7, source_reference="sb://models/source.ifc", version=99)
+    except TypeError as exc:
+        assert "version" in str(exc)
     else:
-        raise AssertionError("Expected a non-positive model version to be rejected")
+        raise AssertionError("Caller-supplied model versions must be rejected")
 
 
 def test_lineage_repository_uses_offline_persistence_fallback(monkeypatch):
@@ -155,6 +171,7 @@ def test_lineage_repository_uses_offline_persistence_fallback(monkeypatch):
     row = repository.record(
         project_id=3,
         source_reference="sb://models/source.ifc",
+        source_version=0,
         output_reference="sb://models/output.ifc",
         version=1,
         summary={"names_added": 2},

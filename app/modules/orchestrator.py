@@ -349,7 +349,7 @@ class BIMGuard_App:
             get_schema_compatibility_note,
             parse_ifc_model,
         )
-        from .module4_comparator.compliance_runner import run_compliance_checks
+        from .pipeline_services import AnalysisService, run_compliance_analysis
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
@@ -461,10 +461,21 @@ class BIMGuard_App:
         compliance_error = None
         cost_impact = None
         issue_stats: dict = {}
+        audit_issues: list[dict] = []
+        bcf_topics: list[dict] = []
+        audit_source_sha256: str | None = None
 
         if selected_theme == "MEP":
             try:
-                raw_results = run_compliance_checks(elements)
+                audit_result = run_compliance_analysis(
+                    elements,
+                    run_id=f"BGR-{project_id}",
+                    source_path=ifc_path,
+                )
+                raw_results = audit_result["results"]
+                audit_issues = audit_result["issues"]
+                bcf_topics = audit_result["bcf_topics"]
+                audit_source_sha256 = audit_result["source_sha256"]
                 # Normalise band names to Title case for the UI
                 band_map = {
                     "LOW": "Low",
@@ -532,6 +543,21 @@ class BIMGuard_App:
             rule_compliance_error = str(exc)
             logger.exception("Rule-based compliance checks failed project_id=%d", project_id)
 
+        if rule_compliance:
+            audit_result = AnalysisService().include_rule_results(
+                {
+                    "pipeline": "audit",
+                    "element_count": len(compliance_results),
+                    "results": compliance_results,
+                    "issues": audit_issues,
+                    "bcf_topics": bcf_topics,
+                },
+                rule_compliance,
+                run_id=f"BGR-{project_id}",
+            )
+            audit_issues = audit_result["issues"]
+            bcf_topics = audit_result["bcf_topics"]
+
         if selected_theme == "MEP":
             ifc_element_count = len(elements)
         else:
@@ -560,6 +586,9 @@ class BIMGuard_App:
             "ifc_schema_note": ifc_schema_note,
             "documents": documents,
             "compliance_results": compliance_results,
+            "audit_issues": audit_issues,
+            "bcf_topics": bcf_topics,
+            "audit_source_sha256": audit_source_sha256,
             "cost_impact": cost_impact,
             "issue_stats": issue_stats,
             "compliance_is_demo": is_demo,
