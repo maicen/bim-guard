@@ -9,6 +9,8 @@
     "structural_with_geometry": 26808,
     "piping_elements": 116006,
     "piping_with_material": 38012,
+    "piping_with_material_text": 0,
+    "legacy_material_records": 37,
     "halos": 49736,
     "clashes": 223516,
     "clash_severity": {

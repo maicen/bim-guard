@@ -820,6 +820,15 @@ def aggregate(records: list[dict]) -> dict:
         "piping_with_material_text": sum(
             r.get("material_coverage", {}).get("with_material_text", 0) for r in ok
         ),
+        # Records cached before the material metric was split carry only
+        # "with_material", and under the OLD semantics that value counted
+        # raw material TEXT, not successful normalisation. Printing it
+        # under the new label silently overstates usable coverage ~16x, so
+        # legacy records are counted and the summary says so rather than
+        # relabelling them.
+        "legacy_material_records": sum(
+            1 for r in ok if "with_material_text" not in r.get("material_coverage", {})
+        ),
         "halos": sum(r.get("halos", 0) for r in ok),
         "clashes": sum(r.get("clashes", 0) for r in ok),
         "clash_severity": severities,
@@ -870,8 +879,13 @@ def print_summary(records: list[dict], totals: dict) -> None:
     _out(f"  structural:        {totals['structural_elements']:,} "
          f"({totals['structural_with_geometry']:,} with resolved geometry)")
     _out(f"  piping elements:   {totals['piping_elements']:,} "
-         f"({totals['piping_with_material']:,} normalise to a known material; "
-         f"{totals.get('piping_with_material_text', 0):,} carry raw material text)")
+         + (f"({totals['piping_with_material']:,} normalise to a known material; "
+            f"{totals.get('piping_with_material_text', 0):,} carry raw material text)"
+            if not totals.get("legacy_material_records")
+            else f"({totals['piping_with_material']:,} carry raw material text — "
+                 f"{totals['legacy_material_records']} model record(s) predate the "
+                 "material-metric split, so the normalised count is unavailable; "
+                 "re-run with --refresh, or see Table A.3)"))
     _out(f"  halo volumes:      {totals['halos']:,}")
     _out(f"  clashes:           {totals['clashes']:,}  {totals['clash_severity']}")
     _out(f"  wall clock:        {totals['seconds']:,.0f}s")

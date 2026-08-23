@@ -132,7 +132,7 @@
   models:            37/38 processed (1 failed)
   MEP elements:      49,736 (49,736 with resolved geometry)
   structural:        26,970 (26,808 with resolved geometry)
-  piping elements:   116,006 (38,012 carry material data)
+  piping elements:   116,006 (38,012 carry raw material text — 37 model record(s) predate the material-metric split, so the normalised count is unavailable; re-run with --refresh, or see Table A.3)
   halo volumes:      49,736
   clashes:           223,516  {'minor': 211581, 'major': 6699, 'critical': 5236}
   wall clock:        3,594s
