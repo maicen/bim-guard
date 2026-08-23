@@ -1,13 +1,13 @@
 """
 analyse_validation_results.py
 ------------------------------------------------
-BIMGUARD AI — Appendix A analysis: 7 tables + 4 figures from the 38-model
+BIMGUARD AI — Appendix B analysis: 7 tables + 4 figures from the 38-model
 validation sweep.
 
 Consumes the per-model records written by test_all_38_models.py
 (data/validation_results/*.json) and the BCF archives it produced
 (data/validation_bcf/*.bcf), and emits the evidentiary artefacts for
-Appendix A of the thesis, following the Appendix F house convention
+Appendix B of the thesis, following the Appendix F house convention
 (JSON + CSV + summary markdown + numbered figures under docs/).
 
 TABLES
@@ -541,7 +541,7 @@ def fig1_severity(records: list[dict], path: Path) -> None:
     ax.invert_yaxis()
     ax.set_xscale("symlog")
     ax.set_xlabel("clashes (symlog scale)")
-    ax.set_title("Figure A.1 — Clash severity distribution by model\n"
+    ax.set_title("Figure B.1 — Clash severity distribution by model\n"
                  "Blue Halo, EN 1998-1 + DIN 4149 (200 mm clearance)", fontsize=11)
     ax.legend(loc="lower right", frameon=False)
     ax.grid(axis="x", color=_C["grid"], lw=0.6)
@@ -589,7 +589,7 @@ def fig2_material_heatmap(material_bands: dict, path: Path) -> None:
     cbar = fig.colorbar(im, ax=ax, ticks=[0, 1, 2, 3])
     cbar.ax.set_yticklabels(BAND_ORDER)
     cbar.set_label("mean risk band")
-    ax.set_title("Figure A.2 — Mean corrosion band by material and engine\n"
+    ax.set_title("Figure B.2 — Mean corrosion band by material and engine\n"
                  "uniform rows/columns indicate output invariant to input", fontsize=10)
     fig.tight_layout()
     fig.savefig(path, dpi=150)
@@ -631,7 +631,7 @@ def fig3_engine_radar(engine_ready: Counter, total: int, findings: dict, path: P
     ax.set_ylim(0, 100)
     ax.set_yticks([25, 50, 75, 100], ["25%", "50%", "75%", "100%"], fontsize=7)
 
-    ax.set_title("Figure A.3 — Engine input coverage vs flag rate\n"
+    ax.set_title("Figure B.3 — Engine input coverage vs flag rate\n"
                  f"n = {total:,} piping elements — coverage is ~0 on every axis,\n"
                  "so the blue series sits on the origin by construction",
                  fontsize=10, pad=30)
@@ -677,7 +677,7 @@ def fig4_schema_scatter(records: list[dict], path: Path) -> None:
     ax.margins(x=0.16, y=0.16)  # keep annotations inside the axes
     ax.set_xlabel("MEP elements (log)")
     ax.set_ylabel("clashes detected (log)")
-    ax.set_title("Figure A.4 — Schema fidelity: clash yield vs model size\n"
+    ax.set_title("Figure B.4 — Schema fidelity: clash yield vs model size\n"
                  "circled pairs are the same building exported to both schemas",
                  fontsize=10)
     ax.grid(color=_C["grid"], lw=0.6, which="both")
@@ -691,7 +691,7 @@ def fig4_schema_scatter(records: list[dict], path: Path) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Appendix A analysis")
+    parser = argparse.ArgumentParser(description="Appendix B analysis")
     parser.add_argument("--max-models", type=int, default=0,
                         help="limit the recompute pass to the N largest models")
     parser.add_argument("--sensitivity-models", type=int, default=5,
@@ -700,7 +700,7 @@ def main() -> int:
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     _out("=" * 78)
-    _out("  BIMGUARD AI — Appendix A analysis (7 tables, 4 figures)")
+    _out("  BIMGUARD AI — Appendix B analysis (7 tables, 4 figures)")
     _out("=" * 78)
 
     records = load_records()
@@ -782,14 +782,14 @@ def main() -> int:
                     c.get("minor", 0), c.get("major", 0), c.get("critical", 0), ratio])
 
     tables = [
-        ("table1_per_model", "Table A.1 — Per-model summary", t1h, t1r),
-        ("table2_severity", "Table A.2 — Severity distribution", t2h, t2r),
-        ("table3_material_engine", "Table A.3 — Material x corrosion engine", t3h, t3r),
-        ("table4_engine_coverage", "Table A.4 — Engine band distribution and input coverage", t4h, t4r),
-        ("table5_bcf_validity", "Table A.5 — BCF 2.1 validity", t5h, t5r),
-        ("table6_standards_sensitivity", "Table A.6 — Standards sensitivity", t6h, t6r),
-        ("table7_schema", "Table A.7 — IFC schema comparison", t7h, t7r),
-        ("table7b_schema_twins", "Table A.7b — Schema twins (controlled)", t7th, t7tr),
+        ("table1_per_model", "Table B.1 — Per-model summary", t1h, t1r),
+        ("table2_severity", "Table B.2 — Severity distribution", t2h, t2r),
+        ("table3_material_engine", "Table B.3 — Material x corrosion engine", t3h, t3r),
+        ("table4_engine_coverage", "Table B.4 — Engine band distribution and input coverage", t4h, t4r),
+        ("table5_bcf_validity", "Table B.5 — BCF 2.1 validity", t5h, t5r),
+        ("table6_standards_sensitivity", "Table B.6 — Standards sensitivity", t6h, t6r),
+        ("table7_schema", "Table B.7 — IFC schema comparison", t7h, t7r),
+        ("table7b_schema_twins", "Table B.7b — Schema twins (controlled)", t7th, t7tr),
     ]
     for slug, _title, header, rows in tables:
         _write_csv(OUT_DIR / f"{slug}.csv", header, rows)
@@ -797,26 +797,26 @@ def main() -> int:
 
     # ---- figures ----
     _out("\n  Rendering figures ...")
-    fig1_severity(records, FIG_DIR / "figA1_clash_severity.png")
-    fig2_material_heatmap(mb, FIG_DIR / "figA2_material_heatmap.png")
+    fig1_severity(records, FIG_DIR / "figB1_clash_severity.png")
+    fig2_material_heatmap(mb, FIG_DIR / "figB2_material_heatmap.png")
     fig3_engine_radar(extra["engine_ready"], recomputed_total, engine_findings,
-                      FIG_DIR / "figA3_engine_radar.png")
-    fig4_schema_scatter(records, FIG_DIR / "figA4_schema_scatter.png")
-    _out("    figA1_clash_severity.png, figA2_material_heatmap.png,")
-    _out("    figA3_engine_radar.png, figA4_schema_scatter.png")
+                      FIG_DIR / "figB3_engine_radar.png")
+    fig4_schema_scatter(records, FIG_DIR / "figB4_schema_scatter.png")
+    _out("    figB1_clash_severity.png, figB2_material_heatmap.png,")
+    _out("    figB3_engine_radar.png, figB4_schema_scatter.png")
 
     # ---- appendix markdown ----
     write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
                    valid, len(t5r), total_piping, recomputed_total, engine_findings)
 
-    _out(f"\n  Wrote {OUT_DIR / 'appendix_a_validation.md'}")
+    _out(f"\n  Wrote {OUT_DIR / 'appendix_b_validation.md'}")
     (OUT_DIR / "analysis_run.txt").write_text("\n".join(_LINES) + "\n", encoding="utf-8")
     return 0
 
 
 def write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
                    bcf_valid, bcf_total, total_piping, recomputed_total, engine_findings) -> None:
-    """Emit the Appendix A markdown with every table inlined."""
+    """Emit the Appendix B markdown with every table inlined."""
     failed = [r for r in records if r["status"] != "ok"]
     material_known = sum(
         sum(c.values()) for m, per in extra["material_bands"].items() if m != "Unknown"
@@ -828,13 +828,13 @@ def write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
     halos = sum(r.get("halos", 0) for r in ok)
 
     body = [
-        "# Appendix A — 38-Model Validation Dataset: Live Results",
+        "# Appendix B — 38-Model Validation Dataset: Live Results",
         "",
         "Generated by `analyse_validation_results.py` from the sweep executed by",
         "`test_all_38_models.py`. Every figure in this appendix is computed from that run;",
         "no value is transcribed by hand.",
         "",
-        "## A.0 Run provenance",
+        "## B.0 Run provenance",
         "",
         f"- Models attempted: **{len(records)}**; processed: **{len(ok)}**; failed: **{len(failed)}**",
         f"- MEP elements: **{mep_total:,}**, of which **{mep_geom:,}** ({mep_geom/mep_total*100:.1f}%) resolved geometry"
@@ -844,7 +844,7 @@ def write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
         f"- Piping elements: **{total_piping:,}**, of which **{material_total:,}** "
         f"({material_total/total_piping*100:.1f}%) carry raw material text" if total_piping else "",
         f"- Of those, only **{material_known:,}** ({material_known/total_piping*100:.2f}%) normalise "
-        f"to a `CANONICAL_MATERIALS` key the engines can score — see §A.1.1" if total_piping else "",
+        f"to a `CANONICAL_MATERIALS` key the engines can score — see §B.1.1" if total_piping else "",
         f"- BCF 2.1 archives: **{bcf_valid} valid of {len(ok)} readable models** "
         f"(every archive parsed, every topic folder complete, zero malformed XML). "
         f"The remaining {bcf_total - bcf_valid} of {bcf_total} is absent rather than invalid — "
@@ -865,7 +865,7 @@ def write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
     best_pct = ready.get(best_engine, 0) / recomputed_total * 100 if recomputed_total else 0
 
     body += [
-        "", "## A.1 Headline finding", "",
+        "", "## B.1 Headline finding", "",
         "The spatial engine and the corrosion engines behave in opposite ways against",
         "third-party models, and the corpus separates them cleanly.",
         "",
@@ -873,10 +873,10 @@ def write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
         f"elements ({mep_geom/mep_total*100:.1f}%)" if mep_total else "**Blue Halo**: no MEP elements",
         f"across IFC2x3 and IFC4 alike, producing {halos:,} halo volumes and {sev_grand:,} clashes,",
         f"with all {bcf_valid} BCF archives valid. The same-building schema twins",
-        "(Table A.7b) differ by 0.11% and 0.00%, so the result does not depend on the export schema.",
+        "(Table B.7b) differ by 0.11% and 0.00%, so the result does not depend on the export schema.",
         "",
-        "**The corrosion engines do not.** Table A.4 shows every engine either flags nothing",
-        "(GC-001: 0%) or flags everything (CC-001 and MC-001: 100%), and Table A.3 shows why:",
+        "**The corrosion engines do not.** Table B.4 shows every engine either flags nothing",
+        "(GC-001: 0%) or flags everything (CC-001 and MC-001: 100%), and Table B.3 shows why:",
         "across six distinct materials the mean band is constant — GC-001 returns Low for every",
         "material, CC-001 Medium for every material, and MC-001 Critical for all but one. These",
         "are constant functions of their input, not risk assessments.",
@@ -890,7 +890,7 @@ def write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
         "This is precisely the question §13 puts to this dataset — whether the inputs the",
         "engines need exist in real federated models at all. On this corpus the answer is no.",
         "",
-        "### A.1.1 Material text is not material data", "",
+        "### B.1.1 Material text is not material data", "",
         f"{material_total:,} elements ({material_total/total_piping*100:.1f}%) carry some material"
         if total_piping else "",
         f"string, but only {material_known:,} ({material_known/total_piping*100:.2f}%) normalise to a"
@@ -910,30 +910,30 @@ def write_appendix(records, ok, tables, extra, sev_totals, sev_grand,
 
     body += [
         "## Figures", "",
-        "![Figure A.1](figA1_clash_severity.png)", "",
-        "![Figure A.2](figA2_material_heatmap.png)", "",
-        "![Figure A.3](figA3_engine_radar.png)", "",
-        "![Figure A.4](figA4_schema_scatter.png)", "",
-        "## A.8 Threats to validity", "",
+        "![Figure B.1](figB1_clash_severity.png)", "",
+        "![Figure B.2](figB2_material_heatmap.png)", "",
+        "![Figure B.3](figB3_engine_radar.png)", "",
+        "![Figure B.4](figB4_schema_scatter.png)", "",
+        "## B.8 Threats to validity", "",
         "- **Clash counts are geometric, not engineering judgements.** A clash is an AABB",
         "  intersection between a halo volume and another element. Bounding boxes overstate",
         "  intersection for diagonal or non-convex members, so counts are an upper bound.",
         "- **Severity banding is a spatial heuristic**, not a standards-derived threshold",
-        "  (overlap fraction of halo volume: >=25% critical, >=5% major). Table A.6 shows how",
+        "  (overlap fraction of halo volume: >=25% critical, >=5% major). Table B.6 shows how",
         "  sensitive the totals are to the clearance input.",
         "- **One brace variant was evaluated.** The EN+DIN config assigns every variant the",
         "  same clearance, a documented data gap in that config, so variant choice does not",
         "  change these numbers — but a jurisdiction that differentiates would.",
         "- **Corrosion coverage is measured on the recompute subset**",
         f"  ({recomputed_total:,} elements across {len(extra['models_used'])} models), not the full corpus.",
-        f"- **The clearance sensitivity sweep (Table A.6) covers rows {extra['sensitivity_rows']} only**,",
-        "  not the whole corpus; its absolute totals are therefore not comparable to Table A.2,",
+        f"- **The clearance sensitivity sweep (Table B.6) covers rows {extra['sensitivity_rows']} only**,",
+        "  not the whole corpus; its absolute totals are therefore not comparable to Table B.2,",
         "  and only the ratios between thresholds should be read from it.",
         "- **Row 35 could not be read at all** (IFC2X2_FINAL, unsupported by IfcOpenShell),",
         "  so the industrial category is one model short of its already-thin count.",
         "",
     ]
-    (OUT_DIR / "appendix_a_validation.md").write_text("\n".join(body) + "\n", encoding="utf-8")
+    (OUT_DIR / "appendix_b_validation.md").write_text("\n".join(body) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
