@@ -24,3 +24,10 @@ apply_benchmark_patch*.ps1
 data/cache/supabase-storage/
 data/uploads/ifc/
 data/bimguard.sqlite-wal
+
+# Validation sweep inputs/outputs: ~1.8 GB, fully regenerable.
+# Models re-download from the URLs in the validation dataset doc; BCF
+# archives re-export from the cached per-model results. The evidentiary
+# summary (validation_sweep_summary.json) and Appendix A are tracked.
+data/validation_models/
+data/validation_bcf/
