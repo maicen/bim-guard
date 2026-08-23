@@ -31,3 +31,4 @@ data/bimguard.sqlite-wal
 # summary (validation_sweep_summary.json) and Appendix A are tracked.
 data/validation_models/
 data/validation_bcf/
+data/validation_results/
