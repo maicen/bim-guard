@@ -30,13 +30,13 @@ import os
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from app.services.corrosion_rule_catalog import load_mc_catalog
 
 RULESET_VERSION = "BIMGUARD-MC-001 v1.0.0"
-ASSESSMENT_DATE = datetime.utcnow().isoformat() + "Z"
+ASSESSMENT_DATE = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 _MC_CATALOG = load_mc_catalog()
 

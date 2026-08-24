@@ -8,10 +8,10 @@ Provides the data source for the BCF issue history field.
 """
 
 import json
+import os
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
 from app.services.persistence import PersistenceService
 
@@ -19,7 +19,7 @@ ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def _now() -> str:
-    return datetime.utcnow().strftime(ISO_FMT)
+    return datetime.now(UTC).strftime(ISO_FMT)
 
 
 @dataclass
@@ -201,7 +201,7 @@ class IssueTracker:
         self._save()
         return summary
 
-    def get_history(self, global_id: str) -> Optional[IssueRecord]:
+    def get_history(self, global_id: str) -> IssueRecord | None:
         """Return the full history record for a given GlobalID."""
         return self._records.get(global_id)
 

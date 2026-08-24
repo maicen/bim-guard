@@ -29,14 +29,14 @@ import os
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from app.services.corrosion_rule_catalog import load_gc_catalog
 
 # ── VERSION ───────────────────────────────────────────────────────────────────
 RULESET_VERSION = "BIMGUARD-GC-001 v1.0.0"
-ASSESSMENT_DATE = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+ASSESSMENT_DATE = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 _GC_CATALOG = load_gc_catalog()
 

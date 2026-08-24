@@ -1,7 +1,7 @@
 """Persistence bootstrap utilities for Supabase tables."""
 
 import os
-from typing import Any
+from typing import Any, override
 
 from app.environment import load_env_file
 from app.services.db_adapters import SupabaseTableAdapter
@@ -145,6 +145,7 @@ class _MemoryQueryWithMutation(_MemoryQuery):
         self._delete = True
         return self
 
+    @override
     def execute(self):
         rows = list(self._client._tables.get(self._table_name, []))
         for field, op, value in self._filters:

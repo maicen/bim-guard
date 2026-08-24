@@ -12,7 +12,7 @@ Outputs:
 import csv
 import io
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 class Module5_Reporter:
@@ -133,7 +133,7 @@ class Module5_Reporter:
             "type":         "Error" if rule.get("severity") == "mandatory" else "Warning",
             "status":       "Open",
             "priority":     rule.get("severity", "recommended"),
-            "creation_date": datetime.utcnow().isoformat(),
+            "creation_date": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "element_guid": failure.get("guid"),
         }
 
