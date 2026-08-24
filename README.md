@@ -47,7 +47,7 @@ bim-guard/
 uv sync
 ```
 
-Python 3.11 or later (tested with 3.11.9) is required. If you need the optional document-processing pipeline, install the extra group as well:
+Python 3.12 or later (tested with 3.12.13) is required. If you need the optional document-processing pipeline, install the extra group as well:
 
 ```bash
 uv sync --group ml-pipeline

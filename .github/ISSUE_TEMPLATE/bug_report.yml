@@ -66,7 +66,7 @@ body:
     attributes:
       label: Environment
       description: OS, Python version, and relevant tooling.
-      placeholder: Windows 11, Python 3.11, uv 0.x
+      placeholder: Windows 11, Python 3.12, uv 0.x
 
   - type: checkboxes
     id: checks
