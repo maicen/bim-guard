@@ -1,8 +1,8 @@
 """Document and rule library routes, including extraction/import endpoints."""
 
 import json
+import os
 import re
-from functools import lru_cache
 from pathlib import Path
 
 from fasthtml.common import (
@@ -33,7 +33,6 @@ from app.components.layout import DashboardLayout
 from app.components.rule_extraction_ui import (
     provider_model_select_fragment,
     rule_extraction_empty_file_result,
-    rule_extraction_free_result,
     rule_extraction_page_content,
     rule_extraction_results,
 )
@@ -69,7 +68,7 @@ from app.modules.module1_doc_parser import Module1_DocReader
 from app.modules.module3_rule_builder.ids_exporter import export_ids_for_ruleset, import_ids_ruleset
 from app.services.documents_service import DocumentService
 from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
-from app.services.object_storage import ObjectStorage
+from app.services.llm_model_service import LLMModelService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rule_extractor import LiteLLMRuleExtractor
 from app.services.rules_service import RuleService
@@ -83,14 +82,7 @@ from app.utils import (
 _document_service = DocumentService()
 _rule_service = RuleService()
 _rule_extraction_service = RuleExtractionService()
-
-
-@lru_cache(maxsize=1)
-def _orchestrator_module():
-    """Import the offline pipeline orchestrator lazily on first use."""
-    from app.modules import orchestrator
-
-    return orchestrator
+_llm_model_service = LLMModelService()
 
 
 def _folders_with_rules() -> list[dict]:
@@ -974,16 +966,30 @@ def setup_routes(rt):
             cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium",
         )
 
-    @rt("/api/rules/provider-models")
-    def api_provider_models(provider: str = "gemini"):
-        return provider_model_select_fragment(provider)
+    @rt("/api/rules/provider-models", methods=["POST"])
+    async def api_provider_models(
+        provider: str = "openrouter", api_key: str = "", api_base: str = ""
+    ):
+        try:
+            models = await _llm_model_service.list_models(
+                provider,
+                api_key=api_key.strip() or None,
+                api_base=api_base.strip() or None,
+            )
+            selected_model = DEFAULT_LLM_MODEL if provider == "openrouter" else ""
+            return provider_model_select_fragment(models, selected_model=selected_model)
+        except Exception as exc:
+            return provider_model_select_fragment(
+                error=f"Could not load models: {type(exc).__name__}: {exc}"
+            )
 
     @rt("/api/rules/extract", methods=["POST"])
     async def rules_extract_api(
         document_id: int = 0,
-        provider: str = "gemini",
+        provider: str = "openrouter",
         model: str = DEFAULT_LLM_MODEL,
         api_key: str = "",
+        api_base: str = "",
     ):
         global _last_extracted, _last_extracted_filename
 
@@ -998,11 +1004,33 @@ def setup_routes(rt):
         if not extracted_text:
             return rule_extraction_empty_file_result()
 
+        resolved_api_base = api_base.strip() or None
+        if provider == "ollama" and resolved_api_base is None:
+            resolved_api_base = os.environ.get(
+                "OLLAMA_API_BASE", "http://localhost:11434"
+            )
+        if not model:
+            return Alert(
+                "Select a model from the provider model list.",
+                cls=AlertT.warning,
+            )
+
+        extra_headers = None
+        if provider == "openrouter":
+            extra_headers = {
+                "HTTP-Referer": os.environ.get(
+                    "OPENROUTER_SITE_URL", "http://127.0.0.1:8000"
+                ),
+                "X-Title": os.environ.get("OPENROUTER_APP_NAME", "BIM Guard"),
+            }
+
         extractor = LiteLLMRuleExtractor(
             client=LiteLLMClientWithRetry(
                 LiteLLMClient(
                     model=model,
                     api_key=api_key or None,
+                    api_base=resolved_api_base,
+                    extra_headers=extra_headers,
                     temperature=COMPLIANCE_TEMPERATURE,
                     max_tokens=MAX_TOKENS_RULE_EXTRACTION,
                 )
@@ -1035,49 +1063,3 @@ def setup_routes(rt):
             str(document.get("filename") or ""),
             warnings=result.warnings,
         )
-
-    @rt("/api/rules/extract-free", methods=["POST"])
-    def rules_extract_free_api(document_id: int = 0, folder_name: str = ""):
-        """Run the free/offline CLI pipeline (Docling + regex, no LLM) on an uploaded PDF."""
-        orchestrator = _orchestrator_module()
-
-        if not document_id:
-            return Alert("Please select a document.", cls=AlertT.warning)
-
-        if not orchestrator._PIPELINE_AVAILABLE:
-            return Alert(
-                "The offline pipeline is unavailable on this server (a Module 1/3 "
-                "dependency failed to import).",
-                cls=AlertT.error,
-            )
-
-        document = _document_service.get_document(document_id)
-        if document is None:
-            return Alert("Selected document was not found.", cls=AlertT.error)
-
-        filename = str(document.get("filename") or "")
-        if not filename.lower().endswith(".pdf"):
-            return Alert(
-                "The free offline pipeline only supports PDF documents "
-                "(it parses tables directly out of the PDF).",
-                cls=AlertT.warning,
-            )
-
-        local_path = ObjectStorage().materialize_local_path(document.get("file_path") or "")
-        if local_path is None:
-            return Alert(
-                "Could not locate the stored PDF file for this document.", cls=AlertT.error
-            )
-
-        ruleset_id = folder_name.strip() or Path(filename).stem
-        try:
-            summary = orchestrator.run_pipeline(
-                local_path, run_sections="all", seed_db_first=True, ruleset_id=ruleset_id
-            )
-        except Exception as exc:
-            return Alert(
-                f"Free extraction failed: {type(exc).__name__}: {exc}",
-                cls=AlertT.error,
-            )
-
-        return rule_extraction_free_result(summary, filename, ruleset_id)

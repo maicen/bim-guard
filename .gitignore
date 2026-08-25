@@ -22,6 +22,7 @@ apply_benchmark_patch*.ps1
 
 # Runtime artifacts are durable in Supabase Storage; local copies are disposable.
 data/cache/supabase-storage/
+data/agent-sessions/
 data/uploads/ifc/
 data/bimguard.sqlite-wal
 

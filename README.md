@@ -16,7 +16,7 @@ The app is a single ASGI service. UI and backend routes live together in Python,
 - MonsterUI for UI components
 - IfcOpenShell for IFC parsing
 - Supabase for the default database and storage backends
-- LiteLLM for rule extraction across multiple providers
+- LiteLLM for OpenRouter-first rule extraction across multiple providers
 
 ## Repository Layout
 
@@ -69,16 +69,25 @@ SUPABASE_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-For rule extraction, set at least one provider key. Only one is needed:
+OpenRouter is the default provider for rule extraction and the Python agent:
+
+```env
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_SITE_URL=http://127.0.0.1:8000
+OPENROUTER_APP_NAME=BIM Guard
+```
+
+Other extraction providers remain available:
 
 ```env
 OPENAI_API_KEY=...
 GEMINI_API_KEY=...
 ANTHROPIC_API_KEY=...
-MISTRAL_API_KEY=...
+OLLAMA_API_BASE=http://localhost:11434
 ```
 
-You can also pin the default LLM model with `BIM_GUARD_RULE_MODEL`.
+Pin the default app model with `BIM_GUARD_LLM_MODEL`; it defaults to
+`openrouter/auto`.
 
 Supabase schema changes are now tracked in-repo under `supabase/migrations/`. For a fresh Supabase environment, apply the migrations in that folder instead of relying on runtime table creation.
 
@@ -89,6 +98,20 @@ uv run uvicorn main:app --reload
 ```
 
 The app is available at [http://127.0.0.1:8000](http://127.0.0.1:8000). You can also start it with `python main.py` if you prefer a direct entrypoint.
+
+### 4. Run the Python agent
+
+The terminal agent uses OpenRouter, repository-local coding tools, bounded tool
+turns and cost, server-side web search, and append-only JSONL sessions:
+
+```bash
+uv run bim-guard-agent
+```
+
+Use `--model`, `--max-steps`, `--max-cost`, or `--no-web-search` to override
+the environment for one run. Inside the agent, `/model` fetches the current
+OpenRouter catalogue, `/new` starts a fresh session, and `/help` lists commands.
+Session logs are written under `data/agent-sessions/` and ignored by Git.
 
 ## Main Routes
 

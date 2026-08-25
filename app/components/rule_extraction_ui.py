@@ -1,54 +1,32 @@
 import json
 from pathlib import Path
-from fasthtml.common import A, Button, Details, Div, Label, Option, P, Pre, Span, Summary
-from monsterui.all import H1, H3, Alert, Form, FormLabel, Input, Select, UkIcon
-from app.components.ui import Card, CardContent, CardHeader, CardTitle, HtmxSpinner
-from app.components.rules_ui import IFC_CLASS_OPTIONS
 
-# ── Provider / model catalogue ───────────────────────────────────────────────────
+from fasthtml.common import Button, Details, Div, Label, Option, P, Pre, Span, Summary
+from monsterui.all import H1, H3, Alert, Form, FormLabel, Input, Select, UkIcon
+
+from app.components.rules_ui import IFC_CLASS_OPTIONS
+from app.components.ui import Card, CardContent, CardHeader, CardTitle, HtmxSpinner
+
+# ── Provider catalogue ───────────────────────────────────────────────────────────
 
 PROVIDER_LABELS: dict[str, str] = {
     "openrouter": "OpenRouter",
     "openai": "OpenAI",
     "gemini": "Google Gemini",
     "anthropic": "Anthropic",
-}
-
-# Values are (litellm_model_string, display_label) pairs.
-PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
-    "openrouter": [
-        ("openrouter/google/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
-        ("openrouter/google/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
-        ("openrouter/google/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
-        ("openrouter/google/gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite Preview"),
-    ],
-    "openai": [
-        ("gpt-4o", "GPT-4o"),
-        ("gpt-4o-mini", "GPT-4o Mini"),
-        ("gpt-4-turbo", "GPT-4 Turbo"),
-        ("gpt-3.5-turbo", "GPT-3.5 Turbo"),
-    ],
-    "gemini": [
-        ("gemini/gemini-2.0-flash", "Gemini 2.0 Flash"),
-        ("gemini/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
-        ("gemini/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
-        ("gemini/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
-        ("gemini/gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite Preview"),
-    ],
-    "anthropic": [
-        ("anthropic/claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
-        ("anthropic/claude-3-5-haiku-20241022", "Claude 3.5 Haiku"),
-        ("anthropic/claude-3-opus-20240229", "Claude 3 Opus"),
-    ],
+    "ollama": "Ollama (Local)",
 }
 
 
-def _model_select(provider: str = "gemini"):
-    models = PROVIDER_MODELS.get(provider, PROVIDER_MODELS["gemini"])
+def _model_select(
+    models: list[tuple[str, str]] | None = None, selected_model: str = ""
+):
+    models = models or []
     return Select(
+        Option("Select a model", value="", selected=True),
         *[
-            Option(label, value=value, selected=(idx == 0))
-            for idx, (value, label) in enumerate(models)
+            Option(label, value=value, selected=value == selected_model)
+            for value, label in models
         ],
         id="model-select",
         name="model",
@@ -56,9 +34,24 @@ def _model_select(provider: str = "gemini"):
     )
 
 
-def provider_model_select_fragment(provider: str = "gemini"):
-    """HTMX fragment: the model <select> wrapper, swapped when provider changes."""
-    return Div(_model_select(provider), id="model-select-container")
+def provider_model_select_fragment(
+    models: list[tuple[str, str]] | None = None,
+    error: str = "",
+    selected_model: str = "",
+):
+    """Render the dynamically discovered model selector HTMX fragment."""
+    return Div(
+        _model_select(models, selected_model),
+        P(
+            error or (f"{len(models)} model(s) available." if models else "No models found."),
+            cls=(
+                "text-xs mt-1 text-destructive"
+                if error
+                else "text-xs mt-1 text-muted-foreground"
+            ),
+        ),
+        id="model-select-container",
+    )
 
 
 def rule_extraction_page_content(documents: list[dict]):
@@ -73,20 +66,8 @@ def rule_extraction_page_content(documents: list[dict]):
     ]
     has_documents = len(document_options) > 0
 
-    # Free-pipeline document select carries a suggested folder name per option,
-    # picked up by onchange JS to pre-fill the folder-name field below it.
-    free_document_options = [
-        Option(
-            doc.get("filename", f"Document {doc.get('id', '')}"),
-            value=str(doc["id"]),
-            **{"data-folder": Path(doc.get("filename") or "").stem or f"Document {doc.get('id', '')}"},
-        )
-        for doc in documents
-        if doc.get("id") is not None
-    ]
-
     provider_options = [
-        Option(label, value=slug, selected=(slug == "gemini"))
+        Option(label, value=slug, selected=(slug == "openrouter"))
         for slug, label in PROVIDER_LABELS.items()
     ]
 
@@ -118,18 +99,42 @@ def rule_extraction_page_content(documents: list[dict]):
                                     id="provider-select",
                                     name="provider",
                                     cls="w-full",
-                                    hx_get="/api/rules/provider-models",
+                                    hx_post="/api/rules/provider-models",
                                     hx_target="#model-select-container",
                                     hx_swap="outerHTML",
                                     hx_trigger="change",
+                                    hx_include="#api-key,#api-base",
                                 ),
                                 cls="space-y-1",
                             ),
                             Div(
                                 FormLabel("Model", fr="model-select"),
                                 Div(
-                                    _model_select("openai"),
+                                    P(
+                                        "Loading available OpenRouter models...",
+                                        cls="text-xs text-muted-foreground mt-1",
+                                    ),
                                     id="model-select-container",
+                                    hx_post="/api/rules/provider-models",
+                                    hx_trigger="load",
+                                    hx_target="this",
+                                    hx_swap="outerHTML",
+                                    hx_include="#provider-select,#api-key,#api-base",
+                                ),
+                                cls="space-y-1",
+                            ),
+                            Div(
+                                FormLabel("Provider Endpoint", fr="api-base"),
+                                Input(
+                                    id="api-base",
+                                    name="api_base",
+                                    type="url",
+                                    placeholder="Ollama defaults to http://localhost:11434",
+                                    cls="w-full",
+                                ),
+                                P(
+                                    "Optional. Use this for Ollama or another provider endpoint.",
+                                    cls="text-xs text-muted-foreground mt-1",
                                 ),
                                 cls="space-y-1",
                             ),
@@ -148,6 +153,20 @@ def rule_extraction_page_content(documents: list[dict]):
                                     cls="text-xs text-muted-foreground mt-1",
                                 ),
                                 cls="space-y-1",
+                            ),
+                            Button(
+                                UkIcon("refresh-cw", cls="h-4 w-4"),
+                                "Refresh Models",
+                                type="button",
+                                title="Fetch available models from the provider",
+                                hx_post="/api/rules/provider-models",
+                                hx_target="#model-select-container",
+                                hx_swap="outerHTML",
+                                hx_include="#provider-select,#api-key,#api-base",
+                                cls=(
+                                    "inline-flex items-center gap-2 rounded-md border px-3 py-2 "
+                                    "text-sm font-medium hover:bg-muted"
+                                ),
                             ),
                             cls="space-y-4",
                         ),
@@ -197,74 +216,6 @@ def rule_extraction_page_content(documents: list[dict]):
                     hx_target="#extracted-rules-container",
                     hx_indicator="#extract-spinner",
                     cls="space-y-4",
-                ),
-                # ── Free/offline pipeline (no API key, no LLM calls) ────────────
-                Card(
-                    CardHeader(CardTitle("Or: Free Offline Extraction")),
-                    CardContent(
-                        P(
-                            "Runs the offline code-rule pipeline (Docling table extraction + "
-                            "section-aware regex rule conversion) locally — no API key, "
-                            "no LLM calls. Best on structured code PDFs with numbered sections. "
-                            "Rules are saved "
-                            "straight to the library, skipping the review step.",
-                            cls="text-xs text-muted-foreground mb-3",
-                        ),
-                        Form(
-                            Div(
-                                FormLabel("Choose uploaded PDF", fr="free-document-id"),
-                                Select(
-                                    Option(
-                                        "Select a document"
-                                        if has_documents
-                                        else "No uploaded documents available",
-                                        value="",
-                                        selected=True,
-                                    ),
-                                    *free_document_options,
-                                    id="free-document-id",
-                                    name="document_id",
-                                    required=True,
-                                    cls="w-full",
-                                    onchange=(
-                                        "var o=this.options[this.selectedIndex];"
-                                        "var f=document.getElementById('free-folder-name');"
-                                        "if(f&&o.dataset.folder)f.value=o.dataset.folder;"
-                                    ),
-                                ),
-                                cls="space-y-1",
-                            ),
-                            Div(
-                                FormLabel("Save extracted rules to folder", fr="free-folder-name"),
-                                Input(
-                                    id="free-folder-name",
-                                    name="folder_name",
-                                    placeholder="e.g. Toronto Fire Code",
-                                    cls="w-full",
-                                ),
-                                P(
-                                    "Editable — pre-fills from the PDF's filename when you pick a document.",
-                                    cls="text-xs text-muted-foreground mt-1",
-                                ),
-                                cls="space-y-1",
-                            ),
-                            Button(
-                                "Run Free Pipeline",
-                                type="submit",
-                                disabled=not has_documents,
-                                cls=(
-                                    "inline-flex items-center justify-center gap-2 rounded-md "
-                                    "px-4 py-2 text-sm font-medium transition-colors bg-secondary "
-                                    "text-secondary-foreground hover:opacity-90 "
-                                    "disabled:cursor-not-allowed disabled:opacity-50 mt-2"
-                                ),
-                            ),
-                            hx_post="/api/rules/extract-free",
-                            hx_target="#extracted-rules-container",
-                            hx_indicator="#extract-spinner",
-                            cls="space-y-2",
-                        ),
-                    ),
                 ),
                 cls="flex-1 bg-muted/30 p-6 overflow-auto space-y-4",
             ),
@@ -591,67 +542,3 @@ def rule_extraction_results(
 
 def rule_extraction_empty_file_result():
     return Alert("Selected document has no extractable text.")
-
-
-def rule_extraction_free_result(summary: dict, filename: str, ruleset_id: str = ""):
-    """Render the outcome of the offline CLI pipeline (already saved to the DB)."""
-    table_rules = summary.get("table_rules", 0)
-    prose_rules = summary.get("prose_rules", 0)
-    total_rules = summary.get("total_rules", 0)
-    sections_run = summary.get("sections_run", 0)
-    new_rules = table_rules + prose_rules
-
-    warning_banners = [
-        Alert(
-            UkIcon("alert-triangle", cls="h-4 w-4"),
-            Span(w),
-            cls="mb-3 text-amber-700 border-amber-400 [&>svg]:text-amber-700",
-        )
-        for w in (summary.get("warnings") or [])
-    ]
-
-    if new_rules == 0:
-        outcome_alert = Alert(
-            UkIcon("alert-triangle", cls="h-4 w-4"),
-            Span(
-                f"No new rules were extracted from {filename}. Folder \"{ruleset_id}\" was "
-                "NOT created — a folder only appears once it has at least one rule in it "
-                f"({sections_run} section(s) scanned, {total_rules} rule(s) already in the "
-                "library from before)."
-            ),
-            cls="mb-1 text-amber-700 border-amber-400 [&>svg]:text-amber-700",
-        )
-        outcome_detail = P(
-            "This usually means the document doesn't have code-style numbered "
-            "sections or tables with Min/Max columns, which is what this offline "
-            "pipeline looks for. Try the AI Extraction Studio above instead — it reads "
-            "the document's meaning rather than its formatting.",
-            cls="text-xs text-muted-foreground mb-2",
-        )
-    else:
-        outcome_alert = Alert(
-            UkIcon("check-circle", cls="h-4 w-4"),
-            Span(
-                f"Free pipeline complete for {filename}: {table_rules} table rule(s) + "
-                f"{prose_rules} regex rule(s) saved across {sections_run} section(s). "
-                f"{total_rules} rule(s) now in the library."
-            ),
-            cls="mb-3 text-emerald-600 border-emerald-600 [&>svg]:text-emerald-600",
-        )
-        outcome_detail = P(
-            f"{new_rules} newly-extracted rule(s) were saved to folder \"{ruleset_id}\". "
-            "Rules from the offline pipeline are saved directly — there is no inline "
-            "review step like the AI extraction path.",
-            cls="text-xs text-muted-foreground mb-2",
-        )
-
-    return Div(
-        *warning_banners,
-        outcome_alert,
-        outcome_detail,
-        A(
-            "View Rule Library →",
-            href="/library/rules",
-            cls="text-sm text-primary underline",
-        ),
-    )

@@ -25,6 +25,19 @@ dependencies = [
     "matplotlib>=3.11.1",
 ]
 
+[project.scripts]
+bim-guard-agent = "app.agent.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.uv]
+package = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
