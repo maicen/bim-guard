@@ -29,6 +29,7 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
         ("gpt-3.5-turbo", "GPT-3.5 Turbo"),
     ],
     "gemini": [
+        ("gemini/gemini-2.0-flash", "Gemini 2.0 Flash"),
         ("gemini/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
         ("gemini/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
         ("gemini/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
@@ -42,8 +43,8 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def _model_select(provider: str = "openai"):
-    models = PROVIDER_MODELS.get(provider, PROVIDER_MODELS["openai"])
+def _model_select(provider: str = "gemini"):
+    models = PROVIDER_MODELS.get(provider, PROVIDER_MODELS["gemini"])
     return Select(
         *[
             Option(label, value=value, selected=(idx == 0))
@@ -55,7 +56,7 @@ def _model_select(provider: str = "openai"):
     )
 
 
-def provider_model_select_fragment(provider: str = "openai"):
+def provider_model_select_fragment(provider: str = "gemini"):
     """HTMX fragment: the model <select> wrapper, swapped when provider changes."""
     return Div(_model_select(provider), id="model-select-container")
 
@@ -85,7 +86,7 @@ def rule_extraction_page_content(documents: list[dict]):
     ]
 
     provider_options = [
-        Option(label, value=slug, selected=(slug == "openai"))
+        Option(label, value=slug, selected=(slug == "gemini"))
         for slug, label in PROVIDER_LABELS.items()
     ]
 
@@ -202,9 +203,10 @@ def rule_extraction_page_content(documents: list[dict]):
                     CardHeader(CardTitle("Or: Free Offline Extraction")),
                     CardContent(
                         P(
-                            "Runs the offline OBC pipeline (Docling table extraction + "
+                            "Runs the offline code-rule pipeline (Docling table extraction + "
                             "section-aware regex rule conversion) locally — no API key, "
-                            "no LLM calls. Best on OBC Part 9-formatted PDFs. Rules are saved "
+                            "no LLM calls. Best on structured code PDFs with numbered sections. "
+                            "Rules are saved "
                             "straight to the library, skipping the review step.",
                             cls="text-xs text-muted-foreground mb-3",
                         ),
@@ -620,7 +622,7 @@ def rule_extraction_free_result(summary: dict, filename: str, ruleset_id: str = 
             cls="mb-1 text-amber-700 border-amber-400 [&>svg]:text-amber-700",
         )
         outcome_detail = P(
-            "This usually means the document doesn't have OBC Part 9-style numbered "
+            "This usually means the document doesn't have code-style numbered "
             "sections or tables with Min/Max columns, which is what this offline "
             "pipeline looks for. Try the AI Extraction Studio above instead — it reads "
             "the document's meaning rather than its formatting.",

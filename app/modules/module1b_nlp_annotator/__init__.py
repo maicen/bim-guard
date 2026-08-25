@@ -35,9 +35,9 @@ from .dimension_extractor import DimensionExtractor
 
 # IFC entity map reused from Module 3 config (no duplication)
 try:
-    from app.modules.config import OBC_TO_IFC_MAP
+    from app.modules.config import CODE_TO_IFC_MAP
 except ImportError:
-    OBC_TO_IFC_MAP = {}
+    CODE_TO_IFC_MAP = {}
 
 
 class Module1b_NLPAnnotator:
@@ -124,13 +124,13 @@ class Module1b_NLPAnnotator:
         }
 
     def _extract_ifc_hints(self, text: str) -> list:
-        """Map surface forms in text to IFC classes using the shared OBC_TO_IFC_MAP."""
+        """Map surface forms in text to IFC classes using the shared code-to-IFC map."""
         import re
         found = []
         seen_ifc: set = set()
         lower = text.lower()
 
-        for surface, ifc_class in OBC_TO_IFC_MAP.items():
+        for surface, ifc_class in CODE_TO_IFC_MAP.items():
             # Whole-word match
             if re.search(rf'\b{re.escape(surface)}s?\b', lower):
                 if ifc_class not in seen_ifc:

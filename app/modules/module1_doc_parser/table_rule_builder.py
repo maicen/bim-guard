@@ -101,7 +101,7 @@ class TableRuleBuilder:
     def _build_rule_dicts(self, table_dict: dict) -> list[dict]:
         """Build rule dicts from a table DataFrame without saving to any store.
 
-        Tries the Min/Max range format first (e.g. OBC dimension tables), then
+        Tries the Min/Max range format first (e.g. building-code dimension tables), then
         falls back to a one-row-per-requirement Operator/Value format (e.g.
         "Entity | Property | Operator | Value | Unit | Requirement")."""
         rules = self._build_minmax_rule_dicts(table_dict)
@@ -135,7 +135,7 @@ class TableRuleBuilder:
 
             rules.append(
                 {
-                    "ref": f"OBC_Table_{idx + 1}",
+                    "ref": f"CODE_Table_{idx + 1}",
                     "desc": f"{name} must be between {min_val} and {max_val}",
                     "source_text": "",
                     "target": self._detect_target(name),
@@ -271,7 +271,7 @@ class TableRuleBuilder:
 
             value = self._parse_value(self._cell(row, value_col))
             unit = self._cell(row, unit_col)
-            ref = self._cell(row, ref_col) or f"OBC_Table_{idx + 1}_{row_idx + 1}"
+            ref = self._cell(row, ref_col) or f"CODE_Table_{idx + 1}_{row_idx + 1}"
             is_value_operator = operator in ("exists", "not_exists")
 
             rules.append(
@@ -322,7 +322,7 @@ class TableRuleBuilder:
             for rule in rules:
                 rule["ruleset_id"] = ruleset_id
         if rules:
-            saved = generator.save_batch(rules, source_doc="OBC_Table_Direct")
+            saved = generator.save_batch(rules, source_doc="Code_Table_Direct")
             return len(saved)
         return 0
 

@@ -5,12 +5,12 @@ Improvement 1 — TF-IDF Auto Keyword Discovery.
 
 WHAT IT DOES:
     Instead of manually guessing which keywords are missing,
-    this runs TF-IDF across the entire OBC text and surfaces
+    this runs TF-IDF across the entire CODE text and surfaces
     which words are most distinctive in rule-dense paragraphs
     vs non-rule paragraphs.
 
     Result: a ranked list of words you should add to keyword_master.py
-    — discovered from the actual OBC text, not guesswork.
+    — discovered from the actual CODE text, not guesswork.
 
 HOW IT WORKS:
     1. Scores every paragraph with the existing keyword list
@@ -20,7 +20,7 @@ HOW IT WORKS:
     5. Filters out words already in your keyword list
     6. Returns ranked list of NEW keywords to consider adding
 
-RUN DIRECTLY to analyse your OBC text:
+RUN DIRECTLY to analyse your CODE text:
     python -m module1_doc_parser.tfidf_analyzer
 
 OR import and call:
@@ -102,7 +102,7 @@ STOP_WORDS = {
 
 class TFIDFAnalyzer:
     """
-    Discovers missing keywords from OBC text using TF-IDF analysis.
+    Discovers missing keywords from CODE text using TF-IDF analysis.
     Compares rule-dense paragraphs vs non-rule paragraphs to find
     words that are statistically distinctive in compliance text.
     """
@@ -332,7 +332,7 @@ class TFIDFAnalyzer:
 if __name__ == "__main__":
     """
     To use this script directly:
-    1. Run your OBC PDF through DoclingExtractor + SectionChunker + KeywordFilter first
+    1. Run your CODE PDF through DoclingExtractor + SectionChunker + KeywordFilter first
     2. Pass the filtered_chunks output to TFIDFAnalyzer.discover()
 
     Quick test with sample text:

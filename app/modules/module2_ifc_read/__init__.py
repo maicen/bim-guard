@@ -32,6 +32,7 @@ continues to work — it now additionally receives richer per-element metadata.
 
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 try:
     import ifcopenshell
@@ -227,21 +228,23 @@ class Module2_IFCRead:
             score = results.get("overall", {}).get("score", 100)
 
             if score < IFC_MIN_QUALITY_SCORE:
-                improved_path = load_path.with_stem(load_path.stem + "_improved")
-                improvement_summary = improve_ifc_file(str(load_path), str(improved_path))
-                load_path = improved_path
-                self.quality_warnings.append(
-                    f"Quality {score:.1f}% was below threshold; "
-                    f"auto-improved file used: {improved_path.name}"
-                )
-                self.quality_improvements = improvement_summary.get("improvements", [])
+                with TemporaryDirectory(prefix="bim-guard-analysis-") as temp_dir:
+                    improved_path = Path(temp_dir) / f"{load_path.stem}_improved.ifc"
+                    improvement_summary = improve_ifc_file(str(load_path), str(improved_path))
+                    self.ifc_file = ifcopenshell.open(str(improved_path))
+                    self.quality_warnings.append(
+                        f"Quality {score:.1f}% was below threshold; "
+                        "an ephemeral auto-improved model was used for analysis"
+                    )
+                    self.quality_improvements = improvement_summary.get("improvements", [])
             elif score < 80:
                 self.quality_warnings.append(
                     f"IFC quality is fair ({score:.1f}%). "
                     "Consider running the IFC improver for better results."
                 )
 
-        self.ifc_file = ifcopenshell.open(str(load_path))
+        if self.ifc_file is None:
+            self.ifc_file = ifcopenshell.open(str(load_path))
         if _GEOMETRY_AVAILABLE:
             self.geometry_extractor = IFCGeometryExtractor(self.ifc_file)
         if _SPATIAL_AVAILABLE:
@@ -1035,7 +1038,7 @@ class Module2_IFCRead:
             operator = str(rule.get("operator") or "").strip()
             fallback_prop = str(rule.get("fallback_property") or "").strip()
 
-            # Property-referencing bounds — e.g. OBC 9.8.4.3.(3): tread depth
+            # Property-referencing bounds — e.g. tread depth
             # must be between its own Run and Run + 25mm. Instead of a fixed
             # numeric value_min/value_max, the bound is another property on
             # the same element (optionally offset by a fixed amount).
@@ -1219,6 +1222,130 @@ class Module2_IFCRead:
         except Exception:
             pass
         return 1.0
+
+    # ── Rule message context (DB-backed with safe fallbacks) ────────────────
+
+    @staticmethod
+    def _as_float(value) -> float | None:
+        """Best-effort conversion of rule values to float."""
+        if isinstance(value, (int, float)):
+            return float(value)
+        if value is None:
+            return None
+        try:
+            decoded = json.loads(str(value))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            decoded = value
+        if isinstance(decoded, (int, float)):
+            return float(decoded)
+        try:
+            return float(str(decoded).strip())
+        except (TypeError, ValueError):
+            return None
+
+    def _get_code_warning_context(self) -> dict:
+        """Return DB-backed references/limits used in Tier 2/3 warning text.
+
+        Falls back to current hardcoded defaults whenever DB access fails or
+        when matching rules are unavailable.
+        """
+        context = {
+            "daylight_ref": "applicable code rule",
+            "daylight_ratio": 0.1,
+            "fire_exists_ref": "applicable code rule",
+            "fire_ref": "applicable code rule",
+            "fire_min": 45.0,
+            "fire_unit": "min",
+            "travel_ref": "applicable code rule",
+            "travel_max": 25.0,
+            "travel_unit": "m",
+        }
+
+        try:
+            from app.services.rules_service import RuleService
+
+            rules = RuleService().list_code_rules()
+        except Exception:
+            return context
+
+        def _matches(row: dict, token: str) -> bool:
+            return token in str(row.get("reference") or "")
+
+        def _best_fire_numeric() -> dict | None:
+            for row in rules:
+                if not _matches(row, "9.10.9"):
+                    continue
+                if str(row.get("target_ifc_class") or "") != "IfcWall":
+                    continue
+                if str(row.get("property_name") or "") not in (
+                    "FireRating",
+                    "FireResistanceRating",
+                    "FireResistance",
+                    "REI",
+                    "FRR",
+                ):
+                    continue
+                if str(row.get("operator") or "") != ">=":
+                    continue
+                check = self._as_float(row.get("check_value"))
+                if check is None:
+                    continue
+                return row
+            return None
+
+        def _best_fire_exists() -> dict | None:
+            for row in rules:
+                if not _matches(row, "9.10.9"):
+                    continue
+                if str(row.get("target_ifc_class") or "") != "IfcWall":
+                    continue
+                if str(row.get("property_name") or "") != "FireRating":
+                    continue
+                if str(row.get("operator") or "") != "exists":
+                    continue
+                return row
+            return None
+
+        fire_rule = _best_fire_numeric()
+        if fire_rule is not None:
+            context["fire_ref"] = str(fire_rule.get("reference") or context["fire_ref"])
+            fire_min = self._as_float(fire_rule.get("check_value"))
+            if fire_min is not None:
+                context["fire_min"] = fire_min
+            unit = str(fire_rule.get("unit") or "").strip()
+            if unit:
+                context["fire_unit"] = unit
+
+        fire_exists_rule = _best_fire_exists()
+        if fire_exists_rule is not None:
+            context["fire_exists_ref"] = str(
+                fire_exists_rule.get("reference") or context["fire_exists_ref"]
+            )
+
+        for row in rules:
+            if not _matches(row, "9.9.10.1"):
+                continue
+            check = self._as_float(row.get("check_value"))
+            if check is None:
+                continue
+            context["travel_ref"] = str(row.get("reference") or context["travel_ref"])
+            context["travel_max"] = check
+            unit = str(row.get("unit") or "").strip()
+            if unit:
+                context["travel_unit"] = unit
+            break
+
+        for row in rules:
+            if not _matches(row, "9.7.2"):
+                continue
+            context["daylight_ref"] = str(row.get("reference") or context["daylight_ref"])
+            ratio_val = self._as_float(row.get("check_value"))
+            unit = str(row.get("unit") or "").strip().lower()
+            if ratio_val and unit == "ratio" and 0.0 < ratio_val <= 1.0:
+                context["daylight_ratio"] = ratio_val
+                break
+
+        return context
 
     # ── Building-level summary (no geometry required) ─────────────────────────
 
@@ -1532,6 +1659,26 @@ class Module2_IFCRead:
         fire_sep = check_fire_separation(adj)
         garage_sep = check_garage_separation(adj)
         space_connection = check_door_space_connection(adj, self.ifc_file)
+        rule_ctx = self._get_code_warning_context()
+
+        daylight_ref = str(rule_ctx.get("daylight_ref") or "applicable code rule")
+        daylight_ratio = self._as_float(rule_ctx.get("daylight_ratio")) or 0.1
+        if daylight_ratio > 0:
+            daylight_ratio_label = f"1/{int(round(1 / daylight_ratio))}"
+        else:
+            daylight_ratio_label = "1/10"
+
+        fire_exists_ref = str(
+            rule_ctx.get("fire_exists_ref") or "applicable code rule"
+        )
+        fire_ref = str(rule_ctx.get("fire_ref") or "applicable code rule")
+        fire_min = self._as_float(rule_ctx.get("fire_min"))
+        fire_min_label = (
+            f"{int(fire_min)}"
+            if isinstance(fire_min, float) and fire_min.is_integer()
+            else str(fire_min or 45)
+        )
+        fire_unit = str(rule_ctx.get("fire_unit") or "min")
 
         daylight_fails = sum(1 for r in daylight if not r["passes"])
         fire_fails = sum(1 for r in fire_sep if not r["passes"])
@@ -1539,17 +1686,18 @@ class Module2_IFCRead:
 
         if daylight_fails:
             warnings.append(
-                f"{daylight_fails} room(s) do not meet the OBC 9.7.2 "
-                "1/10 daylight ratio requirement."
+                f"{daylight_fails} room(s) do not meet the {daylight_ref} "
+                f"{daylight_ratio_label} daylight ratio requirement."
             )
         if fire_missing:
             warnings.append(
                 f"{fire_missing} party wall(s) have no FireRating declared "
-                "(OBC 9.10.9 requires ≥ 45 min)."
+                f"({fire_exists_ref}; {fire_ref} requires >= {fire_min_label} {fire_unit})."
             )
         if fire_fails and not fire_missing:
             warnings.append(
-                f"{fire_fails} party wall(s) have FireRating below 45 min (OBC 9.10.9)."
+                f"{fire_fails} party wall(s) have FireRating below "
+                f"{fire_min_label} {fire_unit} ({fire_ref})."
             )
 
         return {
@@ -1578,6 +1726,15 @@ class Module2_IFCRead:
             }
         """
         warnings: list[str] = []
+        rule_ctx = self._get_code_warning_context()
+        travel_ref = str(rule_ctx.get("travel_ref") or "applicable code rule")
+        travel_max = self._as_float(rule_ctx.get("travel_max"))
+        travel_max_label = (
+            f"{int(travel_max)}"
+            if isinstance(travel_max, float) and travel_max.is_integer()
+            else str(travel_max or 25)
+        )
+        travel_unit = str(rule_ctx.get("travel_unit") or "m")
 
         # Exit count always runs (doesn't need boundary data)
         if self.ifc_file and _EGRESS_AVAILABLE:
@@ -1612,8 +1769,8 @@ class Module2_IFCRead:
         td_fails = sum(1 for r in travel_distance if not r["passes"])
         if td_fails:
             warnings.append(
-                f"{td_fails} habitable space(s) exceed the OBC 9.9.10.1 "
-                f"maximum travel distance of 25 m."
+                f"{td_fails} habitable space(s) exceed the {travel_ref} "
+                f"maximum travel distance of {travel_max_label} {travel_unit}."
             )
 
         return {

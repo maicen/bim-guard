@@ -14,10 +14,10 @@ Responsibilities:
 Usage:
     from module3_rule_builder.rule_converter import RuleConverter
     from module3_rule_builder.rule_store import RuleStore
-    from config import DB_PATH, GEMINI_API_KEY
+    from config import OPENAI_API_KEY
 
-    store     = RuleStore(DB_PATH)
-    converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
+    store     = RuleStore()
+    converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
     rules     = converter.extract_rules(chunk)
 """
 
@@ -26,9 +26,19 @@ import json
 import openai
 
 try:
-    from config import OPENAI_API_KEY, OPENAI_MODEL
+    from config import (
+        COMPLIANCE_TEMPERATURE,
+        MAX_TOKENS_RULE_EXTRACTION,
+        OPENAI_API_KEY,
+        OPENAI_MODEL,
+    )
 except ImportError:
-    from app.modules.config import OPENAI_API_KEY, OPENAI_MODEL
+    from app.modules.config import (
+        COMPLIANCE_TEMPERATURE,
+        MAX_TOKENS_RULE_EXTRACTION,
+        OPENAI_API_KEY,
+        OPENAI_MODEL,
+    )
 
 
 # ── SYSTEM PROMPT ─────────────────────────────────────────────────────────────
@@ -36,13 +46,13 @@ except ImportError:
 # so the LLM always outputs the exact schema — not a guessed version.
 
 RAG_SYSTEM_PROMPT = """\
-You are a BIM compliance rule extraction engine for the Ontario Building Code (OBC) Part 9.
+You are a BIM compliance rule extraction engine for building regulations.
 
 Extract every discrete checkable requirement as a JSON rule object.
 
 SCHEMA — every rule must have ALL these fields:
 {{
-  "ref":               "OBC section number e.g. 9.8.2.1.(2), or empty string",
+    "ref":               "Regulation section number e.g. 9.8.2.1.(2), or empty string",
   "desc":              "short plain-English rule description",
   "source_text":       "exact quote or close paraphrase from the regulation",
 
@@ -199,9 +209,15 @@ class RuleConverter:
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Extract all rules from this OBC section:\n\n{text}"},
+                {
+                    "role": "user",
+                    "content": f"Extract all rules from this regulation section:\n\n{text}",
+                },
             ],
-            temperature=0.1,
+            # Deterministic: the reply is parsed as strict JSON by
+            # _parse_response(), so schema drift matters more than variety.
+            temperature=COMPLIANCE_TEMPERATURE,
+            max_tokens=MAX_TOKENS_RULE_EXTRACTION,
         )
 
         raw = response.choices[0].message.content.strip()
@@ -209,7 +225,7 @@ class RuleConverter:
 
         # Tag each rule with its source section
         for rule in rules:
-            rule["obc_section_number"] = chunk.get("section_number")
-            rule["obc_section_name"] = chunk.get("section_name")
+            rule["code_section_number"] = chunk.get("section_number")
+            rule["code_section_name"] = chunk.get("section_name")
 
         return rules

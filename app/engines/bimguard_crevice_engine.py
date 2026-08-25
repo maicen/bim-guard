@@ -29,8 +29,10 @@ import os
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
+
+from app.services.corrosion_rule_catalog import load_cc_catalog
 
 # Import GC-001 engine for combined assessment
 try:
@@ -47,64 +49,12 @@ try:
 except ImportError:
     GC_AVAILABLE = False
 
-# ── VERSION ───────────────────────────────────────────────────────────────────
 RULESET_VERSION = "BIMGUARD-CC-001 v1.0.0"
-ASSESSMENT_DATE = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+ASSESSMENT_DATE = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-# ── CCT TABLE ─────────────────────────────────────────────────────────────────
-# Critical Crevice Corrosion Temperature — minimum temperature at which
-# crevice corrosion can initiate in the ASTM G48 Method B test solution.
-# Source: ASTM G48 Method B / CIRIA C692 / Sandvik Corrosion Handbook
-CCT_TABLE = {
-    "ss304_passive": {
-        "cct_c": -5,
-        "pren_typical": 19,
-        "label": "SS 304",
-        "standard": "ASTM G48B / CIRIA C692",
-    },
-    "ss304_active": {
-        "cct_c": -5,
-        "pren_typical": 19,
-        "label": "SS 304 (active)",
-        "standard": "ASTM G48B",
-    },
-    "ss316_passive": {
-        "cct_c": 10,
-        "pren_typical": 25,
-        "label": "SS 316",
-        "standard": "ASTM G48B / CIRIA C692",
-    },
-    "ss316_active": {
-        "cct_c": 10,
-        "pren_typical": 25,
-        "label": "SS 316 (active)",
-        "standard": "ASTM G48B",
-    },
-    "duplex2205": {
-        "cct_c": 25,
-        "pren_typical": 35,
-        "label": "Duplex 2205",
-        "standard": "ASTM G48B / CIRIA C692",
-    },
-    "superduplex2507": {
-        "cct_c": 50,
-        "pren_typical": 42,
-        "label": "Super Duplex 2507",
-        "standard": "ASTM G48B / CIRIA C692",
-    },
-    "titanium": {
-        "cct_c": 120,
-        "pren_typical": 45,
-        "label": "Titanium Grade 2",
-        "standard": "ASTM G48B",
-    },
-    "hastelloy_c": {
-        "cct_c": 85,
-        "pren_typical": 70,
-        "label": "Hastelloy C",
-        "standard": "ASTM G48B",
-    },
-}
+_CC_CATALOG = load_cc_catalog()
+
+CCT_TABLE = _CC_CATALOG["cct_table"]
 
 # Material name normalisation for CC-001
 # Maps IFC material strings to CCT table keys
@@ -166,93 +116,9 @@ def get_cct(material_key: str) -> Optional[dict]:
 
 
 # ── GEOMETRY CLASSES ──────────────────────────────────────────────────────────
-# Geometry class determines severity of crevice restriction.
-# Source: CIBSE Guide G / CIRIA C692
-GEOMETRY_CLASSES = {
-    "Open": {"risk": 0.10, "description": "Crevice width > 2mm — free electrolyte circulation"},
-    "Moderate": {"risk": 0.45, "description": "Crevice width 0.5–2mm — some flow restriction"},
-    "Tight": {"risk": 0.75, "description": "Crevice width 0.1–0.5mm — significant restriction"},
-    "Critical": {
-        "risk": 1.00,
-        "description": "Crevice width < 0.1mm — gasket contact / thread interface",
-    },
-}
+GEOMETRY_CLASSES = _CC_CATALOG["geometry_classes"]
 
-# ── JOINT TYPE LIBRARY ────────────────────────────────────────────────────────
-# 14-type library mapping IFC element types to geometry classes.
-# Source: CIBSE Guide G / CIRIA C692 / project methodology
-JOINT_TYPES = {
-    "JT-001": {
-        "label": "Butt weld",
-        "geometry": "Open",
-        "ifc_types": ["IfcPipeSegment_BUTT", "buttweld", "butt weld", "butt-weld"],
-    },
-    "JT-002": {
-        "label": "Socket weld",
-        "geometry": "Moderate",
-        "ifc_types": ["socketweld", "socket weld", "sw"],
-    },
-    "JT-003": {
-        "label": "Slip-on flange",
-        "geometry": "Moderate",
-        "ifc_types": ["slip-on", "slipon", "slip on", "so flange"],
-    },
-    "JT-004": {
-        "label": "Weld neck flange",
-        "geometry": "Tight",
-        "ifc_types": ["weld neck", "weldneck", "wn flange", "wnrf"],
-    },
-    "JT-005": {
-        "label": "Threaded NPT",
-        "geometry": "Critical",
-        "ifc_types": ["threaded", "npt", "bsp", "screwed", "thread"],
-    },
-    "JT-006": {
-        "label": "Compression fitting",
-        "geometry": "Tight",
-        "ifc_types": ["compression", "compr", "olive"],
-    },
-    "JT-007": {
-        "label": "Push-fit press",
-        "geometry": "Moderate",
-        "ifc_types": ["press fit", "pressfit", "push fit", "pushfit", "victaulic-style"],
-    },
-    "JT-008": {
-        "label": "Victaulic groove coupling",
-        "geometry": "Moderate",
-        "ifc_types": ["victaulic", "groove coupling", "grooved"],
-    },
-    "JT-009": {
-        "label": "Screwed BSP",
-        "geometry": "Critical",
-        "ifc_types": ["bsp", "screwed bsp", "rp thread"],
-    },
-    "JT-010": {
-        "label": "Lap joint flange",
-        "geometry": "Tight",
-        "ifc_types": ["lap joint", "lapjoint", "stub end"],
-    },
-    "JT-011": {
-        "label": "Ring-type joint flange",
-        "geometry": "Tight",
-        "ifc_types": ["rtj", "ring type joint", "ring-type joint"],
-    },
-    "JT-012": {
-        "label": "Pipe clamp under insulation",
-        "geometry": "Critical",
-        "ifc_types": ["under insulation", "clamp", "u-bolt"],
-    },
-    "JT-013": {
-        "label": "Mechanical anchor contact",
-        "geometry": "Tight",
-        "ifc_types": ["anchor", "mechanical anchor", "bolt through"],
-    },
-    "JT-014": {
-        "label": "Unknown / unclassified",
-        "geometry": "Tight",
-        "ifc_types": [],
-    },  # conservative default
-}
+JOINT_TYPES = _CC_CATALOG["joint_type_library"]["types"]
 
 
 def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
@@ -260,14 +126,17 @@ def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
     Map a joint description string to a joint type and geometry class.
     Returns (joint_type_code, geometry_class, risk_score).
     """
-    desc_lower = joint_description.lower().strip()
+    desc_lower = (joint_description or "").lower().strip()
     for code, jt in JOINT_TYPES.items():
         if code == "JT-014":
             continue
-        for ifc_type in jt["ifc_types"]:
-            if ifc_type in desc_lower:
-                geo = jt["geometry"]
-                return code, geo, GEOMETRY_CLASSES[geo]["risk"]
+        ifc_types = jt.get("ifc_types") or []
+        if not isinstance(ifc_types, (list, tuple, set)):
+            ifc_types = [ifc_types]
+        for ifc_type in ifc_types:
+            if str(ifc_type).lower() in desc_lower:
+                geo = jt.get("geometry", "Tight")
+                return code, geo, GEOMETRY_CLASSES.get(geo, GEOMETRY_CLASSES["Tight"])["risk"]
     # Default to Tight (JT-014) — conservative
     return "JT-014", "Tight", GEOMETRY_CLASSES["Tight"]["risk"]
 
@@ -537,7 +406,7 @@ def assess_crevice_risk(element: CCElement) -> CCResult:
 
     # Joint type classification
     jt_code, geo_class, geo_risk = classify_joint_type(element.joint_description)
-    jt_label = JOINT_TYPES[jt_code]["label"]
+    jt_label = JOINT_TYPES.get(jt_code, {"label": "Unknown joint type"})["label"]
 
     # CCT adequacy
     env_sev_key, env_sev_data = classify_environment_severity(

@@ -4,7 +4,7 @@ module1b_nlp_annotator/cross_ref_resolver.py
 Extracts and normalises cross-references from building code text.
 
 Pattern families covered:
-    1. Decimal-hierarchy  — "Section 9.8.4.1", "Table 9.8.4.1.A"   (OBC, IBC, NFPA, NCC)
+    1. Decimal-hierarchy  — "Section 9.8.4.1", "Table 9.8.4.1.A"   (CODE, IBC, NFPA, NCC)
     2. Section-symbol     — "§ 1009.1", "§3.1(a)"                   (US legal/IBC)
     3. Alphanumeric std   — "EN 1992-1-1", "BS 5950", "AS 1170.1"   (Eurocodes, ISO, AU)
     4. Shorthand clause   — "cl. 2.3", "Reg. 7", "para. 4.1"        (UK, informal)
@@ -26,14 +26,14 @@ import re
 # Negative lookahead: don't match if immediately followed by a unit
 _NO_UNIT = r'(?!\s*(?:mm|cm|m\b|m2|m²|%|min|h\b|°|deg|storey))'
 
-# ── Pattern family 1: Decimal-hierarchy (OBC/IBC/NFPA/NCC) ────────────────────
+# ── Pattern family 1: Decimal-hierarchy (CODE/IBC/NFPA/NCC) ────────────────────
 
 _LABELS = (
     r'(?:Section|Article|Clause|Subsection|Sentence|Part|Appendix|Table|Figure|'
     r'Div(?:ision)?|Paragraph|Sub-?clause)'
 )
 
-_OBC_NUM = (
+_DECIMAL_NUM = (
     r'[1-9]\d*\.\d+'              # e.g. 9.8 or 10.3
     r'(?:\.\d+(?:\.\d+)?)?'       # up to 2 more groups: 9.8.4.1
     r'(?:\.\([0-9]+\))?'          # optional subsection: 9.8.4.1.(2)
@@ -41,7 +41,7 @@ _OBC_NUM = (
 )
 
 _LABELLED_REF = re.compile(
-    rf'({_LABELS})\s+({_OBC_NUM}){_NO_UNIT}',
+    rf'({_LABELS})\s+({_DECIMAL_NUM}){_NO_UNIT}',
     re.IGNORECASE,
 )
 
@@ -54,12 +54,12 @@ _CONTEXT_PHRASES = (
 )
 
 _CONTEXT_REF = re.compile(
-    rf'({_CONTEXT_PHRASES})({_OBC_NUM}){_NO_UNIT}',
+    rf'({_CONTEXT_PHRASES})({_DECIMAL_NUM}){_NO_UNIT}',
     re.IGNORECASE,
 )
 
 _BARE_SECTION = re.compile(
-    rf'\b({_OBC_NUM}){_NO_UNIT}',
+    rf'\b({_DECIMAL_NUM}){_NO_UNIT}',
     re.IGNORECASE,
 )
 

@@ -17,12 +17,6 @@ services:
     healthCheckPath: /
 
     envVars:
-      # ── Backend selectors (non-secret) ──────────────────────────────────────
-      - key: BIM_GUARD_DB_BACKEND
-        value: supabase
-      - key: BIM_GUARD_STORAGE_BACKEND
-        value: supabase
-
       # ── Supabase — set these in the Render dashboard (never commit secrets) ─
       - key: SUPABASE_URL
         sync: false

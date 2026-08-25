@@ -4,12 +4,12 @@ module1_doc_parser/section_chunker.py
 Step 3 — Splits Docling markdown text into section chunks.
 
 Recognises headings in this priority order:
-  1. The original 13-topic OBC Part 9 taxonomy ("# 4 Stairs", "4 Stairs...")
+  1. The original 13-topic code taxonomy ("# 4 Stairs", "4 Stairs...")
      — exact match required, preserved for backward compatibility.
-  2. Real OBC dotted-decimal numbering ("9.8.2.1.  Stair Width") — the actual
+  2. Real dotted-decimal numbering ("9.8.2.1.  Stair Width") — the actual
      Article/Sentence numbering scheme building codes use, independent of
      markdown and independent of the 13-topic taxonomy above. This is what
-     pypdf's plain-text extraction of a real OBC PDF looks like, so it's the
+      pypdf's plain-text extraction of a real code PDF looks like, so it's the
      pattern the live document-upload -> extract-rules flow actually needs.
   3. Any markdown heading, any level ("## SECTION 8.14 ...") — Docling's own
      structural markers, independent of numbering scheme.
@@ -30,9 +30,9 @@ Usage:
 
 import re
 
-OBC_SECTION_HEADINGS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]
+CODE_SECTION_HEADINGS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]
 
-OBC_SECTION_NAMES = {
+CODE_SECTION_NAMES = {
     "1": "Building Basics",
     "2": "Means of Egress and Exit Paths",
     "3": "Doors (Detailed)",
@@ -48,17 +48,17 @@ OBC_SECTION_NAMES = {
     "13": "Model QA",
 }
 
-# ── 1. Original OBC 13-topic taxonomy — unchanged, exact match only ──────────
-_OBC_MD_HEADING = re.compile(r"^#{1,3}\s+(1[0-3]|[1-9])\s+.+")
-_OBC_TXT_HEADING = re.compile(r"^(1[0-3]|[1-9])[\s\.].+")
+# ── 1. Original 13-topic taxonomy — unchanged, exact match only ──────────────
+_CODE_MD_HEADING = re.compile(r"^#{1,3}\s+(1[0-3]|[1-9])\s+.+")
+_CODE_TXT_HEADING = re.compile(r"^(1[0-3]|[1-9])[\s\.].+")
 
-# ── 2. Real OBC dotted-decimal Article numbering, e.g. "9.8.2.1.  Stair Width"
+# ── 2. Real dotted-decimal Article numbering, e.g. "9.8.2.1.  Stair Width"
 # or "9.8.2.  Stair Dimensions" — 3 to 5 dot-separated components. Requires
 # >=2 dots so a bare decimal mid-prose ("3.7 m") can't false-match, and a
 # capitalised title after the number so a numbered clause ("(1) Except...",
 # which starts with "(" anyway) or a table data row ("1.  Private stairs(1)
 # 200 125...", which has no further dotted digits after "1.") can't either.
-_OBC_DOTTED_HEADING = re.compile(r"^(\d+(?:\.\d+){2,4})\.?\s+[A-Z].+")
+_CODE_DOTTED_HEADING = re.compile(r"^(\d+(?:\.\d+){2,4})\.?\s+[A-Z].+")
 
 # ── 3. Any markdown heading, any level, any numbering scheme ─────────────────
 _MD_ANY_HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
@@ -80,20 +80,20 @@ class SectionChunker:
         if not s:
             return None
 
-        if _OBC_MD_HEADING.match(s):
+        if _CODE_MD_HEADING.match(s):
             m = re.search(r"(1[0-3]|[1-9])", s)
             if m:
                 num = m.group(1)
-                return num, OBC_SECTION_NAMES.get(num, "Unknown")
+                return num, CODE_SECTION_NAMES.get(num, "Unknown")
 
-        if _OBC_TXT_HEADING.match(s):
+        if _CODE_TXT_HEADING.match(s):
             m = re.match(r"^(1[0-3]|[1-9])", s)
             if m:
                 candidate = m.group(1)
                 if s[len(candidate) : len(candidate) + 1] == " ":
-                    return candidate, OBC_SECTION_NAMES.get(candidate, "Unknown")
+                    return candidate, CODE_SECTION_NAMES.get(candidate, "Unknown")
 
-        m = _OBC_DOTTED_HEADING.match(s)
+        m = _CODE_DOTTED_HEADING.match(s)
         if m:
             return m.group(1), s[:100]
 

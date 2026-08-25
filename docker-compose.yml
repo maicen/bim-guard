@@ -10,9 +10,6 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      # Backend selectors (defaults already set in image; explicit here for clarity)
-      - BIM_GUARD_DB_BACKEND=supabase
-      - BIM_GUARD_STORAGE_BACKEND=supabase
       # AI rule extraction
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}

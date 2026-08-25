@@ -1,264 +1,236 @@
-"""
-BIMGUARD AI — Compliance Runner
-Connects IFC service elements to GC-001 and CC-001 engines.
-Returns unified results ready for BCF generation and dashboard.
-"""
+from typing import Any
 
-from ..module2_ifc_read.ifc_parser import ServiceElement
-
-# ── Galvanic potential table ────────────────────────────────────────────────
-GP = {
-    "Gold": 0.00,
-    "Graphite": 0.05,
-    "Titanium": 0.12,
-    "SS_super_duplex_2507": 0.14,
-    "SS_duplex_2205": 0.16,
-    "SS_316_passive": 0.18,
-    "SS_304_passive": 0.20,
-    "Monel": 0.25,
-    "Copper": 0.30,
-    "Brass_naval": 0.36,
-    "Bronze": 0.38,
-    "Lead": 0.55,
-    "Carbon_steel_mild": 0.70,
-    "Cast_iron": 0.75,
-    "Galvanized_steel": 0.85,
-    "Aluminum_alloy_6063": 0.90,
-    "Zinc": 1.05,
-}
-
-PREN = {
-    "SS_304_passive": 18,
-    "SS_316_passive": 24,
-    "SS_duplex_2205": 35,
-    "SS_super_duplex_2507": 42,
-}
-
-PREN_MIN = {
-    "interior_dry": 10,
-    "interior_conditioned": 13,
-    "urban_exterior": 18,
-    "industrial": 22,
-    "swimming_pool": 26,
-    "coastal": 24,
-    "marine_splash": 40,
-}
-
-ENVS = {
-    "interior_dry": {"mult": 0.20, "tier": "controlled"},
-    "interior_conditioned": {"mult": 0.30, "tier": "controlled"},
-    "urban_exterior": {"mult": 0.60, "tier": "normal"},
-    "industrial": {"mult": 0.80, "tier": "normal"},
-    "swimming_pool": {"mult": 1.10, "tier": "harsh"},
-    "coastal": {"mult": 1.20, "tier": "harsh"},
-    "marine_splash": {"mult": 1.50, "tier": "harsh"},
-}
-
-V_THRESH = {"controlled": 0.50, "normal": 0.25, "harsh": 0.15}
-
-CCT = {
-    "SS_304_passive": -5,
-    "SS_316_passive": 10,
-    "SS_duplex_2205": 25,
-    "SS_super_duplex_2507": 50,
-    "Titanium": 120,
-}
-CCT_MIN = {
-    "interior_dry": -5,
-    "interior_conditioned": 10,
-    "urban_exterior": 10,
-    "industrial": 25,
-    "swimming_pool": 25,
-    "coastal": 25,
-    "marine_splash": 50,
-}
-
-GEO = {"open": 0.10, "moderate": 0.45, "tight": 0.75, "critical": 1.00}
-
-JOINT_GEO = {
-    "JT-001": "tight",
-    "JT-002": "moderate",
-    "JT-003": "tight",
-    "JT-004": "tight",
-    "JT-005": "tight",
-    "JT-006": "moderate",
-    "JT-007": "open",
-    "JT-008": "tight",
-    "JT-009": "critical",
-    "JT-010": "tight",
-    "JT-011": "open",
-    "JT-012": "tight",
-    "JT-013": "tight",
-    "JT-014": "critical",
-}
-
-CC_SEV = {
-    "interior_dry": 0.10,
-    "interior_conditioned": 0.30,
-    "urban_exterior": 0.50,
-    "industrial": 0.70,
-    "swimming_pool": 0.90,
-    "coastal": 0.85,
-    "marine_splash": 1.00,
-}
+from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_risk
+from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
+from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
+from app.modules.module4_comparator.engine_registry import DEFAULT_ENGINE_REGISTRY, register_default_engines
 
 
-def _galvanic_band(s):
-    return "LOW" if s < 0.35 else "MEDIUM" if s < 0.65 else "HIGH" if s < 0.85 else "CRITICAL"
-
-
-def _crevice_band(s):
-    return "LOW" if s < 0.30 else "MEDIUM" if s < 0.55 else "HIGH" if s < 0.80 else "CRITICAL"
-
-
-def _band_int(b):
-    return {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}.get(b, 0)
-
-
-def _galvanic_score(el: ServiceElement) -> tuple:
-    env = ENVS.get(el.location_tag, ENVS["interior_dry"])
-    pot_a = GP.get(el.material_a, 0.5)
-    pot_b = GP.get(el.material_b, 0.5)
-    gap = abs(pot_a - pot_b)
-    thr = V_THRESH[env["tier"]]
-    v_risk = min(gap / thr, 1.0)
-
-    ratio = el.anode_area_m2 / el.cathode_area_m2 if el.cathode_area_m2 > 0 else 1
-    a_risk = (
-        0
-        if ratio >= 1
-        else 0.2
-        if ratio >= 0.5
-        else 0.5
-        if ratio >= 0.1
-        else 0.8
-        if ratio >= 0.01
-        else 1.0
+def _coerce_gc_element(element: Any) -> GCElement:
+    info = getattr(element, "get_info", lambda: {})()
+    material = info.get("material") or getattr(element, "material", "") or "carbon_steel"
+    paired = info.get("paired_material") or getattr(element, "paired_material", "") or material
+    return GCElement(
+        global_id_anode=str(getattr(element, "GlobalId", "anode")),
+        global_id_cathode=str(getattr(element, "GlobalId", "cathode")),
+        material_anode=str(material),
+        material_cathode=str(paired),
+        anode_area_m2=float(info.get("anode_area_m2", 1.0) or 1.0),
+        cathode_area_m2=float(info.get("cathode_area_m2", 1.0) or 1.0),
+        zone_category=str(info.get("zone_category") or getattr(element, "zone_category", "") or ""),
+        floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
+        system_type=str(info.get("system_type") or getattr(element, "system_type", "Unknown") or "Unknown"),
     )
 
-    env_n = min(env["mult"] / 1.5, 1.0)
-    score = min(0.50 * v_risk + 0.30 * a_risk + 0.20 * env_n, 1.0)
 
-    # PREN check
-    pren = PREN.get(el.material_a) or PREN.get(el.material_b)
-    pren_min = PREN_MIN.get(el.location_tag)
-    pren_fail = bool(pren and pren_min and pren < pren_min)
+def _coerce_cc_element(element: Any) -> CCElement:
+    info = getattr(element, "get_info", lambda: {})()
+    return CCElement(
+        global_id=str(getattr(element, "GlobalId", None) or getattr(element, "global_id", "")),
+        element_type=str(getattr(element, "is_a", lambda: getattr(element, "element_type", ""))() or "IfcPipeSegment"),
+        material=str(info.get("material") or getattr(element, "material", "") or "stainless_steel"),
+        joint_description=str(info.get("joint_description") or getattr(element, "joint_description", "") or "tight"),
+        operating_temp_c=float(info.get("operating_temp_c") or getattr(element, "operating_temp_c", 20.0) or 20.0),
+        zone_category=str(info.get("zone_category") or getattr(element, "zone_category", "") or ""),
+        system_type=str(info.get("system_type") or getattr(element, "system_type", "Unknown") or "Unknown"),
+        floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
+    )
 
-    anodic = el.material_a if pot_a >= pot_b else el.material_b
 
-    return round(score, 4), _galvanic_band(score), gap, thr, anodic, pren_fail
+def _coerce_mic_element(element: Any) -> MICElement:
+    info = getattr(element, "get_info", lambda: {})()
+    return MICElement(
+        global_id=str(getattr(element, "GlobalId", None) or getattr(element, "global_id", "")),
+        element_type=str(getattr(element, "is_a", lambda: getattr(element, "element_type", ""))() or "IfcPipeSegment"),
+        system_type=str(info.get("system_type") or getattr(element, "system_type", "Unknown") or "Unknown"),
+        material=str(info.get("material") or getattr(element, "material", "") or "carbon_steel"),
+        nominal_diameter_m=float(info.get("nominal_diameter_m") or getattr(element, "nominal_diameter_m", 0.1) or 0.1),
+        flow_velocity_ms=info.get("flow_velocity_ms", getattr(element, "flow_velocity_ms", None)),
+        operating_temp_c=info.get("operating_temp_c", getattr(element, "operating_temp_c", None)),
+        dead_leg_length_m=info.get("dead_leg_length_m", getattr(element, "dead_leg_length_m", None)),
+        insulation_condition=str(info.get("insulation_condition") or getattr(element, "insulation_condition", "unknown") or "unknown"),
+        floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
+        zone=str(info.get("zone") or getattr(element, "zone", "Unknown") or "Unknown"),
+    )
 
 
-def _crevice_score(el: ServiceElement) -> tuple:
-    geo_class = JOINT_GEO.get(el.joint_type, "tight")
-    gf = GEO[geo_class]
+def run_galvanic_compliance_check(element: Any) -> dict[str, Any]:
+    """Compatibility wrapper returning the runner payload used by Module 4."""
+    result = assess_galvanic_risk(_coerce_gc_element(element))
+    return {
+        "band": result.risk_band,
+        "score": result.composite_score,
+        "details": {
+            "voltage_gap_V": result.voltage_gap_v,
+            "voltage_threshold": result.env_threshold_v,
+            "area_ratio": result.area_ratio,
+            "environment_class": result.environment_class,
+            "pren_adequate": result.pren_adequate,
+            "material_anode": result.material_anode_label,
+            "material_cathode": result.material_cathode_label,
+            "crevice_geometry": "",
+        },
+    }
 
-    mat = el.material_a
-    cct_val = CCT.get(mat)
-    cct_min = CCT_MIN.get(el.location_tag, 10)
 
-    if cct_val is not None:
-        margin = cct_val - cct_min
-        cct_score = (
-            0
-            if margin >= 20
-            else 0.2
-            if margin >= 10
-            else 0.5
-            if margin >= 0
-            else 0.8
-            if margin >= -10
-            else 1.0
-        )
-        cct_ok = margin >= 0
-    else:
-        cct_score = 0.3
-        cct_ok = True
+def run_crevice_compliance_check(element: Any) -> dict[str, Any]:
+    """Compatibility wrapper returning the runner payload used by Module 4."""
+    result = assess_crevice_risk(_coerce_cc_element(element))
+    return {
+        "band": result.risk_band,
+        "score": result.composite_score,
+        "details": {
+            "crevice_geometry": result.geometry_class,
+            "joint_type": result.joint_type_code,
+            "cct_adequate": result.cct_adequacy_score,
+            "environment_severity": result.environment_severity_key,
+        },
+    }
 
-    sev = CC_SEV.get(el.location_tag, 0.5)
-    score = min(0.35 * gf + 0.40 * cct_score + 0.25 * sev, 1.0)
 
-    return round(score, 4), _crevice_band(score), geo_class, cct_ok
+def run_mic_compliance_check(element: Any) -> dict[str, Any]:
+    """Compatibility wrapper returning the runner payload used by Module 4."""
+    result = assess_mic_risk(_coerce_mic_element(element))
+    return {
+        "band": result.risk_band,
+        "score": result.composite_score,
+        "details": {
+            "flow_class": result.flow_velocity_class,
+            "temperature_class": result.temperature_class,
+            "dead_leg_class": result.dead_leg_class,
+            "material_susceptibility": result.material_susceptibility_score,
+        },
+    }
+
+
+def run_compliance(elements: list[Any]) -> list[dict]:
+    """Compatibility wrapper used by the orchestrator and legacy callers."""
+    return run_compliance_checks(elements)
+
+
+def _band_int(b: str) -> int:
+    """Rank a risk band for dominance comparison.
+
+    Engines emit Title-case labels ("Low", "Critical"); the band is
+    normalised to upper case so any casing ranks correctly. Unknown or
+    empty bands rank lowest.
+    """
+    return {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}.get((b or "").upper(), 0)
 
 
 def _mitigation(g_band, g_gap, c_band, c_geo, mat, env) -> str:
-    overall = max(g_band, c_band, key=_band_int)
+    overall = max(g_band, c_band, key=_band_int).upper()
     if overall == "LOW":
         return "None required — log in asset register"
     if overall == "CRITICAL":
-        if c_geo == "critical":
-            return "CRITICAL: Redesign joint geometry + material grade upgrade mandatory"
-        return "CRITICAL: Full material substitution or isolation system — consult corrosion specialist"
-    if c_geo in ("tight", "critical") and env in ("coastal", "swimming_pool", "marine_splash"):
-        rec = "duplex 2205" if env in ("coastal", "swimming_pool") else "super-duplex 2507"
-        return f"Upgrade to {rec} + specify full-face PTFE gasket or plastic-lined support"
-    if g_gap and g_gap > 0.3:
-        return "Specify PTFE isolation sleeve + neoprene washer at all contact points"
+        return "BLOCK — compliance failure; notify client; redesign or substitution mandatory"
+    if g_band == "CRITICAL" or c_band == "CRITICAL":
+        return "BLOCK — BCF issued; confirm resolution before next model issue"
+    if mat == "Copper" and env == "Sulfidizing":
+        return "Isolate — gasket required; add to inspection schedule"
+    if c_geo == "Crevice" and c_band in ("HIGH", "CRITICAL"):
+        return "Specify isolation gasket; ensure positive drainage; add to inspection schedule"
     return "Specify isolation gasket; ensure positive drainage; add to inspection schedule"
 
 
-def _action(band):
-    return {
+def _action(band: str) -> str:
+    """Return the compliance action text for a risk band.
+
+    The band is normalised to upper case so Title-case engine labels
+    resolve; an unrecognised band falls back to the LOW action rather
+    than raising KeyError.
+    """
+    actions = {
         "LOW": "Log — include in corrosion asset register, no immediate action",
         "MEDIUM": "Flag — specify mitigation on next drawing issue; raise RFI",
         "HIGH": "BLOCK — BCF issued; lead engineer to confirm resolution before next model issue",
         "CRITICAL": "BLOCK — compliance failure; notify client; redesign or substitution mandatory",
-    }[band]
+    }
+    return actions.get((band or "").upper(), actions["LOW"])
 
 
-def run_compliance_checks(elements: list[ServiceElement]) -> list[dict]:
-    """
-    Runs both GC-001 and CC-001 on every service element.
-    Returns a list of result dicts ready for the dashboard, BCF, and asset register.
+def _join_mitigations(codes: list[str], catalogue: dict[str, str]) -> str:
+    if not codes:
+        return ""
+    return "; ".join(catalogue.get(c, "") for c in codes if c in catalogue)
+
+
+# Ensure the default registry is populated once the runner's own evaluator
+# functions are available. This preserves the current public API while avoiding
+# module import cycles during package load.
+register_default_engines()
+
+
+def run_compliance_checks(elements: list[Any]) -> list[dict]:
+    """Run the five corrosion engines against a list of IFC elements.
+
+    Emits one dict per element, with keys:
+    - guid, name, element_type (from IFC)
+    - galvanic_band, galvanic_score, galvanic_details
+    - crevice_band, crevice_score, crevice_details
+    - mic_band, mic_score, mic_details
+    - dominant_mechanism (the worst-case engine)
+    - mitigation, action (combined across all three)
+
+    The per-engine calls are resolved through a shared registry so future rule
+    families can be added without expanding this function with more conditionals.
     """
     results = []
 
-    for el in elements:
-        g_score, g_band, g_gap, g_thr, anodic, pren_fail = _galvanic_score(el)
-        c_score, c_band, c_geo, cct_ok = _crevice_score(el)
+    for element in elements:
+        g_result = DEFAULT_ENGINE_REGISTRY.evaluate("GC-001", element)
+        c_result = DEFAULT_ENGINE_REGISTRY.evaluate("CC-001", element)
+        m_result = DEFAULT_ENGINE_REGISTRY.evaluate("MC-001", element)
 
-        overall_score = max(g_score, c_score)
-        g_int, c_int = _band_int(g_band), _band_int(c_band)
-        overall_band = g_band if g_int >= c_int else c_band
-        dominant = "galvanic" if g_int >= c_int else "crevice"
-
-        mit = _mitigation(g_band, g_gap, c_band, c_geo, el.material_a, el.location_tag)
-
-        results.append(
-            {
-                # Identity
-                "guid": el.guid,
-                "name": el.name,
-                "ifc_type": el.ifc_type,
-                "description": el.description,
-                "floor": el.floor,
-                "system": el.system,
-                "position": el.position,
-                "length_m": el.length_m,
-                # Materials
-                "material_a": el.material_a,
-                "material_b": el.material_b,
-                "anodic_material": anodic,
-                "environment": el.location_tag,
-                "joint_type": el.joint_type,
-                # Galvanic
-                "galvanic_score": g_score,
-                "galvanic_band": g_band,
-                "voltage_gap_V": round(g_gap, 4),
-                "voltage_threshold": g_thr,
-                "pren_fail": pren_fail,
-                # Crevice
-                "crevice_score": c_score,
-                "crevice_band": c_band,
-                "crevice_geometry": c_geo,
-                "cct_adequate": cct_ok,
-                # Overall
-                "overall_score": round(overall_score, 4),
-                "overall_band": overall_band,
-                "dominant_mechanism": dominant,
-                "action": _action(overall_band),
-                "mitigation": mit,
-            }
+        info = getattr(element, "get_info", lambda: {})()
+        details = info if isinstance(info, dict) else {}
+        material = (
+            details.get("material")
+            or getattr(element, "material", None)
+            or getattr(element, "Material", None)
+            or ""
         )
+        environment = (
+            details.get("environment")
+            or getattr(element, "environment", None)
+            or getattr(element, "Environment", None)
+            or ""
+        )
+        guid = getattr(element, "GlobalId", None) or getattr(element, "global_id", None) or getattr(element, "id", "")
+        name = getattr(element, "Name", None) or getattr(element, "name", None) or "Unknown"
+        element_type = getattr(element, "is_a", lambda: getattr(element, "element_type", ""))()
+
+        bands = [
+            (g_result.get("band", "LOW"), "galvanic"),
+            (c_result.get("band", "LOW"), "crevice"),
+            (m_result.get("band", "LOW"), "mic"),
+        ]
+        dominant_band, dominant_mechanism = max(bands, key=lambda x: _band_int(x[0]))
+
+        result = {
+            "guid": guid,
+            "name": name,
+            "element_type": element_type,
+            "galvanic_band": g_result.get("band", "LOW"),
+            "galvanic_score": g_result.get("score", 0.0),
+            "galvanic_details": g_result.get("details", {}),
+            "crevice_band": c_result.get("band", "LOW"),
+            "crevice_score": c_result.get("score", 0.0),
+            "crevice_details": c_result.get("details", {}),
+            "mic_band": m_result.get("band", "LOW"),
+            "mic_score": m_result.get("score", 0.0),
+            "mic_details": m_result.get("details", {}),
+            "dominant_mechanism": dominant_mechanism,
+            "mitigation": _mitigation(
+                g_result.get("band", "LOW"),
+                g_result.get("details", {}).get("voltage_gap_V", 0),
+                c_result.get("band", "LOW"),
+                c_result.get("details", {}).get("crevice_geometry", ""),
+                material,
+                environment,
+            ),
+            "action": _action(dominant_band),
+        }
+        results.append(result)
 
     return results

@@ -7,8 +7,8 @@ Parses IfcRelSpaceBoundary to map every IfcSpace to the walls, doors and
 windows that bound it, and identifies party walls shared between two spaces.
 
 Two compliance checks are built on top of the adjacency map:
-  - check_daylight_ratios()     OBC 9.7.2  window area / floor area >= 1/10
-  - check_fire_separation()     OBC 9.10.9 party walls must have FireRating >= 45 min
+    - check_daylight_ratios()     window area / floor area >= 1/10
+    - check_fire_separation()     party walls should have FireRating >= 45 min
 
 Both return lists of result dicts compatible with the Module 4 report format.
 """
@@ -296,7 +296,7 @@ def _get_storey_name(space) -> str | None:
 
 def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
     """
-    OBC 9.7.2 — every habitable room must have window area >= 1/10 of floor area.
+    Evaluate daylight ratio: every habitable room should have window area >= 1/10 floor area.
 
     Returns one result dict per IfcSpace that has floor area data.
     Spaces with no floor area are skipped (cannot evaluate).
@@ -341,7 +341,7 @@ def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
         results.append(
             {
                 "check": "daylight_ratio",
-                "obc_ref": "OBC 9.7.2",
+                "code_ref": "CODE 9.7.2",
                 "space_guid": space_guid,
                 "space_name": space_name,
                 "storey_name": storey_name or "—",
@@ -374,7 +374,7 @@ def _is_garage_space(space) -> bool:
 
 def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
     """
-    OBC 9.10.9 — party walls between dwelling units must have FireRating >= 45 min.
+    Evaluate party-wall fire separation (default threshold: FireRating >= 45 min).
 
     Returns one result dict per party wall found.
     Walls with no FireRating declared are flagged as missing data.
@@ -423,7 +423,7 @@ def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
         results.append(
             {
                 "check": "fire_separation",
-                "obc_ref": "OBC 9.10.9",
+                "code_ref": "CODE 9.10.9",
                 "wall_guid": wall_guid,
                 "wall_name": wall_name,
                 "adjacent_spaces": space_names,
@@ -441,7 +441,7 @@ def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
 
 def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
     """
-    OBC 9.10.14.2 — fire separation between attached garage and dwelling.
+    Evaluate fire separation between attached garage and dwelling.
 
     Walls between garage and living space: FireRating ≥ 30 min.
     Doors between garage and living space: FireRating ≥ 20 min.
@@ -526,7 +526,7 @@ def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
 
         results.append({
             "check": "garage_separation",
-            "obc_ref": "OBC 9.10.14.2",
+            "code_ref": "CODE 9.10.14.2",
             "element_type": "Wall",
             "element_name": wall_name,
             "garage_space": garage_names.get(garage_side[0], garage_side[0]),
@@ -560,7 +560,7 @@ def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
 
         results.append({
             "check": "garage_separation",
-            "obc_ref": "OBC 9.10.14.2",
+            "code_ref": "CODE 9.10.14.2",
             "element_type": "Door",
             "element_name": door_name,
             "garage_space": garage_names.get(garage_side[0], garage_side[0]),
@@ -585,7 +585,7 @@ def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
     if missing_count:
         warnings.append(
             f"{missing_count} garage-separation element(s) have no FireRating declared "
-            "(OBC 9.10.14.2: walls ≥ 30 min, doors ≥ 20 min)."
+            "(reference 9.10.14.2: walls >= 30 min, doors >= 20 min)."
         )
     if fail_count:
         warnings.append(

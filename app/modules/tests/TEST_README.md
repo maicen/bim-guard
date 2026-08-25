@@ -35,7 +35,7 @@ tests/
 ├── test_compliance.py       # (your existing file — unchanged)
 ├── eval_harness.py          # LLM-as-judge accuracy scoring tool
 ├── fixtures/                # Put your test PDFs here
-│   └── sample_obc_stairs.pdf
+│   └── sample_code_stairs.pdf
 ├── snapshots/               # Auto-generated regression baselines
 │   ├── chunker_basic.json
 │   └── m3_stair_width.json
@@ -47,11 +47,11 @@ tests/
 
 ### 1. Add test PDF fixtures
 
-Place 1-3 real OBC PDF pages in `tests/fixtures/`:
+Place 1-3 real CODE PDF pages in `tests/fixtures/`:
 
 ```
-tests/fixtures/sample_obc_stairs.pdf    # A page with stair requirements
-tests/fixtures/sample_obc_fire.pdf      # (optional) fire safety section
+tests/fixtures/sample_code_stairs.pdf    # A page with stair requirements
+tests/fixtures/sample_code_fire.pdf      # (optional) fire safety section
 ```
 
 Then update `INTEGRATION_CASES` in `test_integration.py` to match your files.

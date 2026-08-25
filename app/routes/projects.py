@@ -1,5 +1,8 @@
 """Project management routes for creating and maintaining IFC projects."""
 
+import hmac
+import os
+
 from fasthtml.common import (
     FileResponse,
     Title,
@@ -8,11 +11,23 @@ from fasthtml.common import (
 from monsterui.all import Container
 
 from app.components.layout import DashboardLayout
-from app.components.projects_ui import project_form, projects_page
+from app.components.projects_ui import project_enhancements_page, project_form, projects_page
+from app.modules.pipeline_services import execute_model_enhancement
+from app.services.model_lineage import SupabaseModelLineageRepository
+from app.services.object_storage import ObjectStorage
 from app.services.projects_service import ProjectsService
 from app.utils import redirect_see_other
 
 _projects_service = ProjectsService()
+_lineage_repository = SupabaseModelLineageRepository()
+_object_storage = ObjectStorage()
+
+
+def _is_enhancement_authorized(token: str) -> bool:
+    """Authorize explicit model mutation with a deployment-managed secret."""
+    expected = os.getenv("BIM_GUARD_ENHANCEMENT_TOKEN", "").strip()
+    supplied = (token or "").strip()
+    return bool(expected and supplied and hmac.compare_digest(supplied, expected))
 
 
 def setup_routes(rt):
@@ -70,4 +85,61 @@ def setup_routes(rt):
 
         return FileResponse(
             file_path, media_type="application/octet-stream", filename=file_path.name
+        )
+
+    @rt("/projects/{project_id}/enhancements")
+    def project_enhancements(project_id: int, message: str = "", level: str = "success"):
+        project = _projects_service.get_project(project_id)
+        if project is None:
+            return redirect_see_other("/projects")
+        return Title("Enhancement History - BIM Guard"), project_enhancements_page(
+            project,
+            _lineage_repository.list_for_project(project_id),
+            message=message or None,
+            level=level,
+        )
+
+    @rt("/projects/{project_id}/enhance", methods=["POST"])
+    def project_enhance(project_id: int, enhancement_token: str = ""):
+        if not _is_enhancement_authorized(enhancement_token):
+            return redirect_see_other(
+                f"/projects/{project_id}/enhancements?message=Enhancement+authorization+failed&level=warning"
+            )
+
+        project = _projects_service.get_project(project_id)
+        if project is None or not project.get("ifc_file_path"):
+            return redirect_see_other(
+                f"/projects/{project_id}/enhancements?message=Project+IFC+source+not+found&level=warning"
+            )
+
+        try:
+            result = execute_model_enhancement(
+                project_id=project_id,
+                source_reference=project["ifc_file_path"],
+            )
+        except Exception:
+            return redirect_see_other(
+                f"/projects/{project_id}/enhancements?message=Enhancement+failed&level=warning"
+            )
+        return redirect_see_other(
+            f"/projects/{project_id}/enhancements?message=Generated+model+version+{result['version']}"
+        )
+
+    @rt("/projects/{project_id}/enhancements/{lineage_id}/download")
+    def project_enhancement_download(project_id: int, lineage_id: int):
+        lineage = _lineage_repository.get(lineage_id)
+        if lineage is None or int(lineage.get("project_id") or 0) != project_id:
+            return redirect_see_other(f"/projects/{project_id}/enhancements")
+
+        local_path = _object_storage.materialize_local_path(
+            str(lineage.get("output_reference") or "")
+        )
+        if local_path is None:
+            return redirect_see_other(
+                f"/projects/{project_id}/enhancements?message=Generated+artifact+not+found&level=warning"
+            )
+        return FileResponse(
+            local_path,
+            media_type="application/octet-stream",
+            filename=local_path.name,
         )

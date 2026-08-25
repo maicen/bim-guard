@@ -3,7 +3,7 @@ You are a Senior Staff Engineer acting as a “Codebase Consistency & Standardiz
 Repository: <https://github.com/maicen/bim-guard> (BIM-Guard)
 Tech stack & runtime:
 
-- Python web app using FastHTML + MonsterUI + HTMX + FastLite (SQLite), with AI rule extraction via LiteLLM (Gemini). [1](https://github.com/maicen/bim-guard)[2](https://github.com/maicen/bim-guard/blob/main/CLAUDE.md)
+- Python web app using FastHTML + MonsterUI + HTMX + Supabase (Postgres), with AI rule extraction via LiteLLM (Gemini). [1](https://github.com/maicen/bim-guard)[2](https://github.com/maicen/bim-guard/blob/main/CLAUDE.md)
 - JS-based in-browser IFC viewer under /static/js using CDN ESM imports (no bundler). [2](https://github.com/maicen/bim-guard/blob/main/CLAUDE.md)[3](https://github.com/maicen/bim-guard/blob/main/.github/instructions/project-specific.instructions.md)
 - Package manager: uv; run server with uvicorn. [1](https://github.com/maicen/bim-guard)[2](https://github.com/maicen/bim-guard/blob/main/CLAUDE.md)[4](https://github.com/maicen/bim-guard/blob/main/AGENTS.md)
 - IMPORTANT: There are project-specific coding rules in .github/instructions/project-specific.instructions.md that apply to app/** and are authoritative. [3](https://github.com/maicen/bim-guard/blob/main/.github/instructions/project-specific.instructions.md)[2](https://github.com/maicen/bim-guard/blob/main/CLAUDE.md)
@@ -42,7 +42,7 @@ NON-NEGOTIABLE RULES (PROJECT-SPECIFIC)
    - HTMX endpoints return fragments only (no Title/DashboardLayout). [3](https://github.com/maicen/bim-guard/blob/main/.github/instructions/project-specific.instructions.md)
 
 4) Database:
-   - Use FastLite only; no SQLAlchemy/Pydantic models. [3](https://github.com/maicen/bim-guard/blob/main/.github/instructions/project-specific.instructions.md)
+   - Use the shared Supabase persistence layer only; no local database, SQLAlchemy, or Pydantic models. [3](https://github.com/maicen/bim-guard/blob/main/.github/instructions/project-specific.instructions.md)
    - Prefer shared DB accessor to avoid duplicated DB path/bootstrap logic (project rules suggest creating app/db.py). [3](https://github.com/maicen/bim-guard/blob/main/.github/instructions/project-specific.instructions.md)
 
 5) IFC processing:

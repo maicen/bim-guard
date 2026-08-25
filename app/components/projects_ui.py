@@ -1,7 +1,11 @@
-from fasthtml.common import Div, Tbody, Td, Th, Thead, Tr
+import json
+
+from fasthtml.common import A, Div, Tbody, Td, Th, Thead, Tr
 from monsterui.all import (
     H1,
     H2,
+    Button,
+    ButtonT,
     Container,
     DivFullySpaced,
     DivVStacked,
@@ -24,6 +28,7 @@ from app.components.ui import (
     CardHeader,
     CardTitle,
     CreateAction,
+    DropdownMenuItem,
     FieldSpec,
     MessageAlert,
     SaveAction,
@@ -124,6 +129,16 @@ def projects_table_rows(rows: list[dict]):
             delete_action=f"/projects/{row['id']}/delete",
             view_href=(f"/viewer?project_id={row['id']}" if row.get("ifc_file_path") else None),
             view_label="Open IFC in Viewer",
+            extra_items=(
+                [
+                    DropdownMenuItem(
+                        "Enhancement History",
+                        onclick=f"window.location.href='/projects/{row['id']}/enhancements'",
+                    )
+                ]
+                if row.get("ifc_file_path")
+                else None
+            ),
         )
 
     def _build_row(row: dict):
@@ -181,6 +196,98 @@ def projects_page(rows: list[dict], message: str | None = None):
                         ),
                         Tbody(*projects_table_rows(rows)),
                         cls=TableT.hover,
+                    )
+                ),
+            ),
+            cls="space-y-4",
+        )
+    )
+
+
+def project_enhancements_page(
+    project: dict,
+    lineage_rows: list[dict],
+    *,
+    message: str | None = None,
+    level: str = "success",
+):
+    """Render the explicit enhancement command and immutable lineage history."""
+    history_rows = [
+        Tr(
+            Td(f"v{row.get('source_version', 0)}"),
+            Td(f"v{row.get('version', '?')}"),
+            Td("Completed"),
+            Td(str(row.get("source_reference") or ""), cls="max-w-64 truncate font-mono text-xs"),
+            Td(str(row.get("output_reference") or ""), cls="max-w-64 truncate font-mono text-xs"),
+            Td(
+                json.dumps(row.get("summary") or {}, sort_keys=True),
+                cls="max-w-72 truncate font-mono text-xs",
+            ),
+            Td(str(row.get("created_at") or "-")),
+            Td(
+                A(
+                    Button("Download", cls=ButtonT.secondary),
+                    href=(
+                        f"/projects/{project['id']}/enhancements/{row['id']}/download"
+                    ),
+                )
+            ),
+        )
+        for row in lineage_rows
+    ]
+
+    return DashboardLayout(
+        Container(
+            H1(f"Enhancement History - {project.get('name', 'Project')}"),
+            Subtitle("Generate a new IFC version without modifying the audited source model."),
+            *MessageAlert(AlertSpec(message=message, level=level)),
+            Card(
+                CardHeader(CardTitle("Create Enhanced Version")),
+                CardContent(
+                    Form(
+                        DivVStacked(
+                            FormLabel("Enhancement authorization token", fr="enhancement_token"),
+                            Input(
+                                id="enhancement_token",
+                                name="enhancement_token",
+                                type="password",
+                                required=True,
+                                autocomplete="off",
+                            ),
+                            cls="space-y-1",
+                        ),
+                        Button("Generate New Version", type="submit", cls=ButtonT.primary),
+                        method="post",
+                        action=f"/projects/{project['id']}/enhance",
+                        cls="space-y-4",
+                    )
+                ),
+            ),
+            Card(
+                CardHeader(CardTitle("Model Lineage")),
+                CardContent(
+                    Div(
+                        Table(
+                            Thead(
+                                Tr(
+                                    Th("Source Version"),
+                                    Th("Generated Version"),
+                                    Th("Status"),
+                                    Th("Source"),
+                                    Th("Generated Artifact"),
+                                    Th("Summary"),
+                                    Th("Created"),
+                                    Th("Artifact"),
+                                )
+                            ),
+                            Tbody(
+                                *history_rows
+                                if history_rows
+                                else Tr(Td("No enhanced versions yet.", colspan="8"))
+                            ),
+                            cls=TableT.hover,
+                        ),
+                        cls="w-full overflow-x-auto",
                     )
                 ),
             ),

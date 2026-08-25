@@ -8,8 +8,8 @@ identifies exits (exterior doors), and computes travel distances from every
 habitable space to the nearest exit.
 
 Compliance checks:
-  check_exit_count()              OBC 9.9.4.1   exterior door count per floor
-  check_egress_travel_distance()  OBC 9.9.10.1  travel distance ≤ 25 m per room
+    check_exit_count()              building code exit-count reference
+    check_egress_travel_distance()  building code travel-distance reference
 
 Both functions return dicts / lists compatible with the analyse-route rendering.
 """
@@ -44,12 +44,12 @@ except ImportError:
     _GEOMETRY_AVAILABLE = False
 
 
-# OBC Part 9 residential limits
-OBC_MAX_TRAVEL_DISTANCE_M = 25.0  # 9.9.10.1 — max walking distance to exit
-OBC_MIN_EXITS_PER_FLOOR = 1       # 9.9.4.1  — every occupied storey needs an exit
+# Default residential limits when no ruleset-specific override exists.
+CODE_MAX_TRAVEL_DISTANCE_M = 25.0
+CODE_MIN_EXITS_PER_FLOOR = 1
 
 # Space-name keywords for classifying habitable vs non-habitable rooms.
-# Habitable rooms are those OBC 9.9.10 limits apply to.
+# Habitable rooms are those travel-distance limits apply to.
 _HABITABLE_KW = frozenset([
     "bedroom", "living", "dining", "kitchen", "study", "office",
     "lounge", "recreation", "family", "playroom", "den", "library",
@@ -104,7 +104,7 @@ def _space_display_name(space) -> str:
 
 def _is_habitable(name: str) -> bool:
     """
-    Classify a space as habitable (OBC travel-distance limit applies).
+    Classify a space as habitable (travel-distance limit applies).
     Defaults to True (conservative) for spaces whose name matches neither list.
     """
     n = name.lower()
@@ -272,7 +272,7 @@ class IFCEgressGraph:
 
 def check_exit_count(ifc_file) -> dict:
     """
-    OBC 9.9.4.1 — count exterior doors per storey and flag floors with zero exits.
+    Count exterior doors per storey and flag floors with zero exits.
 
     Does NOT require IfcRelSpaceBoundary data.
 
@@ -280,7 +280,7 @@ def check_exit_count(ifc_file) -> dict:
         {
           total_exterior_doors : int,
           exits_per_storey     : {storey_name: count},
-          results              : [{storey, count, passes, obc_ref}],
+                    results              : [{storey, count, passes, code_ref}],
           warnings             : [str],
         }
     """
@@ -309,12 +309,12 @@ def check_exit_count(ifc_file) -> dict:
 
     results = []
     for storey, count in sorted(exits_per_storey.items()):
-        passes = count >= OBC_MIN_EXITS_PER_FLOOR
+        passes = count >= CODE_MIN_EXITS_PER_FLOOR
         results.append({
-            "obc_ref": "OBC 9.9.4.1",
+            "code_ref": "CODE 9.9.4.1",
             "storey": storey,
             "exit_count": count,
-            "required_min": OBC_MIN_EXITS_PER_FLOOR,
+            "required_min": CODE_MIN_EXITS_PER_FLOOR,
             "passes": passes,
         })
 
@@ -336,7 +336,7 @@ def check_exit_count(ifc_file) -> dict:
 
 def check_egress_travel_distance(egress_graph: IFCEgressGraph) -> list[dict]:
     """
-    OBC 9.9.10.1 — travel distance from any habitable room to the nearest exit ≤ 25 m.
+    Check travel distance from any habitable room to the nearest exit.
 
     Uses Dijkstra shortest-path on the space-connectivity graph.
 
@@ -384,28 +384,28 @@ def check_egress_travel_distance(egress_graph: IFCEgressGraph) -> list[dict]:
         if best_dist is None:
             results.append({
                 "check": "egress_travel_distance",
-                "obc_ref": "OBC 9.9.10.1",
+                "code_ref": "CODE 9.9.10.1",
                 "space_guid": sguid,
                 "space_name": name,
                 "storey_name": storey,
                 "travel_distance_m": None,
                 "nearest_exit": None,
-                "required_max_m": OBC_MAX_TRAVEL_DISTANCE_M,
+                "required_max_m": CODE_MAX_TRAVEL_DISTANCE_M,
                 "passes": False,
                 "no_path": True,
                 "severity": "mandatory",
             })
         else:
-            passes = best_dist <= OBC_MAX_TRAVEL_DISTANCE_M
+            passes = best_dist <= CODE_MAX_TRAVEL_DISTANCE_M
             results.append({
                 "check": "egress_travel_distance",
-                "obc_ref": "OBC 9.9.10.1",
+                "code_ref": "CODE 9.9.10.1",
                 "space_guid": sguid,
                 "space_name": name,
                 "storey_name": storey,
                 "travel_distance_m": round(best_dist, 1),
                 "nearest_exit": best_exit_name,
-                "required_max_m": OBC_MAX_TRAVEL_DISTANCE_M,
+                "required_max_m": CODE_MAX_TRAVEL_DISTANCE_M,
                 "passes": passes,
                 "no_path": False,
                 "severity": "mandatory",

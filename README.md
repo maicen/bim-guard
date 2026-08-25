@@ -15,7 +15,6 @@ The app is a single ASGI service. UI and backend routes live together in Python,
 - FastHTML and HTMX for routing and partial page updates
 - MonsterUI for UI components
 - IfcOpenShell for IFC parsing
-- fastlite plus adapter services for persistence
 - Supabase for the default database and storage backends
 - LiteLLM for rule extraction across multiple providers
 
@@ -48,7 +47,7 @@ bim-guard/
 uv sync
 ```
 
-Python 3.12 or later is required. If you need the optional document-processing pipeline, install the extra group as well:
+Python 3.12 or later (tested with 3.12.13) is required. If you need the optional document-processing pipeline, install the extra group as well:
 
 ```bash
 uv sync --group ml-pipeline
@@ -62,11 +61,9 @@ Create your local `.env` file from the template:
 cp example.env .env
 ```
 
-The template defaults to local SQLite and local file storage for development. Switch these to Supabase if you want to use the hosted backend:
+Configure Supabase credentials in `.env`:
 
 ```env
-BIM_GUARD_DB_BACKEND=supabase
-BIM_GUARD_STORAGE_BACKEND=supabase
 SUPABASE_URL=...
 SUPABASE_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...

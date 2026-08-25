@@ -7,7 +7,7 @@ Pipeline flow:
     PDF
       ↓ Docling Extractor         → prose text + table DataFrames
       ↓ Table Rule Builder        → tables → rules.db (no LLM)
-      ↓ Section Chunker           → 13 OBC section chunks
+    ↓ Section Chunker           → 13 code section chunks
       ↓ Keyword Filter            → scored paragraphs (existing)
       ↓ TF-IDF Analyzer           → IMPROVEMENT 1: discovers missing keywords
       ↓ Dependency Parser         → IMPROVEMENT 2: upgrades missed obligations
@@ -20,63 +20,59 @@ Pipeline flow:
 USAGE:
 
     # Full enhanced pipeline
-    python enhanced_orchestrator.py data/input_docs/OBC_Part9.pdf
+    python -m app.modules.module1_doc_parser.enhanced_orchestrator data/input_docs/BuildingCode_Part9.pdf
 
     # Or import:
     from enhanced_orchestrator import run_enhanced_pipeline
     result = run_enhanced_pipeline(
-        pdf_path       = "data/input_docs/OBC_Part9.pdf",
+        pdf_path       = "data/input_docs/BuildingCode_Part9.pdf",
         run_sections   = ["4"],           # test one section first
         use_bert       = False,           # set True after training
         discover_keywords = True,         # run TF-IDF keyword discovery
     )
 """
 
-import os
 import sys
 from pathlib import Path
 
 # Imports work both as a CLI script (python enhanced_orchestrator.py)
 # and when imported by the web app (from app.modules.module1_doc_parser...).
 try:
-    from config import DB_PATH
+    from config import OPENAI_API_KEY
     from module1_doc_parser.docling_extractor import DoclingExtractor
     from module1_doc_parser.table_rule_builder import TableRuleBuilder
     from module1_doc_parser.section_chunker import SectionChunker
     from module1_doc_parser.keyword_filter import KeywordFilter
     from module1_doc_parser.dependency_parser import DependencyParser
     from module1_doc_parser.confidence_scorer import ConfidenceScorer
+    from module3_rule_builder.code_seed_rules import seed_rules
     from module3_rule_builder.rule_store import RuleStore
     from module3_rule_builder.rule_generator import RuleGenerator
     from module3_rule_builder.rule_converter import RuleConverter
 except ImportError:
-    from app.modules.config import DB_PATH
+    from app.modules.config import OPENAI_API_KEY
     from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
     from app.modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
     from app.modules.module1_doc_parser.section_chunker import SectionChunker
     from app.modules.module1_doc_parser.keyword_filter import KeywordFilter
     from app.modules.module1_doc_parser.dependency_parser import DependencyParser
     from app.modules.module1_doc_parser.confidence_scorer import ConfidenceScorer
+    from app.modules.module3_rule_builder.code_seed_rules import seed_rules
     from app.modules.module3_rule_builder.rule_store import RuleStore
     from app.modules.module3_rule_builder.rule_generator import RuleGenerator
     from app.modules.module3_rule_builder.rule_converter import RuleConverter
 
 # TF-IDF requires scikit-learn — optional
 try:
-    try:
-        from module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
-    except ImportError:
-        from app.modules.module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
+    from app.modules.module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
     _TFIDF_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     _TFIDF_AVAILABLE = False
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-
-
 def run_enhanced_pipeline(
     pdf_path: str,
     run_sections: str | list = "all",
+    seed_db_first: bool = False,
     use_bert: bool = False,
     bert_mode: str = "zero_shot",
     bert_model_path: str = None,
@@ -86,8 +82,9 @@ def run_enhanced_pipeline(
     Run the full enhanced Module 1 + 3 pipeline.
 
     Args:
-        pdf_path          (str):        path to the code PDF
+        pdf_path          (str):        path to building code PDF
         run_sections      (str|list):   "all" or ["4","6"]
+        seed_db_first     (bool):       seed baseline rules before processing
         use_bert          (bool):       enable BERT classifier (requires install)
         bert_mode         (str):        "zero_shot" or "fine_tuned"
         bert_model_path   (str):        path to fine-tuned model if mode=fine_tuned
@@ -105,11 +102,12 @@ def run_enhanced_pipeline(
     print(f"{'=' * 65}\n")
 
     # ── Initialise stores ─────────────────────────────────────────────────────
-    store = RuleStore(DB_PATH)
+    store = RuleStore()
     generator = RuleGenerator(store)
     converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
 
-    rules_before = store.count()
+    if seed_db_first:
+        seed_rules(store, generator)
 
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 1 — Docling extraction
@@ -240,7 +238,7 @@ def run_enhanced_pipeline(
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python enhanced_orchestrator.py <pdf_path>")
-        print("Example: python enhanced_orchestrator.py data/input_docs/OBC_Part9.pdf")
+        print("Example: python enhanced_orchestrator.py data/input_docs/BuildingCode_Part9.pdf")
         sys.exit(1)
 
     run_enhanced_pipeline(

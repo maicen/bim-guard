@@ -1,4 +1,4 @@
-"""Storage adapter for local filesystem and Supabase Storage backends."""
+"""Supabase Storage adapter with a local materialization cache."""
 
 from __future__ import annotations
 
@@ -6,7 +6,12 @@ import os
 import uuid
 from pathlib import Path
 
+from app.environment import load_env_file
+from app.logging_config import get_logger
 from supabase import Client, create_client
+
+load_env_file()
+logger = get_logger(__name__)
 
 
 class ObjectStorage:
@@ -14,11 +19,9 @@ class ObjectStorage:
 
     def __init__(self) -> None:
         """Initialize storage settings from environment variables."""
-        self._backend = os.getenv("BIM_GUARD_STORAGE_BACKEND", "supabase").strip().lower()
         self._bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "bim-guard-artifacts").strip()
         self._prefix = os.getenv("SUPABASE_STORAGE_PREFIX", "").strip("/")
-        self._data_dir = Path("data")
-        self._cache_dir = self._data_dir / "cache" / "supabase-storage"
+        self._cache_dir = Path("data/cache/supabase-storage")
         self._client: Client | None = None
 
     def save_upload(self, filename: str, content: bytes, subdir: str) -> str:
@@ -27,18 +30,17 @@ class ObjectStorage:
         object_name = f"{uuid.uuid4().hex}_{safe_name}"
         key = "/".join(part.strip("/") for part in [subdir, object_name] if part).strip("/")
 
-        if self._backend != "supabase":
-            target = self._data_dir / Path(key)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(content)
-            return str(target)
-
         object_key = self._apply_prefix(key)
-        self._supabase_client().storage.from_(self._bucket).upload(
-            path=object_key,
-            file=content,
-            file_options={"upsert": "true"},
-        )
+        try:
+            self._supabase_client().storage.from_(self._bucket).upload(
+                path=object_key,
+                file=content,
+                file_options={"upsert": "true"},
+            )
+        except Exception:
+            logger.exception("Storage upload failed bucket=%s key=%s bytes=%d", self._bucket, object_key, len(content))
+            raise
+        logger.info("Storage upload complete bucket=%s key=%s bytes=%d", self._bucket, object_key, len(content))
         return f"sb://{self._bucket}/{object_key}"
 
     def materialize_local_path(self, reference: str) -> Path | None:
@@ -47,9 +49,6 @@ class ObjectStorage:
             return None
 
         if not reference.startswith("sb://"):
-            local_path = Path(reference)
-            if local_path.exists() and local_path.is_file():
-                return local_path
             return None
 
         parsed = self._parse_supabase_reference(reference)
@@ -61,13 +60,20 @@ class ObjectStorage:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
 
         if cache_file.exists() and cache_file.is_file():
+            logger.debug("Storage cache hit bucket=%s key=%s", bucket, key)
             return cache_file
 
-        content = self._supabase_client().storage.from_(bucket).download(key)
+        try:
+            content = self._supabase_client().storage.from_(bucket).download(key)
+        except Exception:
+            logger.exception("Storage download failed bucket=%s key=%s", bucket, key)
+            raise
         if not content:
+            logger.warning("Storage download returned no content bucket=%s key=%s", bucket, key)
             return None
 
         cache_file.write_bytes(content)
+        logger.info("Storage object cached bucket=%s key=%s bytes=%d", bucket, key, len(content))
         return cache_file
 
     def delete(self, reference: str) -> None:
@@ -76,9 +82,6 @@ class ObjectStorage:
             return
 
         if not reference.startswith("sb://"):
-            path = Path(reference)
-            if path.exists() and path.is_file():
-                path.unlink()
             return
 
         parsed = self._parse_supabase_reference(reference)
@@ -86,11 +89,16 @@ class ObjectStorage:
             return
 
         bucket, key = parsed
-        self._supabase_client().storage.from_(bucket).remove([key])
+        try:
+            self._supabase_client().storage.from_(bucket).remove([key])
+        except Exception:
+            logger.exception("Storage deletion failed bucket=%s key=%s", bucket, key)
+            raise
 
         cache_file = self._cache_dir / key
         if cache_file.exists() and cache_file.is_file():
             cache_file.unlink()
+        logger.info("Storage object deleted bucket=%s key=%s", bucket, key)
 
     def _apply_prefix(self, key: str) -> str:
         """Prefix object keys when SUPABASE_STORAGE_PREFIX is configured."""
@@ -109,7 +117,7 @@ class ObjectStorage:
         return bucket, key
 
     def _supabase_client(self) -> Client:
-        """Return a lazy-initialized Supabase client for storage operations."""
+        """Return a lazy-initialized Supabase client."""
         if self._client is not None:
             return self._client
 
@@ -118,12 +126,9 @@ class ObjectStorage:
             os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
             or os.getenv("SUPABASE_KEY", "").strip()
         )
-        if not url:
-            raise ValueError("SUPABASE_URL is required when BIM_GUARD_STORAGE_BACKEND=supabase")
-        if not key:
-            raise ValueError(
-                "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY is required "
-                "when BIM_GUARD_STORAGE_BACKEND=supabase"
+        if not url or not key:
+            raise RuntimeError(
+                "Supabase Storage requires SUPABASE_URL and a server-side API key"
             )
 
         self._client = create_client(url, key)

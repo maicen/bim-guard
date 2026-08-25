@@ -1,5 +1,5 @@
-docling --to html --to md --pipeline vlm --vlm-model granite_docling --device mps --num-threads 12 --save-profiling -vv OBC_2023.Volume_1.pdf
-docling --to html --to md --pipeline vlm --image-export-mode referenced --vlm-model granite_docling --device mps --num-threads 12 --save-profiling -vv OBC_2023.Volume_2.pdf
+docling --to html --to md --pipeline vlm --vlm-model granite_docling --device mps --num-threads 12 --save-profiling -vv BuildingCode_2023.Volume_1.pdf
+docling --to html --to md --pipeline vlm --image-export-mode referenced --vlm-model granite_docling --device mps --num-threads 12 --save-profiling -vv BuildingCode_2023.Volume_2.pdf
 
 docling --to md --pipeline vlm --image-export-mode placeholder --vlm-model granite_docling --no-ocr --table-mode fast --output Z:\Books\md --num-threads 12 -vv "Z:\Books\Contract Law_ A Comparative Introduction-Edward Elgar (2021).pdf"
 

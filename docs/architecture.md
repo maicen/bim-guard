@@ -1,7 +1,7 @@
 # BIMGUARD AI — Architecture & FastHTML Integration Plan
 
 | | |
-|---|---|
+| --- | --- |
 | **Document** | `docs/architecture.md` |
 | **Version** | 0.1 (target architecture / integration plan) |
 | **Status** | Living document — update as the FastHTML migration lands |
@@ -35,7 +35,7 @@ The FastHTML / MonsterUI stack addresses these issues while keeping the implemen
 ## 3. Runtime stack
 
 | Layer | Choice | Role |
-|---|---|---|
+| --- | --- | --- |
 | Package / environment manager | **uv** (Astral) | Resolve, lock and install dependencies; run commands in the project venv |
 | ASGI server | **uvicorn** | Serve the ASGI app; auto-reload during development |
 | Web framework | **FastHTML** | Routing, request/response, FT (FastTags) rendering, HTMX integration |
@@ -65,7 +65,7 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8000
 
 ## 4. Repository layout
 
-```
+```text
 bimguard-ai/
 ├── main.py                                # ASGI entrypoint — builds `app` and registers routes
 ├── pyproject.toml                         # Project metadata, dependencies (uv)
@@ -94,7 +94,7 @@ bimguard-ai/
 │   ├── services/                          # Persistence, configuration, external integrations
 │   │   ├── __init__.py
 │   │   ├── persistence.py                 # DB adapter bootstrap (Supabase default)
-│   │   ├── db_adapters.py                 # Table adapters (SQLite + Supabase)
+│   │   ├── db_adapters.py                 # Supabase table adapters
 │   │   ├── object_storage.py              # Object storage adapters (local + Supabase)
 │   │   ├── rules_service.py               # Rule CRUD
 │   │   └── gemini_rule_extractor.py       # Standards text → structured rules via Gemini
@@ -118,12 +118,12 @@ bimguard-ai/
 Three design principles govern this layout:
 
 1. **Routes know about HTTP, modules do not.** Anything in `app/modules/` is pure Python that can be unit-tested without a server. Routes adapt HTTP requests into module calls and module results into FT trees.
-2. **Services are the only path to state.** Modules and routes never open the database or touch artifact storage directly; they go through `app/services/`. Persistence and object storage are swappable through adapters (Supabase defaults, SQLite/local optional for local fallback).
+2. **Services are the only path to state.** Modules and routes never open the database or touch artifact storage directly; they go through `app/services/`. Supabase Postgres and Supabase Storage are accessed through the persistence and object-storage adapters.
 3. **Engines are immutable from the app's perspective.** `app/engines/` contains the validated GC-001 and CC-001 logic from the Streamlit prototype. The rest of the app consumes them as a library — it does not edit them.
 
 ## 5. Request lifecycle
 
-```
+```text
 Browser  ──HTTP──▶  uvicorn  ──ASGI──▶  FastHTML app (main.py)
                                               │
                                               ▼
@@ -201,7 +201,7 @@ Why `register(rt)` instead of importing `app` directly in each route file? It ke
 Each file in `app/routes/` corresponds to one page of the former Streamlit application. Every file exposes a `register(rt)` function; everything else in the file is private to that feature area.
 
 | Route file | Endpoints | Purpose | Calls |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `home.py` | `GET /` | Landing page, project selector | `services.project_store` |
 | `ingest.py` | `GET /ingest`, `POST /ingest`, `POST /ingest/pointcloud` | Upload IFC and point cloud, or load the synthetic demo | `modules.ifc_parser`, `modules.pointcloud_loader`, `services.project_store` |
 | `overview.py` | `GET /overview`, `GET /overview/filter` | List extracted elements, filter by system/material/floor, material inventory chart | `services.project_store`, `views.tables`, `views.charts` |
@@ -255,7 +255,7 @@ The `GET` handler renders the full page; the `POST` handler returns only the fra
 Each module is one stage of the pipeline that was proven in the Streamlit prototype. Modules are pure functions over plain Python data structures; they raise exceptions on bad input and never touch `request` objects.
 
 | Module | Input | Output | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `ifc_parser.py` | Path to `.ifc` file (any IFC 2x3 / IFC4 exporter) | List of normalised element dicts — material key, system, floor, space, joint type, environment class | Uses ifcopenshell. Normalises vendor-specific material names to BIMGUARD material keys. Classifies environment from IFC `IfcSpace` metadata. |
 | `pointcloud_loader.py` | Path to `.las` / `.laz` / `.e57` | Numpy array of XYZ (+ intensity where present), bounds, density | Open formats only. No proprietary SDK dependency. |
 | `compliance_runner.py` | Normalised element list + active rulesets | Per-element risk results (GC-001 score, CC-001 score, combined band, mitigation) | Orchestrates both engines; `combined_risk_assessment()` from `engines/bimguard_crevice_engine.py` is the core call. |
@@ -305,10 +305,10 @@ Dataclasses are used instead of free-form dicts so that views (tables, charts) g
 Services are the only components that perform I/O (besides reading uploaded files in modules).
 
 | Service | Responsibility | Key functions |
-|---|---|---|
-| `persistence.py` | Backend selection and table bootstrap (Supabase default, SQLite fallback) | `get_db()`, `get_table(...)` |
-| `db_adapters.py` | Unified table API over SQLite and Supabase | `SQLiteTableAdapter`, `SupabaseTableAdapter` |
-| `object_storage.py` | Unified object storage API over local filesystem and Supabase Storage | `save_upload(...)`, `materialize_local_path(...)`, `delete(...)` |
+| --- | --- | --- |
+| `persistence.py` | Supabase client and table bootstrap | `get_db()`, `get_table(...)` |
+| `db_adapters.py` | Table API over Supabase Postgres | `SupabaseTableAdapter` |
+| `object_storage.py` | Supabase Storage API with local materialization cache | `save_upload(...)`, `materialize_local_path(...)`, `delete(...)` |
 | `gemini_rule_extractor.py` | Extract candidate rules from standards text using Gemini | `extract_rules(...)`, validation helpers |
 
 ### 9.1 Persistence schema (current)
@@ -335,7 +335,7 @@ The engine code itself is unchanged — it always reads the latest active versio
 ## 10. Integration matrix — who calls what
 
 | HTTP endpoint | Module(s) | Service(s) | Engine(s) | Writes |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `POST /projects/create` | `module2_ifc_read` (indirect via services) | `projects_service`, `object_storage` | — | Supabase Storage + `projects` table |
 | `POST /api/documents/upload` | `module1_doc_parser` | `documents_service`, `object_storage` | — | Supabase Storage + `documents` table |
 | `POST /analyze/results` | `orchestrator` | `projects_service`, `documents_service`, `rules_service` | GC-001, CC-001 | read-mostly (analysis output in response) |
@@ -394,7 +394,7 @@ docker compose up --build
 
 These are called out explicitly so reviewers can see what is deliberate vs. still-to-decide:
 
-- **Persistence store.** Supabase Postgres is the default backend. SQLite/local backends remain available as fallback through adapters.
+- **Persistence store.** Supabase Postgres is the application database and the source of truth for persisted state.
 - **Authentication.** Not in scope for the FMP demo. When added, it belongs in `app/services/auth.py` and is enforced via a FastHTML middleware registered in `main.py`.
 - **BCF viewpoint screenshots.** Currently placeholder PNGs. The plan is to render actual screenshots from the Plotly 3D viewer; tracked in the thesis Chapter 5 "limitations" section.
 - **Cost / duration model.** Hardcoded in the prototype; to be made user-configurable via CSV upload, handled by `schedule_impact.py` + `project_store`.

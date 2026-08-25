@@ -14,7 +14,7 @@ the input/output contracts are adapted to the repo's schema.
 
 INPUT
     elements   — list[PipingElement] from Module2
-    rule_pack  — dict loaded from the rules SQLite table (or a JSON file
+    rule_pack  — dict loaded from the Supabase rules table (or a JSON file
                  during development). Expected keys documented below.
 
 OUTPUT
@@ -186,13 +186,23 @@ def _assess_pair(
         # Material normalised but not in series table — treat as data quality
         return None
 
-    # Identify anode (more negative) and cathode (less negative)
-    if v_a < v_b:
+    # Identify the anode — the material that corrodes.
+    #
+    # The GC-001 series is an anodic-index table, not an electrode-potential
+    # table. Every value is positive and ascends from platinum (0.00) to
+    # magnesium (0.95), and the series carries its own note: "Higher potential
+    # = more active (anodic) — corrodes preferentially". So the HIGHER value is
+    # the anode, which is the opposite of the seawater-potential convention
+    # this function previously assumed.
+    #
+    # Verified against the seeded payload by scripts/verify_anode_convention.py:
+    # zinc +0.800 V against copper +0.280 V, and zinc is what galvanising
+    # sacrifices. See docs/defects/defect_report_anode_convention.md.
+    if v_a > v_b:
         anode, cathode = element_a, element_b
-        voltage_v = abs(v_b - v_a)
     else:
         anode, cathode = element_b, element_a
-        voltage_v = abs(v_a - v_b)
+    voltage_v = abs(v_a - v_b)
 
     # Environment — take the more severe of the two spaces
     environment_class = _resolve_environment(anode, cathode)

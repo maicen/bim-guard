@@ -1,12 +1,34 @@
-"""Database adapters exposing a fastlite-like table API."""
+"""Database adapters exposing a table API backed by Supabase."""
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
+from httpx import TransportError
 from postgrest.exceptions import APIError
+
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY_S = 0.2
+
+
+def execute_with_retry(build_query: Callable[[], Any], *, attempts: int = _RETRY_ATTEMPTS) -> Any:
+    """Execute a PostgREST query, retrying transient transport failures.
+
+    Supabase's pooled HTTP/2 connections can go stale between requests and the
+    next call fails with ``httpx.RemoteProtocolError: Server disconnected``.
+    The query is rebuilt on every attempt so each retry acquires a fresh
+    connection instead of reusing the dead one.
+    """
+    for attempt in range(attempts):
+        try:
+            return build_query().execute()
+        except TransportError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(_RETRY_BASE_DELAY_S * (2**attempt))
 
 
 @dataclass(slots=True)
@@ -49,7 +71,12 @@ def parse_where(where_sql: str, params: list[Any] | None = None) -> _WhereExpr:
 
 
 class SQLiteTableAdapter:
-    """Expose a thin compatibility layer around a fastlite table object."""
+    """Expose a thin compatibility layer around a fastlite table object.
+
+    Used only for the isolated SQLite connections PersistenceService hands to
+    tests/the eval harness (see get_isolated_sqlite_db) — Supabase remains the
+    sole runtime backend for the live app.
+    """
 
     def __init__(self, table: Any):
         """Store underlying fastlite table reference."""
@@ -136,12 +163,11 @@ class SupabaseTableAdapter:
 
     def get(self, pk_value: Any) -> dict[str, Any] | None:
         """Get one row by primary key."""
-        response = (
-            self._client.table(self._table_name)
+        response = execute_with_retry(
+            lambda: self._client.table(self._table_name)
             .select("*")
             .eq(self._pk, pk_value)
             .limit(1)
-            .execute()
         )
         rows = response.data or []
         return rows[0] if rows else None
@@ -149,25 +175,33 @@ class SupabaseTableAdapter:
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert one row and return inserted payload from API."""
         try:
-            response = self._client.table(self._table_name).insert(payload).execute()
+            response = execute_with_retry(
+                lambda: self._client.table(self._table_name).insert(payload)
+            )
             rows = response.data or []
             return rows[0] if rows else payload
         except APIError as exc:
             if self._should_retry_insert_with_pk(exc, payload):
                 retry_payload = dict(payload)
                 retry_payload[self._pk] = self._next_numeric_pk()
-                response = self._client.table(self._table_name).insert(retry_payload).execute()
+                response = execute_with_retry(
+                    lambda: self._client.table(self._table_name).insert(retry_payload)
+                )
                 rows = response.data or []
                 return rows[0] if rows else retry_payload
             raise
 
     def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
         """Update one row by primary key."""
-        self._client.table(self._table_name).update(updates).eq(self._pk, pk_values).execute()
+        execute_with_retry(
+            lambda: self._client.table(self._table_name).update(updates).eq(self._pk, pk_values)
+        )
 
     def delete(self, pk_value: Any) -> None:
         """Delete one row by primary key."""
-        self._client.table(self._table_name).delete().eq(self._pk, pk_value).execute()
+        execute_with_retry(
+            lambda: self._client.table(self._table_name).delete().eq(self._pk, pk_value)
+        )
 
     def rows_where(
         self,
@@ -201,11 +235,13 @@ class SupabaseTableAdapter:
                 if remaining <= 0:
                     break
 
-            query = self._client.table(self._table_name).select("*")
-            if expr is not None:
-                query = self._apply_expr(query, expr)
+            def _build(offset=offset, remaining=remaining):
+                query = self._client.table(self._table_name).select("*")
+                if expr is not None:
+                    query = self._apply_expr(query, expr)
+                return query.range(offset, offset + remaining - 1)
 
-            response = query.range(offset, offset + remaining - 1).execute()
+            response = execute_with_retry(_build)
             rows = response.data or []
             collected.extend(rows)
 
@@ -227,12 +263,11 @@ class SupabaseTableAdapter:
 
     def _next_numeric_pk(self) -> int:
         """Compute the next integer primary key value for fallback inserts."""
-        response = (
-            self._client.table(self._table_name)
+        response = execute_with_retry(
+            lambda: self._client.table(self._table_name)
             .select(self._pk)
             .order(self._pk, desc=True)
             .limit(1)
-            .execute()
         )
         rows = response.data or []
         if not rows:

@@ -5,7 +5,7 @@ Improvement 4 — BERT Sentence Classifier.
 
 WHAT IT DOES:
     Replaces the keyword list with a model that LEARNED what a rule
-    looks like from 862 labelled OBC sentences (CODE-ACCORD dataset).
+    looks like from 862 labelled CODE sentences (CODE-ACCORD dataset).
 
     Once trained, it classifies any sentence as:
         RULE (1)     — is a compliance rule
@@ -21,7 +21,7 @@ TWO MODES:
 
     Mode B — Fine-tuned on CODE-ACCORD (recommended)
         Downloads CODE-ACCORD dataset (862 sentences) and fine-tunes
-        a small BERT model specifically on OBC building regulation text.
+        a small BERT model specifically on CODE building regulation text.
         Most accurate — purpose-built for your exact use case.
 
 INSTALL:
@@ -41,7 +41,7 @@ Usage:
     # Fine-tuned (train first, then classify)
     clf = BERTClassifier(mode="fine_tuned")
     clf.train()                              # trains on CODE-ACCORD
-    clf.save("models/bert_obc_classifier")   # save for reuse
+    clf.save("models/bert_code_classifier")   # save for reuse
     results = clf.classify_chunks(filtered_chunks)
 """
 
@@ -61,7 +61,7 @@ BASE_MODEL = "distilbert-base-uncased"
 CODEACCORD_HF = "Accord-Project/CODE-ACCORD"
 
 # Default save path for fine-tuned model
-DEFAULT_MODEL_PATH = Path("models/bert_obc_classifier")
+DEFAULT_MODEL_PATH = Path("models/bert_code_classifier")
 
 # Probability threshold — above this = RULE
 RULE_THRESHOLD = 0.60
@@ -69,7 +69,7 @@ RULE_THRESHOLD = 0.60
 
 class BERTClassifier:
     """
-    BERT-based sentence classifier for OBC compliance rules.
+    BERT-based sentence classifier for CODE compliance rules.
     Supports zero-shot inference and fine-tuning on CODE-ACCORD.
     """
 
@@ -387,7 +387,7 @@ class BERTClassifier:
         Classify one sentence as RULE or NOT_RULE.
 
         Args:
-            sentence (str): one sentence of OBC text
+            sentence (str): one sentence of CODE text
 
         Returns:
             dict:

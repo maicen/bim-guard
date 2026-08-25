@@ -1,5 +1,8 @@
 """Document and rule library routes, including extraction/import endpoints."""
 
+import json
+import re
+from functools import lru_cache
 from pathlib import Path
 
 from fasthtml.common import (
@@ -23,22 +26,22 @@ from monsterui.all import (
     FormLabel,
     Input,
 )
+from starlette.responses import StreamingResponse
 
 from app.components.documents_ui import document_edit_form, documents_panel
 from app.components.layout import DashboardLayout
 from app.components.rule_extraction_ui import (
+    provider_model_select_fragment,
     rule_extraction_empty_file_result,
     rule_extraction_free_result,
     rule_extraction_page_content,
     rule_extraction_results,
-    provider_model_select_fragment,
 )
 from app.components.rules_ui import _decode_json_field, rule_form, rules_folders_panel, rules_panel
 from app.components.ui import (
     Alert,
     AlertT,
     BackAction,
-    CreateAction,
     EditAction,
     HtmxSpinner,
     LinkButton,
@@ -57,13 +60,18 @@ from app.components.ui import (
 from app.components.ui import (
     CardTitle as UICardTitle,
 )
-from app.modules import orchestrator
+from app.modules.config import (
+    COMPLIANCE_TEMPERATURE,
+    DEFAULT_LLM_MODEL,
+    MAX_TOKENS_RULE_EXTRACTION,
+)
 from app.modules.module1_doc_parser import Module1_DocReader
+from app.modules.module3_rule_builder.ids_exporter import export_ids_for_ruleset, import_ids_ruleset
 from app.services.documents_service import DocumentService
-from app.services.llm_client import LiteLLMClient
+from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.object_storage import ObjectStorage
-from app.services.rule_extractor import LiteLLMRuleExtractor
 from app.services.rule_extraction_service import RuleExtractionService
+from app.services.rule_extractor import LiteLLMRuleExtractor
 from app.services.rules_service import RuleService
 from app.utils import (
     md5_hex,
@@ -75,6 +83,14 @@ from app.utils import (
 _document_service = DocumentService()
 _rule_service = RuleService()
 _rule_extraction_service = RuleExtractionService()
+
+
+@lru_cache(maxsize=1)
+def _orchestrator_module():
+    """Import the offline pipeline orchestrator lazily on first use."""
+    from app.modules import orchestrator
+
+    return orchestrator
 
 
 def _folders_with_rules() -> list[dict]:
@@ -262,34 +278,42 @@ def setup_routes(rt):
     @rt("/library/rules")
     def rules_list(message: str = "", needs_review: int = 0):
         needs_review_only = bool(needs_review)
-        rows = (
-            _rule_service.fetch_needs_review() if needs_review_only else _rule_service.list_rules()
-        )
+        all_rows = _rule_service.list_rules()
+        rows = _rule_service.fetch_needs_review() if needs_review_only else all_rows
+        folders = _folders_with_rules()
         return Title("Rules - BIM Guard"), DashboardLayout(
             Container(
                 DivLAligned(
-                    H1("Rule Library", cls="text-3xl font-bold tracking-tight"),
-                    CreateAction(href="/library/rules/new", title="Create Rule"),
-                    cls="justify-between",
-                ),
-                P(
-                    "Create, update, and manage compliance rules used during analysis.",
-                    cls="text-muted-foreground",
-                ),
-                DivLAligned(
-                    LinkButton(
-                        "Open Extraction Studio",
-                        href="/library/rules/extract",
-                        variant="secondary",
+                    Div(
+                        H1("Rule Library", cls="text-3xl font-bold tracking-tight"),
+                        P(
+                            "Create, update, and manage compliance rules used during analysis.",
+                            cls="text-muted-foreground",
+                        ),
+                        cls="space-y-1",
                     ),
-                    cls="justify-end",
+                    Div(
+                        LinkButton(
+                            "Open Extraction Studio",
+                            href="/library/rules/extract",
+                            variant="secondary",
+                        ),
+                        LinkButton(
+                            "New Rule",
+                            href="/library/rules/new",
+                            variant="primary",
+                        ),
+                        cls="flex items-center gap-2 flex-wrap",
+                    ),
+                    cls="justify-between items-start gap-3 flex-wrap",
                 ),
-                rules_folders_panel(_folders_with_rules()),
                 rules_panel(
                     rows,
+                    folders,
                     message=message or None,
                     needs_review_only=needs_review_only,
                     needs_review_count=_rule_service.count_needs_review(),
+                    total_rules=len(all_rows),
                 ),
                 cls=(ContainerT.expand, "space-y-4"),
             ),
@@ -352,6 +376,43 @@ def setup_routes(rt):
                             ),
                             SubmitButton("Import Ruleset", variant="primary"),
                             hx_post="/api/rules/import-json",
+                            hx_target="#import-result",
+                            enctype="multipart/form-data",
+                            cls="space-y-4",
+                        ),
+                        Div(id="import-result"),
+                    ),
+                ),
+                cls="space-y-4",
+            )
+        )
+
+    @rt("/library/rules/import-ids")
+    def rules_import_ids_page():
+        return Title("Import IDS Ruleset - BIM Guard"), DashboardLayout(
+            Container(
+                H1("Import IDS Ruleset", cls="text-3xl font-bold tracking-tight"),
+                P(
+                    "Upload a buildingSMART IDS XML document to import compatible property assertions into BIMGuard.",
+                    cls="text-muted-foreground",
+                ),
+                UICard(
+                    UICardHeader(UICardTitle("Upload IDS XML")),
+                    UICardContent(
+                        Form(
+                            Div(
+                                FormLabel("IDS file (.ids, .xml)", fr="ids_file"),
+                                Input(
+                                    id="ids_file",
+                                    type="file",
+                                    name="ids_file",
+                                    accept=".ids,.xml",
+                                    required=True,
+                                ),
+                                cls="space-y-1",
+                            ),
+                            SubmitButton("Import IDS", variant="primary"),
+                            hx_post="/api/rules/import-ids",
                             hx_target="#import-result",
                             enctype="multipart/form-data",
                             cls="space-y-4",
@@ -571,13 +632,13 @@ def setup_routes(rt):
                 message="No folder specified.",
                 level="warning",
             )
-        count = _rule_service.delete_folder(ruleset_id)
-        if count == 0:
+        if not _rule_service.folder_exists(ruleset_id):
             return rules_folders_panel(
                 _folders_with_rules(),
                 message=f"Folder '{ruleset_id}' was not found.",
                 level="warning",
             )
+        count = _rule_service.delete_folder(ruleset_id)
         return rules_folders_panel(
             _folders_with_rules(),
             message=f"Deleted folder '{ruleset_id}' ({count} rule(s) removed).",
@@ -593,16 +654,79 @@ def setup_routes(rt):
                 message="Enter a new, different folder name to rename.",
                 level="warning",
             )
-        count = _rule_service.rename_folder(old_id, new_id)
-        if count == 0:
+        if not _rule_service.folder_exists(old_id):
             return rules_folders_panel(
                 _folders_with_rules(),
                 message=f"Folder '{old_id}' was not found.",
                 level="warning",
             )
+        count = _rule_service.rename_folder(old_id, new_id)
         return rules_folders_panel(
             _folders_with_rules(),
             message=f"Renamed '{old_id}' to '{new_id}' ({count} rule(s)).",
+        )
+
+    @rt("/api/rules/folders/create", methods=["POST"])
+    def rules_folder_create(
+        ruleset_id: str = "",
+        display_name: str = "",
+        description: str = "",
+        mechanism_scope: str = "",
+    ):
+        ruleset_id = RuleService.normalize_ruleset_id(ruleset_id)
+        if not ruleset_id:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message="Folder ID is required.",
+                level="warning",
+            )
+        if _rule_service.folder_exists(ruleset_id):
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message=f"Folder '{ruleset_id}' already exists.",
+                level="warning",
+            )
+        _rule_service.create_folder(
+            ruleset_id=ruleset_id,
+            display_name=display_name,
+            description=description,
+            mechanism_scope=mechanism_scope,
+        )
+        return rules_folders_panel(
+            _folders_with_rules(),
+            message=f"Created folder '{ruleset_id}'.",
+        )
+
+    @rt("/api/rules/folders/update", methods=["POST"])
+    def rules_folder_update(
+        ruleset_id: str = "",
+        display_name: str = "",
+        description: str = "",
+        mechanism_scope: str = "",
+    ):
+        ruleset_id = RuleService.normalize_ruleset_id(ruleset_id)
+        if not ruleset_id:
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message="No folder specified.",
+                level="warning",
+            )
+
+        if not _rule_service.update_folder_metadata(
+            ruleset_id=ruleset_id,
+            display_name=display_name,
+            description=description,
+            mechanism_scope=mechanism_scope,
+        ):
+            return rules_folders_panel(
+                _folders_with_rules(),
+                message=f"Folder '{ruleset_id}' was not found.",
+                level="warning",
+            )
+
+        return rules_folders_panel(
+            _folders_with_rules(),
+            message=f"Updated folder '{ruleset_id}'.",
         )
 
     @rt("/api/rules/save-extracted", methods=["POST"])
@@ -721,15 +845,46 @@ def setup_routes(rt):
     @rt("/api/rules/export-json")
     def rules_export_json():
         """Download the last extraction as a JSON file \u2014 no data passed through UI."""
-        import json as _json
-        from fasthtml.common import Response
-
         global _last_extracted, _last_extracted_filename
         safe = (_last_extracted_filename or "rules").replace(".pdf", "").replace(" ", "_")
-        return Response(
-            content=_json.dumps(_last_extracted, indent=2),
+
+        # Snapshot current extraction payload so streaming is consistent.
+        payload = list(_last_extracted)
+
+        def _iter_json_payload():
+            encoder = json.JSONEncoder(indent=2)
+            yield from encoder.iterencode(payload)
+            yield "\n"
+
+        return StreamingResponse(
+            _iter_json_payload(),
             media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="{safe}_rules.json"'},
+        )
+
+    @rt("/api/rules/export-ids")
+    def rules_export_ids(ruleset_id: str = ""):
+        """Download an IDS XML document for the selected ruleset."""
+        ruleset_id = RuleService.normalize_ruleset_id(ruleset_id)
+        if not ruleset_id:
+            return Alert("No ruleset selected for IDS export.", cls=AlertT.warning)
+
+        rows = _rule_service.list_by_ruleset(ruleset_id)
+        if not rows:
+            return Alert(f"No rules were found for ruleset '{ruleset_id}'.", cls=AlertT.warning)
+
+        payload = export_ids_for_ruleset(ruleset_id, rows)
+        if not payload.strip():
+            return Alert(
+                f"No exportable IDS property checks were found for ruleset '{ruleset_id}'.",
+                cls=AlertT.warning,
+            )
+
+        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", ruleset_id).strip("_") or "ruleset"
+        return StreamingResponse(
+            iter([payload]),
+            media_type="application/xml",
+            headers={"Content-Disposition": f'attachment; filename="{safe}_ids.xml"'},
         )
 
     @rt("/api/rules/import-json", methods=["POST"])
@@ -755,15 +910,79 @@ def setup_routes(rt):
             cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium",
         )
 
+    @rt("/api/rules/import-ids", methods=["POST"])
+    async def rules_import_ids_api(ids_file: UploadFile):
+        file_content = await ids_file.read()
+        if not file_content:
+            return Alert("No IDS file received.", cls=AlertT.error)
+
+        try:
+            xml_text = file_content.decode("utf-8")
+        except UnicodeDecodeError:
+            return Alert("IDS file must be UTF-8 encoded XML.", cls=AlertT.error)
+
+        try:
+            rows = import_ids_ruleset(xml_text)
+        except ValueError as exc:
+            return Alert(str(exc), cls=AlertT.error)
+
+        if not rows:
+            return Alert(
+                "No compatible property assertions were found in the IDS file.",
+                cls=AlertT.warning,
+            )
+
+        created = 0
+        for row in rows:
+            try:
+                _rule_service.create_rule(
+                    reference=row.get("reference") or "",
+                    rule_type=row.get("rule_type") or "numeric_comparison",
+                    description=row.get("description") or "Imported from IDS",
+                    target_ifc_class=row.get("target_ifc_class") or "Unspecified",
+                    source_text=row.get("source_text") or "",
+                    property_set=row.get("property_set") or "",
+                    property_name=row.get("property_name") or "",
+                    fallback_property="",
+                    operator=row.get("operator") or "=",
+                    check_value=row.get("check_value"),
+                    value_min=row.get("value_min"),
+                    value_max=row.get("value_max"),
+                    unit="",
+                    applies_when={},
+                    severity=row.get("severity") or "mandatory",
+                    keyword="",
+                    compliance_type="",
+                    exceptions=[],
+                    related_refs=[],
+                    overridden_by="",
+                    confidence=None,
+                    extraction_method="ids_import",
+                    needs_review=False,
+                    mechanism=row.get("mechanism") or "CODE",
+                    ruleset_id=row.get("ruleset_id") or "IMPORTED-IDS",
+                    rule_category=row.get("rule_category") or "property_check",
+                    parameters=json.dumps({}),
+                )
+                created += 1
+            except Exception as exc:  # pragma: no cover - surfaced to UI if DB write fails
+                return Alert(f"Import failed while saving rule: {exc}", cls=AlertT.error)
+
+        ruleset_id = rows[0].get("ruleset_id") or "IMPORTED-IDS"
+        return Span(
+            f"Imported {created} IDS rule(s) into '{ruleset_id}' ✓",
+            cls="text-sm px-4 py-1.5 rounded bg-green-100 text-green-800 font-medium",
+        )
+
     @rt("/api/rules/provider-models")
-    def api_provider_models(provider: str = "openai"):
+    def api_provider_models(provider: str = "gemini"):
         return provider_model_select_fragment(provider)
 
     @rt("/api/rules/extract", methods=["POST"])
     async def rules_extract_api(
         document_id: int = 0,
-        provider: str = "openai",
-        model: str = "gpt-4o-mini",
+        provider: str = "gemini",
+        model: str = DEFAULT_LLM_MODEL,
         api_key: str = "",
     ):
         global _last_extracted, _last_extracted_filename
@@ -779,7 +998,16 @@ def setup_routes(rt):
         if not extracted_text:
             return rule_extraction_empty_file_result()
 
-        extractor = LiteLLMRuleExtractor(client=LiteLLMClient(model=model, api_key=api_key or None))
+        extractor = LiteLLMRuleExtractor(
+            client=LiteLLMClientWithRetry(
+                LiteLLMClient(
+                    model=model,
+                    api_key=api_key or None,
+                    temperature=COMPLIANCE_TEMPERATURE,
+                    max_tokens=MAX_TOKENS_RULE_EXTRACTION,
+                )
+            )
+        )
         svc = RuleExtractionService(provider=extractor)
 
         try:
@@ -811,6 +1039,8 @@ def setup_routes(rt):
     @rt("/api/rules/extract-free", methods=["POST"])
     def rules_extract_free_api(document_id: int = 0, folder_name: str = ""):
         """Run the free/offline CLI pipeline (Docling + regex, no LLM) on an uploaded PDF."""
+        orchestrator = _orchestrator_module()
+
         if not document_id:
             return Alert("Please select a document.", cls=AlertT.warning)
 

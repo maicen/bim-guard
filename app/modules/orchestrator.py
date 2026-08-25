@@ -11,7 +11,7 @@ Pipeline flow:
         ↓  Module 1 — Step 2
     TableRuleBuilder          → tables → rules.db directly (no LLM)
         ↓  Module 1 — Step 3
-    SectionChunker            → 13 OBC section chunks
+    SectionChunker            → structured section chunks
         ↓  Module 1 — Step 4
     KeywordFilter             → scored + confidence-labelled paragraphs
         ↓  Handoff M1 → M3
@@ -29,23 +29,25 @@ SWITCHING BETWEEN REGEX AND GPT-4o:
 
 Usage:
     # Run from project root
-    python orchestrator.py data/input_docs/OBC_Part9.pdf
+    python orchestrator.py data/input_docs/building_code.pdf
 
     # Or import and call:
     from orchestrator import run_pipeline
-    result = run_pipeline("data/input_docs/OBC_Part9.pdf")
+    result = run_pipeline("data/input_docs/building_code.pdf")
 """
 
-import os
 import re
 import sys
 from pathlib import Path
 
-from app.services.persistence import PersistenceService
+from app.logging_config import get_logger
+from app.modules.config import OPENAI_API_KEY
 from app.services.pipeline_dependencies import (
     describe_rule_store,
     warm_optional_rule_pipeline_dependencies,
 )
+
+logger = get_logger(__name__)
 
 # The pipeline's progress logging uses box-drawing/unicode symbols, which
 # crash with UnicodeEncodeError on Windows consoles/servers defaulting to
@@ -56,8 +58,6 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, ValueError):
         pass
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # ── SWITCH HERE ───────────────────────────────────────────────────────────────
 # False = regex (free, no API key, works offline)
@@ -71,6 +71,7 @@ try:
     from .module1_doc_parser.keyword_filter import KeywordFilter
     from .module1_doc_parser.section_chunker import SectionChunker
     from .module1_doc_parser.table_rule_builder import TableRuleBuilder
+    from .module3_rule_builder.code_seed_rules import seed_rules
     from .module3_rule_builder.rule_generator import RuleGenerator
     from .module3_rule_builder.rule_store import RuleStore
 
@@ -86,15 +87,17 @@ except ImportError:
 def run_pipeline(
     pdf_path: str | Path,
     run_sections: str | list = "all",
+    seed_db_first: bool = False,
     ruleset_id: str = "",
 ) -> dict:
     """
-    Run the full Module 1 → Module 3 pipeline on an uploaded code PDF.
+    Run the full Module 1 → Module 3 pipeline on a building-code PDF.
 
     Args:
-        pdf_path      (str | Path): path to the PDF file
+        pdf_path      (str | Path): path to the building-code PDF file
         run_sections  (str | list): "all" or list e.g. ["4", "6"]
                                     Use a single section to test first.
+        seed_db_first (bool):       seed baseline rules before processing
         ruleset_id    (str):        folder/group name tagged onto rules newly
                                      extracted by this run (table + prose rules).
 
@@ -112,6 +115,14 @@ def run_pipeline(
     """
     pdf_path = Path(pdf_path)
     converter_name = "gpt-4o" if USE_GPT4O else "regex"
+    logger.info(
+        "Starting rule extraction pipeline pdf=%s converter=%s sections=%s seed_db_first=%s ruleset_id=%s",
+        pdf_path.name,
+        converter_name,
+        run_sections,
+        seed_db_first,
+        ruleset_id or "none",
+    )
 
     print(f"\n{'=' * 60}")
     print("  BIMGuard AI — Module 1 + 3 Pipeline")
@@ -123,6 +134,7 @@ def run_pipeline(
 
     dependency_warnings = list(warm_optional_rule_pipeline_dependencies())
     for warning in dependency_warnings:
+        logger.warning("Optional pipeline dependency unavailable: %s", warning)
         print(f"  [WARN] {warning}")
 
     # ── Initialise ────────────────────────────────────────────────────────────
@@ -130,11 +142,15 @@ def run_pipeline(
     generator = RuleGenerator(store)
 
     if USE_GPT4O:
-        converter = RuleConverter(api_key=GEMINI_API_KEY, rule_store=store)
+        converter = RuleConverter(api_key=OPENAI_API_KEY, rule_store=store)
     else:
         converter = RuleConverter()  # regex needs no arguments
 
-    rules_before = store.count()
+    # ── Seed pre-built rules ──────────────────────────────────────────────────
+    if seed_db_first:
+        logger.info("Seeding baseline rules before extraction")
+        print("── SEEDING DB WITH PRE-BUILT CODE RULES ──")
+        seed_rules(store, generator)
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 1 — STEP 1: Docling extraction
@@ -142,6 +158,7 @@ def run_pipeline(
     print("\n── MODULE 1 / STEP 1: DOCLING EXTRACTION ──")
     extractor = DoclingExtractor()
     text, tables = extractor.extract(pdf_path)
+    logger.info("Document extraction complete chars=%d tables=%d", len(text), len(tables))
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 1 — STEP 2: Table → Direct Rules (no converter needed)
@@ -149,12 +166,14 @@ def run_pipeline(
     print("\n── MODULE 1 / STEP 2: TABLE RULE BUILDER ──")
     table_builder = TableRuleBuilder(store)
     table_rules = table_builder.process_all_tables(tables, generator, ruleset_id)
+    logger.info("Table-rule extraction complete rules=%d", table_rules)
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 1 — STEP 3: Section Chunker
     # ─────────────────────────────────────────────────────────────────────────
     print("\n── MODULE 1 / STEP 3: SECTION CHUNKER ──")
     chunks = SectionChunker().chunk(text)
+    logger.info("Section chunking complete sections=%d", len(chunks))
 
     if not chunks:
         # No headings this chunker recognises (or the source PDF collapsed to
@@ -163,6 +182,7 @@ def run_pipeline(
         # size-bounded chunker the AI extraction path already uses instead
         # of giving up and sending nothing downstream.
         print("  [SectionChunker] 0 sections — falling back to generic chunking")
+        logger.warning("Section chunker returned no sections; using generic fallback")
         generic_blocks = Module1_DocReader().extract_text_sections(text)
         chunks = [
             {
@@ -174,10 +194,12 @@ def run_pipeline(
             for i, block in enumerate(generic_blocks)
         ]
         print(f"  [SectionChunker] Generic fallback produced {len(chunks)} chunk(s)")
+        logger.info("Generic chunking complete sections=%d", len(chunks))
 
     # Filter to requested sections only
     if run_sections != "all":
         chunks = [c for c in chunks if c["section_number"] in run_sections]
+        logger.info("Applied section filter requested=%s remaining=%d", run_sections, len(chunks))
         print(f"  Running sections: {run_sections}")
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -198,6 +220,7 @@ def run_pipeline(
             "for this run (no smart filtering), but regex rule extraction "
             "still ran on all of them."
         )
+        logger.warning("%s", msg)
         print(f"  [WARN] {msg}")
         warnings.append(msg)
         filtered_chunks = [
@@ -232,11 +255,26 @@ def run_pipeline(
                     rule["ruleset_id"] = ruleset_id
             saved_ids = generator.save_batch(raw_rules)
             prose_rules += len(saved_ids)
+            logger.debug(
+                "Processed section=%s extracted_rules=%d saved_rules=%d",
+                section,
+                len(raw_rules),
+                len(saved_ids),
+            )
             print(f"    Saved     : {len(saved_ids)} rules")
 
     # ── Summary ───────────────────────────────────────────────────────────────
     total_rules = store.count()
     db_summary = store.summary()
+    logger.info(
+        "Rule extraction pipeline complete pdf=%s table_rules=%d prose_rules=%d total_rules=%d sections=%d warnings=%d",
+        pdf_path.name,
+        table_rules,
+        prose_rules,
+        total_rules,
+        len(filtered_chunks),
+        len(warnings),
+    )
 
     print(f"\n{'=' * 60}")
     print("  PIPELINE COMPLETE")
@@ -275,11 +313,13 @@ class BIMGuard_App:
         documents_svc = DocumentService()
         rules_svc = RuleService()
 
-        return {
+        summary = {
             "total_projects": projects_svc.total_projects(),
             "total_documents": len(documents_svc.list_documents()),
             "total_rules": rules_svc.count(),
         }
+        logger.debug("Dashboard summary loaded %s", summary)
+        return summary
 
     def orchestrate_workflow(
         self,
@@ -301,21 +341,30 @@ class BIMGuard_App:
         from app.services.documents_service import DocumentService
         from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
+
         from .module2_ifc_read import Module2_IFCRead
         from .module2_ifc_read.ifc_parser import (
             generate_synthetic_elements,
             get_schema_compatibility_note,
             parse_ifc_model,
         )
-        from .module4_comparator.compliance_runner import run_compliance_checks
+        from .pipeline_services import AnalysisService, run_compliance_analysis
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
         selected_theme = RuleService.normalize_theme(analysis_theme)
         rule_folder = (rule_folder or "").strip()
+        logger.info(
+            "Starting compliance workflow project_id=%d theme=%s documents=%d rule_folder=%s",
+            project_id,
+            selected_theme,
+            len(doc_ids),
+            rule_folder or "all",
+        )
 
         project = projects_svc.get_project(project_id)
         if project is None:
+            logger.warning("Compliance workflow project not found project_id=%d", project_id)
             return {"error": f"Project {project_id} not found."}
 
         # ── Documents ────────────────────────────────────────────────────────
@@ -384,6 +433,7 @@ class BIMGuard_App:
                     ifc_type_counts[el.ifc_type] = ifc_type_counts.get(el.ifc_type, 0) + 1
             except Exception as exc:
                 ifc_error = str(exc)
+                logger.exception("IFC parsing failed project_id=%d", project_id)
         else:
             # No IFC file — run on synthetic demo data so the UI still renders
             elements = generate_synthetic_elements(25)
@@ -403,16 +453,28 @@ class BIMGuard_App:
             }
             for el in elements:
                 ifc_type_counts[el.ifc_type] = ifc_type_counts.get(el.ifc_type, 0) + 1
+            logger.info("Using synthetic IFC elements project_id=%d elements=%d", project_id, len(elements))
 
         # ── Compliance checks ─────────────────────────────────────────────────
         compliance_results = []
         compliance_error = None
         cost_impact = None
         issue_stats: dict = {}
+        audit_issues: list[dict] = []
+        bcf_topics: list[dict] = []
+        audit_source_sha256: str | None = None
 
         if selected_theme == "MEP":
             try:
-                raw_results = run_compliance_checks(elements)
+                audit_result = run_compliance_analysis(
+                    elements,
+                    run_id=f"BGR-{project_id}",
+                    source_path=ifc_path,
+                )
+                raw_results = audit_result["results"]
+                audit_issues = audit_result["issues"]
+                bcf_topics = audit_result["bcf_topics"]
+                audit_source_sha256 = audit_result["source_sha256"]
                 # Normalise band names to Title case for the UI
                 band_map = {
                     "LOW": "Low",
@@ -432,6 +494,7 @@ class BIMGuard_App:
                 issue_stats = bands
             except Exception as exc:
                 compliance_error = str(exc)
+                logger.exception("MEP compliance checks failed project_id=%d", project_id)
 
         # ── Module 2 + 4 + 5: Rule-based compliance check ────────────────────
         rule_compliance: list[dict] = []
@@ -477,11 +540,36 @@ class BIMGuard_App:
 
         except Exception as exc:
             rule_compliance_error = str(exc)
+            logger.exception("Rule-based compliance checks failed project_id=%d", project_id)
+
+        if rule_compliance:
+            audit_result = AnalysisService().include_rule_results(
+                {
+                    "pipeline": "audit",
+                    "element_count": len(compliance_results),
+                    "results": compliance_results,
+                    "issues": audit_issues,
+                    "bcf_topics": bcf_topics,
+                },
+                rule_compliance,
+                run_id=f"BGR-{project_id}",
+            )
+            audit_issues = audit_result["issues"]
+            bcf_topics = audit_result["bcf_topics"]
 
         if selected_theme == "MEP":
             ifc_element_count = len(elements)
         else:
             ifc_element_count = int(ifc_totals.get("adjusted_products", 0))
+
+        logger.info(
+            "Compliance workflow complete project_id=%d elements=%d MEP_results=%d rule_results=%d demo=%s",
+            project_id,
+            ifc_element_count,
+            len(compliance_results),
+            len(rule_compliance),
+            is_demo,
+        )
 
         return {
             "project": project,
@@ -497,6 +585,9 @@ class BIMGuard_App:
             "ifc_schema_note": ifc_schema_note,
             "documents": documents,
             "compliance_results": compliance_results,
+            "audit_issues": audit_issues,
+            "bcf_topics": bcf_topics,
+            "audit_source_sha256": audit_source_sha256,
             "cost_impact": cost_impact,
             "issue_stats": issue_stats,
             "compliance_is_demo": is_demo,
@@ -516,8 +607,8 @@ class BIMGuard_App:
 # ── CLI entry point ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python orchestrator.py <path_to_obc_pdf>")
-        print("Example: python orchestrator.py data/input_docs/OBC_Part9.pdf")
+        print("Usage: python orchestrator.py <path_to_code_pdf>")
+        print("Example: python orchestrator.py data/input_docs/building_code.pdf")
         print(f"\nCurrent converter: {'GPT-4o' if USE_GPT4O else 'Regex'}")
         print("To switch: change USE_GPT4O = True/False at top of file")
         sys.exit(1)

@@ -7,7 +7,7 @@ This document was refreshed against the current codebase state in this workspace
 Completed since the original draft:
 
 - `orchestrator.run_dashboard()` and `orchestrator.orchestrate_workflow()` are implemented.
-- `/analysis/run` now has a working form and `/analysis/results` executes workflow calls.
+- `/analysis/MEP` now has a working form and `/analysis/results` executes workflow calls.
 - IFC analysis output now includes per-type counts (`ifc_type_counts`) instead of only a single total.
 - `RuleExtractionService.extract_rules()` is no longer a fake sleep + hardcoded return.
 - Gemini via LiteLLM is integrated through `LiteLLMGeminiRuleExtractor`.
@@ -83,7 +83,7 @@ Still pending:
 
 ### Current state
 
-- `/analysis/run` is functional (project/doc selection, HTMX submit, results rendering).
+- `/analysis/MEP` is functional (project/doc selection, HTMX submit, results rendering).
 - `/analysis/results` calls orchestrator and renders IFC/doc summaries.
 - `/reports` is still a placeholder page.
 
@@ -109,12 +109,12 @@ Still pending:
 
 ### Current state
 
-- SQLite/fastlite remains suitable for local/dev workflows.
+- Supabase remains the persistence backend for local, staging, and production workflows.
 
 ### Remaining enhancements
 
 - Introduce explicit migrations instead of opportunistic startup column adds.
-- Improve rule parameter storage/queryability (SQLite JSON functions or structured columns).
+- Improve rule parameter storage/queryability with Supabase Postgres JSONB operators and appropriate indexes.
 - Add relational links for run history (project + documents + ruleset + output artifacts).
 
 ## 7) Performance and Architecture

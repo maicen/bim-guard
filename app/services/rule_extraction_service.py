@@ -4,7 +4,7 @@ Step  Description                         Status
 ────  ──────────────────────────────────  ──────────────────────────────────────
   1   Docling + pypdf (parallel)          Active — Docling primary, pypdf standby
   2   Table Builder (no LLM)              Active
-  3   Section Chunker (13 OBC sections)   Active
+    3   Section Chunker (structured sections) Active
   4   Keyword Filter                      Optional — active when spaCy installed
   5   TF-IDF Keyword Discovery            Optional — active when spaCy installed
   6   Dependency Parser                   Optional — active when spaCy installed
@@ -25,11 +25,19 @@ import os
 import tempfile
 from pathlib import Path
 
+from app.modules.config import (
+    COMPLIANCE_TEMPERATURE,
+    DEFAULT_LLM_MODEL,
+    MAX_TOKENS_RULE_EXTRACTION,
+)
+from app.logging_config import get_logger
 from app.modules.module1_doc_parser import Module1_DocReader
 from app.modules.module1_doc_parser.section_chunker import SectionChunker
-from app.services.llm_client import LiteLLMClient
+from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.pipeline_dependencies import warm_optional_rule_pipeline_dependencies
 from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
+
+logger = get_logger(__name__)
 
 # ── Optional module flags ─────────────────────────────────────────────────────
 
@@ -74,7 +82,20 @@ except Exception:
     _NLP_ANNOTATOR_AVAILABLE = False
 
 # Step 8: BERT classifier (optional — requires transformers + fine-tuned model)
-_BERT_MODEL_PATH = Path("models/bert_obc_classifier")
+_BERT_MODEL_CANDIDATES = (
+    Path("models/bert_code_classifier"),
+)
+
+
+def _resolve_bert_model_path() -> Path:
+    """Return the first available fine-tuned BERT model directory."""
+    for candidate in _BERT_MODEL_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    return _BERT_MODEL_CANDIDATES[0]
+
+
+_BERT_MODEL_PATH = _resolve_bert_model_path()
 try:
     from app.modules.module1_doc_parser.bert_classifier import BERTClassifier
 
@@ -104,16 +125,27 @@ class RuleExtractionService:
     ):
         """Initialize document parser and extraction provider dependencies."""
         self._doc_reader = doc_reader or Module1_DocReader()
+        # Model, temperature, token cap, and retry all come from the shared
+        # config (Issue #17). DEFAULT_LLM_MODEL already performs the
+        # settings-then-environment lookup this used to do inline.
         self._provider = provider or LiteLLMRuleExtractor(
-            client=LiteLLMClient(model=os.getenv("BIM_GUARD_RULE_MODEL", "gpt-4o-mini"))
+            client=LiteLLMClientWithRetry(
+                LiteLLMClient(
+                    model=DEFAULT_LLM_MODEL,
+                    temperature=COMPLIANCE_TEMPERATURE,
+                    max_tokens=MAX_TOKENS_RULE_EXTRACTION,
+                )
+            )
         )
 
     # ── Public API ────────────────────────────────────────────────────────────
 
     async def extract_rules(self, file_content: bytes) -> ExtractionResult:
         if not file_content:
+            logger.warning("Skipped rule extraction for empty document content")
             return ExtractionResult(rules=[], warnings=[])
 
+        logger.info("Starting rule extraction document_bytes=%d", len(file_content))
         # ── Step 1: Docling + pypdf in parallel ────────────────────────────
         text, tables, warnings = await self._extract_simultaneously(file_content)
 
@@ -128,6 +160,14 @@ class RuleExtractionService:
         if tables and _TABLE_BUILDER_AVAILABLE:
             table_rules = TableRuleBuilder().extract_all_as_dicts(tables)
 
+        logger.info(
+            "Document parsing complete text_chars=%d tables=%d table_rules=%d warnings=%d",
+            len(text),
+            len(tables),
+            len(table_rules),
+            len(warnings),
+        )
+
         return await self._extract_rules_from_text_with_tables(
             text=text,
             table_rules=table_rules,
@@ -137,8 +177,10 @@ class RuleExtractionService:
     async def extract_rules_from_text(self, text: str) -> ExtractionResult:
         """Extract compliance rules from pre-extracted document text."""
         if not text or not text.strip():
+            logger.warning("Skipped rule extraction for empty extracted text")
             return ExtractionResult(rules=[], warnings=[])
 
+        logger.info("Starting rule extraction from text chars=%d", len(text))
         return await self._extract_rules_from_text_with_tables(
             text=text,
             table_rules=[],
@@ -153,10 +195,11 @@ class RuleExtractionService:
         warnings: list[str],
     ) -> ExtractionResult:
         # ── Step 3: Section Chunker ────────────────────────────────────────
-        obc_chunks = SectionChunker().chunk(text)
-        if obc_chunks:
-            chunks_to_process = obc_chunks
+        structured_chunks = SectionChunker().chunk(text)
+        if structured_chunks:
+            chunks_to_process = structured_chunks
         else:
+            logger.warning("Section chunker returned no sections; using generic extraction chunks")
             generic = self._doc_reader.extract_text_sections(text)
             chunks_to_process = [
                 {
@@ -230,6 +273,7 @@ class RuleExtractionService:
                 text_key = "filtered_text"
 
             except (ImportError, OSError):
+                logger.warning("spaCy filtering unavailable; sending unfiltered chunks to rule extractor")
                 pass  # spaCy model not downloaded — skip all filtering
 
         # ── Step 9: LLM extraction via litellm ────────────────────────────
@@ -249,6 +293,15 @@ class RuleExtractionService:
 
         # ── Step 10: Deduplication ────────────────────────────────────────
         rules = self._deduplicate(table_rules + prose_rules)
+        logger.info(
+            "Rule extraction complete chunks=%d sent=%d table_rules=%d prose_rules=%d unique_rules=%d warnings=%d",
+            len(chunks_to_process),
+            len(sendable),
+            len(table_rules),
+            len(prose_rules),
+            len(rules),
+            len(warnings),
+        )
         return ExtractionResult(rules=rules, warnings=warnings)
 
     # ── Private: parallel extraction ──────────────────────────────────────────
@@ -285,6 +338,7 @@ class RuleExtractionService:
             and isinstance(docling_result[0], str)
             and docling_result[0].strip()
         ):
+            logger.debug("Docling extraction succeeded chars=%d tables=%d", len(docling_result[0]), len(docling_result[1]))
             return docling_result[0], docling_result[1], warnings
 
         # Docling failed — surface a warning, fall through to pypdf
@@ -294,8 +348,10 @@ class RuleExtractionService:
                 f"Docling extraction failed ({err}). "
                 "Switched to pypdf — table detection unavailable for this document."
             )
+            logger.warning("Docling extraction failed; falling back to pypdf error=%s", err)
 
         if isinstance(pypdf_result, str) and pypdf_result.strip():
+            logger.info("pypdf extraction succeeded chars=%d", len(pypdf_result))
             return pypdf_result, [], warnings
 
         if isinstance(pypdf_result, Exception):

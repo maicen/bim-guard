@@ -30,54 +30,17 @@ import os
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
-# ── VERSION ───────────────────────────────────────────────────────────────────
-RULESET_VERSION = "BIMGUARD-MC-001 v1.0.0"
-ASSESSMENT_DATE = datetime.utcnow().isoformat() + "Z"
+from app.services.corrosion_rule_catalog import load_mc_catalog
 
-# ── FLOW VELOCITY CLASSES ─────────────────────────────────────────────────────
-# Based on CIBSE TM13:2013 and HSE HSG274
-# Stagnation is the primary enabler of biofilm formation
-FLOW_VELOCITY_CLASSES = {
-    "FV0_STAGNANT": {
-        "label": "Stagnant / dead-leg",
-        "threshold_ms": 0.0,
-        "risk": 1.00,
-        "mic_risk": "Critical — biofilm establishment certain",
-    },
-    "FV1_VERY_LOW": {
-        "label": "Very low flow < 0.1 m/s",
-        "threshold_ms": 0.1,
-        "risk": 0.80,
-        "mic_risk": "High — insufficient flushing velocity",
-    },
-    "FV2_LOW": {
-        "label": "Low flow 0.1–0.3 m/s",
-        "threshold_ms": 0.3,
-        "risk": 0.55,
-        "mic_risk": "Moderate — marginal flushing",
-    },
-    "FV3_ACCEPTABLE": {
-        "label": "Acceptable 0.3–0.6 m/s",
-        "threshold_ms": 0.6,
-        "risk": 0.25,
-        "mic_risk": "Low — adequate flushing for most services",
-    },
-    "FV4_GOOD": {
-        "label": "Good flow 0.6–1.5 m/s",
-        "threshold_ms": 1.5,
-        "risk": 0.10,
-        "mic_risk": "Very low — self-cleaning velocity",
-    },
-    "FV5_TURBULENT": {
-        "label": "Turbulent > 1.5 m/s",
-        "threshold_ms": 999,
-        "risk": 0.02,
-        "mic_risk": "Negligible — turbulent regime inhibits biofilm",
-    },
-}
+RULESET_VERSION = "BIMGUARD-MC-001 v1.0.0"
+ASSESSMENT_DATE = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+_MC_CATALOG = load_mc_catalog()
+
+FLOW_VELOCITY_CLASSES = _MC_CATALOG["flow_velocity_classes"]
 
 
 def classify_flow_velocity(velocity_ms: float) -> tuple[str, dict]:
@@ -96,55 +59,7 @@ def classify_flow_velocity(velocity_ms: float) -> tuple[str, dict]:
         return "FV5_TURBULENT", FLOW_VELOCITY_CLASSES["FV5_TURBULENT"]
 
 
-# ── TEMPERATURE CLASSES ───────────────────────────────────────────────────────
-# Based on WHO Guidelines and CIBSE TM13:2013
-# Legionella pneumophila growth optimum: 35–46°C
-# SRB optimum: 25–35°C (mesophilic), some to 65°C (thermophilic)
-# APB range: 15–45°C
-TEMPERATURE_CLASSES = {
-    "T0_COLD": {
-        "range": "<20°C",
-        "t_min": 0,
-        "t_max": 20,
-        "risk": 0.15,
-        "organisms": "SRB low activity, minimal Legionella risk (WHO cold water <20°C)",
-    },
-    "T1_MARGINAL": {
-        "range": "20–25°C",
-        "t_min": 20,
-        "t_max": 25,
-        "risk": 0.35,
-        "organisms": "SRB active, Legionella survival zone begins",
-    },
-    "T2_DANGER": {
-        "range": "25–45°C",
-        "t_min": 25,
-        "t_max": 45,
-        "risk": 1.00,
-        "organisms": "CRITICAL — Legionella proliferation zone. SRB + APB optimal. CIBSE TM13 danger zone",
-    },
-    "T3_TOLERABLE": {
-        "range": "45–55°C",
-        "t_min": 45,
-        "t_max": 55,
-        "risk": 0.45,
-        "organisms": "Legionella above optimum but survives to 55°C. Thermophilic SRB active",
-    },
-    "T4_SAFE_HOT": {
-        "range": ">55°C",
-        "t_min": 55,
-        "t_max": 999,
-        "risk": 0.05,
-        "organisms": "Legionella destroyed above 60°C (CIBSE TM13). SRB inhibited",
-    },
-    "T5_UNKNOWN": {
-        "range": "Unknown",
-        "t_min": -1,
-        "t_max": -1,
-        "risk": 0.65,
-        "organisms": "Temperature unknown — conservative risk applied (default ambient 20°C applied)",
-    },
-}
+TEMPERATURE_CLASSES = _MC_CATALOG["temperature_classes"]
 
 
 def classify_temperature(temp_c: Optional[float]) -> tuple[str, dict]:
@@ -159,48 +74,7 @@ def classify_temperature(temp_c: Optional[float]) -> tuple[str, dict]:
     return "T4_SAFE_HOT", TEMPERATURE_CLASSES["T4_SAFE_HOT"]
 
 
-# ── DEAD-LEG CLASSIFICATION ───────────────────────────────────────────────────
-# Based on HSE HSG274 Part 2 and CIBSE Guide G
-# Dead-leg length ratio = dead-leg length / supply pipe diameter
-# A dead-leg length > 3× diameter is the standard HSE threshold
-DEAD_LEG_CLASSES = {
-    "DL0_THROUGH": {
-        "label": "Through-flow (no dead-leg)",
-        "risk": 0.05,
-        "ratio_threshold": 0,
-        "description": "Active flow path — no stagnation geometry",
-    },
-    "DL1_SHORT": {
-        "label": "Short dead-leg (< 3D)",
-        "risk": 0.30,
-        "ratio_threshold": 3,
-        "description": "Below HSE HSG274 threshold — low stagnation risk",
-    },
-    "DL2_MODERATE": {
-        "label": "Moderate dead-leg (3D – 10D)",
-        "risk": 0.65,
-        "ratio_threshold": 10,
-        "description": "Exceeds HSE threshold — flushing regime required",
-    },
-    "DL3_LONG": {
-        "label": "Long dead-leg (10D – 20D)",
-        "risk": 0.85,
-        "ratio_threshold": 20,
-        "description": "High stagnation — consider elimination or auto-flush",
-    },
-    "DL4_CRITICAL": {
-        "label": "Critical dead-leg (> 20D)",
-        "risk": 1.00,
-        "ratio_threshold": 999,
-        "description": "Critical stagnation geometry — eliminate or install auto-flush",
-    },
-    "DL5_UNKNOWN": {
-        "label": "Dead-leg unknown",
-        "risk": 0.50,
-        "ratio_threshold": -1,
-        "description": "Topology not determinable from IFC — conservative default",
-    },
-}
+DEAD_LEG_CLASSES = _MC_CATALOG["dead_leg_classes"]
 
 
 def classify_dead_leg(length_m: Optional[float], diameter_m: Optional[float]) -> tuple[str, dict]:
@@ -223,82 +97,17 @@ def classify_dead_leg(length_m: Optional[float], diameter_m: Optional[float]) ->
         return "DL4_CRITICAL", DEAD_LEG_CLASSES["DL4_CRITICAL"]
 
 
-# ── MATERIAL SUSCEPTIBILITY ───────────────────────────────────────────────────
-# Based on ASTM G-187 and NACCE TPC 11
-# MIC susceptibility differs from galvanic/crevice — copper and some alloys
-# have antimicrobial properties; carbon steel and cast iron are highly susceptible
-MATERIAL_SUSCEPTIBILITY = {
-    # key: (susceptibility_score, label, notes)
-    "carbon_steel": (
-        1.00,
-        "Carbon / mild steel",
-        "Highly susceptible — iron provides nutrient for IOB and SRB. Pitting under biofilm common",
-    ),
-    "cast_iron": (
-        0.90,
-        "Cast iron",
-        "High susceptibility — large surface area, graphitic corrosion under biofilm",
-    ),
-    "galv_steel": (
-        0.75,
-        "Galvanised steel",
-        "Moderate-high — zinc coating inhibits initially but SRB attack underlying steel when depleted",
-    ),
-    "ss304": (
-        0.30,
-        "Stainless steel 304",
-        "Low susceptibility — passive film resists MIC. Risk increases under biofilm in stagnant conditions",
-    ),
-    "ss316": (
-        0.20,
-        "Stainless steel 316",
-        "Low — Mo addition improves resistance. Still at risk from SRB pitting in anaerobic stagnant zones",
-    ),
-    "duplex2205": (
-        0.10,
-        "Duplex 2205",
-        "Very low — high Cr+Mo content provides strong MIC resistance",
-    ),
-    "copper": (
-        0.15,
-        "Copper",
-        "Low — antimicrobial properties inhibit biofilm. Risk from APB in acidic conditions (dezincification)",
-    ),
-    "brass": (
-        0.25,
-        "Brass (70/30)",
-        "Low-moderate — antimicrobial but susceptible to dealloying under biofilm",
-    ),
-    "bronze": (0.20, "Bronze", "Low — similar to copper; antimicrobial properties effective"),
-    "cpvc": (
-        0.05,
-        "CPVC",
-        "Negligible — non-metallic; biofilm substrate only, no metallic corrosion",
-    ),
-    "pvc": (0.05, "PVC", "Negligible — non-metallic; biofilm can form but no MIC of pipe material"),
-    "hdpe": (0.05, "HDPE", "Negligible — non-metallic; inert to MIC"),
-    "titanium": (
-        0.05,
-        "Titanium",
-        "Negligible — exceptional MIC resistance; used in aggressive MIC environments",
-    ),
-    "aluminium": (
-        0.50,
-        "Aluminium",
-        "Moderate — susceptible to pitting under biofilm, particularly in chloride environments",
-    ),
-    "unknown": (
-        0.60,
-        "Unknown material",
-        "Conservative default — material not identified in IFC model",
-    ),
-}
+MATERIAL_SUSCEPTIBILITY = _MC_CATALOG["material_susceptibility"]
 
 
 def get_material_susceptibility(material_key: str) -> tuple[float, str, str]:
-    """Return (score, label, notes) for a material key."""
-    key = material_key.lower().replace(" ", "_").replace("-", "_")
-    # Normalise common variants
+    """Return (score, label, notes) for a material key.
+
+    The catalog is intentionally tolerant: missing or partial material entries
+    must degrade to a safe unknown default rather than raising KeyError during a
+    compliance run.
+    """
+    key = (material_key or "").lower().replace(" ", "_").replace("-", "_")
     aliases = {
         "carbon steel": "carbon_steel",
         "mild steel": "carbon_steel",
@@ -319,36 +128,17 @@ def get_material_susceptibility(material_key: str) -> tuple[float, str, str]:
         "copper tube": "copper",
     }
     resolved = aliases.get(key, key)
-    return MATERIAL_SUSCEPTIBILITY.get(resolved, MATERIAL_SUSCEPTIBILITY["unknown"])
+    payload = MATERIAL_SUSCEPTIBILITY.get(resolved)
+    if payload is None:
+        payload = MATERIAL_SUSCEPTIBILITY.get("unknown")
+    if payload is None:
+        payload = (0.5, "Unknown", "Material not recognised; defaulted to unknown MIC susceptibility")
+    return payload
 
 
-# ── UNDER-INSULATION CORROSION (UIC) ─────────────────────────────────────────
-# Based on NACE SP0198 and CIBSE Guide G
-# Under-insulation creates trapped moisture, restricted oxygen, and warm
-# temperatures that are ideal for SRB and APB colonisation
-UNDER_INSULATION_RISK = {
-    "none": 0.00,  # No insulation
-    "good_condition": 0.10,  # Insulation present, intact, no moisture ingress
-    "weathered": 0.45,  # Insulation weathered/aged — moisture ingress possible
-    "damaged": 0.80,  # Insulation visibly damaged — moisture trapped
-    "wet": 1.00,  # Wet insulation confirmed — MIC very likely
-    "unknown": 0.35,  # Insulation present but condition unknown
-}
+UNDER_INSULATION_RISK = _MC_CATALOG["under_insulation_risk"]
 
-# ── SYSTEM TYPE RISK MODIFIER ─────────────────────────────────────────────────
-# Certain system types have inherent MIC risk regardless of individual element conditions
-SYSTEM_TYPE_MODIFIERS = {
-    # IfcDistributionSystem types → (multiplier, description)
-    "DOMESTICCOLDWATER": (1.30, "Domestic cold water — primary Legionella risk system"),
-    "DOMESTICHOTWATER": (1.25, "Domestic hot water — Legionella proliferation if < 55°C"),
-    "CHILLEDWATER": (1.15, "Chilled water — temperature 7–12°C favours biofilm in low-flow zones"),
-    "CONDENSERWATER": (1.20, "Condenser water — warm recirculating system, high MIC risk"),
-    "FIREPROTECTION": (1.40, "Fire suppression — infrequent flow, long stagnation periods"),
-    "IRRIGATION": (1.10, "Irrigation — intermittent flow, warm conditions"),
-    "WASTEWATER": (0.80, "Waste / drain — anaerobic SRB active but corrosion consequence lower"),
-    "PROCESSWATER": (1.00, "Process water — risk depends on operating conditions"),
-    "UNKNOWN": (1.05, "Unknown system type — slight conservative uplift"),
-}
+SYSTEM_TYPE_MODIFIERS = _MC_CATALOG["system_type_modifiers"]
 
 
 def get_system_modifier(system_type: str) -> tuple[float, str]:

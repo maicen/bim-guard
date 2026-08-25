@@ -1,14 +1,14 @@
 """
 module1_doc_parser/keywords/keyword_master.py
 -----------------------------------------------
-Master keyword list for BIMGuard OBC compliance rule detection.
+Master keyword list for BIMGuard CODE compliance rule detection.
 193 keywords across 12 groups with weighted scoring.
 
 Sources:
     - CODE-ACCORD (Nature 2025)   — deontic, permissive, exemption language
     - SPaR.txt (ACL 2021)         — multi-word expressions in building regulations
-    - ScienceDirect (2024)        — OBC-specific terms
-    - ontario.ca (real OBC text)  — actual OBC phrasing patterns
+    - ScienceDirect (2024)        — CODE-specific terms
+    - ontario.ca (real CODE text)  — actual CODE phrasing patterns
 """
 
 # ── GROUP 1: OBLIGATION / MANDATE  (weight 3) ─────────────────────────────────

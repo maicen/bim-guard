@@ -29,40 +29,19 @@ import os
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
+
+from app.services.corrosion_rule_catalog import load_gc_catalog
 
 # ── VERSION ───────────────────────────────────────────────────────────────────
 RULESET_VERSION = "BIMGUARD-GC-001 v1.0.0"
-ASSESSMENT_DATE = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+ASSESSMENT_DATE = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+_GC_CATALOG = load_gc_catalog()
 
 # ── GALVANIC SERIES TABLE ─────────────────────────────────────────────────────
-# Corrosion potential in seawater (V vs. Ag/AgCl reference)
-# Source: WorldStainless / Euro Inox (2025) and AUCSC Basic Corrosion Course (2024)
-# Lower value = more noble (cathodic) — corrodes less
-# Higher value = more active (anodic) — corrodes preferentially
-GALVANIC_SERIES = {
-    "platinum": {"potential": 0.00, "label": "Platinum", "noble": True},
-    "gold": {"potential": 0.02, "label": "Gold", "noble": True},
-    "graphite": {"potential": 0.03, "label": "Graphite", "noble": True},
-    "titanium": {"potential": 0.05, "label": "Titanium", "noble": True},
-    "ss316_passive": {"potential": 0.08, "label": "SS 316 (passive)", "noble": True},
-    "ss304_passive": {"potential": 0.12, "label": "SS 304 (passive)", "noble": True},
-    "hastelloy_c": {"potential": 0.14, "label": "Hastelloy C", "noble": True},
-    "silver_solder": {"potential": 0.18, "label": "Silver solder", "noble": True},
-    "ss316_active": {"potential": 0.22, "label": "SS 316 (active)", "noble": False},
-    "copper": {"potential": 0.28, "label": "Copper", "noble": True},
-    "brass": {"potential": 0.32, "label": "Brass (70/30)", "noble": False},
-    "bronze": {"potential": 0.34, "label": "Bronze", "noble": False},
-    "ss304_active": {"potential": 0.38, "label": "SS 304 (active)", "noble": False},
-    "cast_iron": {"potential": 0.52, "label": "Cast iron", "noble": False},
-    "carbon_steel": {"potential": 0.55, "label": "Carbon / mild steel", "noble": False},
-    "aluminium": {"potential": 0.70, "label": "Aluminium alloys", "noble": False},
-    "cadmium": {"potential": 0.75, "label": "Cadmium", "noble": False},
-    "zinc": {"potential": 0.80, "label": "Zinc", "noble": False},
-    "galv_steel": {"potential": 0.82, "label": "Galvanised steel", "noble": False},
-    "magnesium": {"potential": 0.95, "label": "Magnesium alloys", "noble": False},
-}
+GALVANIC_SERIES = _GC_CATALOG["galvanic_series"]
 
 # Material name normalisation map — maps IFC material name variants to galvanic series keys
 MATERIAL_ALIASES = {
@@ -171,73 +150,9 @@ def get_galvanic_potential(material_key: Optional[str]) -> Optional[float]:
     return GALVANIC_SERIES.get(material_key, {}).get("potential")
 
 
-# ── ENVIRONMENT CLASSES ───────────────────────────────────────────────────────
-# Voltage thresholds per NASA-STD-6012
-ENVIRONMENT_CLASSES = {
-    "E1_CONTROLLED": {
-        "label": "Fully controlled / dry indoor",
-        "voltage_threshold": 0.50,
-        "multiplier": 0.20,
-        "description": "Temperature and humidity controlled — minimal electrolyte risk",
-    },
-    "E2_NORMAL": {
-        "label": "Normal heated indoor",
-        "voltage_threshold": 0.25,
-        "multiplier": 0.40,
-        "description": "Standard building services environment — occasional condensation",
-    },
-    "E3_HUMID": {
-        "label": "Humid plant room",
-        "voltage_threshold": 0.15,
-        "multiplier": 0.65,
-        "description": "High humidity, regular condensation — significant electrolyte risk",
-    },
-    "E4_SHELTERED": {
-        "label": "External sheltered",
-        "voltage_threshold": 0.15,
-        "multiplier": 0.70,
-        "description": "External but sheltered from direct rainfall",
-    },
-    "E5_EXPOSED": {
-        "label": "External exposed",
-        "voltage_threshold": 0.10,
-        "multiplier": 0.85,
-        "description": "Direct weather exposure — continuous moisture risk",
-    },
-    "E6_POOL": {
-        "label": "Pool or spa enclosure",
-        "voltage_threshold": 0.10,
-        "multiplier": 0.90,
-        "description": "Chloride-rich humid atmosphere — aggressive galvanic environment",
-    },
-    "E7_COASTAL": {
-        "label": "Coastal or marine",
-        "voltage_threshold": 0.05,
-        "multiplier": 1.00,
-        "description": "Salt air or seawater — most aggressive environment",
-    },
-}
+ENVIRONMENT_CLASSES = _GC_CATALOG["environment_classes"]
 
-# IFC zone category → environment class mapping
-ZONE_TO_ENV = {
-    "pool": "E6_POOL",
-    "swimming pool": "E6_POOL",
-    "spa": "E6_POOL",
-    "plant room": "E3_HUMID",
-    "plantroom": "E3_HUMID",
-    "mechanical room": "E3_HUMID",
-    "boiler room": "E3_HUMID",
-    "pump room": "E3_HUMID",
-    "external": "E5_EXPOSED",
-    "roof": "E5_EXPOSED",
-    "car park": "E4_SHELTERED",
-    "coastal": "E7_COASTAL",
-    "marine": "E7_COASTAL",
-    "cleanroom": "E1_CONTROLLED",
-    "laboratory": "E1_CONTROLLED",
-    "server room": "E1_CONTROLLED",
-    "data centre": "E1_CONTROLLED",
-}
+ZONE_TO_ENV = _GC_CATALOG["zone_to_env"]
 
 
 def classify_environment(zone_category: str = "") -> tuple[str, dict]:
@@ -267,15 +182,7 @@ def calculate_voltage_risk(
     return min(1.0, ratio / 2.0)
 
 
-# ── AREA RATIO RISK BANDS ─────────────────────────────────────────────────────
-# Source: Prosoco Technical Note 104 / AUCSC Basic Corrosion Course
-AREA_RATIO_BANDS = [
-    {"label": "Favourable", "min_ratio": 5.0, "max_ratio": float("inf"), "risk": 0.20},
-    {"label": "Acceptable", "min_ratio": 2.0, "max_ratio": 5.0, "risk": 0.40},
-    {"label": "Moderate", "min_ratio": 0.5, "max_ratio": 2.0, "risk": 0.60},
-    {"label": "Unfavourable", "min_ratio": 0.1, "max_ratio": 0.5, "risk": 0.80},
-    {"label": "Critical", "min_ratio": 0.0, "max_ratio": 0.1, "risk": 1.00},
-]
+AREA_RATIO_BANDS = _GC_CATALOG["area_ratio_bands"]
 
 
 def classify_area_ratio(anode_area_m2: float, cathode_area_m2: float) -> tuple[str, float]:
@@ -294,25 +201,8 @@ def classify_area_ratio(anode_area_m2: float, cathode_area_m2: float) -> tuple[s
     return "Critical", 1.00
 
 
-# ── PREN ADEQUACY CHECK ───────────────────────────────────────────────────────
-# Source: IMOA Design Manual 4th Ed.
-PREN_THRESHOLDS = {
-    "E1_CONTROLLED": 18,  # SS304 adequate
-    "E2_NORMAL": 18,
-    "E3_HUMID": 25,  # SS316 required
-    "E4_SHELTERED": 25,
-    "E5_EXPOSED": 32,  # Duplex 2205+ required
-    "E6_POOL": 32,
-    "E7_COASTAL": 40,  # Super Duplex 2507+ required
-}
-
-PREN_VALUES = {
-    "ss304_passive": 18,
-    "ss304_active": 18,
-    "ss316_passive": 25,
-    "ss316_active": 25,
-    # Duplex and super duplex mapped to ss316 key in aliases, but store actual PREN
-}
+PREN_THRESHOLDS = _GC_CATALOG["pren_thresholds"]
+PREN_VALUES = _GC_CATALOG["pren_values"]
 
 
 def check_pren_adequacy(material_key: str, env_class: str) -> tuple[bool, str]:
@@ -466,12 +356,21 @@ def assess_galvanic_risk(element: GCElement) -> GCResult:
         and cathode_potential is not None
         and anode_potential < cathode_potential
     ):
-        # Swap so anode is always the less noble (higher potential)
+        # Swap so anode is always the less noble (higher potential).
+        # Every per-side attribute has to move together: the areas included.
+        # Leaving them behind pairs the swapped materials with the original
+        # side's areas, which inverts the area ratio that classify_area_ratio()
+        # reads below — a small anode against a large cathode is the dangerous
+        # case, and the inverted ratio reports it as the safe one.
         anode_key, cathode_key = cathode_key, anode_key
         anode_potential, cathode_potential = cathode_potential, anode_potential
         element.global_id_anode, element.global_id_cathode = (
             element.global_id_cathode,
             element.global_id_anode,
+        )
+        element.anode_area_m2, element.cathode_area_m2 = (
+            element.cathode_area_m2,
+            element.anode_area_m2,
         )
 
     # Environment classification

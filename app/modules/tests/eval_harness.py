@@ -52,7 +52,7 @@ EVAL_CASES = [
             "operator": ">=",
             "value": 860,
             "unit": "mm",
-            "source": "OBC 9.8.2.1",
+            "source": "CODE 9.8.2.1",
         },
     },
     {

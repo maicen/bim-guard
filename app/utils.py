@@ -3,14 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dotenv import load_dotenv
 from fasthtml.common import RedirectResponse
-
-
-def load_env_file(env_path: str = ".env") -> None:
-    """Load local .env file into process environment without overriding set vars."""
-    load_dotenv(dotenv_path=Path(env_path), override=False)
-
 
 ALLOWED_DOCUMENT_SUFFIXES = {".pdf", ".md", ".txt"}
 ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {

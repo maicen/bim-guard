@@ -228,7 +228,7 @@ class DependencyParser:
         Analyse one paragraph for obligation sentences.
 
         Args:
-            paragraph (str): one paragraph of OBC text
+            paragraph (str): one paragraph of CODE text
 
         Returns:
             dict:

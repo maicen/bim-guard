@@ -30,16 +30,13 @@ COPY main.py ./
 COPY app/ ./app/
 COPY static/ ./static/
 
-# data/rulesets — baked into the image; read at startup by ruleset_seeder
-# data/cache    — writable dir for Supabase Storage file cache
-RUN mkdir -p data/rulesets data/cache/supabase-storage
-COPY data/rulesets/ ./data/rulesets/
+# data/cache — writable dir for Supabase Storage file cache
+RUN mkdir -p data/cache/supabase-storage
 
 # Make sure the venv is on PATH
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    BIM_GUARD_DB_BACKEND=supabase \
     BIM_GUARD_STORAGE_BACKEND=supabase
 
 EXPOSE 8000
