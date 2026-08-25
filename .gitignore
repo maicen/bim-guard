@@ -40,3 +40,9 @@ data/validation_results/
 # the human-readable record.
 test_output.bcf
 test_hospital_mep_halos.json
+
+# Test and analysis run logs: regenerated on every run, no durable value.
+pytest_run.log
+route_tests.log
+analysis_*.log
+validation_sweep_retry.log
