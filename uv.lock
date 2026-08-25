@@ -225,7 +225,6 @@ name = "bim-guard-simple"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "docling" },
     { name = "ifcopenshell" },
     { name = "litellm" },
     { name = "matplotlib" },
@@ -241,7 +240,6 @@ dependencies = [
     { name = "python-fasthtml" },
     { name = "pyvis" },
     { name = "reportlab" },
-    { name = "spacy" },
     { name = "supabase" },
 ]
 
@@ -253,14 +251,12 @@ dev = [
 ml-pipeline = [
     { name = "docling" },
     { name = "en-core-web-sm" },
-    { name = "openai" },
     { name = "scikit-learn" },
     { name = "spacy" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "docling", specifier = ">=2.0.0" },
     { name = "ifcopenshell", specifier = ">=0.8.4.post1" },
     { name = "litellm", specifier = ">=1.0.0" },
     { name = "matplotlib", specifier = ">=3.11.1" },
@@ -276,7 +272,6 @@ requires-dist = [
     { name = "python-fasthtml", specifier = ">=0.12.48" },
     { name = "pyvis", specifier = ">=0.3.2" },
     { name = "reportlab", specifier = ">=5.0.0" },
-    { name = "spacy", specifier = ">=3.0.0" },
     { name = "supabase", specifier = ">=2.29.0" },
 ]
 
@@ -288,7 +283,6 @@ dev = [
 ml-pipeline = [
     { name = "docling", specifier = ">=2.0.0" },
     { name = "en-core-web-sm", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
-    { name = "openai", specifier = ">=1.30.0" },
     { name = "scikit-learn", specifier = ">=1.4.0" },
     { name = "spacy", specifier = ">=3.7.0" },
 ]

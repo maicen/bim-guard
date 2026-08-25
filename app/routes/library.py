@@ -81,7 +81,6 @@ from app.utils import (
 
 _document_service = DocumentService()
 _rule_service = RuleService()
-_rule_extraction_service = RuleExtractionService()
 _llm_model_service = LLMModelService()
 
 
