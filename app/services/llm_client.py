@@ -68,6 +68,7 @@ class LiteLLMClient:
             ``"gemini/gemini-2.0-flash"``.
         api_key: Provider API key.  When omitted, litellm reads the relevant
             environment variable (``OPENAI_API_KEY``, ``GEMINI_API_KEY``, etc.).
+        api_base: Optional provider endpoint, such as an Ollama server URL.
         temperature: Sampling temperature.  Defaults to
             ``config.COMPLIANCE_TEMPERATURE``, which is correct for every
             current caller since they all parse the reply as JSON.
@@ -82,6 +83,8 @@ class LiteLLMClient:
         *,
         model: str,
         api_key: str | None = None,
+        api_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> None:
@@ -97,6 +100,8 @@ class LiteLLMClient:
 
         self._model = model
         self._api_key = api_key or None
+        self._api_base = api_base or None
+        self._extra_headers = extra_headers or None
         self._temperature = temperature
         self._max_tokens = max_tokens
 
@@ -126,6 +131,10 @@ class LiteLLMClient:
             kwargs["response_format"] = response_format
         if self._api_key:
             kwargs["api_key"] = self._api_key
+        if self._api_base:
+            kwargs["api_base"] = self._api_base
+        if self._extra_headers:
+            kwargs["extra_headers"] = self._extra_headers
 
         response = await acompletion(**kwargs)
         return response.choices[0].message.content or ""

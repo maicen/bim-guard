@@ -30,6 +30,7 @@ data/BIMGuard_IFC4_Export.json
 
 # Runtime artifacts are durable in Supabase Storage; local copies are disposable.
 data/cache/supabase-storage/
+data/agent-sessions/
 
 # Validation sweep inputs/outputs: ~1.8 GB, fully regenerable.
 # Models re-download from the URLs in the validation dataset doc; BCF

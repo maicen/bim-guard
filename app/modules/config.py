@@ -1,6 +1,5 @@
-"""
-app/modules/config.py
-----------------------
+"""Shared configuration for the document and rule pipeline.
+
 Shared constants for Module 1 and Module 3 pipeline components.
 Imported by rule_generator.py, rule_converter.py, and seed-rule loaders.
 """
@@ -23,12 +22,12 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 # Unified LLM configuration for all extraction, rule building, and compliance work.
 # All modules use these constants instead of hardcoded values.
 
-# Default model: Gemini 2.0-flash (via LiteLLM).
-# The "gemini/" prefix is the LiteLLM provider route — without it litellm cannot
-# resolve which backend to call. Precedence matches the API-key block above:
+# Default model: OpenRouter Auto (via LiteLLM).
+# The "openrouter/" prefix is the LiteLLM provider route. Precedence matches
+# the API-key block above:
 # Environment variable > literal default.
 DEFAULT_LLM_MODEL = os.environ.get(
-    "BIM_GUARD_LLM_MODEL", "gemini/gemini-2.0-flash"
+    "BIM_GUARD_LLM_MODEL", "openrouter/auto"
 )
 
 # Temperature by use case
