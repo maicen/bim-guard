@@ -29,6 +29,16 @@ _RICH_COLUMNS = {
     "value_max_property": str,
     "value_min_offset": str,  # JSON-encoded numeric, default 0
     "value_max_offset": str,  # JSON-encoded numeric, default 0
+    # field_consistency: compare_property is a second property fetched from
+    # the SAME element (like value_min/max_property above) that property_name's
+    # value must match — optionally after name_pattern extracts a substring
+    # from it first (e.g. pulling "CVO14" out of a longer Name before
+    # comparing it to a separate Cod_Object field).
+    "compare_property": str,
+    "name_pattern": str,
+    # unique_within_scope: "storey" | "space" | "building" (default) — the
+    # grouping property_name's value must be unique within.
+    "uniqueness_scope": str,
     "unit": str,
     "applies_when": str,  # JSON object string
     "severity": str,
@@ -311,6 +321,9 @@ class RuleService:
         value_max_property: str = "",
         value_min_offset=0,
         value_max_offset=0,
+        compare_property: str = "",
+        name_pattern: str = "",
+        uniqueness_scope: str = "",
         unit: str = "",
         applies_when: dict | None = None,
         severity: str = "mandatory",
@@ -348,6 +361,9 @@ class RuleService:
                 "value_max_property": value_max_property or "",
                 "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
                 "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
+                "compare_property": compare_property or "",
+                "name_pattern": name_pattern or "",
+                "uniqueness_scope": uniqueness_scope or "",
                 "unit": unit or "",
                 "applies_when": json.dumps(applies_when or {}),
                 "severity": severity or "mandatory",
@@ -394,6 +410,9 @@ class RuleService:
         value_max_property: str = "",
         value_min_offset=0,
         value_max_offset=0,
+        compare_property: str = "",
+        name_pattern: str = "",
+        uniqueness_scope: str = "",
         unit: str = "",
         # classification
         severity: str = "mandatory",
@@ -430,6 +449,9 @@ class RuleService:
                 "value_max_property": value_max_property or "",
                 "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
                 "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
+                "compare_property": compare_property or "",
+                "name_pattern": name_pattern or "",
+                "uniqueness_scope": uniqueness_scope or "",
                 "unit": unit or "",
                 "severity": severity or "mandatory",
                 "keyword": keyword or "",
@@ -593,12 +615,27 @@ class RuleService:
 
     def list_folders(self) -> list[dict]:
         """Return folder rows with current rule counts, ordered by ruleset_id."""
-        counts: dict[str, int] = {}
-        for r in self._rules.rows:
+        rows = self.list_folders_with_rules()
+        for row in rows:
+            row.pop("rules", None)
+        return rows
+
+    def list_folders_with_rules(self, rules: list[dict] | None = None) -> list[dict]:
+        """Return folder rows with current rule counts and member rules attached.
+
+        Groups the already-fetched rules table in one pass instead of issuing a
+        separate Supabase query per folder (the previous list_by_ruleset-per-folder
+        approach was O(n_folders) network round trips and made the rule library
+        page take tens of seconds to load with a few thousand rules).
+        """
+        all_rules = self._rules.rows if rules is None else rules
+
+        by_ruleset: dict[str, list[dict]] = {}
+        for r in all_rules:
             ruleset_id = self.normalize_ruleset_id(r.get("ruleset_id") or "")
             if not ruleset_id:
                 continue
-            counts[ruleset_id] = counts.get(ruleset_id, 0) + 1
+            by_ruleset.setdefault(ruleset_id, []).append(r)
 
         rows: list[dict] = []
         seen: set[str] = set()
@@ -607,6 +644,7 @@ class RuleService:
             if not ruleset_id or ruleset_id in seen:
                 continue
             seen.add(ruleset_id)
+            members = by_ruleset.get(ruleset_id, [])
             rows.append(
                 {
                     "ruleset_id": ruleset_id,
@@ -615,11 +653,12 @@ class RuleService:
                     "mechanism_scope": self._normalize_mechanism_scope(
                         folder.get("mechanism_scope")
                     ),
-                    "count": counts.get(ruleset_id, 0),
+                    "count": len(members),
+                    "rules": members,
                 }
             )
 
-        for ruleset_id, count in counts.items():
+        for ruleset_id, members in by_ruleset.items():
             if ruleset_id in seen:
                 continue
             rows.append(
@@ -628,7 +667,8 @@ class RuleService:
                     "display_name": ruleset_id,
                     "description": "",
                     "mechanism_scope": "",
-                    "count": count,
+                    "count": len(members),
+                    "rules": members,
                 }
             )
 
