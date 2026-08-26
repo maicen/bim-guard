@@ -5,6 +5,7 @@ import os
 
 from fasthtml.common import (
     FileResponse,
+    Response,
     Title,
     UploadFile,
 )
@@ -12,6 +13,7 @@ from monsterui.all import Container
 
 from app.components.layout import DashboardLayout
 from app.components.projects_ui import project_enhancements_page, project_form, projects_page
+from app.constants import DEFAULT_ANALYSIS_TYPE, DEFAULT_COUNTRY
 from app.modules.pipeline_services import execute_model_enhancement
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.object_storage import ObjectStorage
@@ -49,15 +51,29 @@ def setup_routes(rt):
         description: str = "",
         status: str = "Draft",
         ifc_file: UploadFile = None,
+        country: str = DEFAULT_COUNTRY,
+        analysis_type: str = DEFAULT_ANALYSIS_TYPE,
     ):
+        """Create a project from the simple form.
+
+        country and analysis_type default to the same values migration_001 gave
+        existing rows, so this legacy form keeps working while the five-step
+        wizard is the route that collects them explicitly.
+        """
         ifc_file_path, ifc_md5_hash = await _projects_service.prepare_ifc_upload(ifc_file)
-        _projects_service.create_project(
-            name=name,
-            description=description,
-            status=status,
-            ifc_file_path=ifc_file_path,
-            ifc_md5_hash=ifc_md5_hash,
-        )
+        try:
+            _projects_service.create_project(
+                name=name,
+                description=description,
+                status=status,
+                ifc_file_path=ifc_file_path,
+                ifc_md5_hash=ifc_md5_hash,
+                country=country,
+                analysis_type=analysis_type,
+            )
+        except ValueError as exc:
+            # Previously a blank name was accepted and created an unusable row.
+            return Response(str(exc), status_code=400)
         return redirect_see_other("/projects")
 
     @rt("/projects/{project_id}/edit")
