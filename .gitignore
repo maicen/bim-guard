@@ -52,6 +52,8 @@ test_hospital_mep_halos.json
 pytest_run.log
 route_tests.log
 analysis_*.log
+server.log
+server_run.log
 validation_sweep_retry.log
 
 # git format-patch exports (transfer artifacts, not source)

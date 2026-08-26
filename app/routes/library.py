@@ -84,12 +84,9 @@ _rule_service = RuleService()
 _llm_model_service = LLMModelService()
 
 
-def _folders_with_rules() -> list[dict]:
+def _folders_with_rules(rules: list[dict] | None = None) -> list[dict]:
     """List folders with their member rules attached, for the expandable panel."""
-    folders = _rule_service.list_folders()
-    for folder in folders:
-        folder["rules"] = _rule_service.list_by_ruleset(folder["ruleset_id"])
-    return folders
+    return _rule_service.list_folders_with_rules(rules)
 
 
 # Server-side cache of the most recent extraction — avoids passing large JSON
@@ -271,7 +268,7 @@ def setup_routes(rt):
         needs_review_only = bool(needs_review)
         all_rows = _rule_service.list_rules()
         rows = _rule_service.fetch_needs_review() if needs_review_only else all_rows
-        folders = _folders_with_rules()
+        folders = _folders_with_rules(all_rows)
         return Title("Rules - BIM Guard"), DashboardLayout(
             Container(
                 DivLAligned(
@@ -324,13 +321,63 @@ def setup_routes(rt):
         description: str,
         target_ifc_class: str,
         parameters: str = "{}",
+        # identity
+        mechanism: str = "",
+        ruleset_id: str = "",
+        rule_category: str = "property_check",
+        # ifc target
+        property_set: str = "",
+        property_name: str = "",
+        fallback_property: str = "",
+        # rule logic
+        operator: str = "",
+        check_value: str = "",
+        value_min: str = "",
+        value_max: str = "",
+        value_min_property: str = "",
+        value_max_property: str = "",
+        value_min_offset: str = "",
+        value_max_offset: str = "",
+        compare_property: str = "",
+        name_pattern: str = "",
+        uniqueness_scope: str = "",
+        unit: str = "",
+        # classification
+        severity: str = "mandatory",
+        keyword: str = "",
+        compliance_type: str = "",
+        # content
+        source_text: str = "",
     ):
         _rule_service.create_rule(
-            reference,
-            rule_type,
-            description,
-            target_ifc_class,
-            parameters,
+            reference=reference,
+            rule_type=rule_type,
+            description=description,
+            target_ifc_class=target_ifc_class,
+            parameters=parameters,
+            mechanism=mechanism,
+            ruleset_id=ruleset_id,
+            rule_category=rule_category,
+            property_set=property_set,
+            property_name=property_name,
+            fallback_property=fallback_property,
+            operator=operator,
+            check_value=check_value or None,
+            value_min=value_min or None,
+            value_max=value_max or None,
+            value_min_property=value_min_property,
+            value_max_property=value_max_property,
+            value_min_offset=value_min_offset or 0,
+            value_max_offset=value_max_offset or 0,
+            compare_property=compare_property,
+            name_pattern=name_pattern,
+            uniqueness_scope=uniqueness_scope,
+            unit=unit,
+            severity=severity,
+            keyword=keyword,
+            compliance_type=compliance_type,
+            source_text=source_text,
+            extraction_method="manual",
         )
         return redirect_see_other("/library/rules")
 
@@ -555,6 +602,9 @@ def setup_routes(rt):
         value_max_property: str = "",
         value_min_offset: str = "",
         value_max_offset: str = "",
+        compare_property: str = "",
+        name_pattern: str = "",
+        uniqueness_scope: str = "",
         unit: str = "",
         # classification
         severity: str = "mandatory",
@@ -590,6 +640,9 @@ def setup_routes(rt):
             value_max_property=value_max_property,
             value_min_offset=value_min_offset or 0,
             value_max_offset=value_max_offset or 0,
+            compare_property=compare_property,
+            name_pattern=name_pattern,
+            uniqueness_scope=uniqueness_scope,
             unit=unit,
             severity=severity,
             keyword=keyword,

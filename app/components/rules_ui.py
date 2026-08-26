@@ -122,6 +122,14 @@ OPERATOR_OPTIONS = [
     SelectOptionSpec(label="exists", value="exists"),
     SelectOptionSpec(label="not_exists", value="not_exists"),
     SelectOptionSpec(label="matches", value="matches"),
+    SelectOptionSpec(label="field_consistency", value="field_consistency"),
+    SelectOptionSpec(label="unique_within_scope", value="unique_within_scope"),
+]
+
+UNIQUENESS_SCOPE_OPTIONS = [
+    SelectOptionSpec(label="building (whole model)", value="building"),
+    SelectOptionSpec(label="storey", value="storey"),
+    SelectOptionSpec(label="storey + space", value="space"),
 ]
 
 SEVERITY_OPTIONS = [
@@ -1374,6 +1382,12 @@ def rule_form(title: str, action: str, rule: dict | None = None):
         for o in OPERATOR_OPTIONS
     ]
 
+    selected_uniqueness_scope = rule.get("uniqueness_scope", "") or "building"
+    uniqueness_scope_options = [
+        SelectOptionSpec(label=o.label, value=o.value, selected=o.value == selected_uniqueness_scope)
+        for o in UNIQUENESS_SCOPE_OPTIONS
+    ]
+
     selected_severity = rule.get("severity", "mandatory")
     severity_options = [
         SelectOptionSpec(label=o.label, value=o.value, selected=o.value == selected_severity)
@@ -1568,6 +1582,50 @@ def rule_form(title: str, action: str, rule: dict | None = None):
                         input_type="number",
                     ),
                     cls="grid grid-cols-4 gap-3",
+                ),
+                Span(
+                    "field_consistency (optional) — Property Name's value must match "
+                    "another property on the SAME element, e.g. a wall's Name must embed "
+                    "the same code stored in its Cod_Object parameter. Name Pattern is an "
+                    "optional regex run against Property Name's value first (its capture "
+                    "groups, joined, become the compared value) — e.g. "
+                    "([A-Z]+)_.*_(\\d+)$ to pull \"CVO14\" out of \"CVO_90cm_FSR_TES_14\".",
+                    cls="text-xs text-muted-foreground block",
+                ),
+                Div(
+                    TextInputField(
+                        FieldSpec(
+                            label="Compare Property",
+                            field_id="compare_property",
+                            name="compare_property",
+                            value=rule.get("compare_property", ""),
+                            placeholder="e.g. Cod_Object",
+                        )
+                    ),
+                    TextInputField(
+                        FieldSpec(
+                            label="Name Pattern",
+                            field_id="name_pattern",
+                            name="name_pattern",
+                            value=rule.get("name_pattern", ""),
+                            placeholder="optional regex, e.g. ([A-Z]+)_.*_(\\d+)$",
+                        )
+                    ),
+                    cls="grid grid-cols-2 gap-3",
+                ),
+                Span(
+                    "unique_within_scope (optional) — Property Name's value must not be "
+                    "shared by another element in the same scope, e.g. two doors on the "
+                    "same floor both coded \"1\".",
+                    cls="text-xs text-muted-foreground block",
+                ),
+                SelectField(
+                    FieldSpec(
+                        label="Uniqueness Scope",
+                        field_id="uniqueness_scope",
+                        name="uniqueness_scope",
+                    ),
+                    uniqueness_scope_options,
                 ),
                 TextInputField(
                     FieldSpec(

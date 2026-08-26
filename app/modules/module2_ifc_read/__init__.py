@@ -1047,6 +1047,15 @@ class Module2_IFCRead:
             value_min_offset = self._decode_json_val(rule.get("value_min_offset")) or 0.0
             value_max_offset = self._decode_json_val(rule.get("value_max_offset")) or 0.0
 
+            # field_consistency — another property on the SAME element that
+            # prop_name's value (optionally transformed by name_pattern) must
+            # match, e.g. a wall's Name must embed the same code stored in its
+            # Cod_Object parameter. unique_within_scope has no second property
+            # to resolve; it just needs to know how to group elements.
+            compare_property = str(rule.get("compare_property") or "").strip()
+            name_pattern = str(rule.get("name_pattern") or "").strip()
+            uniqueness_scope = str(rule.get("uniqueness_scope") or "building").strip().lower()
+
             # User-configurable interpretation settings stored in the rule's
             # free-form `parameters` JSON blob (no dedicated column — avoids a
             # schema migration for settings that only a few rule types need).
@@ -1124,11 +1133,35 @@ class Module2_IFCRead:
                     if isinstance(max_val, (int, float)):
                         resolved_value_max = round(max_val + value_max_offset, 4)
 
+                # field_consistency's second property, resolved per-element via
+                # the same cascade as prop_name itself (Pset -> direct attribute
+                # -> type -> alias -> fallback) so it finds Cod_Object wherever
+                # the authoring tool actually put it, not just as a literal Pset key.
+                resolved_compare_value = None
+                if compare_property:
+                    resolved_compare_value, _, _ = self._resolve_element_property(
+                        el, compare_property, spatial=spatial, unit_scale_mm=_unit_scale_mm
+                    )
+
                 # ── Type context ────────────────────────────────
                 try:
                     type_inf = self.get_type_info(el)
                 except Exception:
                     type_inf = {}
+
+                # World-space centroid (mm), shape-cached by Module 2's own
+                # geometry extractor so repeat hits on the same element
+                # across different rules are free after the first. Only
+                # consumed downstream by Module 5's BCF export, to point
+                # the viewer's camera at a failing element instead of
+                # defaulting to the world origin — None here just means
+                # that export falls back to the origin, nothing breaks.
+                position_mm = None
+                if self.geometry_extractor:
+                    try:
+                        position_mm = self.geometry_extractor.get_centroid_or_none(el)
+                    except Exception:
+                        position_mm = None
 
                 element_results.append(
                     {
@@ -1141,6 +1174,10 @@ class Module2_IFCRead:
                         # Property-referencing bounds resolved for this element
                         "resolved_value_min": resolved_value_min,
                         "resolved_value_max": resolved_value_max,
+                        # field_consistency's second property, resolved for this element
+                        "resolved_compare_value": resolved_compare_value,
+                        # World-space position for BCF viewpoint camera placement
+                        "position_mm": position_mm,
                         # Gap 1: rich property metadata
                         "value_type": rich_detail.get("value_type"),
                         "value_unit": rich_detail.get("unit"),
@@ -1173,6 +1210,9 @@ class Module2_IFCRead:
                     "value_max_property": value_max_property,
                     "value_min_offset": value_min_offset,
                     "value_max_offset": value_max_offset,
+                    "compare_property": compare_property,
+                    "name_pattern": name_pattern,
+                    "uniqueness_scope": uniqueness_scope,
                     "unit": str(rule.get("unit") or ""),
                     "severity": str(rule.get("severity") or "mandatory"),
                     "egress_direction": egress_direction,

@@ -1061,7 +1061,11 @@ def _rule_validation_card(rule_validations: list[dict], analysis_theme: str):
 
 
 def _rule_compliance_card(
-    compliance_results: list[dict], summary: dict, error: str | None, analysis_theme: str
+    compliance_results: list[dict],
+    summary: dict,
+    error: str | None,
+    analysis_theme: str,
+    project_id: int | None = None,
 ):
     """Module 4 rule compliance card — shows PASS/FAIL per rule with element details."""
     title = f"Rule Compliance Check — Module 4 ({analysis_theme})"
@@ -1226,6 +1230,21 @@ def _rule_compliance_card(
                         return f"{v:,.2f}" if v >= 1 else f"{v:.4f}"
                     return str(v) if v is not None else "—"
 
+                def _view_in_3d_link(f: dict):
+                    pos = f.get("position_mm")
+                    if project_id is None or pos is None:
+                        return ""
+                    href = (
+                        f"/viewer?project_id={project_id}"
+                        f"&target_x={pos[0]}&target_y={pos[1]}&target_z={pos[2]}"
+                    )
+                    return A(
+                        "View in 3D",
+                        href=href,
+                        target="_blank",
+                        cls="text-xs text-blue-700 hover:underline whitespace-nowrap",
+                    )
+
                 fail_rows = [
                     Tr(
                         Td(f.get("element_name", "—")[:35], cls="px-2 py-1 text-xs font-mono"),
@@ -1243,6 +1262,7 @@ def _rule_compliance_card(
                             ),
                             cls="px-2 py-1",
                         ),
+                        Td(_view_in_3d_link(f), cls="px-2 py-1"),
                     )
                     for f in failures[:20]
                 ]
@@ -1260,6 +1280,7 @@ def _rule_compliance_card(
                                     Th("Actual value", cls="px-2 py-1 text-xs bg-muted"),
                                     Th("Reason", cls="px-2 py-1 text-xs bg-muted"),
                                     Th("GUID", cls="px-2 py-1 text-xs bg-muted"),
+                                    Th("", cls="px-2 py-1 text-xs bg-muted"),
                                 )
                             ),
                             Tbody(*fail_rows),
@@ -1347,6 +1368,11 @@ def _rule_compliance_card(
         href="/reports/compliance-csv",
         cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-white hover:bg-slate-600 mt-3",
     )
+    bcf_btn = A(
+        "Download BCF (Revit / Solibri)",
+        href="/reports/compliance-bcf",
+        cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-blue-700 text-white hover:bg-blue-600 mt-3 ml-2",
+    )
 
     return _collapsible_card(
         title,
@@ -1355,7 +1381,7 @@ def _rule_compliance_card(
             Table(Thead(Tr(*header_cells)), Tbody(*rows), cls="w-full text-sm"),
             cls="overflow-auto border rounded-md",
         ),
-        csv_btn,
+        Div(csv_btn, bcf_btn),
     )
 
 
@@ -3182,7 +3208,9 @@ def setup_routes(rt):
         global _last_compliance_results
         _last_compliance_results = rc
 
-        rule_compliance_card = _rule_compliance_card(rc, rc_summary, rc_error, theme_label)
+        rule_compliance_card = _rule_compliance_card(
+            rc, rc_summary, rc_error, theme_label, project_id=analysis_data["project_id"]
+        )
 
         sections = [
             Card(
@@ -3213,6 +3241,25 @@ def setup_routes(rt):
             Module5_Reporter().iter_csv_summary(_last_compliance_results),
             media_type="text/csv",
             headers={"Content-Disposition": 'attachment; filename="compliance_results.csv"'},
+        )
+
+    @rt("/reports/compliance-bcf")
+    def compliance_bcf_download():
+        """Download the last rule compliance check as a BCF 2.1 ZIP.
+
+        One topic per failing element, GUID-linked — opens directly in
+        Revit/Solibri/Navisworks/BIMcollab so the model author can jump
+        straight to each flagged element instead of reading a table.
+        """
+        from starlette.responses import Response as StarletteResponse
+
+        from app.modules.module5_reporter import Module5_Reporter
+
+        bcf_bytes = Module5_Reporter().generate_bcf_zip(_last_compliance_results)
+        return StarletteResponse(
+            content=bcf_bytes,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": 'attachment; filename="compliance_results.bcf"'},
         )
 
     @rt("/reports/simple-summary-xlsx/{category}")

@@ -94,5 +94,18 @@ export async function initViewer(containerId) {
         }
     }
 
-    return { scene, camera, renderer, controls, loadIfc };
+    function focusOn(x, y, z, distance = 8) {
+        // Keep the current camera-to-target direction, just re-centred on
+        // the new target — so a fly-to preserves the viewing angle the
+        // user (or the initial fit-to-model) already had, rather than
+        // snapping to some arbitrary fixed angle.
+        const target = new THREE.Vector3(x, y, z);
+        const direction = camera.position.clone().sub(controls.target).normalize();
+        if (direction.lengthSq() === 0) direction.set(1, 1, 1).normalize();
+        camera.position.copy(target).addScaledVector(direction, distance);
+        controls.target.copy(target);
+        controls.update();
+    }
+
+    return { scene, camera, renderer, controls, loadIfc, focusOn };
 }

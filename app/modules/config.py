@@ -78,6 +78,11 @@ VALID_OPERATORS = [
     "not_exists",  # property must be absent (prohibition)
     "matches",  # regex / pattern match
     "conforms_to",  # must conform to a referenced standard
+    "field_consistency",  # this element's property must match another property
+    # of the same element (optionally after a regex transform) — e.g. a wall's
+    # Cod_Object code must match the code embedded in its own Name
+    "unique_within_scope",  # this element's property value must not be shared
+    # by any other element within the same scope (storey / space / building)
 ]
 
 # ── Rule types ────────────────────────────────────────────────────────────────
