@@ -4,20 +4,20 @@ import os
 from functools import lru_cache
 
 from fasthtml.common import (
+    H3,
     A,
     Details,
     Div,
     FileResponse,
     Form,
-    H3,
     Iframe,
     Option,
     P,
+    Request,
     Response,
     Script,
-    Summary,
-    Request,
     Span,
+    Summary,
     Table,
     Tbody,
     Td,
@@ -40,21 +40,42 @@ from app.components.ui import (
     Checkbox,
     CountTableItemSpec,
     FormLabel,
+    IconLinkButton,
     ItemsCountDataTable,
     Label,
     Select,
     SubmitButton,
 )
+from app.components.ui import (
+    Table as UiTable,
+)
+from app.components.ui import (
+    TableBody as UiTableBody,
+)
+from app.components.ui import (
+    TableCell as UiTableCell,
+)
+from app.components.ui import (
+    TableHead as UiTableHead,
+)
+from app.components.ui import (
+    TableHeader as UiTableHeader,
+)
+from app.components.ui import (
+    TableRow as UiTableRow,
+)
 from app.logging_config import get_logger
 from app.modules.orchestrator import BIMGuard_App
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
+from app.services.report_artifacts import ReportArtifactService
 from app.services.rules_service import RuleService
 
 _bim_guard_app = BIMGuard_App()
 _projects_service = ProjectsService()
 _documents_service = DocumentService()
 _rule_service = RuleService()
+_report_artifact_service = ReportArtifactService()
 logger = get_logger(__name__)
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
@@ -537,6 +558,15 @@ async def _run_analysis_request(req: Request, forced_theme: str | None = None):
     if "error" in result:
         logger.warning("Analysis request failed project_id=%d error=%s", project_id, result["error"])
         return None, Alert(result["error"], cls=AlertT.error)
+
+    try:
+        _report_artifact_service.persist_bcf(project_id, result.get("bcf_topics", []))
+    except Exception:
+        logger.exception("BCF persistence failed project_id=%d", project_id)
+        return None, Alert(
+            "Analysis completed, but the BCF report could not be saved. Please try again.",
+            cls=AlertT.error,
+        )
 
     logger.info(
         "Analysis request complete project_id=%d ifc_elements=%d rule_results=%d",
@@ -3190,9 +3220,10 @@ def setup_routes(rt):
         """Download the full per-element summary table for one Simple Analysis category,
         with failing/missing cells highlighted the same way as the on-screen table."""
         import io
-        from starlette.responses import Response as StarletteResponse
+
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill
+        from starlette.responses import Response as StarletteResponse
 
         targets = _SIMPLE_CATEGORY_TARGETS.get(category, [])
         rule_results = [r for r in _last_simple_compliance if r.get("target") in targets]
@@ -3275,7 +3306,7 @@ def setup_routes(rt):
         with failing rows first and colour-highlighted the same way as the app.
         """
         import io
-        from starlette.responses import Response as StarletteResponse
+
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
         from reportlab.lib.styles import getSampleStyleSheet
@@ -3287,6 +3318,7 @@ def setup_routes(rt):
             Table,
             TableStyle,
         )
+        from starlette.responses import Response as StarletteResponse
 
         targets = _SIMPLE_CATEGORY_TARGETS.get(category, [])
         rule_results = [r for r in _last_simple_compliance if r.get("target") in targets]
@@ -3384,6 +3416,19 @@ def setup_routes(rt):
 
     @rt("/reports/bcf/{project_id}")
     def bcf_download(project_id: int):
+        artifact = _report_artifact_service.latest_bcf(project_id)
+        if artifact is not None:
+            bcf_path = _report_artifact_service.materialize(artifact)
+            if bcf_path is not None and bcf_path.exists():
+                filename = artifact.get("filename") or f"compliance_project_{project_id}.bcf"
+                return FileResponse(
+                    bcf_path,
+                    media_type=artifact.get("content_type") or "application/octet-stream",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{filename}"'
+                    },
+                )
+
         bcf_file = os.path.join(_DATA_DIR, f"compliance_project_{project_id}.bcf")
         if not os.path.exists(bcf_file):
             return Alert(
@@ -3398,6 +3443,24 @@ def setup_routes(rt):
                     f'attachment; filename="compliance_project_{project_id}.bcf"'
                 )
             },
+        )
+
+    @rt("/reports/bcf/artifacts/{artifact_id}")
+    def bcf_artifact_download(artifact_id: int):
+        """Download one persisted BCF export by artifact ID."""
+        artifact = _report_artifact_service.get_bcf(artifact_id)
+        if artifact is None:
+            return Alert("BCF export not found.", cls=AlertT.error)
+
+        bcf_path = _report_artifact_service.materialize(artifact)
+        if bcf_path is None or not bcf_path.exists():
+            return Alert("The stored BCF file could not be loaded.", cls=AlertT.error)
+
+        filename = artifact.get("filename") or f"bcf_export_{artifact_id}.bcf"
+        return FileResponse(
+            bcf_path,
+            media_type=artifact.get("content_type") or "application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     @rt("/reports/ifc-graph/{project_id}")
@@ -3442,22 +3505,76 @@ def setup_routes(rt):
 
     @rt("/reports")
     def reports():
+        artifacts = _report_artifact_service.list_bcf()
+        projects_by_id = {
+            int(project["id"]): project for project in _projects_service.list_projects()
+        }
+
+        rows = []
+        for artifact in artifacts:
+            artifact_id = int(artifact["id"])
+            project_id = int(artifact["project_id"])
+            project = projects_by_id.get(project_id, {})
+            byte_size = int(artifact.get("byte_size") or 0)
+            size_label = f"{byte_size / 1024:.1f} KB"
+            created_at = str(artifact.get("created_at") or "-").replace("T", " ")
+            rows.append(
+                UiTableRow(
+                    UiTableCell(project.get("name") or f"Project {project_id}"),
+                    UiTableCell(artifact.get("filename") or f"BCF export {artifact_id}"),
+                    UiTableCell(str(artifact.get("issue_count") or 0)),
+                    UiTableCell(size_label),
+                    UiTableCell(created_at),
+                    UiTableCell(
+                        Div(
+                            IconLinkButton(
+                                "scan-eye",
+                                href=f"/viewer?project_id={project_id}&bcf_artifact_id={artifact_id}",
+                                title="Visualize BCF in Viewer",
+                            ),
+                            IconLinkButton(
+                                "download",
+                                href=f"/reports/bcf/artifacts/{artifact_id}",
+                                title="Download BCF",
+                            ),
+                            cls="flex items-center gap-1",
+                        )
+                    ),
+                )
+            )
+
+        report_content = (
+            UiTable(
+                UiTableHeader(
+                    UiTableRow(
+                        UiTableHead("Project"),
+                        UiTableHead("Export"),
+                        UiTableHead("Issues"),
+                        UiTableHead("Size"),
+                        UiTableHead("Created"),
+                        UiTableHead("Actions"),
+                    )
+                ),
+                UiTableBody(*rows),
+            )
+            if rows
+            else P(
+                "No BCF exports are stored yet. Run an analysis to create one.",
+                cls="text-sm text-muted-foreground",
+            )
+        )
+
         return Title("Reports - BIM Guard"), DashboardLayout(
             Container(
                 Div(
                     H1("Reports", cls="text-3xl font-bold mb-4 tracking-tight"),
                     P(
-                        "Reports will be available once the compliance pipeline is implemented.",
+                        "Review, download, and visualize every stored BCF compliance export.",
                         cls="text-muted-foreground mb-6",
                     ),
                     Card(
-                        CardHeader(CardTitle("Coming Soon")),
-                        CardContent(
-                            P(
-                                "Add report filters, history, and export actions here.",
-                                cls="text-sm text-muted-foreground",
-                            )
-                        ),
+                        CardHeader(CardTitle(f"BCF exports ({len(artifacts)})")),
+                        CardContent(report_content),
                     ),
                     cls="container mx-auto py-6",
                 )

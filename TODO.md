@@ -108,8 +108,8 @@ Owner: Osama.
 
 ## Priority 6: Analysis and Reporting UX
 
-- [ ] Rename "Simple Analysis" to "Architectural Analysis". Owner: Malak.
-- [ ] Rename "Model Vs Rules Analysis" to "MEP Analysis". Owner: Shane.
+- [ ] Fully implement "Architectural Analysis" User Interface. Owner: Malak.
+- [ ] Fully implement "MEP Analysis" User Interface. Owner: Shane.
 - [ ] Move reporting responsibilities out of Analysis and standardize report generation
   across architectural and MEP workflows.
 - [ ] Consolidate the existing BCF generators/exporters behind one reporting service.
