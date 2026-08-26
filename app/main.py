@@ -17,6 +17,7 @@ from monsterui.all import (
 )
 
 from app.components.layout import DashboardLayout
+from app.components.project_setup_wizard import handle_wizard_get, handle_wizard_post
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
 from app.logging_config import configure_logging, get_logger
@@ -123,6 +124,20 @@ _ROUTES_REGISTERED = False
 @rt("/static/{path:path}")
 def serve_static(path: str):
     return FileResponse(f"static/{path}")
+
+
+# Project Setup Wizard Routes
+@app.get("/wizard")
+def wizard_get():
+    """GET /wizard — Render project setup wizard."""
+    return handle_wizard_get()
+
+
+@app.post("/wizard")
+async def wizard_post(request):
+    """POST /wizard — Handle wizard navigation."""
+    form_data = await request.form()
+    return await handle_wizard_post(form_data)
 
 
 # Compatibility endpoint for stale browser tabs that still attempt FastHTML's
