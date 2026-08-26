@@ -53,3 +53,11 @@ pytest_run.log
 route_tests.log
 analysis_*.log
 validation_sweep_retry.log
+
+# git format-patch exports (transfer artifacts, not source)
+*.patch
+
+# SQLite transient files (should never be tracked)
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
