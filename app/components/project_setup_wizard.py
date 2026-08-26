@@ -12,7 +12,13 @@ from fasthtml.common import (
 )
 from typing import Dict, List, Any, Optional, Tuple
 
-from app.constants import PROJECT_TYPES, ANALYSIS_TYPES, COUNTRIES, NOTEBOOK_STANDARDS
+from app.constants import (
+    ANALYSIS_TYPES,
+    COUNTRIES,
+    DEFAULT_ANALYSIS_TYPE,
+    NOTEBOOK_STANDARDS,
+    PROJECT_TYPES,
+)
 
 #: Wizard default. Must be a member of COUNTRIES, or no option renders as
 #: selected. Deliberately not app.constants.DEFAULT_COUNTRY ("UK"), which
@@ -684,8 +690,43 @@ def validate_all_steps(form_data: Dict) -> List[str]:
 
 
 def create_project_from_wizard(form_data: Dict) -> int:
-    """TODO: Wire to projects_service.create_project() + set_standards_for_project()"""
-    return 1
+    """Create the project and link its standards; return the new project id.
+
+    Synchronous, because ``ProjectsService.create_project`` and
+    ``set_standards_for_project`` are both synchronous. The service is imported
+    inside the function so that importing this component does not pull in the
+    persistence layer at module load time.
+
+    Args:
+        form_data: Collected wizard state. ``name``, ``country`` and
+            ``analysis_type`` must be present -- ``validate_all_steps`` runs
+            before this is called, and ``create_project`` raises ValueError on
+            any of them being blank or unrecognised.
+
+    Returns:
+        The ``id`` of the inserted project row.
+    """
+    from app.services.projects_service import ProjectsService
+
+    service = ProjectsService()
+
+    # create_project returns the inserted ROW, not an id.
+    project = service.create_project(
+        name=form_data.get("name", ""),
+        description=form_data.get("description", ""),
+        status="Active",
+        country=form_data.get("country", DEFAULT_COUNTRY),
+        analysis_type=form_data.get("analysis_type") or DEFAULT_ANALYSIS_TYPE,
+    )
+    project_id = project["id"]
+
+    # set_standards_for_project takes a list of standard-id STRINGS; it builds
+    # the junction rows itself, defaulting source to "notebook".
+    standards = form_data.get("standards", [])
+    if standards:
+        service.set_standards_for_project(project_id, standards)
+
+    return project_id
 
 
 def get_analysis_route(analysis_type: str) -> str:
