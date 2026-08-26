@@ -58,6 +58,7 @@ from app.routes import (
     projects,
     revit_sync,
     settings,
+    user_manual,
     viewer,
 )
 
@@ -109,6 +110,7 @@ _ROUTE_INSTALLERS = (
     projects.setup_routes,
     revit_sync.setup_routes,
     settings.setup_routes,
+    user_manual.setup_routes,
 )
 _ROUTES_REGISTERED = False
 

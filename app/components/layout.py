@@ -34,6 +34,7 @@ NAV_ICONS = {
     "Documents": "book-open",
     "Rule Extraction Studio": "list-checks",
     "Rules": "list-checks",
+    "User Manual": "book-open-check",
     "Modeling Manual": "box",
     "Settings": "settings",
 }
@@ -70,8 +71,9 @@ _NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ),
     ),
     (
-        "3D Modeling Manual",
+        "Manuals",
         (
+            ("User Manual", "/user-manual"),
             ("Modeling Manual", "/modeling-manual"),
         ),
     ),
