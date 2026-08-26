@@ -31,8 +31,13 @@ continues to work — it now additionally receives richer per-element metadata.
 """
 
 import json
+import time
+from collections import Counter
 from pathlib import Path
-from tempfile import TemporaryDirectory
+
+from app.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 try:
     import ifcopenshell
@@ -69,14 +74,12 @@ except ImportError:
 
 try:
     from .ifc_quality.validator import IFCValidator
-    from .ifc_quality.improver import improve_ifc_file
 
     _QUALITY_TOOLS_AVAILABLE = True
 except ImportError:
     _QUALITY_TOOLS_AVAILABLE = False
 
-# Minimum quality score (0-100) required before extraction proceeds.
-# Files below this threshold are auto-improved before loading.
+# Minimum quality score (0-100) that triggers a Projects-page improvement warning.
 IFC_MIN_QUALITY_SCORE = 70
 
 
@@ -203,6 +206,7 @@ class Module2_IFCRead:
         self.ifc_file = None
         self.quality_report: dict = {}
         self.quality_warnings: list[str] = []
+        self.quality_improvements: list[str] = []
         self.geometry_extractor: "IFCGeometryExtractor | None" = None
         self.spatial_adjacency: "IFCSpatialAdjacency | None" = None
         self.egress_graph: "IFCEgressGraph | None" = None
@@ -228,15 +232,10 @@ class Module2_IFCRead:
             score = results.get("overall", {}).get("score", 100)
 
             if score < IFC_MIN_QUALITY_SCORE:
-                with TemporaryDirectory(prefix="bim-guard-analysis-") as temp_dir:
-                    improved_path = Path(temp_dir) / f"{load_path.stem}_improved.ifc"
-                    improvement_summary = improve_ifc_file(str(load_path), str(improved_path))
-                    self.ifc_file = ifcopenshell.open(str(improved_path))
-                    self.quality_warnings.append(
-                        f"Quality {score:.1f}% was below threshold; "
-                        "an ephemeral auto-improved model was used for analysis"
-                    )
-                    self.quality_improvements = improvement_summary.get("improvements", [])
+                self.quality_warnings.append(
+                    f"IFC quality is low ({score:.1f}%). Run Quality Improvements "
+                    "from the Projects page before analysis."
+                )
             elif score < 80:
                 self.quality_warnings.append(
                     f"IFC quality is fair ({score:.1f}%). "
@@ -1031,12 +1030,30 @@ class Module2_IFCRead:
                 door_space_lookup = {}
 
         results = []
-        for rule in rules:
+        total_rules = len(rules)
+        logger.info(
+            "Rule extraction started rules=%d property_search=nominated-pset,all-psets,quantities,direct-attributes,type-properties,aliases,geometry unit_scale_mm=%s",
+            total_rules,
+            _unit_scale_mm,
+        )
+        for rule_index, rule in enumerate(rules, start=1):
+            rule_started_at = time.monotonic()
             target = str(rule.get("target_ifc_class") or "").strip()
             prop_name = str(rule.get("property_name") or "").strip()
             prop_set = str(rule.get("property_set") or "").strip()
             operator = str(rule.get("operator") or "").strip()
             fallback_prop = str(rule.get("fallback_property") or "").strip()
+            logger.info(
+                "Rule extraction rule=%d/%d reference=%s target=%s property=%s pset=%s operator=%s fallback=%s",
+                rule_index,
+                total_rules,
+                rule.get("reference") or rule.get("id") or "unknown",
+                target or "missing",
+                prop_name or "none",
+                prop_set or "any",
+                operator or "missing",
+                fallback_prop or "none",
+            )
 
             # Property-referencing bounds — e.g. tread depth
             # must be between its own Run and Run + 25mm. Instead of a fixed
@@ -1218,6 +1235,24 @@ class Module2_IFCRead:
                     "egress_direction": egress_direction,
                     "elements": element_results,
                 }
+            )
+
+            source_counts = Counter(
+                str(item.get("found_pset") or "missing") for item in element_results
+            )
+            found_count = sum(1 for item in element_results if item.get("found"))
+            progress = round(100 * rule_index / total_rules) if total_rules else 100
+            logger.info(
+                "Rule extraction complete rule=%d/%d progress=%d%% reference=%s matched_elements=%d values_found=%d values_missing=%d sources=%s elapsed=%.2fs",
+                rule_index,
+                total_rules,
+                progress,
+                rule.get("reference") or rule.get("id") or "unknown",
+                len(element_results),
+                found_count,
+                len(element_results) - found_count,
+                dict(source_counts),
+                time.monotonic() - rule_started_at,
             )
 
         return results

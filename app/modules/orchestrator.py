@@ -38,6 +38,7 @@ Usage:
 
 import re
 import sys
+import time
 from pathlib import Path
 
 from app.logging_config import get_logger
@@ -350,10 +351,25 @@ class BIMGuard_App:
         )
         from .pipeline_services import AnalysisService, run_compliance_analysis
 
+        started_at = time.monotonic()
+
+        def log_progress(percentage: int, step: str, **details) -> None:
+            detail_text = " ".join(f"{key}={value}" for key, value in details.items())
+            logger.info(
+                "Analysis progress project_id=%d theme=%s progress=%d%% step=%s elapsed=%.2fs%s",
+                project_id,
+                selected_theme,
+                percentage,
+                step,
+                time.monotonic() - started_at,
+                f" {detail_text}" if detail_text else "",
+            )
+
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
         selected_theme = RuleService.normalize_theme(analysis_theme)
         rule_folder = (rule_folder or "").strip()
+        log_progress(0, "request-started", documents=len(doc_ids), rule_folder=rule_folder or "all")
         logger.info(
             "Starting compliance workflow project_id=%d theme=%s documents=%d rule_folder=%s",
             project_id,
@@ -364,8 +380,10 @@ class BIMGuard_App:
 
         project = projects_svc.get_project(project_id)
         if project is None:
+            log_progress(5, "project-not-found")
             logger.warning("Compliance workflow project not found project_id=%d", project_id)
             return {"error": f"Project {project_id} not found."}
+        log_progress(5, "project-loaded", project_name=project.get("name", ""))
 
         # ── Documents ────────────────────────────────────────────────────────
         documents = []
@@ -380,9 +398,11 @@ class BIMGuard_App:
                     "section_count": len([l for l in text.splitlines() if l.strip()]),
                 }
             )
+        log_progress(10, "documents-loaded", loaded=len(documents), requested=len(doc_ids))
 
         # ── IFC parsing ──────────────────────────────────────────────────────
-        ifc_path = projects_svc.resolve_ifc_file(project_id)
+        log_progress(15, "ifc-file-resolution-started")
+        ifc_path, improvement_lineage = projects_svc.resolve_analysis_ifc(project_id)
         ifc_error = None
         elements = []
         ifc_type_counts: dict = {}
@@ -400,23 +420,117 @@ class BIMGuard_App:
         if ifc_path:
             try:
                 # Open IFC once, then reuse the loaded model for both parsing paths.
+                log_progress(20, "ifc-model-loading", source=ifc_path)
                 m2_reader = Module2_IFCRead(ifc_path)
+                log_progress(30, "ifc-model-loaded")
                 ifc_quality_report = m2_reader.quality_report or {}
                 ifc_quality_warnings = m2_reader.quality_warnings or []
-                ifc_quality_improvements = m2_reader.quality_improvements or []
+                if improvement_lineage is not None:
+                    persisted_summary = improvement_lineage.get("summary") or {}
+                    ifc_quality_improvements = list(
+                        persisted_summary.get("improvements") or []
+                    )
+                    ifc_quality_warnings.insert(
+                        0,
+                        "Using persisted quality-improved IFC "
+                        f"version {improvement_lineage.get('version')} from Projects.",
+                    )
                 ifc_schema_note = get_schema_compatibility_note(m2_reader.ifc_file)
+                log_progress(
+                    31,
+                    "ifc-quality-inspection-complete",
+                    warnings=len(ifc_quality_warnings),
+                    improvements=len(ifc_quality_improvements),
+                    schema=getattr(m2_reader.ifc_file, "schema", "unknown"),
+                )
+                log_progress(
+                    32,
+                    "building-summary-started",
+                    checks="storeys,floor-heights,areas,fixtures,qa-flags",
+                )
                 try:
                     building_summary = m2_reader.extract_building_summary()
-                except Exception:
+                    log_progress(
+                        34,
+                        "building-summary-complete",
+                        storeys=building_summary.get("storey_count", 0),
+                        spaces=building_summary.get("space_count", 0),
+                    )
+                except Exception as exc:
                     building_summary = {}
+                    logger.warning(
+                        "Building summary extraction failed project_id=%d error=%s",
+                        project_id,
+                        exc,
+                        exc_info=True,
+                    )
+                log_progress(
+                    35,
+                    "spatial-compliance-started",
+                    checks="daylight-ratio,fire-separation,garage-separation,door-space-connectivity",
+                )
                 try:
                     spatial_checks = m2_reader.extract_spatial_checks()
-                except Exception:
+                    log_progress(
+                        39,
+                        "spatial-compliance-complete",
+                        boundaries=spatial_checks.get("has_boundaries", False),
+                        spaces=spatial_checks.get("space_count", 0),
+                        daylight_results=len(spatial_checks.get("daylight", [])),
+                        daylight_failures=sum(
+                            1 for item in spatial_checks.get("daylight", []) if not item.get("passes")
+                        ),
+                        fire_results=len(spatial_checks.get("fire_separation", [])),
+                        fire_failures=sum(
+                            1
+                            for item in spatial_checks.get("fire_separation", [])
+                            if not item.get("passes")
+                        ),
+                        garage_results=len(spatial_checks.get("garage_separation", [])),
+                        door_connections=len(spatial_checks.get("space_connection", [])),
+                    )
+                except Exception as exc:
                     spatial_checks = {}
+                    logger.warning(
+                        "Spatial compliance extraction failed project_id=%d error=%s",
+                        project_id,
+                        exc,
+                        exc_info=True,
+                    )
+                log_progress(
+                    40,
+                    "egress-compliance-started",
+                    checks="exterior-exit-count,space-to-exit-travel-distance",
+                )
                 try:
                     egress_checks = m2_reader.extract_egress_checks()
-                except Exception:
+                    exit_count = egress_checks.get("exit_count", {})
+                    travel_results = egress_checks.get("travel_distance", [])
+                    log_progress(
+                        44,
+                        "egress-compliance-complete",
+                        graph=egress_checks.get("has_graph", False),
+                        exterior_doors=exit_count.get("total_exterior_doors", 0),
+                        exit_checks=len(exit_count.get("results", [])),
+                        travel_checks=len(travel_results),
+                        travel_failures=sum(
+                            1 for item in travel_results if not item.get("passes")
+                        ),
+                    )
+                except Exception as exc:
                     egress_checks = {}
+                    logger.warning(
+                        "Egress compliance extraction failed project_id=%d error=%s",
+                        project_id,
+                        exc,
+                        exc_info=True,
+                    )
+                log_progress(
+                    45,
+                    "ifc-domain-data-extracted",
+                    spatial_checks=len(spatial_checks),
+                    egress_checks=len(egress_checks),
+                )
                 if selected_theme == "MEP":
                     elements = parse_ifc_model(m2_reader.ifc_file)
                 else:
@@ -431,8 +545,14 @@ class BIMGuard_App:
                 # Count by IFC type
                 for el in elements:
                     ifc_type_counts[el.ifc_type] = ifc_type_counts.get(el.ifc_type, 0) + 1
+                log_progress(
+                    50,
+                    "ifc-summary-complete",
+                    products=ifc_totals.get("adjusted_products", 0),
+                )
             except Exception as exc:
                 ifc_error = str(exc)
+                log_progress(50, "ifc-processing-failed", error=type(exc).__name__)
                 logger.exception("IFC parsing failed project_id=%d", project_id)
         else:
             # No IFC file — run on synthetic demo data so the UI still renders
@@ -453,6 +573,7 @@ class BIMGuard_App:
             }
             for el in elements:
                 ifc_type_counts[el.ifc_type] = ifc_type_counts.get(el.ifc_type, 0) + 1
+            log_progress(50, "synthetic-ifc-data-generated", elements=len(elements))
             logger.info("Using synthetic IFC elements project_id=%d elements=%d", project_id, len(elements))
 
         # ── Compliance checks ─────────────────────────────────────────────────
@@ -465,6 +586,7 @@ class BIMGuard_App:
         audit_source_sha256: str | None = None
 
         if selected_theme == "MEP":
+            log_progress(55, "mep-compliance-started", elements=len(elements))
             try:
                 audit_result = run_compliance_analysis(
                     elements,
@@ -492,9 +614,13 @@ class BIMGuard_App:
                     if b in bands:
                         bands[b] += 1
                 issue_stats = bands
+                log_progress(65, "mep-compliance-complete", results=len(compliance_results))
             except Exception as exc:
                 compliance_error = str(exc)
+                log_progress(65, "mep-compliance-failed", error=type(exc).__name__)
                 logger.exception("MEP compliance checks failed project_id=%d", project_id)
+        else:
+            log_progress(65, "mep-compliance-skipped")
 
         # ── Module 2 + 4 + 5: Rule-based compliance check ────────────────────
         rule_compliance: list[dict] = []
@@ -511,6 +637,22 @@ class BIMGuard_App:
                 library_rules = [
                     r for r in library_rules if (r.get("ruleset_id") or "") == rule_folder
                 ]
+            log_progress(70, "rules-loaded", rules=len(library_rules))
+            for rule_index, rule in enumerate(library_rules, start=1):
+                logger.info(
+                    "Selected ARCH rule=%d/%d reference=%s target=%s property=%s operator=%s check_value=%r min=%r max=%r unit=%s severity=%s",
+                    rule_index,
+                    len(library_rules),
+                    rule.get("reference") or rule.get("id") or "unknown",
+                    rule.get("target_ifc_class") or "missing",
+                    rule.get("property_name") or "none",
+                    rule.get("operator") or "missing",
+                    rule.get("check_value"),
+                    rule.get("value_min"),
+                    rule.get("value_max"),
+                    rule.get("unit") or "none",
+                    rule.get("severity") or "mandatory",
+                )
 
             # Basic element-presence check (legacy rule_validations card)
             for rule in library_rules:
@@ -534,15 +676,61 @@ class BIMGuard_App:
 
             # Full Module 2 → 4 → 5 compliance pipeline (only when IFC file exists)
             if m2_reader and not ifc_error and library_rules:
+                log_progress(75, "rule-data-extraction-started", rules=len(library_rules))
                 extraction = m2_reader.extract_for_compliance(library_rules)
+                log_progress(82, "rule-validation-started", extracted=len(extraction))
                 rule_compliance = Module4_Comparator().validate_metadata(extraction)
+                for rule_index, result in enumerate(rule_compliance, start=1):
+                    logger.info(
+                        "Rule validation result=%d/%d reference=%s check=%s.%s operator=%s threshold=%r range=%r..%r unit=%s status=%s elements=%d passed=%d failed=%d missing=%d",
+                        rule_index,
+                        len(rule_compliance),
+                        result.get("rule_ref") or result.get("rule_id") or "unknown",
+                        result.get("target") or "unknown",
+                        result.get("property_name") or "none",
+                        result.get("operator") or "unknown",
+                        result.get("check_value"),
+                        result.get("value_min"),
+                        result.get("value_max"),
+                        result.get("unit") or "none",
+                        result.get("status") or "unknown",
+                        result.get("total_count", 0),
+                        result.get("pass_count", 0),
+                        result.get("fail_count", 0),
+                        result.get("missing_count", 0),
+                    )
+                log_progress(90, "report-generation-started", results=len(rule_compliance))
                 rule_compliance_summary = Module5_Reporter().render_visual_report(rule_compliance)
+                logger.info(
+                    "Compliance report summary project_id=%d total_rules=%d passed=%d failed=%d missing_data=%d no_elements=%d mandatory_failed=%d pass_rate=%s%% targets=%s",
+                    project_id,
+                    rule_compliance_summary.get("total_rules", 0),
+                    rule_compliance_summary.get("passed", 0),
+                    rule_compliance_summary.get("failed", 0),
+                    rule_compliance_summary.get("missing_data", 0),
+                    rule_compliance_summary.get("no_elements", 0),
+                    rule_compliance_summary.get("mandatory_failed", 0),
+                    rule_compliance_summary.get("pass_rate", 0),
+                    rule_compliance_summary.get("by_target", {}),
+                )
+            else:
+                log_progress(
+                    90,
+                    "rule-compliance-skipped",
+                    has_ifc=bool(m2_reader),
+                    ifc_error=bool(ifc_error),
+                    rules=len(library_rules),
+                )
 
         except Exception as exc:
             rule_compliance_error = str(exc)
+            log_progress(90, "rule-compliance-failed", error=type(exc).__name__)
             logger.exception("Rule-based compliance checks failed project_id=%d", project_id)
 
         if rule_compliance:
+            log_progress(95, "audit-results-merging", results=len(rule_compliance))
+            existing_issue_count = len(audit_issues)
+            existing_topic_count = len(bcf_topics)
             audit_result = AnalysisService().include_rule_results(
                 {
                     "pipeline": "audit",
@@ -556,12 +744,26 @@ class BIMGuard_App:
             )
             audit_issues = audit_result["issues"]
             bcf_topics = audit_result["bcf_topics"]
+            logger.info(
+                "Audit merge complete project_id=%d rule_failures_added=%d bcf_topics_added=%d total_issues=%d total_bcf_topics=%d",
+                project_id,
+                len(audit_issues) - existing_issue_count,
+                len(bcf_topics) - existing_topic_count,
+                len(audit_issues),
+                len(bcf_topics),
+            )
 
         if selected_theme == "MEP":
             ifc_element_count = len(elements)
         else:
             ifc_element_count = int(ifc_totals.get("adjusted_products", 0))
 
+        log_progress(
+            100,
+            "analysis-complete",
+            elements=ifc_element_count,
+            rule_results=len(rule_compliance),
+        )
         logger.info(
             "Compliance workflow complete project_id=%d elements=%d MEP_results=%d rule_results=%d demo=%s",
             project_id,

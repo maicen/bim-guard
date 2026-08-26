@@ -188,6 +188,11 @@ class EnhancementArtifactStorage(Protocol):
 class ModelLineageLedger(Protocol):
     """Persistence operations required to record model lineage."""
 
+    def find_by_source_sha256(
+        self, project_id: int, source_sha256: str
+    ) -> dict[str, Any] | None:
+        """Return the persisted enhancement for identical source content."""
+
     def allocate_next_version(self, project_id: int) -> int:
         """Atomically reserve and return the next project model version."""
 
@@ -196,6 +201,7 @@ class ModelLineageLedger(Protocol):
         *,
         project_id: int,
         source_reference: str,
+        source_sha256: str,
         source_version: int,
         output_reference: str,
         version: int,
@@ -244,6 +250,21 @@ class EnhancementService:
         if source_path is None:
             raise FileNotFoundError(f"Unable to materialize source IFC: {source_reference}")
 
+        source_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        existing = self._lineage_ledger.find_by_source_sha256(project_id, source_sha256)
+        if existing is not None:
+            return {
+                "pipeline": "enhancement",
+                "project_id": project_id,
+                "version": int(existing.get("version") or 0),
+                "source_reference": str(existing.get("source_reference") or source_reference),
+                "source_sha256": source_sha256,
+                "output_reference": str(existing.get("output_reference") or ""),
+                "summary": dict(existing.get("summary") or {}),
+                "lineage": existing,
+                "reused": True,
+            }
+
         version = self._lineage_ledger.allocate_next_version(project_id)
         with TemporaryDirectory(prefix="bim-guard-enhancement-") as temp_dir:
             output_name = f"{source_path.stem}_v{version}.ifc"
@@ -261,6 +282,7 @@ class EnhancementService:
         lineage = self._lineage_ledger.record(
             project_id=project_id,
             source_reference=source_reference,
+            source_sha256=source_sha256,
             source_version=0,
             output_reference=output_reference,
             version=version,
@@ -271,9 +293,11 @@ class EnhancementService:
             "project_id": project_id,
             "version": version,
             "source_reference": source_reference,
+            "source_sha256": source_sha256,
             "output_reference": output_reference,
             "summary": summary,
             "lineage": lineage,
+            "reused": False,
         }
 
     @staticmethod

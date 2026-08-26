@@ -3036,24 +3036,39 @@ def setup_routes(rt):
 
     @rt("/analysis/ARCH")
     def analysis_simple():
+        logger.info("ARCH page progress=0% step=page-requested path=/analysis/ARCH")
         projects = _projects_service.list_projects()
+        logger.info("ARCH page progress=40%% step=projects-loaded count=%d", len(projects))
         documents = _documents_service.list_documents()
+        logger.info("ARCH page progress=80%% step=documents-loaded count=%d", len(documents))
+        logger.info("ARCH page progress=100% step=page-rendered path=/analysis/ARCH")
         return Title("ARCH Analysis - BIM Guard"), DashboardLayout(
             Container(_analysis_form(projects, documents, mode="simple"), cls="space-y-4")
         )
 
     @rt("/analysis/ARCH/results", methods=["POST"])
     async def analysis_simple_post(req: Request):
+        logger.info("ARCH request progress=0% step=form-received path=/analysis/ARCH/results")
         form = await req.form()
         project_id_raw = form.get("project_id") or ""
         if not project_id_raw:
+            logger.warning("ARCH request progress=0% step=validation-failed reason=missing-project")
             return Alert("Please select a project.", cls=AlertT.error)
         try:
             project_id = int(project_id_raw)
         except ValueError:
+            logger.warning(
+                "ARCH request progress=0%% step=validation-failed reason=invalid-project value=%r",
+                project_id_raw,
+            )
             return Alert("Invalid project selection.", cls=AlertT.error)
 
         rule_folder = (form.get("rule_folder") or "").strip()
+        logger.info(
+            "ARCH request progress=1%% step=validated project_id=%d rule_folder=%s",
+            project_id,
+            rule_folder or "all",
+        )
         result = _bim_guard_app.orchestrate_workflow(
             project_id,
             doc_ids=[],
@@ -3064,10 +3079,16 @@ def setup_routes(rt):
             include_type_definitions=False,
         )
         if "error" in result:
+            logger.warning(
+                "ARCH request step=analysis-failed project_id=%d error=%s",
+                project_id,
+                result["error"],
+            )
             return Alert(result["error"], cls=AlertT.error)
 
         from collections import defaultdict
 
+        logger.info("ARCH request progress=100%% step=results-rendering project_id=%d", project_id)
         project = result["project"]
         rule_compliance = result.get("rule_compliance", [])
         spatial_checks = result.get("spatial_checks", {})
@@ -3108,6 +3129,12 @@ def setup_routes(rt):
             _simple_fire_card(by_class, spatial_checks, building_summary),
             _simple_garage_card(spatial_checks),
         ]
+        logger.info(
+            "ARCH request progress=100%% step=response-ready project_id=%d sections=%d rule_results=%d",
+            project_id,
+            len(sections),
+            len(rule_compliance),
+        )
         return Div(*sections, cls="space-y-4")
 
     @rt("/api/rules/{rule_id}/egress-direction", methods=["POST"])

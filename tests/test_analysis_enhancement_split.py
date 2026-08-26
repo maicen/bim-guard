@@ -10,9 +10,10 @@ from app.modules.pipeline_services import (
     run_compliance_analysis,
 )
 from app.services.persistence import PersistenceService, _MemoryClient
+from app.services.projects_service import ProjectsService
 
 
-def test_low_quality_analysis_uses_an_ephemeral_improved_copy(tmp_path, monkeypatch):
+def test_low_quality_reader_reports_warning_without_improving(tmp_path, monkeypatch):
     source_path = tmp_path / "source.ifc"
     source_path.write_bytes(b"ISO-10303-21;SOURCE")
     opened_paths = []
@@ -24,20 +25,14 @@ def test_low_quality_analysis_uses_an_ephemeral_improved_copy(tmp_path, monkeypa
         def validate(self):
             return {"overall": {"score": 42}}
 
-    def fake_improver(input_path, output_path):
-        assert Path(input_path) == source_path
-        Path(output_path).write_bytes(b"ISO-10303-21;IMPROVED")
-        return {"improvements": ["Names added: 1"]}
-
     def fake_open(path):
         opened_path = Path(path)
         assert opened_path.exists()
-        assert opened_path.read_bytes() == b"ISO-10303-21;IMPROVED"
+        assert opened_path.read_bytes() == b"ISO-10303-21;SOURCE"
         opened_paths.append(opened_path)
         return object()
 
     monkeypatch.setattr(ifc_read_module, "IFCValidator", FakeValidator)
-    monkeypatch.setattr(ifc_read_module, "improve_ifc_file", fake_improver)
     monkeypatch.setattr(ifc_read_module, "ifcopenshell", SimpleNamespace(open=fake_open))
     monkeypatch.setattr(ifc_read_module, "_IFCOPENSHELL_AVAILABLE", True)
     monkeypatch.setattr(ifc_read_module, "_QUALITY_TOOLS_AVAILABLE", True)
@@ -47,11 +42,10 @@ def test_low_quality_analysis_uses_an_ephemeral_improved_copy(tmp_path, monkeypa
 
     reader = ifc_read_module.Module2_IFCRead(source_path)
 
-    assert reader.quality_improvements == ["Names added: 1"]
-    assert "ephemeral auto-improved model" in reader.quality_warnings[0]
+    assert reader.quality_improvements == []
+    assert "Run Quality Improvements from the Projects page" in reader.quality_warnings[0]
     assert len(opened_paths) == 1
-    assert not opened_paths[0].exists()
-    assert not source_path.with_stem("source_improved").exists()
+    assert opened_paths[0] == source_path
 
 
 def test_analysis_and_enhancement_services_are_separated():
@@ -142,6 +136,11 @@ def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
         def __init__(self):
             self.payload = None
 
+        def find_by_source_sha256(self, project_id: int, source_sha256: str):
+            assert project_id == 7
+            assert len(source_sha256) == 64
+            return None
+
         def allocate_next_version(self, project_id: int) -> int:
             assert project_id == 7
             return 2
@@ -181,6 +180,7 @@ def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
     assert ledger.payload == {
         "project_id": 7,
         "source_reference": "sb://models/source.ifc",
+        "source_sha256": "e58a58c9d2696b420664ea94919d1e68e2738d8d9f97d4a1e8691f950eb3a3e3",
         "source_version": 0,
         "output_reference": "sb://models/enhancements/7/source_v2.ifc",
         "version": 2,
@@ -192,6 +192,94 @@ def test_enhancement_execution_creates_versioned_artifact_and_lineage(tmp_path):
     }
     assert result["lineage"]["id"] == 41
     assert "bim-guard-enhancement-" not in str(result["summary"])
+
+
+def test_enhancement_reuses_persisted_result_for_identical_source(tmp_path: Path):
+    source_content = b"ISO-10303-21;SAME-SOURCE"
+    source_path = tmp_path / "source.ifc"
+    source_path.write_bytes(source_content)
+
+    class FakeStorage:
+        def materialize_local_path(self, reference: str) -> Path | None:
+            assert reference == "sb://models/source.ifc"
+            return source_path
+
+        def save_upload(self, filename: str, content: bytes, subdir: str) -> str:
+            raise AssertionError("A repeated source must not create another artifact")
+
+    existing = {
+        "id": 42,
+        "project_id": 7,
+        "source_reference": "sb://models/source.ifc",
+        "source_sha256": "ae4faabdf30c1fc45998f838ec549e221275b2f8356e252ea8460e3cd393af86",
+        "output_reference": "sb://models/enhancements/7/source_v2.ifc",
+        "version": 2,
+        "summary": {"improvements": ["Names added: 3"]},
+    }
+
+    class FakeLineageLedger:
+        def find_by_source_sha256(self, project_id: int, source_sha256: str):
+            assert project_id == 7
+            assert source_sha256 == existing["source_sha256"]
+            return existing
+
+        def allocate_next_version(self, project_id: int) -> int:
+            raise AssertionError("A repeated source must not allocate another version")
+
+        def record(self, **payload):
+            raise AssertionError("A repeated source must not create another lineage row")
+
+    service = EnhancementService(
+        storage=FakeStorage(),
+        lineage_ledger=FakeLineageLedger(),
+        improver=lambda *_: (_ for _ in ()).throw(
+            AssertionError("A repeated source must not run the improver")
+        ),
+    )
+
+    result = service.execute(project_id=7, source_reference="sb://models/source.ifc")
+
+    assert result["reused"] is True
+    assert result["version"] == 2
+    assert result["output_reference"] == existing["output_reference"]
+    assert result["lineage"] == existing
+
+
+def test_project_analysis_resolves_persisted_improved_ifc(tmp_path: Path):
+    source_path = tmp_path / "source.ifc"
+    improved_path = tmp_path / "source_v1.ifc"
+    source_path.write_bytes(b"ISO-10303-21;CURRENT-SOURCE")
+    improved_path.write_bytes(b"ISO-10303-21;PERSISTED-IMPROVED")
+    source_sha256 = "c00361d22dbbeb6683f5c201159b7eef98267afd72ad3c704982fe899514422b"
+    lineage = {
+        "id": 21,
+        "project_id": 7,
+        "source_sha256": source_sha256,
+        "output_reference": "sb://models/enhancements/7/source_v1.ifc",
+        "version": 1,
+        "summary": {"improvements": ["Names added: 1"]},
+    }
+
+    class FakeStorage:
+        def materialize_local_path(self, reference: str) -> Path | None:
+            assert reference == lineage["output_reference"]
+            return improved_path
+
+    class FakeLineage:
+        def find_by_source_sha256(self, project_id: int, actual_sha256: str):
+            assert project_id == 7
+            assert actual_sha256 == source_sha256
+            return lineage
+
+    service = ProjectsService.__new__(ProjectsService)
+    service._storage = FakeStorage()
+    service._lineage = FakeLineage()
+    service.resolve_ifc_file = lambda project_id: source_path
+
+    resolved_path, resolved_lineage = service.resolve_analysis_ifc(7)
+
+    assert resolved_path == improved_path
+    assert resolved_lineage == lineage
 
 
 def test_enhancement_execution_does_not_accept_caller_version():
@@ -214,6 +302,7 @@ def test_lineage_repository_uses_offline_persistence_fallback(monkeypatch):
     row = repository.record(
         project_id=3,
         source_reference="sb://models/source.ifc",
+        source_sha256="abc123",
         source_version=0,
         output_reference="sb://models/output.ifc",
         version=1,
@@ -222,4 +311,5 @@ def test_lineage_repository_uses_offline_persistence_fallback(monkeypatch):
 
     assert row["id"] == 1
     assert row["project_id"] == 3
+    assert row["source_sha256"] == "abc123"
     assert row["summary"] == {"names_added": 2}

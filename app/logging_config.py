@@ -47,7 +47,7 @@ VERBOSITY_LEVELS = {
     4: TRACE,
 }
 
-DEFAULT_VERBOSITY = 1
+DEFAULT_VERBOSITY = 2
 
 _TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 _PLAIN_FORMAT = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)s | %(message)s"

@@ -35,7 +35,11 @@ def _apply_persisted_log_level() -> None:
     """Let the DB-backed log level win when no env override is present."""
     import os
 
-    if os.environ.get("BIM_GUARD_LOG_LEVEL") or os.environ.get("LOG_LEVEL"):
+    if (
+        os.environ.get("BIM_GUARD_LOG_LEVEL")
+        or os.environ.get("LOG_LEVEL")
+        or os.environ.get("BIM_GUARD_VERBOSITY")
+    ):
         return
     try:
         from app.logging_config import set_log_level

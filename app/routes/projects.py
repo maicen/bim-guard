@@ -92,7 +92,7 @@ def setup_routes(rt):
         project = _projects_service.get_project(project_id)
         if project is None:
             return redirect_see_other("/projects")
-        return Title("Enhancement History - BIM Guard"), project_enhancements_page(
+        return Title("Quality Improvements - BIM Guard"), project_enhancements_page(
             project,
             _lineage_repository.list_for_project(project_id),
             message=message or None,
@@ -121,8 +121,12 @@ def setup_routes(rt):
             return redirect_see_other(
                 f"/projects/{project_id}/enhancements?message=Enhancement+failed&level=warning"
             )
+        if result.get("reused"):
+            message = f"Reused persisted quality-improved version {result['version']}"
+        else:
+            message = f"Quality improvements persisted as version {result['version']}"
         return redirect_see_other(
-            f"/projects/{project_id}/enhancements?message=Generated+model+version+{result['version']}"
+            f"/projects/{project_id}/enhancements?message={message.replace(' ', '+')}"
         )
 
     @rt("/projects/{project_id}/enhancements/{lineage_id}/download")

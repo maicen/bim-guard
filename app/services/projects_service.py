@@ -1,10 +1,12 @@
 """Project service for IFC-backed project CRUD and file handling."""
 
+import hashlib
 from pathlib import Path
 
 from app.logging_config import get_logger
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
+from app.services.model_lineage import SupabaseModelLineageRepository
 from app.utils import (
     md5_hex,
     now_iso_utc,
@@ -21,6 +23,7 @@ class ProjectsService:
     def __init__(self):
         """Initialize project storage and ensure required table columns exist."""
         self._storage = ObjectStorage()
+        self._lineage = SupabaseModelLineageRepository()
         self._projects = PersistenceService.get_table(
             "projects",
             {
@@ -130,3 +133,39 @@ class ProjectsService:
         local_path = self._storage.materialize_local_path(ifc_file_path)
         logger.debug("Resolved project IFC project_id=%d available=%s", project_id, local_path is not None)
         return local_path
+
+    def resolve_analysis_ifc(self, project_id: int) -> tuple[Path | None, dict | None]:
+        """Return the persisted improved IFC for the current source, when available."""
+        source_path = self.resolve_ifc_file(project_id)
+        if source_path is None:
+            return None, None
+
+        source_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        lineage = self._lineage.find_by_source_sha256(project_id, source_sha256)
+        if lineage is None:
+            logger.info(
+                "Analysis using original IFC project_id=%d source_sha256=%s improved=False",
+                project_id,
+                source_sha256,
+            )
+            return source_path, None
+
+        improved_path = self._storage.materialize_local_path(
+            str(lineage.get("output_reference") or "")
+        )
+        if improved_path is None:
+            logger.warning(
+                "Persisted improved IFC unavailable; using original project_id=%d lineage_id=%s",
+                project_id,
+                lineage.get("id"),
+            )
+            return source_path, None
+
+        logger.info(
+            "Analysis using persisted improved IFC project_id=%d lineage_id=%s version=%s source_sha256=%s",
+            project_id,
+            lineage.get("id"),
+            lineage.get("version"),
+            source_sha256,
+        )
+        return improved_path, lineage

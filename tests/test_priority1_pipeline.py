@@ -106,7 +106,9 @@ def test_project_enhancement_history_shows_lineage_and_download():
     )
 
     html = str(page)
-    assert "Enhancement History - Plant Room" in html
+    assert "Quality Improvements - Plant Room" in html
+    assert "Identical source files reuse the existing result" in html
+    assert "Run Quality Improvements" in html
     assert "Source Version" in html
     assert "v0" in html
     assert "v1" in html

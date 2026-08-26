@@ -132,7 +132,7 @@ def projects_table_rows(rows: list[dict]):
             extra_items=(
                 [
                     DropdownMenuItem(
-                        "Enhancement History",
+                        "Quality Improvements",
                         onclick=f"window.location.href='/projects/{row['id']}/enhancements'",
                     )
                 ]
@@ -211,7 +211,7 @@ def project_enhancements_page(
     message: str | None = None,
     level: str = "success",
 ):
-    """Render the explicit enhancement command and immutable lineage history."""
+    """Render the explicit IFC quality-improvement command and immutable history."""
     history_rows = [
         Tr(
             Td(f"v{row.get('source_version', 0)}"),
@@ -238,11 +238,14 @@ def project_enhancements_page(
 
     return DashboardLayout(
         Container(
-            H1(f"Enhancement History - {project.get('name', 'Project')}"),
-            Subtitle("Generate a new IFC version without modifying the audited source model."),
+            H1(f"Quality Improvements - {project.get('name', 'Project')}"),
+            Subtitle(
+                "Improve and persist a new IFC version without modifying the uploaded source. "
+                "Identical source files reuse the existing result."
+            ),
             *MessageAlert(AlertSpec(message=message, level=level)),
             Card(
-                CardHeader(CardTitle("Create Enhanced Version")),
+                CardHeader(CardTitle("Run IFC Quality Improvements")),
                 CardContent(
                     Form(
                         DivVStacked(
@@ -256,7 +259,7 @@ def project_enhancements_page(
                             ),
                             cls="space-y-1",
                         ),
-                        Button("Generate New Version", type="submit", cls=ButtonT.primary),
+                        Button("Run Quality Improvements", type="submit", cls=ButtonT.primary),
                         method="post",
                         action=f"/projects/{project['id']}/enhance",
                         cls="space-y-4",
@@ -264,7 +267,7 @@ def project_enhancements_page(
                 ),
             ),
             Card(
-                CardHeader(CardTitle("Model Lineage")),
+                CardHeader(CardTitle("Persisted Improvement History")),
                 CardContent(
                     Div(
                         Table(

@@ -7,7 +7,7 @@ from app.services.static_data_service import StaticDataService
 DEFAULT_SETTINGS = [
     {
         "key": "BIM_GUARD_LOG_LEVEL",
-        "value": "WARNING",
+        "value": "INFO",
         "value_type": "string",
         "scope": "runtime",
         "description": "Log verbosity: 0-4 or ERROR | WARNING | INFO | DEBUG | TRACE.",

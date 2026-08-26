@@ -19,6 +19,7 @@ class SupabaseModelLineageRepository:
                 "id": int,
                 "project_id": int,
                 "source_reference": str,
+                "source_sha256": str,
                 "source_version": int,
                 "output_reference": str,
                 "version": int,
@@ -32,6 +33,7 @@ class SupabaseModelLineageRepository:
         *,
         project_id: int,
         source_reference: str,
+        source_sha256: str,
         source_version: int,
         output_reference: str,
         version: int,
@@ -42,12 +44,23 @@ class SupabaseModelLineageRepository:
             {
                 "project_id": project_id,
                 "source_reference": source_reference,
+                "source_sha256": source_sha256,
                 "source_version": source_version,
                 "output_reference": output_reference,
                 "version": version,
                 "summary": summary,
                 "created_at": now_iso_utc(),
             }
+        )
+
+    def find_by_source_sha256(
+        self, project_id: int, source_sha256: str
+    ) -> dict[str, Any] | None:
+        """Return an existing enhancement for the same project and source bytes."""
+        rows = self._lineage.rows_where("project_id = ?", [project_id])
+        return next(
+            (row for row in rows if row.get("source_sha256") == source_sha256),
+            None,
         )
 
     def allocate_next_version(self, project_id: int) -> int:
