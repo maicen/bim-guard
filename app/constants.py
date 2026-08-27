@@ -1,6 +1,6 @@
 """Static reference data for BIM-Guard project setup and analysis routing.
 
-Generated from NOTEBOOK_STANDARDS.py and the country list in
+Generated from tools/NOTEBOOK_STANDARDS.py and the country list in
 docs/experimental/bimguard-frontend-prototype-v1.html. Edit those sources and
 regenerate rather than editing this module by hand.
 """
