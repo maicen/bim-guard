@@ -161,6 +161,29 @@ def _join_mitigations(codes: list[str], catalogue: dict[str, str]) -> str:
 register_default_engines()
 
 
+def _band_or_none(engine_result: dict) -> str | None:
+    """Return the band an engine reported, or ``None`` if it reported none.
+
+    Previously this was ``engine_result.get("band", "LOW")``. Substituting
+    ``"LOW"`` made "not assessed" indistinguishable from "assessed and cleared":
+    the element carried a band no engine produced, ``issue_adapter``'s
+    ``if band_key not in result`` guard could never fire because the key was
+    always written, and ``include_low=False`` then dropped the element
+    entirely. An element the engines never touched vanished from the findings.
+
+    Returning ``None`` — and omitting the key downstream — restores the guard.
+    It deliberately does **not** raise: ``piping_schema``'s nullability policy
+    requires a comparator that cannot run to emit a Low-severity
+    ``mechanism="data_quality"`` issue "rather than crashing", and one
+    unassessable element must not abort an analysis over thousands. See
+    ``docs/PHASE_6_DATA_CONTRACTS.md`` §4.2, failure mode 5.
+    """
+    band = engine_result.get("band")
+    if band is None or (isinstance(band, str) and not band.strip()):
+        return None
+    return band
+
+
 def run_compliance_checks(elements: list[Any]) -> list[dict]:
     """Run the five corrosion engines against a list of IFC elements.
 
@@ -200,37 +223,47 @@ def run_compliance_checks(elements: list[Any]) -> list[dict]:
         name = getattr(element, "Name", None) or getattr(element, "name", None) or "Unknown"
         element_type = getattr(element, "is_a", lambda: getattr(element, "element_type", ""))()
 
-        bands = [
-            (g_result.get("band", "LOW"), "galvanic"),
-            (c_result.get("band", "LOW"), "crevice"),
-            (m_result.get("band", "LOW"), "mic"),
+        # Assessed mechanisms only. A mechanism that produced no band is left
+        # out entirely rather than given one — see _band_or_none.
+        assessed = [
+            (_band_or_none(g_result), "galvanic", g_result),
+            (_band_or_none(c_result), "crevice", c_result),
+            (_band_or_none(m_result), "mic", m_result),
         ]
-        dominant_band, dominant_mechanism = max(bands, key=lambda x: _band_int(x[0]))
+        scored = [(band, mech) for band, mech, _ in assessed if band is not None]
+
+        if scored:
+            dominant_band, dominant_mechanism = max(scored, key=lambda x: _band_int(x[0]))
+        else:
+            # Nothing was assessed. Saying "LOW / galvanic" here would assert a
+            # verdict no engine reached.
+            dominant_band, dominant_mechanism = "", ""
 
         result = {
             "guid": guid,
             "name": name,
             "element_type": element_type,
-            "galvanic_band": g_result.get("band", "LOW"),
-            "galvanic_score": g_result.get("score", 0.0),
-            "galvanic_details": g_result.get("details", {}),
-            "crevice_band": c_result.get("band", "LOW"),
-            "crevice_score": c_result.get("score", 0.0),
-            "crevice_details": c_result.get("details", {}),
-            "mic_band": m_result.get("band", "LOW"),
-            "mic_score": m_result.get("score", 0.0),
-            "mic_details": m_result.get("details", {}),
             "dominant_mechanism": dominant_mechanism,
             "mitigation": _mitigation(
-                g_result.get("band", "LOW"),
+                _band_or_none(g_result) or "",
                 g_result.get("details", {}).get("voltage_gap_V", 0),
-                c_result.get("band", "LOW"),
+                _band_or_none(c_result) or "",
                 c_result.get("details", {}).get("crevice_geometry", ""),
                 material,
                 environment,
             ),
             "action": _action(dominant_band),
         }
+
+        # Per-mechanism keys are written only for mechanisms that ran, so
+        # issue_adapter's "if band_key not in result" guard can do its job.
+        for band, mechanism, raw in assessed:
+            if band is None:
+                continue
+            result[f"{mechanism}_band"] = band
+            result[f"{mechanism}_score"] = raw.get("score", 0.0)
+            result[f"{mechanism}_details"] = raw.get("details", {})
+
         results.append(result)
 
     return results

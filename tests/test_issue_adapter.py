@@ -277,14 +277,45 @@ class TestIssuesFromPathA:
         assert issue.metadata["crevice_geometry"] == "tight"
         assert issue.metadata["joint_type"] == "JT-004"
 
-    def test_absent_mechanism_is_skipped(self, allocator):
-        """A dict with no mic_band means MIC did not run for that element."""
+    def test_absent_mechanism_is_reported_not_skipped(self, allocator):
+        """A dict with no mic_band means MIC did not run for that element.
+
+        It used to vanish, which made "not assessed" indistinguishable from
+        "assessed and cleared". It is now reported as a data_quality Issue —
+        see data contracts §4.2 failure mode 5.
+        """
         row = path_a_row(galvanic="HIGH", crevice="HIGH", mic="HIGH")
         del row["mic_band"]
 
         issues = issues_from_path_a([row], id_allocator=allocator)
 
-        assert [i.rule_id for i in issues] == ["GC-001.01", "CC-001.01"]
+        assert [i.rule_id for i in issues] == ["GC-001.01", "CC-001.01", "MC-001.DATA"]
+
+    def test_absent_mechanism_survives_the_include_low_filter(self, allocator):
+        """Step 4. Without the exemption the Issue above is deleted at birth.
+
+        Do not pass include_low=True here: that disables the filter under test,
+        and the assertion would hold whether or not the exemption exists.
+        """
+        row = path_a_row(galvanic="HIGH", crevice="HIGH", mic="HIGH")
+        del row["mic_band"]
+
+        issues = issues_from_path_a([row], id_allocator=allocator, include_low=False)
+
+        assert any(i.mechanism == "data_quality" for i in issues)
+
+    def test_absent_mechanism_issue_is_not_a_verdict(self, allocator):
+        """metadata["check"] implies mechanism == "data_quality"."""
+        row = path_a_row(galvanic="HIGH", crevice="HIGH", mic="HIGH")
+        del row["mic_band"]
+
+        issues = issues_from_path_a([row], id_allocator=allocator)
+        dq = [i for i in issues if i.mechanism == "data_quality"]
+
+        assert len(dq) == 1
+        assert dq[0].metadata["check"] == "band_unassessed"
+        assert dq[0].assignee_role == "BIM coordinator"
+        assert dq[0].band is RiskBand.LOW
 
     def test_common_fields_come_from_the_source_dict(self, allocator):
         """title, mitigation and description track the runner's own text."""
