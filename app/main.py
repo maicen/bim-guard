@@ -57,6 +57,9 @@ _apply_persisted_log_level()
 
 from app.routes import (
     analyze,
+    analyze_architecture,
+    analyze_corrosion,
+    analyze_seismic,
     dashboard,
     library,
     modeling_manual,
@@ -109,6 +112,10 @@ app.add_middleware(PageLoadLoggingMiddleware)
 _ROUTE_INSTALLERS = (
     viewer.setup_routes,
     analyze.setup_routes,
+    # Wizard destinations — one per app.constants.ANALYSIS_ROUTES slug.
+    analyze_corrosion.setup_routes,
+    analyze_seismic.setup_routes,
+    analyze_architecture.setup_routes,
     dashboard.setup_routes,
     library.setup_routes,
     modeling_manual.setup_routes,
