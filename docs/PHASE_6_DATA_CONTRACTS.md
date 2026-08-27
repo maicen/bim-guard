@@ -137,7 +137,7 @@ class ServiceElement:
 }
 ```
 
-### Rules
+### Rules — ParsedIFC
 
 1. **`guid` is the join key.** Every downstream `Issue.element_id` is a `guid`
    from this list. An `Issue` referencing an absent guid is a bug — Session C/D
@@ -175,7 +175,7 @@ C and D consume and extend it. The keys that matter across the boundary:
 | `compliance_is_demo` | `bool` | `True` ⇒ UI must label output as synthetic |
 | `compliance_error` | `str \| None` | Engine failed; other keys may be empty |
 
-### Rules
+### Rules — AnalysisResult
 
 1. **Additive only.** Adding a key is safe; renaming or removing one breaks
    every consumer. Session D adds seismic keys alongside the corrosion ones —
@@ -248,26 +248,122 @@ defaults in use are:
 Session D supplies its own `risk_band_thresholds` in the seismic rulepack. It
 must not hard-code different cut-points in Python.
 
-### 4.2 Casing — the one real trap
+### 4.2 Casing — the band trap
 
-There are **two** casings in this codebase and they are not interchangeable:
+**Three** casings of the same four values are live in this codebase
+simultaneously. They are not interchangeable, and every mismatch between them
+fails *silently* — no exception, no log, just a wrong colour or a wrong severity.
 
-| Layer | Casing | Source |
-| --- | --- | --- |
-| Engine / storage / BCF | lowercase | `RiskBand.CRITICAL == "critical"` |
-| UI badge | Capitalised | `_band_badge()` keys on `"Critical"` |
+| # | Casing | Who produces it | Site |
+| --- | --- | --- | --- |
+| 1 | `Critical` Title | the corrosion/crevice/MIC engines | `app/engines/bimguard_*_engine.py` |
+| 2 | `LOW` UPPER | `compliance_runner` fallback when a result carries no band | `compliance_runner.py:214` (`.get("band", "LOW")`) |
+| 3 | `critical` lower | `RiskBand` enum — storage, BCF, `Issue` | `issue_schema.py` |
 
-`_band_badge()` in `app/routes/analyze.py` falls back to a **grey** badge on an
-unknown key. A lowercase band reaching it therefore renders grey with no error —
-the failure is silent and looks like a styling glitch rather than a data bug.
+`_band_int()`'s own docstring records the drift: *"Engines emit Title-case
+labels ("Low", "Critical"); the band is normalised to upper case so any casing
+ranks correctly."*
 
-> **Contract:** `RiskBand` values are lowercase everywhere except at the moment
-> of rendering. Convert with `.title()` at the presentation boundary only. Never
-> persist, export, or compare the capitalised form. Never compare band strings
-> with `==` across layers — compare `RiskBand` members.
+#### The four silent failure modes
 
-For ordering (sorting most-severe-first), use the existing
-`_band_int()` in `compliance_runner.py` rather than an ad-hoc dict.
+**1 — `_band_badge` greys out.** `app/routes/analyze.py:754` is an exact dict
+lookup keyed on **Title-case**, with a grey fallback:
+
+```text
+_band_badge("Critical") -> bg-red-600     correct
+_band_badge("critical") -> bg-gray-400    GREY, no error
+```
+
+A lowercase `RiskBand` value reaching the UI renders grey. It looks like a CSS
+glitch, so it gets triaged as a styling bug rather than a data-flow bug. Note
+the direction: **lowercase is what breaks here**; Title-case is the correct key.
+
+**2 — `_band_int` silently ranks unknown as safest.** It *is* defensive
+(`.upper()` accepts all three casings) but returns `0` for anything
+unrecognised — the same rank as `LOW`. A typo or a new band label does not
+raise; it demotes the finding to lowest severity in dominance ordering.
+
+```text
+_band_int("critical") = 3   _band_int("Critical") = 3   _band_int("CRITICAL") = 3
+_band_int("nonsense") = 0   <- ranks LOWEST, silently
+```
+
+**3 — `RiskBand` is a `str` subclass, so wrong-case comparison is just `False`.**
+
+```python
+RiskBand.CRITICAL == "critical"   # True
+RiskBand.CRITICAL == "Critical"   # False — no error, the branch never fires
+```
+
+A capitalised `==` against a `RiskBand` never matches and never complains.
+
+**4 — Sorting band values alphabetically inverts severity.** `_BAND_RANK` in
+`issue_adapter.py` carries the warning; the effect is worth seeing:
+
+```python
+sorted(["critical","low","high","medium"])   # ['critical','high','low','medium']  WRONG
+max(["critical","low","high","medium"])      # 'medium'  <- a Critical demoted to Medium
+```
+
+Never `sort`, `max` or `min` on raw band strings.
+
+#### The pattern to copy
+
+`issues_from_path_a()` in `app/modules/module4_comparator/issue_adapter.py`
+already does this correctly and is the reference implementation:
+
+```python
+# Normalise "CRITICAL" -> RiskBand.CRITICAL -> "critical".
+try:
+    band = RiskBand(band_str.strip().lower())
+except ValueError:
+    raise ValueError(
+        f"Unknown band '{band_str}' for {element_name} / {mechanism_code}"
+    ) from None
+```
+
+Two properties make it right, and both matter:
+
+1. **One normalisation point.** `.strip().lower()` into the enum, at the
+   boundary where external band strings enter the `Issue` world.
+2. **It raises.** An unrecognised band is a `ValueError` naming the element and
+   mechanism — not a grey badge, not a rank of 0.
+
+For ordering, use `_BAND_RANK` (or `_band_int()` in `compliance_runner.py`),
+never an ad-hoc dict and never string comparison.
+
+> **Contract**
+>
+> - `RiskBand` members — not strings — are the currency between layers. Compare
+>   members; convert to `.value` only at a serialisation boundary.
+> - Normalise **once, on entry**, with `RiskBand(s.strip().lower())`, and let it
+>   raise. Do not normalise defensively at each use site; that is how three
+>   casings became normal.
+> - Title-case exists **only** inside the render call. Never persist, export, or
+>   compare it.
+> - Never `sort`/`max`/`min` raw band strings.
+
+#### What Sessions C and D should fix
+
+This section documents the trap; it does not change the code. Two follow-ups
+belong to the sessions that own those files:
+
+- **Session C (`phase-7-corrosion-ui`)** owns `app/routes/analyze.py`. Make
+  `_band_badge` normalise its input through `RiskBand` and render from the
+  member, rather than exact-matching a Title-case key with a grey fallback. Its
+  call site at `analyze.py:855` defaults to `"Low"` — a Title-case literal that
+  should become `RiskBand.LOW`.
+- **Session D (`phase-8-seismic`)** must not add a fourth casing. Seismic bands
+  are `RiskBand` members from the moment they leave the engine. Route them
+  through the `issues_from_path_a` normalisation pattern, not around it.
+
+Both are behaviour changes to shipped UI, so each deserves its own commit with a
+test that asserts an unknown band now fails loudly instead of rendering grey.
+
+> **Not a band:** `HIGH`/`MEDIUM`/`LOW` in
+> `app/modules/module1_doc_parser/` are rule-extraction **confidence** levels, a
+> separate concept with its own scale. Do not feed them to `_band_badge`,
+> `_band_int` or `RiskBand`.
 
 ### 4.3 Issue workflow status
 
@@ -338,7 +434,7 @@ uv run pytest -q                 # app/modules/tests (unit)
 
 Baseline at `2d7d80c`, for comparison when judging whether a failure is yours:
 
-```
+```text
 tests/            16 failed, 352 passed, 2 skipped, 13 xfailed, 54 errors
 ```
 
