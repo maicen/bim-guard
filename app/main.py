@@ -70,6 +70,8 @@ from app.routes import (
     settings,
     user_manual,
     viewer,
+    workflow_api,
+    workflow_page,
 )
 
 APP_HEADERS = SiteTheme()
@@ -122,6 +124,10 @@ _ROUTE_INSTALLERS = (
     analyze_pipeline.setup_routes,
     # GET /download/{fmt}/{project_id} file downloads.
     analyze_download.setup_routes,
+    # GET /api/workflow/{project_id} live pipeline status.
+    workflow_api.setup_routes,
+    # GET /workflow/{project_id} live dashboard page.
+    workflow_page.setup_routes,
     dashboard.setup_routes,
     library.setup_routes,
     modeling_manual.setup_routes,

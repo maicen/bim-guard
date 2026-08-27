@@ -33,6 +33,8 @@ from datetime import UTC, datetime
 from typing import Optional
 
 from app.services.corrosion_rule_catalog import load_gc_catalog
+from app.services.pipeline_tracker import GC_ENGINE, Stage, emit, increment
+from app.services.pipeline_tracker import fail as track_failure
 
 # ── VERSION ───────────────────────────────────────────────────────────────────
 RULESET_VERSION = "BIMGUARD-GC-001 v1.0.0"
@@ -341,7 +343,14 @@ class GCResult:
 def assess_galvanic_risk(element: GCElement) -> GCResult:
     """
     Run GC-001 galvanic corrosion risk assessment on a single element pair.
+
+    Emits stage-3 (Engine Execution) progress to the bound pipeline tracker.
+    The emit is a no-op when nothing is bound, so the CLI demos, the validation
+    sweep and the tests reach exactly the code they always did.
     """
+    emit(GC_ENGINE, Stage.ENGINE_EXECUTION)
+    increment(GC_ENGINE, elements_analyzed=1)
+
     # Resolve materials
     anode_key = resolve_material(element.material_anode)
     cathode_key = resolve_material(element.material_cathode)
@@ -405,6 +414,14 @@ def assess_galvanic_risk(element: GCElement) -> GCResult:
         score = 0.35
 
     risk_band, bcf_priority = classify_gc001_risk(score)
+
+    # Band tallies as metrics rather than as a stage transition. Scoring really
+    # does happen per element, but flipping the reported stage 3 -> 4 -> 3 on
+    # every element would make a polling client's progress bar jitter and would
+    # grow the stage history to two records per element. The batch entry point
+    # below closes stage 4 once, for the whole batch.
+    increment(GC_ENGINE, **{f"band_{risk_band.lower()}": 1})
+
     mitigations = select_gc_mitigation(anode_key or "", cathode_key or "", risk_band, pren_ok)
 
     anode_label = GALVANIC_SERIES.get(anode_key, {}).get("label", element.material_anode)
@@ -438,8 +455,25 @@ def assess_galvanic_risk(element: GCElement) -> GCResult:
 
 
 def assess_galvanic_batch(elements: list) -> list:
-    """Run GC-001 on a list of GCElement pairs."""
-    return [assess_galvanic_risk(el) for el in elements]
+    """Run GC-001 on a list of GCElement pairs.
+
+    The batch entry point is where the denominator is known, so this is what
+    reports ``elements_total`` and closes stage 4 (Risk Scoring) once for the
+    whole batch. A caller that loops :func:`assess_galvanic_risk` itself -- as
+    the Phase 6 corrosion pipeline does, because it interleaves mechanisms per
+    element -- still gets stage 3 and the counters, and its driver closes the
+    later stages.
+    """
+    emit(GC_ENGINE, Stage.ENGINE_EXECUTION, elements_total=len(elements))
+    try:
+        results = [assess_galvanic_risk(el) for el in elements]
+    except Exception as exc:
+        # Reported, not swallowed: the tracker records the stage the run stopped
+        # in and the exception carries on to the caller unchanged.
+        track_failure(GC_ENGINE, f"{type(exc).__name__}: {exc}")
+        raise
+    emit(GC_ENGINE, Stage.RISK_SCORING, findings=len(results))
+    return results
 
 
 # ── BCF 2.1 EXPORT ────────────────────────────────────────────────────────────
@@ -448,8 +482,13 @@ def generate_gc_bcf(results: list, output_path: str) -> int:
     Generate BCF 2.1 compliant ZIP for GC-001 findings.
     Only Medium, High, and Critical results generate BCF issues.
     Returns count of issues generated.
+
+    Reports stage 6 (Export) to the bound pipeline tracker, including the empty
+    case: "exported nothing because nothing was above Low" is a result, and a
+    tracker that stayed silent there would look like an export that hung.
     """
     issues = [r for r in results if r.risk_band != "Low"]
+    emit(GC_ENGINE, Stage.EXPORT, bcf_topics=len(issues))
     if not issues:
         return 0
 
@@ -526,7 +565,11 @@ Standards referenced:
 
 # ── ASSET REGISTER EXPORT ─────────────────────────────────────────────────────
 def export_gc_asset_register(results: list, output_path: str) -> None:
-    """Export GC-001 results to CSV asset register."""
+    """Export GC-001 results to CSV asset register.
+
+    Reports stage 6 (Export) to the bound pipeline tracker.
+    """
+    emit(GC_ENGINE, Stage.EXPORT, csv_rows=len(results))
     fieldnames = [
         "AnodeGlobalID",
         "CathodeGlobalID",

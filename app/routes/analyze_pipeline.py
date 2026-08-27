@@ -45,6 +45,7 @@ from app.modules.phase_6.phase_6b_parsing import parse_ifc_bytes
 from app.modules.phase_6.phase_6c_corrosion_ui import run_corrosion_analysis
 from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
 from app.modules.phase_6.phase_6e_export import DATA_QUALITY, FORMATS, export, sort_issues
+from app.services.analysis_runner import run_analysis
 from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
@@ -63,50 +64,20 @@ def _error(message: str) -> Div:
     return Div(Alert(message, cls=AlertT.error), cls="space-y-4")
 
 
-def _model_bytes(project_id: int) -> tuple[bytes | None, str | None]:
-    """Return the project's IFC content, or a reason it is unavailable.
-
-    Reads through ``resolve_ifc_file``, which materialises the object from
-    storage into the local cache when needed. That is a read path; nothing here
-    writes to Supabase.
-    """
-    project = _projects_service.get_project(project_id)
-    if project is None:
-        return None, "That project no longer exists."
-    if not project.get("ifc_file_path"):
-        return None, "No IFC model is attached to this project yet."
-
-    path = _projects_service.resolve_ifc_file(project_id)
-    if path is None:
-        return None, "The IFC model could not be retrieved from storage."
-    try:
-        return path.read_bytes(), None
-    except OSError as exc:
-        logger.warning("IFC unreadable project_id=%d error=%s", project_id, exc)
-        return None, f"The IFC model could not be read: {exc}"
-
-
 def _run(slug: str, project_id: int) -> dict:
-    """Run one analysis for a project and return its ``AnalysisResult``.
+    """Return the ``AnalysisResult`` for one project.
 
-    Shared by the run endpoints and by export, so a downloaded report and the
-    page it was downloaded from are produced by the same code path.
+    Delegates to :func:`app.services.analysis_runner.run_analysis`, which the
+    download endpoints also call — so a report downloaded from this page is the
+    same computation the page rendered, and both are cached on the model digest.
+
+    It is also the instrumented path: ``run_analysis`` reports each stage to
+    :mod:`app.services.pipeline_tracker`, which is what
+    ``GET /api/workflow/{project_id}`` serves to the live dashboard. Running the
+    check from anywhere else would leave that dashboard showing "pending"
+    through a run that was actually in flight.
     """
-    content, error = _model_bytes(project_id)
-    if error:
-        return {
-            "audit_issues": [],
-            "issue_stats": {},
-            "cost_impact": None,
-            "compliance_error": error,
-            "compliance_is_demo": False,
-        }
-
-    if slug == "seismic":
-        return run_seismic_analysis(content)
-
-    parsed = parse_ifc_bytes(content, source_ref=f"project-{project_id}")
-    return run_corrosion_analysis(parsed, include_low=False)
+    return run_analysis(slug, project_id)
 
 
 # ---------------------------------------------------------------------------
