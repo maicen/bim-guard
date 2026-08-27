@@ -13,7 +13,7 @@ The engine itself is untouched: these pages hand off to the existing
 
 from dataclasses import dataclass
 
-from fasthtml.common import Div, P, Span, Title
+from fasthtml.common import Div, Form, Input, P, Span, Style, Title
 from monsterui.all import (
     H1,
     Alert,
@@ -34,6 +34,7 @@ from app.components.ui import (
     CardTitle,
     LinkButton,
     NotFoundBlock,
+    SubmitButton,
 )
 from app.constants import ANALYSIS_ROUTES
 from app.logging_config import get_logger
@@ -70,6 +71,10 @@ class AnalysisSpec:
     run_href: str = ""
     run_label: str = "Run analysis"
     pending_note: str = ""
+    #: Phase 6 endpoint this page posts to via HTMX. When set it takes
+    #: precedence over ``run_href``: the check runs in place and swaps its
+    #: results into the page, rather than navigating to the older workflow.
+    run_endpoint: str = ""
 
     def __post_init__(self) -> None:
         """Fail at import if the spec has drifted from ``ANALYSIS_ROUTES``.
@@ -230,9 +235,48 @@ def _inputs_card(inputs: list[dict]) -> Card:
     )
 
 
+def _run_form(spec: AnalysisSpec, project_id: int) -> Form:
+    """Post to the Phase 6 endpoint and swap the results in below.
+
+    An HTMX fragment swap rather than a navigation: the analysis can take
+    seconds, and the page already shows the model and inputs it ran against.
+    """
+    spinner_id = f"run-spinner-{spec.slug}"
+    return Form(
+        Input(type="hidden", name="project_id", value=str(project_id)),
+        SubmitButton(spec.run_label),
+        Div(
+            Span("Running the check…", cls="text-sm text-muted-foreground"),
+            id=spinner_id,
+            cls="htmx-indicator",
+            style="display:none",
+        ),
+        Style(".htmx-indicator.htmx-request { display: flex !important; }"),
+        hx_post=spec.run_endpoint,
+        hx_target=f"#results-{spec.slug}",
+        hx_indicator=f"#{spinner_id}",
+        cls="space-y-3",
+    )
+
+
 def _next_step_card(spec: AnalysisSpec, project_id: int, has_model: bool) -> Card:
     """Render the handoff into the engine, or explain why there is none."""
-    if not spec.run_href:
+    if spec.run_endpoint and has_model:
+        body = Div(
+            P(
+                f"Run the {spec.analysis_type} check against this project's model "
+                "and the inputs listed above.",
+                cls="text-sm text-muted-foreground",
+            ),
+            _run_form(spec, project_id),
+            cls="space-y-4",
+        )
+    elif spec.run_endpoint and not has_model:
+        body = Alert(
+            "Attach an IFC model to this project before running the check.",
+            cls=AlertT.warning,
+        )
+    elif not spec.run_href:
         body = Alert(spec.pending_note, cls=AlertT.warning)
     elif not has_model:
         body = Div(
@@ -357,6 +401,8 @@ def analysis_landing_page(spec: AnalysisSpec, project_id: int | None):
             # breakpoint to the same value.
             Grid(_model_card(project), _inputs_card(inputs), cls="gap-6"),
             _next_step_card(spec, project_id, has_model),
+            # HTMX swap target for the Phase 6 run endpoints.
+            Div(id=f"results-{spec.slug}"),
             cls="space-y-6",
         )
     )

@@ -59,6 +59,7 @@ from app.routes import (
     analyze,
     analyze_architecture,
     analyze_corrosion,
+    analyze_pipeline,
     analyze_seismic,
     dashboard,
     library,
@@ -116,6 +117,8 @@ _ROUTE_INSTALLERS = (
     analyze_corrosion.setup_routes,
     analyze_seismic.setup_routes,
     analyze_architecture.setup_routes,
+    # Phase 6 pipeline endpoints (upload / run / export).
+    analyze_pipeline.setup_routes,
     dashboard.setup_routes,
     library.setup_routes,
     modeling_manual.setup_routes,

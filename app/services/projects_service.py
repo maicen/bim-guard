@@ -191,6 +191,25 @@ class ProjectsService:
         )
         logger.info("Project updated project_id=%d status=%s", project_id, status)
 
+    def attach_ifc(self, project_id: int, storage_ref: str) -> None:
+        """Point a project at an IFC object already in storage.
+
+        Used by the Phase 6 upload route, where ``FileUploadService`` has
+        already stored the bytes and recorded their SHA-256 in
+        ``uploaded_files``. Only the reference is written here: ``projects``
+        has no SHA-256 column, and putting one into ``ifc_md5_hash`` would make
+        the schema describe the wrong algorithm.
+
+        Args:
+            project_id: Project to update.
+            storage_ref: Reference returned by ``ObjectStorage.save_upload``.
+        """
+        self._projects.update(
+            updates={"ifc_file_path": storage_ref, "updated_at": now_iso_utc()},
+            pk_values=project_id,
+        )
+        logger.info("Project IFC attached project_id=%d ref=%s", project_id, storage_ref)
+
     def delete_project(self, project_id: int):
         """Delete a project row by primary key."""
         project = self.get_project(project_id)
