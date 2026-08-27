@@ -253,7 +253,9 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
     appended as their own rows, flagged with path_b_only.
 
     Adds per row: path_b_issues (list[dict]), path_b_band (str|None),
-    path_b_count (int), mm_band, mm_score, xm_band, xm_score.
+    path_b_count (int), data_quality_count (int), mm_band, mm_score, xm_band,
+    xm_score. path_b_count counts findings only; data_quality entries are
+    counted separately and never set path_b_band.
     Leaves every existing key untouched, and never mutates base_results.
     """
     output = [dict(r) for r in base_results]
@@ -262,6 +264,7 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
         row["path_b_issues"] = []
         row["path_b_band"] = None
         row["path_b_count"] = 0
+        row["data_quality_count"] = 0
         row["mm_band"] = None
         row["mm_score"] = 0.0
         row["xm_band"] = None
@@ -283,6 +286,7 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
                     "path_b_issues": [],
                     "path_b_band": None,
                     "path_b_count": 0,
+                    "data_quality_count": 0,
                     "mm_band": None,
                     "mm_score": 0.0,
                     "xm_band": None,
@@ -296,6 +300,15 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
             by_guid[issue.element_id] = row
 
         row["path_b_issues"].append(to_dict(issue))
+
+        # data_quality entries are reports, not verdicts. Counting them as
+        # findings would show a compliant element as flagged, and letting one
+        # set path_b_band would give an unassessed element a risk band — both
+        # the confusion data contracts §4.2 exists to prevent.
+        if issue.mechanism == DATA_QUALITY:
+            row["data_quality_count"] += 1
+            continue
+
         row["path_b_count"] += 1
 
         # Worst band wins, by severity rank rather than string order.

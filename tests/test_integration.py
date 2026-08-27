@@ -191,10 +191,19 @@ def test_path_a_dict_to_issue_to_ui_dict_roundtrip(path_a_results, allocator):
 
     issues = issues_from_path_a(path_a_results, id_allocator=allocator)
 
-    # Two mechanisms above LOW on element A, none on compliant element B.
-    assert [issue.rule_id for issue in issues] == ["GC-001.01", "CC-001.01"]
-    assert [issue.band for issue in issues] == [RiskBand.MEDIUM, RiskBand.CRITICAL]
-    assert len({issue.id for issue in issues}) == 2
+    # Two mechanisms above LOW on element A. Element B carries only a galvanic
+    # band, so crevice and MIC were never assessed for it — reported as
+    # data_quality rather than passed over, which would state that an
+    # unassessed mechanism is compliant (data contracts §4.2 failure mode 5).
+    assert [issue.rule_id for issue in issues] == [
+        "GC-001.01",
+        "CC-001.01",
+        "CC-001.DATA",
+        "MC-001.DATA",
+    ]
+    findings = [i for i in issues if i.mechanism != "data_quality"]
+    assert [issue.band for issue in findings] == [RiskBand.MEDIUM, RiskBand.CRITICAL]
+    assert len({issue.id for issue in issues}) == len(issues)
 
     rows = path_a_view(issues, path_a_results)
 
