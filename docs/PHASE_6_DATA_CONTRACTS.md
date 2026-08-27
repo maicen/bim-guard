@@ -264,7 +264,7 @@ fails *silently* — no exception, no log, just a wrong colour or a wrong severi
 labels ("Low", "Critical"); the band is normalised to upper case so any casing
 ranks correctly."*
 
-#### The four silent failure modes
+#### The five silent failure modes
 
 **1 — `_band_badge` greys out.** `app/routes/analyze.py:754` is an exact dict
 lookup keyed on **Title-case**, with a grey fallback:
@@ -306,6 +306,103 @@ max(["critical","low","high","medium"])      # 'medium'  <- a Critical demoted t
 ```
 
 Never `sort`, `max` or `min` on raw band strings.
+
+**5 — The default that kills the guard.** The most serious of the five, and the
+only one where the normalise-and-raise pattern below does *not* protect you.
+
+`compliance_runner.py:204-220` fills a missing band with a literal:
+
+```python
+"galvanic_band": g_result.get("band", "LOW"),
+"crevice_band":  c_result.get("band", "LOW"),
+"mic_band":      m_result.get("band", "LOW"),
+```
+
+`issue_adapter.py:125` guards against a mechanism that never ran:
+
+```python
+if band_key not in result:
+    continue  # Mechanism did not run for this element — nothing to report.
+```
+
+Both are correct in isolation. Together they fail, because the runner writes all
+three band keys **unconditionally** — so for any runner-produced element:
+
+```text
+'galvanic_band' in result -> True    guard fires: False
+'crevice_band'  in result -> True    guard fires: False
+'mic_band'      in result -> True    guard fires: False
+```
+
+The guard is **dead code on this path**. It can never fire. Then
+`issue_adapter.py:141` finishes the job:
+
+```python
+if band is RiskBand.LOW and not include_low:
+    continue
+```
+
+An element the engines never assessed is now `LOW`, so it is skipped — no Issue,
+no report line, nothing downstream that could notice. **"Not assessed" and
+"assessed and cleared" become indistinguishable**, and the fabrication spreads
+before it disappears: `dominant_mechanism` resolves to `"galvanic"` (a `max()`
+tie returning the first entry) and `_action()` issues a real disposition, both
+derived from a band no engine produced.
+
+##### The doctrine — already decided in this codebase
+
+This question has been answered here before; do not re-litigate it.
+
+`app/modules/module2_ifc_read/piping_schema.py:34` (NULLABILITY POLICY):
+
+> *"If a comparator cannot run because a required field is None, it emits a
+> Low-severity issue with `mechanism="data_quality"` pointing at the offending
+> element **rather than crashing**."*
+
+`tests/test_material_media.py:219` names this exact bug:
+
+> *"An absent matrix cell must not be treated as compliant. Reporting it clean
+> would state that an unassessed pairing is compliant."*
+
+`tests/test_material_media.py:239` enforces the separation — any Issue carrying
+`metadata["check"]` must have `mechanism == "data_quality"`, so data quality can
+never be mistaken for a verdict.
+
+**Reference implementation:** `_data_quality_issue()` at
+`app/modules/module4_comparator/galvanic.py:441` — `mechanism="data_quality"`,
+`band=RiskBand.LOW`, `score=0.10`, `metadata["check"]`, and an
+`assignee_role="BIM coordinator"` so it lands as actionable work.
+
+##### The fix — four steps, and step 4 is the one that gets missed
+
+1. **Don't invent.** The runner omits the band key when the engine did not
+   assess that mechanism, instead of substituting `"LOW"`.
+2. **Report the absence.** The adapter emits a `data_quality` Issue naming the
+   element and the mechanism that did not run.
+3. **Make it visible.** Low severity, `metadata={"check": "band_unassessed",
+   "mechanism_code": "GC-001"}`, assigned to the BIM coordinator.
+4. **Exempt it from the skip.** `issues_from_path_a` must not drop
+   `mechanism == "data_quality"` under `include_low=False`.
+
+> **Step 4 is not optional.** A `data_quality` Issue is Low-severity by
+> doctrine, so the `include_low` guard at `issue_adapter.py:141` deletes it one
+> line after it is created — restoring the exact invisibility the fix set out to
+> remove. The existing `data_quality` issues live on Path B (`galvanic.py`),
+> which has no `include_low` skip, which is why this has not bitten yet. Path A
+> does have one.
+
+##### Two fixes that look right and are not
+
+Both were considered and rejected. They are recorded here so they are not
+re-derived:
+
+| Option | What happens | Why it fails |
+| --- | --- | --- |
+| Omit the key and let the adapter's guard skip the element | Guard finally fires; element is skipped | Still invisible. "Must not be treated as compliant" becomes "not reported at all" — the same silence in a different place |
+| Substitute `"UNASSESSED"` and let `RiskBand` reject it | `ValueError` propagates | Violates *"rather than crashing"*. One unassessed element aborts an analysis over thousands; a data-quality problem becomes a total failure |
+
+The doctrine wants a **visible, attributable, non-verdict finding** — not a
+skip, and not a crash.
 
 #### The pattern to copy
 
@@ -353,12 +450,24 @@ belong to the sessions that own those files:
   member, rather than exact-matching a Title-case key with a grey fallback. Its
   call site at `analyze.py:855` defaults to `"Low"` — a Title-case literal that
   should become `RiskBand.LOW`.
+- **Session C also owns failure mode 5** — `compliance_runner.py:204-220` and
+  `issue_adapter.py:125/141`. Apply the four-step fix above. Note that 16 tests
+  in this area already fail on a `compare()` signature mismatch (see §5.6), so
+  separate that pre-existing breakage from any regression you introduce.
 - **Session D (`phase-8-seismic`)** must not add a fourth casing. Seismic bands
   are `RiskBand` members from the moment they leave the engine. Route them
-  through the `issues_from_path_a` normalisation pattern, not around it.
+  through the `issues_from_path_a` normalisation pattern, not around it. The
+  same applies to unassessed seismic mechanisms: emit a `data_quality` Issue,
+  never a substituted band.
 
-Both are behaviour changes to shipped UI, so each deserves its own commit with a
-test that asserts an unknown band now fails loudly instead of rendering grey.
+These are behaviour changes to shipped code, so each deserves its own commit.
+Tests to add:
+
+- an unknown band fails loudly instead of rendering grey;
+- an element with no computed band produces a `data_quality` Issue, **and that
+  Issue survives `include_low=False`**.
+
+The second assertion is the one that proves step 4 was not skipped.
 
 > **Not a band:** `HIGH`/`MEDIUM`/`LOW` in
 > `app/modules/module1_doc_parser/` are rule-extraction **confidence** levels, a
