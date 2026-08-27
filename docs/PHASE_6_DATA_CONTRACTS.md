@@ -391,6 +391,75 @@ never be mistaken for a verdict.
 > which has no `include_low` skip, which is why this has not bitten yet. Path A
 > does have one.
 
+##### The test trap — how a broken fix passes review
+
+Steps 1–3 are visible in a diff. Step 4 is one line in a different function, and
+a test can be written that passes whether or not it exists. That is how a fix
+that is still invisible in the real pipeline gets merged.
+
+**The trap is `include_low=True`.** Reaching for it is natural — you are testing
+a Low-severity Issue that is not showing up, so raising the flag "fixes" the
+test. It also disables the exact filter under test:
+
+```python
+# WRONG — passes with or without step 4. Proves nothing.
+issues = issues_from_path_a(results, id_allocator=alloc, include_low=True)
+assert any(i.mechanism == "data_quality" for i in issues)
+```
+
+`include_low=False` is the **default**, so omitting the argument is already
+correct. Pass it explicitly anyway, so the intent survives a future change to
+the default and nobody "repairs" a red test by flipping it to `True`:
+
+```python
+def test_data_quality_issue_survives_include_low_filter(allocator):
+    """An unassessed mechanism must stay visible under the default filter.
+
+    include_low=False is the real pipeline path. Do not pass include_low=True
+    here — it disables the filter under test and the assertion would hold
+    whether or not the step 4 exemption exists.
+    """
+    row = path_a_row(galvanic="HIGH", crevice="HIGH", mic="HIGH")
+    del row["mic_band"]                      # MIC did not run for this element
+
+    issues = issues_from_path_a(
+        [row],
+        id_allocator=allocator,
+        include_low=False,                   # explicit: the behaviour under test
+    )
+
+    assert any(i.mechanism == "data_quality" for i in issues)
+```
+
+Two call-signature details that stop a hand-written test before it runs:
+`id_allocator` is **required and keyword-only** (`IssueIdAllocator("BGR-TEST")`,
+or the `allocator` fixture in `conftest.py`), and the producer is
+`run_compliance_checks(elements)` — there is no `run_corrosion`.
+
+The `del row["mic_band"]` idiom is the established way to express "this
+mechanism did not run"; `tests/test_issue_adapter.py:280` already uses it.
+
+> **An existing green test encodes the behaviour the fix must change.**
+> `tests/test_issue_adapter.py::test_absent_mechanism_is_skipped` deletes
+> `mic_band` and asserts the result is exactly `["GC-001.01", "CC-001.01"]` —
+> that MIC is silently dropped. It passes today. After step 2 it **must** fail,
+> because an absent mechanism now emits a `data_quality` Issue instead of
+> vanishing.
+>
+> Update that test and its name as part of the fix. Do not restore the green by
+> reverting the change — a red `test_absent_mechanism_is_skipped` is the fix
+> working.
+
+#### Summary — what each test proves
+
+| Test | Proves |
+| --- | --- |
+| `data_quality` Issue is emitted at all | steps 1–2 |
+| …and survives `include_low=False` | **step 4** |
+| `test_absent_mechanism_is_skipped` now fails and is rewritten | the old silent-skip is genuinely gone |
+
+Only the second row distinguishes a working fix from an invisible one.
+
 ##### Two fixes that look right and are not
 
 Both were considered and rejected. They are recorded here so they are not
