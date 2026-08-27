@@ -283,9 +283,25 @@ class TestHierarchyDeduplication:
         result = parse_ifc_bytes(build_ifc(specs=[("IfcPipeSegment", "P-01")]))
         assert result["elements"][0].ifc_type == "IfcPipeSegment"
 
-    def test_collapse_is_reported_not_silent(self):
+    def test_no_collapse_needed_now_that_module2_dedups(self):
+        """parse_ifc_model gained its own GlobalId guard, so nothing arrives twice.
+
+        The envelope-level dedup below is kept as defence in depth — it protects
+        any other producer of ServiceElement rows — but on the Module 2 path it
+        now has nothing to do, and reporting a collapse that did not happen
+        would be noise.
+        """
         result = parse_ifc_bytes(build_ifc(specs=[("IfcPipeSegment", "P-01")]))
-        assert any("collapsed" in w for w in result["quality"]["warnings"])
+        assert not any("collapsed" in w for w in result["quality"]["warnings"])
+
+    def test_envelope_dedup_still_collapses_duplicates(self):
+        """The guard itself, exercised directly rather than through a parse."""
+        from app.modules.phase_6.phase_6b_parsing import _deduplicate_by_guid
+
+        rows = parse_ifc_bytes(build_ifc(specs=[("IfcPipeSegment", "P-01")]))["elements"]
+        unique, collapsed = _deduplicate_by_guid(rows + rows)
+        assert len(unique) == 1
+        assert collapsed == 1
 
     def test_type_counts_reflect_deduplicated_elements(self, parsed):
         assert parsed["type_counts"] == {"IfcPipeSegment": 2, "IfcValve": 1}

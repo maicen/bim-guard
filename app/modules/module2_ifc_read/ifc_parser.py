@@ -178,8 +178,24 @@ def get_system_name(element, ifc_model) -> str:
 
 
 def parse_ifc_model(model) -> list[ServiceElement]:
-    """Parse an already opened IFC model into service elements."""
+    """Parse an already opened IFC model into service elements.
+
+    One entity yields exactly one ServiceElement. IFC classes are a hierarchy —
+    an IfcPipeSegment is also an IfcFlowSegment and an IfcDistributionElement —
+    so ``model.by_type()`` returns the same entity once per matching class in
+    ``IFC_SERVICE_LABELS``. Without the GlobalId guard below, a three-entity
+    model produced eight rows: inflated element counts, the corrosion engines
+    run repeatedly over one element, and duplicate issues raised against a
+    single GlobalId.
+
+    ``IFC_SERVICE_LABELS`` is ordered specific to general and iterated in
+    order, so first-occurrence-wins keeps the most specific class: a pipe
+    segment is reported as IfcPipeSegment, not IfcDistributionElement.
+    """
     elements = []
+    # A GlobalId identifies exactly one entity in IFC, so a repeat is always
+    # the same element arriving under a broader class.
+    seen_guids: set[str] = set()
 
     target_types = list(IFC_SERVICE_LABELS.keys())
 
@@ -191,6 +207,11 @@ def parse_ifc_model(model) -> list[ServiceElement]:
             continue
 
         for el in typed_elements:
+            guid = str(getattr(el, "GlobalId", "") or "").strip()
+            if guid:
+                if guid in seen_guids:
+                    continue
+                seen_guids.add(guid)
             mat_a_raw = get_material_name(el, model)
             mat_a = normalise_material_name(mat_a_raw)
             mat_b = None  # Second material (e.g. bracket material) — extend via Pset
