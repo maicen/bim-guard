@@ -28,8 +28,8 @@ from __future__ import annotations
 from fasthtml.common import Response
 
 from app.logging_config import get_logger
-from app.modules.phase_6.phase_6e_export import FORMATS, export
 from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
+from app.services.phase6_service import Phase6Service
 
 logger = get_logger(__name__)
 
@@ -85,7 +85,7 @@ def _download(fmt: str, project_id: int, slug: str) -> Response:
         )
         return Response(result["compliance_error"], status_code=409)
 
-    content, media_type, extension = export(result, fmt)
+    content, media_type, extension = Phase6Service.export_summary(result, fmt)
     filename = _filename(slug, project_id, extension)
 
     logger.info(

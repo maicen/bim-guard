@@ -349,7 +349,7 @@ class BIMGuard_App:
             get_schema_compatibility_note,
             parse_ifc_model,
         )
-        from .pipeline_services import AnalysisService, run_compliance_analysis
+        from app.services.pipeline_services import AnalysisService, run_compliance_analysis
 
         started_at = time.monotonic()
 

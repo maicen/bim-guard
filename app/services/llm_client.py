@@ -23,8 +23,9 @@ Configuration:
     module scope — importing this module must not require a live database.
 """
 
+import abc
 import asyncio
-from typing import Protocol
+from typing import Any, Protocol
 
 from litellm import acompletion
 from litellm.exceptions import (
@@ -47,6 +48,38 @@ _RETRYABLE = (
 )
 
 
+class BaseLLMClient(abc.ABC):
+    """Unified abstract base class for LLM transport interfaces."""
+
+    @abc.abstractmethod
+    async def complete(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        response_format: dict[str, Any] | None = None,
+    ) -> str:
+        """Send chat messages and return raw string reply."""
+
+    async def generate_completion(
+        self,
+        prompt: str | list[dict[str, Any]],
+        system_prompt: str | None = None,
+        response_format: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> str:
+        """Generic completion interface accepting standard Python parameters."""
+        if isinstance(prompt, str):
+            messages: list[dict[str, Any]] = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+        else:
+            messages = list(prompt)
+            if system_prompt:
+                messages.insert(0, {"role": "system", "content": system_prompt})
+        return await self.complete(messages, response_format=response_format)
+
+
 class LLMClient(Protocol):
     """Minimal async chat-completion interface (Dependency Inversion)."""
 
@@ -60,7 +93,7 @@ class LLMClient(Protocol):
         ...
 
 
-class LiteLLMClient:
+class LiteLLMClient(BaseLLMClient):
     """Concrete LLMClient backed by litellm — routes to any supported provider.
 
     Args:
@@ -140,7 +173,7 @@ class LiteLLMClient:
         return response.choices[0].message.content or ""
 
 
-class LiteLLMClientWithRetry:
+class LiteLLMClientWithRetry(BaseLLMClient):
     """Adds exponential-backoff retrying to any LLMClient (Decorator).
 
     Satisfies the LLMClient protocol itself, so it substitutes anywhere a plain

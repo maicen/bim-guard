@@ -45,8 +45,7 @@ from monsterui.all import Container, H1
 
 from app.components.layout import DashboardLayout
 from app.components.ui import Alert, AlertT, Card, CardContent, CardHeader, CardTitle
-from app.modules.module4_comparator import Module4_Comparator
-from app.modules.module5_reporter import Module5_Reporter
+from app.services.pipeline_services import PipelineOrchestratorService
 from app.routes.analyze import _rule_compliance_card
 from app.services.revit_sync_service import RevitSyncService
 
@@ -145,11 +144,11 @@ requests.post("http://localhost:8000/revit-sync", json=data)
         # Build Module 4 input from pyRevit data
         extraction = _sync_service.build_extraction_results(elements, theme)
 
-        # Run Module 4 — same comparator used by IFC path
-        compliance = Module4_Comparator().validate_metadata(extraction)
+        # Run Module 4 via service facade — same comparator used by IFC path
+        compliance = PipelineOrchestratorService.validate_metadata(extraction)
 
-        # Run Module 5 — summary stats
-        summary = Module5_Reporter().render_visual_report(compliance)
+        # Run Module 5 via service facade — summary stats
+        summary = PipelineOrchestratorService.render_visual_report(compliance)
 
         # Element count breakdown by IFC class
         class_counts: dict[str, int] = {}
@@ -209,8 +208,8 @@ requests.post("http://localhost:8000/revit-sync", json=data)
         theme = str(body.get("theme") or "Architecture").strip()
 
         extraction = _sync_service.build_extraction_results(elements, theme)
-        compliance = Module4_Comparator().validate_metadata(extraction)
-        summary    = Module5_Reporter().render_visual_report(compliance)
+        compliance = PipelineOrchestratorService.validate_metadata(extraction)
+        summary    = PipelineOrchestratorService.render_visual_report(compliance)
 
         return JSONResponse({
             "element_count": len(elements),

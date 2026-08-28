@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -70,7 +71,50 @@ def parse_where(where_sql: str, params: list[Any] | None = None) -> _WhereExpr:
     raise ValueError(f"Unsupported where expression: {where_sql}")
 
 
-class SQLiteTableAdapter:
+class DatabaseAdapter(abc.ABC):
+    """Abstract base repository adapter for standard database operations."""
+
+    @property
+    @abc.abstractmethod
+    def columns_dict(self) -> dict[str, Any]:
+        """Return declared columns map."""
+
+    @property
+    @abc.abstractmethod
+    def rows(self) -> Iterable[dict[str, Any]]:
+        """Return all rows."""
+
+    @abc.abstractmethod
+    def get(self, pk_value: Any) -> dict[str, Any] | None:
+        """Get row by primary key."""
+
+    @abc.abstractmethod
+    def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Insert row into repository."""
+
+    @abc.abstractmethod
+    def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
+        """Update row by primary key."""
+
+    @abc.abstractmethod
+    def delete(self, pk_value: Any) -> None:
+        """Delete row by primary key."""
+
+    @abc.abstractmethod
+    def rows_where(
+        self,
+        where_sql: str,
+        params: list[Any] | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query rows matching predicate."""
+
+    def save_report(self, report_data: dict[str, Any]) -> dict[str, Any]:
+        """Persist a compliance report entity."""
+        return self.insert(report_data)
+
+
+class SQLiteTableAdapter(DatabaseAdapter):
     """Expose a thin compatibility layer around a fastlite table object.
 
     Used only for the isolated SQLite connections PersistenceService hands to
@@ -126,7 +170,7 @@ class SQLiteTableAdapter:
         return list(self._table.rows_where(where_sql, params or [], limit=limit))
 
 
-class SupabaseTableAdapter:
+class SupabaseTableAdapter(DatabaseAdapter):
     """Table adapter backed by Supabase PostgREST queries."""
 
     def __init__(

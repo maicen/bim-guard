@@ -20,6 +20,11 @@ ANALYSIS_TYPES: list[str] = [
 DEFAULT_COUNTRY: str = "UK"
 DEFAULT_ANALYSIS_TYPE: str = "Piping (Corrosive)"
 
+#: LLM extraction defaults
+DEFAULT_LLM_MODEL: str = "openrouter/auto"
+COMPLIANCE_TEMPERATURE: float = 0.2
+MAX_TOKENS_RULE_EXTRACTION: int = 4096
+
 #: Analysis type -> URL slug served by app/routes/analyze_*.py.
 ANALYSIS_ROUTES: dict[str, str] = {
     "Piping (Corrosive)": "corrosion",

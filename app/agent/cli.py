@@ -170,6 +170,37 @@ async def run_cli(args: argparse.Namespace) -> None:
         )
 
 
+def run_pipeline_cli(ifc_file: str | None = None) -> None:
+    """Execute the full IFC parsing and rule-checking pipeline strictly via services without UI."""
+    from pathlib import Path
+    from app.services.phase6_service import Phase6Service
+    from app.services.pipeline_services import PipelineOrchestratorService
+    from app.services.pipeline_tracker import get_event_history
+
+    print(f"\n{BOLD}BIM Guard CLI Pipeline Execution{RESET}")
+    print(f"{DIM}Running framework-agnostic backend services...{RESET}\n")
+
+    if ifc_file and Path(ifc_file).exists():
+        print(f"Parsing IFC file: {CYAN}{ifc_file}{RESET}")
+        content = Path(ifc_file).read_bytes()
+        parsed = Phase6Service.parse_ifc(content)
+        print(f"Elements parsed: {GREEN}{len(parsed.get('elements', []))}{RESET}")
+        analysis_result = Phase6Service.run_corrosion(parsed)
+        issues = analysis_result.get("audit_issues", [])
+        print(f"Compliance issues found: {YELLOW}{len(issues)}{RESET}")
+    else:
+        print("Executing pipeline orchestrator workflow...")
+        result = PipelineOrchestratorService.orchestrate_workflow()
+        print(f"Pipeline execution finished. Status: {GREEN}SUCCESS{RESET}")
+        print(f"Workflow stats: {result}")
+
+    events = get_event_history()
+    print(f"\nEmitted events count: {GREEN}{len(events)}{RESET}")
+    for event in events:
+        print(f"  ├─ {CYAN}{event.event_type}{RESET} from {event.source_module}")
+    print(f"\n{GREEN}CLI pipeline run completed successfully with zero UI imports.{RESET}\n")
+
+
 def main() -> None:
     """Console-script entry point."""
     parser = argparse.ArgumentParser(
@@ -184,7 +215,17 @@ def main() -> None:
         action="store_true",
         help="Disable OpenRouter's server-side web search plugin",
     )
-    asyncio.run(run_cli(parser.parse_args()))
+    parser.add_argument(
+        "--run-pipeline",
+        nargs="?",
+        const="",
+        help="Run the complete backend IFC parsing and rule-checking pipeline without UI",
+    )
+    args = parser.parse_args()
+    if args.run_pipeline is not None:
+        run_pipeline_cli(args.run_pipeline)
+        return
+    asyncio.run(run_cli(args))
 
 
 if __name__ == "__main__":

@@ -15,11 +15,9 @@ from monsterui.all import (
 from app.components.layout import DashboardLayout
 from app.components.themed_ui import SiteStyles
 from app.components.ui import BentoBox, LinkButton
-from app.modules.orchestrator import BIMGuard_App
+from app.services.pipeline_services import PipelineOrchestratorService
 from app.services.persistence import PersistenceService
 
-# Initialize orchestrator (provides run_dashboard stats)
-_bim_guard_app = BIMGuard_App()
 
 
 def _db_status_badge(is_connected: bool) -> Div:
@@ -53,7 +51,7 @@ def setup_routes(rt):
         db_ok = False
 
         try:
-            stats = _bim_guard_app.run_dashboard()
+            stats = PipelineOrchestratorService.get_dashboard_stats()
             db_ok = True
         except Exception:
             # Keep dashboard available even if the configured DB backend is down.

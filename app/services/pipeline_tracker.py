@@ -61,7 +61,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum, IntEnum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from app.logging_config import get_logger
 
@@ -620,3 +620,64 @@ def fail(code: str, reason: str) -> None:
     if tracker is None:
         return
     tracker.run(code).fail(reason)
+
+
+# ---------------------------------------------------------------------------
+# Event-driven messaging infrastructure
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PipelineEvent:
+    """Event payload emitted during pipeline execution."""
+
+    event_type: str
+    source_module: str
+    project_id: int
+    payload: dict[str, Any]
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+
+
+_EVENT_SUBSCRIBERS: list[Callable[[PipelineEvent], None]] = []
+_EVENT_HISTORY: list[PipelineEvent] = []
+
+
+def subscribe_event(handler: Callable[[PipelineEvent], None]) -> None:
+    """Register a callback for pipeline events."""
+    if handler not in _EVENT_SUBSCRIBERS:
+        _EVENT_SUBSCRIBERS.append(handler)
+
+
+def unsubscribe_event(handler: Callable[[PipelineEvent], None]) -> None:
+    """Remove a registered pipeline event callback."""
+    if handler in _EVENT_SUBSCRIBERS:
+        _EVENT_SUBSCRIBERS.remove(handler)
+
+
+def emit_event(
+    event_type: str, source_module: str, project_id: int, payload: dict[str, Any]
+) -> PipelineEvent:
+    """Publish an event to all active pipeline subscribers."""
+    event = PipelineEvent(
+        event_type=event_type,
+        source_module=source_module,
+        project_id=project_id,
+        payload=payload,
+    )
+    _EVENT_HISTORY.append(event)
+    for subscriber in list(_EVENT_SUBSCRIBERS):
+        try:
+            subscriber(event)
+        except Exception as exc:
+            logger.warning("Error in event subscriber %r: %s", subscriber, exc)
+    return event
+
+
+def get_event_history(project_id: int | None = None) -> list[PipelineEvent]:
+    """Return historical pipeline events."""
+    if project_id is None:
+        return list(_EVENT_HISTORY)
+    return [event for event in _EVENT_HISTORY if event.project_id == project_id]
+

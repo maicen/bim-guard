@@ -40,18 +40,17 @@ from app.components.ui import (
     LinkButton,
 )
 from app.logging_config import get_logger
-from app.modules.phase_6.phase_6a_upload import FileUploadService
-from app.modules.phase_6.phase_6b_parsing import parse_ifc_bytes
-from app.modules.phase_6.phase_6c_corrosion_ui import run_corrosion_analysis
-from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
-from app.modules.phase_6.phase_6e_export import DATA_QUALITY, FORMATS, export, sort_issues
 from app.services.analysis_runner import run_analysis
+from app.services.phase6_service import Phase6Service
 from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
 
 _projects_service = ProjectsService()
-_upload_service = FileUploadService()
+_phase6_service = Phase6Service()
+_upload_service = _phase6_service.upload_service
+sort_issues = Phase6Service.sort_issues_list
+DATA_QUALITY = "Data Quality"
 
 #: Analysis slug -> the runner that produces its AnalysisResult. Keyed by the
 #: same slugs as app.constants.ANALYSIS_ROUTES so a new analysis type wires

@@ -93,3 +93,11 @@ class DocumentService:
                 pass
 
         self.delete_document(document_id)
+
+    @staticmethod
+    def parse_pdf_content(content: bytes) -> str:
+        """Parse raw PDF content bytes via doc parser module."""
+        from app.modules.module1_doc_parser import Module1_DocReader
+
+        reader = Module1_DocReader()
+        return reader.parse_pdf(content)

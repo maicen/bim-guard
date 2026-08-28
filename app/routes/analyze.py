@@ -67,13 +67,8 @@ from app.components.ui import (
     TableRow as UiTableRow,
 )
 from app.logging_config import get_logger
-from app.modules.orchestrator import BIMGuard_App
+from app.services.pipeline_services import PipelineOrchestratorService
 from app.services.documents_service import DocumentService
-from app.services.projects_service import ProjectsService
-from app.services.report_artifacts import ReportArtifactService
-from app.services.rules_service import RuleService
-
-_bim_guard_app = BIMGuard_App()
 _projects_service = ProjectsService()
 _documents_service = DocumentService()
 _rule_service = RuleService()
@@ -554,15 +549,7 @@ async def _run_analysis_request(req: Request, forced_theme: str | None = None):
         len(doc_ids),
         rule_folder or "all",
     )
-    result = _bim_guard_app.orchestrate_workflow(
-        project_id,
-        doc_ids,
-        analysis_theme=analysis_theme,
-        rule_folder=rule_folder,
-        include_openings=include_openings,
-        include_spaces=include_spaces,
-        include_type_definitions=include_type_definitions,
-    )
+    result = PipelineOrchestratorService.orchestrate_workflow()
 
     if "error" in result:
         logger.warning("Analysis request failed project_id=%d error=%s", project_id, result["error"])
@@ -3102,15 +3089,7 @@ def setup_routes(rt):
             project_id,
             rule_folder or "all",
         )
-        result = _bim_guard_app.orchestrate_workflow(
-            project_id,
-            doc_ids=[],
-            analysis_theme="Architecture",
-            rule_folder=rule_folder,
-            include_openings=True,
-            include_spaces=True,
-            include_type_definitions=False,
-        )
+        result = PipelineOrchestratorService.orchestrate_workflow()
         if "error" in result:
             logger.warning(
                 "ARCH request step=analysis-failed project_id=%d error=%s",
@@ -3317,10 +3296,8 @@ def setup_routes(rt):
     @rt("/reports/compliance-csv")
     def compliance_csv_download():
         """Download the last rule compliance check as a CSV file."""
-        from app.modules.module5_reporter import Module5_Reporter
-
         return StreamingResponse(
-            Module5_Reporter().iter_csv_summary(_last_compliance_results),
+            PipelineOrchestratorService.iter_csv_summary(_last_compliance_results),
             media_type="text/csv",
             headers={"Content-Disposition": 'attachment; filename="compliance_results.csv"'},
         )
@@ -3335,9 +3312,7 @@ def setup_routes(rt):
         """
         from starlette.responses import Response as StarletteResponse
 
-        from app.modules.module5_reporter import Module5_Reporter
-
-        bcf_bytes = Module5_Reporter().generate_bcf_zip(_last_compliance_results)
+        bcf_bytes = PipelineOrchestratorService.generate_bcf_zip(_last_compliance_results)
         return StarletteResponse(
             content=bcf_bytes,
             media_type="application/octet-stream",
@@ -3620,7 +3595,7 @@ def setup_routes(rt):
         ]
 
         try:
-            graph_data = render_ifc_graph(ifc_path, violations)
+            graph_data = PipelineOrchestratorService.get_ifc_graph(ifc_path, violations)
         except Exception as exc:
             return Response(
                 content=(

@@ -56,16 +56,11 @@ from app.components.ui import (
 from app.components.ui import (
     CardHeader as UICardHeader,
 )
-from app.components.ui import (
-    CardTitle as UICardTitle,
-)
-from app.modules.config import (
+from app.constants import (
     COMPLIANCE_TEMPERATURE,
     DEFAULT_LLM_MODEL,
     MAX_TOKENS_RULE_EXTRACTION,
 )
-from app.modules.module1_doc_parser import Module1_DocReader
-from app.modules.module3_rule_builder.ids_exporter import export_ids_for_ruleset, import_ids_ruleset
 from app.services.documents_service import DocumentService
 from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.llm_model_service import LLMModelService
@@ -175,9 +170,8 @@ def setup_routes(rt):
 
         stored_path = _document_service.store_document_file(filename, file_content)
 
-        reader = Module1_DocReader()
         if filename.lower().endswith(".pdf"):
-            extracted_text = reader.parse_pdf(file_content)
+            extracted_text = DocumentService.parse_pdf_content(file_content)
         else:
             extracted_text = file_content.decode("utf-8", errors="replace").strip()
 
@@ -917,7 +911,7 @@ def setup_routes(rt):
         if not rows:
             return Alert(f"No rules were found for ruleset '{ruleset_id}'.", cls=AlertT.warning)
 
-        payload = export_ids_for_ruleset(ruleset_id, rows)
+        payload = RuleService.export_ids_xml(ruleset_id, rows)
         if not payload.strip():
             return Alert(
                 f"No exportable IDS property checks were found for ruleset '{ruleset_id}'.",
@@ -966,7 +960,7 @@ def setup_routes(rt):
             return Alert("IDS file must be UTF-8 encoded XML.", cls=AlertT.error)
 
         try:
-            rows = import_ids_ruleset(xml_text)
+            rows = RuleService.import_ids_xml(xml_text)
         except ValueError as exc:
             return Alert(str(exc), cls=AlertT.error)
 

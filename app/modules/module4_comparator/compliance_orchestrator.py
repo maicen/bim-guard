@@ -67,4 +67,17 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
     path_a_issues = issues_from_path_a(path_a_results, id_allocator=id_allocator, include_low=False)
     all_issues = path_a_issues + path_b_issues
     output = path_a_view(all_issues, path_a_results)
+    
+    try:
+        from app.services.pipeline_tracker import emit_event
+
+        emit_event(
+            event_type="COMPLIANCE_COMPLETED",
+            source_module="module4_comparator",
+            project_id=0,
+            payload={"element_count": len(output), "issue_count": len(all_issues), "run_id": run_id},
+        )
+    except Exception:
+        pass
+
     return output

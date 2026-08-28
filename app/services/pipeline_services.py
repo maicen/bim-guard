@@ -108,16 +108,6 @@ class AnalysisService:
     @staticmethod
     def _to_bcf_topic(issue: AuditIssue) -> dict[str, Any]:
         """Return a deterministic BCF-compatible topic payload for one finding."""
-        # The "ElementGUID:" line lets the viewer find this topic again after
-        # a round trip through BCF export/import: BCF's Topic entity has no
-        # native "linked element" field of its own (that lives inside each
-        # Viewpoint's component selection instead), but Description is one
-        # of its most basic, spec-required fields, so any compliant BCF
-        # reader — including the one this app's viewer uses — is guaranteed
-        # to preserve it verbatim. Matching a substring in it is therefore a
-        # safe way to jump straight to "the topic for element X" from a
-        # "View in 3D" link, without needing to read that library's internal
-        # object model.
         description = f"{issue.description}\n\nElementGUID: {issue.element_id}"
         return {
             "guid": str(uuid5(NAMESPACE_URL, f"bim-guard:{issue.id}:{issue.element_id}")),
@@ -166,11 +156,6 @@ class AnalysisService:
                             "property_name": rule.get("property_name"),
                             "target": rule.get("target"),
                             "severity": severity,
-                            # (x, y, z) mm from Module 2, or None — carried
-                            # through _to_bcf_topic() so ReportArtifactService
-                            # can give this topic's BCF viewpoint a real
-                            # camera position instead of defaulting to the
-                            # world origin.
                             "position_mm": failure.get("position_mm"),
                         },
                     )
@@ -243,12 +228,18 @@ class EnhancementService:
         self._lineage_ledger = lineage_ledger
         self._improver = improver
 
-    def plan(self, elements: list[Any], *, changes: dict[str, Any] | None = None, version: int = 1) -> dict[str, Any]:
+    def plan(
+        self, elements: list[Any], *, changes: dict[str, Any] | None = None, version: int = 1
+    ) -> dict[str, Any]:
         """Produce a planned enhancement set without mutating the input model."""
         effective_changes = changes or {}
         items: list[dict[str, Any]] = []
         for element in elements:
-            element_id = str(getattr(element, "GlobalId", None) or getattr(element, "global_id", None) or getattr(element, "id", "unknown"))
+            element_id = str(
+                getattr(element, "GlobalId", None)
+                or getattr(element, "global_id", None)
+                or getattr(element, "id", "unknown")
+            )
             items.append({
                 "element_id": element_id,
                 "changes": dict(effective_changes),
@@ -331,6 +322,102 @@ class EnhancementService:
             ]
         sanitized["generated_filename"] = output_name
         return sanitized
+
+
+class PipelineOrchestratorService:
+    """Service facade wrapping workflow execution for UI routes."""
+
+    @staticmethod
+    def orchestrate_workflow(
+        project_id: int = 1,
+        doc_ids: list[int] | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Execute complete application workflow and return summary payload."""
+        from app.modules.orchestrator import BIMGuard_App
+
+        workflow = BIMGuard_App()
+        return workflow.orchestrate_workflow(
+            project_id=project_id, doc_ids=doc_ids or [], **kwargs
+        )
+
+    @staticmethod
+    def get_dashboard_stats() -> dict[str, Any]:
+        """Return system-wide dashboard counts and compliance metrics."""
+        from app.modules.orchestrator import BIMGuard_App
+
+        workflow = BIMGuard_App()
+        return workflow.run_dashboard()
+
+    @staticmethod
+    def export_bcf(report_data: dict[str, Any], output_path: str | Path) -> str:
+        """Export BCF file from report payload via service boundary."""
+        from app.modules.module5_reporter import Module5_Reporter
+
+        reporter = Module5_Reporter()
+        return reporter.generate_bcf(report_data, output_path=output_path)
+
+    @staticmethod
+    def export_csv(report_data: dict[str, Any], output_path: str | Path) -> str:
+        """Export CSV file from report payload via service boundary."""
+        from app.modules.module5_reporter import Module5_Reporter
+
+        reporter = Module5_Reporter()
+        return reporter.generate_csv(report_data, output_path=output_path)
+
+    @staticmethod
+    def iter_csv_summary(results: list[dict[str, Any]]):
+        """Stream CSV compliance summary rows."""
+        from app.modules.module5_reporter import Module5_Reporter
+
+        return Module5_Reporter().iter_csv_summary(results)
+
+    @staticmethod
+    def generate_bcf_zip(results: list[dict[str, Any]]) -> bytes:
+        """Generate BCF zip file bytes from compliance results."""
+        from app.modules.module5_reporter import Module5_Reporter
+
+        return Module5_Reporter().generate_bcf_zip(results)
+
+    @staticmethod
+    def get_ifc_graph(
+        ifc_file_path: str | Path, violations: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
+        """Generate element hierarchy graph payload."""
+        from app.modules.module2_ifc_read.ifc_graph import render_ifc_graph
+
+        return render_ifc_graph(ifc_file_path, violations=violations)
+
+    @staticmethod
+    def run_comparator_check(elements: list[Any], rules: list[Any]) -> list[dict[str, Any]]:
+        """Run comparator rule evaluation against element properties."""
+        from app.modules.module4_comparator import Module4_Comparator
+
+        comparator = Module4_Comparator()
+        return comparator.check_compliance(elements, rules)
+
+    @staticmethod
+    def validate_metadata(extraction: dict[str, Any]) -> list[dict[str, Any]]:
+        """Validate metadata extraction payload via comparator."""
+        from app.modules.module4_comparator import Module4_Comparator
+
+        return Module4_Comparator().validate_metadata(extraction)
+
+    @staticmethod
+    def render_visual_report(compliance: list[dict[str, Any]]) -> dict[str, Any]:
+        """Render visual report summary via reporter module."""
+        from app.modules.module5_reporter import Module5_Reporter
+
+        return Module5_Reporter().render_visual_report(compliance)
+
+    @staticmethod
+    def export_phase6(
+        summary_payload: dict[str, Any], fmt: str, source_reference: str = ""
+    ) -> tuple[bytes, str, str]:
+        """Export Phase 6 summary data into requested file format."""
+        from app.modules.phase_6.phase_6e_export import export
+
+        return export(summary_payload, fmt, source_reference=source_reference)
 
 
 def run_compliance_analysis(

@@ -14,7 +14,7 @@ from monsterui.all import Container
 from app.components.layout import DashboardLayout
 from app.components.projects_ui import project_enhancements_page, project_form, projects_page
 from app.constants import DEFAULT_ANALYSIS_TYPE, DEFAULT_COUNTRY
-from app.modules.pipeline_services import execute_model_enhancement
+from app.services.pipeline_services import execute_model_enhancement
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.object_storage import ObjectStorage
 from app.services.projects_service import ProjectsService
