@@ -14,7 +14,7 @@ services:
     region: oregon         # change to your preferred region
     branch: main
     autoDeploy: true       # redeploy on every push to `branch`
-    healthCheckPath: /
+    healthCheckPath: /api/health
 
     envVars:
       # ── Supabase — set these in the Render dashboard (never commit secrets) ─
@@ -24,14 +24,18 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: bim-guard-artifacts
 
-      # ── AI rule extraction (optional — rule extraction won't work without it) ─
+      # ── AI rule extraction & Agent Providers ────────────────────────────────
+      - key: BIM_GUARD_LLM_MODEL
+        value: openrouter/auto
+      - key: OPENROUTER_API_KEY
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
-      - key: GOOGLE_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
-      - key: BIM_GUARD_RULE_MODEL
-        value: gemini/gemini-2.0-flash
 
     # Render free/starter tier has ephemeral storage — the Supabase Storage
     # file cache (data/cache) will be rebuilt on first access after each deploy.

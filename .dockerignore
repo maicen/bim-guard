@@ -8,36 +8,44 @@ __pycache__/
 *.py[oc]
 *.egg-info/
 .venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Frontend artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
+frontend/.vite/
 
 # IDE / tooling
 .vscode/
 .claude/
+.gemini/
 .Jules/
 .playwright-mcp/
 
 # Secrets — never bake into image
 .env
+*.env
 .sesskey
 
-# Runtime data (mounted at run time, not baked in)
+# Runtime data (mounted via volumes at runtime, not baked into image)
+data/cache/
 data/uploads/
 data/*.sqlite
 data/*.sqlite-shm
 data/*.sqlite-wal
+data/agent-sessions/
+data/logs/
 data/bimguard_issue_history.json
 
-# Docs and test fixtures not needed in image
+# Documentation and test fixtures not needed in production image
 docs/
 IFC-Sample-Test-Files/
+tests/
 app/modules/tests/
-
-# Build / dist artifacts
-build/
-dist/
-wheels/
 
 # Misc
 *.md
 !README.md
-index.html
 open_issues_full.json

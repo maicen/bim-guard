@@ -1,29 +1,74 @@
+# ==============================================================================
+# BIM Guard Docker Compose Configuration
+# FastAPI Backend Gateway + Svelte 5 SPA + Supabase & LLM Integration
+# ==============================================================================
+
 services:
   bim-guard:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: bim-guard:latest
     container_name: bim-guard-app
     ports:
-      - "8000:8000"
+      - "${PORT:-8000}:8000"
     environment:
-      # Supabase — required; all data and file storage lives here
+      # ── Supabase Configuration (Required for database & file storage) ────────
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      # AI rule extraction
+      - SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-bim-guard-artifacts}
+      - SUPABASE_STORAGE_PREFIX=${SUPABASE_STORAGE_PREFIX:-}
+      - SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN:-}
+
+      # ── LLM Extraction & Agent Providers ────────────────────────────────────
+      - BIM_GUARD_LLM_MODEL=${BIM_GUARD_LLM_MODEL:-openrouter/auto}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_SITE_URL=${OPENROUTER_SITE_URL:-http://127.0.0.1:8000}
+      - OPENROUTER_APP_NAME=${OPENROUTER_APP_NAME:-BIM Guard}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - BIM_GUARD_RULE_MODEL=${BIM_GUARD_RULE_MODEL:-gemini/gemini-2.0-flash}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://localhost:11434}
+
+      # ── Terminal Agent Configuration ────────────────────────────────────────
+      - BIM_GUARD_AGENT_MODEL=${BIM_GUARD_AGENT_MODEL:-openrouter/auto}
+      - BIM_GUARD_AGENT_MAX_STEPS=${BIM_GUARD_AGENT_MAX_STEPS:-20}
+      - BIM_GUARD_AGENT_MAX_COST=${BIM_GUARD_AGENT_MAX_COST:-1.0}
+      - BIM_GUARD_AGENT_WEB_SEARCH=${BIM_GUARD_AGENT_WEB_SEARCH:-1}
+
+      # ── Runtime & Feature Configuration ─────────────────────────────────────
+      - BIM_GUARD_STORAGE_BACKEND=supabase
+      - BIM_GUARD_VERBOSITY=${BIM_GUARD_VERBOSITY:-1}
+      - BIM_GUARD_LOG_LEVEL=${BIM_GUARD_LOG_LEVEL:-INFO}
+      - FEATURE_PATH_B_MM=${FEATURE_PATH_B_MM:-0}
+      - FEATURE_PATH_B_XM=${FEATURE_PATH_B_XM:-0}
+      - BIM_GUARD_ALLOWED_ORIGINS=${BIM_GUARD_ALLOWED_ORIGINS:-}
+
     volumes:
-      # Persist the Supabase Storage file cache across container restarts
+      # Persistent cache for downloaded IFC models & artifacts
       - bim-guard-cache:/app/data/cache
+      # Persistent storage for agent conversation sessions
+      - bim-guard-sessions:/app/data/agent-sessions
+      # Persistent application logs
+      - bim-guard-logs:/app/data/logs
+
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" ]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 20s
+
     restart: unless-stopped
 
 volumes:
   bim-guard-cache:
+    name: bim-guard-cache
+  bim-guard-sessions:
+    name: bim-guard-sessions
+  bim-guard-logs:
+    name: bim-guard-logs
