@@ -63,3 +63,6 @@ validation_sweep_retry.log
 *.sqlite-shm
 *.sqlite-wal
 *.sqlite-journal
+
+# Local MCP server config (machine-specific, may hold credentials)
+.mcp.json

@@ -7,20 +7,33 @@ commercial building plant room and distribution system.
 Used when no IFC file is uploaded.
 """
 
-import os
-import sys
+import logging
 
-# Add parent directory to path for engine imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+logger = logging.getLogger(__name__)
 
+# Absolute package imports. These were previously ``from engines.…`` with a
+# sys.path insert, which stopped resolving once the engines moved under the
+# ``app`` package: every import raised ImportError, ENGINES_AVAILABLE went
+# False, and run_demo_compliance() returned canned fallback rows instead of
+# engine output — silently, because the except branch logged nothing. The
+# validation dataset was therefore not reproducible from this module.
 try:
-    from engines.bimguard_corrosion_engine import GCElement, assess_galvanic_risk
-    from engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
-    from engines.bimguard_mic_engine import MICElement, assess_mic_risk
+    from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_risk
+    from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
+    from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
 
     ENGINES_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover - only when the engines are genuinely absent
     ENGINES_AVAILABLE = False
+    # Loud, because the fallback returns numbers that look like results. A
+    # silent degrade here is the same defect class as substituting a band for
+    # an unassessed mechanism: plausible output nobody computed.
+    logger.warning(
+        "Corrosion engines could not be imported; run_demo_compliance() will "
+        "return canned fallback rows, NOT engine output. Any figures produced "
+        "in this state are not reproducible.",
+        exc_info=True,
+    )
 
 # ── SYNTHETIC ELEMENT DEFINITIONS ────────────────────────────────────────────
 DEMO_ELEMENTS = [

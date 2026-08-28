@@ -33,6 +33,8 @@ from datetime import UTC, datetime
 from typing import Optional
 
 from app.services.corrosion_rule_catalog import load_cc_catalog
+from app.services.pipeline_tracker import CC_ENGINE, Stage, emit, increment
+from app.services.pipeline_tracker import fail as track_failure
 
 # Import GC-001 engine for combined assessment
 try:
@@ -394,7 +396,15 @@ class CCResult:
 
 # ── CORE ASSESSMENT FUNCTION ──────────────────────────────────────────────────
 def assess_crevice_risk(element: CCElement) -> CCResult:
-    """Run CC-001 crevice corrosion risk assessment on a single element."""
+    """Run CC-001 crevice corrosion risk assessment on a single element.
+
+    Emits stage-3 (Engine Execution) progress to the bound pipeline tracker.
+    The emit is a no-op when nothing is bound, so the CLI demos, the validation
+    sweep and the tests reach exactly the code they always did.
+    """
+    emit(CC_ENGINE, Stage.ENGINE_EXECUTION)
+    increment(CC_ENGINE, elements_analyzed=1)
+
     # Material resolution
     mat_key = resolve_cc_material(element.material)
     if mat_key:
@@ -420,6 +430,10 @@ def assess_crevice_risk(element: CCElement) -> CCResult:
     # Composite score
     score = calculate_cc001_score(geo_risk, cct_score, env_score)
     risk_band, bcf_priority = classify_cc001_risk(score)
+
+    # Band tallies as metrics rather than as a stage transition -- see the same
+    # note in the GC-001 engine for why scoring does not flip the stage here.
+    increment(CC_ENGINE, **{f"band_{risk_band.lower()}": 1})
 
     mitigations = select_cc_mitigation(geo_class, cct_score, env_sev_key, mat_key, risk_band)
 
@@ -449,8 +463,25 @@ def assess_crevice_risk(element: CCElement) -> CCResult:
 
 
 def assess_crevice_batch(elements: list) -> list:
-    """Run CC-001 on a list of CCElement objects."""
-    return [assess_crevice_risk(el) for el in elements]
+    """Run CC-001 on a list of CCElement objects.
+
+    The batch entry point is where the denominator is known, so this is what
+    reports ``elements_total`` and closes stage 4 (Risk Scoring) once for the
+    whole batch. A caller that loops :func:`assess_crevice_risk` itself -- as
+    the Phase 6 corrosion pipeline does, because it interleaves mechanisms per
+    element -- still gets stage 3 and the counters, and its driver closes the
+    later stages.
+    """
+    emit(CC_ENGINE, Stage.ENGINE_EXECUTION, elements_total=len(elements))
+    try:
+        results = [assess_crevice_risk(el) for el in elements]
+    except Exception as exc:
+        # Reported, not swallowed: the tracker records the stage the run stopped
+        # in and the exception carries on to the caller unchanged.
+        track_failure(CC_ENGINE, f"{type(exc).__name__}: {exc}")
+        raise
+    emit(CC_ENGINE, Stage.RISK_SCORING, findings=len(results))
+    return results
 
 
 # ── COMBINED RISK ASSESSMENT ──────────────────────────────────────────────────
@@ -494,8 +525,14 @@ def combined_risk_assessment(
 
 # ── BCF 2.1 EXPORT ────────────────────────────────────────────────────────────
 def generate_cc_bcf(results: list, output_path: str) -> int:
-    """Generate BCF 2.1 ZIP for CC-001 findings."""
+    """Generate BCF 2.1 ZIP for CC-001 findings.
+
+    Reports stage 6 (Export) to the bound pipeline tracker, including the empty
+    case: "exported nothing because nothing was above Low" is a result, and a
+    tracker that stayed silent there would look like an export that hung.
+    """
     issues = [r for r in results if r.risk_band != "Low"]
+    emit(CC_ENGINE, Stage.EXPORT, bcf_topics=len(issues))
     if not issues:
         return 0
 
@@ -571,7 +608,11 @@ Standards referenced:
 
 # ── ASSET REGISTER EXPORT ─────────────────────────────────────────────────────
 def export_cc_asset_register(results: list, output_path: str) -> None:
-    """Export CC-001 results to CSV asset register."""
+    """Export CC-001 results to CSV asset register.
+
+    Reports stage 6 (Export) to the bound pipeline tracker.
+    """
+    emit(CC_ENGINE, Stage.EXPORT, csv_rows=len(results))
     fieldnames = [
         "GlobalID",
         "ElementType",

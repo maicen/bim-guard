@@ -137,7 +137,7 @@ class ServiceElement:
 }
 ```
 
-### Rules
+### Rules — ParsedIFC
 
 1. **`guid` is the join key.** Every downstream `Issue.element_id` is a `guid`
    from this list. An `Issue` referencing an absent guid is a bug — Session C/D
@@ -175,7 +175,7 @@ C and D consume and extend it. The keys that matter across the boundary:
 | `compliance_is_demo` | `bool` | `True` ⇒ UI must label output as synthetic |
 | `compliance_error` | `str \| None` | Engine failed; other keys may be empty |
 
-### Rules
+### Rules — AnalysisResult
 
 1. **Additive only.** Adding a key is safe; renaming or removing one breaks
    every consumer. Session D adds seismic keys alongside the corrosion ones —
@@ -248,26 +248,300 @@ defaults in use are:
 Session D supplies its own `risk_band_thresholds` in the seismic rulepack. It
 must not hard-code different cut-points in Python.
 
-### 4.2 Casing — the one real trap
+### 4.2 Casing — the band trap
 
-There are **two** casings in this codebase and they are not interchangeable:
+**Three** casings of the same four values are live in this codebase
+simultaneously. They are not interchangeable, and every mismatch between them
+fails *silently* — no exception, no log, just a wrong colour or a wrong severity.
 
-| Layer | Casing | Source |
+| # | Casing | Who produces it | Site |
+| --- | --- | --- | --- |
+| 1 | `Critical` Title | the corrosion/crevice/MIC engines | `app/engines/bimguard_*_engine.py` |
+| 2 | `LOW` UPPER | `compliance_runner` fallback when a result carries no band | `compliance_runner.py:214` (`.get("band", "LOW")`) |
+| 3 | `critical` lower | `RiskBand` enum — storage, BCF, `Issue` | `issue_schema.py` |
+
+`_band_int()`'s own docstring records the drift: *"Engines emit Title-case
+labels ("Low", "Critical"); the band is normalised to upper case so any casing
+ranks correctly."*
+
+#### The five silent failure modes
+
+**1 — `_band_badge` greys out.** `app/routes/analyze.py:754` is an exact dict
+lookup keyed on **Title-case**, with a grey fallback:
+
+```text
+_band_badge("Critical") -> bg-red-600     correct
+_band_badge("critical") -> bg-gray-400    GREY, no error
+```
+
+A lowercase `RiskBand` value reaching the UI renders grey. It looks like a CSS
+glitch, so it gets triaged as a styling bug rather than a data-flow bug. Note
+the direction: **lowercase is what breaks here**; Title-case is the correct key.
+
+**2 — `_band_int` silently ranks unknown as safest.** It *is* defensive
+(`.upper()` accepts all three casings) but returns `0` for anything
+unrecognised — the same rank as `LOW`. A typo or a new band label does not
+raise; it demotes the finding to lowest severity in dominance ordering.
+
+```text
+_band_int("critical") = 3   _band_int("Critical") = 3   _band_int("CRITICAL") = 3
+_band_int("nonsense") = 0   <- ranks LOWEST, silently
+```
+
+**3 — `RiskBand` is a `str` subclass, so wrong-case comparison is just `False`.**
+
+```python
+RiskBand.CRITICAL == "critical"   # True
+RiskBand.CRITICAL == "Critical"   # False — no error, the branch never fires
+```
+
+A capitalised `==` against a `RiskBand` never matches and never complains.
+
+**4 — Sorting band values alphabetically inverts severity.** `_BAND_RANK` in
+`issue_adapter.py` carries the warning; the effect is worth seeing:
+
+```python
+sorted(["critical","low","high","medium"])   # ['critical','high','low','medium']  WRONG
+max(["critical","low","high","medium"])      # 'medium'  <- a Critical demoted to Medium
+```
+
+Never `sort`, `max` or `min` on raw band strings.
+
+**5 — The default that kills the guard.** The most serious of the five, and the
+only one where the normalise-and-raise pattern below does *not* protect you.
+
+`compliance_runner.py:204-220` fills a missing band with a literal:
+
+```python
+"galvanic_band": g_result.get("band", "LOW"),
+"crevice_band":  c_result.get("band", "LOW"),
+"mic_band":      m_result.get("band", "LOW"),
+```
+
+`issue_adapter.py:125` guards against a mechanism that never ran:
+
+```python
+if band_key not in result:
+    continue  # Mechanism did not run for this element — nothing to report.
+```
+
+Both are correct in isolation. Together they fail, because the runner writes all
+three band keys **unconditionally** — so for any runner-produced element:
+
+```text
+'galvanic_band' in result -> True    guard fires: False
+'crevice_band'  in result -> True    guard fires: False
+'mic_band'      in result -> True    guard fires: False
+```
+
+The guard is **dead code on this path**. It can never fire. Then
+`issue_adapter.py:141` finishes the job:
+
+```python
+if band is RiskBand.LOW and not include_low:
+    continue
+```
+
+An element the engines never assessed is now `LOW`, so it is skipped — no Issue,
+no report line, nothing downstream that could notice. **"Not assessed" and
+"assessed and cleared" become indistinguishable**, and the fabrication spreads
+before it disappears: `dominant_mechanism` resolves to `"galvanic"` (a `max()`
+tie returning the first entry) and `_action()` issues a real disposition, both
+derived from a band no engine produced.
+
+##### The doctrine — already decided in this codebase
+
+This question has been answered here before; do not re-litigate it.
+
+`app/modules/module2_ifc_read/piping_schema.py:34` (NULLABILITY POLICY):
+
+> *"If a comparator cannot run because a required field is None, it emits a
+> Low-severity issue with `mechanism="data_quality"` pointing at the offending
+> element **rather than crashing**."*
+
+`tests/test_material_media.py:219` names this exact bug:
+
+> *"An absent matrix cell must not be treated as compliant. Reporting it clean
+> would state that an unassessed pairing is compliant."*
+
+`tests/test_material_media.py:239` enforces the separation — any Issue carrying
+`metadata["check"]` must have `mechanism == "data_quality"`, so data quality can
+never be mistaken for a verdict.
+
+**Reference implementation:** `_data_quality_issue()` at
+`app/modules/module4_comparator/galvanic.py:441` — `mechanism="data_quality"`,
+`band=RiskBand.LOW`, `score=0.10`, `metadata["check"]`, and an
+`assignee_role="BIM coordinator"` so it lands as actionable work.
+
+##### The fix — four steps, and step 4 is the one that gets missed
+
+1. **Don't invent.** The runner omits the band key when the engine did not
+   assess that mechanism, instead of substituting `"LOW"`.
+2. **Report the absence.** The adapter emits a `data_quality` Issue naming the
+   element and the mechanism that did not run.
+3. **Make it visible.** Low severity, `metadata={"check": "band_unassessed",
+   "mechanism_code": "GC-001"}`, assigned to the BIM coordinator.
+4. **Exempt it from the skip.** `issues_from_path_a` must not drop
+   `mechanism == "data_quality"` under `include_low=False`.
+
+> **Step 4 is not optional.** A `data_quality` Issue is Low-severity by
+> doctrine, so the `include_low` guard at `issue_adapter.py:141` deletes it one
+> line after it is created — restoring the exact invisibility the fix set out to
+> remove. The existing `data_quality` issues live on Path B (`galvanic.py`),
+> which has no `include_low` skip, which is why this has not bitten yet. Path A
+> does have one.
+
+##### The test trap — how a broken fix passes review
+
+Steps 1–3 are visible in a diff. Step 4 is one line in a different function, and
+a test can be written that passes whether or not it exists. That is how a fix
+that is still invisible in the real pipeline gets merged.
+
+**The trap is `include_low=True`.** Reaching for it is natural — you are testing
+a Low-severity Issue that is not showing up, so raising the flag "fixes" the
+test. It also disables the exact filter under test:
+
+```python
+# WRONG — passes with or without step 4. Proves nothing.
+issues = issues_from_path_a(results, id_allocator=alloc, include_low=True)
+assert any(i.mechanism == "data_quality" for i in issues)
+```
+
+`include_low=False` is the **default**, so omitting the argument is already
+correct. Pass it explicitly anyway, so the intent survives a future change to
+the default and nobody "repairs" a red test by flipping it to `True`:
+
+```python
+def test_data_quality_issue_survives_include_low_filter(allocator):
+    """An unassessed mechanism must stay visible under the default filter.
+
+    include_low=False is the real pipeline path. Do not pass include_low=True
+    here — it disables the filter under test and the assertion would hold
+    whether or not the step 4 exemption exists.
+    """
+    row = path_a_row(galvanic="HIGH", crevice="HIGH", mic="HIGH")
+    del row["mic_band"]                      # MIC did not run for this element
+
+    issues = issues_from_path_a(
+        [row],
+        id_allocator=allocator,
+        include_low=False,                   # explicit: the behaviour under test
+    )
+
+    assert any(i.mechanism == "data_quality" for i in issues)
+```
+
+Two call-signature details that stop a hand-written test before it runs:
+`id_allocator` is **required and keyword-only** (`IssueIdAllocator("BGR-TEST")`,
+or the `allocator` fixture in `conftest.py`), and the producer is
+`run_compliance_checks(elements)` — there is no `run_corrosion`.
+
+The `del row["mic_band"]` idiom is the established way to express "this
+mechanism did not run"; `tests/test_issue_adapter.py:280` already uses it.
+
+> **An existing green test encodes the behaviour the fix must change.**
+> `tests/test_issue_adapter.py::test_absent_mechanism_is_skipped` deletes
+> `mic_band` and asserts the result is exactly `["GC-001.01", "CC-001.01"]` —
+> that MIC is silently dropped. It passes today. After step 2 it **must** fail,
+> because an absent mechanism now emits a `data_quality` Issue instead of
+> vanishing.
+>
+> Update that test and its name as part of the fix. Do not restore the green by
+> reverting the change — a red `test_absent_mechanism_is_skipped` is the fix
+> working.
+
+#### Summary — what each test proves
+
+| Test | Proves |
+| --- | --- |
+| `data_quality` Issue is emitted at all | steps 1–2 |
+| …and survives `include_low=False` | **step 4** |
+| `test_absent_mechanism_is_skipped` now fails and is rewritten | the old silent-skip is genuinely gone |
+
+Only the second row distinguishes a working fix from an invisible one.
+
+##### Two fixes that look right and are not
+
+Both were considered and rejected. They are recorded here so they are not
+re-derived:
+
+| Option | What happens | Why it fails |
 | --- | --- | --- |
-| Engine / storage / BCF | lowercase | `RiskBand.CRITICAL == "critical"` |
-| UI badge | Capitalised | `_band_badge()` keys on `"Critical"` |
+| Omit the key and let the adapter's guard skip the element | Guard finally fires; element is skipped | Still invisible. "Must not be treated as compliant" becomes "not reported at all" — the same silence in a different place |
+| Substitute `"UNASSESSED"` and let `RiskBand` reject it | `ValueError` propagates | Violates *"rather than crashing"*. One unassessed element aborts an analysis over thousands; a data-quality problem becomes a total failure |
 
-`_band_badge()` in `app/routes/analyze.py` falls back to a **grey** badge on an
-unknown key. A lowercase band reaching it therefore renders grey with no error —
-the failure is silent and looks like a styling glitch rather than a data bug.
+The doctrine wants a **visible, attributable, non-verdict finding** — not a
+skip, and not a crash.
 
-> **Contract:** `RiskBand` values are lowercase everywhere except at the moment
-> of rendering. Convert with `.title()` at the presentation boundary only. Never
-> persist, export, or compare the capitalised form. Never compare band strings
-> with `==` across layers — compare `RiskBand` members.
+#### The pattern to copy
 
-For ordering (sorting most-severe-first), use the existing
-`_band_int()` in `compliance_runner.py` rather than an ad-hoc dict.
+`issues_from_path_a()` in `app/modules/module4_comparator/issue_adapter.py`
+already does this correctly and is the reference implementation:
+
+```python
+# Normalise "CRITICAL" -> RiskBand.CRITICAL -> "critical".
+try:
+    band = RiskBand(band_str.strip().lower())
+except ValueError:
+    raise ValueError(
+        f"Unknown band '{band_str}' for {element_name} / {mechanism_code}"
+    ) from None
+```
+
+Two properties make it right, and both matter:
+
+1. **One normalisation point.** `.strip().lower()` into the enum, at the
+   boundary where external band strings enter the `Issue` world.
+2. **It raises.** An unrecognised band is a `ValueError` naming the element and
+   mechanism — not a grey badge, not a rank of 0.
+
+For ordering, use `_BAND_RANK` (or `_band_int()` in `compliance_runner.py`),
+never an ad-hoc dict and never string comparison.
+
+> **Contract**
+>
+> - `RiskBand` members — not strings — are the currency between layers. Compare
+>   members; convert to `.value` only at a serialisation boundary.
+> - Normalise **once, on entry**, with `RiskBand(s.strip().lower())`, and let it
+>   raise. Do not normalise defensively at each use site; that is how three
+>   casings became normal.
+> - Title-case exists **only** inside the render call. Never persist, export, or
+>   compare it.
+> - Never `sort`/`max`/`min` raw band strings.
+
+#### What Sessions C and D should fix
+
+This section documents the trap; it does not change the code. Two follow-ups
+belong to the sessions that own those files:
+
+- **Session C (`phase-7-corrosion-ui`)** owns `app/routes/analyze.py`. Make
+  `_band_badge` normalise its input through `RiskBand` and render from the
+  member, rather than exact-matching a Title-case key with a grey fallback. Its
+  call site at `analyze.py:855` defaults to `"Low"` — a Title-case literal that
+  should become `RiskBand.LOW`.
+- **Session C also owns failure mode 5** — `compliance_runner.py:204-220` and
+  `issue_adapter.py:125/141`. Apply the four-step fix above. Note that 16 tests
+  in this area already fail on a `compare()` signature mismatch (see §5.6), so
+  separate that pre-existing breakage from any regression you introduce.
+- **Session D (`phase-8-seismic`)** must not add a fourth casing. Seismic bands
+  are `RiskBand` members from the moment they leave the engine. Route them
+  through the `issues_from_path_a` normalisation pattern, not around it. The
+  same applies to unassessed seismic mechanisms: emit a `data_quality` Issue,
+  never a substituted band.
+
+These are behaviour changes to shipped code, so each deserves its own commit.
+Tests to add:
+
+- an unknown band fails loudly instead of rendering grey;
+- an element with no computed band produces a `data_quality` Issue, **and that
+  Issue survives `include_low=False`**.
+
+The second assertion is the one that proves step 4 was not skipped.
+
+> **Not a band:** `HIGH`/`MEDIUM`/`LOW` in
+> `app/modules/module1_doc_parser/` are rule-extraction **confidence** levels, a
+> separate concept with its own scale. Do not feed them to `_band_badge`,
+> `_band_int` or `RiskBand`.
 
 ### 4.3 Issue workflow status
 
@@ -338,7 +612,7 @@ uv run pytest -q                 # app/modules/tests (unit)
 
 Baseline at `2d7d80c`, for comparison when judging whether a failure is yours:
 
-```
+```text
 tests/            16 failed, 352 passed, 2 skipped, 13 xfailed, 54 errors
 ```
 

@@ -59,6 +59,8 @@ from app.routes import (
     analyze,
     analyze_architecture,
     analyze_corrosion,
+    analyze_download,
+    analyze_pipeline,
     analyze_seismic,
     dashboard,
     library,
@@ -68,6 +70,8 @@ from app.routes import (
     settings,
     user_manual,
     viewer,
+    workflow_api,
+    workflow_page,
 )
 
 APP_HEADERS = SiteTheme()
@@ -116,6 +120,14 @@ _ROUTE_INSTALLERS = (
     analyze_corrosion.setup_routes,
     analyze_seismic.setup_routes,
     analyze_architecture.setup_routes,
+    # Phase 6 pipeline endpoints (upload / run / export).
+    analyze_pipeline.setup_routes,
+    # GET /download/{fmt}/{project_id} file downloads.
+    analyze_download.setup_routes,
+    # GET /api/workflow/{project_id} live pipeline status.
+    workflow_api.setup_routes,
+    # GET /workflow/{project_id} live dashboard page.
+    workflow_page.setup_routes,
     dashboard.setup_routes,
     library.setup_routes,
     modeling_manual.setup_routes,

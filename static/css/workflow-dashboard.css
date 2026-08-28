@@ -1,0 +1,248 @@
+/*
+ * workflow-dashboard.css — live analysis workflow panel.
+ *
+ * Dark by default to match the app shell, with a light override under
+ * prefers-color-scheme so the panel does not stay dark on a light desktop.
+ * Colours are declared as custom properties on .wf-dashboard so a single block
+ * flips the whole panel rather than every rule carrying two values.
+ */
+
+.wf-dashboard {
+  --wf-bg: #0f172a;
+  --wf-panel: #1e293b;
+  --wf-border: #334155;
+  --wf-text: #e2e8f0;
+  --wf-muted: #94a3b8;
+  --wf-track: #334155;
+
+  --wf-pending: #64748b;
+  --wf-running: #3b82f6;
+  --wf-complete: #22c55e;
+  --wf-failed: #ef4444;
+  --wf-not-implemented: #a16207;
+
+  background: var(--wf-bg);
+  border: 1px solid var(--wf-border);
+  border-radius: 0.75rem;
+  color: var(--wf-text);
+  padding: 1.25rem;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .wf-dashboard {
+    --wf-bg: #f8fafc;
+    --wf-panel: #ffffff;
+    --wf-border: #cbd5e1;
+    --wf-text: #0f172a;
+    --wf-muted: #475569;
+    --wf-track: #e2e8f0;
+  }
+}
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+
+.wf-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--wf-border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.wf-title {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.wf-stage {
+  color: var(--wf-muted);
+  font-size: 0.8125rem;
+  /* The stage line changes on nearly every poll; reserving height stops the
+     rows below shifting each time it grows or shrinks by a word. */
+  min-height: 1.2em;
+}
+
+/* ── engine rows ────────────────────────────────────────────────────────── */
+
+.wf-engines {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.wf-engine {
+  background: var(--wf-panel);
+  border: 1px solid var(--wf-border);
+  border-left: 3px solid var(--wf-pending);
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  transition: border-left-color 200ms ease;
+}
+
+.wf-engine.is-running {
+  border-left-color: var(--wf-running);
+}
+
+.wf-row-top {
+  display: grid;
+  /* name | bar | percent. The bar takes the slack so every row's percentage
+     lands in the same column and the numbers can be read down the panel. */
+  grid-template-columns: minmax(10rem, 18rem) 1fr 3.5rem;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+@media (max-width: 40rem) {
+  .wf-row-top {
+    grid-template-columns: 1fr 3.5rem;
+  }
+  .wf-row-top .wf-bar {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+
+.wf-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.wf-code {
+  font-weight: 700;
+}
+
+.wf-label {
+  color: var(--wf-muted);
+  font-size: 0.75rem;
+  /* Engine names are long; truncate rather than wrap so row heights stay equal. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-bar {
+  background: var(--wf-track);
+  border-radius: 999px;
+  height: 0.625rem;
+  overflow: hidden;
+}
+
+.wf-bar-fill {
+  background: var(--wf-running);
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  transition: width 300ms ease;
+}
+
+.wf-engine.is-running .wf-bar-fill {
+  /* A subtle sheen only while running, so a stalled bar is visibly stalled. */
+  background-image: linear-gradient(
+    90deg,
+    var(--wf-running) 0%,
+    #60a5fa 50%,
+    var(--wf-running) 100%
+  );
+}
+
+.wf-percent {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.wf-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  margin-top: 0.625rem;
+}
+
+/* ── status badges ──────────────────────────────────────────────────────── */
+
+.wf-badge {
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  background: var(--wf-pending);
+  white-space: nowrap;
+}
+
+.wf-badge.wf-pending  { background: var(--wf-pending); }
+.wf-badge.wf-running  { background: var(--wf-running); }
+.wf-badge.wf-complete { background: var(--wf-complete); }
+.wf-badge.wf-failed   { background: var(--wf-failed); }
+
+/* Amber, not grey: "no engine behind this code" is a fact worth noticing, and
+   distinctly not the same as one waiting its turn. */
+.wf-badge.wf-not-implemented { background: var(--wf-not-implemented); }
+
+/* An engine that will not report progress gets a muted bar, so an empty track
+   does not read as one stuck at zero. */
+.wf-engine.is-inert .wf-bar { opacity: 0.35; }
+.wf-engine.is-inert .wf-percent { color: var(--wf-muted); }
+
+.wf-detail {
+  color: var(--wf-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── footer ─────────────────────────────────────────────────────────────── */
+
+.wf-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  border-top: 1px solid var(--wf-border);
+  margin-top: 1rem;
+  padding-top: 0.875rem;
+}
+
+.wf-run {
+  background: var(--wf-running);
+  border: none;
+  border-radius: 0.375rem;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+}
+
+.wf-run:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.wf-run:disabled {
+  background: var(--wf-pending);
+  cursor: not-allowed;
+}
+
+.wf-run:focus-visible {
+  outline: 2px solid var(--wf-text);
+  outline-offset: 2px;
+}
+
+.wf-summary {
+  color: var(--wf-muted);
+  font-size: 0.8125rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-bar-fill,
+  .wf-engine {
+    transition: none;
+  }
+}

@@ -25,6 +25,8 @@ SPEC = AnalysisSpec(
 def setup_routes(rt):
     """Register the architecture analysis landing route."""
 
-    @rt("/analyze/architecture")
+    # GET only: a bare @rt() also binds POST, which would shadow the
+    # Phase 6 run endpoint registered on the same path.
+    @rt("/analyze/architecture", methods=["GET"])
     def analyze_architecture(project_id: int = None):
         return analysis_landing_page(SPEC, project_id)

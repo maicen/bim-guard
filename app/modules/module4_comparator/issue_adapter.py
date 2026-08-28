@@ -66,6 +66,50 @@ _BAND_RANK = {
 }
 
 
+#: Mechanism string marking an Issue as a data gap rather than a verdict.
+#: The include_low exemption keys on this, so a typo would silently reinstate
+#: the invisibility this exists to remove.
+DATA_QUALITY = "data_quality"
+
+
+def _data_quality_issue(
+    *,
+    element_id: str,
+    element_name: str,
+    mechanism_code: str,
+    mechanism_prefix: str,
+    id_allocator: "IssueIdAllocator",
+) -> Issue:
+    """Report that a mechanism produced no band for this element.
+
+    Low severity because it is not a finding, but ``mechanism="data_quality"``
+    and a populated ``metadata["check"]`` keep it distinguishable from one —
+    the separation ``test_data_quality_never_masquerades_as_a_verdict``
+    asserts. Mirrors ``galvanic.py:_data_quality_issue``.
+    """
+    return make_issue(
+        id=id_allocator.next(mechanism_prefix),
+        element_id=element_id,
+        rule_id=f"{mechanism_code}.DATA",
+        title=f"{mechanism_code} could not be evaluated on {element_name}",
+        mechanism=DATA_QUALITY,
+        band=RiskBand.LOW,
+        score=0.10,
+        mitigation=(
+            f"Review the IFC source for this element. {mechanism_code} "
+            "compliance cannot be evaluated until the missing data is corrected."
+        ),
+        assignee_role="BIM coordinator",
+        description=f"{mechanism_code} produced no band for this element.",
+        metadata={
+            "path": "A",
+            "check": "band_unassessed",
+            "mechanism_code": mechanism_code,
+        },
+        citations=[],
+    )
+
+
 class IssueIdAllocator:
     """Run-wide unique Issue ids with a per-mechanism prefix.
 
@@ -121,8 +165,19 @@ def issues_from_path_a(
         element_name = result["name"]
 
         for band_key, score_key, rule_id, metadata_keys in _MechanismSpec:
-            # Mechanism did not run for this element — nothing to report.
+            # Mechanism did not run for this element. Reported, not skipped:
+            # a silent skip makes "not assessed" indistinguishable from
+            # "assessed and cleared". See data contracts §4.2 failure mode 5.
             if band_key not in result:
+                issues.append(
+                    _data_quality_issue(
+                        element_id=element_id,
+                        element_name=element_name,
+                        mechanism_code=rule_id.split(".")[0],
+                        mechanism_prefix=rule_id.split(".")[0].split("-")[0],
+                        id_allocator=id_allocator,
+                    )
+                )
                 continue
 
             band_str = str(result[band_key])
@@ -138,6 +193,11 @@ def issues_from_path_a(
                     f"Unknown band '{band_str}' for {element_name} / {mechanism_code}"
                 ) from None
 
+            # Step 4 of the data_quality rule. Only findings are filtered here:
+            # data_quality Issues are emitted above and never reach this line,
+            # which is deliberate — they are Low by doctrine, so filtering them
+            # would delete each one immediately after creating it and undo the
+            # whole fix. See data contracts §4.2.
             if band is RiskBand.LOW and not include_low:
                 continue
 
@@ -193,7 +253,9 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
     appended as their own rows, flagged with path_b_only.
 
     Adds per row: path_b_issues (list[dict]), path_b_band (str|None),
-    path_b_count (int), mm_band, mm_score, xm_band, xm_score.
+    path_b_count (int), data_quality_count (int), mm_band, mm_score, xm_band,
+    xm_score. path_b_count counts findings only; data_quality entries are
+    counted separately and never set path_b_band.
     Leaves every existing key untouched, and never mutates base_results.
     """
     output = [dict(r) for r in base_results]
@@ -202,6 +264,7 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
         row["path_b_issues"] = []
         row["path_b_band"] = None
         row["path_b_count"] = 0
+        row["data_quality_count"] = 0
         row["mm_band"] = None
         row["mm_score"] = 0.0
         row["xm_band"] = None
@@ -223,6 +286,7 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
                     "path_b_issues": [],
                     "path_b_band": None,
                     "path_b_count": 0,
+                    "data_quality_count": 0,
                     "mm_band": None,
                     "mm_score": 0.0,
                     "xm_band": None,
@@ -236,6 +300,15 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
             by_guid[issue.element_id] = row
 
         row["path_b_issues"].append(to_dict(issue))
+
+        # data_quality entries are reports, not verdicts. Counting them as
+        # findings would show a compliant element as flagged, and letting one
+        # set path_b_band would give an unassessed element a risk band — both
+        # the confusion data contracts §4.2 exists to prevent.
+        if issue.mechanism == DATA_QUALITY:
+            row["data_quality_count"] += 1
+            continue
+
         row["path_b_count"] += 1
 
         # Worst band wins, by severity rank rather than string order.
