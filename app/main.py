@@ -204,6 +204,13 @@ def _seed_library() -> None:
         # Seed GC-001 / CC-001 / MC-001 engine rulesets (each idempotent)
         seed_engine_rulesets(svc)
 
+        # Seeding writes rules, and the folder reconciliation in RuleService's
+        # constructor already ran (before those rows existed, and once per
+        # process besides). Reconciling here is what gives a freshly seeded
+        # ruleset its folder without another restart. Already off the boot
+        # path: this whole function runs in the background thread.
+        svc.sync_folders_from_rules()
+
     except Exception:
         logger.warning("Rule library seeding failed; continuing startup", exc_info=True)
 

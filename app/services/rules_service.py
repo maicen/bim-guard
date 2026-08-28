@@ -8,6 +8,23 @@ from postgrest.exceptions import APIError
 from app.services.persistence import PersistenceService
 from app.utils import now_iso_utc, rows_desc_by_id
 
+#: Whether the shared database's folder backfill has already run in this process.
+#:
+#: The backfill reconciles ``rule_folders`` against ``rules`` and is idempotent,
+#: so the second run in a process reaches the same end state as the first at the
+#: cost of two more full-table reads. It used to run inside every constructor,
+#: which is how importing ``app.main`` came to spend ~30 of its ~40 seconds on
+#: six identical reconciliations: ``RuleService`` is built at module level by
+#: three route/component modules and per call by
+#: ``corrosion_rule_catalog._rules_for``, which each of the three corrosion
+#: engines invokes while being imported.
+#:
+#: Only the shared database is guarded. A service given its own ``db`` -- the
+#: isolated-connection path tests use -- always reconciles, because that
+#: connection has its own rows and a process-wide flag would leak one test's
+#: state into the next.
+_SHARED_FOLDER_SYNC_DONE = False
+
 # ── Schema columns ────────────────────────────────────────────────────────────
 
 _RICH_COLUMNS = {
@@ -143,7 +160,14 @@ class RuleService:
             _FOLDER_COLUMNS,
         )
         self._folders_enabled = True
-        self._sync_folders_from_rules()
+
+        # The flag is set only after a clean run, so a reconciliation that
+        # raises leaves the next constructor to retry rather than skipping it.
+        if db is not None:
+            self._sync_folders_from_rules()
+        elif not _SHARED_FOLDER_SYNC_DONE:
+            self._sync_folders_from_rules()
+            globals()["_SHARED_FOLDER_SYNC_DONE"] = True
 
     @staticmethod
     def normalize_ruleset_id(value: str | None) -> str:
@@ -207,6 +231,16 @@ class RuleService:
         except APIError as exc:
             if not self._disable_folders_if_missing(exc):
                 raise
+
+    def sync_folders_from_rules(self) -> None:
+        """Reconcile folder rows against the rules table on demand.
+
+        The constructor runs this once per process for the shared database, so
+        rules written afterwards -- by the startup seeder, or by an import --
+        have no folder until something asks for one. Callers that add rules in
+        bulk call this when they are done.
+        """
+        self._sync_folders_from_rules()
 
     def _sync_folders_from_rules(self) -> None:
         """Backfill folder rows from existing rule records during startup."""
