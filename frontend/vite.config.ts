@@ -15,6 +15,31 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      '/viewer': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/projects': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/reports': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/download': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/workflow': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      external: [/^\/static\/.*/],
     },
   },
 });

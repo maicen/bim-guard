@@ -31,7 +31,7 @@
   $: if (initialProjectId) {
     selectedProjectId = initialProjectId;
   }
-  $: if (initialElementGuid) {
+  $: if (initialElementGuid !== undefined) {
     selectedElementGuid = initialElementGuid;
   }
 </script>
@@ -82,11 +82,10 @@
   {/if}
 
   {#if projects.length === 0}
-    <div class="p-16 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/40 space-y-2">
-      <div class="text-slate-300 font-semibold">No IFC models attached</div>
-      <div class="text-xs text-slate-400">Upload an IFC model under Projects to inspect it in the 3D viewport.</div>
+    <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+      <span>No saved projects with IFC models found. You can upload an IFC model under Projects or open a local IFC file directly in the viewport below.</span>
     </div>
-  {:else}
-    <IfcViewer projectId={selectedProjectId} elementGuid={selectedElementGuid} />
   {/if}
+
+  <IfcViewer projectId={selectedProjectId} elementGuid={selectedElementGuid} />
 </div>

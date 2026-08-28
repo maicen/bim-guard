@@ -289,10 +289,12 @@ function createTopicsWorkspace(components, world, viewport, highlightTopics) {
     };
 }
 
-export async function initViewer(containerId) {
-    const container = document.getElementById(containerId);
+export async function initViewer(containerOrId) {
+    const container = typeof containerOrId === "string"
+        ? document.getElementById(containerOrId)
+        : containerOrId;
     if (!container) {
-        console.error(`Container with id ${containerId} not found.`);
+        console.error("Container not found:", containerOrId);
         return null;
     }
 
@@ -347,8 +349,21 @@ export async function initViewer(containerId) {
     const workspace = createTopicsWorkspace(components, world, viewport, highlightTopics);
     container.replaceChildren(workspace.app);
 
+    async function clearModels() {
+        try {
+            for (const [, model] of fragments.list) {
+                if (model.object) world.scene.three.remove(model.object);
+                if (model.dispose) model.dispose();
+            }
+            fragments.list.clear();
+        } catch (e) {
+            console.warn("Could not clear previous models:", e);
+        }
+    }
+
     async function loadIfc(urlOrFile) {
         try {
+            await clearModels();
             const file = typeof urlOrFile === "string"
                 ? await fetch(urlOrFile).then(async (response) => {
                     if (!response.ok) throw new Error(`IFC request failed (${response.status})`);
@@ -421,5 +436,13 @@ export async function initViewer(containerId) {
         setupFileLoader,
         selectTopic: workspace.selectTopic,
         findTopicByElementGuid,
+        dispose: () => {
+            try {
+                workspace.dispose();
+                components.dispose();
+            } catch (e) {
+                console.warn("Error disposing viewer:", e);
+            }
+        },
     };
 }
