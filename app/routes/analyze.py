@@ -31,6 +31,7 @@ from monsterui.all import H1, Container
 from starlette.responses import RedirectResponse, StreamingResponse
 
 from app.components.layout import DashboardLayout
+from app.components.mep_analysis_ui import mep_analysis_form, mep_engine_rules_card
 from app.components.ui import (
     Alert,
     AlertT,
@@ -910,76 +911,6 @@ def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, err
         tracker_line,
         results_table,
         bcf_btn,
-    )
-
-
-def _mep_engine_rules_card():
-    """Show MEP engine and ruleset coverage for the MEP analysis page."""
-    engines = [
-        ("GC-001", "Galvanic Corrosion", "BIMGUARD-GC-001", "bg-blue-100 text-blue-800"),
-        ("CC-001", "Crevice Corrosion", "BIMGUARD-CC-001", "bg-teal-100 text-teal-800"),
-        (
-            "MC-001",
-            "Microbially Influenced Corrosion",
-            "BIMGUARD-MC-001",
-            "bg-indigo-100 text-indigo-800",
-        ),
-    ]
-
-    rows = []
-    for mech, label, ruleset_id, badge_cls in engines:
-        count = len(_rule_service.list_by_ruleset(ruleset_id))
-        rows.append(
-            Tr(
-                Td(
-                    Span(
-                        mech,
-                        cls=f"inline-block px-2 py-0.5 rounded text-xs font-semibold {badge_cls}",
-                    ),
-                    cls="px-3 py-2",
-                ),
-                Td(label, cls="px-3 py-2 text-sm"),
-                Td(ruleset_id, cls="px-3 py-2 text-xs font-mono"),
-                Td(str(count), cls="px-3 py-2 text-sm font-semibold"),
-                cls="border-b border-muted last:border-0",
-            )
-        )
-
-    return Card(
-        CardHeader(CardTitle("MEP Engines and Rule Coverage")),
-        CardContent(
-            P(
-                "MEP analysis runs corrosion, crevice, and MIC engines using their saved rule libraries.",
-                cls="text-sm text-muted-foreground mb-3",
-            ),
-            Div(
-                Table(
-                    Thead(
-                        Tr(
-                            Th(
-                                "Engine",
-                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
-                            ),
-                            Th(
-                                "Scope",
-                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
-                            ),
-                            Th(
-                                "Ruleset",
-                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
-                            ),
-                            Th(
-                                "Rules",
-                                cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted",
-                            ),
-                        )
-                    ),
-                    Tbody(*rows),
-                    cls="w-full text-sm",
-                ),
-                cls="overflow-auto border rounded-md",
-            ),
-        ),
     )
 
 
@@ -3231,11 +3162,16 @@ def setup_routes(rt):
     def analysis_run():
         projects = _projects_service.list_projects()
         documents = _documents_service.list_documents()
+        folders = _rule_service.list_folders()
+        rule_counts = {
+            ruleset_id: len(_rule_service.list_by_ruleset(ruleset_id))
+            for ruleset_id in ("BIMGUARD-GC-001", "BIMGUARD-CC-001", "BIMGUARD-MC-001")
+        }
 
         return Title("MEP Analysis - BIM Guard"), DashboardLayout(
             Container(
-                _mep_engine_rules_card(),
-                _analysis_form(projects, documents, mode="model-rules"),
+                mep_engine_rules_card(rule_counts),
+                mep_analysis_form(projects, documents, folders),
                 cls="space-y-4",
             )
         )
