@@ -4,6 +4,7 @@
         "ms-python.python",
         "charliermarsh.ruff",
         "shd101wyy.markdown-preview-enhanced",
-        "anthropic.claude-code"
+        "anthropic.claude-code",
+        "google.google-antigravity"
     ]
 }
