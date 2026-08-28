@@ -132,6 +132,33 @@ Owner: Osama.
   to concise entry points linking to the canonical documentation; retain agent skills
   only for reusable operational guidance.
 
+
+## Priority 8: IFC Ingestion Correctness
+
+- [ ] Coerce numeric strings before the `isinstance(value, (int, float))` guard in
+  Module 2's unit-conversion pass. Quantities stored as `IfcLabel('1.2')` currently
+  skip conversion and are compared raw, so a 1.2 m window is evaluated as 1.2 mm and
+  fails every dimensional rule.
+- [ ] Log a warning when a length-typed or length-named property is found but skipped
+  by unit conversion, so silent misreporting is visible in the run log.
+- [ ] Surface the `_get_length_unit_scale_mm` fallback-to-1.0 path as an explicit model
+  warning instead of a silent default. Read from source, not reproduced — the reference
+  models both declare a valid `LENGTHUNIT`.
+- [ ] Investigate `ClearWidth` and `OverallWidth` resolving to 2,125 mm on `IfcDoor`
+  in the same report where `Width` correctly resolves to 950 mm; 2,125 mm is the door
+  height. `_GEOMETRY_PROPERTY_MAP` maps `overallwidth` to the width extractor and
+  `clearwidth` to the corridor-width extractor, so the mapping alone does not explain
+  it. Cause not yet identified. Reproduction: golden reference model, Doors card,
+  rule folder "All folders".
+- [ ] Confirm precedence between a declared property value and the geometry
+  bounding-box fallback. `Pset_DoorCommon_Egress.ClearWidth` is declared as
+  `IFCREAL(0.95)` on the reference model but does not appear as 950 mm in the report.
+- [ ] Add `requiredheadroom` to `_LENGTH_DIRECT_ATTRS`; the list contains
+  `requireheadroom`, so `Pset_StairCommon.RequiredHeadroom` only converts when it
+  carries an explicit measure type.
+
+Owner: unassigned.
+
 ## Validation Gates
 
 - [x] Audit tests prove the source IFC hash is unchanged.
@@ -144,10 +171,19 @@ Owner: Osama.
 - [ ] Queue tests cover retry, duplicate submission, cancellation, and worker failure.
 - [ ] Viewer tests verify rendering and lifecycle cleanup on desktop and mobile.
 - [x] Supabase security and performance advisors have no unresolved high-severity items.
+- [ ] Add the golden/broken reference IFC pair as regression fixtures. The golden model
+  must pass its architectural checks; the broken model must report all four planted
+  faults.
+- [ ] Assert unit conversion end to end: a 1.2 m window height on a metre-based model
+  must evaluate as 1200 mm.
+- [ ] Assert that fire separation reports a missing `FireRating` on a party wall, and
+  that its absent-boundary path is reported as "not checked" rather than as a pass.
 
 ## Product Ownership and Delivery
 
 - [ ] Leticia to manage milestones, dependencies, acceptance criteria, and delivery
   reporting as product manager.
-- [ ] Confirm Marc's ownership area and deliverables.
+- [x] Confirm Marc's ownership area and deliverables — architectural slice: reference
+  models, architectural rule set, IFC modelling and export guidance, and validation of
+  the ARCH pipeline.
 - [ ] Assign an owner and target milestone to every unchecked priority item.
