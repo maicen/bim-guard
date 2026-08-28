@@ -157,20 +157,19 @@ class EngineSpec:
 #:     ``FEATURE_PATH_B_XM`` in :mod:`app.modules.config` and off by default, so
 #:     ``pending`` is accurate for a default deployment.
 #: ``MC-001``
-#:     Declared ``not_implemented`` because the frontend contract for this
-#:     endpoint specifies it. **Note that this repository does ship an MC-001
-#:     engine** -- :mod:`app.engines.bimguard_mic_engine`, wired into
-#:     ``phase_6c_corrosion_ui.MECHANISMS`` and running on every corrosion
-#:     analysis. To report it as a live engine, change this one value to
-#:     ``Status.PENDING`` and instrument it exactly as GC-001 is. Tracking always
-#:     wins over the declared status, so a tracked MC-001 run would report
-#:     ``running`` / ``complete`` regardless of this value.
+#:     Runs on every corrosion analysis -- :mod:`app.engines.bimguard_mic_engine`,
+#:     wired into ``phase_6c_corrosion_ui.MECHANISMS`` -- but is declared
+#:     ``pending`` per the Phase 3 UI contract: it belongs in the queue rather
+#:     than being labelled as unbuilt. It has no tracking emitters yet, so it
+#:     stays at ``pending`` for the whole run and will only report ``running`` /
+#:     ``complete`` once instrumented as GC-001 is (Phase 4). Tracking always
+#:     wins over the declared status, so no further change here is needed then.
 ENGINE_SPECS: tuple[EngineSpec, ...] = (
     EngineSpec("GC-001", "Galvanic corrosion", Status.PENDING),
     EngineSpec("CC-001", "Crevice corrosion", Status.PENDING),
     EngineSpec("MM-001", "Material / media comparator", Status.PENDING),
     EngineSpec("XM-001", "Cross-material comparator", Status.PENDING),
-    EngineSpec("MC-001", "Microbially influenced corrosion", Status.NOT_IMPLEMENTED),
+    EngineSpec("MC-001", "Microbially influenced corrosion", Status.PENDING),
 )
 
 #: Lookup by code, built once.
@@ -179,11 +178,19 @@ ENGINES: dict[str, EngineSpec] = {spec.code: spec for spec in ENGINE_SPECS}
 #: Codes in payload order, for callers that iterate without touching the specs.
 ENGINE_CODES: tuple[str, ...] = tuple(spec.code for spec in ENGINE_SPECS)
 
-#: Ruleset codes for the two instrumented engines. The engines import these
-#: rather than repeating the literal, so a code change cannot leave one call
-#: site emitting under a name the endpoint does not know.
+#: Ruleset codes for the instrumented engines. The engines import these rather
+#: than repeating the literal, so a code change cannot leave one call site
+#: emitting under a name the endpoint does not know.
+#:
+#: GC-001 and CC-001 run on every corrosion analysis. MM-001 and XM-001 are the
+#: Path B comparators in :mod:`app.modules.module4_comparator`: instrumented the
+#: same way, but only reached through ``orchestrate_workflow`` and only when
+#: their feature flag is on, so they stay at their declared status on a default
+#: deployment. See :data:`ENGINE_SPECS`.
 GC_ENGINE = "GC-001"
 CC_ENGINE = "CC-001"
+MM_ENGINE = "MM-001"
+XM_ENGINE = "XM-001"
 
 
 # ---------------------------------------------------------------------------
@@ -620,3 +627,28 @@ def fail(code: str, reason: str) -> None:
     if tracker is None:
         return
     tracker.run(code).fail(reason)
+
+
+@contextmanager
+def reporting_failures(code: str) -> Iterator[None]:
+    """Record an exception escaping the block as ``code``'s failure, then re-raise.
+
+    For a caller that catches its own exceptions and carries on -- as
+    ``compliance_orchestrator.orchestrate_workflow`` does for Path B -- this
+    reports the failure to the tracker without the reporting call having to live
+    inside that caller's ``except`` block. That separation is deliberate:
+    ``tests/test_orchestrator.py`` pins the swallowing itself as a known defect
+    by inspecting those handlers, and instrumentation must not disguise a defect
+    it does not fix.
+
+    Re-raises unchanged, so control flow is exactly as it was without it. A
+    no-op when no tracker is bound.
+
+    Args:
+        code: Ruleset code to mark failed.
+    """
+    try:
+        yield
+    except Exception as exc:
+        fail(code, f"{type(exc).__name__}: {exc}")
+        raise

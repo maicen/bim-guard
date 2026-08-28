@@ -29,6 +29,16 @@ from app.modules.module4_comparator.material_media import (
 from app.modules.module4_comparator.material_media import (
     load_rule_pack as load_mm_pack,
 )
+from app.services.pipeline_tracker import (
+    MM_ENGINE,
+    XM_ENGINE,
+    Stage,
+    Status,
+    active,
+    complete,
+    emit,
+    reporting_failures,
+)
 
 
 def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[dict]:
@@ -46,25 +56,59 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
     id_allocator = IssueIdAllocator(run_id)
     path_b_issues = []
 
+    mm_issues_total = 0
+    xm_issues_total = 0
+
     if FEATURE_PATH_B_MM:
+        emit(MM_ENGINE, Stage.ENGINE_EXECUTION, elements_total=len(elements))
         try:
-            mm_pack = load_mm_pack()
-            for element in elements:
-                mm_issues = compare_mm(element, rule_pack=mm_pack, id_allocator=id_allocator)
-                path_b_issues.extend(mm_issues)
+            # reporting_failures marks the engine failed on the way out and
+            # re-raises; the handler below is left exactly as it was, because a
+            # swallowed Path B failure is a pinned defect (see
+            # tests/test_orchestrator.py) that tracking does not fix.
+            with reporting_failures(MM_ENGINE):
+                mm_pack = load_mm_pack()
+                for element in elements:
+                    mm_issues = compare_mm(element, rule_pack=mm_pack, id_allocator=id_allocator)
+                    path_b_issues.extend(mm_issues)
+                    mm_issues_total += len(mm_issues)
         except Exception as exc:
             print(f"MM-001 error: {type(exc).__name__}: {exc}")
+        else:
+            emit(MM_ENGINE, Stage.RISK_SCORING, findings=mm_issues_total)
 
     if FEATURE_PATH_B_XM:
+        emit(XM_ENGINE, Stage.ENGINE_EXECUTION, elements_total=len(elements))
         try:
-            xm_pack = load_xm_pack()
-            for element in elements:
-                xm_issues = compare_xm(element, rule_pack=xm_pack, id_allocator=id_allocator)
-                path_b_issues.extend(xm_issues)
+            with reporting_failures(XM_ENGINE):
+                xm_pack = load_xm_pack()
+                for element in elements:
+                    xm_issues = compare_xm(element, rule_pack=xm_pack, id_allocator=id_allocator)
+                    path_b_issues.extend(xm_issues)
+                    xm_issues_total += len(xm_issues)
         except Exception as exc:
             print(f"XM-001 error: {type(exc).__name__}: {exc}")
+        else:
+            emit(XM_ENGINE, Stage.RISK_SCORING, findings=xm_issues_total)
 
     path_a_issues = issues_from_path_a(path_a_results, id_allocator=id_allocator, include_low=False)
     all_issues = path_a_issues + path_b_issues
     output = path_a_view(all_issues, path_a_results)
+
+    # Stage 5 and completion are stamped after the merge, because that is where
+    # a Path B finding actually becomes part of the report. An engine whose loop
+    # raised is left at FAILED -- complete() is only reached for the engines that
+    # got through their loop.
+    for code, enabled, issue_count in (
+        (MM_ENGINE, FEATURE_PATH_B_MM, mm_issues_total),
+        (XM_ENGINE, FEATURE_PATH_B_XM, xm_issues_total),
+    ):
+        if not enabled:
+            continue
+        tracker = active()
+        if tracker is not None and tracker.run(code).status is Status.FAILED:
+            continue
+        emit(code, Stage.REPORT_ASSEMBLY, issues=issue_count)
+        complete(code)
+
     return output

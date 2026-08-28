@@ -31,7 +31,9 @@ from app.services.pipeline_tracker import (
     CC_ENGINE,
     ENGINE_CODES,
     GC_ENGINE,
+    MM_ENGINE,
     TOTAL_STAGES,
+    XM_ENGINE,
     Stage,
     Status,
 )
@@ -64,15 +66,16 @@ def test_unrun_engines_report_a_bare_pending(code: str):
     assert pt.snapshot(1)["engines"][code] == {"status": "pending"}
 
 
-def test_mc001_reports_the_declared_not_implemented_status():
-    """The frontend contract declares MC-001 not_implemented.
+def test_mc001_reports_the_declared_pending_status():
+    """The frontend contract declares MC-001 pending, not not_implemented.
 
-    Note that an MC-001 engine does exist in this repository; the declared
-    status is a contract decision recorded in ``ENGINE_SPECS``, not a claim
-    about the codebase. If that decision changes, this assertion is the thing
-    that should fail first.
+    MC-001 does run on every corrosion analysis, so the queue is where it
+    belongs; it simply carries no emitters yet, which is why a completed run
+    still leaves it here. The declared status is a contract decision recorded
+    in ``ENGINE_SPECS``, so if that decision changes this assertion is the
+    thing that should fail first.
     """
-    assert pt.snapshot(1)["engines"]["MC-001"] == {"status": "not_implemented"}
+    assert pt.snapshot(1)["engines"]["MC-001"] == {"status": "pending"}
 
 
 def test_snapshot_of_an_unknown_project_does_not_fill_the_store():
@@ -283,6 +286,111 @@ def test_the_export_writers_report_stage_six(tmp_path):
     assert gc["current_stage"] == int(Stage.EXPORT)
     assert gc["stage_name"] == "Export"
     assert gc["metrics"]["csv_rows"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Path B comparators (MM-001 / XM-001)
+# ---------------------------------------------------------------------------
+
+
+def pb_element(**props):
+    """A minimal stand-in for the piping element the comparators read.
+
+    They reach the model only through ``get_property`` and two attributes, so a
+    namespace is a truthful double here -- and keeps these tests off a real IFC
+    model, which is what makes them fast enough to run with the rest.
+    """
+    import types
+
+    element = types.SimpleNamespace(GlobalId="0FQ6pMwzXBJucYaRTqfuw2", Name="Joint")
+    element.get_property = lambda key, default="", _p=props: _p.get(key, default)
+    return element
+
+
+#: Packs shaped as ``load_rule_pack`` validates them, with one entry each that
+#: scores above the engine's reporting threshold. Built here rather than read
+#: from ``data/rulesets/`` because these tests are about the instrumentation,
+#: not about the shipped rule data.
+MM_TEST_PACK = {
+    "materials": {},
+    "media": {},
+    "environments": {},
+    "compatibility_matrix": {"carbon_steel:seawater:coastal": 0.91},
+}
+XM_TEST_PACK = {
+    "couples": {"carbon_steel:stainless_316": 0.62},
+    "environment_thresholds": {"coastal": 0.25},
+}
+
+
+def run_path_b():
+    """Drive both comparators over one scoring element and one incomplete one."""
+    from app.modules.module4_comparator.cross_material import compare as compare_xm
+    from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
+    from app.modules.module4_comparator.material_media import compare as compare_mm
+
+    elements = [
+        pb_element(
+            Material="carbon_steel",
+            Medium="seawater",
+            Environment="coastal",
+            AdjacentMaterial="stainless_316",
+        ),
+        pb_element(Material="carbon_steel"),
+    ]
+    allocator = IssueIdAllocator("BGR-TEST")
+    for element in elements:
+        compare_mm(element, rule_pack=MM_TEST_PACK, id_allocator=allocator)
+        compare_xm(element, rule_pack=XM_TEST_PACK, id_allocator=allocator)
+
+
+def test_path_b_comparators_are_inert_when_untracked():
+    """Same property as the corrosion engines, for the same reason.
+
+    ``orchestrate_workflow`` is not the only caller: the validation sweep and
+    the comparator tests call ``compare`` directly, and none of them binds a
+    tracker.
+    """
+    run_path_b()
+
+    assert pt.active() is None
+    assert pt.TRACKERS.get(1) is None
+
+
+@pytest.mark.parametrize("code", [MM_ENGINE, XM_ENGINE])
+def test_path_b_comparators_report_execution_and_counters(code: str):
+    """A tracked comparator run leaves PENDING for RUNNING, carrying its counts."""
+    with pt.tracking(1):
+        run_path_b()
+
+    engine = pt.snapshot(1)["engines"][code]
+
+    assert engine["status"] == Status.RUNNING.value
+    assert engine["current_stage"] == int(Stage.ENGINE_EXECUTION)
+    assert engine["metrics"]["elements_analyzed"] == 2
+    assert engine["metrics"]["findings"] == 1
+    # The element with no medium and no adjacent material is counted as such
+    # rather than being reported as an element that came back clean.
+    assert engine["metrics"]["elements_incomplete"] == 1
+
+
+def test_reporting_failures_marks_the_engine_and_re_raises():
+    """The failure reaches the tracker without the caller's handler changing.
+
+    ``orchestrate_workflow`` catches and prints Path B exceptions, a defect
+    pinned by ``tests/test_orchestrator.py``. This helper exists so the tracker
+    can record the failure without an added statement in that handler making the
+    defect look fixed, so the re-raise is the point of the test.
+    """
+    with pt.tracking(1):
+        with pytest.raises(ValueError):
+            with pt.reporting_failures(MM_ENGINE):
+                raise ValueError("rule pack missing keys")
+
+    engine = pt.snapshot(1)["engines"][MM_ENGINE]
+
+    assert engine["status"] == Status.FAILED.value
+    assert engine["error"] == "ValueError: rule pack missing keys"
 
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ Entry point: compare(element, rule_pack, id_allocator) -> list[Issue]
 from pathlib import Path
 from typing import Any
 from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
+from app.services.pipeline_tracker import XM_ENGINE, Stage, emit, increment
 
 
 XM_PACK_PATH = Path("data/rulesets/xm_001_cross_material.json")
@@ -65,7 +66,16 @@ def compare(
     
     Returns:
         List of Issues (zero if couples are below threshold for the environment).
+
+    Reports stage 3 (Engine Execution) and its per-element counters to the bound
+    pipeline tracker. The calls are no-ops when nothing is bound, so the tests
+    and the CLI paths that call this directly behave exactly as before; the
+    caller that loops elements -- ``compliance_orchestrator.orchestrate_workflow``
+    -- owns the totals and the later stages.
     """
+    emit(XM_ENGINE, Stage.ENGINE_EXECUTION)
+    increment(XM_ENGINE, elements_analyzed=1)
+
     issues = []
     
     # Extract material pair and environment from element properties
@@ -74,6 +84,7 @@ def compare(
     environment = element.get_property("Environment", "")
     
     if not all([material_a, material_b, environment]):
+        increment(XM_ENGINE, elements_incomplete=1)
         return issues  # Insufficient data; no finding
     
     if material_a == material_b:
@@ -129,5 +140,6 @@ def compare(
         citations=[],
     )
     issues.append(issue)
+    increment(XM_ENGINE, findings=1, **{f"band_{band.value}": 1})
     
     return issues

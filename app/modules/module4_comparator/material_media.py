@@ -10,6 +10,7 @@ Entry point: compare(element, rule_pack, id_allocator) -> list[Issue]
 from pathlib import Path
 from typing import Any
 from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
+from app.services.pipeline_tracker import MM_ENGINE, Stage, emit, increment
 
 
 MM_PACK_PATH = Path("data/rulesets/mm_001_material_media.json")
@@ -62,7 +63,16 @@ def compare(
     
     Returns:
         List of Issues (zero if material/medium combo is compatible).
+
+    Reports stage 3 (Engine Execution) and its per-element counters to the bound
+    pipeline tracker. The calls are no-ops when nothing is bound, so the tests
+    and the CLI paths that call this directly behave exactly as before; the
+    caller that loops elements -- ``compliance_orchestrator.orchestrate_workflow``
+    -- owns the totals and the later stages.
     """
+    emit(MM_ENGINE, Stage.ENGINE_EXECUTION)
+    increment(MM_ENGINE, elements_analyzed=1)
+
     issues = []
     
     # Extract material, medium, environment from element properties
@@ -71,6 +81,7 @@ def compare(
     environment = element.get_property("Environment", "")
     
     if not all([material, medium, environment]):
+        increment(MM_ENGINE, elements_incomplete=1)
         return issues  # Insufficient data; no finding
     
     # Look up compatibility score in the matrix
@@ -112,5 +123,6 @@ def compare(
         citations=[],
     )
     issues.append(issue)
+    increment(MM_ENGINE, findings=1, **{f"band_{band.value}": 1})
     
     return issues

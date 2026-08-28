@@ -40,9 +40,10 @@ logger = get_logger(__name__)
 _projects_service = ProjectsService()
 
 #: The engines a corrosion run drives and therefore reports stages for. MC-001
-#: also runs (see ``phase_6c_corrosion_ui.MECHANISMS``) but is declared
-#: ``not_implemented`` in the workflow contract, so it is not driven here — see
-#: the note on :data:`app.services.pipeline_tracker.ENGINE_SPECS`.
+#: also runs (see ``phase_6c_corrosion_ui.MECHANISMS``) and is declared
+#: ``pending`` so it shows in the queue, but it carries no emitters yet and so
+#: is not driven here — it stays at ``pending`` for the whole run. See the note
+#: on :data:`app.services.pipeline_tracker.ENGINE_SPECS`.
 TRACKED_ENGINES: tuple[str, ...] = (GC_ENGINE, CC_ENGINE)
 
 #: Analysis slugs this runner can produce, matching the values of

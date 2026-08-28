@@ -265,6 +265,13 @@
     poll(panel, 0);
   }
 
+  /* True when the page was reached from a redirect that had just kicked off an
+     analysis. The run is already going, so the panel must poll for it rather
+     than start one — see the MEP handler in app/routes/analyze.py. */
+  function startedElsewhere() {
+    return window.location.search.indexOf("status=running") !== -1;
+  }
+
   function attach(panel) {
     if (panel.dataset.wfAttached === "1") return;
     panel.dataset.wfAttached = "1";
@@ -279,6 +286,13 @@
 
     if (panel.dataset.autostart === "1") {
       start(panel);
+    } else if (startedElsewhere()) {
+      /* A run was dispatched just before this page was served, so treat the
+         panel as busy without POSTing a second one: the engines have not
+         reported yet and a single read would see nothing and go idle. */
+      panel.dataset.wfBusy = "1";
+      setBusy(panel, true);
+      poll(panel, 0);
     } else {
       /* One read on load, so a run already in flight — started from the analyse
          page, or before a reload — shows up instead of the panel looking idle. */
