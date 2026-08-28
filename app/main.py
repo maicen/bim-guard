@@ -65,6 +65,7 @@ from app.routes import (
     dashboard,
     library,
     modeling_manual,
+    piping_routes,
     projects,
     revit_sync,
     settings,
@@ -122,6 +123,8 @@ _ROUTE_INSTALLERS = (
     analyze_architecture.setup_routes,
     # Phase 6 pipeline endpoints (upload / run / export).
     analyze_pipeline.setup_routes,
+    # GET /analysis/piping/{project_id} form + POST /analysis/piping/run.
+    piping_routes.setup_routes,
     # GET /download/{fmt}/{project_id} file downloads.
     analyze_download.setup_routes,
     # GET /api/workflow/{project_id} live pipeline status.
