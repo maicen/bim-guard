@@ -39,8 +39,9 @@ bim-guard/
 │   ├── package.json     # Frontend dependencies (Svelte 5, Tailwind CSS)
 │   └── vite.config.ts   # Dev server with /api proxy to FastAPI
 ├── data/                # Local runtime data, cache, and seed rule sets
-├── docs/                # Architectural and technical documentation
-├── scripts/             # Migration and backfill utilities
+├── docs/                # Architectural docs, validation reports, and planning
+├── scripts/             # Evaluation, build, benchmark, and utility scripts
+├── tests/               # Pytest test suites for the backend
 ├── static/              # CSS, JS, and viewer assets
 ├── main.py              # Uvicorn entrypoint (`uv run uvicorn main:app --reload`)
 ├── pyproject.toml       # Project metadata and backend dependencies

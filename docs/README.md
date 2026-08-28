@@ -6,53 +6,54 @@ This index organizes repository markdown files by purpose and maintenance status
 
 These files should be treated as current sources of truth.
 
-- ../README.md
-- ../AGENTS.md
-- ../CLAUDE.md
-- ../DESIGN.md
-- ../.github/instructions/project-specific.instructions.md
-- architecture.md
-- piping_schema_spec.md
+- `../README.md`
+- `../AGENTS.md`
+- `../CLAUDE.md`
+- `../DESIGN.md`
+- `../.github/instructions/project-specific.instructions.md`
+- `architecture.md`
+- `piping_schema_spec.md`
+- `BIMGUARD_DATA_ARCHITECTURE.md`
+- `CONVENTIONS.md`
+- `HERMES_CONTEXT.md`
+- `PHASE_6_DATA_CONTRACTS.md`
 
 ## Operational Guides
 
-- ../frontend/README.md
-- NotebookLM/README.md
-- NotebookLM/setup_guide.md
-- NotebookLM/sources.md
-- NotebookLM/master_prompt.md
-- MonsterUI/llms.txt.md
-- RESOURCES.md
+- `../frontend/README.md`
+- `NotebookLM/README.md`
+- `NotebookLM/setup_guide.md`
+- `NotebookLM/sources.md`
+- `NotebookLM/master_prompt.md`
+- `MonsterUI/llms.txt.md`
+- `RESOURCES.md`
 
-## Project Tracking and Historical Updates
+## Validation & Research (`validation/`)
 
-These files are useful context but are time-bound snapshots.
+- Contains methodology documents, dataset notes, and standard research matrices.
+- `logs/`: Output traces and raw text logs from full evaluation runs.
+- `data/`: JSON summaries and configs from validation sweeps.
 
-- enhancements-plan-20260407.md
-- revised-issues-20260408.md
-- update-2026-04-09.md
+## Project Tracking & Historical Updates (`planning/`)
 
-## Archived or Legacy Context
+These files are useful context but are time-bound snapshots (e.g., enhancement plans, session summaries).
+- `planning/BIMGuard-enhancement-plan-20260821.md`
+- `planning/session-summary-2026-06-30.md`
+- `planning/improvements-20260420.md`
+- `planning/enhancements-plan-20260407.md`
+- `planning/update-2026-04-09.md`
+- `planning/integration_plan_mm_xm.md`
 
-These files are intentionally retained for historical reference and may not reflect the current FastHTML architecture.
+## Theses & Submissions (`thesis/` & `submissions/`)
 
-- INTEGRATION_GUIDE.md
-- docs/archive/2026-04-migration-from-nextjs.md
+- `thesis/`: The MAICEN M10 Final Thesis documents.
+- `submissions/`: Official revised submission docs.
 
-## Module-Level Documentation
+## Archived or Legacy Context (`archive/`)
 
-- ../app/modules/README.md
-- ../app/modules/tests/TEST_README.md
-
-## Supporting Documents
-
-- ../.Jules/palette.md
-
-## Generated or Internal Markdown Files
-
-These are not project docs and should not be edited as source documentation.
-
-- ../data/uploads/fbd19cfd9d764dc0a1b4537a75ba45b1_docling.md
+These files are intentionally retained for historical reference.
+- `archive/index.html` (Legacy frontend prototype)
+- `INTEGRATION_GUIDE.md`
 
 ## Documentation Maintenance Rules
 
