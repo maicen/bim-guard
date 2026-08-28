@@ -677,9 +677,11 @@ class BIMGuard_App:
             # Full Module 2 → 4 → 5 compliance pipeline (only when IFC file exists)
             if m2_reader and not ifc_error and library_rules:
                 log_progress(75, "rule-data-extraction-started", rules=len(library_rules))
+                _compliance_started_at = time.perf_counter()
                 extraction = m2_reader.extract_for_compliance(library_rules)
                 log_progress(82, "rule-validation-started", extracted=len(extraction))
                 rule_compliance = Module4_Comparator().validate_metadata(extraction)
+                compliance_duration_seconds = time.perf_counter() - _compliance_started_at
                 for rule_index, result in enumerate(rule_compliance, start=1):
                     logger.info(
                         "Rule validation result=%d/%d reference=%s check=%s.%s operator=%s threshold=%r range=%r..%r unit=%s status=%s elements=%d passed=%d failed=%d missing=%d",
@@ -700,7 +702,9 @@ class BIMGuard_App:
                         result.get("missing_count", 0),
                     )
                 log_progress(90, "report-generation-started", results=len(rule_compliance))
-                rule_compliance_summary = Module5_Reporter().render_visual_report(rule_compliance)
+                rule_compliance_summary = Module5_Reporter().render_visual_report(
+                    rule_compliance, duration_seconds=compliance_duration_seconds
+                )
                 logger.info(
                     "Compliance report summary project_id=%d total_rules=%d passed=%d failed=%d missing_data=%d no_elements=%d mandatory_failed=%d pass_rate=%s%% targets=%s",
                     project_id,

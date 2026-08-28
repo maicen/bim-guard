@@ -1404,6 +1404,7 @@ def _rule_compliance_card(
     return _collapsible_card(
         title,
         summary_bar,
+        _coverage_stat_line(summary),
         Div(
             Table(Thead(Tr(*header_cells)), Tbody(*rows), cls="w-full text-sm"),
             cls="overflow-auto border rounded-md",
@@ -2126,6 +2127,38 @@ def _fmt_val_s(v) -> str:
     if isinstance(v, float):
         return f"{v:,.2f}" if v >= 1 else f"{v:.4f}"
     return str(v) if v is not None else "—"
+
+
+def _fmt_duration(seconds: float) -> str:
+    """Format a run duration for display — 's' under a minute, 'm s' beyond."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, rest = divmod(seconds, 60)
+    return f"{int(minutes)}m {rest:.0f}s"
+
+
+def _coverage_stat_line(summary: dict):
+    """Duration + elements-checked evidence line, shared by the MEP rule
+    compliance card and the ARCH results page — the concrete "how long, how
+    much" numbers behind an automated-vs-manual pitch (no meaningful line to
+    show without at least one of the two)."""
+    duration = summary.get("duration_seconds")
+    elements = summary.get("unique_elements_evaluated", 0)
+    rules_with_elements = summary.get("rules_with_elements", 0)
+    if duration is None and not elements:
+        return ""
+    parts = []
+    if duration is not None:
+        parts.append(Span(f"⏱ {_fmt_duration(duration)}", cls="text-xs text-muted-foreground mr-3"))
+    if elements:
+        parts.append(
+            Span(
+                f"🔍 {elements} element(s) checked across {rules_with_elements} applicable "
+                f"rule(s) — every match evaluated, no sampling",
+                cls="text-xs text-muted-foreground",
+            )
+        )
+    return Div(*parts, cls="flex flex-wrap items-center gap-1 mb-3")
 
 
 def _domain_badge(rule_results: list) -> tuple:
@@ -3189,7 +3222,8 @@ def setup_routes(rt):
                     P(
                         f"Domain-based compliance check against {_active_code_refs_summary()}.",
                         cls="text-sm text-muted-foreground",
-                    )
+                    ),
+                    _coverage_stat_line(result.get("rule_compliance_summary", {})),
                 ),
             ),
             *(([bldg_card]) if bldg_card else []),

@@ -156,13 +156,23 @@ class Module5_Reporter:
             "position_mm":  failure.get("position_mm"),
         }
 
-    def render_visual_report(self, compliance_results: list[dict]) -> dict:
+    def render_visual_report(
+        self, compliance_results: list[dict], duration_seconds: float | None = None
+    ) -> dict:
         """
         Return a summary dict for display in the web UI dashboard / analyze page.
 
+        Args:
+            compliance_results: Module 4's validate_metadata() output.
+            duration_seconds: wall-clock time for the extraction + comparison
+                phase (Module 2 + Module 4 combined), timed by the caller —
+                Module 5 has no visibility into how long extraction took on
+                its own, so it can't measure this itself.
+
         Returns:
             {total_rules, passed, failed, missing_data, no_elements,
-             pass_rate, mandatory_failed, by_target}
+             pass_rate, mandatory_failed, by_target, duration_seconds,
+             elements_evaluated, unique_elements_evaluated, rules_with_elements}
         """
         total       = len(compliance_results)
         passed      = sum(1 for r in compliance_results if r.get("status") == "PASS")
@@ -175,6 +185,8 @@ class Module5_Reporter:
         )
 
         by_target: dict[str, dict] = {}
+        elements_evaluated = 0
+        unique_guids: set[str] = set()
         for r in compliance_results:
             t = r.get("target", "Unknown")
             if t not in by_target:
@@ -187,6 +199,16 @@ class Module5_Reporter:
             else:
                 by_target[t]["other"] += 1
 
+            # Coverage: every element Module 2 matched to this rule was
+            # actually evaluated (BIM-Guard never samples), so this is a
+            # straightforward count/dedup, not a fraction against some
+            # smaller "checked" subset.
+            elements_evaluated += r.get("total_count", 0)
+            for el in r.get("all_elements", []):
+                guid = el.get("guid")
+                if guid:
+                    unique_guids.add(guid)
+
         return {
             "total_rules":      total,
             "passed":           passed,
@@ -196,6 +218,10 @@ class Module5_Reporter:
             "mandatory_failed": mand_failed,
             "pass_rate":        round(100 * passed / total, 1) if total else 0,
             "by_target":        by_target,
+            "duration_seconds":          duration_seconds,
+            "elements_evaluated":        elements_evaluated,
+            "unique_elements_evaluated": len(unique_guids),
+            "rules_with_elements":       total - no_elem,
         }
 
     def bcf_topics_for_results(self, compliance_results: list[dict]) -> list[dict]:
