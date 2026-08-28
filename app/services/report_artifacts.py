@@ -115,6 +115,23 @@ class ReportArtifactService:
         element_guid = str(topic.get("element_guid") or "")
         rule_id = str(topic.get("rule_id") or "BIM-GUARD")
         due_date = datetime.now(UTC).date().isoformat()
+
+        # Camera/target share the element's centroid — same convention as
+        # the corrosion-engine BCF path (bcf_generator.issues_from_results).
+        # position_mm comes from Module 2 (world mm); the viewer's fragments
+        # scene works in metres, so convert here. None (geometry unresolved
+        # for this element) leaves the BCFIssue's own origin default, which
+        # just means that topic's viewpoint won't fly anywhere useful —
+        # selecting it still works, it just doesn't move the camera.
+        pos = topic.get("position_mm")
+        pos_kwargs: dict[str, float] = {}
+        if pos is not None:
+            x, y, z = float(pos[0]) / 1000, float(pos[1]) / 1000, float(pos[2]) / 1000
+            pos_kwargs = {
+                "camera_x": x, "camera_y": y, "camera_z": z,
+                "target_x": x, "target_y": y, "target_z": z,
+            }
+
         return BCFIssue(
             guid=str(topic.get("guid") or element_guid),
             title=str(topic.get("title") or "BIM Guard compliance issue"),
@@ -132,4 +149,5 @@ class ReportArtifactService:
             mechanism=rule_id,
             risk_score=0.0,
             mitigation="Review and resolve the compliance finding.",
+            **pos_kwargs,
         )

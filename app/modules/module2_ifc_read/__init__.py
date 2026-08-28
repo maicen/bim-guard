@@ -1015,6 +1015,18 @@ class Module2_IFCRead:
         # Pre-compute once; 1.0 means model is already in mm → no scaling needed
         _unit_scale_mm = self._get_length_unit_scale_mm()
 
+        # Per-run centroid cache, keyed by element id() (not GlobalId — cheaper
+        # and every el here is a live ifcopenshell entity for this run).
+        # IFCGeometryExtractor already caches the triangulated *shape* per
+        # element, but get_centroid() still re-derives the vertex array and
+        # re-averages it on every call — ~0.5s/element even on a cache hit.
+        # The same physical element gets evaluated once per rule that targets
+        # its class (e.g. 37 door rules x 6 doors), so without this second
+        # cache layer a 3000-rule library turns a ~1s extraction into
+        # multiple minutes, repeating that ~0.5s for every rule instead of
+        # once per element. See position_mm below.
+        _position_cache: dict[int, tuple | None] = {}
+
         # Door → connected-space data, computed once regardless of whether any
         # rule in this batch actually needs it (cheap — reuses the already-built
         # spatial_adjacency, no re-parsing). Feeds the ConnectedSpaces /
@@ -1166,19 +1178,23 @@ class Module2_IFCRead:
                 except Exception:
                     type_inf = {}
 
-                # World-space centroid (mm), shape-cached by Module 2's own
-                # geometry extractor so repeat hits on the same element
-                # across different rules are free after the first. Only
-                # consumed downstream by Module 5's BCF export, to point
-                # the viewer's camera at a failing element instead of
-                # defaulting to the world origin — None here just means
-                # that export falls back to the origin, nothing breaks.
-                position_mm = None
-                if self.geometry_extractor:
-                    try:
-                        position_mm = self.geometry_extractor.get_centroid_or_none(el)
-                    except Exception:
-                        position_mm = None
+                # World-space centroid (mm) — resolved once per unique
+                # element via _position_cache above, not once per rule. Only
+                # consumed downstream by Module 5's BCF export / the "View in
+                # 3D" links, to point the camera at a failing element instead
+                # of the world origin — None here just means that fallback,
+                # nothing breaks.
+                eid = el.id()
+                if eid in _position_cache:
+                    position_mm = _position_cache[eid]
+                else:
+                    position_mm = None
+                    if self.geometry_extractor:
+                        try:
+                            position_mm = self.geometry_extractor.get_centroid_or_none(el)
+                        except Exception:
+                            position_mm = None
+                    _position_cache[eid] = position_mm
 
                 element_results.append(
                     {

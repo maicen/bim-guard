@@ -2,6 +2,7 @@
 
 import os
 from functools import lru_cache
+from urllib.parse import quote
 
 from fasthtml.common import (
     H3,
@@ -85,6 +86,13 @@ _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 # re-running the full IFC-parse + compliance pipeline (which alone takes
 # 100s+ on a real building model — measured on bimguard_headquarter1).
 _last_initial_rule_compliance: dict[int, list[dict]] = {}
+
+# Project ID for the ARCH-analysis card render currently in flight — read by
+# _simple_summary_table()'s "View in 3D" links. Threading project_id as an
+# explicit parameter would mean touching all 9 _simple_*_card() wrappers plus
+# _simple_domain_card() just to pass one value through; this follows the same
+# last-result-cache convention already used above and by _last_compliance_results.
+_last_summary_project_id: int | None = None
 
 
 @lru_cache(maxsize=1)
@@ -1079,6 +1087,15 @@ def _rule_compliance_card(
     if not compliance_results:
         return None
 
+    # Looked up once per render (not per failing element) — every "View in
+    # 3D" link on this card points at the same run's freshly-persisted BCF
+    # artifact, which _run_analysis_request() creates right before this
+    # card is built.
+    bcf_artifact_id = None
+    if project_id is not None:
+        latest = _report_artifact_service.latest_bcf(project_id)
+        bcf_artifact_id = latest.get("id") if latest else None
+
     total = summary.get("total_rules", 0)
     passed = summary.get("passed", 0)
     failed = summary.get("failed", 0)
@@ -1231,12 +1248,12 @@ def _rule_compliance_card(
                     return str(v) if v is not None else "—"
 
                 def _view_in_3d_link(f: dict):
-                    pos = f.get("position_mm")
-                    if project_id is None or pos is None:
+                    guid = f.get("guid")
+                    if project_id is None or bcf_artifact_id is None or not guid:
                         return ""
                     href = (
-                        f"/viewer?project_id={project_id}"
-                        f"&target_x={pos[0]}&target_y={pos[1]}&target_z={pos[2]}"
+                        f"/viewer?project_id={project_id}&bcf_artifact_id={bcf_artifact_id}"
+                        f"&element_guid={quote(guid)}"
                     )
                     return A(
                         "View in 3D",
@@ -1373,6 +1390,16 @@ def _rule_compliance_card(
         href="/reports/compliance-bcf",
         cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-blue-700 text-white hover:bg-blue-600 mt-3 ml-2",
     )
+    view_3d_btn = (
+        A(
+            "View failures in 3D",
+            href=f"/viewer?project_id={project_id}&bcf_artifact_id={bcf_artifact_id}",
+            target="_blank",
+            cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-emerald-700 text-white hover:bg-emerald-600 mt-3 ml-2",
+        )
+        if project_id is not None and bcf_artifact_id is not None
+        else ""
+    )
 
     return _collapsible_card(
         title,
@@ -1381,7 +1408,7 @@ def _rule_compliance_card(
             Table(Thead(Tr(*header_cells)), Tbody(*rows), cls="w-full text-sm"),
             cls="overflow-auto border rounded-md",
         ),
-        Div(csv_btn, bcf_btn),
+        Div(csv_btn, bcf_btn, view_3d_btn),
     )
 
 
@@ -2244,7 +2271,15 @@ def _pivot_category_elements(rule_results: list) -> tuple[list, list]:
                     "storey": el.get("storey") or "—",
                     "space": el.get("space") or "—",
                     "guid": guid,
+                    "position_mm": None,
                 }
+            # Different rules can evaluate the same element; geometry only
+            # needs resolving once, so keep the first position_mm any of
+            # them managed to resolve rather than overwriting with a later
+            # None (e.g. a rule whose element pass never hit Module 2's
+            # geometry fallback).
+            if identities[guid]["position_mm"] is None and el.get("position_mm") is not None:
+                identities[guid]["position_mm"] = el["position_mm"]
             cells.setdefault(guid, {})[rule_key] = el
 
     rows = []
@@ -2280,6 +2315,11 @@ def _simple_summary_table(category: str, rule_results: list):
     if not columns:
         return ""
 
+    _bcf_artifact = (
+        _report_artifact_service.latest_bcf(_last_summary_project_id)
+        if _last_summary_project_id is not None
+        else None
+    )
     download_btns = Div(
         A(
             "Download Excel",
@@ -2291,6 +2331,14 @@ def _simple_summary_table(category: str, rule_results: list):
             href=f"/reports/simple-summary-pdf/{category}",
             cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-white hover:bg-slate-600",
         ),
+        A(
+            "View in 3D",
+            href=f"/viewer?project_id={_last_summary_project_id}&bcf_artifact_id={_bcf_artifact['id']}",
+            target="_blank",
+            cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-emerald-700 text-white hover:bg-emerald-600",
+        )
+        if _bcf_artifact
+        else "",
         cls="flex gap-2",
     )
 
@@ -2403,9 +2451,23 @@ def _simple_summary_table(category: str, rule_results: list):
             )
             tds.append(Td(_rule_required_text(rule), cls="px-3 py-2 text-xs text-muted-foreground"))
         issues_txt = "; ".join(r["issues"]) if r["issues"] else "✓ none"
+        view_link = (
+            A(
+                "View in 3D",
+                href=(
+                    f"/viewer?project_id={_last_summary_project_id}"
+                    f"&bcf_artifact_id={_bcf_artifact['id']}&element_guid={quote(r['guid'])}"
+                ),
+                target="_blank",
+                cls="ml-2 text-blue-700 hover:underline whitespace-nowrap",
+            )
+            if r["issues"] and _bcf_artifact and r.get("guid")
+            else ""
+        )
         tds.append(
             Td(
                 issues_txt,
+                view_link,
                 cls=f"px-3 py-2 text-xs {'text-red-700 font-medium' if r['issues'] else 'text-green-700'}",
             )
         )
@@ -3087,6 +3149,18 @@ def setup_routes(rt):
             return Alert(result["error"], cls=AlertT.error)
 
         from collections import defaultdict
+
+        global _last_summary_project_id
+        _last_summary_project_id = project_id
+
+        # Persist a BCF artifact for this run — same mechanism _run_analysis_request
+        # uses — so the "View in 3D" links below have a fresh, matching artifact to
+        # point at (this route calls orchestrate_workflow directly rather than
+        # through _run_analysis_request, so it doesn't get this for free).
+        try:
+            _report_artifact_service.persist_bcf(project_id, result.get("bcf_topics", []))
+        except Exception:
+            logger.exception("BCF persistence failed project_id=%d", project_id)
 
         logger.info("ARCH request progress=100%% step=results-rendering project_id=%d", project_id)
         project = result["project"]

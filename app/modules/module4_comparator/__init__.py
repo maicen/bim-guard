@@ -380,6 +380,10 @@ class Module4_Comparator:
             "actual": actual,
             "status": status,
             "reason": reason,
+            # (x, y, z) mm from Module 2, or None — carried through so any
+            # per-element view built from all_elements (not just failures)
+            # can still offer a "View in 3D" link.
+            "position_mm": el.get("position_mm"),
         }
 
     @staticmethod

@@ -21,9 +21,7 @@ def setup_routes(rt):
     def viewer_page(
         project_id: int | None = None,
         bcf_artifact_id: int | None = None,
-        target_x: float | None = None,
-        target_y: float | None = None,
-        target_z: float | None = None,
+        element_guid: str | None = None,
     ):
         projects = [row for row in _projects_service.list_projects() if row.get("ifc_file_path")]
         project = _projects_service.get_project(project_id) if project_id is not None else None
@@ -57,16 +55,7 @@ def setup_routes(rt):
             viewer_title = f"3D Viewer - {project.get('name', 'Project')}"
         preload_ifc_url = json.dumps(ifc_url)
         preload_bcf_url = json.dumps(bcf_url)
-
-        # Optional fly-to target from a compliance failure — e.g. a "View in
-        # 3D" link. Coordinates arrive in mm (Module 2's world unit); the
-        # viewer's three.js scene works in metres (its default camera/grid
-        # constants are metre-scaled), so convert here rather than pushing
-        # that unit knowledge into the client script.
-        focus_target = None
-        if target_x is not None and target_y is not None and target_z is not None:
-            focus_target = {"x": target_x / 1000, "y": target_y / 1000, "z": target_z / 1000}
-        preload_focus_target = json.dumps(focus_target)
+        preload_element_guid = json.dumps(element_guid)
         project_options = [
             Option("Select a project", value="", selected=project_id is None),
             *[
@@ -182,7 +171,7 @@ def setup_routes(rt):
                 ),
                 Script(
                     """
-import { initViewer } from '/static/js/viewer/ifc-viewer.js?v=topics-ui-9';
+import { initViewer } from '/static/js/viewer/ifc-viewer.js?v=topics-ui-10';
 
 window.addEventListener('DOMContentLoaded', async () => {
     const viewerAPI = await initViewer('viewer-container');
@@ -190,21 +179,18 @@ window.addEventListener('DOMContentLoaded', async () => {
         const ifcUrl = IFC_URL_PLACEHOLDER;
         if (ifcUrl) {
             await viewerAPI.loadIfc(ifcUrl);
-            const focusTarget = FOCUS_TARGET_PLACEHOLDER;
-            if (focusTarget) {
-                viewerAPI.focusOn(focusTarget.x, focusTarget.y, focusTarget.z);
-            }
         }
         const bcfUrl = BCF_URL_PLACEHOLDER;
         if (bcfUrl) {
-            await viewerAPI.loadBcf(bcfUrl);
+            const elementGuid = ELEMENT_GUID_PLACEHOLDER;
+            await viewerAPI.loadBcf(bcfUrl, elementGuid);
         }
     }
 });
                 """
                     .replace("IFC_URL_PLACEHOLDER", preload_ifc_url)
-                    .replace("FOCUS_TARGET_PLACEHOLDER", preload_focus_target)
-                    .replace("BCF_URL_PLACEHOLDER", preload_bcf_url),
+                    .replace("BCF_URL_PLACEHOLDER", preload_bcf_url)
+                    .replace("ELEMENT_GUID_PLACEHOLDER", preload_element_guid),
                     type="module",
                 ),
                 cls="h-full flex flex-col p-4 bg-muted/30 rounded-xl",

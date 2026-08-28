@@ -299,7 +299,22 @@ export async function initViewer(containerId) {
         }
     }
 
-    async function loadBcf(urlOrFile) {
+    // Topics don't carry a dedicated "linked element" field of their own —
+    // that lives inside each viewpoint's component selection instead — so
+    // the server embeds the element's IFC GUID as an "ElementGUID:" line in
+    // the topic's Description (a basic, spec-required BCF field every
+    // compliant reader must preserve verbatim). Matching that substring is
+    // how a "View in 3D" link for one specific element finds its topic here.
+    function findTopicByElementGuid(elementGuid) {
+        if (!elementGuid) return null;
+        const needle = `ElementGUID: ${elementGuid}`;
+        for (const topic of workspace.topics.list.values()) {
+            if ((topic.description || "").includes(needle)) return topic;
+        }
+        return null;
+    }
+
+    async function loadBcf(urlOrFile, elementGuid) {
         try {
             const file = typeof urlOrFile === "string"
                 ? await fetch(urlOrFile).then(async (response) => {
@@ -312,8 +327,9 @@ export async function initViewer(containerId) {
             for (const viewpoint of importedViewpoints) viewpoint.world = world;
             workspace.refreshTopicsList();
 
-            const firstTopic = workspace.topics.list.values().next().value;
-            if (firstTopic) await workspace.selectTopic(firstTopic);
+            const targetTopic = findTopicByElementGuid(elementGuid)
+                || workspace.topics.list.values().next().value;
+            if (targetTopic) await workspace.selectTopic(targetTopic);
             return imported;
         } catch (error) {
             console.error("Error loading BCF file", error);
@@ -338,5 +354,7 @@ export async function initViewer(containerId) {
         loadBcf,
         loadIfc,
         setupFileLoader,
+        selectTopic: workspace.selectTopic,
+        findTopicByElementGuid,
     };
 }

@@ -108,15 +108,27 @@ class AnalysisService:
     @staticmethod
     def _to_bcf_topic(issue: AuditIssue) -> dict[str, Any]:
         """Return a deterministic BCF-compatible topic payload for one finding."""
+        # The "ElementGUID:" line lets the viewer find this topic again after
+        # a round trip through BCF export/import: BCF's Topic entity has no
+        # native "linked element" field of its own (that lives inside each
+        # Viewpoint's component selection instead), but Description is one
+        # of its most basic, spec-required fields, so any compliant BCF
+        # reader — including the one this app's viewer uses — is guaranteed
+        # to preserve it verbatim. Matching a substring in it is therefore a
+        # safe way to jump straight to "the topic for element X" from a
+        # "View in 3D" link, without needing to read that library's internal
+        # object model.
+        description = f"{issue.description}\n\nElementGUID: {issue.element_id}"
         return {
             "guid": str(uuid5(NAMESPACE_URL, f"bim-guard:{issue.id}:{issue.element_id}")),
             "title": issue.title,
-            "description": issue.description,
+            "description": description,
             "type": "Error" if issue.band in {"critical", "high"} else "Warning",
             "status": "Open",
             "priority": issue.band,
             "element_guid": issue.element_id,
             "rule_id": issue.rule_id,
+            "position_mm": issue.details.get("position_mm"),
         }
 
     def include_rule_results(
@@ -154,6 +166,12 @@ class AnalysisService:
                             "property_name": rule.get("property_name"),
                             "target": rule.get("target"),
                             "severity": severity,
+                            # (x, y, z) mm from Module 2, or None — carried
+                            # through _to_bcf_topic() so ReportArtifactService
+                            # can give this topic's BCF viewpoint a real
+                            # camera position instead of defaulting to the
+                            # world origin.
+                            "position_mm": failure.get("position_mm"),
                         },
                     )
                 )

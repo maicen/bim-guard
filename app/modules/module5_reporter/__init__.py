@@ -148,6 +148,12 @@ class Module5_Reporter:
             "priority":     rule.get("severity", "recommended"),
             "creation_date": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "element_guid": failure.get("guid"),
+            # (x, y, z) mm from Module 2, or None — consumed by
+            # ReportArtifactService._topic_to_issue() to give the persisted
+            # BCF topic's viewpoint a real camera position, so selecting the
+            # topic in the TopicsUI viewer actually flies to the element
+            # instead of defaulting to the world origin.
+            "position_mm":  failure.get("position_mm"),
         }
 
     def render_visual_report(self, compliance_results: list[dict]) -> dict:
