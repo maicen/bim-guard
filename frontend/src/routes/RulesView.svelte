@@ -45,6 +45,16 @@
   let formPropertyName = '';
   let formOperator = '==';
   let formCheckValue = '';
+  let formValueMin = '';
+  let formValueMax = '';
+  let formValueMinProperty = '';
+  let formValueMaxProperty = '';
+  let formValueMinOffset = '';
+  let formValueMaxOffset = '';
+  let formCompareProperty = '';
+  let formNamePattern = '';
+  let formUniquenessScope = 'building';
+  let formUnit = '';
   let formSeverity = 'Medium';
   let formNeedsReview = 0;
 
@@ -74,7 +84,8 @@
       searchQuery === '' ||
       (r.rule_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (r.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.property_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (r.property_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.compare_property || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesFolder =
       !selectedFolderId || r.ruleset_id === selectedFolderId;
@@ -110,6 +121,16 @@
     formPropertyName = '';
     formOperator = '==';
     formCheckValue = '';
+    formValueMin = '';
+    formValueMax = '';
+    formValueMinProperty = '';
+    formValueMaxProperty = '';
+    formValueMinOffset = '';
+    formValueMaxOffset = '';
+    formCompareProperty = '';
+    formNamePattern = '';
+    formUniquenessScope = 'building';
+    formUnit = '';
     formSeverity = 'Medium';
     formNeedsReview = 0;
     isModalOpen = true;
@@ -127,6 +148,16 @@
     formPropertyName = rule.property_name || '';
     formOperator = rule.operator || '==';
     formCheckValue = rule.check_value || '';
+    formValueMin = rule.value_min || '';
+    formValueMax = rule.value_max || '';
+    formValueMinProperty = rule.value_min_property || '';
+    formValueMaxProperty = rule.value_max_property || '';
+    formValueMinOffset = rule.value_min_offset !== undefined && rule.value_min_offset !== null ? String(rule.value_min_offset) : '';
+    formValueMaxOffset = rule.value_max_offset !== undefined && rule.value_max_offset !== null ? String(rule.value_max_offset) : '';
+    formCompareProperty = rule.compare_property || '';
+    formNamePattern = rule.name_pattern || '';
+    formUniquenessScope = rule.uniqueness_scope || 'building';
+    formUnit = rule.unit || '';
     formSeverity = rule.severity || 'Medium';
     formNeedsReview = rule.needs_review || 0;
     isModalOpen = true;
@@ -149,6 +180,16 @@
         property_name: formPropertyName,
         operator: formOperator,
         check_value: formCheckValue,
+        value_min: formValueMin || null,
+        value_max: formValueMax || null,
+        value_min_property: formValueMinProperty || '',
+        value_max_property: formValueMaxProperty || '',
+        value_min_offset: formValueMinOffset || 0,
+        value_max_offset: formValueMaxOffset || 0,
+        compare_property: formCompareProperty || '',
+        name_pattern: formNamePattern || '',
+        uniqueness_scope: formUniquenessScope || 'building',
+        unit: formUnit || '',
         severity: formSeverity,
         needs_review: formNeedsReview,
       };
@@ -342,10 +383,32 @@
                       <div class="text-[10px] text-slate-500">{rule.property_set || 'Pset_Compliance'}</div>
                     </td>
                     <td class="py-3 px-4 font-mono text-cyan-300">
-                      {rule.operator || '=='} {rule.check_value || '-'}
+                      {#if rule.operator === 'field_consistency'}
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-[11px] text-amber-300">≡ {rule.compare_property || 'same element'}</span>
+                          {#if rule.name_pattern}
+                            <span class="text-[10px] text-slate-500 font-sans">pattern: {rule.name_pattern}</span>
+                          {/if}
+                        </div>
+                      {:else if rule.operator === 'unique_within_scope'}
+                        <div class="text-[11px] text-purple-300">
+                          <span>unique ({rule.uniqueness_scope || 'building'})</span>
+                        </div>
+                      {:else if rule.value_min_property || rule.value_max_property}
+                        <div class="text-[11px] text-emerald-300">
+                          <span>relative [{rule.value_min_property || '0'}..{rule.value_max_property || '∞'}]</span>
+                        </div>
+                      {:else}
+                        <span>{rule.operator || '=='} {rule.check_value || '-'} {rule.unit || ''}</span>
+                      {/if}
+                      {#if rule.needs_review}
+                        <span class="inline-block mt-1 px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-amber-950/70 border border-amber-800 text-amber-400">
+                          Needs Review
+                        </span>
+                      {/if}
                     </td>
                     <td class="py-3 px-4">
-                      <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold {rule.severity === 'Critical' ? 'bg-red-950/60 text-red-400 border border-red-800/60' : rule.severity === 'High' ? 'bg-orange-950/60 text-orange-400 border border-orange-800/60' : 'bg-yellow-950/60 text-yellow-400 border border-yellow-800/60'}">
+                      <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold {rule.severity === 'Critical' || rule.severity === 'mandatory' ? 'bg-red-950/60 text-red-400 border border-red-800/60' : rule.severity === 'High' ? 'bg-orange-950/60 text-orange-400 border border-orange-800/60' : 'bg-yellow-950/60 text-yellow-400 border border-yellow-800/60'}">
                         {rule.severity}
                       </span>
                     </td>
@@ -383,7 +446,7 @@
 <!-- Rule Edit/Create Modal -->
 {#if isModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl p-6 space-y-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-base font-bold text-white">{isEditing ? 'Edit Rule' : 'Create New Rule'}</h2>
         <button
@@ -395,7 +458,7 @@
         </button>
       </div>
 
-      <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+      <div class="space-y-4 overflow-y-auto pr-1 flex-1">
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label for="rule-id" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Rule ID *</label>
@@ -433,7 +496,7 @@
           ></textarea>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-3">
           <div>
             <label for="rule-pset" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Property Set</label>
             <input
@@ -452,6 +515,16 @@
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
             />
           </div>
+          <div>
+            <label for="rule-unit" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Unit</label>
+            <input
+              id="rule-unit"
+              type="text"
+              bind:value={formUnit}
+              placeholder="e.g. mm, min, m²"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            />
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -462,22 +535,131 @@
               bind:value={formOperator}
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
             >
-              <option value="==">==</option>
-              <option value="!=">!=</option>
-              <option value=">">&gt;</option>
-              <option value=">=">&gt;=</option>
-              <option value="<">&lt;</option>
-              <option value="<=">&lt;=</option>
+              <option value="==">== (Exact match)</option>
+              <option value="!=">!= (Not equal)</option>
+              <option value=">">&gt; (Greater than)</option>
+              <option value=">=">&gt;= (Greater than or equal)</option>
+              <option value="<">&lt; (Less than)</option>
+              <option value="<=">&lt;= (Less than or equal)</option>
+              <option value="exists">exists</option>
+              <option value="not_exists">not_exists</option>
+              <option value="matches">matches (Regex)</option>
+              <option value="field_consistency">field_consistency (Element match)</option>
+              <option value="unique_within_scope">unique_within_scope (Uniqueness)</option>
             </select>
           </div>
           <div>
-            <label for="rule-val" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Expected Value</label>
+            <label for="rule-val" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Expected / Target Value</label>
             <input
               id="rule-val"
               type="text"
               bind:value={formCheckValue}
+              placeholder="Literal value or threshold"
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
             />
+          </div>
+        </div>
+
+        <!-- Field Consistency section -->
+        {#if formOperator === 'field_consistency'}
+          <div class="p-3 rounded-xl bg-slate-950 border border-amber-900/40 space-y-2.5">
+            <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+              Field Consistency (Element-to-Element Property Match)
+            </div>
+            <p class="text-[11px] text-slate-400">
+              Validates that Property Name's value matches another property on the SAME element (e.g. wall Name matches Cod_Object).
+            </p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="rule-compare-prop" class="block text-[11px] font-semibold text-slate-300 mb-1">Compare Property</label>
+                <input
+                  id="rule-compare-prop"
+                  type="text"
+                  bind:value={formCompareProperty}
+                  placeholder="e.g. Cod_Object"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                />
+              </div>
+              <div>
+                <label for="rule-name-pattern" class="block text-[11px] font-semibold text-slate-300 mb-1">Name Pattern (Regex extraction)</label>
+                <input
+                  id="rule-name-pattern"
+                  type="text"
+                  bind:value={formNamePattern}
+                  placeholder="e.g. ([A-Z]+)_.*_(\\d+)$"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                />
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Uniqueness Scope section -->
+        {#if formOperator === 'unique_within_scope'}
+          <div class="p-3 rounded-xl bg-slate-950 border border-purple-900/40 space-y-2.5">
+            <div class="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
+              Scope Uniqueness Verification
+            </div>
+            <p class="text-[11px] text-slate-400">
+              Ensures Property Name's value is unique across elements within the selected building hierarchy scope.
+            </p>
+            <div>
+              <label for="rule-unique-scope" class="block text-[11px] font-semibold text-slate-300 mb-1">Uniqueness Scope</label>
+              <select
+                id="rule-unique-scope"
+                bind:value={formUniquenessScope}
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              >
+                <option value="building">building (entire model)</option>
+                <option value="storey">storey (same floor)</option>
+                <option value="space">storey + space (same room)</option>
+              </select>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Relative Bounds Section -->
+        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Relative Dynamic Bounds & Offsets (Optional)
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="rule-min-prop" class="block text-[11px] font-semibold text-slate-400 mb-1">Min Dynamic Property / Offset</label>
+              <div class="grid grid-cols-2 gap-2">
+                <input
+                  id="rule-min-prop"
+                  type="text"
+                  bind:value={formValueMinProperty}
+                  placeholder="e.g. Run"
+                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                />
+                <input
+                  type="number"
+                  bind:value={formValueMinOffset}
+                  placeholder="Offset (0)"
+                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                />
+              </div>
+            </div>
+            <div>
+              <label for="rule-max-prop" class="block text-[11px] font-semibold text-slate-400 mb-1">Max Dynamic Property / Offset</label>
+              <div class="grid grid-cols-2 gap-2">
+                <input
+                  id="rule-max-prop"
+                  type="text"
+                  bind:value={formValueMaxProperty}
+                  placeholder="e.g. Run"
+                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                />
+                <input
+                  type="number"
+                  bind:value={formValueMaxOffset}
+                  placeholder="Offset (+25)"
+                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -489,6 +671,8 @@
               bind:value={formSeverity}
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
             >
+              <option value="mandatory">Mandatory</option>
+              <option value="recommended">Recommended</option>
               <option value="Critical">Critical</option>
               <option value="High">High</option>
               <option value="Medium">Medium</option>
@@ -505,9 +689,21 @@
             />
           </div>
         </div>
+
+        <div>
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formNeedsReview === 1}
+              on:change={(e) => (formNeedsReview = e.currentTarget.checked ? 1 : 0)}
+              class="rounded border-slate-700 bg-slate-950 text-[#0071e3]"
+            />
+            <span>Flag for engineering review (Needs Review)</span>
+          </label>
+        </div>
       </div>
 
-      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
         <button
           type="button"
           on:click={() => (isModalOpen = false)}

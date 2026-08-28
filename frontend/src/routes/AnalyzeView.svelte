@@ -33,7 +33,7 @@
   import PipelineProgress from '../lib/components/PipelineProgress.svelte';
 
   export let initialProjectId: number | null = null;
-  export let onSelectProjectForViewer: (projectId: number, elementGuid?: string) => void;
+  export let onSelectProjectForViewer: (projectId: number, elementGuid?: string, bcfArtifactId?: number) => void;
 
   let projects: Project[] = [];
   let selectedProjectId: number | null = initialProjectId;

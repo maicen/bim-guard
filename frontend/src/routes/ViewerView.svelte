@@ -7,10 +7,12 @@
 
   export let initialProjectId: number | null = null;
   export let initialElementGuid: string | null = null;
+  export let initialBcfArtifactId: number | null = null;
 
   let projects: Project[] = [];
   let selectedProjectId: number | null = initialProjectId;
   let selectedElementGuid: string | null = initialElementGuid;
+  let selectedBcfArtifactId: number | null = initialBcfArtifactId;
 
   async function loadProjects() {
     try {
@@ -33,6 +35,9 @@
   }
   $: if (initialElementGuid !== undefined) {
     selectedElementGuid = initialElementGuid;
+  }
+  $: if (initialBcfArtifactId !== undefined) {
+    selectedBcfArtifactId = initialBcfArtifactId;
   }
 </script>
 
@@ -87,5 +92,5 @@
     </div>
   {/if}
 
-  <IfcViewer projectId={selectedProjectId} elementGuid={selectedElementGuid} />
+  <IfcViewer projectId={selectedProjectId} elementGuid={selectedElementGuid} bcfArtifactId={selectedBcfArtifactId} />
 </div>

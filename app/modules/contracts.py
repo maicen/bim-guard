@@ -135,6 +135,13 @@ class RuleCreateRequest(BaseModel):
     check_value: Optional[str] = None
     value_min: Optional[str] = None
     value_max: Optional[str] = None
+    value_min_property: Optional[str] = None
+    value_max_property: Optional[str] = None
+    value_min_offset: Optional[str] = None
+    value_max_offset: Optional[str] = None
+    compare_property: Optional[str] = None
+    name_pattern: Optional[str] = None
+    uniqueness_scope: Optional[str] = None
     unit: Optional[str] = None
     severity: str = Field(default="recommended", description="Severity (mandatory, recommended)")
     confidence: Optional[str] = None
@@ -152,6 +159,13 @@ class RuleUpdateRequest(BaseModel):
     check_value: Optional[str] = None
     value_min: Optional[str] = None
     value_max: Optional[str] = None
+    value_min_property: Optional[str] = None
+    value_max_property: Optional[str] = None
+    value_min_offset: Optional[str] = None
+    value_max_offset: Optional[str] = None
+    compare_property: Optional[str] = None
+    name_pattern: Optional[str] = None
+    uniqueness_scope: Optional[str] = None
     unit: Optional[str] = None
     severity: Optional[str] = None
     needs_review: Optional[int] = None
@@ -173,6 +187,13 @@ class RuleResponse(BaseModel):
     check_value: Optional[str] = None
     value_min: Optional[str] = None
     value_max: Optional[str] = None
+    value_min_property: Optional[str] = None
+    value_max_property: Optional[str] = None
+    value_min_offset: Optional[str] = None
+    value_max_offset: Optional[str] = None
+    compare_property: Optional[str] = None
+    name_pattern: Optional[str] = None
+    uniqueness_scope: Optional[str] = None
     unit: Optional[str] = None
     severity: Optional[str] = "recommended"
     confidence: Optional[str] = None
@@ -253,6 +274,23 @@ class AnalysisInputItemContract(BaseModel):
     file_path: str = Field("", description="Storage reference")
 
 
+class ComplianceSummaryContract(BaseModel):
+    """Evidence metrics and check-time summary from compliance reporting."""
+
+    total_rules: int = 0
+    passed: int = 0
+    failed: int = 0
+    missing_data: int = 0
+    no_elements: int = 0
+    mandatory_failed: int = 0
+    pass_rate: float = 0.0
+    duration_seconds: Optional[float] = None
+    elements_evaluated: int = 0
+    unique_elements_evaluated: int = 0
+    rules_with_elements: int = 0
+    by_target: dict[str, Any] = Field(default_factory=dict)
+
+
 class AnalysisResultContract(BaseModel):
     """Composite analysis result returned by analysis runners."""
 
@@ -265,6 +303,32 @@ class AnalysisResultContract(BaseModel):
     compliance_error: Optional[str] = None
     compliance_is_demo: bool = False
     cached: bool = False
+    duration_seconds: Optional[float] = None
+    elements_evaluated: Optional[int] = None
+    unique_elements_evaluated: Optional[int] = None
+    rules_with_elements: Optional[int] = None
+    pass_rate: Optional[float] = None
+    bcf_artifact_id: Optional[int] = None
+    summary: Optional[dict[str, Any]] = None
+
+
+class ArchAnalysisResponse(BaseModel):
+    """Architectural compliance analysis response model."""
+
+    project_id: int
+    project_name: str
+    categories: dict[str, Any] = Field(default_factory=dict)
+    total_issues: int = 0
+    issues: list[dict[str, Any]] = Field(default_factory=list)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    rule_compliance_summary: dict[str, Any] = Field(default_factory=dict)
+    bcf_artifact_id: Optional[int] = None
+    building_summary: dict[str, Any] = Field(default_factory=dict)
+    spatial_checks: dict[str, Any] = Field(default_factory=dict)
+    egress_checks: dict[str, Any] = Field(default_factory=dict)
+    rule_compliance: list[dict[str, Any]] = Field(default_factory=list)
+    rule_folder: Optional[str] = None
+    ifc_element_count: Optional[int] = 0
 
 
 # ---------------------------------------------------------------------------

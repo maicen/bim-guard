@@ -103,6 +103,15 @@ export const rulesApi = {
     return handleResponse<Rule>(res);
   },
 
+  async update(id: number, payload: Partial<Rule>): Promise<Rule> {
+    const res = await fetch(`${API_BASE}/rules/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<Rule>(res);
+  },
+
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/rules/${id}`, {
       method: 'DELETE',
@@ -145,6 +154,14 @@ export const analyzeApi = {
 
   getExportUrl(projectId: number, slug: string, fmt: 'bcf' | 'csv' | 'json'): string {
     return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}`;
+  },
+
+  getBcfArtifactUrl(artifactId: number): string {
+    return `${API_BASE}/analyze/bcf/artifacts/${artifactId}`;
+  },
+
+  getLatestBcfUrl(projectId: number): string {
+    return `${API_BASE}/analyze/bcf/latest/${projectId}`;
   },
 
   async runArch(projectId: number, ruleFolder = ''): Promise<any> {

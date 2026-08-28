@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Loader2, AlertCircle, RefreshCw, UploadCloud, Layers } from 'lucide-svelte';
+  import { projectsApi, analyzeApi } from '../api';
 
   export let projectId: number | null = null;
   export let elementGuid: string | null = null;
@@ -13,6 +14,7 @@
   let loadingMessage = 'Initializing OpenBIM 3D Viewport...';
   let error: string | null = null;
   let loadedProjectId: number | null = null;
+  let loadedBcfArtifactId: number | null = null;
   let isInitialized = false;
 
   async function init() {
@@ -46,14 +48,15 @@
       loadingMessage = `Loading IFC geometry for Project #${id}...`;
       error = null;
 
-      const ifcUrl = `/projects/${id}/ifc`;
+      const ifcUrl = projectsApi.getIfcUrl(id);
       await viewerAPI.loadIfc(ifcUrl);
       loadedProjectId = id;
 
       if (bcfArtifactId) {
         loadingMessage = 'Loading BCF viewpoints...';
-        const bcfUrl = `/reports/bcf/artifacts/${bcfArtifactId}`;
+        const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
         await viewerAPI.loadBcf(bcfUrl, elementGuid);
+        loadedBcfArtifactId = bcfArtifactId;
       } else if (elementGuid) {
         const topic = viewerAPI.findTopicByElementGuid(elementGuid);
         if (topic) {
@@ -102,6 +105,12 @@
 
   $: if (viewerAPI && projectId && projectId !== loadedProjectId) {
     loadProjectModel(projectId);
+  }
+
+  $: if (viewerAPI && bcfArtifactId && bcfArtifactId !== loadedBcfArtifactId && loadedProjectId) {
+    loadedBcfArtifactId = bcfArtifactId;
+    const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
+    viewerAPI.loadBcf(bcfUrl, elementGuid);
   }
 
   $: if (viewerAPI && elementGuid && loadedProjectId) {

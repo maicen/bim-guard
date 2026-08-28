@@ -256,13 +256,14 @@ def export_analysis_report(
     )
 
 
-@router.post("/arch", summary="Run architectural compliance analysis")
+@router.post("/arch", response_model=ArchAnalysisResponse, summary="Run architectural compliance analysis")
 def run_arch_analysis(
     project_id: Annotated[int, Form(...)],
     rule_folder: Annotated[str, Form()] = "",
-) -> dict:
+) -> ArchAnalysisResponse:
     """Run Ontario Building Code Part 9 architectural checks (egress, daylight, fire separations, clearances)."""
     from app.services.pipeline_services import PipelineOrchestratorService
+    from app.services.report_artifacts import ReportArtifactService
 
     result = PipelineOrchestratorService.orchestrate_workflow(
         project_id=project_id,
@@ -278,20 +279,116 @@ def run_arch_analysis(
     categories = result.get("categories", {})
     issues = result.get("issues", [])
     project = result.get("project", {})
+    rule_compliance_summary = result.get("rule_compliance_summary", {})
+    bcf_topics = result.get("bcf_topics", [])
 
-    return {
-        "project_id": project_id,
-        "project_name": project.get("name", f"Project {project_id}"),
-        "categories": categories,
-        "total_issues": len(issues),
-        "issues": issues,
-        "summary": result.get("summary", {}),
-    }
+    report_svc = ReportArtifactService()
+    bcf_artifact_id = None
+    if bcf_topics:
+        try:
+            persisted = report_svc.persist_bcf(project_id, bcf_topics)
+            if persisted:
+                bcf_artifact_id = persisted.get("id")
+        except Exception:
+            logger.exception("BCF persistence failed project_id=%d", project_id)
+
+    if not bcf_artifact_id:
+        latest = report_svc.latest_bcf(project_id)
+        if latest:
+            bcf_artifact_id = latest.get("id")
+
+    return ArchAnalysisResponse(
+        project_id=project_id,
+        project_name=project.get("name", f"Project {project_id}"),
+        categories=categories,
+        total_issues=len(issues),
+        issues=issues,
+        summary=result.get("summary", {}),
+        rule_compliance_summary=rule_compliance_summary,
+        bcf_artifact_id=bcf_artifact_id,
+        building_summary=result.get("building_summary", {}),
+        spatial_checks=result.get("spatial_checks", {}),
+        egress_checks=result.get("egress_checks", {}) or {},
+        rule_compliance=result.get("rule_compliance", []),
+        rule_folder=result.get("rule_folder", ""),
+        ifc_element_count=result.get("ifc_element_count", 0),
+    )
 
 
-@router.get("/arch/{project_id}", summary="Get architectural compliance results")
-def get_arch_analysis(project_id: int) -> dict:
+@router.get("/arch/{project_id}", response_model=ArchAnalysisResponse, summary="Get architectural compliance results")
+def get_arch_analysis(project_id: int) -> ArchAnalysisResponse:
     """Retrieve architectural compliance findings for a project."""
     return run_arch_analysis(project_id=project_id)
+
+
+# ---------------------------------------------------------------------------
+# BCF Report Artifact Endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/bcf/artifacts/{artifact_id}", summary="Download BCF artifact by ID")
+def download_bcf_artifact(artifact_id: int):
+    """Download a stored BCF 2.1 report archive by artifact primary key."""
+    from fastapi.responses import FileResponse
+    from app.services.report_artifacts import ReportArtifactService
+
+    report_svc = ReportArtifactService()
+    artifact = report_svc.get_bcf(artifact_id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"BCF artifact {artifact_id} not found.",
+        )
+
+    bcf_path = report_svc.materialize(artifact)
+    if bcf_path is None or not bcf_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve the BCF file from storage.",
+        )
+
+    filename = artifact.get("filename") or f"compliance_artifact_{artifact_id}.bcf"
+    return FileResponse(
+        str(bcf_path),
+        media_type=artifact.get("content_type") or "application/octet-stream",
+        filename=filename,
+    )
+
+
+@router.get("/bcf/latest/{project_id}", summary="Download latest BCF for a project")
+def download_latest_bcf(project_id: int):
+    """Retrieve the latest BCF 2.1 archive generated for a project."""
+    from fastapi.responses import FileResponse
+    from app.services.report_artifacts import ReportArtifactService
+
+    report_svc = ReportArtifactService()
+    artifact = report_svc.latest_bcf(project_id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No BCF artifacts found for project {project_id}.",
+        )
+
+    bcf_path = report_svc.materialize(artifact)
+    if bcf_path is None or not bcf_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve the BCF file from storage.",
+        )
+
+    filename = artifact.get("filename") or f"compliance_project_{project_id}.bcf"
+    return FileResponse(
+        str(bcf_path),
+        media_type=artifact.get("content_type") or "application/octet-stream",
+        filename=filename,
+    )
+
+
+@router.get("/bcf/list", summary="List all persisted BCF artifacts")
+def list_bcf_artifacts() -> list[dict]:
+    """List all persisted BCF report artifacts ordered newest first."""
+    from app.services.report_artifacts import ReportArtifactService
+
+    return ReportArtifactService().list_bcf()
 
 

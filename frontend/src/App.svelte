@@ -25,6 +25,7 @@
   let activeView = 'dashboard';
   let targetProjectId: number | null = null;
   let targetElementGuid: string | null = null;
+  let targetBcfArtifactId: number | null = null;
   let selectedProject: Project | null = null;
   let isGlobalWizardOpen = false;
 
@@ -68,9 +69,10 @@
     activeView = 'analyze';
   }
 
-  function handleSelectProjectForViewer(projectId: number, elementGuid?: string) {
+  function handleSelectProjectForViewer(projectId: number, elementGuid?: string, bcfArtifactId?: number) {
     targetProjectId = projectId;
     targetElementGuid = elementGuid || null;
+    targetBcfArtifactId = bcfArtifactId || null;
     loadProjectDetails(projectId);
     activeView = 'viewer';
   }
@@ -119,6 +121,7 @@
         <ViewerView
           initialProjectId={targetProjectId}
           initialElementGuid={targetElementGuid}
+          initialBcfArtifactId={targetBcfArtifactId}
         />
       {:else if activeView === 'documents'}
         <DocumentsView />
