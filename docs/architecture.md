@@ -401,8 +401,50 @@ These are called out explicitly so reviewers can see what is deliberate vs. stil
 - **LLM rule extraction UI.** The Gemini extraction service is in scope; a full curation UI may be deferred post-submission.
 - **Migration status.** The repository is now FastHTML-first. Treat this file as a living architecture reference and update it whenever routes, modules, or deployment assumptions change.
 
-## 15. Change log
+## 15. Target Architecture: FastAPI Gateway & Decoupled Svelte SPA Frontend
+
+As part of the platform's production evolution, BIM-Guard decouples its presentation layer from the compute engines:
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│              Svelte 5 SPA Client (frontend/)               │
+│        Vite + TypeScript + Tailwind CSS + OpenBIM 3D       │
+└─────────────┬───────────────────────────────▲──────────────┘
+              │ REST Requests                 │ Server-Sent Events
+              │ (JSON & Multipart)            │ (text/event-stream)
+              ▼                               │
+┌─────────────────────────────────────────────┴──────────────┐
+│           FastAPI API Gateway (app/api/)                    │
+│   Mount: /api on Starlette  |  OpenAPI Docs: /api/docs     │
+│   Routers: /projects, /rules, /analyze, /events            │
+└─────────────┬───────────────────────────────▲──────────────┘
+              │ Calls Facades                 │ Emits Progress
+              ▼                               │
+┌─────────────────────────────────────────────┴──────────────┐
+│          Service & Pipeline Layer (app/services/)          │
+│   AnalysisRunner  |  PipelineTracker  |  ProjectsService    │
+│   EventBroadcaster (Thread-Safe Async SSE Bridge)          │
+└─────────────┬──────────────────────────────────────────────┘
+              │ Evaluates
+              ▼
+┌────────────────────────────────────────────────────────────┐
+│      Framework-Agnostic Compute Kernels (app/engines/)     │
+│   GC-001 Galvanic  |  CC-001 Crevice  |  MC-001 MIC        │
+│   Blue Halo Seismic Clearance  |  Docling / NLP Extractor  │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 15.1 Core Architectural Principles
+
+1. **Strict Data Contracts**: All boundary interactions are formalized using Pydantic models in `app/modules/contracts.py` (`ProjectResponse`, `RuleResponse`, `AnalysisResultContract`, `WorkflowStatusContract`).
+2. **Coexistence via Starlette Mount**: FastAPI is mounted at `/api` directly within `app/main.py`. This ensures existing FastHTML pages remain 100% operational during the incremental migration.
+3. **Real-Time Event Streaming (SSE)**: Instead of wasteful client-side polling or full HTML fragment swaps, pipeline progression across the 6 execution stages (`Validation` -> `IFC Parsing` -> `Engine Execution` -> `Risk Scoring` -> `Report Assembly` -> `Export`) is broadcast as `text/event-stream` via `/api/events/{project_id}`.
+4. **Standalone Svelte SPA**: Located under `frontend/`, configured with Vite dev proxy forwarding `/api` calls to `http://127.0.0.1:8000/api`.
+
+## 16. Change log
 
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-04 | Initial integration plan based on task brief + validated Streamlit workflow |
+| 0.2 | 2026-08 | Transition to FastAPI Gateway, Server-Sent Events, and Decoupled Svelte 5 SPA Frontend |
+

@@ -5,6 +5,7 @@
         "charliermarsh.ruff",
         "shd101wyy.markdown-preview-enhanced",
         "anthropic.claude-code",
-        "google.google-antigravity"
+        "google.google-antigravity",
+        "svelte.svelte-vscode"
     ]
 }

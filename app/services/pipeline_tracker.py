@@ -52,6 +52,7 @@ STORAGE
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from collections import OrderedDict
@@ -594,8 +595,24 @@ def emit(code: str, stage: Optional[Stage] = None, **metrics: Any) -> None:
     run = tracker.run(code)
     if stage is not None:
         run.stage(stage, **metrics)
+        emit_event(
+            event_type="stage_transition",
+            source_module=code,
+            project_id=tracker.project_id,
+            payload={
+                "stage": stage.value,
+                "stage_name": stage.label,
+                "metrics": metrics,
+            },
+        )
     elif metrics:
         run.record(**metrics)
+        emit_event(
+            event_type="metric_increment",
+            source_module=code,
+            project_id=tracker.project_id,
+            payload={"metrics": metrics},
+        )
 
 
 def increment(code: str, **counters: int) -> None:
@@ -612,6 +629,12 @@ def complete(code: str, **metrics: Any) -> None:
     if tracker is None:
         return
     tracker.run(code).complete(**metrics)
+    emit_event(
+        event_type="engine_complete",
+        source_module=code,
+        project_id=tracker.project_id,
+        payload={"status": "complete", "metrics": metrics},
+    )
 
 
 def fail(code: str, reason: str) -> None:
@@ -620,6 +643,12 @@ def fail(code: str, reason: str) -> None:
     if tracker is None:
         return
     tracker.run(code).fail(reason)
+    emit_event(
+        event_type="engine_failed",
+        source_module=code,
+        project_id=tracker.project_id,
+        payload={"status": "failed", "reason": reason},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -680,4 +709,54 @@ def get_event_history(project_id: int | None = None) -> list[PipelineEvent]:
     if project_id is None:
         return list(_EVENT_HISTORY)
     return [event for event in _EVENT_HISTORY if event.project_id == project_id]
+
+
+class EventBroadcaster:
+    """Thread-safe bridge between synchronous engine emits and async SSE queues."""
+
+    def __init__(self) -> None:
+        self._subscribers: dict[int, set[asyncio.Queue]] = {}
+        self._lock = threading.Lock()
+
+    def subscribe(self, project_id: int) -> asyncio.Queue:
+        """Register an asyncio.Queue to receive events for project_id."""
+        q: asyncio.Queue = asyncio.Queue()
+        with self._lock:
+            if project_id not in self._subscribers:
+                self._subscribers[project_id] = set()
+            self._subscribers[project_id].add(q)
+        return q
+
+    def unsubscribe(self, project_id: int, q: asyncio.Queue) -> None:
+        """Remove a previously registered asyncio.Queue."""
+        with self._lock:
+            if project_id in self._subscribers:
+                self._subscribers[project_id].discard(q)
+                if not self._subscribers[project_id]:
+                    del self._subscribers[project_id]
+
+    def broadcast(self, event: PipelineEvent) -> None:
+        """Forward an event to all subscribed queues for this project."""
+        with self._lock:
+            queues = list(self._subscribers.get(event.project_id, []))
+        for q in queues:
+            try:
+                q.put_nowait(event)
+            except Exception:
+                pass
+
+
+EVENT_BROADCASTER = EventBroadcaster()
+subscribe_event(EVENT_BROADCASTER.broadcast)
+
+
+def subscribe_async(project_id: int) -> asyncio.Queue:
+    """Subscribe to live pipeline events for project_id using an asyncio Queue."""
+    return EVENT_BROADCASTER.subscribe(project_id)
+
+
+def unsubscribe_async(project_id: int, q: asyncio.Queue) -> None:
+    """Unsubscribe an asyncio Queue from project_id pipeline events."""
+    EVENT_BROADCASTER.unsubscribe(project_id, q)
+
 

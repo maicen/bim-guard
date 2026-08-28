@@ -6,36 +6,44 @@ View the published demo at [https://maicen.github.io/bim-guard/](https://maicen.
 
 ## Overview
 
-BIM-Guard is a FastHTML and MonsterUI application for BIM compliance workflows. Users can upload IFC models and regulatory documents, extract rules, review a rule library, run compliance analysis, and export artifacts such as BCF reports.
+BIM-Guard is an OpenBIM compliance platform supporting a **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, run multi-engine audits (galvanic corrosion, crevice corrosion, MIC, seismic clearance), and stream live progress via Server-Sent Events (SSE).
 
-The app is a single ASGI service. UI and backend routes live together in Python, with HTMX used for partial updates and MonsterUI for the component layer.
+During migration, the legacy FastHTML + MonsterUI interface remains mounted alongside the API Gateway.
 
 ## Stack
 
-- FastHTML and HTMX for routing and partial page updates
-- MonsterUI for UI components
-- IfcOpenShell for IFC parsing
-- Supabase for the default database and storage backends
-- LiteLLM for OpenRouter-first rule extraction across multiple providers
+- **Backend API**: FastAPI (REST + SSE) mounted with Pydantic contracts
+- **Frontend SPA**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
+- **Legacy UI**: FastHTML and MonsterUI (coexisting during transition)
+- **IFC & BIM Processing**: IfcOpenShell, ThatOpenCompany / Web-IFC viewer
+- **Database & Storage**: Supabase (Postgres) and Supabase Object Storage
+- **LLM Engine**: LiteLLM for rule extraction across multiple providers
 
 ## Repository Layout
 
 ```
 bim-guard/
 ├── app/
-│   ├── main.py          # App bootstrap and route registration
-│   ├── components/      # Reusable UI building blocks
-│   ├── routes/          # HTTP handlers and HTMX responses
-│   ├── services/        # Persistence, storage, and extraction services
-│   ├── modules/         # 5-step compliance pipeline
-│   ├── engines/         # Corrosion engines and demo data
+│   ├── api/             # FastAPI routers (/projects, /rules, /analyze, /events)
+│   ├── main.py          # App bootstrap, FastHTML + FastAPI mount at /api
+│   ├── components/      # Reusable FastHTML UI building blocks
+│   ├── routes/          # FastHTML HTTP handlers and HTMX responses
+│   ├── services/        # Persistence, runner, tracker, and extraction services
+│   ├── modules/         # Compliance pipeline stages & Pydantic contracts
+│   ├── engines/         # Corrosion physics engines (GC-001, CC-001, MC-001)
 │   └── views/           # Shared page layout helpers
+├── frontend/            # Standalone Vite + Svelte 5 Single-Page App (SPA)
+│   ├── src/
+│   │   ├── lib/         # Typed API client, SSE subscriber, UI components
+│   │   └── routes/      # Projects, Audit, Rules, and 3D Viewer views
+│   ├── package.json     # Frontend dependencies (Svelte 5, Tailwind CSS)
+│   └── vite.config.ts   # Dev server with /api proxy to FastAPI
 ├── data/                # Local runtime data, cache, and seed rule sets
-├── docs/                # Supporting documentation
+├── docs/                # Architectural and technical documentation
 ├── scripts/             # Migration and backfill utilities
 ├── static/              # CSS, JS, and viewer assets
 ├── main.py              # Uvicorn entrypoint (`uv run uvicorn main:app --reload`)
-├── pyproject.toml       # Project metadata and dependencies
+├── pyproject.toml       # Project metadata and backend dependencies
 └── example.env          # Environment template for local development
 ```
 
@@ -91,15 +99,38 @@ Pin the default app model with `BIM_GUARD_LLM_MODEL`; it defaults to
 
 Supabase schema changes are now tracked in-repo under `supabase/migrations/`. For a fresh Supabase environment, apply the migrations in that folder instead of relying on runtime table creation.
 
-### 3. Run the app
+### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
 
+You can launch both the backend and frontend concurrently using the cross-platform launcher:
+
+- **macOS / Linux / WSL**: `./run_server.sh` (or `./run_server.bat`)
+- **Windows**: `run_server.bat`
+
+Alternatively, run each service individually in separate terminals:
+
+**Backend API & app:**
 ```bash
 uv run uvicorn main:app --reload
 ```
+The app is available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+Interactive FastAPI Swagger docs are at [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs).
 
-The app is available at [http://127.0.0.1:8000](http://127.0.0.1:8000). You can also start it with `python main.py` if you prefer a direct entrypoint.
+**Svelte SPA Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+The Svelte frontend is available at [http://localhost:5173](http://localhost:5173). Requests to `/api/*` are automatically proxied to the backend at port 8000.
 
-### 4. Run the Python agent
+### 4. Run Production Server
+
+To build the frontend and serve the compiled single-page application with multi-worker Uvicorn:
+
+- **macOS / Linux / WSL**: `./run_production_server.sh` (or `./run_production_server.bat`)
+- **Windows**: `run_production_server.bat`
+
+### 5. Run the Python agent
 
 The terminal agent uses OpenRouter, repository-local coding tools, bounded tool
 turns and cost, server-side web search, and append-only JSONL sessions:

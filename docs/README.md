@@ -16,6 +16,7 @@ These files should be treated as current sources of truth.
 
 ## Operational Guides
 
+- ../frontend/README.md
 - NotebookLM/README.md
 - NotebookLM/setup_guide.md
 - NotebookLM/sources.md

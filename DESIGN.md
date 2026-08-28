@@ -2,10 +2,11 @@
 
 ## Sources
 
-- [Components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui) _(visual reference only — implemented as MonsterUI Python FT components, not React/shadcn)_
+- [Components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui) _(visual reference implemented in MonsterUI and Svelte 5 Tailwind components)_
 - [This Design](https://raw.githubusercontent.com/VoltAgent/awesome-design-md/refs/heads/main/design-md/apple/DESIGN.md)
 - [What is DESIGN.md?](https://stitch.withgoogle.com/docs/design-md/overview)
 - [MonsterUI](https://monsterui.answer.ai/)
+- [Svelte Frontend](frontend/README.md)
 - [basecoat/src/js](https://github.com/hunvreus/basecoat/tree/main/src/js)
 - [basecoat/src/css](https://github.com/hunvreus/basecoat/tree/main/src/css)
 
@@ -354,3 +355,17 @@ The color story is starkly binary. Product sections alternate between pure black
 6. Products always appear on solid color fields — never on gradients, textures, or lifestyle backgrounds in hero modules
 7. Shadow is rare and always soft: `3px 5px 30px 0.22 opacity` or nothing at all
 8. Pill CTAs use 980px radius — this creates the signature BIMGuard rounded-rectangle-that-looks-like-a-capsule shape
+
+## 10. Decoupled Svelte SPA Component System
+
+The standalone frontend (`frontend/src/`) translates these design principles into modern Svelte 5 + Tailwind CSS components:
+
+- **Surface Treatment**: Dark glassmorphic headers (`bg-slate-900/80 backdrop-blur-md`), elevated dark cards (`bg-slate-900/60 border-slate-800`), and deep canvas backgrounds (`bg-slate-950`).
+- **Accent Rhythm**: Emerald (`#10b981`) and BIMGuard Blue interactive states, with dedicated risk banding for compliance findings:
+  - Critical: `rose-500`
+  - High: `amber-500`
+  - Medium: `yellow-400`
+  - Low / Tolerable: `emerald-500`
+- **Real-Time Instrumentation**: The `PipelineProgress` component features animated SSE stream status pings, stage step meters, and dynamic metrics chips reflecting the active physics engines.
+- **3D OpenBIM Viewport**: Enclosed viewport canvas (`IfcViewer.svelte`) featuring dark frame styling and model isolation.
+

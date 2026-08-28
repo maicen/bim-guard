@@ -68,3 +68,226 @@ class ReportPayloadContract(BaseModel):
         default_factory=list, description="BCF topic structures"
     )
 
+
+# ---------------------------------------------------------------------------
+# Project Contracts
+# ---------------------------------------------------------------------------
+
+
+class ProjectCreateRequest(BaseModel):
+    """Payload for creating a new project via the API."""
+
+    name: str = Field(..., min_length=1, max_length=255, description="Project name")
+    description: Optional[str] = Field(default="", description="Project description")
+    status: str = Field(default="Draft", description="Workflow status (e.g. Draft, Active)")
+    country: str = Field(default="US", description="Regulatory jurisdiction or country code")
+    analysis_type: str = Field(default="Architecture", description="Target analysis domain")
+
+
+class ProjectUpdateRequest(BaseModel):
+    """Payload for updating an existing project."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    status: Optional[str] = None
+    country: Optional[str] = None
+    analysis_type: Optional[str] = None
+
+
+class ProjectResponse(BaseModel):
+    """Detailed response model for a project."""
+
+    id: int
+    name: str
+    description: Optional[str] = ""
+    status: Optional[str] = "Draft"
+    country: Optional[str] = "US"
+    analysis_type: Optional[str] = "Architecture"
+    ifc_file_path: Optional[str] = None
+    ifc_md5_hash: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ProjectListResponse(BaseModel):
+    """Paginated or listed collection of projects."""
+
+    total: int = Field(..., description="Total number of projects")
+    projects: list[ProjectResponse] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Rule & Ruleset Contracts
+# ---------------------------------------------------------------------------
+
+
+class RuleCreateRequest(BaseModel):
+    """Payload for creating or registering a rule."""
+
+    rule_id: str = Field(..., description="Unique rule identifier (e.g. GC-001.01)")
+    description: Optional[str] = Field(default="", description="Rule human description")
+    mechanism: Optional[str] = Field(default="CODE", description="Domain or mechanism (e.g. GC-001, CODE)")
+    ruleset_id: Optional[str] = Field(default=None, description="Group or folder ruleset identifier")
+    rule_category: Optional[str] = Field(default="property_check", description="Rule classification")
+    property_set: Optional[str] = None
+    property_name: Optional[str] = None
+    operator: Optional[str] = Field(default="==", description="Evaluation operator")
+    check_value: Optional[str] = None
+    value_min: Optional[str] = None
+    value_max: Optional[str] = None
+    unit: Optional[str] = None
+    severity: str = Field(default="recommended", description="Severity (mandatory, recommended)")
+    confidence: Optional[str] = None
+    extraction_method: Optional[str] = "manual"
+    needs_review: int = Field(default=0, description="1 if flag for review")
+
+
+class RuleUpdateRequest(BaseModel):
+    """Payload for updating an existing rule."""
+
+    description: Optional[str] = None
+    property_set: Optional[str] = None
+    property_name: Optional[str] = None
+    operator: Optional[str] = None
+    check_value: Optional[str] = None
+    value_min: Optional[str] = None
+    value_max: Optional[str] = None
+    unit: Optional[str] = None
+    severity: Optional[str] = None
+    needs_review: Optional[int] = None
+
+
+class RuleResponse(BaseModel):
+    """Detailed response model for a rule."""
+
+    id: int
+    rule_id: Optional[str] = None
+    description: Optional[str] = None
+    source_text: Optional[str] = None
+    mechanism: Optional[str] = None
+    ruleset_id: Optional[str] = None
+    rule_category: Optional[str] = None
+    property_set: Optional[str] = None
+    property_name: Optional[str] = None
+    operator: Optional[str] = None
+    check_value: Optional[str] = None
+    value_min: Optional[str] = None
+    value_max: Optional[str] = None
+    unit: Optional[str] = None
+    severity: Optional[str] = "recommended"
+    confidence: Optional[str] = None
+    extraction_method: Optional[str] = None
+    needs_review: Optional[int] = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class RuleFolderResponse(BaseModel):
+    """Grouped folder / ruleset model."""
+
+    id: Optional[int] = None
+    ruleset_id: str
+    display_name: str
+    description: Optional[str] = ""
+    mechanism_scope: Optional[str] = ""
+    rules: list[RuleResponse] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Analysis & Finding Contracts
+# ---------------------------------------------------------------------------
+
+
+class AuditIssueContract(BaseModel):
+    """Individual compliance violation or issue finding."""
+
+    id: str = Field(..., description="Finding identifier (e.g. BGR-0001)")
+    element_id: str = Field(..., description="Target IFC element GlobalId")
+    rule_id: str = Field(..., description="Evaluated rule ID")
+    title: str = Field(..., description="Short finding summary")
+    band: str = Field(default="low", description="Risk band: critical, high, medium, low")
+    score: float = Field(default=0.0, description="Risk score 0.0 to 1.0")
+    mechanism: str = Field(default="", description="Evaluated mechanism label")
+    description: str = Field(default="", description="Detailed issue description")
+    mitigation: str = Field(default="", description="Remediation guidance")
+    details: dict[str, Any] = Field(default_factory=dict, description="Metadata and position info")
+
+
+class IssueStatsContract(BaseModel):
+    """Statistical summary of issue findings by severity band."""
+
+    total: int = 0
+    critical: int = 0
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+
+
+class AnalysisRunRequest(BaseModel):
+    """Request to trigger compliance analysis."""
+
+    project_id: int = Field(..., description="Target project ID")
+    slug: str = Field(default="corrosion", description="Analysis type slug (corrosion, seismic)")
+    rule_ids: Optional[list[str]] = Field(default=None, description="Optional rule subset to evaluate")
+
+
+class AnalysisResultContract(BaseModel):
+    """Composite analysis result returned by analysis runners."""
+
+    pipeline: str = Field(default="audit", description="Pipeline identifier")
+    project_id: int
+    slug: str = "corrosion"
+    element_count: int = 0
+    audit_issues: list[AuditIssueContract] = Field(default_factory=list)
+    issue_stats: IssueStatsContract = Field(default_factory=IssueStatsContract)
+    compliance_error: Optional[str] = None
+    cached: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Workflow Status & Live Pipeline Contracts
+# ---------------------------------------------------------------------------
+
+
+class StageRecordContract(BaseModel):
+    """Record of a single pipeline execution stage."""
+
+    stage: int
+    name: str
+    duration_seconds: Optional[float] = None
+
+
+class EngineRunContract(BaseModel):
+    """Live progress and status of an individual compliance engine."""
+
+    code: str
+    label: str
+    status: str = Field(..., description="pending, running, complete, failed, not_implemented")
+    current_stage: Optional[int] = None
+    stage_name: Optional[str] = None
+    progress_percent: int = 0
+    total_stages: int = 6
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    stages: list[StageRecordContract] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
+class WorkflowStatusContract(BaseModel):
+    """Overall workflow snapshot for a project."""
+
+    project_id: int
+    status: str = Field(default="pending", description="Overall project analysis state")
+    engines: dict[str, EngineRunContract] = Field(default_factory=dict)
+    timestamp: Optional[str] = None
+
+
+class PipelineEventContract(BaseModel):
+    """Real-time event emitted during pipeline execution for SSE streaming."""
+
+    event_type: str = Field(..., description="stage_transition, metric_increment, completed, failed")
+    source_module: str = Field(..., description="Engine or driver identifier")
+    project_id: int
+    payload: dict[str, Any] = Field(default_factory=dict)
+    timestamp: str
+
+

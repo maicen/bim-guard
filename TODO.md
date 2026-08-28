@@ -95,10 +95,24 @@ Owner: Osama.
 - [ ] Add a persistent job repository with queued, running, completed, failed, and
   cancelled states.
 - [ ] Move IFC parsing, geometry extraction, compliance analysis, enhancement, and
-  report generation out of request handlers.
+  report generation out of request handlers into dedicated background workers.
 - [ ] Add retry, idempotency, timeout, cancellation, and worker recovery behavior.
-- [ ] Add authenticated Server-Sent Events endpoints for job progress.
-- [ ] Replace long-running HTMX requests with job submission and streamed progress UI.
+- [x] Add authenticated Server-Sent Events endpoints for job progress (`GET /api/events/{project_id}`).
+- [x] Replace polling and HTMX swaps with Server-Sent Events (SSE) stream in FastAPI gateway.
+
+## Priority 4.1: FastAPI Gateway & Decoupled Svelte SPA Architecture
+
+- [x] Add `fastapi>=0.115.0` to backend dependencies (`pyproject.toml`).
+- [x] Formalize strict Pydantic data contracts for Project, Rule, Analysis, and Workflow entities (`app/modules/contracts.py`).
+- [x] Initialize FastAPI API Gateway under `app/api/` with CORS and OpenAPI documentation (`/api/docs`).
+- [x] Implement REST routers: `projects.py`, `rules.py`, `analyze.py`, and `events.py`.
+- [x] Implement EventBroadcaster and async queue subscription in `pipeline_tracker.py` for real-time SSE streaming.
+- [x] Mount FastAPI API Gateway under `/api` in `app/main.py` ensuring zero-downtime coexistence with legacy FastHTML.
+- [x] Scaffold standalone Vite + Svelte 5 SPA client under `frontend/`.
+- [x] Implement typed API client (`frontend/src/lib/api.ts`) and SSE subscriber (`frontend/src/lib/sse.ts`).
+- [x] Build core Svelte views: `ProjectsView`, `AnalyzeView`, `RulesView`, `ViewerView`, and `PipelineProgress`.
+- [ ] Implement native `@thatopen/components` Svelte wrapper in `IfcViewer.svelte` to retire iframe embedding.
+- [ ] Add user authentication (Supabase Auth / JWT) across FastAPI endpoints and Svelte client.
 
 ## Priority 5: Viewer Island
 

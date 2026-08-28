@@ -69,6 +69,10 @@ from app.components.ui import (
 from app.logging_config import get_logger
 from app.services.pipeline_services import PipelineOrchestratorService
 from app.services.documents_service import DocumentService
+from app.services.projects_service import ProjectsService
+from app.services.rules_service import RuleService
+from app.services.report_artifacts import ReportArtifactService
+
 _projects_service = ProjectsService()
 _documents_service = DocumentService()
 _rule_service = RuleService()

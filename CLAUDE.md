@@ -13,65 +13,84 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Install dependencies
+# Install backend dependencies
 uv sync
 
 # Install optional ML pipeline dependency group
 uv sync --group ml-pipeline
 
-# Run development server
+# Run development backend server
 uv run uvicorn main:app --reload
 
 # Run with specific host/port
 uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
 
-There are no automated tests or lint commands configured.
+# Install & run Svelte frontend
+cd frontend && npm install
+npm run dev
+
+# Run full development stack (cross-platform)
+./run_server.sh         # macOS/Linux (or ./run_server.bat)
+run_server.bat          # Windows
+
+# Run production stack (build SPA + multi-worker uvicorn)
+./run_production_server.sh  # macOS/Linux (or ./run_production_server.bat)
+run_production_server.bat   # Windows
+
+# Run automated tests and lint
+uv run ruff check .
+uv run pytest tests/ -v
+```
 
 ## Dependency Management Rule
 
 All Python dependencies must be managed via uv and declared in pyproject.toml (including optional dependency groups). Do not add or maintain separate requirements.txt files.
+All frontend dependencies must be declared in `frontend/package.json`.
 
 ## Docstring and API Documentation Rule
 
 - Follow [PEP 257](https://peps.python.org/pep-0257/) for Python docstrings.
-- Use Python [pydoc](https://docs.python.org/3/library/pydoc.html) to inspect and generate API docs.
+- Interactive OpenAPI documentation is automatically served at `http://127.0.0.1:8000/api/docs`.
 - For new public modules/classes/functions, add or update docstrings in the same change.
 
 Useful commands:
 
 ```bash
 uv run ruff check .
-uv run python -m pydoc app.modules.orchestrator
-uv run python -m pydoc -w app.modules.orchestrator
+uv run pytest tests/test_api_*.py -v
 ```
 
 ## Architecture
 
-BIM-Guard is a FastHTML + MonsterUI web application for BIM (Building Information Modeling) compliance checking. Users upload IFC models and specification documents, extract compliance rules, and generate compliance reports.
+BIM-Guard is evolving from a FastHTML + MonsterUI monolith into a modern, decoupled architecture: a **FastAPI API Gateway** providing strict Pydantic REST contracts and real-time Server-Sent Events (SSE) tracking, and a **standalone Vite + Svelte 5 Single-Page Application (SPA)** client.
 
 ### Layer Structure
 
 ```text
-Routes (app/routes/)       → HTTP handlers, HTMX responses
-Services (app/services/)   → Business logic, Supabase persistence
-Components (app/components/) → Reusable FastHTML UI elements
-Modules (app/modules/)     → 5-step compliance pipeline
+Frontend (frontend/)       → Vite + Svelte 5 SPA, TypeScript, Tailwind CSS
+API Gateway (app/api/)     → FastAPI routers (/projects, /rules, /analyze, /events)
+Data Contracts (app/modules/contracts.py) → Pydantic request/response schemas
+Routes (app/routes/)       → FastHTML handlers, HTMX responses (legacy/coexistence)
+Services (app/services/)   → Business logic, pipeline runner, tracker, Supabase persistence
+Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernels (GC-001, CC-001, MC-001, Blue Halo)
 ```
 
 ### Key Technologies
 
-- **FastHTML** — Python framework where HTML is generated programmatically as Python objects (no template files). Every UI element is a Python function returning HTML nodes.
-- **MonsterUI** — Tailwind-based component library layered on top of FastHTML. Components like `Card`, `Button`, `Grid` are imported and used directly.
-- **Supabase** — Managed Postgres persistence accessed through `PersistenceService` and the table adapters in `app/services/persistence.py`.
-- **HTMX** — Used via FastHTML's `hx_*` attributes for partial page updates without full reloads.
+- **FastAPI** — Modern API framework serving `/api` with automatic OpenAPI documentation (`/api/docs`), CORS, Pydantic model validation, and SSE streaming.
+- **Svelte 5** — Modern reactive frontend framework powering the decoupled SPA under `frontend/`.
+- **FastHTML & MonsterUI** — Coexisting Python UI layer mounted at `/` for backward compatibility during migration.
+- **Server-Sent Events (SSE)** — Real-time event streaming (`/api/events/{project_id}`) for 6-stage compliance pipelines.
+- **Supabase** — Managed Postgres persistence accessed through `PersistenceService` and object storage.
+- **IfcOpenShell** — Server-side IFC parsing engine.
 
 ### Data Flow
 
 1. `main.py` (root) → boots uvicorn
-2. `app/main.py` → initializes FastHTML app, mounts all routes
-3. Routes call services for data; services call Supabase through the shared persistence layer
-4. Routes return FastHTML components (which become HTML) or trigger HTMX swaps
+2. `app/main.py` → initializes FastHTML app and mounts FastAPI gateway at `/api`
+3. Svelte client (`frontend/`) talks to `/api/*` via `src/lib/api.ts` and listens to real-time events via `src/lib/sse.ts`
+4. FastAPI routers call service layer (`app/services/`); compute kernels execute without UI framework dependencies
+5. Results return as validated Pydantic models or stream over SSE connections
 
 ### Database
 

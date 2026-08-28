@@ -17,30 +17,45 @@ applyTo: "app/**"
 
 ## Project Overview
 
-**BIM Guard** is a BIM compliance application built with FastHTML (Python) and MonsterUI. It lets users upload IFC models, define compliance rules from documents, and generate reports.
+**BIM Guard** is an OpenBIM compliance platform supporting:
+1. A **FastAPI API Gateway** (`app/api/`) delivering strict Pydantic REST contracts, file streaming, and real-time Server-Sent Events (SSE).
+2. A **Decoupled SPA Frontend** (`frontend/`) built with Svelte 5, Vite, TypeScript, and Tailwind CSS.
+3. A **Legacy FastHTML + MonsterUI monolith** (`app/routes/`, `app/components/`) coexisting during the transition period.
+4. **Compute engines & pipelines** (`app/engines/`, `app/modules/`) that operate framework-agnostic.
 
-**Tech stack:** FastHTML · MonsterUI · Supabase (Postgres) · IfcOpenShell · HTMX
-
-**IfcOpenShell** is the server-side IFC parsing library (used in `app/modules/module2_ifc_read.py`). It is not yet integrated — module stubs await implementation. Do not import it in route files; all IFC processing goes through the orchestrator.
+**Tech stack:** FastAPI · Svelte 5 · FastHTML · MonsterUI · Supabase (Postgres) · IfcOpenShell · Server-Sent Events
 
 ---
 
 ## Getting Started
 
 ```bash
-# Install dependencies
+# Install backend dependencies
 uv sync
 
-# Run the app
+# Run backend with auto-reload (available at http://127.0.0.1:8000, API docs at /api/docs)
 uv run uvicorn main:app --reload
 
-# Run on a specific host/port
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Run frontend in development (available at http://localhost:5173 with proxy to /api)
+cd frontend && npm install && npm run dev
+
+# Or launch both dev servers concurrently (cross-platform)
+./run_server.sh         # macOS/Linux (or ./run_server.bat)
+run_server.bat          # Windows
 ```
 
-There are no automated tests or lint commands. Use manual browser verification.
+---
 
-## UI / Frontend Rules (highest priority)
+## API & Backend Rules (`app/api/**`)
+
+1. **Always use Pydantic schemas**: Every route in `app/api/` must accept and return strict Pydantic models defined in `app/modules/contracts.py`. Never return raw HTML or unvalidated dictionaries.
+2. **Dependency Injection**: Use FastAPI `Depends(...)` with provider functions in `app/api/dependencies.py` to access services.
+3. **HTTP Status & Errors**: Raise standard `HTTPException` with appropriate status codes (400 for bad parameters, 404 for missing entities, 409 for pipeline conflicts).
+4. **Real-Time Streaming**: Use Server-Sent Events via `app/api/events.py` and `pipeline_tracker.py` for tracking multi-stage analysis workflows.
+
+---
+
+## UI / Frontend Rules (FastHTML legacy)
 
 ### 1. Always use MonsterUI components — never raw HTML tags
 
