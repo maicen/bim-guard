@@ -685,7 +685,7 @@
                       {#if selectedProjectId && issue.element_id}
                         <button
                           type="button"
-                          on:click={() => onSelectProjectForViewer(selectedProjectId, issue.element_id)}
+                          on:click={() => onSelectProjectForViewer(selectedProjectId!, issue.element_id)}
                           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0071e3]/20 hover:bg-[#0071e3]/30 text-[#0071e3] hover:text-blue-300 text-xs font-semibold transition-colors"
                         >
                           <ScanEye class="w-3.5 h-3.5" />

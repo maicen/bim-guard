@@ -22,6 +22,7 @@ from app.logging_config import get_logger
 from app.modules.contracts import (
     AnalysisResultContract,
     AnalysisRunRequest,
+    ArchAnalysisResponse,
     AuditIssueContract,
     IssueStatsContract,
     WorkflowStatusContract,

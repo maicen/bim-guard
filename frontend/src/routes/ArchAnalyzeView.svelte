@@ -24,6 +24,11 @@
     RuleComplianceResult,
     RuleElementResult,
     BuildingSummary,
+    ExitCountResult,
+    TravelDistanceResult,
+    DaylightResult,
+    FireSeparationResult,
+    GarageResult,
   } from '../lib/types';
 
   export let initialProjectId: number | null = null;
@@ -484,7 +489,7 @@
             <div class="px-4 pb-5 space-y-4">
               <!-- Exit Count table -->
               {#if exitResults.length}
-                {@const ePass = exitResults.filter((r) => r.passes).length}
+                {@const ePass = exitResults.filter((r: ExitCountResult) => r.passes).length}
                 <div>
                   <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('exit-count')}>
                     {#if openSections['exit-count']}<ChevronDown class="w-3.5 h-3.5" />{:else}<ChevronRight class="w-3.5 h-3.5" />{/if}
@@ -520,7 +525,7 @@
 
               <!-- Travel Distance table -->
               {#if travel.length}
-                {@const tdPass = travel.filter((r) => r.passes).length}
+                {@const tdPass = travel.filter((r: TravelDistanceResult) => r.passes).length}
                 <div>
                   <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('travel-dist')}>
                     {#if openSections['travel-dist']}<ChevronDown class="w-3.5 h-3.5" />{:else}<ChevronRight class="w-3.5 h-3.5" />{/if}
@@ -593,7 +598,7 @@
         {@const garageSep = (result.spatial_checks || {}).garage_separation || {}}
         {@const gResults = garageSep.results || []}
         {@const gWarnings = garageSep.warnings || []}
-        {@const gFail = gResults.filter((r) => !r.passes).length}
+        {@const gFail = gResults.filter((r: GarageResult) => !r.passes).length}
         {@const gBadge = !gResults.length && !gWarnings.length
           ? { label: 'N/A — no garage detected', cls: 'bg-slate-800 text-slate-400 border-slate-700' }
           : gFail > 0
@@ -668,7 +673,7 @@
               {#if domain.key === 'windows'}
                 {@const daylight = (result.spatial_checks || {}).daylight || []}
                 {#if daylight.length}
-                  {@const dPass = daylight.filter((r) => r.passes).length}
+                  {@const dPass = daylight.filter((r: DaylightResult) => r.passes).length}
                   {@const dFail = daylight.length - dPass}
                   <div>
                     <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('daylight')}>
@@ -710,7 +715,7 @@
               {#if domain.key === 'fire'}
                 {@const fireSep = (result.spatial_checks || {}).fire_separation || []}
                 {#if fireSep.length}
-                  {@const fPass = fireSep.filter((r) => r.passes).length}
+                  {@const fPass = fireSep.filter((r: FireSeparationResult) => r.passes).length}
                   {@const fFail = fireSep.length - fPass}
                   <div>
                     <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('fire-sep')}>
@@ -794,9 +799,9 @@
                     </button>
 
                     {#if isRuleOpen}
-                      {@const sortedEls = [...(rule.all_elements || [])].sort((a, b) => {
-                        const order = { FAIL: 0, MISSING: 1, PASS: 2 };
-                        return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+                      {@const sortedEls = [...(rule.all_elements || [])].sort((a: RuleElementResult, b: RuleElementResult) => {
+                        const order: Record<string, number> = { FAIL: 0, MISSING: 1, PASS: 2 };
+                        return (order[a.status ?? ''] ?? 3) - (order[b.status ?? ''] ?? 3);
                       })}
                       <div class="overflow-auto border-t border-slate-800/60 max-h-64">
                         <table class="w-full text-xs">
@@ -834,7 +839,7 @@
                                     <button
                                       type="button"
                                       class="ml-2 text-blue-400 hover:text-blue-300 hover:underline"
-                                      on:click|stopPropagation={() => onSelectProjectForViewer(selectedProjectId, el.guid, result?.bcf_artifact_id || undefined)}
+                                      on:click|stopPropagation={() => onSelectProjectForViewer(selectedProjectId!, el.guid, result?.bcf_artifact_id || undefined)}
                                     >View in 3D</button>
                                   {/if}
                                 </td>
