@@ -10,9 +10,26 @@
     ShieldAlert,
     ScanEye,
     Search,
+    RefreshCw,
+    FileCode,
+    Box,
+    Layers,
+    FileText,
+    Upload,
+    Info,
+    Check,
+    X,
+    Sparkles,
+    ShieldCheck,
+    ExternalLink,
+    ChevronRight,
+    Copy,
+    Building2,
+    Compass,
+    SlidersHorizontal,
   } from 'lucide-svelte';
   import { analyzeApi, projectsApi } from '../lib/api';
-  import type { AnalysisResult, Project, AuditIssue } from '../lib/types';
+  import type { AnalysisResult, Project, AuditIssue, AnalysisInputItem } from '../lib/types';
   import PipelineProgress from '../lib/components/PipelineProgress.svelte';
 
   export let initialProjectId: number | null = null;
@@ -24,10 +41,22 @@
   let isRunning = false;
   let error = '';
   let result: AnalysisResult | null = null;
+  let analysisInputs: AnalysisInputItem[] = [];
 
-  // Filter state
+  // Options & Filters
   let searchQuery = '';
   let severityFilter = 'all';
+  let mechanismFilter = 'all';
+  let showLowRisk = true;
+  let isUploadModalOpen = false;
+  let uploadFile: File | null = null;
+  let isUploading = false;
+  let uploadSuccessMsg = '';
+  let uploadErrorMsg = '';
+  let copiedGuid = '';
+
+  // Inspection Drawer/Modal state
+  let inspectedIssue: AuditIssue | null = null;
 
   onMount(async () => {
     try {
@@ -37,29 +66,38 @@
         selectedProjectId = projects[0].id;
       }
       if (selectedProjectId) {
-        await fetchResults();
+        await Promise.all([fetchResults(), loadInputs()]);
       }
     } catch (err: any) {
       error = err.message || 'Failed to load projects';
     }
   });
 
-  async function fetchResults() {
+  async function loadInputs() {
     if (!selectedProjectId) return;
     try {
-      result = await analyzeApi.getResults(selectedProjectId, selectedSlug);
+      analysisInputs = await projectsApi.getInputs(selectedProjectId);
+    } catch {
+      analysisInputs = [];
+    }
+  }
+
+  async function fetchResults(useCache = true) {
+    if (!selectedProjectId) return;
+    try {
+      result = await analyzeApi.getResults(selectedProjectId, selectedSlug, useCache);
     } catch {
       result = null;
     }
   }
 
-  async function handleRun() {
+  async function handleRun(forceRecompute = false) {
     if (!selectedProjectId) return;
     isRunning = true;
     error = '';
     result = null;
     try {
-      result = await analyzeApi.run(selectedProjectId, selectedSlug);
+      result = await analyzeApi.run(selectedProjectId, selectedSlug, false, !forceRecompute);
     } catch (err: any) {
       error = err.message || 'Analysis failed';
     } finally {
@@ -67,44 +105,117 @@
     }
   }
 
+  async function handleProjectChange() {
+    error = '';
+    result = null;
+    await Promise.all([fetchResults(), loadInputs()]);
+  }
+
+  async function handleUploadIfc() {
+    if (!selectedProjectId || !uploadFile) return;
+    isUploading = true;
+    uploadSuccessMsg = '';
+    uploadErrorMsg = '';
+    try {
+      const res = await analyzeApi.uploadIfc(selectedProjectId, uploadFile);
+      uploadSuccessMsg = `Successfully attached ${res.filename} (${res.size_bytes?.toLocaleString() || '0'} bytes). SHA-256: ${res.sha256?.slice(0, 16) || ''}…`;
+      
+      // Refresh project info
+      const data = await projectsApi.list();
+      projects = data.projects || [];
+      uploadFile = null;
+      setTimeout(() => {
+        isUploadModalOpen = false;
+        uploadSuccessMsg = '';
+      }, 1500);
+    } catch (err: any) {
+      uploadErrorMsg = err.message || 'Upload failed';
+    } finally {
+      isUploading = false;
+    }
+  }
+
+  function copyText(text: string) {
+    navigator.clipboard.writeText(text);
+    copiedGuid = text;
+    setTimeout(() => {
+      if (copiedGuid === text) copiedGuid = '';
+    }, 2000);
+  }
+
   $: currentProject = projects.find((p) => p.id === selectedProjectId);
 
   $: filteredIssues = (result?.audit_issues || []).filter((issue: AuditIssue) => {
+    // Low risk filter (Note: data_quality issues are doctrine-exempt and ALWAYS shown)
+    if (!showLowRisk && issue.band === 'low' && issue.mechanism !== 'data_quality' && issue.mechanism !== 'Data Quality') {
+      return false;
+    }
+
     const matchesSearch =
       searchQuery === '' ||
       issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       issue.rule_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      issue.element_id.toLowerCase().includes(searchQuery.toLowerCase());
+      issue.element_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      issue.mechanism.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (issue.citations || []).some((c) => c.standard.toLowerCase().includes(searchQuery.toLowerCase()) || c.clause.toLowerCase().includes(searchQuery.toLowerCase()));
+
     const matchesSeverity =
-      severityFilter === 'all' || issue.band === severityFilter;
-    return matchesSearch && matchesSeverity;
+      severityFilter === 'all' ||
+      (severityFilter === 'data_quality'
+        ? issue.mechanism === 'data_quality' || issue.mechanism === 'Data Quality'
+        : issue.band === severityFilter && issue.mechanism !== 'data_quality' && issue.mechanism !== 'Data Quality');
+
+    const matchesMechanism =
+      mechanismFilter === 'all' ||
+      (mechanismFilter === 'data_quality'
+        ? issue.mechanism === 'data_quality' || issue.mechanism === 'Data Quality'
+        : issue.rule_id.startsWith(mechanismFilter) || issue.mechanism.includes(mechanismFilter));
+
+    return matchesSearch && matchesSeverity && matchesMechanism;
   });
+
+  // Distinct count for data quality reports
+  $: dataQualityCount = result?.issue_stats?.data_quality ?? (result?.audit_issues || []).filter((i) => i.mechanism === 'data_quality' || i.mechanism === 'Data Quality').length;
+  $: hasFindingsOnlyDataQuality = (result?.audit_issues || []).length > 0 && (result?.audit_issues || []).every((i) => i.mechanism === 'data_quality' || i.mechanism === 'Data Quality');
 </script>
 
-<div class="space-y-6 max-w-6xl mx-auto">
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="space-y-6 max-w-7xl mx-auto pb-12">
+  <!-- Top Navigation & Title Bar -->
+  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
     <div>
-      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Analysis</div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">MEP Piping &amp; Seismic Audit</h1>
-      <p class="text-xs sm:text-sm text-slate-400">
-        Run galvanic, crevice, and microbiological corrosion checks or Blue Halo seismic clearance validation.
+      <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#0071e3] mb-1">
+        <span>Analysis Gateway</span>
+        <span>•</span>
+        <span class="text-slate-400">Phase 6–9 Pipeline</span>
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+        <span>MEP Piping &amp; Seismic Audit</span>
+        {#if result?.cached}
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/80 shadow-sm">
+            <Sparkles class="w-3 h-3 text-blue-400" />
+            Cached SHA-256
+          </span>
+        {/if}
+      </h1>
+      <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
+        Execute verified Galvanic (GC-001), Crevice (CC-001), and Microbiological (MC-001) compliance audits or Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN 4149) envelopes.
       </p>
     </div>
 
-    <!-- Domain switcher & project select -->
-    <div class="flex items-center gap-3">
-      <!-- Engine toggle -->
-      <div class="bg-slate-900 border border-slate-800 p-0.5 rounded-xl flex items-center">
+    <!-- Actions & Project Selector -->
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Domain Toggle -->
+      <div class="bg-slate-900/90 border border-slate-800 p-1 rounded-2xl flex items-center shadow-inner">
         <button
           type="button"
           on:click={() => {
             selectedSlug = 'corrosion';
             fetchResults();
           }}
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {selectedSlug === 'corrosion' ? 'bg-[#0071e3] text-white shadow-sm' : 'text-slate-400 hover:text-white'}"
+          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug === 'corrosion' ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white'}"
         >
-          Corrosion (GC/CC/MC)
+          <Layers class="w-3.5 h-3.5" />
+          <span>Piping Corrosion (GC/CC/MC)</span>
         </button>
         <button
           type="button"
@@ -112,109 +223,278 @@
             selectedSlug = 'seismic';
             fetchResults();
           }}
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {selectedSlug === 'seismic' ? 'bg-[#0071e3] text-white shadow-sm' : 'text-slate-400 hover:text-white'}"
+          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug === 'seismic' ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20' : 'text-slate-400 hover:text-white'}"
         >
-          Seismic Clearance
+          <Compass class="w-3.5 h-3.5" />
+          <span>Seismic Clearance (Halo)</span>
         </button>
       </div>
 
-      <!-- Project dropdown -->
-      <select
-        bind:value={selectedProjectId}
-        on:change={() => fetchResults()}
-        class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-      >
-        {#each projects as p}
-          <option value={p.id}>{p.name}</option>
-        {/each}
-      </select>
+      <!-- Project Dropdown -->
+      <div class="relative">
+        <select
+          bind:value={selectedProjectId}
+          on:change={handleProjectChange}
+          class="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs font-medium text-white focus:outline-none focus:border-[#0071e3] shadow-sm appearance-none pr-8 cursor-pointer"
+        >
+          {#each projects as p}
+            <option value={p.id}>{p.name} ({p.country})</option>
+          {/each}
+        </select>
+        <ChevronRight class="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+      </div>
 
-      <!-- Run Action -->
+      <!-- Run Action Button -->
       <button
         type="button"
         disabled={isRunning || !currentProject?.ifc_file_path}
-        on:click={handleRun}
-        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+        on:click={() => handleRun(false)}
+        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:pointer-events-none"
       >
-        <Play class="w-3.5 h-3.5" />
-        <span>{isRunning ? 'Analyzing...' : 'Run Audit'}</span>
+        {#if isRunning}
+          <RefreshCw class="w-3.5 h-3.5 animate-spin" />
+          <span>Running Engine…</span>
+        {:else}
+          <Play class="w-3.5 h-3.5 fill-current" />
+          <span>Run Audit</span>
+        {/if}
       </button>
+
+      <!-- Recompute (force uncached) -->
+      {#if result}
+        <button
+          type="button"
+          disabled={isRunning || !currentProject?.ifc_file_path}
+          on:click={() => handleRun(true)}
+          title="Force uncached recomputation against the latest IFC digest"
+          class="p-2 rounded-full border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+        >
+          <RefreshCw class="w-3.5 h-3.5 {isRunning ? 'animate-spin' : ''}" />
+        </button>
+      {/if}
     </div>
   </div>
 
-  {#if currentProject && !currentProject.ifc_file_path}
-    <div class="p-4 rounded-2xl bg-amber-950/40 border border-amber-800 text-amber-300 text-xs flex items-center gap-2.5">
-      <AlertTriangle class="w-4 h-4 text-amber-400 shrink-0" />
-      <span>No IFC model is attached to {currentProject.name}. Upload one in the project registry before running the compliance engine.</span>
-    </div>
-  {/if}
-
-  {#if error}
-    <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
-      {error}
-    </div>
-  {/if}
-
-  <!-- Real-time pipeline tracker -->
-  {#if selectedProjectId && isRunning}
-    <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800">
-      <PipelineProgress projectId={selectedProjectId} />
-    </div>
-  {/if}
-
-  {#if result}
-    <!-- Summary Stats Row -->
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="text-xs text-slate-400 font-semibold uppercase">Total Findings</div>
-        <div class="text-2xl font-bold text-white mt-1">{result.issue_stats.total}</div>
-      </div>
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="text-xs text-slate-400 font-semibold uppercase">Critical</div>
-        <div class="text-2xl font-bold text-rose-400 mt-1">{result.issue_stats.critical}</div>
-      </div>
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="text-xs text-slate-400 font-semibold uppercase">High Risk</div>
-        <div class="text-2xl font-bold text-orange-400 mt-1">{result.issue_stats.high}</div>
-      </div>
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="text-xs text-slate-400 font-semibold uppercase">Medium Risk</div>
-        <div class="text-2xl font-bold text-yellow-400 mt-1">{result.issue_stats.medium}</div>
-      </div>
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="text-xs text-slate-400 font-semibold uppercase">Low Risk</div>
-        <div class="text-2xl font-bold text-emerald-400 mt-1">{result.issue_stats.low}</div>
-      </div>
-    </div>
-
-    <!-- Findings Table Card -->
-    <div class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+  <!-- Project Readiness & Lineage Section (Session A / B) -->
+  {#if currentProject}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Project Metadata Card -->
+      <div class="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Target Project</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase {currentProject.status === 'Active' ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60' : 'bg-slate-800 text-slate-400'}">
+            {currentProject.status}
+          </span>
+        </div>
         <div>
-          <h2 class="text-base font-bold text-white tracking-tight">Audit Findings ({result.audit_issues.length})</h2>
-          <p class="text-xs text-slate-400">Detailed component non-compliance and engineering mitigations.</p>
+          <div class="text-sm font-bold text-white truncate">{currentProject.name}</div>
+          <div class="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+            <span>Jurisdiction: <strong>{currentProject.country}</strong></span>
+            <span>•</span>
+            <span>Type: <strong>{currentProject.analysis_type}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- IFC Model Card & Lineage -->
+      <div class="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs uppercase font-bold tracking-wider text-slate-400">IFC Model Lineage</span>
+          {#if currentProject.ifc_file_path}
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+              Model Ready
+            </span>
+          {:else}
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-950/60 text-amber-400 border border-amber-800/60">
+              No Model Attached
+            </span>
+          {/if}
+        </div>
+        {#if currentProject.ifc_file_path}
+          <div class="text-xs space-y-1">
+            <div class="text-slate-300 font-mono text-[11px] truncate" title={currentProject.ifc_file_path}>
+              {currentProject.ifc_file_path.split('/').pop()}
+            </div>
+            {#if currentProject.ifc_md5_hash}
+              <div class="text-slate-500 font-mono text-[10px] flex items-center gap-1.5">
+                <span>Digest: {currentProject.ifc_md5_hash.slice(0, 16)}…</span>
+                <button
+                  type="button"
+                  on:click={() => copyText(currentProject?.ifc_md5_hash || '')}
+                  class="hover:text-slate-300"
+                >
+                  <Copy class="w-3 h-3" />
+                </button>
+              </div>
+            {/if}
+          </div>
+          <div class="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              on:click={() => onSelectProjectForViewer(currentProject.id)}
+              class="inline-flex items-center gap-1 text-xs font-semibold text-[#0071e3] hover:text-blue-400 transition-colors"
+            >
+              <ScanEye class="w-3.5 h-3.5" />
+              <span>Open 3D Viewer</span>
+            </button>
+            <span class="text-slate-700">•</span>
+            <button
+              type="button"
+              on:click={() => (isUploadModalOpen = true)}
+              class="text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              Replace Model
+            </button>
+          </div>
+        {:else}
+          <div class="text-xs text-amber-300/80">
+            Attach an IFC model to run compliance checks.
+          </div>
+          <button
+            type="button"
+            on:click={() => (isUploadModalOpen = true)}
+            class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300"
+          >
+            <Upload class="w-3.5 h-3.5" />
+            <span>Upload IFC Model</span>
+          </button>
+        {/if}
+      </div>
+
+      <!-- Analysis Inputs (Standards & Client Docs) -->
+      <div class="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Linked Standards &amp; Inputs</span>
+          <span class="text-xs font-mono font-bold text-slate-300">{analysisInputs.length} linked</span>
+        </div>
+        {#if analysisInputs.length > 0}
+          <div class="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto pr-1">
+            {#each analysisInputs as inp}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium {inp.kind === 'standard' ? 'bg-indigo-950/60 text-indigo-300 border border-indigo-800/60' : 'bg-teal-950/60 text-teal-300 border border-teal-800/60'}">
+                {inp.label}
+              </span>
+            {/each}
+          </div>
+        {:else}
+          <div class="text-xs text-slate-500">
+            Default regulatory rulepacks will be evaluated.
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Error Alerts -->
+  {#if error}
+    <div class="p-4 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-3">
+      <ShieldAlert class="w-5 h-5 text-rose-400 shrink-0" />
+      <div>
+        <strong class="font-bold">Execution Error:</strong> {error}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Live 6-Stage Pipeline Progress -->
+  {#if selectedProjectId && isRunning}
+    <PipelineProgress projectId={selectedProjectId} />
+  {/if}
+
+  <!-- Results Section -->
+  {#if result}
+    <!-- Demo Mode Notice -->
+    {#if result.compliance_is_demo}
+      <div class="p-4 rounded-2xl bg-amber-950/40 border border-amber-800/70 text-amber-300 text-xs flex items-center gap-2.5">
+        <AlertTriangle class="w-4 h-4 text-amber-400 shrink-0" />
+        <span><strong>Demo Compliance Mode:</strong> Results are generated from demonstration test cases.</span>
+      </div>
+    {/if}
+
+    <!-- Data Quality Doctrine Notice -->
+    {#if dataQualityCount > 0}
+      <div class="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/70 text-blue-200 text-xs flex items-start gap-3 shadow-sm">
+        <Info class="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+        <div>
+          <strong class="font-bold text-white">White Box Data-Quality Doctrine:</strong>
+          <span>
+            {dataQualityCount} unassessed service elements are explicitly reported below as <strong>Data Quality</strong> findings (assigned to the BIM Coordinator) rather than fabricating a false compliance pass.
+          </span>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Executive KPI Statistics Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-sm">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Total Findings</div>
+        <div class="text-2xl font-bold text-white mt-1">{result.issue_stats.total}</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">Non-compliant items</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-red-950/30 border border-red-900/40 shadow-sm">
+        <div class="text-[11px] text-red-300 font-semibold uppercase tracking-wider">Critical</div>
+        <div class="text-2xl font-bold text-red-400 mt-1">{result.issue_stats.critical}</div>
+        <div class="text-[10px] text-red-400/60 mt-0.5">Immediate intervention</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-orange-950/30 border border-orange-900/40 shadow-sm">
+        <div class="text-[11px] text-orange-300 font-semibold uppercase tracking-wider">High Risk</div>
+        <div class="text-2xl font-bold text-orange-400 mt-1">{result.issue_stats.high}</div>
+        <div class="text-[10px] text-orange-400/60 mt-0.5">Mandatory remediation</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-yellow-950/30 border border-yellow-900/40 shadow-sm">
+        <div class="text-[11px] text-yellow-300 font-semibold uppercase tracking-wider">Medium Risk</div>
+        <div class="text-2xl font-bold text-yellow-400 mt-1">{result.issue_stats.medium}</div>
+        <div class="text-[10px] text-yellow-400/60 mt-0.5">Recommended mitigation</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-900/40 shadow-sm">
+        <div class="text-[11px] text-emerald-300 font-semibold uppercase tracking-wider">Low Risk</div>
+        <div class="text-2xl font-bold text-emerald-400 mt-1">{result.issue_stats.low}</div>
+        <div class="text-[10px] text-emerald-400/60 mt-0.5">Minor tolerance variance</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-900/40 shadow-sm">
+        <div class="text-[11px] text-indigo-300 font-semibold uppercase tracking-wider">Data Quality</div>
+        <div class="text-2xl font-bold text-indigo-300 mt-1">{dataQualityCount}</div>
+        <div class="text-[10px] text-indigo-300/60 mt-0.5">Unassessed mechanisms</div>
+      </div>
+    </div>
+
+    <!-- Findings Table & Export Controls -->
+    <div class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-5">
+      <!-- Toolbar Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
+            <span>Audit Findings</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+              {filteredIssues.length} of {result.audit_issues.length}
+            </span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Component compliance verdicts, authoritative citations, and actionable engineering mitigations.
+          </p>
         </div>
 
-        <!-- Export formats -->
+        <!-- Multi-Format Export Actions (Session E) -->
         <div class="flex items-center gap-2">
           {#if selectedProjectId}
             <a
               href={analyzeApi.getExportUrl(selectedProjectId, selectedSlug, 'bcf')}
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm transition-all"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm transition-all hover:scale-[1.02]"
+              title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
             >
               <Download class="w-3.5 h-3.5" />
               <span>Export BCF 2.1</span>
             </a>
             <a
               href={analyzeApi.getExportUrl(selectedProjectId, selectedSlug, 'csv')}
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              title="Download tabulated audit spreadsheet with lineage and citations"
             >
               <Download class="w-3.5 h-3.5" />
               <span>CSV</span>
             </a>
             <a
               href={analyzeApi.getExportUrl(selectedProjectId, selectedSlug, 'json')}
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              title="Download structured machine-readable JSON analysis report"
             >
               <Download class="w-3.5 h-3.5" />
               <span>JSON</span>
@@ -223,78 +503,193 @@
         </div>
       </div>
 
-      <!-- Filters -->
-      <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
-        <div class="relative flex-1 w-full">
+      <!-- Filters & Search Bar -->
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2">
+        <!-- Search Input -->
+        <div class="sm:col-span-6 relative">
           <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             bind:value={searchQuery}
-            placeholder="Search findings by rule, element GUID, or description..."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+            placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
           />
         </div>
 
-        <select
-          bind:value={severityFilter}
-          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-        >
-          <option value="all">All Severities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+        <!-- Severity Filter -->
+        <div class="sm:col-span-3">
+          <select
+            bind:value={severityFilter}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            <option value="all">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="data_quality">Data Quality Only</option>
+          </select>
+        </div>
+
+        <!-- Mechanism Filter -->
+        <div class="sm:col-span-3">
+          <select
+            bind:value={mechanismFilter}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            <option value="all">All Mechanisms</option>
+            {#if selectedSlug === 'corrosion'}
+              <option value="GC">GC-001 Galvanic</option>
+              <option value="CC">CC-001 Crevice</option>
+              <option value="MC">MC-001 Microbiological</option>
+            {:else}
+              <option value="SB">SB-001 Seismic Halo</option>
+            {/if}
+            <option value="data_quality">Data Quality</option>
+          </select>
+        </div>
       </div>
 
-      <!-- Table -->
-      <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/40">
+      <!-- Low Risk Visibility Toggle -->
+      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            bind:checked={showLowRisk}
+            class="rounded border-slate-700 bg-slate-900 text-[#0071e3] focus:ring-0 w-3.5 h-3.5"
+          />
+          <span>Include Low Severity verdicts in list</span>
+        </label>
+        <span class="text-[11px] text-slate-500">
+          Showing {filteredIssues.length} items
+        </span>
+      </div>
+
+      <!-- Tabular Findings Table -->
+      <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/50">
         {#if filteredIssues.length === 0}
-          <div class="p-8 text-center text-xs text-slate-500">
-            No compliance issues match your filters.
+          <div class="p-12 text-center text-xs text-slate-500">
+            No compliance issues match your selected filters.
           </div>
         {:else}
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
               <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
                 <tr>
-                  <th class="py-3 px-4">Severity</th>
-                  <th class="py-3 px-4">Rule / Mechanism</th>
-                  <th class="py-3 px-4">Element GUID</th>
-                  <th class="py-3 px-4">Finding &amp; Mitigation</th>
-                  <th class="py-3 px-4 text-right">3D Action</th>
+                  <th class="py-3.5 px-4">Severity</th>
+                  <th class="py-3.5 px-4">Rule &amp; Mechanism</th>
+                  <th class="py-3.5 px-4">Element GUID</th>
+                  <th class="py-3.5 px-4">Finding &amp; Citations</th>
+                  <th class="py-3.5 px-4 text-center">Score / Clearance</th>
+                  <th class="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
                 {#each filteredIssues as issue}
-                  <tr class="hover:bg-slate-900/60 transition-colors">
-                    <td class="py-3 px-4">
-                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase {issue.band === 'critical' ? 'bg-red-950/60 text-red-400 border border-red-800/60' : issue.band === 'high' ? 'bg-orange-950/60 text-orange-400 border border-orange-800/60' : issue.band === 'medium' ? 'bg-yellow-950/60 text-yellow-400 border border-yellow-800/60' : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'}">
-                        {issue.band}
-                      </span>
-                    </td>
-                    <td class="py-3 px-4 font-mono">
-                      <div class="font-bold text-white text-xs">{issue.rule_id}</div>
-                      <div class="text-[10px] text-slate-500">{issue.mechanism}</div>
-                    </td>
-                    <td class="py-3 px-4 font-mono text-slate-400 text-[11px] truncate max-w-xs">
-                      {issue.element_id}
-                    </td>
-                    <td class="py-3 px-4 max-w-md">
-                      <div class="font-semibold text-slate-200">{issue.title}</div>
-                      {#if issue.mitigation}
-                        <div class="text-[11px] text-slate-400 mt-0.5">{issue.mitigation}</div>
+                  {@const isDq = issue.mechanism === 'data_quality' || issue.mechanism === 'Data Quality'}
+                  <tr class="hover:bg-slate-900/60 transition-colors group">
+                    <!-- Severity Band Pill -->
+                    <td class="py-3.5 px-4 align-top whitespace-nowrap">
+                      {#if isDq}
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                          Data Quality
+                        </span>
+                      {:else if issue.band === 'critical'}
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-red-950/80 text-red-400 border border-red-800/80 shadow-sm">
+                          Critical
+                        </span>
+                      {:else if issue.band === 'high'}
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-orange-950/80 text-orange-400 border border-orange-800/80 shadow-sm">
+                          High
+                        </span>
+                      {:else if issue.band === 'medium'}
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-yellow-950/80 text-yellow-400 border border-yellow-800/80 shadow-sm">
+                          Medium
+                        </span>
+                      {:else}
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 shadow-sm">
+                          Low
+                        </span>
                       {/if}
                     </td>
-                    <td class="py-3 px-4 text-right whitespace-nowrap">
+
+                    <!-- Rule & Mechanism -->
+                    <td class="py-3.5 px-4 align-top font-mono">
+                      <div class="font-bold text-white text-xs">{issue.rule_id}</div>
+                      <div class="text-[10px] text-slate-400 mt-0.5">{issue.mechanism}</div>
+                    </td>
+
+                    <!-- Element GUID -->
+                    <td class="py-3.5 px-4 align-top">
+                      <div class="flex items-center gap-1.5 font-mono text-slate-300 text-[11px]">
+                        <span class="truncate max-w-[140px]" title={issue.element_id}>{issue.element_id}</span>
+                        <button
+                          type="button"
+                          on:click={() => copyText(issue.element_id)}
+                          class="text-slate-500 hover:text-white transition-colors"
+                          title="Copy GUID"
+                        >
+                          <Copy class="w-3 h-3" />
+                        </button>
+                      </div>
+                      {#if issue.details?.ifc_type}
+                        <div class="text-[10px] text-slate-500 font-mono mt-0.5">{issue.details.ifc_type}</div>
+                      {/if}
+                    </td>
+
+                    <!-- Finding, Mitigation, & Citations -->
+                    <td class="py-3.5 px-4 align-top max-w-md">
+                      <div class="font-semibold text-slate-100">{issue.title}</div>
+                      {#if issue.mitigation}
+                        <div class="text-[11px] text-slate-400 mt-1 line-clamp-2">{issue.mitigation}</div>
+                      {/if}
+
+                      <!-- Real Citations -->
+                      {#if issue.citations && issue.citations.length > 0}
+                        <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                          {#each issue.citations as cit}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-900 text-indigo-300 border border-indigo-900/60" title={cit.reason}>
+                              <FileText class="w-2.5 h-2.5 opacity-70" />
+                              <span>{cit.standard} {cit.clause}</span>
+                            </span>
+                          {/each}
+                        </div>
+                      {/if}
+                    </td>
+
+                    <!-- Score or Clearance Depth -->
+                    <td class="py-3.5 px-4 align-top text-center font-mono">
+                      {#if isDq}
+                        <span class="text-slate-500 text-[11px]">N/A</span>
+                      {:else if issue.score !== undefined && issue.score > 0}
+                        <div class="text-xs font-bold text-white">{issue.score.toFixed(2)}</div>
+                        <div class="text-[9px] text-slate-500">Risk Score</div>
+                      {:else if issue.details?.intrusion_depth_mm !== undefined}
+                        <div class="text-xs font-bold text-red-400">{issue.details.intrusion_depth_mm} mm</div>
+                        <div class="text-[9px] text-slate-500">Clash Intrusion</div>
+                      {:else}
+                        <span class="text-slate-500 text-[11px]">-</span>
+                      {/if}
+                    </td>
+
+                    <!-- Action Buttons -->
+                    <td class="py-3.5 px-4 align-top text-right whitespace-nowrap space-x-1.5">
+                      <button
+                        type="button"
+                        on:click={() => (inspectedIssue = issue)}
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
+                      >
+                        <span>Details</span>
+                      </button>
+
                       {#if selectedProjectId && issue.element_id}
                         <button
                           type="button"
                           on:click={() => onSelectProjectForViewer(selectedProjectId, issue.element_id)}
-                          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors"
+                          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0071e3]/20 hover:bg-[#0071e3]/30 text-[#0071e3] hover:text-blue-300 text-xs font-semibold transition-colors"
                         >
                           <ScanEye class="w-3.5 h-3.5" />
-                          <span>View in 3D</span>
+                          <span>3D</span>
                         </button>
                       {/if}
                     </td>
@@ -307,8 +702,215 @@
       </div>
     </div>
   {:else if !isRunning}
-    <div class="p-16 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-      Select a project above and click "Run Audit" to assess compliance.
+    <div class="p-16 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl space-y-3">
+      <div class="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-400">
+        <Compass class="w-6 h-6" />
+      </div>
+      <div>
+        <div class="text-sm font-bold text-white">No Analysis Run Loaded</div>
+        <div class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+          Select an OpenBIM project above and click <strong>"Run Audit"</strong> to compute compliance across corrosion engines or Blue Halo seismic clearance envelopes.
+        </div>
+      </div>
     </div>
   {/if}
 </div>
+
+<!-- Detailed Issue Inspection Modal / Drawer -->
+{#if inspectedIssue}
+  {@const isDq = inspectedIssue.mechanism === 'data_quality' || inspectedIssue.mechanism === 'Data Quality'}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div class="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="px-2.5 py-1 rounded-md bg-slate-800 text-white font-mono text-xs font-bold border border-slate-700">
+            {inspectedIssue.id}
+          </span>
+          <span class="text-sm font-bold text-white">{inspectedIssue.rule_id}</span>
+          {#if isDq}
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+              Data Quality
+            </span>
+          {:else}
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase {inspectedIssue.band === 'critical' ? 'bg-red-950/80 text-red-400' : inspectedIssue.band === 'high' ? 'bg-orange-950/80 text-orange-400' : inspectedIssue.band === 'medium' ? 'bg-yellow-950/80 text-yellow-400' : 'bg-emerald-950/80 text-emerald-400'}">
+              {inspectedIssue.band}
+            </span>
+          {/if}
+        </div>
+        <button
+          type="button"
+          on:click={() => (inspectedIssue = null)}
+          class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-6 overflow-y-auto">
+        <!-- Title & Mechanism -->
+        <div>
+          <h3 class="text-base font-bold text-white">{inspectedIssue.title}</h3>
+          <p class="text-xs text-slate-400 mt-1">Mechanism: <strong class="text-slate-200">{inspectedIssue.mechanism}</strong></p>
+        </div>
+
+        <!-- Element Context Card -->
+        <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
+          <div class="text-xs uppercase font-bold tracking-wider text-slate-400">Target IFC Element</div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span class="text-slate-500">GlobalId (GUID):</span>
+              <div class="font-mono text-slate-200 flex items-center gap-1.5 mt-0.5">
+                <span class="truncate">{inspectedIssue.element_id}</span>
+                <button type="button" on:click={() => copyText(inspectedIssue?.element_id || '')} class="text-slate-400 hover:text-white">
+                  <Copy class="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+            {#if inspectedIssue.assignee_role}
+              <div>
+                <span class="text-slate-500">Assigned Resolution Role:</span>
+                <div class="font-semibold text-slate-200 mt-0.5">{inspectedIssue.assignee_role}</div>
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Description & Mitigations -->
+        {#if inspectedIssue.description}
+          <div class="space-y-1">
+            <h4 class="text-xs uppercase font-bold tracking-wider text-slate-400">Finding Description</h4>
+            <p class="text-xs text-slate-300 bg-slate-950/40 p-3 rounded-xl border border-slate-800/60">{inspectedIssue.description}</p>
+          </div>
+        {/if}
+
+        {#if inspectedIssue.mitigation}
+          <div class="space-y-1">
+            <h4 class="text-xs uppercase font-bold tracking-wider text-emerald-400">Engineering Mitigation Guidance</h4>
+            <p class="text-xs text-emerald-200 bg-emerald-950/30 p-3 rounded-xl border border-emerald-800/40">{inspectedIssue.mitigation}</p>
+          </div>
+        {/if}
+
+        <!-- Standards Cited (White Box Audit Trail) -->
+        {#if inspectedIssue.citations && inspectedIssue.citations.length > 0}
+          <div class="space-y-2">
+            <h4 class="text-xs uppercase font-bold tracking-wider text-indigo-400">White Box Audit Citations</h4>
+            <div class="space-y-2">
+              {#each inspectedIssue.citations as cit}
+                <div class="p-3 rounded-xl bg-indigo-950/20 border border-indigo-800/40 text-xs">
+                  <div class="font-bold text-indigo-300 flex items-center gap-1.5">
+                    <FileText class="w-3.5 h-3.5" />
+                    <span>{cit.standard} — {cit.clause}</span>
+                  </div>
+                  {#if cit.reason}
+                    <div class="text-[11px] text-slate-300 mt-1">{cit.reason}</div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Raw Metadata Details -->
+        {#if inspectedIssue.details && Object.keys(inspectedIssue.details).length > 0}
+          <div class="space-y-1">
+            <h4 class="text-xs uppercase font-bold tracking-wider text-slate-400">Metadata Parameters</h4>
+            <pre class="text-[11px] font-mono text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800 overflow-x-auto">{JSON.stringify(inspectedIssue.details, null, 2)}</pre>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/40">
+        <button
+          type="button"
+          on:click={() => (inspectedIssue = null)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        >
+          Close
+        </button>
+
+        {#if selectedProjectId && inspectedIssue.element_id}
+          <button
+            type="button"
+            on:click={() => {
+              const elId = inspectedIssue?.element_id;
+              inspectedIssue = null;
+              if (selectedProjectId && elId) {
+                onSelectProjectForViewer(selectedProjectId, elId);
+              }
+            }}
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white transition-colors"
+          >
+            <ScanEye class="w-4 h-4" />
+            <span>Isolate in 3D Viewer</span>
+          </button>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- IFC Upload Modal -->
+{#if isUploadModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">Upload IFC Model</h3>
+        <button type="button" on:click={() => (isUploadModalOpen = false)} class="text-slate-400 hover:text-white">
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400">
+        Attach or update the IFC model for <strong>{currentProject?.name}</strong> (Session A file lineage with SHA-256 digest).
+      </p>
+
+      <div class="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center hover:border-slate-500 transition-colors">
+        <Upload class="w-8 h-8 text-slate-400 mx-auto mb-2" />
+        <input
+          type="file"
+          accept=".ifc"
+          on:change={(e) => (uploadFile = e.currentTarget.files?.[0] || null)}
+          class="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#0071e3] file:text-white hover:file:bg-[#0077ed]"
+        />
+      </div>
+
+      {#if uploadSuccessMsg}
+        <div class="p-3 rounded-xl bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-xs">
+          {uploadSuccessMsg}
+        </div>
+      {/if}
+
+      {#if uploadErrorMsg}
+        <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+          {uploadErrorMsg}
+        </div>
+      {/if}
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button
+          type="button"
+          on:click={() => (isUploadModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={!uploadFile || isUploading}
+          on:click={handleUploadIfc}
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] text-white hover:bg-[#0077ed] disabled:opacity-50"
+        >
+          {#if isUploading}
+            <RefreshCw class="w-3.5 h-3.5 animate-spin" />
+            <span>Uploading…</span>
+          {:else}
+            <span>Confirm Upload</span>
+          {/if}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

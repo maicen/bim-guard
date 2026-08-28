@@ -12,6 +12,7 @@ from app.api.dependencies import get_projects_service
 from app.constants import DEFAULT_ANALYSIS_TYPE, DEFAULT_COUNTRY
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    AnalysisInputItemContract,
     ProjectCreateRequest,
     ProjectListResponse,
     ProjectResponse,
@@ -47,6 +48,22 @@ def get_project(
             detail=f"Project with ID {project_id} not found.",
         )
     return ProjectResponse(**row)
+
+
+@router.get("/{project_id}/inputs", response_model=list[AnalysisInputItemContract], summary="Get analysis inputs")
+def get_project_inputs(
+    project_id: int,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> list[AnalysisInputItemContract]:
+    """Retrieve merged project standards and client documents."""
+    project = service.get_project(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found.",
+        )
+    inputs = service.get_analysis_inputs(project_id)
+    return [AnalysisInputItemContract(**i) for i in inputs]
 
 
 @router.post(

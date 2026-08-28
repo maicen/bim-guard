@@ -38,6 +38,11 @@ export const projectsApi = {
     return handleResponse<Project>(res);
   },
 
+  async getInputs(id: number): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/projects/${id}/inputs`);
+    return handleResponse<any[]>(res);
+  },
+
   async create(payload: ProjectCreatePayload): Promise<Project> {
     const res = await fetch(`${API_BASE}/projects`, {
       method: 'POST',
@@ -107,7 +112,7 @@ export const rulesApi = {
 };
 
 export const analyzeApi = {
-  async uploadIfc(projectId: number, file: File): Promise<{ success: boolean; filename: string }> {
+  async uploadIfc(projectId: number, file: File): Promise<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }> {
     const form = new FormData();
     form.append('project_id', projectId.toString());
     form.append('ifc_file', file);
@@ -116,20 +121,20 @@ export const analyzeApi = {
       method: 'POST',
       body: form,
     });
-    return handleResponse<{ success: boolean; filename: string }>(res);
+    return handleResponse<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }>(res);
   },
 
-  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false): Promise<AnalysisResult> {
+  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true): Promise<AnalysisResult> {
     const res = await fetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId, slug }),
+      body: JSON.stringify({ project_id: projectId, slug, use_cache: useCache }),
     });
     return handleResponse<AnalysisResult>(res);
   },
 
-  async getResults(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion'): Promise<AnalysisResult> {
-    const res = await fetch(`${API_BASE}/analyze/results/${projectId}/${slug}`);
+  async getResults(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', useCache = true): Promise<AnalysisResult> {
+    const res = await fetch(`${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}`);
     return handleResponse<AnalysisResult>(res);
   },
 

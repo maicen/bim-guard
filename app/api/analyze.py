@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -43,6 +43,22 @@ def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultCo
     issues: list[AuditIssueContract] = []
     for i in raw_issues:
         band_val = getattr(i.band, "value", str(i.band)).lower()
+        raw_citations = getattr(i, "citations", []) or []
+        citations: list[dict[str, str]] = []
+        for c in raw_citations:
+            if isinstance(c, dict):
+                citations.append({
+                    "standard": c.get("standard", ""),
+                    "clause": c.get("clause", ""),
+                    "reason": c.get("reason", ""),
+                })
+            elif hasattr(c, "standard"):
+                citations.append({
+                    "standard": getattr(c, "standard", ""),
+                    "clause": getattr(c, "clause", ""),
+                    "reason": getattr(c, "reason", ""),
+                })
+
         issues.append(
             AuditIssueContract(
                 id=i.id,
@@ -50,31 +66,37 @@ def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultCo
                 rule_id=i.rule_id,
                 title=i.title,
                 band=band_val,
-                score=i.score,
+                score=getattr(i, "score", 0.0) or 0.0,
                 mechanism=i.mechanism,
                 description=i.description or "",
                 mitigation=i.mitigation or "",
-                details=dict(i.metadata) if hasattr(i, "metadata") else {},
+                assignee_role=getattr(i, "assignee_role", "BIM coordinator") or "BIM coordinator",
+                citations=citations,
+                details=dict(i.metadata) if hasattr(i, "metadata") and i.metadata else {},
             )
         )
 
     raw_stats = result.get("issue_stats", {})
     stats = IssueStatsContract(
-        total=raw_stats.get("total", len(issues)),
+        total=raw_stats.get("total", len([i for i in issues if i.mechanism != "data_quality"])),
         critical=raw_stats.get("critical", 0),
         high=raw_stats.get("high", 0),
         medium=raw_stats.get("medium", 0),
         low=raw_stats.get("low", 0),
+        data_quality=raw_stats.get("data_quality", sum(1 for i in issues if i.mechanism == "data_quality")),
     )
+
+    element_count = result.get("ifc_element_count") or len(issues)
 
     return AnalysisResultContract(
         pipeline="audit",
         project_id=project_id,
         slug=slug,
-        element_count=len(issues),
+        element_count=element_count,
         audit_issues=issues,
         issue_stats=stats,
         compliance_error=result.get("compliance_error"),
+        compliance_is_demo=result.get("compliance_is_demo", False),
         cached=result.get("cached", False),
     )
 
@@ -127,7 +149,7 @@ def run_analysis_endpoint(
         )
 
     if background:
-        background_tasks.add_task(run_analysis, slug, payload.project_id)
+        background_tasks.add_task(run_analysis, slug, payload.project_id, use_cache=payload.use_cache)
         return {
             "status": "queued",
             "project_id": payload.project_id,
@@ -135,7 +157,7 @@ def run_analysis_endpoint(
             "message": "Analysis started in background.",
         }
 
-    raw_result = run_analysis(slug, payload.project_id)
+    raw_result = run_analysis(slug, payload.project_id, use_cache=payload.use_cache)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -149,7 +171,7 @@ def run_corrosion(
     project_id: Annotated[int, Form(...)],
 ) -> AnalysisResultContract:
     """Run GC-001, CC-001, MC-001 corrosion engines."""
-    raw_result = run_analysis("corrosion", project_id)
+    raw_result = run_analysis("corrosion", project_id, use_cache=False)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -163,7 +185,7 @@ def run_seismic(
     project_id: Annotated[int, Form(...)],
 ) -> AnalysisResultContract:
     """Run Blue Halo seismic clearance volume validation."""
-    raw_result = run_analysis("seismic", project_id)
+    raw_result = run_analysis("seismic", project_id, use_cache=False)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -176,6 +198,7 @@ def run_seismic(
 def get_analysis_results(
     project_id: int,
     slug: str,
+    use_cache: bool = Query(True, description="Whether to read from cache"),
 ) -> AnalysisResultContract:
     """Get analysis results (retrieved from cache or computed on-demand)."""
     if slug not in RUNNABLE_SLUGS:
@@ -183,7 +206,7 @@ def get_analysis_results(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown analysis slug {slug!r}.",
         )
-    raw_result = run_analysis(slug, project_id)
+    raw_result = run_analysis(slug, project_id, use_cache=use_cache)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

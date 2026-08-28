@@ -60,6 +60,12 @@ export interface RuleFolder {
   rules: Rule[];
 }
 
+export interface Citation {
+  standard: string;
+  clause: string;
+  reason: string;
+}
+
 export interface AuditIssue {
   id: string;
   element_id: string;
@@ -70,6 +76,8 @@ export interface AuditIssue {
   mechanism: string;
   description: string;
   mitigation: string;
+  assignee_role?: string;
+  citations?: Citation[];
   details: Record<string, any>;
 }
 
@@ -79,6 +87,15 @@ export interface IssueStats {
   high: number;
   medium: number;
   low: number;
+  data_quality?: number;
+}
+
+export interface AnalysisInputItem {
+  kind: 'standard' | 'document';
+  id: string;
+  label: string;
+  detail: string;
+  file_path?: string;
 }
 
 export interface AnalysisResult {
@@ -89,6 +106,7 @@ export interface AnalysisResult {
   audit_issues: AuditIssue[];
   issue_stats: IssueStats;
   compliance_error?: string | null;
+  compliance_is_demo?: boolean;
   cached: boolean;
 }
 

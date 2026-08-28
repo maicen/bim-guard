@@ -198,6 +198,14 @@ class RuleFolderResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class CitationContract(BaseModel):
+    """Regulatory standard citation and clause rationale."""
+
+    standard: str = Field("", description="Standard reference, e.g. NASA-STD-6012 or EN 1998-1")
+    clause: str = Field("", description="Specific clause or table, e.g. Table 2 or Clause 4.3")
+    reason: str = Field("", description="Regulatory requirement or threshold rationale")
+
+
 class AuditIssueContract(BaseModel):
     """Individual compliance violation or issue finding."""
 
@@ -210,6 +218,8 @@ class AuditIssueContract(BaseModel):
     mechanism: str = Field(default="", description="Evaluated mechanism label")
     description: str = Field(default="", description="Detailed issue description")
     mitigation: str = Field(default="", description="Remediation guidance")
+    assignee_role: str = Field(default="BIM coordinator", description="Assigned role for resolution")
+    citations: list[CitationContract] = Field(default_factory=list, description="White Box audit citations")
     details: dict[str, Any] = Field(default_factory=dict, description="Metadata and position info")
 
 
@@ -221,6 +231,7 @@ class IssueStatsContract(BaseModel):
     high: int = 0
     medium: int = 0
     low: int = 0
+    data_quality: int = 0
 
 
 class AnalysisRunRequest(BaseModel):
@@ -229,6 +240,17 @@ class AnalysisRunRequest(BaseModel):
     project_id: int = Field(..., description="Target project ID")
     slug: str = Field(default="corrosion", description="Analysis type slug (corrosion, seismic)")
     rule_ids: Optional[list[str]] = Field(default=None, description="Optional rule subset to evaluate")
+    use_cache: bool = Field(default=True, description="Whether to use cached analysis results")
+
+
+class AnalysisInputItemContract(BaseModel):
+    """Project standard or client document analysis input."""
+
+    kind: str = Field(..., description="standard or document")
+    id: str = Field(..., description="Prefixed identifier")
+    label: str = Field(..., description="Name or filename")
+    detail: str = Field("", description="Domain or document category")
+    file_path: str = Field("", description="Storage reference")
 
 
 class AnalysisResultContract(BaseModel):
@@ -241,6 +263,7 @@ class AnalysisResultContract(BaseModel):
     audit_issues: list[AuditIssueContract] = Field(default_factory=list)
     issue_stats: IssueStatsContract = Field(default_factory=IssueStatsContract)
     compliance_error: Optional[str] = None
+    compliance_is_demo: bool = False
     cached: bool = False
 
 

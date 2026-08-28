@@ -199,7 +199,7 @@ class FileUploadService:
             )
             return UploadResponse(success=False, error=rejection)
 
-        safe_name = Path(filename).name
+        safe_name = Path(filename.replace("\\", "/")).name
         file_hash = sha256_of(content)
 
         try:

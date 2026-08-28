@@ -43,9 +43,9 @@
 <div class="space-y-6">
   <!-- Stats Cards -->
   {#if stats}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
       <div class="p-4 rounded-xl border border-rose-900/40 bg-rose-950/20 backdrop-blur">
-        <div class="text-xs uppercase tracking-wider font-semibold text-rose-400">Critical Risk</div>
+        <div class="text-xs uppercase tracking-wider font-semibold text-rose-400">Critical</div>
         <div class="text-2xl font-bold text-white mt-1">{stats.critical}</div>
       </div>
       <div class="p-4 rounded-xl border border-amber-900/40 bg-amber-950/20 backdrop-blur">
@@ -57,8 +57,12 @@
         <div class="text-2xl font-bold text-white mt-1">{stats.medium}</div>
       </div>
       <div class="p-4 rounded-xl border border-emerald-900/40 bg-emerald-950/20 backdrop-blur">
-        <div class="text-xs uppercase tracking-wider font-semibold text-emerald-400">Low / Tolerable</div>
+        <div class="text-xs uppercase tracking-wider font-semibold text-emerald-400">Low Risk</div>
         <div class="text-2xl font-bold text-white mt-1">{stats.low}</div>
+      </div>
+      <div class="p-4 rounded-xl border border-indigo-900/40 bg-indigo-950/20 backdrop-blur">
+        <div class="text-xs uppercase tracking-wider font-semibold text-indigo-300">Data Quality</div>
+        <div class="text-2xl font-bold text-white mt-1">{stats.data_quality || 0}</div>
       </div>
     </div>
   {/if}
