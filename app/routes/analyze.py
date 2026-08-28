@@ -1,6 +1,7 @@
 """Analysis routes for orchestrating compliance checks and rendering results."""
 
 import os
+import threading
 from functools import lru_cache
 from urllib.parse import quote
 
@@ -28,7 +29,7 @@ from fasthtml.common import (
     Tr,
 )
 from monsterui.all import H1, Container
-from starlette.responses import RedirectResponse, StreamingResponse
+from starlette.responses import RedirectResponse, Response as StarletteResponse, StreamingResponse
 
 from app.components.layout import DashboardLayout
 from app.components.ui import (
@@ -67,6 +68,7 @@ from app.components.ui import (
 )
 from app.logging_config import get_logger
 from app.modules.orchestrator import BIMGuard_App
+from app.services.analysis_runner import run_analysis
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
 from app.services.report_artifacts import ReportArtifactService
@@ -772,147 +774,6 @@ def _band_badge(band: str):
     )
 
 
-def _compliance_card(results, cost_impact, issue_stats, is_demo, project_id, error):
-    """Build the corrosion compliance results card for the analysis results page."""
-    if error:
-        return Card(
-            CardHeader(CardTitle("Corrosion Compliance — GC-001 / CC-001 / MC-001")),
-            CardContent(P(f"Compliance engine error: {error}", cls="text-sm text-destructive")),
-        )
-
-    if not results:
-        return None
-
-    bands = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
-    for r in results:
-        b = r.get("risk_band", "Low")
-        if b in bands:
-            bands[b] += 1
-
-    badge_row = Div(
-        *[
-            Div(
-                _band_badge(b),
-                Span(f" {bands[b]}", cls="text-sm font-medium ml-1"),
-                cls="flex items-center",
-            )
-            for b in ("Critical", "High", "Medium", "Low")
-        ],
-        cls="flex items-center gap-4 flex-wrap",
-    )
-
-    cost_line = (
-        P(
-            f"Estimated remediation: £{cost_impact.total_cost_gbp:,.0f}  |  "
-            f"Programme impact: {cost_impact.total_days} days",
-            cls="text-sm text-muted-foreground mt-2",
-        )
-        if cost_impact
-        else ""
-    )
-
-    tracker_line = (
-        P(
-            f"Issue history: {issue_stats.get('new', 0)} new, "
-            f"{issue_stats.get('updated', 0)} updated, "
-            f"{issue_stats.get('resolved', 0)} resolved.",
-            cls="text-xs text-muted-foreground mt-1",
-        )
-        if issue_stats
-        else ""
-    )
-
-    demo_notice = (
-        Alert(
-            "No IFC file found — showing synthetic demo data (25 representative MEP elements).",
-            cls=AlertT.info if hasattr(AlertT, "info") else "",
-        )
-        if is_demo
-        else ""
-    )
-
-    flagged = [r for r in results if r.get("risk_band", "Low") != "Low"]
-
-    if flagged:
-        header_cells = [
-            Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-            for h in (
-                "Element",
-                "Floor",
-                "Material",
-                "Engine",
-                "Band",
-                "Score",
-                "Required Action",
-            )
-        ]
-        data_rows = []
-        for r in flagged[:20]:
-            data_rows.append(
-                Tr(
-                    Td(r.get("name", "—")[:40], cls="px-3 py-2 text-sm"),
-                    Td(r.get("floor", "—"), cls="px-3 py-2 text-sm"),
-                    Td(r.get("material_a", "—")[:22], cls="px-3 py-2 text-sm"),
-                    Td(
-                        Span(
-                            str(r.get("dominant_mechanism", "—")).upper(),
-                            cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700",
-                        ),
-                        cls="px-3 py-2",
-                    ),
-                    Td(_band_badge(r.get("risk_band", "Low")), cls="px-3 py-2"),
-                    Td(f"{r.get('overall_score', 0):.3f}", cls="px-3 py-2 text-sm font-mono"),
-                    Td(r.get("action", "—")[:70], cls="px-3 py-2 text-xs"),
-                    cls="border-b border-muted last:border-0",
-                )
-            )
-        if len(flagged) > 20:
-            data_rows.append(
-                Tr(
-                    Td(
-                        f"… and {len(flagged) - 20} more flagged elements",
-                        cls="px-3 py-2 text-xs text-muted-foreground italic",
-                        colspan="7",
-                    )
-                )
-            )
-        results_table = Div(
-            Table(
-                Thead(Tr(*header_cells)),
-                Tbody(*data_rows),
-                cls="w-full text-sm",
-            ),
-            cls="overflow-auto mt-4 border rounded-md",
-        )
-    else:
-        results_table = P(
-            "No elements flagged at Medium risk or above.",
-            cls="text-sm text-muted-foreground mt-3",
-        )
-
-    bcf_btn = (
-        Div(
-            A(
-                "Download BCF Report",
-                href=f"/reports/bcf/{project_id}",
-                cls="inline-block mt-4 px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:opacity-90",
-            ),
-        )
-        if project_id
-        else ""
-    )
-
-    return _collapsible_card(
-        "Corrosion Compliance — GC-001 / CC-001 / MC-001",
-        demo_notice,
-        badge_row,
-        cost_line,
-        tracker_line,
-        results_table,
-        bcf_btn,
-    )
-
-
 def _mep_engine_rules_card():
     """Show MEP engine and ruleset coverage for the MEP analysis page."""
     engines = [
@@ -980,91 +841,6 @@ def _mep_engine_rules_card():
                 cls="overflow-auto border rounded-md",
             ),
         ),
-    )
-
-
-def _rule_validation_card(rule_validations: list[dict], analysis_theme: str):
-    """Build the Module 3 rule validation card for the analysis results page."""
-    if not rule_validations:
-        return Card(
-            CardHeader(CardTitle(f"Rule Validation — Module 3 ({analysis_theme})")),
-            CardContent(
-                P(
-                    f"No matching rules found in the library for {analysis_theme}. "
-                    "Go to Library → Rule Extraction Studio to extract and save rules first.",
-                    cls="text-sm text-muted-foreground",
-                )
-            ),
-        )
-
-    present = sum(1 for r in rule_validations if r["status"] == "present")
-    not_found = len(rule_validations) - present
-
-    summary = Div(
-        Div(
-            Span(str(len(rule_validations)), cls="text-2xl font-bold"),
-            Span(" rules checked", cls="text-sm text-muted-foreground ml-1"),
-            cls="flex items-baseline",
-        ),
-        Div(
-            Span(
-                f"{present} matched",
-                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800 mr-2",
-            ),
-            Span(
-                f"{not_found} no elements",
-                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-800",
-            ),
-            cls="mt-1",
-        ),
-        cls="mb-4",
-    )
-
-    header_cells = [
-        Th(h, cls="px-3 py-2 text-left text-xs font-semibold text-muted-foreground bg-muted")
-        for h in ("Reference", "Description", "Target IFC Class", "Elements in Model", "Status")
-    ]
-
-    def _status_badge(status: str, count: int):
-        if status == "present":
-            return Span(
-                f"✓ {count} found",
-                cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800",
-            )
-        return Span(
-            "No elements",
-            cls="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-800",
-        )
-
-    data_rows = []
-    for r in rule_validations:
-        data_rows.append(
-            Tr(
-                Td(r.get("reference", "—"), cls="px-3 py-2 text-xs font-mono"),
-                Td(
-                    r.get("description", "")[:80]
-                    + ("…" if len(r.get("description", "")) > 80 else ""),
-                    cls="px-3 py-2 text-sm",
-                ),
-                Td(r.get("target_ifc_class", "—"), cls="px-3 py-2 text-xs font-mono text-blue-700"),
-                Td(str(r.get("element_count", 0)), cls="px-3 py-2 text-sm text-center"),
-                Td(_status_badge(r["status"], r["element_count"]), cls="px-3 py-2"),
-                cls="border-b border-muted last:border-0",
-            )
-        )
-
-    return _collapsible_card(
-        f"Rule Validation — Module 3 ({analysis_theme})",
-        summary,
-        Div(
-            Table(
-                Thead(Tr(*header_cells)),
-                Tbody(*data_rows),
-                cls="w-full text-sm",
-            ),
-            cls="overflow-auto border rounded-md",
-        ),
-        open=False,
     )
 
 
@@ -3093,6 +2869,39 @@ def _simple_garage_card(spatial_checks: dict):
     return _simple_domain_card("Garage / Carport", code_ctx["garage_ref"], [], extra, override)
 
 
+def _run_analysis_background(project_id: int) -> None:
+    """Run the corrosion analysis off-request so the dashboard can watch it.
+
+    Runs in a daemon thread. :mod:`app.services.pipeline_tracker` binds its
+    ContextVar inside whichever thread calls it and keys the shared tracker
+    store by ``project_id``, so the progress this populates is exactly what
+    ``GET /api/workflow/{project_id}`` reads back -- no context needs carrying
+    across the thread boundary.
+
+    Nothing awaits this, so a failure has nowhere to be returned to. It is
+    logged and the dashboard simply stops advancing; the caller has already
+    been redirected by the time anything here can go wrong.
+
+    Args:
+        project_id: Project whose model to analyse.
+    """
+    try:
+        result = run_analysis("corrosion", project_id, use_cache=False)
+    except Exception:
+        logger.exception("Background analysis crashed project_id=%d", project_id)
+        return
+
+    error = result.get("compliance_error")
+    if error:
+        logger.warning("Background analysis failed project_id=%d error=%s", project_id, error)
+        return
+    logger.info(
+        "Background analysis complete project_id=%d issues=%d",
+        project_id,
+        len(result.get("audit_issues", [])),
+    )
+
+
 def setup_routes(rt):
     """Register analysis workflow routes."""
 
@@ -3276,62 +3085,47 @@ def setup_routes(rt):
 
     @rt("/analysis/results", methods=["POST"])
     async def analysis_run_post(req: Request):
-        analysis_data, error_response = await _run_analysis_request(req, forced_theme="MEP")
-        if error_response:
-            return error_response
+        """Start the corrosion analysis off-request and show the live dashboard.
 
-        result = analysis_data["result"]
-        project = result["project"]
-        selected_theme = result.get("analysis_theme", "MEP")
-        rule_folder = result.get("rule_folder", "")
-        theme_label = f"{selected_theme} Theme" + (
-            f" · Folder: {rule_folder}" if rule_folder else ""
-        )
+        The run is handed to a daemon thread rather than awaited, so the
+        redirect lands while the engines are still working and
+        ``/workflow/{project_id}`` has progress left to show. The project is
+        checked here, before the thread starts, because once the run is
+        detached there is nowhere to return an error to.
 
-        compliance_card = _compliance_card(
-            results=result.get("compliance_results", []),
-            cost_impact=result.get("cost_impact"),
-            issue_stats=result.get("issue_stats", {}),
-            is_demo=result.get("compliance_is_demo", False),
-            project_id=result.get("bcf_project_id"),
-            error=result.get("compliance_error"),
-        )
+        The form posts with HTMX, which follows a 303 itself and would swap the
+        dashboard's markup into the results div instead of navigating, so an
+        HTMX request gets ``HX-Redirect`` and a plain post gets the 303.
+        """
+        form = await req.form()
+        project_id_raw = form.get("project_id") or ""
+        if not project_id_raw:
+            logger.warning("Rejected MEP analysis request without a project ID")
+            return Alert("Please select a project.", cls=AlertT.error)
+        try:
+            project_id = int(project_id_raw)
+        except ValueError:
+            logger.warning("Rejected MEP analysis request with invalid project ID=%r", project_id_raw)
+            return Alert("Invalid project selection.", cls=AlertT.error)
 
-        rule_validation_card = _rule_validation_card(
-            result.get("rule_validations", []), theme_label
-        )
+        if _projects_service.get_project(project_id) is None:
+            logger.warning("Rejected MEP analysis request for missing project_id=%d", project_id)
+            return Alert("That project no longer exists.", cls=AlertT.error)
 
-        rc = result.get("rule_compliance", [])
-        rc_summary = result.get("rule_compliance_summary", {})
-        rc_error = result.get("rule_compliance_error")
+        logger.info("Dispatching background MEP analysis project_id=%d", project_id)
+        threading.Thread(
+            target=_run_analysis_background,
+            args=(project_id,),
+            name=f"bimguard-analysis-{project_id}",
+            daemon=True,
+        ).start()
 
-        # Cache for CSV download
-        global _last_compliance_results
-        _last_compliance_results = rc
-
-        rule_compliance_card = _rule_compliance_card(
-            rc, rc_summary, rc_error, theme_label, project_id=analysis_data["project_id"]
-        )
-
-        sections = [
-            Card(
-                CardHeader(CardTitle(f"{project.get('name', 'Project')} — {theme_label}")),
-                CardContent(
-                    P(
-                        "Model loaded and ready for MEP corrosion analysis against the "
-                        "saved MEP rule library.",
-                        cls="text-sm text-muted-foreground",
-                    )
-                ),
-            ),
-            rule_validation_card,
-        ]
-        if rule_compliance_card:
-            sections.append(rule_compliance_card)
-        if selected_theme == "MEP" and compliance_card:
-            sections.append(compliance_card)
-
-        return Div(*sections, cls="space-y-4")
+        # ?status=running tells the dashboard a run it did not start is already
+        # in flight, so it polls instead of taking one read and going idle.
+        target = f"/workflow/{project_id}?status=running"
+        if req.headers.get("hx-request"):
+            return StarletteResponse(status_code=204, headers={"HX-Redirect": target})
+        return RedirectResponse(url=target, status_code=303)
 
     @rt("/reports/compliance-csv")
     def compliance_csv_download():
