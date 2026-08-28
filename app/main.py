@@ -68,6 +68,7 @@ from app.routes import (
     piping_routes,
     projects,
     revit_sync,
+    seismic_routes,
     settings,
     user_manual,
     viewer,
@@ -125,6 +126,8 @@ _ROUTE_INSTALLERS = (
     analyze_pipeline.setup_routes,
     # GET /analysis/piping/{project_id} form + POST /analysis/piping/run.
     piping_routes.setup_routes,
+    # GET /analysis/seismic/{project_id} form + POST /analysis/seismic/run.
+    seismic_routes.setup_routes,
     # GET /download/{fmt}/{project_id} file downloads.
     analyze_download.setup_routes,
     # GET /api/workflow/{project_id} live pipeline status.
