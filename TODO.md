@@ -78,6 +78,13 @@ Completion evidence (2026-08-22):
 - [ ] Retire TF-IDF, dependency-parser, confidence-scorer, and BERT routing only after
   the Pydantic LLM workflow meets an agreed evaluation threshold.
 - [ ] Add precision, recall, F1, and confusion-matrix evaluation for extraction.
+- [ ] Import the architectural rule set as a named rule folder so ARCH runs can be
+  scoped to it. Running "All folders" currently applies 35 rules from unrelated
+  rulesets to two doors, which makes the report unreadable. Owner: Marc.
+- [ ] Review and retire non-production rule folders (`door_mock`, `test`,
+  `test_folder`), or exclude them from the folder picker.
+- [ ] Document that selecting a named rule folder excludes the built-in seeded code
+  rules rather than narrowing them; the current help text does not make this clear.
 
 Owner: Osama.
 
