@@ -126,3 +126,74 @@ export interface PipelineEvent {
   timestamp: string;
 }
 
+export interface DashboardStats {
+  total_projects: number;
+  total_documents: number;
+  total_rules: number;
+  issues_found: number;
+  db_ok: boolean;
+  db_backend: string;
+}
+
+export interface DocumentItem {
+  id: number;
+  filename: string;
+  file_path?: string | null;
+  upload_date?: string | null;
+  extracted_text_preview?: string | null;
+  char_count: number;
+}
+
+export interface DocumentDetail extends DocumentItem {
+  extracted_text: string;
+}
+
+export interface SettingItem {
+  key: string;
+  value: string;
+  description: string;
+}
+
+export interface SettingsResponse {
+  settings: SettingItem[];
+  active_log_level: string;
+  db_backend: string;
+}
+
+export interface ModelLineageRecord {
+  id: number;
+  project_id: number;
+  source_version: number;
+  version: number;
+  status: string;
+  source_reference?: string;
+  output_reference?: string;
+  summary?: Record<string, any>;
+  created_at?: string;
+}
+
+export interface ExtractedRule {
+  rule_id: string;
+  description: string;
+  property_set?: string;
+  property_name?: string;
+  operator?: string;
+  check_value?: string;
+  value_min?: string;
+  value_max?: string;
+  unit?: string;
+  severity: string;
+  confidence?: string;
+  selected?: boolean;
+}
+
+export interface ArchAnalysisResult {
+  project_id: number;
+  project_name: string;
+  categories: Record<string, any>;
+  total_issues: number;
+  issues: any[];
+  summary: Record<string, any>;
+}
+
+

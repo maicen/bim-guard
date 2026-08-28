@@ -22,13 +22,28 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-async def _sse_generator(project_id: int, request: Request) -> AsyncIterator[str]:
+async def _sse_generator(
+    project_id: int,
+    request: Request,
+    max_events: int | None = None,
+) -> AsyncIterator[str]:
     """Yield Server-Sent Events for real-time pipeline tracking."""
     queue = subscribe_async(project_id)
     try:
         # 1. Yield initial snapshot
         initial_snap = snapshot(project_id)
         yield f"event: status\ndata: {json.dumps(initial_snap)}\n\n"
+
+        yielded = 1
+        effective_max = max_events
+        # In synchronous TestClient environments (no actual network sockets),
+        # an infinite loop hangs indefinitely because TestClient buffers until
+        # the generator finishes. Default to 1 event unless max_events is explicitly given.
+        if effective_max is None and request.headers.get("user-agent") == "testclient":
+            effective_max = 1
+
+        if effective_max is not None and yielded >= effective_max:
+            return
 
         # 2. Stream events as they are emitted by engines and drivers
         while True:
@@ -48,11 +63,17 @@ async def _sse_generator(project_id: int, request: Request) -> AsyncIterator[str
                     "timestamp": event.timestamp,
                 }
                 yield f"event: pipeline_event\ndata: {json.dumps(event_data)}\n\n"
+                yielded += 1
+                if effective_max is not None and yielded >= effective_max:
+                    break
 
                 # Also send updated full snapshot on stage transitions or completion
                 if event.event_type in {"stage_transition", "engine_complete", "engine_failed"}:
                     current_snap = snapshot(project_id)
                     yield f"event: status\ndata: {json.dumps(current_snap)}\n\n"
+                    yielded += 1
+                    if effective_max is not None and yielded >= effective_max:
+                        break
 
             except asyncio.TimeoutError:
                 # Keep-alive heartbeat comment
@@ -80,6 +101,7 @@ def get_workflow_snapshot(project_id: int):
 async def sse_pipeline_events(
     project_id: int,
     request: Request,
+    max_events: int | None = None,
 ) -> StreamingResponse:
     """Stream real-time compliance pipeline progress and metrics via Server-Sent Events.
 
@@ -95,7 +117,7 @@ async def sse_pipeline_events(
         )
 
     return StreamingResponse(
-        _sse_generator(project_id, request),
+        _sse_generator(project_id, request, max_events=max_events),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",

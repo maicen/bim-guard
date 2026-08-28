@@ -49,13 +49,11 @@ from app.components.ui import (
 )
 from app.components.ui import (
     Card as UICard,
-)
-from app.components.ui import (
     CardContent as UICardContent,
-)
-from app.components.ui import (
     CardHeader as UICardHeader,
+    CardTitle as UICardTitle,
 )
+
 from app.constants import (
     COMPLIANCE_TEMPERATURE,
     DEFAULT_LLM_MODEL,

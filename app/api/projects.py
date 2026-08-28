@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from app.api.dependencies import get_projects_service
 from app.constants import DEFAULT_ANALYSIS_TYPE, DEFAULT_COUNTRY
@@ -178,4 +179,62 @@ def download_project_ifc(
         media_type="application/octet-stream",
         filename=filename,
     )
+
+
+@router.get("/{project_id}/enhancements", summary="Get model lineage history")
+def get_project_enhancements(
+    project_id: int,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> list[dict]:
+    """Retrieve immutable model lineage versions and quality improvement records."""
+    from app.services.model_lineage import SupabaseModelLineageRepository
+
+    repo = SupabaseModelLineageRepository()
+    return repo.list_for_project(project_id)
+
+
+class EnhanceRequest(BaseModel):
+    token: str = ""
+
+
+@router.post("/{project_id}/enhance", summary="Trigger IFC model quality improvements")
+def trigger_project_enhancement(
+    project_id: int,
+    payload: EnhanceRequest,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> dict:
+    """Execute model enhancement pipeline and persist a new immutable version."""
+    import hmac
+    import os
+
+    from app.services.pipeline_services import execute_model_enhancement
+
+    expected = os.getenv("BIM_GUARD_ENHANCEMENT_TOKEN", "").strip()
+    supplied = payload.token.strip()
+    if not (expected and supplied and hmac.compare_digest(supplied, expected)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid enhancement authorization token.",
+        )
+
+    project = service.get_project(project_id)
+    if not project or not project.get("ifc_file_path"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Project has no IFC model attached.",
+        )
+
+    try:
+        result = execute_model_enhancement(
+            project_id=project_id,
+            source_reference=project["ifc_file_path"],
+        )
+        return result
+    except Exception as exc:
+        logger.error("Enhancement failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Model quality enhancement failed: {exc}",
+        )
+
 

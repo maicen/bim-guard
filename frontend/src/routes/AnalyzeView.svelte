@@ -1,197 +1,314 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import {
+    Play,
+    Download,
+    Cpu,
+    Activity,
+    CheckCircle2,
+    AlertTriangle,
+    ShieldAlert,
+    ScanEye,
+    Search,
+  } from 'lucide-svelte';
   import { analyzeApi, projectsApi } from '../lib/api';
-  import { subscribeToPipelineEvents } from '../lib/sse';
-  import type { AnalysisResult, Project, WorkflowStatus } from '../lib/types';
+  import type { AnalysisResult, Project, AuditIssue } from '../lib/types';
   import PipelineProgress from '../lib/components/PipelineProgress.svelte';
-  import IssueTable from '../lib/components/IssueTable.svelte';
-  import ExportActions from '../lib/components/ExportActions.svelte';
 
   export let initialProjectId: number | null = null;
+  export let onSelectProjectForViewer: (projectId: number, elementGuid?: string) => void;
 
   let projects: Project[] = [];
   let selectedProjectId: number | null = initialProjectId;
   let selectedSlug: 'corrosion' | 'seismic' = 'corrosion';
-
-  let running = false;
+  let isRunning = false;
   let error = '';
-  let analysisResult: AnalysisResult | null = null;
-  let workflowStatus: WorkflowStatus | null = null;
-  let isStreaming = false;
+  let result: AnalysisResult | null = null;
 
-  let unsubscribeSSE: (() => void) | null = null;
+  // Filter state
+  let searchQuery = '';
+  let severityFilter = 'all';
 
-  async function loadProjects() {
+  onMount(async () => {
     try {
-      const res = await projectsApi.list();
-      projects = res.projects;
+      const data = await projectsApi.list();
+      projects = data.projects || [];
       if (!selectedProjectId && projects.length > 0) {
         selectedProjectId = projects[0].id;
       }
       if (selectedProjectId) {
-        setupSSE(selectedProjectId);
-        fetchExistingResults();
+        await fetchResults();
       }
     } catch (err: any) {
-      error = err.message || 'Failed to load projects.';
+      error = err.message || 'Failed to load projects';
     }
-  }
-
-  function setupSSE(projectId: number) {
-    if (unsubscribeSSE) {
-      unsubscribeSSE();
-      unsubscribeSSE = null;
-    }
-    isStreaming = true;
-    unsubscribeSSE = subscribeToPipelineEvents(projectId, {
-      onStatus: (st) => {
-        workflowStatus = st;
-      },
-      onEvent: (evt) => {
-        // When engine completes, re-fetch findings
-        if (evt.event_type === 'engine_complete') {
-          fetchExistingResults();
-        }
-      },
-      onError: () => {
-        isStreaming = false;
-      },
-    });
-  }
-
-  async function fetchExistingResults() {
-    if (!selectedProjectId) return;
-    try {
-      const res = await analyzeApi.getResults(selectedProjectId, selectedSlug);
-      if (res && res.audit_issues) {
-        analysisResult = res;
-      }
-    } catch {
-      // no cached results yet
-    }
-  }
-
-  async function handleRunAnalysis() {
-    if (!selectedProjectId) return;
-    running = true;
-    error = '';
-    analysisResult = null;
-
-    try {
-      setupSSE(selectedProjectId);
-      const res = await analyzeApi.run(selectedProjectId, selectedSlug);
-      analysisResult = res;
-    } catch (err: any) {
-      error = err.message || 'Analysis run failed.';
-    } finally {
-      running = false;
-    }
-  }
-
-  function onProjectChange() {
-    if (selectedProjectId) {
-      analysisResult = null;
-      setupSSE(selectedProjectId);
-      fetchExistingResults();
-    }
-  }
-
-  onMount(() => {
-    loadProjects();
   });
 
-  onDestroy(() => {
-    if (unsubscribeSSE) {
-      unsubscribeSSE();
+  async function fetchResults() {
+    if (!selectedProjectId) return;
+    try {
+      result = await analyzeApi.getResults(selectedProjectId, selectedSlug);
+    } catch {
+      result = null;
     }
+  }
+
+  async function handleRun() {
+    if (!selectedProjectId) return;
+    isRunning = true;
+    error = '';
+    result = null;
+    try {
+      result = await analyzeApi.run(selectedProjectId, selectedSlug);
+    } catch (err: any) {
+      error = err.message || 'Analysis failed';
+    } finally {
+      isRunning = false;
+    }
+  }
+
+  $: currentProject = projects.find((p) => p.id === selectedProjectId);
+
+  $: filteredIssues = (result?.audit_issues || []).filter((issue: AuditIssue) => {
+    const matchesSearch =
+      searchQuery === '' ||
+      issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      issue.rule_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      issue.element_id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSeverity =
+      severityFilter === 'all' || issue.band === severityFilter;
+    return matchesSearch && matchesSeverity;
   });
 </script>
 
-<div class="space-y-6">
-  <!-- Controls Card -->
-  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur shadow-xl space-y-4">
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-white">Compliance Audit Center</h1>
-        <p class="text-xs text-slate-400 mt-0.5">Run automated physics & clearance engines with real-time SSE streaming</p>
-      </div>
+<div class="space-y-6 max-w-6xl mx-auto">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Analysis</div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">MEP Piping &amp; Seismic Audit</h1>
+      <p class="text-xs sm:text-sm text-slate-400">
+        Run galvanic, crevice, and microbiological corrosion checks or Blue Halo seismic clearance validation.
+      </p>
+    </div>
 
-      <div class="flex items-center gap-3 flex-wrap">
-        <!-- Project select -->
-        <div>
-          <select
-            bind:value={selectedProjectId}
-            on:change={onProjectChange}
-            class="px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-emerald-500"
-          >
-            {#each projects as proj}
-              <option value={proj.id}>{proj.name} (#{proj.id})</option>
-            {/each}
-          </select>
-        </div>
-
-        <!-- Analysis Slug select -->
-        <div>
-          <select
-            bind:value={selectedSlug}
-            on:change={fetchExistingResults}
-            class="px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-emerald-500"
-          >
-            <option value="corrosion">Corrosion (GC-001, CC-001, MC-001)</option>
-            <option value="seismic">Seismic Clearance (Blue Halo)</option>
-          </select>
-        </div>
-
-        <!-- Run button -->
+    <!-- Domain switcher & project select -->
+    <div class="flex items-center gap-3">
+      <!-- Engine toggle -->
+      <div class="bg-slate-900 border border-slate-800 p-0.5 rounded-xl flex items-center">
         <button
-          on:click={handleRunAnalysis}
-          disabled={running || !selectedProjectId}
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold shadow-lg shadow-emerald-600/20 transition-all"
+          type="button"
+          on:click={() => {
+            selectedSlug = 'corrosion';
+            fetchResults();
+          }}
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {selectedSlug === 'corrosion' ? 'bg-[#0071e3] text-white shadow-sm' : 'text-slate-400 hover:text-white'}"
         >
-          {#if running}
-            <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            Auditing IFC...
-          {:else}
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Execute Audit
-          {/if}
+          Corrosion (GC/CC/MC)
+        </button>
+        <button
+          type="button"
+          on:click={() => {
+            selectedSlug = 'seismic';
+            fetchResults();
+          }}
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {selectedSlug === 'seismic' ? 'bg-[#0071e3] text-white shadow-sm' : 'text-slate-400 hover:text-white'}"
+        >
+          Seismic Clearance
         </button>
       </div>
+
+      <!-- Project dropdown -->
+      <select
+        bind:value={selectedProjectId}
+        on:change={() => fetchResults()}
+        class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+      >
+        {#each projects as p}
+          <option value={p.id}>{p.name}</option>
+        {/each}
+      </select>
+
+      <!-- Run Action -->
+      <button
+        type="button"
+        disabled={isRunning || !currentProject?.ifc_file_path}
+        on:click={handleRun}
+        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+      >
+        <Play class="w-3.5 h-3.5" />
+        <span>{isRunning ? 'Analyzing...' : 'Run Audit'}</span>
+      </button>
     </div>
   </div>
 
+  {#if currentProject && !currentProject.ifc_file_path}
+    <div class="p-4 rounded-2xl bg-amber-950/40 border border-amber-800 text-amber-300 text-xs flex items-center gap-2.5">
+      <AlertTriangle class="w-4 h-4 text-amber-400 shrink-0" />
+      <span>No IFC model is attached to {currentProject.name}. Upload one in the project registry before running the compliance engine.</span>
+    </div>
+  {/if}
+
   {#if error}
-    <div class="p-4 rounded-xl bg-rose-950/40 border border-rose-800 text-rose-300 text-sm">
+    <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
       {error}
     </div>
   {/if}
 
-  <!-- Live SSE Pipeline Progress Tracker -->
-  <PipelineProgress status={workflowStatus} {isStreaming} />
+  <!-- Real-time pipeline tracker -->
+  {#if selectedProjectId && isRunning}
+    <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800">
+      <PipelineProgress projectId={selectedProjectId} />
+    </div>
+  {/if}
 
-  <!-- Findings Table & Exports -->
-  {#if analysisResult}
-    <div class="space-y-4">
-      <div class="flex items-center justify-between flex-wrap gap-4 pt-2">
-        <h2 class="text-lg font-bold text-white">
-          Audit Findings ({analysisResult.element_count} Issues)
-        </h2>
-        {#if selectedProjectId}
-          <ExportActions projectId={selectedProjectId} slug={selectedSlug} />
-        {/if}
+  {#if result}
+    <!-- Summary Stats Row -->
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <div class="text-xs text-slate-400 font-semibold uppercase">Total Findings</div>
+        <div class="text-2xl font-bold text-white mt-1">{result.issue_stats.total}</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <div class="text-xs text-slate-400 font-semibold uppercase">Critical</div>
+        <div class="text-2xl font-bold text-rose-400 mt-1">{result.issue_stats.critical}</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <div class="text-xs text-slate-400 font-semibold uppercase">High Risk</div>
+        <div class="text-2xl font-bold text-orange-400 mt-1">{result.issue_stats.high}</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <div class="text-xs text-slate-400 font-semibold uppercase">Medium Risk</div>
+        <div class="text-2xl font-bold text-yellow-400 mt-1">{result.issue_stats.medium}</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <div class="text-xs text-slate-400 font-semibold uppercase">Low Risk</div>
+        <div class="text-2xl font-bold text-emerald-400 mt-1">{result.issue_stats.low}</div>
+      </div>
+    </div>
+
+    <!-- Findings Table Card -->
+    <div class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-white tracking-tight">Audit Findings ({result.audit_issues.length})</h2>
+          <p class="text-xs text-slate-400">Detailed component non-compliance and engineering mitigations.</p>
+        </div>
+
+        <!-- Export formats -->
+        <div class="flex items-center gap-2">
+          {#if selectedProjectId}
+            <a
+              href={analyzeApi.getExportUrl(selectedProjectId, selectedSlug, 'bcf')}
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm transition-all"
+            >
+              <Download class="w-3.5 h-3.5" />
+              <span>Export BCF 2.1</span>
+            </a>
+            <a
+              href={analyzeApi.getExportUrl(selectedProjectId, selectedSlug, 'csv')}
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+            >
+              <Download class="w-3.5 h-3.5" />
+              <span>CSV</span>
+            </a>
+            <a
+              href={analyzeApi.getExportUrl(selectedProjectId, selectedSlug, 'json')}
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+            >
+              <Download class="w-3.5 h-3.5" />
+              <span>JSON</span>
+            </a>
+          {/if}
+        </div>
       </div>
 
-      <IssueTable
-        issues={analysisResult.audit_issues}
-        stats={analysisResult.issue_stats}
-      />
+      <!-- Filters -->
+      <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
+        <div class="relative flex-1 w-full">
+          <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            bind:value={searchQuery}
+            placeholder="Search findings by rule, element GUID, or description..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+          />
+        </div>
+
+        <select
+          bind:value={severityFilter}
+          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        >
+          <option value="all">All Severities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+
+      <!-- Table -->
+      <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/40">
+        {#if filteredIssues.length === 0}
+          <div class="p-8 text-center text-xs text-slate-500">
+            No compliance issues match your filters.
+          </div>
+        {:else}
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                <tr>
+                  <th class="py-3 px-4">Severity</th>
+                  <th class="py-3 px-4">Rule / Mechanism</th>
+                  <th class="py-3 px-4">Element GUID</th>
+                  <th class="py-3 px-4">Finding &amp; Mitigation</th>
+                  <th class="py-3 px-4 text-right">3D Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60">
+                {#each filteredIssues as issue}
+                  <tr class="hover:bg-slate-900/60 transition-colors">
+                    <td class="py-3 px-4">
+                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase {issue.band === 'critical' ? 'bg-red-950/60 text-red-400 border border-red-800/60' : issue.band === 'high' ? 'bg-orange-950/60 text-orange-400 border border-orange-800/60' : issue.band === 'medium' ? 'bg-yellow-950/60 text-yellow-400 border border-yellow-800/60' : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'}">
+                        {issue.band}
+                      </span>
+                    </td>
+                    <td class="py-3 px-4 font-mono">
+                      <div class="font-bold text-white text-xs">{issue.rule_id}</div>
+                      <div class="text-[10px] text-slate-500">{issue.mechanism}</div>
+                    </td>
+                    <td class="py-3 px-4 font-mono text-slate-400 text-[11px] truncate max-w-xs">
+                      {issue.element_id}
+                    </td>
+                    <td class="py-3 px-4 max-w-md">
+                      <div class="font-semibold text-slate-200">{issue.title}</div>
+                      {#if issue.mitigation}
+                        <div class="text-[11px] text-slate-400 mt-0.5">{issue.mitigation}</div>
+                      {/if}
+                    </td>
+                    <td class="py-3 px-4 text-right whitespace-nowrap">
+                      {#if selectedProjectId && issue.element_id}
+                        <button
+                          type="button"
+                          on:click={() => onSelectProjectForViewer(selectedProjectId, issue.element_id)}
+                          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors"
+                        >
+                          <ScanEye class="w-3.5 h-3.5" />
+                          <span>View in 3D</span>
+                        </button>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {:else if !isRunning}
+    <div class="p-16 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+      Select a project above and click "Run Audit" to assess compliance.
     </div>
   {/if}
 </div>
-

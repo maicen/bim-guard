@@ -141,5 +141,120 @@ export const analyzeApi = {
   getExportUrl(projectId: number, slug: string, fmt: 'bcf' | 'csv' | 'json'): string {
     return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}`;
   },
+
+  async runArch(projectId: number, ruleFolder = ''): Promise<any> {
+    const form = new FormData();
+    form.append('project_id', projectId.toString());
+    if (ruleFolder) form.append('rule_folder', ruleFolder);
+
+    const res = await fetch(`${API_BASE}/analyze/arch`, {
+      method: 'POST',
+      body: form,
+    });
+    return handleResponse<any>(res);
+  },
 };
+
+export const dashboardApi = {
+  async getStats(): Promise<any> {
+    const res = await fetch(`${API_BASE}/dashboard/stats`);
+    return handleResponse<any>(res);
+  },
+};
+
+export const documentsApi = {
+  async list(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/documents`);
+    return handleResponse<any[]>(res);
+  },
+
+  async get(id: number): Promise<any> {
+    const res = await fetch(`${API_BASE}/documents/${id}`);
+    return handleResponse<any>(res);
+  },
+
+  async upload(file: File): Promise<any> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_BASE}/documents`, {
+      method: 'POST',
+      body: form,
+    });
+    return handleResponse<any>(res);
+  },
+
+  async delete(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/documents/${id}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<void>(res);
+  },
+};
+
+export const settingsApi = {
+  async get(): Promise<any> {
+    const res = await fetch(`${API_BASE}/settings`);
+    return handleResponse<any>(res);
+  },
+
+  async update(settings: Record<string, string>): Promise<any> {
+    const res = await fetch(`${API_BASE}/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings }),
+    });
+    return handleResponse<any>(res);
+  },
+};
+
+export const lineageApi = {
+  async getHistory(projectId: number): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/enhancements`);
+    return handleResponse<any[]>(res);
+  },
+
+  async enhance(projectId: number, token: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/enhance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    return handleResponse<any>(res);
+  },
+};
+
+export const ruleExtractionApi = {
+  async extract(file?: File, rawText?: string): Promise<{ rules: any[]; warnings: string[]; count: number }> {
+    const form = new FormData();
+    if (file) form.append('file', file);
+    if (rawText) form.append('raw_text', rawText);
+
+    const res = await fetch(`${API_BASE}/rules/extract`, {
+      method: 'POST',
+      body: form,
+    });
+    return handleResponse<any>(res);
+  },
+
+  async bulkCreate(rules: any[]): Promise<any> {
+    const res = await fetch(`${API_BASE}/rules/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rules),
+    });
+    return handleResponse<any>(res);
+  },
+
+  async seed(): Promise<any> {
+    const res = await fetch(`${API_BASE}/rules/seed`, {
+      method: 'POST',
+    });
+    return handleResponse<any>(res);
+  },
+
+  getIdsExportUrl(rulesetId: string): string {
+    return `${API_BASE}/rules/export-ids/${rulesetId}`;
+  },
+};
+
 

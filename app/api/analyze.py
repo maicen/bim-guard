@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
@@ -196,11 +196,14 @@ def get_analysis_results(
 def get_workflow_status(project_id: int) -> WorkflowStatusContract:
     """Get the current live workflow stages and metrics for a project."""
     snap = snapshot(project_id)
+    raw_engines = snap.get("engines", {})
     return WorkflowStatusContract(
         project_id=project_id,
-        status="running" if any(e.get("status") == "running" for e in snap.get("engines", {}).values()) else "idle",
-        engines=snap.get("engines", {}),
+        status="running" if any(isinstance(e, dict) and e.get("status") == "running" for e in raw_engines.values()) else "idle",
+        engines=raw_engines,
+        timestamp=snap.get("timestamp"),
     )
+
 
 
 @router.get("/export", summary="Export analysis report as BCF, CSV, or JSON")
@@ -228,4 +231,44 @@ def export_analysis_report(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/arch", summary="Run architectural compliance analysis")
+def run_arch_analysis(
+    project_id: Annotated[int, Form(...)],
+    rule_folder: Annotated[str, Form()] = "",
+) -> dict:
+    """Run Ontario Building Code Part 9 architectural checks (egress, daylight, fire separations, clearances)."""
+    from app.services.pipeline_services import PipelineOrchestratorService
+
+    result = PipelineOrchestratorService.orchestrate_workflow(
+        project_id=project_id,
+        analysis_theme="Architecture",
+        rule_folder=rule_folder,
+    )
+    if "error" in result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["error"],
+        )
+
+    categories = result.get("categories", {})
+    issues = result.get("issues", [])
+    project = result.get("project", {})
+
+    return {
+        "project_id": project_id,
+        "project_name": project.get("name", f"Project {project_id}"),
+        "categories": categories,
+        "total_issues": len(issues),
+        "issues": issues,
+        "summary": result.get("summary", {}),
+    }
+
+
+@router.get("/arch/{project_id}", summary="Get architectural compliance results")
+def get_arch_analysis(project_id: int) -> dict:
+    """Retrieve architectural compliance findings for a project."""
+    return run_arch_analysis(project_id=project_id)
+
 

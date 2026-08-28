@@ -1,8 +1,7 @@
-"""BIM Guard Application Entrypoint — FastAPI Gateway & Static SPA Server."""
+"""BIM Guard Application Entrypoint — Dual FastAPI Gateway & MonsterUI Monolith."""
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from threading import Thread
@@ -10,11 +9,11 @@ from time import perf_counter
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api import api_app
+from app.compat.monsterui import ensure_monsterui_compat
 from app.environment import load_env_file
 from app.logging_config import configure_logging, get_logger
 
@@ -103,7 +102,94 @@ def _schedule_seed_library_once_per_host() -> None:
 _schedule_seed_library_once_per_host()
 
 
-# --- Main FastAPI Application ---
+# ==============================================================================
+# FastHTML / MonsterUI Legacy Monolith Setup
+# ==============================================================================
+ensure_monsterui_compat()
+from fasthtml.common import FileResponse, Title, fast_app
+from monsterui.all import Container, DivLAligned, H1, Subtitle
+
+from app.components.layout import DashboardLayout
+from app.components.project_setup_wizard import handle_wizard_get, handle_wizard_post
+from app.components.themed_ui import SiteTheme
+from app.components.ui import ViewAction
+from app.routes import (
+    analyze,
+    analyze_architecture,
+    analyze_corrosion,
+    analyze_download,
+    analyze_pipeline,
+    analyze_seismic,
+    dashboard,
+    library,
+    modeling_manual,
+    projects,
+    revit_sync,
+    settings,
+    user_manual,
+    viewer,
+    workflow_api,
+    workflow_page,
+)
+
+APP_HEADERS = SiteTheme()
+
+fasthtml_app, rt = fast_app(
+    hdrs=APP_HEADERS,
+    cls="antialiased",
+)
+
+_ROUTE_INSTALLERS = (
+    viewer.setup_routes,
+    analyze.setup_routes,
+    analyze_corrosion.setup_routes,
+    analyze_seismic.setup_routes,
+    analyze_architecture.setup_routes,
+    analyze_pipeline.setup_routes,
+    analyze_download.setup_routes,
+    workflow_api.setup_routes,
+    workflow_page.setup_routes,
+    dashboard.setup_routes,
+    library.setup_routes,
+    modeling_manual.setup_routes,
+    projects.setup_routes,
+    revit_sync.setup_routes,
+    settings.setup_routes,
+    user_manual.setup_routes,
+)
+
+for installer in _ROUTE_INSTALLERS:
+    logger.debug("Registering FastHTML routes from %s", installer.__module__)
+    installer(rt)
+
+
+@fasthtml_app.get("/wizard")
+def wizard_get():
+    """GET /wizard — Render project setup wizard."""
+    return handle_wizard_get()
+
+
+@fasthtml_app.post("/wizard")
+async def wizard_post(request: Request):
+    """POST /wizard — Handle wizard navigation."""
+    form_data = await request.form()
+    return await handle_wizard_post(form_data)
+
+
+@rt("/")
+def get():
+    return Title("BIM Guard"), DashboardLayout(
+        Container(
+            H1("Welcome to BIM Guard"),
+            Subtitle("Open the IFC viewer to start a new compliance workflow."),
+            DivLAligned(ViewAction(href="/viewer", title="Go to Viewer")),
+        )
+    )
+
+
+# ==============================================================================
+# Main FastAPI Gateway & Routing
+# ==============================================================================
 app = FastAPI(
     title="BIM Guard",
     description="OpenBIM Compliance Gateway & Decoupled Svelte SPA Architecture",
@@ -157,12 +243,23 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 
 # Register API Gateway routers directly under /api prefix
-from app.api import analyze, events, projects, rules
+from app.api import (
+    analyze as api_analyze,
+    dashboard as api_dashboard,
+    documents as api_documents,
+    events as api_events,
+    projects as api_projects,
+    rules as api_rules,
+    settings as api_settings,
+)
 
-app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
-app.include_router(rules.router, prefix="/api/rules", tags=["Rules"])
-app.include_router(analyze.router, prefix="/api/analyze", tags=["Analysis"])
-app.include_router(events.router, prefix="/api", tags=["Events"])
+app.include_router(api_dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(api_projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
+app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])
+app.include_router(api_documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(api_settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(api_events.router, prefix="/api", tags=["Events"])
 
 
 @app.get("/api/health", tags=["Health"], summary="API Gateway Health Check")
@@ -170,100 +267,14 @@ def health_check() -> dict:
     """Return API gateway operational status."""
     return {"status": "ok", "service": "bim-guard-api", "version": "1.0.0"}
 
-# Mount static files
+
+# Mount static files for both FastAPI and FastHTML/Viewer
 static_dir = Path("static")
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
-@app.get("/viewer", response_class=HTMLResponse, summary="3D OpenBIM Viewer Viewport")
-def viewer_page(project_id: int | None = None, element_guid: str | None = None):
-    """Standalone 3D IFC Viewer embedding web-ifc and ThatOpenCompany components."""
-    ifc_url = f"/api/projects/{project_id}/ifc" if project_id else ""
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>3D Viewer — BIM Guard</title>
-  <script type="importmap">
-    {{"imports":{{"web-ifc":"https://unpkg.com/web-ifc@0.0.77/web-ifc-api.js"}}}}
-  </script>
-  <style>
-    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-    body {{ background: #020617; color: #f8fafc; font-family: system-ui, sans-serif; overflow: hidden; width: 100vw; height: 100vh; }}
-    #viewer-container {{ width: 100%; height: 100%; position: relative; }}
-    .bimguard-viewport {{ width: 100%; height: 100%; display: block; }}
-    .overlay {{ position: absolute; top: 12px; left: 12px; z-index: 10; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 8px 14px; border-radius: 8px; border: 1px solid #334155; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 8px; }}
-    .dot {{ width: 8px; height: 8px; border-radius: 50%; background: #10b981; }}
-  </style>
-</head>
-<body>
-  <div class="overlay">
-    <span class="dot"></span>
-    <span>BIM Guard 3D Viewport {f"• Project #{project_id}" if project_id else ""}</span>
-  </div>
-  <div id="viewer-container"></div>
-  <script type="module">
-    import {{ initViewer }} from '/static/js/viewer/ifc-viewer.js?v=error-highlight-2';
-    window.addEventListener('DOMContentLoaded', async () => {{
-      const viewerAPI = await initViewer('viewer-container');
-      if (viewerAPI) {{
-        const ifcUrl = {json.dumps(ifc_url)};
-        if (ifcUrl) {{
-          await viewerAPI.loadIfc(ifcUrl);
-        }}
-      }}
-    }});
-  </script>
-</body>
-</html>"""
-
-
-# Frontend SPA mount or landing page
-frontend_dist = Path("frontend/dist")
-if frontend_dist.exists() and (frontend_dist / "index.html").exists():
-    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="spa")
-else:
-
-    @app.get("/", response_class=HTMLResponse)
-    def root_landing():
-        """Welcome landing page directing to Svelte 5 dev server and FastAPI docs."""
-        return """<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>BIM Guard — FastAPI & Svelte 5</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-6 antialiased">
-  <div class="max-w-xl w-full p-8 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-2xl backdrop-blur space-y-6 text-center">
-    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 mx-auto flex items-center justify-center font-black text-2xl text-white shadow-lg shadow-emerald-500/20">
-      BG
-    </div>
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight text-white">BIM Guard Platform</h1>
-      <p class="text-sm text-slate-400 mt-1">FastAPI Gateway & Decoupled Svelte 5 SPA Architecture</p>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-      <a href="/api/docs" class="p-4 rounded-xl border border-slate-800 bg-slate-950/60 hover:border-emerald-500/50 hover:bg-slate-900 transition-all text-left group">
-        <div class="text-xs uppercase tracking-wider font-semibold text-emerald-400">REST & SSE API</div>
-        <div class="text-sm font-semibold text-white mt-1 group-hover:text-emerald-300">FastAPI Swagger UI ↗</div>
-        <div class="text-xs text-slate-400 mt-1">Explore endpoints, contracts, and events.</div>
-      </a>
-      <a href="http://localhost:5173" target="_blank" class="p-4 rounded-xl border border-slate-800 bg-slate-950/60 hover:border-emerald-500/50 hover:bg-slate-900 transition-all text-left group">
-        <div class="text-xs uppercase tracking-wider font-semibold text-teal-400">Svelte 5 Client</div>
-        <div class="text-sm font-semibold text-white mt-1 group-hover:text-teal-300">Svelte SPA (Port 5173) ↗</div>
-        <div class="text-xs text-slate-400 mt-1">Launch Vite development server.</div>
-      </a>
-    </div>
-    <p class="text-xs text-slate-500 pt-2 border-t border-slate-800/80">
-      Backend active at port 8000 • Run <code class="text-slate-300 font-mono">cd frontend && npm run dev</code> for the Svelte client.
-    </p>
-  </div>
-</body>
-</html>"""
+# Mount FastHTML / MonsterUI Monolith at root to catch all browser routes
+app.mount("/", fasthtml_app)
 
 
 if __name__ == "__main__":

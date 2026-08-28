@@ -3,11 +3,14 @@
   import { projectsApi } from '../lib/api';
   import type { Project } from '../lib/types';
   import IfcViewer from '../lib/components/IfcViewer.svelte';
+  import { ScanEye, Layers } from 'lucide-svelte';
 
   export let initialProjectId: number | null = null;
+  export let initialElementGuid: string | null = null;
 
   let projects: Project[] = [];
   let selectedProjectId: number | null = initialProjectId;
+  let selectedElementGuid: string | null = initialElementGuid;
 
   async function loadProjects() {
     try {
@@ -24,25 +27,35 @@
   onMount(() => {
     loadProjects();
   });
+
+  $: if (initialProjectId) {
+    selectedProjectId = initialProjectId;
+  }
+  $: if (initialElementGuid) {
+    selectedElementGuid = initialElementGuid;
+  }
 </script>
 
-<div class="space-y-6">
-  <div class="flex items-center justify-between flex-wrap gap-4">
+<div class="space-y-6 max-w-6xl mx-auto">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight text-white">3D OpenBIM Viewer</h1>
-      <p class="text-sm text-slate-400 mt-1">Interactive 3D model exploration with element clash highlighting</p>
+      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Viewer</div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">3D OpenBIM Viewer</h1>
+      <p class="text-xs sm:text-sm text-slate-400">
+        Spatial geometry inspection powered by ThatOpenCompany web-ifc and BCF viewpoints.
+      </p>
     </div>
 
     <!-- Project dropdown -->
     {#if projects.length > 0}
       <div class="flex items-center gap-3">
         <label for="viewer-project-select" class="text-xs uppercase tracking-wider font-semibold text-slate-400">
-          Loaded Model:
+          Model:
         </label>
         <select
           id="viewer-project-select"
           bind:value={selectedProjectId}
-          class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-emerald-500"
+          class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-[#0071e3]"
         >
           {#each projects as p}
             <option value={p.id}>{p.name} (#{p.id})</option>
@@ -52,13 +65,28 @@
     {/if}
   </div>
 
+  {#if selectedElementGuid}
+    <div class="p-3 rounded-xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-300 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <ScanEye class="w-4 h-4 text-blue-400 shrink-0" />
+        <span>Focusing on violating element GUID: <strong class="font-mono">{selectedElementGuid}</strong></span>
+      </div>
+      <button
+        type="button"
+        on:click={() => (selectedElementGuid = null)}
+        class="text-blue-400 hover:text-white underline text-[11px]"
+      >
+        Clear Selection
+      </button>
+    </div>
+  {/if}
+
   {#if projects.length === 0}
-    <div class="p-8 text-center border border-slate-800 rounded-xl bg-slate-900/50 space-y-2">
-      <div class="text-slate-300 font-semibold">No IFC models uploaded yet</div>
+    <div class="p-16 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/40 space-y-2">
+      <div class="text-slate-300 font-semibold">No IFC models attached</div>
       <div class="text-xs text-slate-400">Upload an IFC model under Projects to inspect it in the 3D viewport.</div>
     </div>
   {:else}
-    <IfcViewer projectId={selectedProjectId} />
+    <IfcViewer projectId={selectedProjectId} elementGuid={selectedElementGuid} />
   {/if}
 </div>
-

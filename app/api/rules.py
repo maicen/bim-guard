@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import PlainTextResponse
 
 from app.api.dependencies import get_rules_service
@@ -184,13 +184,29 @@ def export_ids_xml(
     )
 
 
-@router.post("/extract", summary="Extract rules from document text")
+@router.post("/extract", summary="Extract rules from document text or file")
 async def extract_rules(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    raw_text: Optional[str] = Form(None),
 ) -> dict:
-    """Extract compliance rules from an uploaded text or markdown document via LLM."""
-    content_bytes = await file.read()
-    text = content_bytes.decode("utf-8", errors="replace")
+    """Extract compliance rules from uploaded document or provided raw text via LLM."""
+    text = ""
+    if file is not None and file.filename:
+        content_bytes = await file.read()
+        lower_name = file.filename.lower()
+        if lower_name.endswith(".pdf"):
+            from app.services.documents_service import DocumentService
+            text = DocumentService.parse_pdf_content(content_bytes)
+        else:
+            text = content_bytes.decode("utf-8", errors="replace")
+    elif raw_text:
+        text = raw_text
+
+    if not text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No document or text content was provided for rule extraction.",
+        )
 
     extraction_service = RuleExtractionService()
     result = await extraction_service.extract_rules_from_text(text)
@@ -199,4 +215,60 @@ async def extract_rules(
         "warnings": result.warnings,
         "count": len(result.rules),
     }
+
+
+@router.post("/seed", summary="Seed rule library with engine rulesets")
+def seed_rules(
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> dict:
+    """Seed corrosion mechanisms GC-001, CC-001, MC-001 into the rule library."""
+    from app.services.ruleset_seeder import seed_engine_rulesets
+
+    seeded = seed_engine_rulesets(service)
+    total_rules = service.count()
+    return {
+        "success": True,
+        "seeded_rulesets": seeded,
+        "total_rules": total_rules,
+    }
+
+
+@router.post("/bulk", summary="Bulk insert extracted compliance rules")
+def bulk_create_rules(
+    rules: list[RuleCreateRequest],
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> dict:
+    """Save a batch of extracted rules into the library."""
+    created_count = 0
+    for payload in rules:
+        try:
+            service.create_rule(
+                rule_id=payload.rule_id,
+                description=payload.description or "",
+                source_text="",
+                property_set=payload.property_set or "",
+                property_name=payload.property_name or "",
+                operator=payload.operator or "==",
+                check_value=payload.check_value,
+                value_min=payload.value_min,
+                value_max=payload.value_max,
+                unit=payload.unit or "",
+                severity=payload.severity,
+                mechanism=payload.mechanism or "CODE",
+                ruleset_id=payload.ruleset_id,
+                rule_category=payload.rule_category or "property_check",
+                confidence=payload.confidence or "1.0",
+                extraction_method=payload.extraction_method or "ai_extracted",
+                needs_review=payload.needs_review,
+            )
+            created_count += 1
+        except Exception as exc:
+            logger.warning("Could not bulk create rule %s: %s", payload.rule_id, exc)
+
+    return {
+        "success": True,
+        "created_count": created_count,
+        "total_requested": len(rules),
+    }
+
 

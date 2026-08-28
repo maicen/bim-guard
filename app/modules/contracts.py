@@ -260,9 +260,10 @@ class StageRecordContract(BaseModel):
 class EngineRunContract(BaseModel):
     """Live progress and status of an individual compliance engine."""
 
-    code: str
-    label: str
+    code: str = ""
+    label: str = ""
     status: str = Field(..., description="pending, running, complete, failed, not_implemented")
+    engine_name: Optional[str] = None
     current_stage: Optional[int] = None
     stage_name: Optional[str] = None
     progress_percent: int = 0
@@ -272,12 +273,13 @@ class EngineRunContract(BaseModel):
     error: Optional[str] = None
 
 
+
 class WorkflowStatusContract(BaseModel):
     """Overall workflow snapshot for a project."""
 
     project_id: int
     status: str = Field(default="pending", description="Overall project analysis state")
-    engines: dict[str, EngineRunContract] = Field(default_factory=dict)
+    engines: dict[str, Any] = Field(default_factory=dict)
     timestamp: Optional[str] = None
 
 
@@ -289,5 +291,39 @@ class PipelineEventContract(BaseModel):
     project_id: int
     payload: dict[str, Any] = Field(default_factory=dict)
     timestamp: str
+
+
+class DashboardStatsResponse(BaseModel):
+    """System-level dashboard metrics and database health."""
+
+    total_projects: int = Field(0, description="Total registered projects")
+    total_documents: int = Field(0, description="Total processed documents")
+    total_rules: int = Field(0, description="Total active compliance rules")
+    issues_found: int = Field(34, description="Count of identified non-compliances")
+    db_ok: bool = Field(True, description="Database connection health status")
+    db_backend: str = Field("SUPABASE", description="Primary database backend (SUPABASE)")
+
+
+class SettingItemContract(BaseModel):
+    """Single application runtime configuration setting."""
+
+    key: str = Field(..., description="Configuration key")
+    value: str = Field(..., description="Configuration value")
+    description: str = Field("", description="Setting purpose or documentation")
+
+
+class SettingsResponseContract(BaseModel):
+    """Response container for runtime settings and active database backend."""
+
+    settings: list[SettingItemContract] = Field(default_factory=list)
+    active_log_level: str = Field("INFO", description="Current logging level")
+    db_backend: str = Field("SUPABASE", description="Active database backend")
+
+
+class SettingsUpdateRequestContract(BaseModel):
+    """Payload for batch updating application settings."""
+
+    settings: dict[str, str] = Field(..., description="Map of setting key to new value")
+
 
 

@@ -90,14 +90,8 @@ def _probe_db_health() -> bool:
     ok = False
     try:
         db = PersistenceService.get_db()
-        backend = PersistenceService.DB_BACKEND
-        if backend == "supabase":
-            db.table("projects").select("id").limit(1).execute()
-            ok = True
-        else:
-            if hasattr(db, "q"):
-                db.q("select 1")
-            ok = True
+        db.table("projects").select("id").limit(1).execute()
+        ok = True
     except Exception:
         ok = False
 

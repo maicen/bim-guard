@@ -220,10 +220,10 @@ class PersistenceService:
         """Create or migrate a table, then return the table handle.
 
         Pass db explicitly (from get_isolated_sqlite_db()) to bypass the
-        shared singleton and its configured backend entirely — always
-        creates a SQLite-backed table on that connection instead. Used to
-        give callers (tests, the eval harness) a database that is
-        structurally unable to reach the live Supabase/SQLite data.
+        shared singleton entirely — creates an isolated SQLite-backed table on
+        that connection instead. Used strictly to give offline tests and eval
+        harnesses an isolated database structurally unable to reach the live
+        Supabase data.
         """
         if db is not None:
             table = SQLiteTableAdapter(db[table_name])
@@ -243,10 +243,10 @@ class PersistenceService:
     def get_isolated_sqlite_db(path: str):
         """Return a brand-new, independent SQLite connection at *path*.
 
-        Unlike get_db(), this never touches the shared singleton or its
-        configured backend (sqlite or Supabase) — the connection it returns
-        is structurally incapable of reaching the live app database. Callers
-        own its lifecycle (close it themselves) since it isn't cached here.
+        Unlike get_db(), this never touches the shared singleton — the
+        connection it returns is structurally incapable of reaching the live
+        Supabase app database. Callers own its lifecycle (close it themselves)
+        since it isn't cached here.
         """
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         return database(str(path))
