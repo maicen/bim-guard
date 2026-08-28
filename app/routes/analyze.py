@@ -2372,7 +2372,7 @@ def _simple_summary_table(category: str, rule_results: list):
             cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-white hover:bg-slate-600",
         ),
         A(
-            "View in 3D",
+            "View in 3D/ Export to BCF",
             href=f"/viewer?project_id={_last_summary_project_id}&bcf_artifact_id={_bcf_artifact['id']}",
             target="_blank",
             cls="inline-block px-3 py-1.5 rounded text-xs font-medium bg-emerald-700 text-white hover:bg-emerald-600",

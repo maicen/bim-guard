@@ -33,6 +33,27 @@ function installErrorHighlighting(components, world) {
             await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, selectionMap, false, false);
         }
     };
+
+    // Highlights every element linked to the given topics at once (used for
+    // the topics table's checkbox multi-select), replacing whatever a single
+    // go() call highlighted.
+    async function highlightTopics(topicList) {
+        const viewpoints = components.get(OBC.Viewpoints);
+        const maps = [];
+        for (const topic of topicList) {
+            const viewpointGuid = topic.viewpoints.values().next().value;
+            const viewpoint = viewpointGuid ? viewpoints.list.get(viewpointGuid) : null;
+            if (!viewpoint) continue;
+            const map = await viewpoint.getSelectionMap();
+            if (!OBC.ModelIdMapUtils.isEmpty(map)) maps.push(map);
+        }
+        await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
+        if (maps.length > 0) {
+            await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, OBC.ModelIdMapUtils.join(maps), false, false);
+        }
+    }
+
+    return { highlightTopics };
 }
 
 const USERS = {
@@ -105,7 +126,7 @@ function createTopicPanel(components, topics, world) {
     return [topicPanel, updateTopicPanel];
 }
 
-function createTopicsWorkspace(components, world, viewport) {
+function createTopicsWorkspace(components, world, viewport, highlightTopics) {
     const topics = components.get(OBC.BCFTopics);
     topics.setup({
         users: new Set(Object.keys(USERS)),
@@ -125,6 +146,15 @@ function createTopicsWorkspace(components, world, viewport) {
         dataStyles: { users: USERS },
     });
     topicsList.selectableRows = true;
+    const updateMultiHighlight = () => {
+        const selected = [...topicsList.selection]
+            .map(({ Guid }) => (Guid ? topics.list.get(Guid) : null))
+            .filter(Boolean);
+        highlightTopics(selected);
+    };
+    topicsList.addEventListener("dataselected", updateMultiHighlight);
+    topicsList.addEventListener("datadeselected", updateMultiHighlight);
+    topicsList.addEventListener("dataselectioncleared", updateMultiHighlight);
     const refreshTopicsList = () => {
         window.setTimeout(() => {
             topicsList.data = [...topicsList.data];
@@ -287,7 +317,7 @@ export async function initViewer(containerId) {
     const grids = components.get(OBC.Grids);
     grids.create(world);
 
-    installErrorHighlighting(components, world);
+    const { highlightTopics } = installErrorHighlighting(components, world);
 
     const fragments = components.get(OBC.FragmentsManager);
     const workerUrl = await OBC.FragmentsManager.getWorker();
@@ -314,7 +344,7 @@ export async function initViewer(containerId) {
         if (world.camera) world.camera.updateAspect();
     });
 
-    const workspace = createTopicsWorkspace(components, world, viewport);
+    const workspace = createTopicsWorkspace(components, world, viewport, highlightTopics);
     container.replaceChildren(workspace.app);
 
     async function loadIfc(urlOrFile) {
