@@ -1,6 +1,39 @@
 import * as BUI from "https://esm.sh/@thatopen/ui@3.4.10";
 import * as OBC from "https://esm.sh/@thatopen/components@3.4.8?external=web-ifc&deps=three@0.182.0,@thatopen/fragments@3.4.7";
+import * as OBF from "https://esm.sh/@thatopen/components-front@3.4.4?external=web-ifc&deps=@thatopen/components@3.4.8,@thatopen/fragments@3.4.7,three@0.182.0";
 import * as CUI from "https://esm.sh/@thatopen/ui-obc@3.4.2?external=web-ifc&deps=@thatopen/ui@3.4.10,@thatopen/components@3.4.8,three@0.182.0,@thatopen/fragments@3.4.7";
+import * as THREE from "https://esm.sh/three@0.182.0";
+
+const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
+
+// The BCF viewpoints the corrosion engine generates carry the failing
+// element's GUID in their selection (see bcf_generator._viewpoint_xml), but
+// Viewpoint.go() only moves the camera and applies visibility — it never
+// colors the linked component. Patching go() once here means every way a
+// viewpoint can be shown (the topic list's row click below, and the native
+// eye-icon button ui-obc renders per viewpoint) highlights the offending
+// element in red instead of just zooming to it.
+function installErrorHighlighting(components, world) {
+    components.get(OBC.Raycasters).get(world);
+    const highlighter = components.get(OBF.Highlighter);
+    highlighter.setup({ world, selectEnabled: false, autoHighlightOnClick: false });
+    highlighter.styles.set(ERROR_HIGHLIGHT_STYLE, {
+        color: new THREE.Color("red"),
+        opacity: 1,
+        transparent: false,
+        renderedFaces: 0,
+    });
+
+    const originalGo = OBC.Viewpoint.prototype.go;
+    OBC.Viewpoint.prototype.go = async function highlightingGo(config) {
+        await originalGo.call(this, config);
+        await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
+        const selectionMap = await this.getSelectionMap();
+        if (!OBC.ModelIdMapUtils.isEmpty(selectionMap)) {
+            await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, selectionMap, false, false);
+        }
+    };
+}
 
 const USERS = {
     "reviewer@bimguard.local": { name: "BIM Guard Reviewer" },
@@ -253,6 +286,8 @@ export async function initViewer(containerId) {
 
     const grids = components.get(OBC.Grids);
     grids.create(world);
+
+    installErrorHighlighting(components, world);
 
     const fragments = components.get(OBC.FragmentsManager);
     const workerUrl = await OBC.FragmentsManager.getWorker();

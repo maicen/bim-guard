@@ -1096,28 +1096,14 @@ def _rule_compliance_card(
         latest = _report_artifact_service.latest_bcf(project_id)
         bcf_artifact_id = latest.get("id") if latest else None
 
-    total = summary.get("total_rules", 0)
     passed = summary.get("passed", 0)
     failed = summary.get("failed", 0)
     missing = summary.get("missing_data", 0)
     no_elem = summary.get("no_elements", 0)
-    rate = summary.get("pass_rate", 0)
     mand_f = summary.get("mandatory_failed", 0)
 
-    # Colour the pass-rate pill
-    rate_cls = (
-        "bg-green-100 text-green-800"
-        if rate >= 80
-        else "bg-yellow-100 text-yellow-800"
-        if rate >= 50
-        else "bg-red-100 text-red-800"
-    )
-
     summary_bar = Div(
-        Span(
-            f"{rate:.0f}% pass rate",
-            cls=f"inline-block px-3 py-1 rounded-full text-sm font-semibold {rate_cls} mr-3",
-        ),
+        _pass_rate_pill(summary),
         Span(f"✓ {passed} passed", cls="text-xs text-green-700 mr-2"),
         Span(f"✗ {failed} failed", cls="text-xs text-red-700 mr-2"),
         Span(f"~ {missing} missing data", cls="text-xs text-yellow-700 mr-2") if missing else "",
@@ -2135,6 +2121,27 @@ def _fmt_duration(seconds: float) -> str:
         return f"{seconds:.1f}s"
     minutes, rest = divmod(seconds, 60)
     return f"{int(minutes)}m {rest:.0f}s"
+
+
+def _pass_rate_pill(summary: dict, total_key: str = "total_rules"):
+    """Colour-coded 'N% pass rate' pill, shared by the MEP rule compliance
+    card and the ARCH results page. Returns "" when there's nothing to rate
+    (no rules evaluated) rather than a misleading "0% pass rate"."""
+    total = summary.get(total_key, 0)
+    if not total:
+        return ""
+    rate = summary.get("pass_rate", 0)
+    rate_cls = (
+        "bg-green-100 text-green-800"
+        if rate >= 80
+        else "bg-yellow-100 text-yellow-800"
+        if rate >= 50
+        else "bg-red-100 text-red-800"
+    )
+    return Span(
+        f"{rate:.0f}% pass rate",
+        cls=f"inline-block px-3 py-1 rounded-full text-sm font-semibold {rate_cls} mr-3",
+    )
 
 
 def _coverage_stat_line(summary: dict):
@@ -3222,6 +3229,10 @@ def setup_routes(rt):
                     P(
                         f"Domain-based compliance check against {_active_code_refs_summary()}.",
                         cls="text-sm text-muted-foreground",
+                    ),
+                    Div(
+                        _pass_rate_pill(result.get("rule_compliance_summary", {})),
+                        cls="mt-3",
                     ),
                     _coverage_stat_line(result.get("rule_compliance_summary", {})),
                 ),

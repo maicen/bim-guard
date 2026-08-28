@@ -171,7 +171,7 @@ def setup_routes(rt):
                 ),
                 Script(
                     """
-import { initViewer } from '/static/js/viewer/ifc-viewer.js?v=topics-ui-10';
+import { initViewer } from '/static/js/viewer/ifc-viewer.js?v=error-highlight-1';
 
 window.addEventListener('DOMContentLoaded', async () => {
     const viewerAPI = await initViewer('viewer-container');

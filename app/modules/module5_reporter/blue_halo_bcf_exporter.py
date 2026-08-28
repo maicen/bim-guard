@@ -151,8 +151,9 @@ def generate_bcf_zip_from_halo_clashes(
         for index, clash in enumerate(clashes):
             issue = _bcf_issue_from_clash(clash, halo=halos.get(clash.halo_id))
             folder = issue.guid + "/"
-            zf.writestr(folder + "markup.bcf", _markup_xml(issue, index))
-            zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue))
+            viewpoint_guid = str(uuid.uuid4()).upper()
+            zf.writestr(folder + "markup.bcf", _markup_xml(issue, index, viewpoint_guid))
+            zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue, viewpoint_guid))
             zf.writestr(folder + "snapshot.png", _placeholder_png())
 
     return buf.getvalue()

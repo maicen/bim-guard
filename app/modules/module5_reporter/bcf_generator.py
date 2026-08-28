@@ -41,7 +41,7 @@ def _utc_now() -> str:
     return datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z")
 
 
-def _markup_xml(issue: BCFIssue, index: int) -> str:
+def _markup_xml(issue: BCFIssue, index: int, viewpoint_guid: str) -> str:
     """Generate BCF 2.1 markup.bcf XML for one issue."""
     labels_xml = "\n".join(f"    <Labels>{l}</Labels>" for l in issue.labels)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -76,20 +76,18 @@ Component: {issue.component_name} ({issue.component_guid})
 Service type: {issue.service_type} | Floor/zone: {issue.floor}
 Mitigation: {issue.mitigation}</Comment>
   </Comment>
-  <Viewpoints>
-    <ViewPoint>
-      <Viewpoint>viewpoint.bcfv</Viewpoint>
-      <Snapshot>snapshot.png</Snapshot>
-      <Index>0</Index>
-    </ViewPoint>
+  <Viewpoints Guid="{viewpoint_guid}">
+    <Viewpoint>viewpoint.bcfv</Viewpoint>
+    <Snapshot>snapshot.png</Snapshot>
+    <Index>0</Index>
   </Viewpoints>
 </Markup>"""
 
 
-def _viewpoint_xml(issue: BCFIssue) -> str:
+def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
     """Generate BCF 2.1 viewpoint.bcfv XML with camera position and component selection."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<VisualizationInfo Guid="{str(uuid.uuid4()).upper()}">
+<VisualizationInfo Guid="{viewpoint_guid}">
   <Components>
     <Selection>
       <Component IfcGuid="{issue.component_guid}">
@@ -192,8 +190,9 @@ def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf
         # One folder per issue
         for i, issue in enumerate(issues):
             folder = issue.guid + "/"
-            zf.writestr(folder + "markup.bcf", _markup_xml(issue, i))
-            zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue))
+            viewpoint_guid = str(uuid.uuid4()).upper()
+            zf.writestr(folder + "markup.bcf", _markup_xml(issue, i, viewpoint_guid))
+            zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue, viewpoint_guid))
             zf.writestr(folder + "snapshot.png", _placeholder_png())
 
     return buf.getvalue()
