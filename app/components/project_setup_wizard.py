@@ -13,9 +13,11 @@ from fasthtml.common import (
 from typing import Dict, List, Any, Optional, Tuple
 
 from app.constants import (
+    ANALYSIS_ROUTES,
     ANALYSIS_TYPES,
     COUNTRIES,
     DEFAULT_ANALYSIS_TYPE,
+    normalise_analysis_types,
     NOTEBOOK_STANDARDS,
     PROJECT_TYPES,
 )
@@ -463,21 +465,27 @@ class ProjectSetupWizard:
 
     def render_step_3_analysis_type(self, fd: Dict = None) -> Div:
         fd = fd or {}
-        selected = fd.get("analysis_type", "")
+        selected = normalise_analysis_types(fd.get("analysis_types"))
         descs = {
             "Piping (Corrosive)": "Galvanic & crevice corrosion risk",
             "Halo": "Seismic bracing clearance (LOD 200/300)",
             "Architecture": "Architectural compliance (TBD)"
         }
         cards = [Div(
-            Input(type="radio", name="analysis_type", value=atype, id=f"atype-{atype}"),
+            Input(
+                type="checkbox",
+                name="analysis_types",
+                value=atype,
+                id=f"atype-{atype}",
+                checked=atype in selected,
+            ),
             Div(Label(atype, cls="card-select-label"),
                 P(descs.get(atype, ""), style="font-size: 10px; color: var(--text-muted);")),
-            cls=f"card-select-item {'selected' if selected == atype else ''}",
+            cls=f"card-select-item {'selected' if atype in selected else ''}",
             onclick="selectCard(this)")
             for atype in ANALYSIS_TYPES]
         return Div(
-            P("Select analysis type:", style="font-size: 12px; margin: 0 0 12px 0;"),
+            P("Select one or more analyses:", style="font-size: 12px; margin: 0 0 12px 0;"),
             Div(*cards, cls="card-selector"),
             cls="wiz-step")
 
@@ -515,7 +523,7 @@ class ProjectSetupWizard:
         country = fd.get("country", DEFAULT_COUNTRY)
         name = fd.get("name", "")
         project_type = fd.get("project_type", "")
-        analysis_type = fd.get("analysis_type", "")
+        analysis_types = normalise_analysis_types(fd.get("analysis_types"))
 
         return Div(
             Div(H3("Step 5A: Select Standards", style="font-size: 12px;"),
@@ -530,7 +538,7 @@ class ProjectSetupWizard:
                         Div(Span("Type", cls="review-label"), Span(project_type or "—", cls="review-value"), cls="review-row"),
                         cls="review-section"),
                     Div(Div("Analysis", style="font-size: 11px; font-weight: 700; color: var(--text-muted);"),
-                        Div(Span("Analysis Type", cls="review-label"), Span(analysis_type or "—", cls="review-value"), cls="review-row"),
+                        Div(Span("Analysis Types", cls="review-label"), Span(", ".join(analysis_types) or "—", cls="review-value"), cls="review-row"),
                         Div(Span("Standards", cls="review-label"), Span(f"{len(selected_standards)} chosen", cls="review-value"), cls="review-row"),
                         cls="review-section")),
                 Div("Review and click 'Create Project' to proceed.", cls="note"),
@@ -544,7 +552,7 @@ class ProjectSetupWizard:
     STEP_FIELDS = {
         1: ("country", "name", "description", "size", "buildings", "floors"),
         2: ("project_type",),
-        3: ("analysis_type",),
+        3: ("analysis_types",),
         4: (),
         5: ("standards",),
     }
@@ -560,12 +568,18 @@ class ProjectSetupWizard:
             ("buildings", fd.get("buildings", "")),
             ("floors", fd.get("floors", "")),
             ("project_type", fd.get("project_type", "")),
-            ("analysis_type", fd.get("analysis_type", "")),
+        ]
+        # analysis_types is multi-valued, so it carries as one hidden input per
+        # selected value. A single input would collapse the list to its last
+        # entry, which is exactly the bug FormData.get() causes on the way in.
+        multi_carry_over = [
+            ("analysis_types", value)
+            for value in normalise_analysis_types(fd.get("analysis_types"))
         ]
         hidden_fields = [Input(type="hidden", name="wizard_step", value=str(current_step))]
         hidden_fields += [
             Input(type="hidden", name=key, value=value)
-            for key, value in carry_over
+            for key, value in carry_over + multi_carry_over
             if key not in owned
         ]
         if "standards" not in owned:
@@ -636,7 +650,11 @@ async def handle_wizard_post(request_data) -> Div:
         "buildings": request_data.get("buildings", ""),
         "floors": request_data.get("floors", ""),
         "project_type": request_data.get("project_type", ""),
-        "analysis_type": request_data.get("analysis_type", ""),
+        "analysis_types": (
+            request_data.getlist("analysis_types")
+            if hasattr(request_data, "getlist")
+            else []
+        ),
         "standards": request_data.getlist("standards") if hasattr(request_data, 'getlist') else [],
     }
 
@@ -654,7 +672,9 @@ async def handle_wizard_post(request_data) -> Div:
             wizard = ProjectSetupWizard()
             return wizard.render(current_step=5, form_data=form_data)
         project_id = create_project_from_wizard(form_data)
-        analysis_route = get_analysis_route(form_data["analysis_type"])
+        analysis_route = get_analysis_route(
+            normalise_analysis_types(form_data.get("analysis_types"))
+        )
         return Div(Script(f"window.location.href = '/analyze/{analysis_route}?project_id={project_id}'"))
 
     wizard = ProjectSetupWizard()
@@ -673,8 +693,8 @@ def validate_step(step: int, form_data: Dict) -> List[str]:
         if not form_data.get("project_type"):
             errors.append("Project type is required")
     elif step == 3:
-        if not form_data.get("analysis_type"):
-            errors.append("Analysis type is required")
+        if not normalise_analysis_types(form_data.get("analysis_types")):
+            errors.append("At least one analysis type is required")
     elif step == 5:
         if not form_data.get("standards"):
             errors.append("At least one standard must be selected")
@@ -699,7 +719,7 @@ def create_project_from_wizard(form_data: Dict) -> int:
 
     Args:
         form_data: Collected wizard state. ``name``, ``country`` and
-            ``analysis_type`` must be present -- ``validate_all_steps`` runs
+            ``analysis_types`` must be present -- ``validate_all_steps`` runs
             before this is called, and ``create_project`` raises ValueError on
             any of them being blank or unrecognised.
 
@@ -716,7 +736,9 @@ def create_project_from_wizard(form_data: Dict) -> int:
         description=form_data.get("description", ""),
         status="Active",
         country=form_data.get("country", DEFAULT_COUNTRY),
-        analysis_type=form_data.get("analysis_type") or DEFAULT_ANALYSIS_TYPE,
+        analysis_types=(
+            normalise_analysis_types(form_data.get("analysis_types")) or [DEFAULT_ANALYSIS_TYPE]
+        ),
     )
     project_id = project["id"]
 
@@ -729,6 +751,24 @@ def create_project_from_wizard(form_data: Dict) -> int:
     return project_id
 
 
-def get_analysis_route(analysis_type: str) -> str:
-    """Map analysis type to route slug."""
-    return {"Piping (Corrosive)": "corrosion", "Halo": "seismic", "Architecture": "architecture"}.get(analysis_type, "corrosion")
+def get_analysis_route(analysis_types: list[str] | str) -> str:
+    """Map a project's analyses to the slug it should land on.
+
+    The primary analysis wins -- the first one selected -- matching where
+    ``POST /projects/create`` sends you. Reads
+    :data:`app.constants.ANALYSIS_ROUTES` rather than repeating the mapping, so
+    a new analysis type cannot be routable in one place and not the other.
+
+    Args:
+        analysis_types: The project's analyses, or a single one as a string.
+
+    Returns:
+        The slug for the primary analysis, falling back to ``"corrosion"`` when
+        nothing recognisable was selected.
+    """
+    ordered = normalise_analysis_types(analysis_types)
+    for analysis_type in ordered:
+        slug = ANALYSIS_ROUTES.get(analysis_type)
+        if slug:
+            return slug
+    return "corrosion"

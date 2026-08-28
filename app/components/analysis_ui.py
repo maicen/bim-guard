@@ -36,7 +36,7 @@ from app.components.ui import (
     NotFoundBlock,
     SubmitButton,
 )
-from app.constants import ANALYSIS_ROUTES
+from app.constants import ANALYSIS_ROUTES, normalise_analysis_types
 from app.logging_config import get_logger
 from app.services.projects_service import ProjectsService
 
@@ -148,7 +148,10 @@ def _project_card(project: dict) -> Card:
             Grid(
                 _fact("Project ID", str(project.get("id", ""))),
                 _fact("Country", project.get("country") or ""),
-                _fact("Analysis type", project.get("analysis_type") or ""),
+                _fact(
+                    "Analysis types",
+                    ", ".join(normalise_analysis_types(project.get("analysis_types"))),
+                ),
                 _fact("Created", str(project.get("created_at") or "")[:10]),
                 # Grid ignores every per-breakpoint value when `cols` is set, so
                 # the responsive steps have to be spelled out instead.
@@ -330,18 +333,20 @@ def _missing_project_page(spec: AnalysisSpec):
 
 
 def _mismatch_alert(project: dict, spec: AnalysisSpec) -> tuple:
-    """Warn when the project's stored analysis type is not this page's.
+    """Warn when this page's analysis is not one the project selected.
 
-    The wizard always lands on the slug matching the project's own analysis
-    type, so a mismatch means the URL was hand-edited or the project was changed
-    afterwards. The page still renders; it just says so.
+    A project may be set up for several analyses, so this is a membership test,
+    not an equality one: the page is only wrong if its type is absent from the
+    list entirely. Setup lands on the project's primary analysis, so reaching a
+    page outside the list means the URL was hand-edited or the project was
+    changed afterwards. The page still renders; it just says so.
     """
-    stored = project.get("analysis_type") or ""
-    if not stored or stored == spec.analysis_type:
+    stored = normalise_analysis_types(project.get("analysis_types"))
+    if not stored or spec.analysis_type in stored:
         return ()
     return (
         Alert(
-            f"This project is set up for {stored}, not {spec.analysis_type}. "
+            f"This project is set up for {', '.join(stored)}, not {spec.analysis_type}. "
             f"Showing the {spec.analysis_type} page anyway.",
             cls=AlertT.warning,
         ),

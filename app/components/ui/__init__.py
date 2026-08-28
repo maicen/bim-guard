@@ -7,10 +7,12 @@ from fasthtml.common import Div, Option, Span, Style, Td, Tr
 from monsterui.all import (
     Alert,
     AlertT,
+    CheckboxX,
     DivLAligned,
     DivVStacked,
     FormLabel,
     Input,
+    Label,
     Select,
     TextArea,
     UkIcon,
@@ -201,6 +203,23 @@ class SelectOptionSpec:
 
 
 @dataclass(frozen=True)
+class CheckboxOptionSpec:
+    """One box in a :func:`CheckboxGroupField`.
+
+    Attributes:
+        label: Text shown beside the box.
+        value: Submitted value when ticked.
+        checked: Whether the box starts ticked.
+        hint: Optional second line explaining what the option means.
+    """
+
+    label: str
+    value: str
+    checked: bool = False
+    hint: str = ""
+
+
+@dataclass(frozen=True)
 class FieldSpec:
     label: str
     field_id: str
@@ -291,6 +310,59 @@ def SelectField(spec: FieldSpec, options: list[SelectOptionSpec]):
             required=spec.required,
         ),
         cls="space-y-1",
+    )
+
+
+def CheckboxGroupField(
+    label: str,
+    name: str,
+    options: list[CheckboxOptionSpec],
+    help_text: str = "",
+):
+    """Render several checkboxes that post under one field name.
+
+    Every box carries the same ``name``, so the browser submits one value per
+    ticked box and the handler reads them with ``form.getlist(name)``. A field
+    that can hold more than one value needs that on both sides: ``FormData.get``
+    would return only the last, which is how a multi-select silently becomes a
+    single-select.
+
+    Args:
+        label: Group heading, rendered like any other field label.
+        name: Form field name shared by every box.
+        options: The boxes, in display order.
+        help_text: Optional line under the group.
+
+    Returns:
+        A stacked group matching the other ``*Field`` helpers here.
+    """
+    boxes = [
+        Div(
+            DivLAligned(
+                CheckboxX(
+                    id=f"{name}_{index}",
+                    name=name,
+                    value=option.value,
+                    checked=option.checked,
+                ),
+                Label(option.label, for_=f"{name}_{index}", cls="text-sm cursor-pointer"),
+                cls="gap-2",
+            ),
+            *(
+                (Span(option.hint, cls="text-xs text-muted-foreground ml-6"),)
+                if option.hint
+                else ()
+            ),
+            cls="space-y-0.5",
+        )
+        for index, option in enumerate(options)
+    ]
+
+    return DivVStacked(
+        FormLabel(label),
+        Div(*boxes, cls="space-y-2 border border-border rounded-md p-3 bg-muted/30"),
+        *((Span(help_text, cls="text-xs text-muted-foreground"),) if help_text else ()),
+        cls="space-y-1 items-stretch",
     )
 
 

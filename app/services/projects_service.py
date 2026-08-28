@@ -8,6 +8,7 @@ from app.constants import (
     DOCUMENT_CATEGORIES,
     STANDARD_UPLOAD_EXTENSIONS,
     get_standard,
+    normalise_analysis_types,
 )
 from app.logging_config import get_logger
 from app.services.object_storage import ObjectStorage
@@ -38,7 +39,7 @@ class ProjectsService:
                 "description": str,
                 "status": str,
                 "country": str,
-                "analysis_type": str,
+                "analysis_types": list,
                 "ifc_file_path": str,
                 "ifc_md5_hash": str,
                 "created_at": str,
@@ -118,7 +119,7 @@ class ProjectsService:
         ifc_file_path: str = "",
         ifc_md5_hash: str = "",
         country: str = "",
-        analysis_type: str = "",
+        analysis_types: list[str] | str = (),
     ):
         """Insert a new project record into the database.
 
@@ -129,27 +130,36 @@ class ProjectsService:
             ifc_file_path: Storage reference for the uploaded IFC model.
             ifc_md5_hash: MD5 of the uploaded IFC model.
             country: Jurisdiction governing which codes apply. Required.
-            analysis_type: One of :data:`app.constants.ANALYSIS_TYPES`. Required.
+            analysis_types: One or more of :data:`app.constants.ANALYSIS_TYPES`.
+                At least one is required. A bare string is accepted and treated
+                as a single-element list, so callers that predate multi-select
+                keep working. Order is preserved and meaningful: the first entry
+                is the project's primary analysis, which is where setup
+                redirects after creation.
 
         Returns:
             The inserted project row.
 
         Raises:
-            ValueError: if name, country or analysis_type is missing, or if
-                analysis_type is not a recognised value. Validating here rather
-                than only in the route keeps the ``valid_analysis_type`` check
-                constraint from being the first thing to notice a bad value.
+            ValueError: if name or country is missing, if no analysis type was
+                given, or if any entry is not a recognised value. Validating
+                here rather than only in the route keeps the
+                ``valid_analysis_types`` check constraint from being the first
+                thing to notice a bad value.
         """
         name = name.strip()
         country = country.strip()
-        analysis_type = analysis_type.strip()
+        analysis_types = normalise_analysis_types(analysis_types)
         if not name:
             raise ValueError("Project name is required")
         if not country:
             raise ValueError("Country is required")
-        if analysis_type not in ANALYSIS_TYPES:
+        if not analysis_types:
+            raise ValueError("At least one analysis type is required")
+        unknown = [value for value in analysis_types if value not in ANALYSIS_TYPES]
+        if unknown:
             raise ValueError(
-                f"analysis_type must be one of {ANALYSIS_TYPES!r}, got {analysis_type!r}"
+                f"analysis_types must all be one of {ANALYSIS_TYPES!r}, got {unknown!r}"
             )
 
         now = now_iso_utc()
@@ -159,7 +169,7 @@ class ProjectsService:
                 "description": description.strip(),
                 "status": status,
                 "country": country,
-                "analysis_type": analysis_type,
+                "analysis_types": analysis_types,
                 "ifc_file_path": ifc_file_path,
                 "ifc_md5_hash": ifc_md5_hash,
                 "created_at": now,
@@ -167,11 +177,11 @@ class ProjectsService:
             }
         )
         logger.info(
-            "Project created project_id=%s status=%s country=%s analysis_type=%s has_ifc=%s",
+            "Project created project_id=%s status=%s country=%s analysis_types=%s has_ifc=%s",
             project.get("id"),
             status,
             country,
-            analysis_type,
+            ",".join(analysis_types),
             bool(ifc_file_path),
         )
         return project

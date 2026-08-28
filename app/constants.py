@@ -528,3 +528,53 @@ def route_for_analysis_type(analysis_type: str) -> str:
         return ANALYSIS_ROUTES[analysis_type]
     except KeyError:
         raise ValueError(f"Unknown analysis type: {analysis_type!r}") from None
+
+
+def normalise_analysis_types(value: object) -> list[str]:
+    """Coerce whatever a caller passed into an ordered list of analysis types.
+
+    Accepts a bare string (treated as one type), any iterable of strings, or
+    ``None``. Blanks are dropped and duplicates collapse to their first
+    occurrence, so order stays meaningful: the first entry is the project's
+    primary analysis.
+
+    No membership check happens here — that belongs with the caller that can
+    raise a useful error. This only fixes the shape.
+
+    Args:
+        value: A string, an iterable of strings, or ``None``.
+
+    Returns:
+        Analysis types in submitted order, deduplicated.
+    """
+    if value is None:
+        return []
+    candidates = [value] if isinstance(value, str) else list(value)
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for candidate in candidates:
+        text = str(candidate).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        ordered.append(text)
+    return ordered
+
+
+def primary_analysis_type(project: dict) -> str:
+    """Return the analysis a project leads with, or ``""`` if it has none.
+
+    The first element of ``analysis_types`` by convention — see the column
+    comment in ``20260828120000_projects_analysis_types_multi.sql``. Routing
+    after project creation follows this, so it is read in more than one place
+    and lives here rather than being re-derived at each call site.
+
+    Args:
+        project: A project row.
+
+    Returns:
+        The primary analysis type, or an empty string.
+    """
+    types = normalise_analysis_types(project.get("analysis_types"))
+    return types[0] if types else ""

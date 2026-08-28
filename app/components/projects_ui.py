@@ -12,6 +12,7 @@ from monsterui.all import (
     Form,
     FormLabel,
     Input,
+    Label,
     Subtitle,
     Table,
     TableT,
@@ -19,10 +20,13 @@ from monsterui.all import (
 )
 
 from app.components.layout import DashboardLayout
+from app.constants import ANALYSIS_TYPES, DEFAULT_ANALYSIS_TYPE, normalise_analysis_types
 from app.components.ui import (
     ActionRow,
     AlertSpec,
     CancelAction,
+    CheckboxGroupField,
+    CheckboxOptionSpec,
     Card,
     CardContent,
     CardHeader,
@@ -42,24 +46,85 @@ from app.components.ui import (
 )
 
 
+#: What each analysis type does, shown under its checkbox. Keyed by the values
+#: in :data:`app.constants.ANALYSIS_TYPES` so a new type surfaces here as a
+#: missing hint rather than a missing box.
+_ANALYSIS_TYPE_HINTS: dict[str, str] = {
+    "Piping (Corrosive)": "GC-001 galvanic, CC-001 crevice and MC-001 microbial corrosion checks.",
+    "Halo": "Blue Halo seismic bracing clearance at LOD 300.",
+    "Architecture": "Architectural code checks — doors, windows, stairs, egress.",
+}
+
+
+def _analysis_types_field(project: dict):
+    """Build the analysis-type checkbox group for the project form.
+
+    A new project with nothing stored starts on
+    :data:`app.constants.DEFAULT_ANALYSIS_TYPE`, so the common case is one click
+    from done. An existing project reflects exactly what it was saved with.
+    """
+    selected = normalise_analysis_types(project.get("analysis_types")) or (
+        [DEFAULT_ANALYSIS_TYPE] if not project else []
+    )
+    return CheckboxGroupField(
+        label="Analysis Types",
+        name="analysis_types",
+        options=[
+            CheckboxOptionSpec(
+                label=analysis_type,
+                value=analysis_type,
+                checked=analysis_type in selected,
+                hint=_ANALYSIS_TYPE_HINTS.get(analysis_type, ""),
+            )
+            for analysis_type in ANALYSIS_TYPES
+        ],
+        help_text=(
+            "Pick at least one. The first one ticked is the project's primary "
+            "analysis, and is where you land after creating it."
+        ),
+    )
+
+
+def _ifc_dropzone_field():
+    """File picker that also accepts a dropped file.
+
+    The input itself stays a plain ``<input type=file>``: it is what the form
+    actually submits, and it keeps working with JavaScript off or still loading.
+    ``static/js/upload-dropzone.js`` upgrades the surrounding label into a drop
+    target when it runs, which is why the markup carries the ids that script
+    looks for rather than any behaviour of its own.
+    """
+    return DivVStacked(
+        FormLabel("IFC Model", fr="ifc_file"),
+        Label(
+            Div(
+                UkIcon("upload-cloud", cls="w-8 h-8 mx-auto text-muted-foreground"),
+                Div("Drop an IFC file here, or click to choose", cls="text-sm mt-2"),
+                Div(".ifc only", cls="text-xs text-muted-foreground mt-1"),
+                cls="text-center",
+            ),
+            Input(
+                id="ifc_file",
+                name="ifc_file",
+                type="file",
+                accept=".ifc",
+                cls="sr-only",
+            ),
+            id="project-ifc-dropzone",
+            for_="ifc_file",
+            cls=(
+                "block border-2 border-dashed border-border rounded-lg p-8 "
+                "cursor-pointer transition-colors hover:border-primary hover:bg-muted/40"
+            ),
+        ),
+        Div(id="project-ifc-filename", cls="text-xs text-muted-foreground"),
+        cls="space-y-1 items-stretch",
+    )
+
+
 def project_form(title: str, action: str, project: dict | None = None, include_ifc: bool = False):
     project = project or {}
-    ifc_field = (
-        (
-            DivVStacked(
-                FormLabel("IFC Model", fr="ifc_file"),
-                Input(
-                    id="ifc_file",
-                    name="ifc_file",
-                    type="file",
-                    accept=".ifc",
-                ),
-                cls="space-y-1",
-            ),
-        )
-        if include_ifc
-        else ()
-    )
+    ifc_field = (_ifc_dropzone_field(),) if include_ifc else ()
     return Card(
         CardHeader(
             CardTitle(H2(title)),
@@ -107,6 +172,7 @@ def project_form(title: str, action: str, project: dict | None = None, include_i
                         ),
                     ],
                 ),
+                _analysis_types_field(project),
                 *ifc_field,
                 ActionRow(
                     SaveAction("Save Project"),

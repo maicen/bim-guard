@@ -7,13 +7,18 @@ from fasthtml.common import (
     FileResponse,
     Response,
     Title,
-    UploadFile,
 )
+from starlette.requests import Request
 from monsterui.all import Container
 
 from app.components.layout import DashboardLayout
 from app.components.projects_ui import project_enhancements_page, project_form, projects_page
-from app.constants import DEFAULT_ANALYSIS_TYPE, DEFAULT_COUNTRY
+from app.constants import (
+    ANALYSIS_ROUTES,
+    DEFAULT_COUNTRY,
+    normalise_analysis_types,
+    primary_analysis_type,
+)
 from app.modules.pipeline_services import execute_model_enhancement
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.object_storage import ObjectStorage
@@ -46,34 +51,43 @@ def setup_routes(rt):
         )
 
     @rt("/projects/create", methods=["POST"])
-    async def projects_create(
-        name: str,
-        description: str = "",
-        status: str = "Draft",
-        ifc_file: UploadFile = None,
-        country: str = DEFAULT_COUNTRY,
-        analysis_type: str = DEFAULT_ANALYSIS_TYPE,
-    ):
+    async def projects_create(req: Request):
         """Create a project from the simple form.
 
-        country and analysis_type default to the same values migration_001 gave
-        existing rows, so this legacy form keeps working while the five-step
-        wizard is the route that collects them explicitly.
+        Takes the raw request rather than typed parameters because
+        ``analysis_types`` is multi-valued: the form posts one entry per ticked
+        box, and only ``getlist`` sees more than the last of them.
+
+        country still defaults to the value migration_001 gave existing rows —
+        this form does not collect it, while the five-step wizard does.
+
+        On success the browser goes to the primary analysis for the new project,
+        which is the first type ticked. A project created without a usable id
+        falls back to the project list rather than guessing at a URL.
         """
+        form = await req.form()
+        analysis_types = normalise_analysis_types(form.getlist("analysis_types"))
+        ifc_file = form.get("ifc_file") or None
+
         ifc_file_path, ifc_md5_hash = await _projects_service.prepare_ifc_upload(ifc_file)
         try:
-            _projects_service.create_project(
-                name=name,
-                description=description,
-                status=status,
+            project = _projects_service.create_project(
+                name=str(form.get("name") or ""),
+                description=str(form.get("description") or ""),
+                status=str(form.get("status") or "Draft"),
                 ifc_file_path=ifc_file_path,
                 ifc_md5_hash=ifc_md5_hash,
-                country=country,
-                analysis_type=analysis_type,
+                country=str(form.get("country") or DEFAULT_COUNTRY),
+                analysis_types=analysis_types,
             )
         except ValueError as exc:
             # Previously a blank name was accepted and created an unusable row.
             return Response(str(exc), status_code=400)
+
+        project_id = (project or {}).get("id")
+        slug = ANALYSIS_ROUTES.get(primary_analysis_type(project or {}))
+        if project_id and slug:
+            return redirect_see_other(f"/analyze/{slug}?project_id={project_id}")
         return redirect_see_other("/projects")
 
     @rt("/projects/{project_id}/edit")
