@@ -80,8 +80,9 @@ def client() -> TestClient:
 PAGE_ROUTES = [
     "/",
     "/dashboard",
-    "/projects",
+    "/projects/archive",
     "/projects/new",
+    "/wizard",
     "/library/documents",
     "/library/rules",
     "/library/rules/new",
@@ -286,3 +287,30 @@ def test_head_is_supported_where_get_is(client: TestClient) -> None:
     answers 405 and reads as an outage.
     """
     assert client.head("/dashboard").status_code < 400
+
+
+def test_projects_redirects_to_the_archive(client: TestClient) -> None:
+    """The old list URL still resolves.
+
+    It is linked from the user manual and is the kind of path people bookmark,
+    so the rename keeps it as a redirect rather than letting it 404.
+    """
+    response = client.get("/projects", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/projects/archive"
+
+
+def test_sidebar_leads_with_project_setup() -> None:
+    """Setup is the first Platform entry, ahead of Dashboard and the archive."""
+    from app.components.layout import _NAV_SECTIONS
+
+    platform = dict(_NAV_SECTIONS)["Platform"]
+
+    assert platform[0] == ("Project Setup", "/wizard")
+    assert [title for title, _ in platform] == [
+        "Project Setup",
+        "Dashboard",
+        "Archive",
+        "Viewer",
+    ]

@@ -25,8 +25,9 @@ from app.components.ui import (
 
 # Standardized Apple-style icons for the sidebar
 NAV_ICONS = {
+    "Project Setup": "square-pen",
     "Dashboard": "layout-dashboard",
-    "Projects": "folder-open",
+    "Archive": "folder-open",
     "Viewer": "scan-eye",
     "ARCH": "layout-list",
     "MEP": "cpu",
@@ -49,8 +50,11 @@ _NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     (
         "Platform",
         (
+            # Setup leads: it is where a new project starts, and until now the
+            # wizard at /wizard had no way in from the sidebar at all.
+            ("Project Setup", "/wizard"),
             ("Dashboard", "/dashboard"),
-            ("Projects", "/projects"),
+            ("Archive", "/projects/archive"),
             ("Viewer", "/viewer"),
         ),
     ),

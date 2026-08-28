@@ -36,7 +36,7 @@ def setup_routes(rt):
         project = _projects_service.get_project(project_id)
         if project is None:
             return Title("Workflow - BIM Guard"), DashboardLayout(
-                NotFoundBlock("Project", "/projects", "Back to projects")
+                NotFoundBlock("Project", "/projects/archive", "Back to projects")
             )
 
         logger.info("Workflow page project_id=%d slug=%s", project_id, slug)

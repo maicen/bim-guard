@@ -19,7 +19,7 @@ _WORKFLOW_STEPS = (
         "result": "Result: the project appears in the project registry with its IFC file attached.",
         "links": (
             ("Create Project", "/projects/new", "primary"),
-            ("View Projects", "/projects", "secondary"),
+            ("View Archive", "/projects/archive", "secondary"),
         ),
     },
     {

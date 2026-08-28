@@ -176,7 +176,7 @@ def project_form(title: str, action: str, project: dict | None = None, include_i
                 *ifc_field,
                 ActionRow(
                     SaveAction("Save Project"),
-                    CancelAction(href="/projects"),
+                    CancelAction(href="/projects/archive"),
                     cls="gap-2",
                 ),
                 method="post",

@@ -383,7 +383,7 @@ def seismic_analysis_page(project_id: int):
     if project is None:
         logger.warning("Seismic analysis page project not found project_id=%d", project_id)
         return Title("Seismic Analysis - BIM Guard"), DashboardLayout(
-            NotFoundBlock("Project", "/projects", "Back to projects")
+            NotFoundBlock("Project", "/projects/archive", "Back to projects")
         )
 
     projects = _projects_service.list_projects()

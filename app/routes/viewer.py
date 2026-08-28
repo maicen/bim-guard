@@ -28,7 +28,7 @@ def setup_routes(rt):
 
         if project_id is not None and project is None:
             return Title("Not Found — BIM Guard"), DashboardLayout(
-                Container(NotFoundBlock("Project", "/projects", "Back to Projects"))
+                Container(NotFoundBlock("Project", "/projects/archive", "Back to Projects"))
             )
 
         bcf_artifact = (

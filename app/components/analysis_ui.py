@@ -323,7 +323,7 @@ def _missing_project_page(spec: AnalysisSpec):
                 cls=AlertT.warning,
             ),
             DivLAligned(
-                LinkButton("Go to projects", href="/projects"),
+                LinkButton("Go to projects", href="/projects/archive"),
                 LinkButton("Start the wizard", href="/wizard", variant="secondary"),
                 cls="gap-2",
             ),
@@ -377,7 +377,7 @@ def analysis_landing_page(spec: AnalysisSpec, project_id: int | None):
             "Analyze page project not found slug=%s project_id=%d", spec.slug, project_id
         )
         return Title(f"{spec.title} - BIM Guard"), DashboardLayout(
-            NotFoundBlock("Project", "/projects", "Back to projects")
+            NotFoundBlock("Project", "/projects/archive", "Back to projects")
         )
 
     inputs = _projects_service.get_analysis_inputs(project_id)

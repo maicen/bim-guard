@@ -40,9 +40,23 @@ def _is_enhancement_authorized(token: str) -> bool:
 def setup_routes(rt):
     """Register project CRUD and IFC download routes."""
 
+    @rt("/projects/archive")
+    def projects_archive():
+        """The project archive — every project that exists.
+
+        Lives under /projects/archive rather than /projects so the bare path can
+        stay a redirect: it is linked from the user manual and is the kind of URL
+        people bookmark, and a rename that 404s those is a worse trade than one
+        extra route.
+        """
+        return Title("Project Archive - BIM Guard"), projects_page(
+            _projects_service.list_projects()
+        )
+
     @rt("/projects")
     def projects_list():
-        return Title("Projects - BIM Guard"), projects_page(_projects_service.list_projects())
+        """Redirect the old list URL to its new home."""
+        return redirect_see_other("/projects/archive")
 
     @rt("/projects/new")
     def projects_new():
@@ -88,7 +102,7 @@ def setup_routes(rt):
         slug = ANALYSIS_ROUTES.get(primary_analysis_type(project or {}))
         if project_id and slug:
             return redirect_see_other(f"/analyze/{slug}?project_id={project_id}")
-        return redirect_see_other("/projects")
+        return redirect_see_other("/projects/archive")
 
     @rt("/projects/{project_id}/edit")
     def projects_edit(project_id: int):
@@ -100,18 +114,18 @@ def setup_routes(rt):
     @rt("/projects/{project_id}/update", methods=["POST"])
     def projects_update(project_id: int, name: str, description: str = "", status: str = "Draft"):
         _projects_service.update_project(project_id, name, description, status)
-        return redirect_see_other("/projects")
+        return redirect_see_other("/projects/archive")
 
     @rt("/projects/{project_id}/delete", methods=["POST"])
     def projects_delete(project_id: int):
         _projects_service.delete_project(project_id)
-        return redirect_see_other("/projects")
+        return redirect_see_other("/projects/archive")
 
     @rt("/projects/{project_id}/ifc")
     def project_ifc_file(project_id: int):
         file_path = _projects_service.resolve_ifc_file(project_id)
         if file_path is None:
-            return redirect_see_other("/projects")
+            return redirect_see_other("/projects/archive")
 
         return FileResponse(
             file_path, media_type="application/octet-stream", filename=file_path.name
@@ -121,7 +135,7 @@ def setup_routes(rt):
     def project_enhancements(project_id: int, message: str = "", level: str = "success"):
         project = _projects_service.get_project(project_id)
         if project is None:
-            return redirect_see_other("/projects")
+            return redirect_see_other("/projects/archive")
         return Title("Quality Improvements - BIM Guard"), project_enhancements_page(
             project,
             _lineage_repository.list_for_project(project_id),

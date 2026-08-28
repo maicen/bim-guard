@@ -39,7 +39,7 @@ def SiteNav(title: str = "BIM Guard"):
             A(title, href="/", cls="font-semibold text-xl tracking-tight"),
             Div(cls="flex space-x-6 text-sm")(
                 A("Dashboard", href="/dashboard"),
-                A("Projects", href="/projects"),
+                A("Archive", href="/projects/archive"),
                 A("Library", href="/library"),
             ),
         )

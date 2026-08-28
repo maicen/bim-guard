@@ -468,7 +468,7 @@ def piping_analysis_page(project_id: int):
     if project is None:
         logger.warning("Piping analysis page project not found project_id=%d", project_id)
         return Title("Piping Analysis - BIM Guard"), DashboardLayout(
-            NotFoundBlock("Project", "/projects", "Back to projects")
+            NotFoundBlock("Project", "/projects/archive", "Back to projects")
         )
 
     projects = _projects_service.list_projects()
