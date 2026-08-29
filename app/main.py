@@ -128,6 +128,7 @@ from app.routes import (
     settings,
     user_manual,
     viewer,
+    viewer_routes,
     workflow_api,
     workflow_page,
 )
@@ -141,6 +142,7 @@ fasthtml_app, rt = fast_app(
 
 _ROUTE_INSTALLERS = (
     viewer.setup_routes,
+    viewer_routes.setup_routes,
     analyze.setup_routes,
     analyze_corrosion.setup_routes,
     analyze_seismic.setup_routes,

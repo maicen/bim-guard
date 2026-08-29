@@ -361,9 +361,15 @@ export async function initViewer(containerOrId) {
         }
     }
 
-    async function loadIfc(urlOrFile) {
+    // `replace` defaults to true so every existing single-model caller keeps
+    // its "one model at a time" behaviour unchanged. The multi-model viewer
+    // passes false for every model after the first, which is the only way to
+    // get more than one model into the scene at once.
+    // `name` overrides the model id, which otherwise derives from the
+    // filename -- two uploads sharing a name would collide in `fragments.list`.
+    async function loadIfc(urlOrFile, { replace = true, name = "" } = {}) {
         try {
-            await clearModels();
+            if (replace) await clearModels();
             const file = typeof urlOrFile === "string"
                 ? await fetch(urlOrFile).then(async (response) => {
                     if (!response.ok) throw new Error(`IFC request failed (${response.status})`);
@@ -372,10 +378,21 @@ export async function initViewer(containerOrId) {
                 : urlOrFile;
             const data = await file.arrayBuffer();
             const buffer = new Uint8Array(data);
-            await fragmentIfcLoader.load(buffer, true, file.name.replace(/\.ifc$/i, ""));
+            const modelId = name || file.name.replace(/\.ifc$/i, "");
+            return await fragmentIfcLoader.load(buffer, true, modelId);
         } catch (error) {
             console.error("Error loading IFC file", error);
             throw error;
+        }
+    }
+
+    // Toggling a model's visibility mutates the three.js scene graph directly,
+    // which on-demand rendering will not notice on its own.
+    async function refresh() {
+        try {
+            await fragments.core.update(true);
+        } catch (e) {
+            console.warn("Could not refresh the viewer:", e);
         }
     }
 
@@ -433,6 +450,8 @@ export async function initViewer(containerOrId) {
         topics: workspace.topics,
         loadBcf,
         loadIfc,
+        clearModels,
+        refresh,
         setupFileLoader,
         selectTopic: workspace.selectTopic,
         findTopicByElementGuid,

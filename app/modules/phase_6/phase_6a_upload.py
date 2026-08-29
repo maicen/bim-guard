@@ -267,3 +267,45 @@ class FileUploadService:
         except Exception:
             logger.warning("Upload lookup by hash failed", exc_info=True)
             return []
+
+    def list_for_project(self, project_id: int, kind: str | None = None) -> list[dict]:
+        """Return recorded uploads for ``project_id``, newest first.
+
+        ``kind`` is filtered in Python rather than in the predicate because
+        ``parse_where`` accepts a single comparison only -- there is no way to
+        express ``project_id = ? AND kind = ?`` through ``rows_where``.
+
+        Args:
+            project_id: Project whose uploads to list.
+            kind: When given, keep only rows of that kind (e.g. ``"ifc"``).
+
+        Returns:
+            Matching rows, newest ``created_at`` first. Empty on any lookup
+            failure -- a viewer with no models is a better outcome than a 500.
+        """
+        try:
+            rows = list(self._table.rows_where("project_id = ?", [project_id]))
+        except Exception:
+            logger.warning(
+                "Upload lookup by project failed project_id=%s", project_id, exc_info=True
+            )
+            return []
+
+        if kind is not None:
+            rows = [row for row in rows if row.get("kind") == kind]
+        return sorted(rows, key=lambda row: str(row.get("created_at") or ""), reverse=True)
+
+    def get_recorded(self, file_id: int) -> dict | None:
+        """Return one recorded upload by primary key, or ``None``.
+
+        Args:
+            file_id: ``uploaded_files.id`` of the row to fetch.
+
+        Returns:
+            The row, or ``None`` when it does not exist or cannot be read.
+        """
+        try:
+            return self._table.get(file_id)
+        except Exception:
+            logger.warning("Upload lookup by id failed file_id=%s", file_id, exc_info=True)
+            return None
