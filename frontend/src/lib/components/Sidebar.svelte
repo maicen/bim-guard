@@ -1,10 +1,13 @@
 <script lang="ts">
   import {
     LayoutDashboard,
+    Plus,
     FolderOpen,
     ScanEye,
     LayoutList,
     Cpu,
+    Layers,
+    Compass,
     Workflow,
     FileText,
     BookOpen,
@@ -29,8 +32,9 @@
     {
       title: 'Platform',
       items: [
+        { id: 'newproject', label: 'New Project', icon: Plus },
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'projects', label: 'Projects', icon: FolderOpen },
+        { id: 'projects', label: 'Project Registry', icon: FolderOpen },
         { id: 'viewer', label: '3D Viewer', icon: ScanEye },
       ],
     },
@@ -47,6 +51,8 @@
       items: [
         { id: 'arch', label: 'ARCH Compliance', icon: LayoutList },
         { id: 'analyze', label: 'MEP & Piping', icon: Cpu },
+        { id: 'piping', label: 'PIPING', icon: Layers },
+        { id: 'seismic', label: 'SEISMIC', icon: Compass },
         { id: 'workflow', label: 'Live Workflow', icon: Workflow },
         { id: 'reports', label: 'Reports & Exports', icon: FileText },
       ],

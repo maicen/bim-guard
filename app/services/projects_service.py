@@ -44,6 +44,10 @@ class ProjectsService:
                 "status": str,
                 "country": str,
                 "analysis_type": str,
+                "project_type": str,
+                "project_size_sqm": float,
+                "buildings_count": int,
+                "floors_count": int,
                 "ifc_file_path": str,
                 "ifc_md5_hash": str,
                 "created_at": str,
@@ -115,6 +119,49 @@ class ProjectsService:
         logger.info("IFC upload prepared filename=%s bytes=%d", filename, len(content))
         return storage_ref, ifc_md5_hash
 
+    #: Columns added by the wizard-fields migration. Held separately so an
+    #: insert can be retried without them on a database where that migration
+    #: has not been run yet.
+    _WIZARD_COLUMNS = (
+        "project_type",
+        "project_size_sqm",
+        "buildings_count",
+        "floors_count",
+    )
+
+    def _insert_project_row(self, row: dict):
+        """Insert a project row, dropping wizard columns the schema lacks.
+
+        The wizard-fields migration is applied out of band, so a deployment can
+        be running this code against a ``projects`` table that predates it.
+        Losing four descriptive fields is a far better outcome there than
+        refusing to create the project at all, so a missing-column error is
+        retried once without them and reported as a warning.
+
+        Args:
+            row: The full row, wizard columns included.
+
+        Returns:
+            The inserted project row.
+        """
+        try:
+            return self._projects.insert(row)
+        except Exception as exc:
+            # PGRST204 is PostgREST's "column not in the schema cache". Any
+            # other failure is a real one and belongs to the caller.
+            if "PGRST204" not in str(exc):
+                raise
+            trimmed = {k: v for k, v in row.items() if k not in self._WIZARD_COLUMNS}
+            if len(trimmed) == len(row):
+                raise
+            logger.warning(
+                "Projects table is missing the wizard columns; created without "
+                "them. Apply the add_wizard_fields_to_projects migration. "
+                "dropped=%s",
+                sorted(set(row) - set(trimmed)),
+            )
+            return self._projects.insert(trimmed)
+
     def create_project(
         self,
         name: str,
@@ -124,6 +171,10 @@ class ProjectsService:
         ifc_md5_hash: str = "",
         country: str = "",
         analysis_type: str = "",
+        project_type: str | None = None,
+        project_size_sqm: float | None = None,
+        buildings_count: int | None = None,
+        floors_count: int | None = None,
     ):
         """Insert a new project record into the database.
 
@@ -135,6 +186,10 @@ class ProjectsService:
             ifc_md5_hash: MD5 of the uploaded IFC model.
             country: Jurisdiction governing which codes apply. Required.
             analysis_type: One of :data:`app.constants.ANALYSIS_TYPES`. Required.
+            project_type: Building type from :data:`app.constants.PROJECT_TYPES`.
+            project_size_sqm: Gross floor area in square metres.
+            buildings_count: Number of buildings.
+            floors_count: Number of floors.
 
         Returns:
             The inserted project row.
@@ -158,19 +213,30 @@ class ProjectsService:
             )
 
         now = now_iso_utc()
-        project = self._projects.insert(
-            {
-                "name": name,
-                "description": description.strip(),
-                "status": status,
-                "country": country,
-                "analysis_type": analysis_type,
-                "ifc_file_path": ifc_file_path,
-                "ifc_md5_hash": ifc_md5_hash,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
+        row = {
+            "name": name,
+            "description": description.strip(),
+            "status": status,
+            "country": country,
+            "analysis_type": analysis_type,
+            "ifc_file_path": ifc_file_path,
+            "ifc_md5_hash": ifc_md5_hash,
+            "created_at": now,
+            "updated_at": now,
+        }
+        # Only send the wizard columns the caller actually filled in, so a
+        # project created through the plain API is not written a row full of
+        # NULLs for fields it never had an opinion about.
+        for column, value in (
+            ("project_type", project_type),
+            ("project_size_sqm", project_size_sqm),
+            ("buildings_count", buildings_count),
+            ("floors_count", floors_count),
+        ):
+            if value is not None and value != "":
+                row[column] = value
+
+        project = self._insert_project_row(row)
         logger.info(
             "Project created project_id=%s status=%s country=%s analysis_type=%s has_ifc=%s",
             project.get("id"),
@@ -424,6 +490,85 @@ class ProjectsService:
         rows = list(self._client_documents.rows_where("project_id = ?", [project_id]))
         logger.debug("Loaded client documents project_id=%d count=%d", project_id, len(rows))
         return rows
+
+    def link_library_documents(self, project_id: int, document_ids: list[int]) -> int:
+        """Attach documents from the library to a project.
+
+        ``client_documents`` holds a row per document attached to a project
+        rather than a foreign key into ``documents``: the library row can be
+        edited or deleted later, and a project's evidence trail should not
+        change underneath it. The filename and storage reference are therefore
+        copied, and the originating library id is recorded in ``description``
+        so the two can still be matched.
+
+        Already-linked documents are skipped, so re-submitting the wizard for
+        the same project does not duplicate rows.
+
+        Args:
+            project_id: Owning project.
+            document_ids: ``documents.id`` values chosen in the wizard.
+
+        Returns:
+            The number of documents newly linked.
+        """
+        if not document_ids:
+            return 0
+
+        # Imported here rather than at module scope: DocumentService is only
+        # needed on this path, and a top-level import would couple every
+        # ProjectsService construction to the documents table.
+        from app.services.documents_service import DocumentService
+
+        documents = DocumentService()
+        already_linked = {
+            row.get("file_path")
+            for row in self.get_client_documents_by_project(project_id)
+        }
+        now = now_iso_utc()
+        linked = 0
+
+        for document_id in document_ids:
+            document = documents.get_document(document_id)
+            if not document:
+                logger.warning(
+                    "Skipped unknown library document project_id=%d document_id=%s",
+                    project_id,
+                    document_id,
+                )
+                continue
+
+            file_path = str(document.get("file_path") or "")
+            if file_path and file_path in already_linked:
+                continue
+
+            filename = str(document.get("filename") or f"document-{document_id}")
+            extension = Path(filename).suffix.lstrip(".").lower()
+            self._client_documents.insert(
+                {
+                    "project_id": project_id,
+                    "filename": filename,
+                    "file_path": file_path,
+                    "file_type": extension,
+                    # The check constraint only accepts the DOCUMENT_CATEGORIES
+                    # values; library documents are specifications by default,
+                    # and can be recategorised from the document library later.
+                    "category": "Specification",
+                    "description": f"Linked from document library (id {document_id})",
+                    "tags": "",
+                    "upload_date": now,
+                    "updated_at": now,
+                }
+            )
+            already_linked.add(file_path)
+            linked += 1
+
+        logger.info(
+            "Library documents linked project_id=%d requested=%d linked=%d",
+            project_id,
+            len(document_ids),
+            linked,
+        )
+        return linked
 
     async def add_client_document(
         self,

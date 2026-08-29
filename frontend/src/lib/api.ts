@@ -5,6 +5,7 @@ import type {
   DocumentUpdatePayload,
   Project,
   ProjectCreatePayload,
+  ProjectOptions,
   ProjectListResponse,
   ProjectUpdatePayload,
   Rule,
@@ -45,6 +46,11 @@ export const projectsApi = {
   async getInputs(id: number): Promise<any[]> {
     const res = await fetch(`${API_BASE}/projects/${id}/inputs`);
     return handleResponse<any[]>(res);
+  },
+
+  async options(): Promise<ProjectOptions> {
+    const res = await fetch(`${API_BASE}/projects/options`);
+    return handleResponse<ProjectOptions>(res);
   },
 
   async create(payload: ProjectCreatePayload): Promise<Project> {

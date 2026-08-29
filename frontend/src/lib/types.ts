@@ -9,6 +9,10 @@ export interface Project {
   status: string;
   country: string;
   analysis_type: string;
+  project_type?: string | null;
+  project_size_sqm?: number | null;
+  buildings_count?: number | null;
+  floors_count?: number | null;
   ifc_file_path?: string | null;
   ifc_md5_hash?: string | null;
   created_at?: string | null;
@@ -26,6 +30,29 @@ export interface ProjectCreatePayload {
   status?: string;
   country?: string;
   analysis_type?: string;
+  project_type?: string | null;
+  project_size_sqm?: number | null;
+  buildings_count?: number | null;
+  floors_count?: number | null;
+  document_ids?: number[];
+  standards_codes?: string[];
+}
+
+/** One selectable normative reference offered by the project setup wizard. */
+export interface StandardOption {
+  id: string;
+  name: string;
+  domain: string;
+  description?: string;
+  applicable_to?: string[];
+}
+
+/** Reference data the wizard renders its choices from (GET /projects/options). */
+export interface ProjectOptions {
+  countries: string[];
+  project_types: string[];
+  analysis_types: string[];
+  standards: StandardOption[];
 }
 
 export interface ProjectUpdatePayload {

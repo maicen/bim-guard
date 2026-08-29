@@ -38,6 +38,7 @@
   import PipelineProgress from "../lib/components/PipelineProgress.svelte";
 
   export let initialProjectId: number | null = null;
+  export let initialSlug: "corrosion" | "seismic" = "corrosion";
   export let onSelectProjectForViewer: (
     projectId: number,
     elementGuid?: string,
@@ -46,7 +47,7 @@
 
   let projects: Project[] = [];
   let selectedProjectId: number | null = initialProjectId;
-  let selectedSlug: "corrosion" | "seismic" = "corrosion";
+  let selectedSlug: "corrosion" | "seismic" = initialSlug;
   let isRunning = false;
   let error = "";
   let result: AnalysisResult | null = null;

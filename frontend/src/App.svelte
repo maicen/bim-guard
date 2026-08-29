@@ -62,7 +62,26 @@
     return () => clearInterval(interval);
   });
 
+  /** Sidebar view id → the analysis view a newly created project opens in.
+   *
+   * Keyed by the values in app/constants.ANALYSIS_TYPES, which is what the
+   * wizard submits and what `projects.analysis_type` stores. Anything
+   * unrecognised falls back to the combined MEP & Piping view.
+   */
+  const ANALYSIS_VIEW_BY_TYPE: Record<string, string> = {
+    Architecture: 'arch',
+    'Piping (Corrosive)': 'piping',
+    Halo: 'seismic',
+  };
+
   function handleSelectView(view: string) {
+    // "New Project" is an action, not a destination: it opens the wizard over
+    // whatever is on screen. Changing activeView would leave the sidebar
+    // highlighting a view that renders nothing once the modal is dismissed.
+    if (view === 'newproject') {
+      isGlobalWizardOpen = true;
+      return;
+    }
     activeView = view;
   }
 
@@ -83,7 +102,7 @@
   function handleProjectCreated(project: Project) {
     targetProjectId = project.id;
     selectedProject = project;
-    activeView = project.analysis_type === 'Architecture' ? 'arch' : 'analyze';
+    activeView = ANALYSIS_VIEW_BY_TYPE[project.analysis_type] || 'analyze';
   }
 </script>
 
@@ -102,7 +121,6 @@
     <TopHeader
       {activeView}
       {selectedProject}
-      onOpenWizard={() => (isGlobalWizardOpen = true)}
       {apiOnline}
     />
 
@@ -140,6 +158,18 @@
       {:else if activeView === 'analyze'}
         <AnalyzeView
           initialProjectId={targetProjectId}
+          onSelectProjectForViewer={handleSelectProjectForViewer}
+        />
+      {:else if activeView === 'piping'}
+        <AnalyzeView
+          initialProjectId={targetProjectId}
+          initialSlug="corrosion"
+          onSelectProjectForViewer={handleSelectProjectForViewer}
+        />
+      {:else if activeView === 'seismic'}
+        <AnalyzeView
+          initialProjectId={targetProjectId}
+          initialSlug="seismic"
           onSelectProjectForViewer={handleSelectProjectForViewer}
         />
       {:else if activeView === 'workflow'}

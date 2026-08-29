@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { Plus, ExternalLink, Activity } from 'lucide-svelte';
+  import { ExternalLink, Activity } from 'lucide-svelte';
   import ThemeToggle from './ThemeToggle.svelte';
   import type { Project } from '../types';
 
   export let activeView: string;
   export let selectedProject: Project | null = null;
-  export let onOpenWizard: () => void;
   export let apiOnline: boolean = true;
 
   const TITLES: Record<string, { section: string; title: string }> = {
@@ -63,15 +62,6 @@
     <!-- Theme Toggle Button -->
     <ThemeToggle />
 
-    <!-- New Check CTA Button -->
-    <button
-      type="button"
-      on:click={onOpenWizard}
-      class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
-    >
-      <Plus class="w-3.5 h-3.5" />
-      <span>New Check</span>
-    </button>
   </div>
 </header>
 
