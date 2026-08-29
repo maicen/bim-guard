@@ -161,17 +161,24 @@
           onSelectProjectForViewer={handleSelectProjectForViewer}
         />
       {:else if activeView === 'piping'}
-        <AnalyzeView
-          initialProjectId={targetProjectId}
-          initialSlug="corrosion"
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
+        <!-- Keyed so switching between the dedicated analysis routes remounts
+             AnalyzeView: initialSlug only seeds selectedSlug, so a reused
+             instance would keep whichever engine was last selected. -->
+        {#key activeView}
+          <AnalyzeView
+            initialProjectId={targetProjectId}
+            initialSlug="corrosion"
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
+        {/key}
       {:else if activeView === 'seismic'}
-        <AnalyzeView
-          initialProjectId={targetProjectId}
-          initialSlug="seismic"
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
+        {#key activeView}
+          <AnalyzeView
+            initialProjectId={targetProjectId}
+            initialSlug="seismic"
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
+        {/key}
       {:else if activeView === 'workflow'}
         <WorkflowView initialProjectId={targetProjectId} />
       {:else if activeView === 'reports'}

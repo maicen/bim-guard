@@ -38,7 +38,10 @@
   import PipelineProgress from "../lib/components/PipelineProgress.svelte";
 
   export let initialProjectId: number | null = null;
-  export let initialSlug: "corrosion" | "seismic" = "corrosion";
+  // Undefined means "this route covers both engines", which is what makes the
+  // domain toggle appear. The dedicated PIPING and SEISMIC routes pass a slug
+  // and therefore render without it.
+  export let initialSlug: "corrosion" | "seismic" | undefined = undefined;
   export let onSelectProjectForViewer: (
     projectId: number,
     elementGuid?: string,
@@ -47,7 +50,27 @@
 
   let projects: Project[] = [];
   let selectedProjectId: number | null = initialProjectId;
-  let selectedSlug: "corrosion" | "seismic" = initialSlug;
+  let selectedSlug: "corrosion" | "seismic" = initialSlug ?? "corrosion";
+
+  //: Corrosion engines a run can be narrowed to. The codes are the rule-id
+  //: prefixes the backend matches on, not display labels, so they must stay in
+  //: step with MechanismSpec.code in phase_6c_corrosion_ui.
+  const CORROSION_ENGINES: { code: string; label: string }[] = [
+    { code: "GC-001", label: "GC-001 Galvanic" },
+    { code: "CC-001", label: "CC-001 Crevice" },
+    { code: "MC-001", label: "MC-001 Microbiological" },
+  ];
+  let selectedEngines: string[] = ["GC-001", "CC-001"];
+
+  function toggleEngine(code: string) {
+    selectedEngines = selectedEngines.includes(code)
+      ? selectedEngines.filter((c) => c !== code)
+      : [...selectedEngines, code];
+  }
+
+  // Seismic has no engine subset, so only a corrosion run can be under-selected.
+  $: engineSelectionEmpty =
+    selectedSlug === "corrosion" && selectedEngines.length === 0;
   let isRunning = false;
   let error = "";
   let result: AnalysisResult | null = null;
@@ -116,6 +139,7 @@
         selectedSlug,
         false,
         !forceRecompute,
+        selectedSlug === "corrosion" ? selectedEngines : undefined,
       );
     } catch (err: any) {
       error = err.message || "Analysis failed";
@@ -238,7 +262,11 @@
       <h1
         class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3"
       >
-        <span>MEP Piping &amp; Seismic Audit</span>
+        <span
+          >{selectedSlug === "corrosion"
+            ? "Piping Audit"
+            : "Seismic Clearance"}</span
+        >
         {#if result?.cached}
           <span
             class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/80 shadow-sm"
@@ -249,47 +277,54 @@
         {/if}
       </h1>
       <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
-        Execute verified Galvanic (GC-001), Crevice (CC-001), and
-        Microbiological (MC-001) compliance audits or Blue Halo Seismic
-        Clearance (SB-001 / EN 1998-1 / DIN 4149) envelopes.
+        {#if selectedSlug === "corrosion"}
+          Execute verified Galvanic (GC-001), Crevice (CC-001), and
+          Microbiological (MC-001) corrosion compliance audits against the
+          project's OpenBIM piping network.
+        {:else}
+          Validate Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN 4149)
+          envelopes against the project's bracing and clearance geometry.
+        {/if}
       </p>
     </div>
 
     <!-- Actions & Project Selector -->
     <div class="flex flex-wrap items-center gap-3">
-      <!-- Domain Toggle -->
-      <div
-        class="bg-slate-900/90 border border-slate-800 p-1 rounded-2xl flex items-center shadow-inner"
-      >
-        <button
-          type="button"
-          on:click={() => {
-            selectedSlug = "corrosion";
-            fetchResults();
-          }}
-          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug ===
-          'corrosion'
-            ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20'
-            : 'text-slate-400 hover:text-white'}"
+      <!-- Domain Toggle: only on the combined route, where no slug was fixed -->
+      {#if initialSlug === undefined}
+        <div
+          class="bg-slate-900/90 border border-slate-800 p-1 rounded-2xl flex items-center shadow-inner"
         >
-          <Layers class="w-3.5 h-3.5" />
-          <span>Piping Corrosion (GC/CC/MC)</span>
-        </button>
-        <button
-          type="button"
-          on:click={() => {
-            selectedSlug = "seismic";
-            fetchResults();
-          }}
-          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug ===
-          'seismic'
-            ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20'
-            : 'text-slate-400 hover:text-white'}"
-        >
-          <Compass class="w-3.5 h-3.5" />
-          <span>Seismic Clearance (Halo)</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            on:click={() => {
+              selectedSlug = "corrosion";
+              fetchResults();
+            }}
+            class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug ===
+            'corrosion'
+              ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-400 hover:text-white'}"
+          >
+            <Layers class="w-3.5 h-3.5" />
+            <span>Piping Corrosion (GC/CC/MC)</span>
+          </button>
+          <button
+            type="button"
+            on:click={() => {
+              selectedSlug = "seismic";
+              fetchResults();
+            }}
+            class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug ===
+            'seismic'
+              ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-400 hover:text-white'}"
+          >
+            <Compass class="w-3.5 h-3.5" />
+            <span>Seismic Clearance (Halo)</span>
+          </button>
+        </div>
+      {/if}
 
       <!-- Project Dropdown -->
       <div class="relative">
@@ -307,11 +342,47 @@
         />
       </div>
 
+      <!-- Engine Selector: corrosion runs three engines, any subset of which
+           can be requested. Seismic has a single engine, so it has no subset. -->
+      {#if selectedSlug === "corrosion"}
+        <div
+          class="flex items-center gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl px-3.5 py-2 shadow-inner"
+        >
+          <span
+            class="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+            >Engines</span
+          >
+          {#each CORROSION_ENGINES as engine}
+            <label
+              class="flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none {selectedEngines.includes(
+                engine.code,
+              )
+                ? 'text-white'
+                : 'text-slate-500 hover:text-slate-300'}"
+              title={engine.label}
+            >
+              <input
+                type="checkbox"
+                checked={selectedEngines.includes(engine.code)}
+                on:change={() => toggleEngine(engine.code)}
+                class="rounded border-slate-700 bg-slate-950 text-[#0071e3] focus:ring-0 w-3.5 h-3.5"
+              />
+              <span>{engine.code}</span>
+            </label>
+          {/each}
+        </div>
+      {/if}
+
       <!-- Run Action Button -->
       <button
         type="button"
-        disabled={isRunning || !currentProject?.ifc_file_path}
+        disabled={isRunning ||
+          !currentProject?.ifc_file_path ||
+          engineSelectionEmpty}
         on:click={() => handleRun(false)}
+        title={engineSelectionEmpty
+          ? "Select at least one corrosion engine to run"
+          : "Run the audit against the selected engines"}
         class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:pointer-events-none"
       >
         {#if isRunning}
@@ -327,7 +398,9 @@
       {#if result}
         <button
           type="button"
-          disabled={isRunning || !currentProject?.ifc_file_path}
+          disabled={isRunning ||
+            !currentProject?.ifc_file_path ||
+            engineSelectionEmpty}
           on:click={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
           class="p-2 rounded-full border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"

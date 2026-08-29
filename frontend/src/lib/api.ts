@@ -152,11 +152,13 @@ export const analyzeApi = {
     return handleResponse<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }>(res);
   },
 
-  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true): Promise<AnalysisResult> {
+  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true, ruleIds?: string[]): Promise<AnalysisResult> {
     const res = await fetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId, slug, use_cache: useCache }),
+      // rule_ids narrows a corrosion run to the selected engines; omitted (null)
+      // means every engine, which is what the seismic slug always wants.
+      body: JSON.stringify({ project_id: projectId, slug, use_cache: useCache, rule_ids: ruleIds ?? null }),
     });
     return handleResponse<AnalysisResult>(res);
   },
