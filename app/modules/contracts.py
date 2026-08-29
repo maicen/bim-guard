@@ -413,4 +413,45 @@ class SettingsUpdateRequestContract(BaseModel):
     settings: dict[str, str] = Field(..., description="Map of setting key to new value")
 
 
+class RevitSyncElement(BaseModel):
+    """Element descriptor pushed by pyRevit."""
+
+    ifc_class: str = Field(..., description="IFC entity type (e.g. IfcStairFlight, IfcDoor)")
+    name: str = Field("", description="Element name or mark")
+    guid: str = Field("", description="Unique identifier (UniqueId / GUID)")
+    storey: str = Field("", description="Level or storey name")
+    properties: dict[str, Any] = Field(default_factory=dict, description="Extracted parameters")
+
+
+class RevitSyncRequest(BaseModel):
+    """Payload pushed by pyRevit or direct integration."""
+
+    project_name: str = Field("Revit Model", description="Project label")
+    theme: str = Field("Architecture", description="Analysis theme")
+    elements: list[RevitSyncElement] = Field(default_factory=list, description="Extracted elements")
+
+
+class RevitRuleResult(BaseModel):
+    """Validation result for one rule against Revit elements."""
+
+    rule_ref: Optional[str] = None
+    rule_desc: Optional[str] = None
+    target: Optional[str] = None
+    property_name: Optional[str] = None
+    status: Optional[str] = None
+    pass_count: Optional[int] = 0
+    fail_count: Optional[int] = 0
+    missing_count: Optional[int] = 0
+    failures: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class RevitSyncResponse(BaseModel):
+    """Compliance verification result returned to pyRevit / UI."""
+
+    element_count: int
+    theme: str
+    summary: dict[str, Any] = Field(default_factory=dict)
+    results: list[RevitRuleResult] = Field(default_factory=list)
+
+
 

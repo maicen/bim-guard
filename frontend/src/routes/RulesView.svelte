@@ -17,12 +17,15 @@
   } from 'lucide-svelte';
   import { rulesApi, ruleExtractionApi } from '../lib/api';
   import type { Rule, RuleFolder } from '../lib/types';
+  import ConfirmModal from '../lib/components/ConfirmModal.svelte';
 
   let rules: Rule[] = [];
   let folders: RuleFolder[] = [];
   let isLoading = true;
   let error = '';
   let successMessage = '';
+  let isDeleteModalOpen = false;
+  let ruleToDelete: { id: number; ruleId: string } | null = null;
 
   // Filter state
   let searchQuery = '';
@@ -207,13 +210,19 @@
     }
   }
 
-  async function handleDelete(id: number, ruleId: string) {
-    if (!confirm(`Delete rule "${ruleId}"?`)) return;
+  function promptDelete(id: number, ruleId: string) {
+    ruleToDelete = { id, ruleId };
+    isDeleteModalOpen = true;
+  }
+
+  async function confirmDelete() {
+    if (!ruleToDelete) return;
     try {
-      await rulesApi.delete(id);
-      rules = rules.filter((r) => r.id !== id);
+      await rulesApi.delete(ruleToDelete.id);
+      rules = rules.filter((r) => r.id !== ruleToDelete!.id);
+      ruleToDelete = null;
     } catch (err: any) {
-      alert(`Delete failed: ${err.message}`);
+      error = `Delete failed: ${err.message}`;
     }
   }
 </script>
@@ -424,7 +433,7 @@
                         </button>
                         <button
                           type="button"
-                          on:click={() => handleDelete(rule.id, rule.rule_id || '')}
+                          on:click={() => promptDelete(rule.id, rule.rule_id || '')}
                           class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
                           title="Delete rule"
                         >
@@ -722,3 +731,14 @@
     </div>
   </div>
 {/if}
+
+<!-- Styled Delete Confirmation Modal -->
+<ConfirmModal
+  bind:isOpen={isDeleteModalOpen}
+  title="Delete Rule"
+  message={`Are you sure you want to delete rule "${ruleToDelete?.ruleId || ''}"? This action cannot be undone.`}
+  confirmText="Delete Rule"
+  danger={true}
+  onConfirm={confirmDelete}
+  onCancel={() => (ruleToDelete = null)}
+/>

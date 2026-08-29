@@ -335,3 +335,37 @@ export interface ArchAnalysisResult {
   rule_folder?: string;
   ifc_element_count?: number;
 }
+
+export interface RevitSyncElement {
+  ifc_class: string;
+  name?: string;
+  guid?: string;
+  storey?: string;
+  properties?: Record<string, any>;
+}
+
+export interface RevitSyncRequest {
+  project_name?: string;
+  theme?: string;
+  elements: RevitSyncElement[];
+}
+
+export interface RevitRuleResult {
+  rule_ref?: string;
+  rule_desc?: string;
+  target?: string;
+  property_name?: string;
+  status?: string;
+  pass_count?: number;
+  fail_count?: number;
+  missing_count?: number;
+  failures?: any[];
+}
+
+export interface RevitSyncResponse {
+  element_count: number;
+  theme: string;
+  summary: Record<string, any>;
+  results: RevitRuleResult[];
+}
+

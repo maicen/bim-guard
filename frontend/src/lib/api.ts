@@ -279,4 +279,16 @@ export const ruleExtractionApi = {
   },
 };
 
+export const revitSyncApi = {
+  async sync(payload: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/analyze/revit-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<any>(res);
+  },
+};
+
+
 

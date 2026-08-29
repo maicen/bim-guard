@@ -13,10 +13,13 @@
   } from 'lucide-svelte';
   import { documentsApi } from '../lib/api';
   import type { DocumentItem, DocumentDetail } from '../lib/types';
+  import ConfirmModal from '../lib/components/ConfirmModal.svelte';
 
   let documents: DocumentItem[] = [];
   let isLoading = true;
   let error = '';
+  let isDeleteModalOpen = false;
+  let docToDelete: { id: number; filename: string } | null = null;
 
   // Upload modal state
   let isUploadModalOpen = false;
@@ -77,13 +80,19 @@
     }
   }
 
-  async function handleDelete(id: number, filename: string) {
-    if (!confirm(`Delete specification document "${filename}"?`)) return;
+  function promptDelete(id: number, filename: string) {
+    docToDelete = { id, filename };
+    isDeleteModalOpen = true;
+  }
+
+  async function confirmDelete() {
+    if (!docToDelete) return;
     try {
-      await documentsApi.delete(id);
-      documents = documents.filter((d) => d.id !== id);
+      await documentsApi.delete(docToDelete.id);
+      documents = documents.filter((d) => d.id !== docToDelete!.id);
+      docToDelete = null;
     } catch (err: any) {
-      alert(`Failed to delete document: ${err.message}`);
+      error = `Failed to delete document: ${err.message}`;
     }
   }
 </script>
@@ -185,7 +194,7 @@
                     </button>
                     <button
                       type="button"
-                      on:click={() => handleDelete(doc.id, doc.filename)}
+                      on:click={() => promptDelete(doc.id, doc.filename)}
                       class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
                       title="Delete document"
                     >
@@ -302,4 +311,14 @@
     </div>
   </div>
 {/if}
+
+<ConfirmModal
+  bind:isOpen={isDeleteModalOpen}
+  title="Delete Specification Document"
+  message={`Are you sure you want to delete "${docToDelete?.filename || ''}" and its extracted text? This cannot be undone.`}
+  confirmText="Delete Document"
+  danger={true}
+  onConfirm={confirmDelete}
+  onCancel={() => (docToDelete = null)}
+/>
 

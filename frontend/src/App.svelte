@@ -17,6 +17,7 @@
   import ReportsView from './routes/ReportsView.svelte';
   import UserManualView from './routes/UserManualView.svelte';
   import ModelingManualView from './routes/ModelingManualView.svelte';
+  import RevitSyncView from './routes/RevitSyncView.svelte';
   import SettingsView from './routes/SettingsView.svelte';
 
   import { dashboardApi, projectsApi } from './lib/api';
@@ -147,6 +148,8 @@
         <UserManualView onNavigate={handleSelectView} />
       {:else if activeView === 'modeling-manual'}
         <ModelingManualView />
+      {:else if activeView === 'revit-sync'}
+        <RevitSyncView />
       {:else if activeView === 'settings'}
         <SettingsView />
       {/if}

@@ -17,6 +17,7 @@
   import type { Project } from '../lib/types';
   import ProjectWizardModal from '../lib/components/ProjectWizardModal.svelte';
   import ProjectEnhancementsModal from '../lib/components/ProjectEnhancementsModal.svelte';
+  import ConfirmModal from '../lib/components/ConfirmModal.svelte';
 
   export let onSelectProjectForAudit: (projectId: number) => void;
   export let onSelectProjectForViewer: (projectId: number) => void;
@@ -33,7 +34,9 @@
   // Modals state
   let isWizardOpen = false;
   let isEnhancementsOpen = false;
+  let isDeleteModalOpen = false;
   let selectedProjectForEnhance: Project | null = null;
+  let projectToDelete: { id: number; name: string } | null = null;
 
   async function loadProjects() {
     isLoading = true;
@@ -62,13 +65,19 @@
     return matchesSearch && matchesStatus && matchesDomain;
   });
 
-  async function handleDelete(projectId: number, name: string) {
-    if (!confirm(`Are you sure you want to delete project "${name}"?`)) return;
+  function promptDelete(projectId: number, name: string) {
+    projectToDelete = { id: projectId, name };
+    isDeleteModalOpen = true;
+  }
+
+  async function confirmDelete() {
+    if (!projectToDelete) return;
     try {
-      await projectsApi.delete(projectId);
-      projects = projects.filter((p) => p.id !== projectId);
+      await projectsApi.delete(projectToDelete.id);
+      projects = projects.filter((p) => p.id !== projectToDelete!.id);
+      projectToDelete = null;
     } catch (err: any) {
-      alert(`Could not delete project: ${err.message}`);
+      error = `Could not delete project: ${err.message}`;
     }
   }
 
@@ -243,7 +252,7 @@
 
                     <button
                       type="button"
-                      on:click={() => handleDelete(project.id, project.name)}
+                      on:click={() => promptDelete(project.id, project.name)}
                       class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
                       title="Delete project"
                     >
@@ -277,4 +286,14 @@
     isEnhancementsOpen = false;
     selectedProjectForEnhance = null;
   }}
+/>
+
+<ConfirmModal
+  bind:isOpen={isDeleteModalOpen}
+  title="Delete Project"
+  message={`Are you sure you want to delete project "${projectToDelete?.name || ''}" and its associated artifacts? This cannot be undone.`}
+  confirmText="Delete Project"
+  danger={true}
+  onConfirm={confirmDelete}
+  onCancel={() => (projectToDelete = null)}
 />

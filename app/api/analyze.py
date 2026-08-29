@@ -25,6 +25,9 @@ from app.modules.contracts import (
     ArchAnalysisResponse,
     AuditIssueContract,
     IssueStatsContract,
+    RevitRuleResult,
+    RevitSyncRequest,
+    RevitSyncResponse,
     WorkflowStatusContract,
 )
 from app.modules.phase_6.phase_6e_export import export
@@ -331,6 +334,7 @@ def get_arch_analysis(project_id: int) -> ArchAnalysisResponse:
 def download_bcf_artifact(artifact_id: int):
     """Download a stored BCF 2.1 report archive by artifact primary key."""
     from fastapi.responses import FileResponse
+
     from app.services.report_artifacts import ReportArtifactService
 
     report_svc = ReportArtifactService()
@@ -360,6 +364,7 @@ def download_bcf_artifact(artifact_id: int):
 def download_latest_bcf(project_id: int):
     """Retrieve the latest BCF 2.1 archive generated for a project."""
     from fastapi.responses import FileResponse
+
     from app.services.report_artifacts import ReportArtifactService
 
     report_svc = ReportArtifactService()
@@ -391,5 +396,49 @@ def list_bcf_artifacts() -> list[dict]:
     from app.services.report_artifacts import ReportArtifactService
 
     return ReportArtifactService().list_bcf()
+
+
+# ---------------------------------------------------------------------------
+# Revit Direct Sync Endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.post("/revit-sync", response_model=RevitSyncResponse, summary="Direct Revit pyRevit synchronization")
+def sync_revit_elements(payload: RevitSyncRequest) -> RevitSyncResponse:
+    """Accept element data pushed directly from Revit/pyRevit, run compliance checks, and return verdicts."""
+    from app.services.pipeline_services import PipelineOrchestratorService
+    from app.services.revit_sync_service import RevitSyncService
+
+    sync_service = RevitSyncService()
+    elements = [el.model_dump() for el in payload.elements]
+    theme = payload.theme or "Architecture"
+
+    extraction = sync_service.build_extraction_results(elements, theme)
+    compliance = PipelineOrchestratorService.validate_metadata(extraction)
+    summary = PipelineOrchestratorService.render_visual_report(compliance)
+
+    results: list[RevitRuleResult] = []
+    for r in compliance:
+        results.append(
+            RevitRuleResult(
+                rule_ref=r.get("rule_ref"),
+                rule_desc=r.get("rule_desc"),
+                target=r.get("target"),
+                property_name=r.get("property_name"),
+                status=r.get("status"),
+                pass_count=r.get("pass_count", 0),
+                fail_count=r.get("fail_count", 0),
+                missing_count=r.get("missing_count", 0),
+                failures=r.get("failures", []) or [],
+            )
+        )
+
+    return RevitSyncResponse(
+        element_count=len(elements),
+        theme=theme,
+        summary=summary if isinstance(summary, dict) else {},
+        results=results,
+    )
+
 
 

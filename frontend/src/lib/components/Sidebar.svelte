@@ -15,6 +15,7 @@
     Settings,
     ChevronLeft,
     ChevronRight,
+    RefreshCw,
   } from 'lucide-svelte';
 
   export let activeView: string = 'dashboard';
@@ -48,6 +49,12 @@
         { id: 'analyze', label: 'MEP & Piping', icon: Cpu },
         { id: 'workflow', label: 'Live Workflow', icon: Workflow },
         { id: 'reports', label: 'Reports & Exports', icon: FileText },
+      ],
+    },
+    {
+      title: 'Integrations',
+      items: [
+        { id: 'revit-sync', label: 'Revit Direct Sync', icon: RefreshCw },
       ],
     },
     {
