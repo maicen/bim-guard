@@ -49,18 +49,14 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
     if FEATURE_PATH_B_MM:
         try:
             mm_pack = load_mm_pack()
-            for element in elements:
-                mm_issues = compare_mm(element, rule_pack=mm_pack, id_allocator=id_allocator)
-                path_b_issues.extend(mm_issues)
+            path_b_issues.extend(compare_mm(elements, mm_pack, id_allocator))
         except Exception as exc:
             print(f"MM-001 error: {type(exc).__name__}: {exc}")
 
     if FEATURE_PATH_B_XM:
         try:
             xm_pack = load_xm_pack()
-            for element in elements:
-                xm_issues = compare_xm(element, rule_pack=xm_pack, id_allocator=id_allocator)
-                path_b_issues.extend(xm_issues)
+            path_b_issues.extend(compare_xm(elements, xm_pack, id_allocator))
         except Exception as exc:
             print(f"XM-001 error: {type(exc).__name__}: {exc}")
 

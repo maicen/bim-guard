@@ -144,17 +144,24 @@
           onSelectProjectForViewer={handleSelectProjectForViewer}
         />
       {:else if activeView === 'piping'}
-        <AnalyzeView
-          activeCategory="Piping"
-          initialProjectId={targetProjectId}
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
+        <!-- Keyed so moving between PIPING and SEISMIC remounts the view:
+             both routes share AnalyzeView, and without this the previous
+             route's results and filters survive the switch. -->
+        {#key activeView}
+          <AnalyzeView
+            activeCategory="Piping"
+            initialProjectId={targetProjectId}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
+        {/key}
       {:else if activeView === 'seismic'}
-        <AnalyzeView
-          activeCategory="seismic"
-          initialProjectId={targetProjectId}
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
+        {#key activeView}
+          <AnalyzeView
+            activeCategory="seismic"
+            initialProjectId={targetProjectId}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
+        {/key}
       {:else if activeView === 'analyze'}
         <AnalyzeView
           activeCategory="Piping"

@@ -187,17 +187,6 @@ def test_orchestrate_workflow_projects_the_path_b_columns(run_probe, flag_env):
     assert not missing, f"projection keys missing from the row: {sorted(missing)}"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: two failures stacked. The module does not import; and once it "
-        "does, compliance_orchestrator.py:51 and :62 call compare() with an "
-        "id_allocator keyword the comparators do not accept, and pass a single "
-        "element where a list is expected. Both calls sit inside a bare "
-        "`except Exception: print(...)`, so an enabled flag yields zero "
-        "findings instead of raising."
-    ),
-)
 @pytest.mark.parametrize(
     ("mm", "xm"), [("1", "0"), ("0", "1"), ("1", "1")], ids=FLAG_COMBO_IDS[1:]
 )

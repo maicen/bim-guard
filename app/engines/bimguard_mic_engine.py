@@ -313,8 +313,11 @@ def assess_mic_risk(element: MICElement) -> MICResult:
     sys_mult, _ = get_system_modifier(element.system_type)
 
     # Under-insulation risk (independent pathway)
+    # The catalogue is DB-driven and its fallback carries only dry/wet, so an
+    # "unknown" row is not guaranteed. Contribute nothing rather than crash or
+    # fabricate a risk floor the data does not support.
     uic_risk = UNDER_INSULATION_RISK.get(
-        element.insulation_condition.lower(), UNDER_INSULATION_RISK["unknown"]
+        element.insulation_condition.lower(), UNDER_INSULATION_RISK.get("unknown", 0.0)
     )
 
     # Base composite score using DB weights
