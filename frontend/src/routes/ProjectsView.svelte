@@ -11,13 +11,11 @@
     CheckCircle2,
     XCircle,
     SlidersHorizontal,
-    Wand2,
     Eye,
     Pencil,
   } from "lucide-svelte";
   import { projectsApi } from "../lib/api";
   import type { Project } from "../lib/types";
-  import ProjectWizardModal from "../lib/components/ProjectWizardModal.svelte";
   import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
@@ -36,7 +34,6 @@
   let domainFilter = "all";
 
   // Modals state
-  let isWizardOpen = false;
   let isEditModalOpen = false;
   let isDetailsModalOpen = false;
   let isEnhancementsOpen = false;
@@ -128,17 +125,6 @@
       <p class="text-xs sm:text-sm text-slate-400">
         Manage OpenBIM models, analysis scopes, and compliance records.
       </p>
-    </div>
-
-    <div class="flex items-center gap-2">
-      <button
-        type="button"
-        on:click={() => (isWizardOpen = true)}
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
-      >
-        <Wand2 class="w-3.5 h-3.5" />
-        <span>Setup Wizard</span>
-      </button>
     </div>
   </div>
 
@@ -352,15 +338,6 @@
 </div>
 
 <!-- Modals -->
-<ProjectWizardModal
-  isOpen={isWizardOpen}
-  onClose={() => (isWizardOpen = false)}
-  onProjectCreated={(newProject) => {
-    projects = [newProject, ...projects];
-    onSelectProjectForAudit(newProject.id);
-  }}
-/>
-
 <ProjectEditModal
   isOpen={isEditModalOpen}
   project={selectedProjectForEdit}
