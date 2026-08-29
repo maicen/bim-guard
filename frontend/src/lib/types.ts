@@ -235,6 +235,20 @@ export interface ModelLineageRecord {
   created_at?: string;
 }
 
+export interface BcfArtifact {
+  id: number;
+  project_id: number;
+  artifact_type: string;
+  filename: string;
+  storage_ref: string;
+  content_type: string;
+  byte_size: number;
+  sha256?: string;
+  issue_count: number;
+  created_at?: string;
+}
+
+
 export interface ExtractedRule {
   rule_id: string;
   description: string;

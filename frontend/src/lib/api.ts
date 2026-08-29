@@ -188,6 +188,11 @@ export const analyzeApi = {
     });
     return handleResponse<any>(res);
   },
+
+  async listBcfArtifacts(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/analyze/bcf/list`);
+    return handleResponse<any[]>(res);
+  },
 };
 
 export const dashboardApi = {

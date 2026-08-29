@@ -16,8 +16,13 @@
     Car,
     Footprints,
     Wind,
+    Sparkles,
+    FolderOpen,
+    CheckCircle2,
+    Save,
   } from 'lucide-svelte';
-  import { projectsApi, analyzeApi } from '../lib/api';
+  import { projectsApi, analyzeApi, lineageApi, rulesApi } from '../lib/api';
+  import ProjectEnhancementsModal from '../lib/components/ProjectEnhancementsModal.svelte';
   import type {
     Project,
     ArchAnalysisResult,
@@ -29,6 +34,7 @@
     DaylightResult,
     FireSeparationResult,
     GarageResult,
+    RuleFolder,
   } from '../lib/types';
 
   export let initialProjectId: number | null = null;
@@ -40,41 +46,135 @@
   let error = '';
   let result: ArchAnalysisResult | null = null;
 
+  // Rule folder selection — '' means "All rules"
+  let ruleFolders: RuleFolder[] = [];
+  let selectedFolder = ''; // '' = All
+  let isFoldersLoading = false;
+
+  // Enhanced model gate
+  let hasEnhancedModel: boolean | null = null;
+  let isCheckingEnhancement = false;
+  let showEnhancementsModal = false;
+
+  // BCF save tracking (backend auto-persists; we reflect the status)
+  let bcfSaveMessage = '';
+  let bcfSaveType: 'success' | 'error' = 'success';
+
+  $: selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
+
   // Collapsible state tracking
   let openDomains: Record<string, boolean> = {};
   let openRules: Record<string, boolean> = {};
   let openSections: Record<string, boolean> = {};
 
   onMount(async () => {
+    // Load projects and rule folders in parallel; do NOT auto-run analysis
     try {
-      const data = await projectsApi.list();
-      projects = data.projects || [];
+      const [projectData] = await Promise.all([
+        projectsApi.list(),
+        loadFolders(),
+      ]);
+      projects = projectData.projects || [];
       if (!selectedProjectId && projects.length > 0) {
         selectedProjectId = projects[0].id;
       }
+      // Only check for enhanced model — do not auto-run
       if (selectedProjectId) {
-        await runCheck();
+        await checkEnhancedModel();
       }
     } catch (err: any) {
       error = err.message || 'Failed to load projects';
     }
   });
 
+  async function loadFolders(): Promise<void> {
+    isFoldersLoading = true;
+    try {
+      ruleFolders = await rulesApi.folders();
+    } catch {
+      ruleFolders = [];
+    } finally {
+      isFoldersLoading = false;
+    }
+  }
+
+  /** Check for enhanced model only — do NOT run analysis. */
+  async function checkEnhancedModel() {
+    if (!selectedProjectId) return;
+    isCheckingEnhancement = true;
+    hasEnhancedModel = null;
+    try {
+      const history = await lineageApi.getHistory(selectedProjectId);
+      hasEnhancedModel = Array.isArray(history) && history.length > 0;
+    } catch {
+      hasEnhancedModel = false;
+    } finally {
+      isCheckingEnhancement = false;
+    }
+  }
+
+  /** Called when the project selector changes — reset state, check enhancement. */
+  async function handleProjectChange() {
+    result = null;
+    error = '';
+    bcfSaveMessage = '';
+    await checkEnhancedModel();
+    if (!hasEnhancedModel) {
+      showEnhancementsModal = true;
+    }
+  }
+
+  /**
+   * Main run entrypoint — validates enhanced model, then runs the ARCH audit.
+   * Only called by the Run button, never automatically.
+   */
+  async function handleRunClick() {
+    if (!selectedProjectId) return;
+    if (!hasEnhancedModel) {
+      await checkEnhancedModel();
+      if (!hasEnhancedModel) {
+        showEnhancementsModal = true;
+        return;
+      }
+    }
+    await runCheck();
+  }
+
   async function runCheck() {
     if (!selectedProjectId) return;
     isRunning = true;
     error = '';
+    bcfSaveMessage = '';
     try {
-      result = await analyzeApi.runArch(selectedProjectId);
-      // Auto-open domains that have failures
+      result = await analyzeApi.runArch(selectedProjectId, selectedFolder);
       if (result) {
         initDomainState(result);
+        if (result.bcf_artifact_id) {
+          bcfSaveMessage = `BCF report saved to database (artifact #${result.bcf_artifact_id})`;
+          bcfSaveType = 'success';
+        }
       }
     } catch (err: any) {
       error = err.message || 'Architectural compliance check failed.';
     } finally {
       isRunning = false;
     }
+  }
+
+  /**
+   * Called when the enhancements modal is closed.
+   * Re-checks enhancement status; user must click Run explicitly.
+   */
+  async function handleEnhancementsModalClose() {
+    showEnhancementsModal = false;
+    if (!selectedProjectId) return;
+    try {
+      const history = await lineageApi.getHistory(selectedProjectId);
+      hasEnhancedModel = Array.isArray(history) && history.length > 0;
+    } catch {
+      hasEnhancedModel = false;
+    }
+    // Do NOT auto-run — wait for user to click Run
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -207,7 +307,7 @@
   $: rulesWithElements = summary.rules_with_elements || 0;
   $: totalRules = summary.total_rules || 0;
   $: buildingSummary = result?.building_summary;
-  $: folderNote = result?.rule_folder ? ` (Folder: ${result.rule_folder})` : '';
+  $: folderNote = result?.rule_folder ? ` · ${result.rule_folder}` : (selectedFolder ? ` · ${selectedFolder}` : '');
 </script>
 
 <div class="space-y-5 max-w-7xl mx-auto">
@@ -260,7 +360,202 @@
     <div class="flex items-center gap-2.5 flex-wrap shrink-0">
       <select
         bind:value={selectedProjectId}
-        on:change={() => runCheck()}
+        on:change={handleProjectChange}
+        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+      >
+        {#each projects as project}
+          <option value={project.id}>{project.name}</option>
+        {/each}
+      </select>
+
+      {#if result && selectedProjectId}
+        <button
+          type="button"
+          on:click={() => selectedProjectId && onSelectProjectForViewer(selectedProjectId, undefined, result?.bcf_artifact_id || undefined)}
+          class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-800/80 hover:bg-emerald-700 text-white border border-emerald-700 transition-colors"
+          title="Open in 3D ThatOpen Viewer with error viewpoints"
+        >
+          <ScanEye class="w-3.5 h-3.5" />
+          View in 3D / BCF
+    const minutes = Math.floor(seconds / 60);
+    const rest = Math.round(seconds % 60);
+    return `${minutes}m ${rest}s`;
+  }
+
+  function fmtVal(v: any): string {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'number') {
+      return v >= 1 ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : v.toFixed(4);
+    }
+    return String(v);
+  }
+
+  function ruleRequiredText(rule: RuleComplianceResult): string {
+    const op = rule.operator || '';
+    const cv = rule.check_value;
+    const unit = rule.unit || '';
+    if (op === '>=') return `≥ ${cv} ${unit}`.trim();
+    if (op === '<=') return `≤ ${cv} ${unit}`.trim();
+    if (op === 'between') return `${rule.value_min}–${rule.value_max} ${unit}`.trim();
+    if (op === 'exists') return 'must be present';
+    if (op === 'not_exists') return 'must not be present';
+    return cv !== null && cv !== undefined ? `${op} ${cv} ${unit}`.trim() : '—';
+  }
+
+  const ELEM_LABELS: Record<string, string> = {
+    IfcDoor: 'Doors',
+    IfcWindow: 'Windows',
+    IfcStairFlight: 'Stair Flights',
+    IfcRailing: 'Railings',
+    IfcRamp: 'Ramps',
+    IfcRampFlight: 'Ramp Flights',
+    IfcSanitaryTerminal: 'Sanitary Terminals',
+    IfcAlarm: 'Alarms',
+    IfcWall: 'Walls',
+    IfcSlab: 'Slabs',
+    IfcSpace: 'Spaces',
+    IfcBuildingStorey: 'Storeys',
+  };
+
+  // Category → IFC target classes (matching the legacy _SIMPLE_CATEGORY_TARGETS)
+  const DOMAIN_TARGETS: Record<string, string[]> = {
+    windows: ['IfcWindow'],
+    doors: ['IfcDoor'],
+    stairs: ['IfcStairFlight', 'IfcRailing'],
+    ramps: ['IfcRamp', 'IfcRampFlight'],
+    washrooms: ['IfcSanitaryTerminal'],
+    fire: ['IfcAlarm'],
+  };
+
+  interface DomainConfig {
+    key: string;
+    label: string;
+    targets: string[];
+    category: string;
+  }
+
+  const DOMAIN_CARDS: DomainConfig[] = [
+    { key: 'windows', label: 'Windows & Glazing', targets: ['IfcWindow'], category: 'windows' },
+    { key: 'doors', label: 'Doors', targets: ['IfcDoor'], category: 'doors' },
+    { key: 'stairs', label: 'Stairs, Guards & Handrails', targets: ['IfcStairFlight', 'IfcRailing'], category: 'stairs' },
+    { key: 'ramps', label: 'Ramps', targets: ['IfcRamp', 'IfcRampFlight'], category: 'ramps' },
+    { key: 'egress', label: 'Means of Egress', targets: [], category: 'egress' },
+    { key: 'washrooms', label: 'Washrooms & Accessibility', targets: ['IfcSanitaryTerminal'], category: 'washrooms' },
+    { key: 'plumbing', label: 'Plumbing Fixture Counts', targets: [], category: 'plumbing' },
+    { key: 'fire', label: 'Fire Protection (House-Level)', targets: ['IfcAlarm'], category: 'fire' },
+    { key: 'garage', label: 'Garage / Carport', targets: [], category: 'garage' },
+  ];
+
+  function getDomainRules(targets: string[]): RuleComplianceResult[] {
+    if (!result?.rule_compliance) return [];
+    return result.rule_compliance.filter((r) => targets.includes(r.target || ''));
+  }
+
+  function domainBadge(rules: RuleComplianceResult[]): { label: string; cls: string } {
+    if (!rules.length) return { label: 'N/A', cls: 'bg-slate-800 text-slate-400 border-slate-700' };
+    const real = rules.filter((r) => r.status !== 'NO_ELEMENTS');
+    if (!real.length) return { label: 'N/A', cls: 'bg-slate-800 text-slate-400 border-slate-700' };
+    const nFail = real.filter((r) => r.status === 'FAIL').length;
+    if (nFail) return { label: `${nFail} rule(s) failed`, cls: 'bg-rose-950/80 text-rose-300 border-rose-800' };
+    if (real.some((r) => ['MISSING_DATA', 'PARTIAL'].includes(r.status || '')))
+      return { label: 'Missing data', cls: 'bg-amber-950/80 text-amber-300 border-amber-800' };
+    return { label: 'All pass', cls: 'bg-emerald-950/80 text-emerald-300 border-emerald-800' };
+  }
+
+  function initDomainState(r: ArchAnalysisResult) {
+    const rc = r.rule_compliance || [];
+    for (const dc of DOMAIN_CARDS) {
+      const rules = rc.filter((rule) => dc.targets.includes(rule.target || ''));
+      const hasFail = rules.some((rule) => rule.status === 'FAIL');
+      openDomains[dc.key] = hasFail;
+    }
+    // Egress / fire / garage open if they have failures
+    const eg = r.egress_checks || {};
+    const exitResults = eg.exit_count?.results || [];
+    const travel = eg.travel_distance || [];
+    if ([...exitResults, ...travel].some((x: any) => !x.passes)) openDomains['egress'] = true;
+    const fireSep = (r.spatial_checks || {}).fire_separation || [];
+    if (fireSep.some((x: any) => !x.passes)) openDomains['fire'] = true;
+  }
+
+  function toggleDomain(key: string) {
+    openDomains[key] = !openDomains[key];
+    openDomains = openDomains;
+  }
+
+  function toggleRule(key: string) {
+    openRules[key] = !openRules[key];
+    openRules = openRules;
+  }
+
+  function toggleSection(key: string) {
+    openSections[key] = !openSections[key];
+    openSections = openSections;
+  }
+
+  // ── Reactive derivations ────────────────────────────────────────────────
+
+  $: summary = result?.rule_compliance_summary || {};
+  $: passRate = summary.pass_rate !== undefined ? Number(summary.pass_rate) : null;
+  $: durationSeconds = summary.duration_seconds;
+  $: uniqueElements = summary.unique_elements_evaluated || 0;
+  $: rulesWithElements = summary.rules_with_elements || 0;
+  $: totalRules = summary.total_rules || 0;
+  $: buildingSummary = result?.building_summary;
+  $: folderNote = result?.rule_folder ? ` · ${result.rule_folder}` : (selectedFolder ? ` · ${selectedFolder}` : '');
+</script>
+
+<div class="space-y-5 max-w-7xl mx-auto">
+  <!-- ═══ Header ═══ -->
+  <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+    <div>
+      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Analysis</div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+        {#if result}
+          {result.project_name} — ARCH Analysis{folderNote}
+        {:else}
+          Architectural Compliance Audit
+        {/if}
+      </h1>
+      <p class="text-xs sm:text-sm text-slate-400 mt-1">
+        Domain-based compliance check against Ontario Building Code Part 9.
+      </p>
+
+      <!-- Pass rate pill + coverage evidence -->
+      {#if result && totalRules > 0}
+        <div class="flex flex-wrap items-center gap-3 mt-3">
+          {#if passRate !== null}
+            <span
+              class="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wide border {passRate >= 80
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                : passRate >= 50
+                  ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                  : 'bg-rose-950/80 text-rose-300 border-rose-800'}"
+            >
+              {passRate.toFixed(0)}% pass rate
+            </span>
+          {/if}
+          {#if durationSeconds !== undefined && durationSeconds !== null}
+            <span class="inline-flex items-center gap-1 text-xs text-slate-400 font-mono">
+              <Timer class="w-3.5 h-3.5 text-blue-400" />
+              ⏱ {formatDuration(durationSeconds)}
+            </span>
+          {/if}
+          {#if uniqueElements > 0}
+            <span class="text-xs text-slate-400">
+              🔍 <strong class="text-slate-300">{uniqueElements}</strong> element(s) checked across
+              <strong class="text-slate-300">{rulesWithElements}</strong> applicable rule(s) — every match evaluated, no sampling
+            </span>
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    <!-- Project selector & Run button -->
+    <div class="flex items-center gap-2.5 flex-wrap shrink-0">
+      <select
+        bind:value={selectedProjectId}
+        on:change={() => handleProjectChange()}
         class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
       >
         {#each projects as project}
@@ -292,18 +587,105 @@
 
       <button
         type="button"
-        disabled={isRunning || !selectedProjectId}
-        on:click={runCheck}
+        disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
+        on:click={handleRunClick}
         class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
       >
         <Play class="w-3.5 h-3.5" />
-        {isRunning ? 'Auditing…' : 'Run ARCH Audit'}
+        {isRunning ? 'Auditing…' : isCheckingEnhancement ? 'Checking model…' : 'Run ARCH Audit'}
       </button>
     </div>
   </div>
 
   {#if error}
     <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">{error}</div>
+  {/if}
+
+  {#if bcfSaveMessage}
+    <div class="p-3.5 rounded-xl flex items-center gap-2 text-xs
+      {bcfSaveType === 'success'
+        ? 'bg-emerald-950/40 border border-emerald-800 text-emerald-300'
+        : 'bg-rose-950/40 border border-rose-800 text-rose-300'}">
+      <CheckCircle2 class="w-4 h-4 shrink-0 {bcfSaveType === 'success' ? 'text-emerald-400' : 'text-rose-400'}" />
+      <span>{bcfSaveMessage}</span>
+      {#if result?.bcf_artifact_id}
+        <a
+          href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
+          download
+          class="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-700 transition-colors"
+        >
+          <Download class="w-3 h-3" />
+          Download BCF
+        </a>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- ═══ Ruleset Folder Selector ═══ -->
+  {#if hasEnhancedModel && !isCheckingEnhancement && selectedProjectId}
+    <div class="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div class="flex items-center gap-2 shrink-0">
+        <FolderOpen class="w-4 h-4 text-blue-400" />
+        <span class="text-xs font-semibold text-slate-300">Ruleset</span>
+      </div>
+      <div class="flex flex-wrap gap-2 flex-1">
+        <!-- "All" option -->
+        <button
+          type="button"
+          on:click={() => (selectedFolder = '')}
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all border
+            {selectedFolder === ''
+              ? 'bg-[#0071e3] border-blue-500 text-white shadow-sm shadow-blue-500/20'
+              : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'}"
+        >
+          All Rules
+        </button>
+        {#if isFoldersLoading}
+          <span class="text-xs text-slate-500 italic px-2 py-1.5">Loading folders…</span>
+        {:else}
+          {#each ruleFolders as folder}
+            <button
+              type="button"
+              on:click={() => (selectedFolder = folder.ruleset_id)}
+              class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all border
+                {selectedFolder === folder.ruleset_id
+                  ? 'bg-[#0071e3] border-blue-500 text-white shadow-sm shadow-blue-500/20'
+                  : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'}"
+              title={folder.description || folder.display_name}
+            >
+              {folder.display_name}
+            </button>
+          {/each}
+        {/if}
+      </div>
+      {#if selectedFolder}
+        <span class="text-[10px] text-slate-500 shrink-0">Selected: <span class="text-slate-300 font-mono">{selectedFolder}</span></span>
+      {/if}
+    </div>
+  {/if}
+
+  {#if hasEnhancedModel === false && !isCheckingEnhancement}
+    <!-- No enhanced model warning banner -->
+    <div class="p-4 rounded-2xl bg-purple-950/40 border border-purple-800/60 flex items-start gap-3">
+      <div class="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+        <Sparkles class="w-4 h-4" />
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-purple-200">Enhanced model required</p>
+        <p class="text-xs text-purple-400 mt-0.5">
+          ARCH analysis runs on an enhanced/improved model. This project doesn't have one yet.
+          Generate an improved model version to unlock the full compliance audit.
+        </p>
+      </div>
+      <button
+        type="button"
+        on:click={() => (showEnhancementsModal = true)}
+        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-all hover:scale-[1.02] shrink-0"
+      >
+        <Sparkles class="w-3.5 h-3.5" />
+        Run Improvements
+      </button>
+    </div>
   {/if}
 
   {#if result}
@@ -871,4 +1253,12 @@
       Select a project and click "Run ARCH Audit" to inspect building code compliance.
     </div>
   {/if}
+
 </div>
+
+<!-- Quality Improvements modal (shown when no enhanced model exists) -->
+<ProjectEnhancementsModal
+  isOpen={showEnhancementsModal}
+  project={selectedProject}
+  onClose={handleEnhancementsModalClose}
+/>
