@@ -235,7 +235,24 @@ def setup_routes(rt):
         # Session A stored the object; the project row still has to point at it
         # for the analysis routes to find it. The SHA-256 stays in
         # uploaded_files — projects has no column for it.
-        _projects_service.attach_ifc(project_id, response.ref.storage_ref)
+        #
+        # Storage failures already arrive as response.success False (the
+        # service turns them into a value), but this write does not go through
+        # it. An unreachable database here would otherwise raise straight out
+        # of the handler and answer a 500 error page, losing both the reason
+        # and the fact that the object *was* stored.
+        try:
+            _projects_service.attach_ifc(project_id, response.ref.storage_ref)
+        except Exception as exc:
+            logger.exception(
+                "IFC stored but not attached project_id=%d ref=%s",
+                project_id,
+                response.ref.storage_ref,
+            )
+            return _error(
+                f"{response.ref.filename} was stored, but the project could not be "
+                f"pointed at it: {exc}. The file is not lost — re-upload to retry."
+            )
 
         note = (
             ""

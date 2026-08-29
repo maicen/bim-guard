@@ -595,7 +595,12 @@ class ProjectSetupWizard:
             *hidden_fields,
             Div(*footer_buttons, cls="wiz-foot"),
             method="POST",
+            # enctype covers a native (non-HTMX) submit; htmx ignores it and
+            # uses its own encoding, which is urlencoded unless hx-encoding
+            # says otherwise. Without the second attribute the file input on
+            # step 4 is silently dropped from every htmx-driven submit.
             enctype="multipart/form-data",
+            hx_encoding="multipart/form-data",
             hx_post="/wizard",
             hx_target="#wizard",
             hx_swap="outerHTML"
