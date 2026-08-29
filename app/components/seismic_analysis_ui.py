@@ -1,4 +1,4 @@
-"""Form and page for the Seismic (Blue Halo) bracing analysis.
+﻿"""Form and page for the Seismic (Blue Halo) bracing analysis.
 
     GET /analysis/seismic/{project_id}
 
@@ -369,6 +369,40 @@ def seismic_analysis_form(project_id: int, projects: list[dict]) -> Div:
     )
 
 
+def seismic_analysis_landing():
+    """Render ``GET /analysis/seismic`` -- the form with no project chosen yet.
+
+    The sidebar entry has to lead somewhere that does not already know a project,
+    which is what :func:`seismic_analysis_page` requires. Rather than invent a
+    second form, this renders the same one with ``project_id=0``, the value
+    :func:`seismic_analysis_form` already documents as "leaves the picker empty".
+
+    Returns:
+        The ``(Title, *assets, DashboardLayout)`` tuple the route returns.
+    """
+    projects = _projects_service.list_projects()
+    logger.info("Seismic analysis landing rendered projects=%d", len(projects))
+    return (
+        Title("Seismic Analysis - BIM Guard"),
+        *seismic_analysis_assets(),
+        DashboardLayout(
+            Div(
+                Div(
+                    P("Analysis", cls="pp-eyebrow"),
+                    P("Seismic (Blue Halo)", cls="pp-title"),
+                    P(
+                        "Bracing clearance and restraint checks. Pick a model to begin.",
+                        cls="pp-lead",
+                    ),
+                    style="margin-bottom:16px",
+                ),
+                seismic_analysis_form(0, projects),
+                cls="pp-scope",
+            )
+        ),
+    )
+
+
 def seismic_analysis_page(project_id: int):
     """Render ``GET /analysis/seismic/{project_id}``.
 
@@ -414,3 +448,4 @@ def seismic_analysis_page(project_id: int):
             )
         ),
     )
+

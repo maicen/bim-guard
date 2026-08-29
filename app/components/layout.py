@@ -31,6 +31,7 @@ NAV_ICONS = {
     "Viewer": "scan-eye",
     "ARCH": "layout-list",
     "MEP": "cpu",
+    "SEISMIC": "activity",
     "Reports": "file-text",
     "Documents": "book-open",
     "Rule Extraction Studio": "list-checks",
@@ -71,6 +72,7 @@ _NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         (
             ("ARCH", "/analysis/ARCH"),
             ("MEP", "/analysis/MEP"),
+            ("SEISMIC", "/analysis/seismic"),
             ("Reports", "/reports"),
         ),
     ),

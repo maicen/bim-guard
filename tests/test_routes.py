@@ -90,6 +90,7 @@ PAGE_ROUTES = [
     "/reports",
     "/settings",
     "/viewer",
+    "/analysis/seismic",
     "/revit-sync",
     "/modeling-manual",
 ]
@@ -314,3 +315,18 @@ def test_sidebar_leads_with_project_setup() -> None:
         "Archive",
         "Viewer",
     ]
+
+
+def test_sidebar_offers_every_analysis(client: TestClient) -> None:
+    """SEISMIC sits between MEP and Reports, and its target actually resolves.
+
+    The entry was missing entirely, which made the seismic page look like it
+    was labelled MEP: the sidebar offered no link matching the page you were on.
+    """
+    from app.components.layout import _NAV_SECTIONS
+
+    analysis = dict(_NAV_SECTIONS)["Analysis"]
+
+    assert [title for title, _ in analysis] == ["ARCH", "MEP", "SEISMIC", "Reports"]
+    assert dict(analysis)["SEISMIC"] == "/analysis/seismic"
+    assert client.get("/analysis/seismic").status_code == 200

@@ -34,7 +34,10 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from starlette.responses import Response as StarletteResponse
 
-from app.components.seismic_analysis_ui import seismic_analysis_page
+from app.components.seismic_analysis_ui import (
+    seismic_analysis_landing,
+    seismic_analysis_page,
+)
 from app.logging_config import get_logger
 from app.services.analysis_runner import run_analysis
 from app.services.projects_service import ProjectsService
@@ -115,6 +118,13 @@ def _run_seismic_background(project_id: int, clearance_mm: float | None, codes: 
 
 def setup_routes(rt):
     """Register the Seismic (Blue Halo) form and run endpoints."""
+
+    # Registered before the {project_id} route so the literal path wins; the
+    # sidebar links here, where no project has been chosen yet.
+    @rt("/analysis/seismic", methods=["GET"])
+    def seismic_analysis_index():
+        """Render the run form with an empty project picker."""
+        return seismic_analysis_landing()
 
     # GET only: a bare @rt() also binds POST on the same path, which is not
     # where the run is posted.
