@@ -281,7 +281,9 @@ def run_arch_analysis(
         )
 
     categories = result.get("categories", {})
-    issues = result.get("issues", [])
+    # The orchestrator returns findings under "audit_issues"; there is no
+    # "issues" key, so the old read made every project report zero.
+    issues = result.get("audit_issues", [])
     project = result.get("project", {})
     rule_compliance_summary = result.get("rule_compliance_summary", {})
     bcf_topics = result.get("bcf_topics", [])
