@@ -294,15 +294,35 @@ def _get_storey_name(space) -> str | None:
     return None
 
 
-def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
+def check_daylight_ratios(
+    adjacency: IFCSpatialAdjacency,
+    min_ratio: float | None = None,
+) -> list[dict]:
     """
-    Evaluate daylight ratio: every habitable room should have window area >= 1/10 floor area.
+    Evaluate daylight ratio: every habitable room should have window area >= min_ratio floor area.
 
     Returns one result dict per IfcSpace that has floor area data.
     Spaces with no floor area are skipped (cannot evaluate).
     """
     if not adjacency.has_boundaries:
         return []
+
+    if min_ratio is None:
+        try:
+            from app.services.rules_service import RuleService
+
+            for r in RuleService().list_by_ruleset("BUILDING-CODE-PART9"):
+                ref = str(r.get("reference") or "")
+                prop = str(r.get("property_name") or "")
+                unit = str(r.get("unit") or "").lower()
+                if "9.7.2.3" in ref or prop == "DaylightRatio" or (unit == "ratio" and "9.7.2" in ref):
+                    val = r.get("check_value")
+                    if val is not None and 0.0 < float(val) <= 1.0:
+                        min_ratio = float(val)
+                        break
+        except Exception:
+            pass
+    required_ratio = min_ratio if min_ratio is not None else 0.10
 
     results = []
 
@@ -336,7 +356,7 @@ def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
                 window_details.append({"name": win_name, "area_m2": round(area, 4)})
 
         ratio = total_window_area / floor_area if floor_area else 0.0
-        passes = ratio >= 0.10
+        passes = ratio >= required_ratio
 
         results.append(
             {
@@ -348,7 +368,7 @@ def check_daylight_ratios(adjacency: IFCSpatialAdjacency) -> list[dict]:
                 "floor_area_m2": round(floor_area, 3),
                 "total_window_area_m2": round(total_window_area, 3),
                 "daylight_ratio": round(ratio, 4),
-                "required_ratio": 0.10,
+                "required_ratio": required_ratio,
                 "passes": passes,
                 "window_count": len(windows),
                 "windows": window_details,
@@ -363,7 +383,7 @@ _GARAGE_KW = frozenset(["garage", "carport", "car port", "parking", "vehicle"])
 
 
 def _is_garage_space(space) -> bool:
-    """Return True when the space name suggests it is a garage or carport."""
+    """Check whether an IfcSpace represents a garage/carport by name."""
     name = (
         getattr(space, "LongName", None)
         or getattr(space, "Name", None)
@@ -372,15 +392,32 @@ def _is_garage_space(space) -> bool:
     return any(kw in name for kw in _GARAGE_KW)
 
 
-def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
+def check_fire_separation(
+    adjacency: IFCSpatialAdjacency,
+    min_rating_min: float | None = None,
+) -> list[dict]:
     """
-    Evaluate party-wall fire separation (default threshold: FireRating >= 45 min).
+    Evaluate party-wall fire separation (default threshold: FireRating >= min_rating_min min).
 
     Returns one result dict per party wall found.
     Walls with no FireRating declared are flagged as missing data.
     """
     if not adjacency.has_boundaries:
         return []
+
+    if min_rating_min is None:
+        try:
+            from app.services.rules_service import RuleService
+
+            for r in RuleService().list_by_ruleset("BUILDING-CODE-PART9"):
+                if "9.10.9" in str(r.get("reference") or "") and str(r.get("target_ifc_class") or "") == "IfcWall":
+                    val = r.get("check_value")
+                    if val is not None and float(val) > 1.0:
+                        min_rating_min = float(val)
+                        break
+        except Exception:
+            pass
+    required_min = min_rating_min if min_rating_min is not None else 45.0
 
     results = []
 
@@ -418,7 +455,7 @@ def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
                 space_names.append(name)
 
         missing_rating = raw_rating is None
-        passes = not missing_rating and numeric_rating is not None and numeric_rating >= 45
+        passes = not missing_rating and numeric_rating is not None and numeric_rating >= required_min
 
         results.append(
             {
@@ -429,7 +466,7 @@ def check_fire_separation(adjacency: IFCSpatialAdjacency) -> list[dict]:
                 "adjacent_spaces": space_names,
                 "fire_rating_raw": raw_rating,
                 "fire_rating_min": numeric_rating,
-                "required_min": 45,
+                "required_min": required_min,
                 "passes": passes,
                 "missing_rating": missing_rating,
                 "severity": "mandatory",

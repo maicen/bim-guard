@@ -30,8 +30,9 @@ import uuid
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Optional
+from typing import Any, Optional
 
+from app.modules.contracts import RuleEvaluationResult
 from app.services.corrosion_rule_catalog import load_gc_catalog
 from app.services.pipeline_tracker import GC_ENGINE, Stage, emit, increment
 from app.services.pipeline_tracker import fail as track_failure
@@ -477,6 +478,82 @@ def assess_galvanic_risk(element: GCElement) -> GCResult:
         bcf_priority=bcf_priority,
         mitigations=mitigations,
     )
+
+
+class GalvanicCorrosionEngine:
+    """GC-001 Galvanic Corrosion evaluator implementing the RuleEvaluator protocol directly."""
+
+    rule_type: str = "GC-001"
+
+    @staticmethod
+    def coerce_element(element: Any) -> GCElement:
+        """Normalise an arbitrary IFC or dictionary element into GCElement."""
+        if isinstance(element, GCElement):
+            return element
+        info = getattr(element, "get_info", lambda: {})()
+        if not isinstance(info, dict):
+            info = {}
+        material = (
+            info.get("material")
+            or getattr(element, "material", "")
+            or getattr(element, "Material", "")
+            or (element.get("material") if isinstance(element, dict) else "")
+            or "carbon_steel"
+        )
+        paired_material = (
+            info.get("paired_material")
+            or getattr(element, "paired_material", "")
+            or (element.get("paired_material") if isinstance(element, dict) else "")
+            or material
+        )
+        guid = (
+            getattr(element, "GlobalId", None)
+            or getattr(element, "global_id", None)
+            or (element.get("guid") if isinstance(element, dict) else None)
+            or "anode"
+        )
+        return GCElement(
+            global_id_anode=str(guid),
+            global_id_cathode=str(guid),
+            material_anode=str(material),
+            material_cathode=str(paired_material),
+            anode_area_m2=float(info.get("anode_area_m2", 1.0) or 1.0),
+            cathode_area_m2=float(info.get("cathode_area_m2", 1.0) or 1.0),
+            zone_category=str(info.get("zone_category") or getattr(element, "zone_category", "") or ""),
+            floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
+            system_type=str(info.get("system_type") or getattr(element, "system_type", "Unknown") or "Unknown"),
+        )
+
+    def evaluate(
+        self,
+        element: Any,
+        *,
+        context: Any = None,
+    ) -> RuleEvaluationResult:
+        """Assess galvanic corrosion risk directly adhering to RuleEvaluator protocol."""
+        gc_element = self.coerce_element(element)
+        result = assess_galvanic_risk(gc_element)
+        return RuleEvaluationResult(
+            rule_type=self.rule_type,
+            band=result.risk_band,
+            score=result.composite_score,
+            element_id=result.global_id_anode,
+            details={
+                "voltage_gap_V": result.voltage_gap_v,
+                "voltage_threshold": result.env_threshold_v,
+                "area_ratio": result.area_ratio,
+                "environment_class": result.environment_class,
+                "pren_adequate": result.pren_adequate,
+                "material_anode": result.material_anode_label,
+                "material_cathode": result.material_cathode_label,
+                "crevice_geometry": "",
+                "risk_band": result.risk_band,
+            },
+            status="FAIL" if result.risk_band in ("High", "Critical") else "PASS",
+            mitigation="; ".join(result.mitigations) if result.mitigations else None,
+            action=result.bcf_priority,
+            raw_result=result,
+        )
 
 
 def assess_galvanic_batch(elements: list) -> list:

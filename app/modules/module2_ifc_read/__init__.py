@@ -1746,10 +1746,6 @@ class Module2_IFCRead:
                 "fire separation checks."
             )
 
-        daylight = check_daylight_ratios(adj)
-        fire_sep = check_fire_separation(adj)
-        garage_sep = check_garage_separation(adj)
-        space_connection = check_door_space_connection(adj, self.ifc_file)
         rule_ctx = self._get_code_warning_context()
 
         daylight_ref = str(rule_ctx.get("daylight_ref") or "applicable code rule")
@@ -1770,6 +1766,11 @@ class Module2_IFCRead:
             else str(fire_min or 45)
         )
         fire_unit = str(rule_ctx.get("fire_unit") or "min")
+
+        daylight = check_daylight_ratios(adj, min_ratio=daylight_ratio)
+        fire_sep = check_fire_separation(adj, min_rating_min=fire_min)
+        garage_sep = check_garage_separation(adj)
+        space_connection = check_door_space_connection(adj, self.ifc_file)
 
         daylight_fails = sum(1 for r in daylight if not r["passes"])
         fire_fails = sum(1 for r in fire_sep if not r["passes"])
@@ -1842,7 +1843,9 @@ class Module2_IFCRead:
         # Travel distance requires boundary data + egress graph
         has_graph = self.egress_graph is not None and self.egress_graph.graph is not None
         if has_graph and _EGRESS_AVAILABLE:
-            travel_distance = check_egress_travel_distance(self.egress_graph)
+            travel_distance = check_egress_travel_distance(
+                self.egress_graph, max_distance_m=travel_max
+            )
             if not self.egress_graph._exit_spaces:
                 warnings.append(
                     "No exits identified in the space graph (no exterior doors linked to spaces). "

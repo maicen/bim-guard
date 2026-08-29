@@ -17,12 +17,29 @@ logger = get_logger(__name__)
 class ObjectStorage:
     """Persist and retrieve binary artifacts using a selectable backend."""
 
-    def __init__(self) -> None:
-        """Initialize storage settings from environment variables."""
-        self._bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "bim-guard-artifacts").strip()
-        self._prefix = os.getenv("SUPABASE_STORAGE_PREFIX", "").strip("/")
-        self._cache_dir = Path("data/cache/supabase-storage")
-        self._client: Client | None = None
+    def __init__(
+        self,
+        *,
+        client: Client | None = None,
+        bucket: str | None = None,
+        prefix: str | None = None,
+        cache_dir: Path | None = None,
+    ) -> None:
+        """Initialize storage settings with optional dependency injection."""
+        self._bucket = (
+            bucket
+            if bucket is not None
+            else os.getenv("SUPABASE_STORAGE_BUCKET", "bim-guard-artifacts").strip()
+        )
+        self._prefix = (
+            prefix.strip("/")
+            if prefix is not None
+            else os.getenv("SUPABASE_STORAGE_PREFIX", "").strip("/")
+        )
+        self._cache_dir = (
+            cache_dir if cache_dir is not None else Path("data/cache/supabase-storage")
+        )
+        self._client = client
 
     def save_upload(self, filename: str, content: bytes, subdir: str) -> str:
         """Save uploaded content and return a persistent storage reference."""

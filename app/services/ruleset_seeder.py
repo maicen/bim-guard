@@ -52,6 +52,81 @@ def _seed_json_ruleset(svc: RuleService, filename: str) -> int:
     return svc.import_ruleset(payload)
 
 
+def seed_architectural_code_rules(svc: RuleService) -> int:
+    """Ensure hardcoded architectural egress, exit, daylight, and fire separation rules exist in DB."""
+    count = 0
+    rules_to_seed = [
+        {
+            "reference": "CODE 9.9.10.1",
+            "rule_type": "egress_path",
+            "rule_category": "circulation",
+            "description": "Maximum egress travel distance from habitable room to exit — 25.0 m",
+            "target_ifc_class": "IfcSpace",
+            "property_name": "TravelDistance",
+            "operator": "<=",
+            "check_value": 25.0,
+            "unit": "m",
+            "ruleset_id": "BUILDING-CODE-PART9",
+            "mechanism": "CODE",
+            "severity": "mandatory",
+        },
+        {
+            "reference": "CODE 9.9.4.1",
+            "rule_type": "numeric_comparison",
+            "rule_category": "circulation",
+            "description": "Minimum number of exterior exits per building storey — 1",
+            "target_ifc_class": "IfcBuildingStorey",
+            "property_name": "ExitCount",
+            "operator": ">=",
+            "check_value": 1.0,
+            "unit": "count",
+            "ruleset_id": "BUILDING-CODE-PART9",
+            "mechanism": "CODE",
+            "severity": "mandatory",
+        },
+        {
+            "reference": "CODE 9.7.2.3",
+            "rule_type": "spatial_adjacency",
+            "rule_category": "daylight",
+            "description": "Minimum window glazing area to floor area ratio for habitable spaces — 1/10 (0.10)",
+            "target_ifc_class": "IfcSpace",
+            "property_name": "DaylightRatio",
+            "operator": ">=",
+            "check_value": 0.10,
+            "unit": "ratio",
+            "ruleset_id": "BUILDING-CODE-PART9",
+            "mechanism": "CODE",
+            "severity": "mandatory",
+        },
+        {
+            "reference": "CODE 9.10.9.14.PW",
+            "rule_type": "spatial_adjacency",
+            "rule_category": "fire_safety",
+            "description": "Fire-rated wall between dwelling units (party wall) — minimum 45-minute fire resistance",
+            "target_ifc_class": "IfcWall",
+            "property_name": "FireRating",
+            "operator": ">=",
+            "check_value": 45.0,
+            "unit": "min",
+            "ruleset_id": "BUILDING-CODE-PART9",
+            "mechanism": "CODE",
+            "severity": "mandatory",
+        },
+    ]
+
+    existing_refs = {
+        str(r.get("reference") or "")
+        for r in svc.list_rules()
+    }
+
+    for item in rules_to_seed:
+        if item["reference"] not in existing_refs:
+            _create(svc, **item)
+            count += 1
+
+    return count
+
+
 def seed_default_code_rulesets(svc: RuleService) -> dict[str, int]:
     """Seed baseline/extended building-code rulesets from JSON files."""
     seeded: dict[str, int] = {}
@@ -59,6 +134,7 @@ def seed_default_code_rulesets(svc: RuleService) -> dict[str, int]:
         payload = _load(filename)
         ruleset_id = str(payload.get("ruleset_id") or "").strip() or filename
         seeded[ruleset_id] = _seed_json_ruleset(svc, filename)
+    seed_architectural_code_rules(svc)
     return seeded
 
 
@@ -450,7 +526,7 @@ def _seed_mc001(svc: RuleService) -> int:
 
 def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
     """
-    Seed GC-001, CC-001, and MC-001 from their JSON files.
+    Seed GC-001, CC-001, MC-001, and architectural code rules.
 
     Idempotent: skips any ruleset already present in the DB.
     Returns a dict of {ruleset_id: rows_inserted}.
@@ -459,7 +535,13 @@ def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
         gc = _seed_gc001(svc)
         cc = _seed_cc001(svc)
         mc = _seed_mc001(svc)
-        return {"BIMGUARD-GC-001": gc, "BIMGUARD-CC-001": cc, "BIMGUARD-MC-001": mc}
+        arch = seed_architectural_code_rules(svc)
+        return {
+            "BIMGUARD-GC-001": gc,
+            "BIMGUARD-CC-001": cc,
+            "BIMGUARD-MC-001": mc,
+            "BUILDING-CODE-PART9-ARCH": arch,
+        }
     except Exception as exc:
         print(f"[RulesetSeeder] Warning: {exc}")
         return {}

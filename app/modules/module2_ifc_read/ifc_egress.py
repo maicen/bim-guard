@@ -270,7 +270,7 @@ class IFCEgressGraph:
 
 # ── Check 1: exit count ────────────────────────────────────────────────────────
 
-def check_exit_count(ifc_file) -> dict:
+def check_exit_count(ifc_file, min_exits: int | None = None) -> dict:
     """
     Count exterior doors per storey and flag floors with zero exits.
 
@@ -280,10 +280,24 @@ def check_exit_count(ifc_file) -> dict:
         {
           total_exterior_doors : int,
           exits_per_storey     : {storey_name: count},
-                    results              : [{storey, count, passes, code_ref}],
+          results              : [{storey, count, passes, code_ref}],
           warnings             : [str],
         }
     """
+    if min_exits is None:
+        try:
+            from app.services.rules_service import RuleService
+
+            for r in RuleService().list_by_ruleset("BUILDING-CODE-PART9"):
+                if "9.9.4.1" in str(r.get("reference") or ""):
+                    val = r.get("check_value")
+                    if val is not None:
+                        min_exits = int(float(val))
+                        break
+        except Exception:
+            pass
+    required_min = min_exits if min_exits is not None else CODE_MIN_EXITS_PER_FLOOR
+
     if ifc_file is None:
         return {
             "total_exterior_doors": 0,
@@ -309,12 +323,12 @@ def check_exit_count(ifc_file) -> dict:
 
     results = []
     for storey, count in sorted(exits_per_storey.items()):
-        passes = count >= CODE_MIN_EXITS_PER_FLOOR
+        passes = count >= required_min
         results.append({
             "code_ref": "CODE 9.9.4.1",
             "storey": storey,
             "exit_count": count,
-            "required_min": CODE_MIN_EXITS_PER_FLOOR,
+            "required_min": required_min,
             "passes": passes,
         })
 
@@ -334,7 +348,10 @@ def check_exit_count(ifc_file) -> dict:
 
 # ── Check 2: egress travel distance ───────────────────────────────────────────
 
-def check_egress_travel_distance(egress_graph: IFCEgressGraph) -> list[dict]:
+def check_egress_travel_distance(
+    egress_graph: IFCEgressGraph,
+    max_distance_m: float | None = None,
+) -> list[dict]:
     """
     Check travel distance from any habitable room to the nearest exit.
 
@@ -344,6 +361,20 @@ def check_egress_travel_distance(egress_graph: IFCEgressGraph) -> list[dict]:
     """
     if not _NX_AVAILABLE:
         return []
+
+    if max_distance_m is None:
+        try:
+            from app.services.rules_service import RuleService
+
+            for r in RuleService().list_by_ruleset("BUILDING-CODE-PART9"):
+                if "9.9.10.1" in str(r.get("reference") or ""):
+                    val = r.get("check_value")
+                    if val is not None:
+                        max_distance_m = float(val)
+                        break
+        except Exception:
+            pass
+    required_max_m = max_distance_m if max_distance_m is not None else CODE_MAX_TRAVEL_DISTANCE_M
 
     G = egress_graph.graph
     if G is None or G.number_of_nodes() == 0:
@@ -390,13 +421,13 @@ def check_egress_travel_distance(egress_graph: IFCEgressGraph) -> list[dict]:
                 "storey_name": storey,
                 "travel_distance_m": None,
                 "nearest_exit": None,
-                "required_max_m": CODE_MAX_TRAVEL_DISTANCE_M,
+                "required_max_m": required_max_m,
                 "passes": False,
                 "no_path": True,
                 "severity": "mandatory",
             })
         else:
-            passes = best_dist <= CODE_MAX_TRAVEL_DISTANCE_M
+            passes = best_dist <= required_max_m
             results.append({
                 "check": "egress_travel_distance",
                 "code_ref": "CODE 9.9.10.1",
@@ -405,7 +436,7 @@ def check_egress_travel_distance(egress_graph: IFCEgressGraph) -> list[dict]:
                 "storey_name": storey,
                 "travel_distance_m": round(best_dist, 1),
                 "nearest_exit": best_exit_name,
-                "required_max_m": CODE_MAX_TRAVEL_DISTANCE_M,
+                "required_max_m": required_max_m,
                 "passes": passes,
                 "no_path": False,
                 "severity": "mandatory",

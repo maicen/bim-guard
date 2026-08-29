@@ -11,19 +11,23 @@ logger = get_logger(__name__)
 class DocumentService:
     """Encapsulates CRUD and lookup operations for uploaded documents."""
 
-    def __init__(self):
-        """Initialize the documents table and Supabase Storage adapter."""
-        self._storage = ObjectStorage()
-        self._documents = PersistenceService.get_table(
-            "documents",
-            {
-                "id": int,
-                "md5_hash": str,
-                "filename": str,
-                "file_path": str,
-                "extracted_text": str,
-                "upload_date": str,
-            },
+    def __init__(self, *, documents_repo=None, storage=None):
+        """Initialize the documents table and storage adapter with dependency injection."""
+        self._storage = storage if storage is not None else ObjectStorage()
+        self._documents = (
+            documents_repo
+            if documents_repo is not None
+            else PersistenceService.get_table(
+                "documents",
+                {
+                    "id": int,
+                    "md5_hash": str,
+                    "filename": str,
+                    "file_path": str,
+                    "extracted_text": str,
+                    "upload_date": str,
+                },
+            )
         )
 
     def list_documents(self):

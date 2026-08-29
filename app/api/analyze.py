@@ -17,7 +17,11 @@ from fastapi import (
     status,
 )
 
-from app.api.dependencies import get_phase6_service, get_projects_service
+from app.api.dependencies import (
+    get_arch_analysis_service,
+    get_phase6_service,
+    get_projects_service,
+)
 from app.logging_config import get_logger
 from app.modules.contracts import (
     AnalysisResultContract,
@@ -32,6 +36,7 @@ from app.modules.contracts import (
 )
 from app.modules.phase_6.phase_6e_export import export
 from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
+from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_tracker import snapshot
 from app.services.projects_service import ProjectsService
@@ -264,65 +269,25 @@ def export_analysis_report(
 def run_arch_analysis(
     project_id: Annotated[int, Form(...)],
     rule_folder: Annotated[str, Form()] = "",
+    arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
 ) -> ArchAnalysisResponse:
     """Run Ontario Building Code Part 9 architectural checks (egress, daylight, fire separations, clearances)."""
-    from app.services.pipeline_services import PipelineOrchestratorService
-    from app.services.report_artifacts import ReportArtifactService
-
-    result = PipelineOrchestratorService.orchestrate_workflow(
-        project_id=project_id,
-        analysis_theme="Architecture",
-        rule_folder=rule_folder,
-    )
-    if "error" in result:
+    try:
+        return arch_service.run_analysis(project_id=project_id, rule_folder=rule_folder)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result["error"],
+            detail=str(exc),
         )
-
-    categories = result.get("categories", {})
-    issues = result.get("issues", [])
-    project = result.get("project", {})
-    rule_compliance_summary = result.get("rule_compliance_summary", {})
-    bcf_topics = result.get("bcf_topics", [])
-
-    report_svc = ReportArtifactService()
-    bcf_artifact_id = None
-    if bcf_topics:
-        try:
-            persisted = report_svc.persist_bcf(project_id, bcf_topics)
-            if persisted:
-                bcf_artifact_id = persisted.get("id")
-        except Exception:
-            logger.exception("BCF persistence failed project_id=%d", project_id)
-
-    if not bcf_artifact_id:
-        latest = report_svc.latest_bcf(project_id)
-        if latest:
-            bcf_artifact_id = latest.get("id")
-
-    return ArchAnalysisResponse(
-        project_id=project_id,
-        project_name=project.get("name", f"Project {project_id}"),
-        categories=categories,
-        total_issues=len(issues),
-        issues=issues,
-        summary=result.get("summary", {}),
-        rule_compliance_summary=rule_compliance_summary,
-        bcf_artifact_id=bcf_artifact_id,
-        building_summary=result.get("building_summary", {}),
-        spatial_checks=result.get("spatial_checks", {}),
-        egress_checks=result.get("egress_checks", {}) or {},
-        rule_compliance=result.get("rule_compliance", []),
-        rule_folder=result.get("rule_folder", ""),
-        ifc_element_count=result.get("ifc_element_count", 0),
-    )
 
 
 @router.get("/arch/{project_id}", response_model=ArchAnalysisResponse, summary="Get architectural compliance results")
-def get_arch_analysis(project_id: int) -> ArchAnalysisResponse:
+def get_arch_analysis(
+    project_id: int,
+    arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
+) -> ArchAnalysisResponse:
     """Retrieve architectural compliance findings for a project."""
-    return run_arch_analysis(project_id=project_id)
+    return run_arch_analysis(project_id=project_id, arch_service=arch_service)
 
 
 # ---------------------------------------------------------------------------

@@ -56,10 +56,10 @@ def _apply_persisted_log_level() -> None:
     ):
         return
     try:
+        from app.bootstrap import get_container
         from app.logging_config import set_log_level
-        from app.services.settings_service import SettingsService
 
-        level = SettingsService().get("BIM_GUARD_LOG_LEVEL", "")
+        level = get_container().settings_service.get("BIM_GUARD_LOG_LEVEL", "")
         if level:
             set_log_level(level)
     except Exception:
@@ -85,14 +85,18 @@ def _backfill_code_metadata(svc) -> None:
 
 
 def _seed_library() -> None:
-    """Populate the rule library with engine rulesets (corrosion mechanisms)."""
+    """Populate the rule library with engine rulesets (corrosion mechanisms and building code)."""
     try:
-        from app.services.rules_service import RuleService
-        from app.services.ruleset_seeder import seed_engine_rulesets
+        from app.bootstrap import get_container
+        from app.services.ruleset_seeder import (
+            seed_architectural_code_rules,
+            seed_engine_rulesets,
+        )
 
-        svc = RuleService()
+        svc = get_container().rules_service
         _backfill_code_metadata(svc)
         seed_engine_rulesets(svc)
+        seed_architectural_code_rules(svc)
     except Exception:
         logger.warning("Rule library seeding failed; continuing startup", exc_info=True)
 

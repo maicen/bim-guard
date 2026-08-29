@@ -11,21 +11,25 @@ from app.utils import now_iso_utc
 class SupabaseModelLineageRepository:
     """Append enhancement lineage records through the shared Supabase adapter."""
 
-    def __init__(self) -> None:
-        """Initialize the model enhancement lineage table adapter."""
-        self._lineage = PersistenceService.get_table(
-            "model_enhancement_lineage",
-            {
-                "id": int,
-                "project_id": int,
-                "source_reference": str,
-                "source_sha256": str,
-                "source_version": int,
-                "output_reference": str,
-                "version": int,
-                "summary": dict,
-                "created_at": str,
-            },
+    def __init__(self, *, lineage_repo=None) -> None:
+        """Initialize the model enhancement lineage table adapter with dependency injection."""
+        self._lineage = (
+            lineage_repo
+            if lineage_repo is not None
+            else PersistenceService.get_table(
+                "model_enhancement_lineage",
+                {
+                    "id": int,
+                    "project_id": int,
+                    "source_reference": str,
+                    "source_sha256": str,
+                    "source_version": int,
+                    "output_reference": str,
+                    "version": int,
+                    "summary": dict,
+                    "created_at": str,
+                },
+            )
         )
 
     def record(

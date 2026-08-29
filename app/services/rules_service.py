@@ -114,8 +114,14 @@ class RuleService:
     - Mitigation catalogue (mitigation)
     """
 
-    def __init__(self, *, db=None):
-        """Initialize the rules table with required schema columns.
+    def __init__(
+        self,
+        *,
+        rules_repo=None,
+        folders_repo=None,
+        db=None,
+    ):
+        """Initialize the rules table with required schema columns and dependency injection.
 
         db: optional isolated connection (from
         PersistenceService.get_isolated_sqlite_db()) — when given, this
@@ -123,24 +129,32 @@ class RuleService:
         database. Used for test isolation.
         """
         all_required = {**_RICH_COLUMNS, **_META_COLUMNS}
-        self._rules = PersistenceService.get_table(
-            "rules",
-            {
-                "id": int,
-                "reference": str,
-                "rule_type": str,
-                "description": str,
-                "target_ifc_class": str,
-                "parameters": str,  # kept for backward-compat / engine data
-                "created_at": str,
-                "updated_at": str,
-            },
-            required_columns=all_required,
-            db=db,
+        self._rules = (
+            rules_repo
+            if rules_repo is not None
+            else PersistenceService.get_table(
+                "rules",
+                {
+                    "id": int,
+                    "reference": str,
+                    "rule_type": str,
+                    "description": str,
+                    "target_ifc_class": str,
+                    "parameters": str,  # kept for backward-compat / engine data
+                    "created_at": str,
+                    "updated_at": str,
+                },
+                required_columns=all_required,
+                db=db,
+            )
         )
-        self._folders = PersistenceService.get_table(
-            "rule_folders",
-            _FOLDER_COLUMNS,
+        self._folders = (
+            folders_repo
+            if folders_repo is not None
+            else PersistenceService.get_table(
+                "rule_folders",
+                _FOLDER_COLUMNS,
+            )
         )
         self._folders_enabled = True
         self._sync_folders_from_rules()

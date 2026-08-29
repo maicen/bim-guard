@@ -30,8 +30,9 @@ import uuid
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Optional
+from typing import Any, Optional
 
+from app.modules.contracts import RuleEvaluationResult
 from app.services.corrosion_rule_catalog import load_cc_catalog
 from app.services.pipeline_tracker import CC_ENGINE, Stage, emit, increment
 from app.services.pipeline_tracker import fail as track_failure
@@ -482,6 +483,106 @@ def assess_crevice_risk(element: CCElement) -> CCResult:
         bcf_priority=bcf_priority,
         mitigations=mitigations,
     )
+
+
+class CreviceCorrosionEngine:
+    """CC-001 Crevice Corrosion evaluator implementing the RuleEvaluator protocol directly."""
+
+    rule_type: str = "CC-001"
+
+    @staticmethod
+    def coerce_element(element: Any) -> CCElement:
+        """Normalise an arbitrary IFC or dictionary element into CCElement."""
+        if isinstance(element, CCElement):
+            return element
+        info = getattr(element, "get_info", lambda: {})()
+        if not isinstance(info, dict):
+            info = {}
+        guid = (
+            getattr(element, "GlobalId", None)
+            or getattr(element, "global_id", None)
+            or (element.get("guid") if isinstance(element, dict) else None)
+            or ""
+        )
+        element_type = (
+            getattr(element, "is_a", lambda: getattr(element, "element_type", ""))()
+            or (element.get("element_type") if isinstance(element, dict) else None)
+            or "IfcPipeSegment"
+        )
+        material = (
+            info.get("material")
+            or getattr(element, "material", "")
+            or getattr(element, "Material", "")
+            or (element.get("material") if isinstance(element, dict) else "")
+            or "stainless_steel"
+        )
+        joint_description = (
+            info.get("joint_description")
+            or getattr(element, "joint_description", "")
+            or (element.get("joint_description") if isinstance(element, dict) else "")
+            or "tight"
+        )
+        operating_temp_c = float(
+            info.get("operating_temp_c")
+            or getattr(element, "operating_temp_c", 20.0)
+            or (element.get("operating_temp_c") if isinstance(element, dict) else 20.0)
+            or 20.0
+        )
+        zone_category = str(
+            info.get("zone_category")
+            or getattr(element, "zone_category", "")
+            or (element.get("zone_category") if isinstance(element, dict) else "")
+            or ""
+        )
+        system_type = str(
+            info.get("system_type")
+            or getattr(element, "system_type", "Unknown")
+            or (element.get("system_type") if isinstance(element, dict) else "Unknown")
+            or "Unknown"
+        )
+        floor = str(
+            info.get("floor")
+            or getattr(element, "floor", "Unknown")
+            or (element.get("floor") if isinstance(element, dict) else "Unknown")
+            or "Unknown"
+        )
+        return CCElement(
+            global_id=str(guid),
+            element_type=str(element_type),
+            material=str(material),
+            joint_description=str(joint_description),
+            operating_temp_c=operating_temp_c,
+            zone_category=zone_category,
+            system_type=system_type,
+            floor=floor,
+        )
+
+    def evaluate(
+        self,
+        element: Any,
+        *,
+        context: Any = None,
+    ) -> RuleEvaluationResult:
+        """Assess crevice corrosion risk directly adhering to RuleEvaluator protocol."""
+        cc_element = self.coerce_element(element)
+        result = assess_crevice_risk(cc_element)
+        return RuleEvaluationResult(
+            rule_type=self.rule_type,
+            band=result.risk_band,
+            score=result.composite_score,
+            element_id=result.global_id,
+            details={
+                "crevice_geometry": result.geometry_class,
+                "joint_type": result.joint_type_code,
+                "cct_adequate": result.cct_adequacy_score,
+                "environment_severity": result.environment_severity_key,
+                "risk_band": result.risk_band,
+            },
+            status="FAIL" if result.risk_band in ("High", "Critical") else "PASS",
+            mitigation="; ".join(result.mitigations) if result.mitigations else None,
+            action=result.bcf_priority,
+            raw_result=result,
+        )
 
 
 def assess_crevice_batch(elements: list) -> list:

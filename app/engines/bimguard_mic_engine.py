@@ -31,8 +31,9 @@ import uuid
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Optional
+from typing import Any, Optional
 
+from app.modules.contracts import RuleEvaluationResult
 from app.services.corrosion_rule_catalog import load_mc_catalog
 
 RULESET_VERSION = "BIMGUARD-MC-001 v1.0.0"
@@ -355,6 +356,121 @@ def assess_mic_risk(element: MICElement) -> MICResult:
         bcf_priority=bcf_priority,
         mitigations=mitigations,
     )
+
+
+class MICEngine:
+    """MC-001 Microbiologically Influenced Corrosion evaluator implementing RuleEvaluator directly."""
+
+    rule_type: str = "MC-001"
+
+    @staticmethod
+    def coerce_element(element: Any) -> MICElement:
+        """Normalise an arbitrary IFC or dictionary element into MICElement."""
+        if isinstance(element, MICElement):
+            return element
+        info = getattr(element, "get_info", lambda: {})()
+        if not isinstance(info, dict):
+            info = {}
+        guid = (
+            getattr(element, "GlobalId", None)
+            or getattr(element, "global_id", None)
+            or (element.get("guid") if isinstance(element, dict) else None)
+            or ""
+        )
+        element_type = (
+            getattr(element, "is_a", lambda: getattr(element, "element_type", ""))()
+            or (element.get("element_type") if isinstance(element, dict) else None)
+            or "IfcPipeSegment"
+        )
+        system_type = str(
+            info.get("system_type")
+            or getattr(element, "system_type", "Unknown")
+            or (element.get("system_type") if isinstance(element, dict) else "Unknown")
+            or "Unknown"
+        )
+        material = str(
+            info.get("material")
+            or getattr(element, "material", "")
+            or getattr(element, "Material", "")
+            or (element.get("material") if isinstance(element, dict) else "")
+            or "carbon_steel"
+        )
+        nominal_diameter_m = float(
+            info.get("nominal_diameter_m")
+            or getattr(element, "nominal_diameter_m", 0.1)
+            or (element.get("nominal_diameter_m") if isinstance(element, dict) else 0.1)
+            or 0.1
+        )
+        flow_velocity_ms = info.get("flow_velocity_ms", getattr(element, "flow_velocity_ms", None))
+        if flow_velocity_ms is None and isinstance(element, dict):
+            flow_velocity_ms = element.get("flow_velocity_ms")
+
+        operating_temp_c = info.get("operating_temp_c", getattr(element, "operating_temp_c", None))
+        if operating_temp_c is None and isinstance(element, dict):
+            operating_temp_c = element.get("operating_temp_c")
+
+        dead_leg_length_m = info.get("dead_leg_length_m", getattr(element, "dead_leg_length_m", None))
+        if dead_leg_length_m is None and isinstance(element, dict):
+            dead_leg_length_m = element.get("dead_leg_length_m")
+
+        insulation_condition = str(
+            info.get("insulation_condition")
+            or getattr(element, "insulation_condition", "unknown")
+            or (element.get("insulation_condition") if isinstance(element, dict) else "unknown")
+            or "unknown"
+        )
+        floor = str(
+            info.get("floor")
+            or getattr(element, "floor", "Unknown")
+            or (element.get("floor") if isinstance(element, dict) else "Unknown")
+            or "Unknown"
+        )
+        zone = str(
+            info.get("zone")
+            or getattr(element, "zone", "Unknown")
+            or (element.get("zone") if isinstance(element, dict) else "Unknown")
+            or "Unknown"
+        )
+        return MICElement(
+            global_id=str(guid),
+            element_type=str(element_type),
+            system_type=system_type,
+            material=material,
+            nominal_diameter_m=nominal_diameter_m,
+            flow_velocity_ms=float(flow_velocity_ms) if flow_velocity_ms is not None else None,
+            operating_temp_c=float(operating_temp_c) if operating_temp_c is not None else None,
+            dead_leg_length_m=float(dead_leg_length_m) if dead_leg_length_m is not None else None,
+            insulation_condition=insulation_condition,
+            floor=floor,
+            zone=zone,
+        )
+
+    def evaluate(
+        self,
+        element: Any,
+        *,
+        context: Any = None,
+    ) -> RuleEvaluationResult:
+        """Assess MIC risk directly adhering to RuleEvaluator protocol."""
+        mic_element = self.coerce_element(element)
+        result = assess_mic_risk(mic_element)
+        return RuleEvaluationResult(
+            rule_type=self.rule_type,
+            band=result.risk_band,
+            score=result.composite_score,
+            element_id=result.global_id,
+            details={
+                "flow_class": result.flow_velocity_class,
+                "temperature_class": result.temperature_class,
+                "dead_leg_class": result.dead_leg_class,
+                "material_susceptibility": result.material_susceptibility_score,
+                "risk_band": result.risk_band,
+            },
+            status="FAIL" if result.risk_band in ("High", "Critical") else "PASS",
+            mitigation="; ".join(result.mitigations) if result.mitigations else None,
+            action=result.bcf_priority,
+            raw_result=result,
+        )
 
 
 def assess_mic_batch(elements: list[MICElement]) -> list[MICResult]:

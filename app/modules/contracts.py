@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ElementDataContract(BaseModel):
@@ -486,6 +486,80 @@ class RevitSyncResponse(BaseModel):
     theme: str
     summary: dict[str, Any] = Field(default_factory=dict)
     results: list[RevitRuleResult] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Evaluator Domain Contracts (Dependency Inversion)
+# ---------------------------------------------------------------------------
+
+
+class RuleEvaluationRequest(BaseModel):
+    """Typed request payload for evaluating an element against a physics/compliance engine."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    rule_type: str = Field(..., description="Target rule code (e.g. GC-001, CC-001, MC-001)")
+    element: Any = Field(..., description="Target IFC element, element pair, or dictionary data")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Contextual evaluation metadata")
+
+
+class RuleEvaluationResult(BaseModel):
+    """Typed result payload produced by an engine implementing RuleEvaluator."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
+    rule_type: str = Field(..., description="Evaluated rule identifier")
+    band: Optional[str] = Field(None, description="Assessed risk band (Low, Medium, High, Critical)")
+    score: float = Field(0.0, description="Calculated composite risk score [0.0, 1.0]")
+    details: dict[str, Any] = Field(default_factory=dict, description="Mechanism-specific engineering metrics")
+    status: str = Field("PASS", description="Compliance status: PASS, FAIL, or NOT_ASSESSED")
+    element_id: Optional[str] = Field(None, description="GlobalId or identifier of the evaluated element")
+    mitigation: Optional[str] = Field(None, description="Remediation guidance")
+    action: Optional[str] = Field(None, description="Operational compliance action")
+    raw_result: Optional[Any] = Field(None, description="Underlying physics engine result dataclass instance")
+
+    def __getitem__(self, item: str) -> Any:
+        """Allow dictionary-style subscripting for backward compatibility."""
+        if hasattr(self, item):
+            return getattr(self, item)
+        if item in self.__dict__:
+            return self.__dict__[item]
+        raise KeyError(item)
+
+    def get(self, item: str, default: Any = None) -> Any:
+        """Allow dictionary-style .get() access for backward compatibility."""
+        if hasattr(self, item):
+            return getattr(self, item)
+        return self.__dict__.get(item, default)
+
+    def __contains__(self, item: object) -> bool:
+        """Support 'in' operator for backward compatibility."""
+        return isinstance(item, str) and (hasattr(self, item) or item in self.__dict__)
+
+    def keys(self):
+        """Return dictionary keys for dictionary-style unpacking and inspection."""
+        base_keys = {
+            "rule_type",
+            "band",
+            "score",
+            "details",
+            "status",
+            "element_id",
+            "mitigation",
+            "action",
+            "raw_result",
+        }
+        return base_keys.union(self.__dict__.keys())
+
+    def __eq__(self, other: object) -> bool:
+        """Support equality check against dictionaries for backward compatibility."""
+        if isinstance(other, dict):
+            return all(self.get(k) == v for k, v in other.items())
+        return super().__eq__(other)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize result to a standard dictionary."""
+        return self.model_dump()
 
 
 

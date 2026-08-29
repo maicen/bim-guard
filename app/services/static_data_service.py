@@ -35,10 +35,18 @@ _SETTINGS_SCHEMA = {
 class StaticDataService:
     """Persist static payloads and app settings inside the shared database."""
 
-    def __init__(self) -> None:
-        """Initialize storage tables used for static payload migration."""
-        self._assets = PersistenceService.get_table("static_data_assets", _STATIC_ASSET_SCHEMA)
-        self._settings = PersistenceService.get_table("app_settings", _SETTINGS_SCHEMA, pk="key")
+    def __init__(self, *, assets_repo=None, settings_repo=None) -> None:
+        """Initialize storage tables used for static payload migration with dependency injection."""
+        self._assets = (
+            assets_repo
+            if assets_repo is not None
+            else PersistenceService.get_table("static_data_assets", _STATIC_ASSET_SCHEMA)
+        )
+        self._settings = (
+            settings_repo
+            if settings_repo is not None
+            else PersistenceService.get_table("app_settings", _SETTINGS_SCHEMA, pk="key")
+        )
 
     @staticmethod
     def _json_text(payload: Any) -> str:

@@ -52,15 +52,29 @@ Completion evidence (2026-08-22):
 
 ## Priority 2: Dependency Inversion
 
-- [ ] Replace broad evaluator `Any`/`dict` contracts with typed request and result models.
-- [ ] Make each physics engine implement the evaluator interface directly instead of
-      relying on `CallableRuleEvaluator` adapters.
-- [ ] Keep custom Python evaluators limited to geometry, topology, proximity, and other
-      checks IDS cannot express.
+- [x] Replace broad evaluator `Any`/`dict` contracts with typed request and result models (`RuleEvaluationRequest`, `RuleEvaluationResult` in `app/modules/contracts.py`).
+- [x] Make each physics engine implement the evaluator interface directly instead of
+      relying on `CallableRuleEvaluator` adapters (`GalvanicCorrosionEngine`, `CreviceCorrosionEngine`, `MICEngine`).
+- [x] Keep custom Python evaluators limited to geometry, topology, proximity, and other
+      checks IDS cannot express. Documented in `docs/architecture.md`.
 - [x] Provide central dependency injection for FastAPI service layer in `app/api/dependencies.py`.
-- [ ] Inject project, document, rule, storage, and lineage repositories into services;
+- [x] Inject project, document, rule, storage, and lineage repositories into services;
       remove internal construction of Supabase adapters from business logic.
-- [ ] Move default engine/repository composition to an application bootstrap module.
+- [x] Move default engine/repository composition to an application bootstrap module (`app/bootstrap.py`).
+
+Completion evidence (2026-08-29):
+
+- Added strict Pydantic contracts `RuleEvaluationRequest` and `RuleEvaluationResult` to `app/modules/contracts.py` with dictionary-like mapping compatibility (`__getitem__`, `.get()`, `__contains__`, `__eq__`, `to_dict()`).
+- Implemented `RuleEvaluator` protocol directly across physics engines (`GalvanicCorrosionEngine`, `CreviceCorrosionEngine`, `MICEngine`) and architectural engines (`EgressAnalysisEngine`, `SpatialDaylightEngine` in `app/engines/bimguard_arch_engine.py`).
+- Seeded database-driven architectural code rules (`CODE 9.9.10.1`, `CODE 9.9.4.1`, `CODE 9.7.2.3`, `CODE 9.10.9.14.PW`) under `BUILDING-CODE-PART9`, parameterizing `ifc_egress.py` and `ifc_spatial.py` with dynamic threshold resolution.
+- Updated `register_default_engines()` in `app/modules/module4_comparator/engine_registry.py` to register all corrosion and architectural engine instances directly without `CallableRuleEvaluator` wrapping.
+- Refactored `ProjectsService`, `DocumentService`, `RuleService`, `SettingsService`, `StaticDataService`, `SupabaseModelLineageRepository`, and `ObjectStorage` to accept optional injected repositories and storage instances.
+- Created `ArchAnalysisService` with constructor dependency injection and wired it into `ApplicationContainer` and FastAPI dependency injection (`/api/analyze/arch`).
+- Created `app/bootstrap.py` with `ApplicationContainer`, `build_default_container()`, `get_container()`, `set_container()`, and `reset_container()` for single-point composition of persistence adapters, engines, and domain services.
+- Re-wired `app/api/dependencies.py` and `app/main.py` to resolve dependencies from the bootstrap container.
+- Added comprehensive unit test suites in `tests/test_dependency_inversion.py` (9 tests) and `tests/test_arch_engine_di.py` (6 tests) validating contracts, direct engine evaluation, repository injection, dynamic threshold overrides, and container composition.
+- All API and registry test suites passed (`tests/test_api_projects.py`, `tests/test_api_rules.py`, `tests/test_api_analyze.py`, `tests/test_api_events.py`, `tests/test_api_gateway.py`, `tests/test_rule_evaluator_contract.py`, `tests/test_rule_registry.py`).
+- Frontend production bundle built cleanly with zero errors (`npm run build`).
 
 ## Priority 3: Rules and IDS
 

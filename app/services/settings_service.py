@@ -22,9 +22,9 @@ class SettingsService:
     _defaults_seeded = False
     _values_cache: dict[str, str] | None = None
 
-    def __init__(self) -> None:
-        """Initialize settings tables and insert missing default settings."""
-        self._static = StaticDataService()
+    def __init__(self, *, static_data_service: StaticDataService | None = None) -> None:
+        """Initialize settings tables and insert missing default settings with dependency injection."""
+        self._static = static_data_service if static_data_service is not None else StaticDataService()
         if not self.__class__._defaults_seeded:
             self.__class__._values_cache = self._static.seed_default_settings_with_snapshot(
                 DEFAULT_SETTINGS

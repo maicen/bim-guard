@@ -31,55 +31,75 @@ def is_enhancement_authorized(token: str = "") -> bool:
 class ProjectsService:
     """Encapsulates projects persistence and IFC file operations."""
 
-    def __init__(self):
-        """Initialize project storage and ensure required table columns exist."""
-        self._storage = ObjectStorage()
-        self._lineage = SupabaseModelLineageRepository()
-        self._projects = PersistenceService.get_table(
-            "projects",
-            {
-                "id": int,
-                "name": str,
-                "description": str,
-                "status": str,
-                "country": str,
-                "analysis_type": str,
-                "ifc_file_path": str,
-                "ifc_md5_hash": str,
-                "created_at": str,
-                "updated_at": str,
-            },
-            required_columns={"ifc_file_path": str, "ifc_md5_hash": str},
+    def __init__(
+        self,
+        *,
+        projects_repo=None,
+        standards_repo=None,
+        client_documents_repo=None,
+        storage=None,
+        lineage=None,
+    ):
+        """Initialize project storage and repositories with explicit dependency injection."""
+        self._storage = storage if storage is not None else ObjectStorage()
+        self._lineage = lineage if lineage is not None else SupabaseModelLineageRepository()
+        self._projects = (
+            projects_repo
+            if projects_repo is not None
+            else PersistenceService.get_table(
+                "projects",
+                {
+                    "id": int,
+                    "name": str,
+                    "description": str,
+                    "status": str,
+                    "country": str,
+                    "analysis_type": str,
+                    "ifc_file_path": str,
+                    "ifc_md5_hash": str,
+                    "created_at": str,
+                    "updated_at": str,
+                },
+                required_columns={"ifc_file_path": str, "ifc_md5_hash": str},
+            )
         )
         # Both tables are created by migration_002 / migration_003. The Supabase
         # adapter's create() is a no-op (schema is managed outside runtime), so
         # declaring them here is safe even before those migrations have been run.
-        self._standards = PersistenceService.get_table(
-            "standards_by_project",
-            {
-                "id": int,
-                "project_id": int,
-                "standard_id": str,
-                "source": str,
-                "file_path": str,
-                "created_at": str,
-                "updated_at": str,
-            },
+        self._standards = (
+            standards_repo
+            if standards_repo is not None
+            else PersistenceService.get_table(
+                "standards_by_project",
+                {
+                    "id": int,
+                    "project_id": int,
+                    "standard_id": str,
+                    "source": str,
+                    "file_path": str,
+                    "created_at": str,
+                    "updated_at": str,
+                },
+            )
         )
-        self._client_documents = PersistenceService.get_table(
-            "client_documents",
-            {
-                "id": int,
-                "project_id": int,
-                "filename": str,
-                "file_path": str,
-                "file_type": str,
-                "category": str,
-                "description": str,
-                "tags": str,
-                "upload_date": str,
-                "updated_at": str,
-            },
+        self._client_documents = (
+            client_documents_repo
+            if client_documents_repo is not None
+            else PersistenceService.get_table(
+                "client_documents",
+                {
+                    "id": int,
+                    "project_id": int,
+                    "filename": str,
+                    "file_path": str,
+                    "file_type": str,
+                    "category": str,
+                    "description": str,
+                    "tags": str,
+                    "upload_date": str,
+                    "updated_at": str,
+                },
+            )
         )
 
     def list_projects(self):

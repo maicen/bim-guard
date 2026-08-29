@@ -17,7 +17,7 @@
 This document describes how the BIMGUARD AI application is architected across its decoupled layers:
 1. **Backend API Gateway (FastAPI)**: Serves typed REST endpoints and real-time Server-Sent Events (SSE) from `/api` with strict Pydantic request/response validation (`app/modules/contracts.py`).
 2. **Frontend Client (Svelte 5 SPA)**: Reactive client under `frontend/` powered by Vite, TypeScript, and Tailwind CSS, communicating exclusively with `/api`.
-3. **Compute Kernels & Pipelines**: Framework-agnostic Python physics engines (GC-001 galvanic, CC-001 crevice, MC-001 microbiological) and compliance orchestrator (`app/engines/`, `app/modules/`, `app/services/`) driven dynamically by database-stored rules.
+3. **Compute Kernels & Pipelines**: Framework-agnostic Python compliance and physics engines (corrosion GC-001/CC-001/MC-001, architectural egress & spatial daylighting) and orchestrator (`app/engines/`, `app/modules/`, `app/services/`) driven dynamically by database-stored rules.
 4. **Data & Storage Layer**: Supabase Postgres for relational state and Supabase Object Storage for IFC models, extracted documents, and generated BCF issue archives.
 
 ## 2. Architecture Overview
@@ -60,8 +60,10 @@ This document describes how the BIMGUARD AI application is architected across it
 │ - GC-001 Galvanic Engine     ││ - Supabase Postgres         │
 │ - CC-001 Crevice Engine      ││   (projects, rules, audit)  │
 │ - MC-001 Microbiological     ││ - Supabase Storage          │
-│ - Phase 6 Orchestrator       ││   (models, reports, BCF)    │
-│ - Blue Halo Material Graph   ││ - SQLite / Fastlite Cache   │
+│ - ARCH-EGRESS-001 Egress     ││   (models, reports, BCF)    │
+│ - ARCH-SPATIAL-001 Daylight  ││ - SQLite / Fastlite Cache   │
+│ - Phase 6 Orchestrator       ││                             │
+│ - Blue Halo Material Graph   ││                             │
 └──────────────────────────────┘└─────────────────────────────┘
 ```
 
@@ -147,3 +149,28 @@ bim-guard/
 2. The orchestrator emits stage progression events (`init`, `parsing`, `engine_run`, `scoring`, `reporting`, `complete`).
 3. `PipelineTracker` broadcasts each event to active SSE subscriber queues in real time.
 4. The Svelte UI updates state reactively (progress meters, status chips, stage indicators) without polling loops.
+
+## 6. Evaluator Contracts & Dependency Inversion
+
+BIM-Guard enforces strict Dependency Inversion across engines, repositories, and services for both MEP/corrosion and architectural domains:
+
+### 6.1 Direct RuleEvaluator Protocol Implementation
+- Both MEP physics engines (`GalvanicCorrosionEngine`, `CreviceCorrosionEngine`, `MICEngine`) and architectural engines (`EgressAnalysisEngine`, `SpatialDaylightEngine`) implement the `RuleEvaluator` protocol directly rather than relying on legacy `CallableRuleEvaluator` wrappers.
+- Evaluators consume typed `RuleEvaluationRequest` (or coerced elements) and return structured `RuleEvaluationResult` models defined in `app/modules/contracts.py`.
+- Results support dictionary-style mapping semantics for full backwards compatibility while providing strictly typed attribute access (`band`, `score`, `details`, `element_id`, `status`).
+
+### 6.2 Evaluator Scope Boundary: Custom Python vs. buildingSMART IDS
+- **Custom Python Evaluators**: Strictly limited to evaluations that declarative buildingSMART Information Delivery Specification (IDS) cannot express:
+  - Multiphysics calculations (galvanic voltage gaps, anodic/cathodic area ratios, PREN adequacy).
+  - Joint crevice geometries and critical crevice temperatures (CCT).
+  - Microbiological growth kinetics, flow velocity classes, and topological dead-leg length-to-diameter ratios.
+  - NetworkX topological space-connectivity graph traversal (habitable space to exterior exit shortest paths via `IfcRelSpaceBoundary`).
+  - Spatial boundary daylight calculations (window glazing area vs. room floor area).
+  - Spatial, topological, and geometric proximity calculations.
+- **Database Rules & IDS Validation**: Standard alphanumeric assertions, property set existence, data types, unit checks, and scalar property thresholds are executed via database-driven rules and IDS schemas.
+- **Database-Driven Rule Thresholds**: Engineering cutoffs are never hardcoded in Python engines. Egress travel limits (`CODE 9.9.10.1`), exit counts (`CODE 9.9.4.1`), daylight ratios (`CODE 9.7.2.3`), and fire separation ratings (`CODE 9.10.9.14`) are dynamically read from `RuleService` (`BUILDING-CODE-PART9`).
+
+### 6.3 Centralized Application Bootstrap Container
+- All repository construction, object storage adapters, and service wiring are consolidated in `app/bootstrap.py` via `ApplicationContainer`.
+- Domain services (`ProjectsService`, `DocumentService`, `RuleService`, `SettingsService`, `AnalysisService`, `ArchAnalysisService`) receive their persistence and storage dependencies via constructor injection, eliminating hardcoded internal construction of Supabase adapters and enabling seamless in-memory and mock testing.
+- FastAPI dependency providers in `app/api/dependencies.py` resolve singleton services directly from the container.
