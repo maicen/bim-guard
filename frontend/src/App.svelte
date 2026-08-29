@@ -145,7 +145,10 @@
       {:else if activeView === 'workflow'}
         <WorkflowView initialProjectId={targetProjectId} />
       {:else if activeView === 'reports'}
-        <ReportsView initialProjectId={targetProjectId} />
+        <ReportsView
+          initialProjectId={targetProjectId}
+          onSelectProjectForViewer={handleSelectProjectForViewer}
+        />
       {:else if activeView === 'user-manual'}
         <UserManualView onNavigate={handleSelectView} />
       {:else if activeView === 'modeling-manual'}

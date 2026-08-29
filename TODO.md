@@ -253,17 +253,17 @@ Folder selection UX: The backend accepts a single rule_folder string (one folder
 ## Tasks
 
 - [x] Add `BcfArtifact` type to `types.ts`
-- [ ] Add `listBcfArtifacts()` to `api.ts`
-- [ ] Update `ArchAnalyzeView.svelte`:
-  - [ ] Load rule folders on mount
-  - [ ] Remove auto-run on mount + project change
-  - [ ] Add folder selector UI (single-select + "All")
-  - [ ] Pass selected folder to `runArch()`
-  - [ ] Add BCF saved badge / save button after run
-- [ ] Update `ReportsView.svelte`:
-  - [ ] Load BCF artifacts list
-  - [ ] Add ARCH BCF artifacts table section
-- [ ] Build validation
+- [x] Add `listBcfArtifacts()` to `api.ts`
+- [x] Update `ArchAnalyzeView.svelte`:
+  - [x] Load rule folders on mount
+  - [x] Remove auto-run on mount + project change
+  - [x] Add folder selector UI (single-select + "All")
+  - [x] Pass selected folder to `runArch()`
+  - [x] Add BCF saved badge / save button after run
+- [x] Update `ReportsView.svelte`:
+  - [x] Load BCF artifacts list
+  - [x] Add ARCH BCF artifacts table section
+- [x] Build validation
 
 ## Summary
 

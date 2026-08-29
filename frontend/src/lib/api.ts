@@ -1,5 +1,6 @@
 import type {
   AnalysisResult,
+  BcfArtifact,
   DocumentDetail,
   DocumentItem,
   DocumentUpdatePayload,
@@ -189,9 +190,9 @@ export const analyzeApi = {
     return handleResponse<any>(res);
   },
 
-  async listBcfArtifacts(): Promise<any[]> {
+  async listBcfArtifacts(): Promise<BcfArtifact[]> {
     const res = await fetch(`${API_BASE}/analyze/bcf/list`);
-    return handleResponse<any[]>(res);
+    return handleResponse<BcfArtifact[]>(res);
   },
 };
 
