@@ -17,7 +17,7 @@
     X,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
-  import type { Rule, RuleFolder } from "../lib/types";
+  import type { Rule, RuleFolder, RulesetCategory } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
 
   let rules: Rule[] = [];
@@ -34,6 +34,7 @@
   let searchQuery = "";
   let selectedFolderId: string | null = null;
   let selectedMechanism: string = "all";
+  let selectedCategory: RulesetCategory | "all" = "all";
   let filterNeedsReview: boolean = false;
 
   // Rule edit/create modal state
@@ -47,6 +48,7 @@
   let formMechanism = "CODE";
   let formRulesetId = "BUILDING-CODE-PART9";
   let formCategory = "property_check";
+  let formDomainCategory: RulesetCategory = "Arch";
   let formPropertySet = "Pset_Compliance";
   let formPropertyName = "";
   let formOperator = "==";
@@ -85,6 +87,15 @@
     loadData();
   });
 
+  $: archCount = rules.filter((r) => (r.category || "").toLowerCase() === "arch").length;
+  $: pipingCount = rules.filter((r) => (r.category || "").toLowerCase() === "piping").length;
+  $: seismicCount = rules.filter((r) => (r.category || "").toLowerCase() === "seismic").length;
+
+  $: filteredFolders = folders.filter((f) => {
+    if (selectedCategory === "all") return true;
+    return (f.category || "").toLowerCase() === selectedCategory.toLowerCase();
+  });
+
   $: filteredRules = rules.filter((r) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -103,9 +114,13 @@
     const matchesMechanism =
       selectedMechanism === "all" || r.mechanism === selectedMechanism;
 
+    const matchesCategory =
+      selectedCategory === "all" ||
+      (r.category || "").toLowerCase() === selectedCategory.toLowerCase();
+
     const matchesReview = !filterNeedsReview || r.needs_review === 1;
 
-    return matchesSearch && matchesFolder && matchesMechanism && matchesReview;
+    return matchesSearch && matchesFolder && matchesMechanism && matchesCategory && matchesReview;
   });
 
   async function handleSeedRules() {
@@ -126,6 +141,14 @@
     formMechanism = "CODE";
     formRulesetId = selectedFolderId || "BUILDING-CODE-PART9";
     formCategory = "property_check";
+    if (selectedCategory !== "all") {
+      formDomainCategory = selectedCategory;
+    } else if (selectedFolderId) {
+      const folder = folders.find((f) => f.ruleset_id === selectedFolderId);
+      formDomainCategory = (folder?.category as RulesetCategory) || "Arch";
+    } else {
+      formDomainCategory = "Arch";
+    }
     formPropertySet = "Pset_Compliance";
     formPropertyName = "";
     formOperator = "==";
@@ -158,6 +181,7 @@
     formMechanism = rule.mechanism || "CODE";
     formRulesetId = rule.ruleset_id || "BUILDING-CODE-PART9";
     formCategory = rule.rule_category || "property_check";
+    formDomainCategory = (rule.category as RulesetCategory) || "Arch";
     formPropertySet = rule.property_set || "Pset_Compliance";
     formPropertyName = rule.property_name || "";
     formOperator = rule.operator || "==";
@@ -196,6 +220,7 @@
         mechanism: formMechanism,
         ruleset_id: formRulesetId,
         rule_category: formCategory,
+        category: formDomainCategory,
         property_set: formPropertySet,
         property_name: formPropertyName,
         operator: formOperator,
@@ -312,6 +337,64 @@
     </div>
   {/if}
 
+  <!-- Category Selector Tabs: Arch | Piping | seismic -->
+  <div class="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/60 border border-slate-800 w-fit">
+    <button
+      type="button"
+      on:click={() => {
+        selectedCategory = "all";
+        selectedFolderId = null;
+      }}
+      class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {selectedCategory === 'all'
+        ? 'bg-[#0071e3] text-white shadow-sm'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
+    >
+      All Categories
+    </button>
+    <button
+      type="button"
+      on:click={() => {
+        selectedCategory = "Arch";
+        selectedFolderId = null;
+      }}
+      class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {selectedCategory === 'Arch'
+        ? 'bg-blue-600 text-white shadow-sm'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
+    >
+      <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+      <span>Arch</span>
+      <span class="text-[10px] opacity-75 ml-0.5">({archCount})</span>
+    </button>
+    <button
+      type="button"
+      on:click={() => {
+        selectedCategory = "Piping";
+        selectedFolderId = null;
+      }}
+      class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {selectedCategory === 'Piping'
+        ? 'bg-amber-600 text-white shadow-sm'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
+    >
+      <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+      <span>Piping</span>
+      <span class="text-[10px] opacity-75 ml-0.5">({pipingCount})</span>
+    </button>
+    <button
+      type="button"
+      on:click={() => {
+        selectedCategory = "seismic";
+        selectedFolderId = null;
+      }}
+      class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {selectedCategory === 'seismic'
+        ? 'bg-purple-600 text-white shadow-sm'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
+    >
+      <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+      <span>seismic</span>
+      <span class="text-[10px] opacity-75 ml-0.5">({seismicCount})</span>
+    </button>
+  </div>
+
   <!-- Main Grid: Folders Sidebar + Rules Table -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
     <!-- Folder tree sidebar -->
@@ -338,7 +421,7 @@
           <span class="text-[10px] opacity-75">{rules.length}</span>
         </button>
 
-        {#each folders as folder}
+        {#each filteredFolders as folder}
           <button
             type="button"
             on:click={() => (selectedFolderId = folder.ruleset_id)}
@@ -347,13 +430,24 @@
               ? 'bg-[#0071e3] text-white'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
           >
-            <div class="flex items-center gap-2 truncate">
+            <div class="flex items-center gap-2 truncate flex-1">
               <Folder class="w-3.5 h-3.5 shrink-0" />
               <span class="truncate">{folder.display_name}</span>
             </div>
-            <span class="text-[10px] opacity-75 ml-2 shrink-0"
-              >{folder.rules.length}</span
-            >
+            <div class="flex items-center gap-1.5 shrink-0 ml-2">
+              {#if folder.category}
+                <span
+                  class="text-[9px] px-1.5 py-0.5 rounded font-mono font-medium {folder.category === 'Piping'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : folder.category === 'seismic'
+                    ? 'bg-purple-500/20 text-purple-300'
+                    : 'bg-blue-500/20 text-blue-300'}"
+                >
+                  {folder.category}
+                </span>
+              {/if}
+              <span class="text-[10px] opacity-75">{folder.rules.length}</span>
+            </div>
           </button>
         {/each}
       </div>
@@ -421,6 +515,7 @@
               >
                 <tr>
                   <th class="py-3 px-4">Rule Ref</th>
+                  <th class="py-3 px-4">Category</th>
                   <th class="py-3 px-4">Mechanism</th>
                   <th class="py-3 px-4">Target Property</th>
                   <th class="py-3 px-4">Condition</th>
@@ -438,6 +533,17 @@
                       <div class="text-[11px] text-slate-400 truncate max-w-xs">
                         {rule.description || "No description"}
                       </div>
+                    </td>
+                    <td class="py-3 px-4">
+                      <span
+                        class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold font-mono {rule.category === 'Piping'
+                          ? 'bg-amber-950/60 border border-amber-800/50 text-amber-300'
+                          : rule.category === 'seismic'
+                          ? 'bg-purple-950/60 border border-purple-800/50 text-purple-300'
+                          : 'bg-blue-950/60 border border-blue-800/50 text-blue-300'}"
+                      >
+                        {rule.category || "Arch"}
+                      </span>
                     </td>
                     <td class="py-3 px-4">
                       <span
@@ -569,7 +675,7 @@
       </div>
 
       <div class="space-y-4 overflow-y-auto pr-1 flex-1">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-3">
           <div>
             <label
               for="rule-id"
@@ -583,6 +689,22 @@
               placeholder="e.g. OBC-9.9.4.2"
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
             />
+          </div>
+          <div>
+            <label
+              for="rule-domain-category"
+              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
+              >Category *</label
+            >
+            <select
+              id="rule-domain-category"
+              bind:value={formDomainCategory}
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            >
+              <option value="Arch">Arch</option>
+              <option value="Piping">Piping</option>
+              <option value="seismic">seismic</option>
+            </select>
           </div>
           <div>
             <label
@@ -786,20 +908,27 @@
           </div>
         {/if}
 
-        <!-- Relative Bounds Section -->
+        <!-- Dynamic relative threshold section -->
         <div
-          class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5"
+          class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5"
         >
           <div
-            class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+            class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5"
           >
-            Relative Dynamic Bounds & Offsets (Optional)
+            <SlidersHorizontal class="w-3.5 h-3.5 text-blue-400" />
+            <span>Dynamic Property-Relative Range (Optional)</span>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <p class="text-[11px] text-slate-400">
+            Compare target property dynamically against other properties on the
+            same element with optional offsets (e.g. RiserHeight &lt;= 0.5 *
+            StairHeight + 25mm).
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label
                 for="rule-min-prop"
-                class="block text-[11px] font-semibold text-slate-400 mb-1"
+                class="block text-[11px] font-semibold text-slate-300 mb-1"
                 >Min Dynamic Property / Offset</label
               >
               <div class="grid grid-cols-2 gap-2">
@@ -807,7 +936,7 @@
                   id="rule-min-prop"
                   type="text"
                   bind:value={formValueMinProperty}
-                  placeholder="e.g. Run"
+                  placeholder="e.g. TreadWidth"
                   class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
                 />
                 <input
@@ -821,7 +950,7 @@
             <div>
               <label
                 for="rule-max-prop"
-                class="block text-[11px] font-semibold text-slate-400 mb-1"
+                class="block text-[11px] font-semibold text-slate-300 mb-1"
                 >Max Dynamic Property / Offset</label
               >
               <div class="grid grid-cols-2 gap-2">
@@ -829,7 +958,7 @@
                   id="rule-max-prop"
                   type="text"
                   bind:value={formValueMaxProperty}
-                  placeholder="e.g. Run"
+                  placeholder="e.g. TreadWidth"
                   class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
                 />
                 <input
@@ -958,7 +1087,12 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div class="p-2.5 bg-slate-950/40 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Category</span>
+            <span class="font-mono text-white font-semibold">{ruleToView.category || 'Arch'}</span>
+          </div>
+
           <div class="p-2.5 bg-slate-950/40 rounded-xl border border-slate-800">
             <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Mechanism</span>
             <span class="font-mono text-white font-semibold">{ruleToView.mechanism || 'CODE'}</span>

@@ -59,6 +59,8 @@ export interface DocumentUpdatePayload {
   extracted_text?: string;
 }
 
+export type RulesetCategory = 'Arch' | 'Piping' | 'seismic';
+
 export interface Rule {
   id: number;
   rule_id?: string;
@@ -67,6 +69,7 @@ export interface Rule {
   mechanism?: string;
   ruleset_id?: string;
   rule_category?: string;
+  category?: RulesetCategory | string;
   property_set?: string;
   property_name?: string;
   operator?: string;
@@ -95,7 +98,24 @@ export interface RuleFolder {
   display_name: string;
   description?: string;
   mechanism_scope?: string;
+  category?: RulesetCategory | string;
+  count?: number;
   rules: Rule[];
+}
+
+export interface RuleFolderCreatePayload {
+  ruleset_id: string;
+  display_name?: string;
+  description?: string;
+  mechanism_scope?: string;
+  category?: RulesetCategory | string;
+}
+
+export interface RuleFolderUpdatePayload {
+  display_name?: string;
+  description?: string;
+  mechanism_scope?: string;
+  category?: RulesetCategory | string;
 }
 
 export interface Citation {

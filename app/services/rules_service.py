@@ -55,10 +55,11 @@ _RICH_COLUMNS = {
 # Columns that classify a rule within the broader multi-mechanism schema.
 # Added via required_columns so existing DBs migrate automatically.
 _META_COLUMNS = {
-    "mechanism": str,  # "CODE" | "GC-001" | "CC-001" | "MC-001"
+    "mechanism": str,  # "CODE" | "GC-001" | "CC-001" | "MC-001" | "SEISMIC"
     "ruleset_id": str,  # "BUILDING-CODE-PART9" | "BIMGUARD-GC-001" | …
     "rule_category": str,  # "property_check" | "threshold_band" | "material_property"
     # | "scoring_model" | "mitigation" | "reference_config"
+    "category": str,  # "Arch" | "Piping" | "seismic"
 }
 
 _FOLDER_COLUMNS = {
@@ -67,13 +68,15 @@ _FOLDER_COLUMNS = {
     "display_name": str,
     "description": str,
     "mechanism_scope": str,
+    "category": str,
     "created_at": str,
     "updated_at": str,
 }
 
 # ── Valid controlled vocabulary ───────────────────────────────────────────────
 
-MECHANISMS = {"GC-001", "CC-001", "MC-001", "IFC", "CODE"}
+MECHANISMS = {"GC-001", "CC-001", "MC-001", "IFC", "CODE", "SEISMIC", "SB-001"}
+RULESET_CATEGORIES = {"Arch", "Piping", "seismic"}
 
 RULE_CATEGORIES = {
     "property_check",  # IFC element property assertion (building code)
@@ -172,6 +175,51 @@ class RuleService:
             return normalized
         return ""
 
+    @staticmethod
+    def normalize_category(category: str | None, default: str = "Arch") -> str:
+        """Normalize category to one of 'Arch', 'Piping', or 'seismic'."""
+        val = (category or "").strip().lower()
+        if val in ("arch", "architecture", "architectural", "building_code", "code"):
+            return "Arch"
+        if val in ("piping", "mep", "corrosion"):
+            return "Piping"
+        if val in ("seismic", "halo", "sb-001", "sb001"):
+            return "seismic"
+        return default
+
+    @classmethod
+    def infer_category(cls, rule_or_folder: dict[str, Any]) -> str:
+        """Infer category (Arch, Piping, or seismic) for a rule or folder."""
+        explicit = rule_or_folder.get("category")
+        if explicit:
+            norm = cls.normalize_category(explicit, default="")
+            if norm:
+                return norm
+
+        mechanism = (
+            rule_or_folder.get("mechanism")
+            or rule_or_folder.get("mechanism_scope")
+            or ""
+        ).strip().upper()
+        if mechanism in {"GC-001", "CC-001", "MC-001"}:
+            return "Piping"
+        if mechanism in {"SB-001", "SEISMIC"}:
+            return "seismic"
+        if mechanism in {"CODE", "IFC", "OBC"}:
+            return "Arch"
+
+        ruleset_id = (rule_or_folder.get("ruleset_id") or "").strip().upper()
+        if any(k in ruleset_id for k in ("GC-001", "CC-001", "MC-001", "CORROSION")):
+            return "Piping"
+        if any(k in ruleset_id for k in ("SB-001", "SEISMIC", "HALO")):
+            return "seismic"
+
+        target = (rule_or_folder.get("target_ifc_class") or "").strip()
+        if target.startswith(_MEP_IFC_PREFIXES):
+            return "Piping"
+
+        return "Arch"
+
     def _disable_folders_if_missing(self, exc: APIError) -> bool:
         """Disable folder-table operations when Supabase schema lacks rule_folders."""
         code = str(getattr(exc, "code", "") or "")
@@ -234,12 +282,14 @@ class RuleService:
             ruleset_id = self.normalize_ruleset_id(rule.get("ruleset_id") or "")
             if not ruleset_id or ruleset_id in existing:
                 continue
+            cat = self.infer_category(rule)
             self._folder_insert(
                 {
                     "ruleset_id": ruleset_id,
                     "display_name": ruleset_id,
                     "description": "",
                     "mechanism_scope": self._normalize_mechanism_scope(rule.get("mechanism")),
+                    "category": cat,
                     "created_at": now,
                     "updated_at": now,
                 }
@@ -252,12 +302,16 @@ class RuleService:
         display_name: str = "",
         description: str = "",
         mechanism_scope: str = "",
+        category: str = "",
     ) -> None:
         """Ensure a folder row exists for a non-empty ruleset_id."""
         normalized = self.normalize_ruleset_id(ruleset_id)
         if not normalized:
             return
         scope = self._normalize_mechanism_scope(mechanism_scope)
+        cat = self.normalize_category(category, default="") or self.infer_category(
+            {"ruleset_id": normalized, "mechanism": scope}
+        )
         for row in self._folder_rows():
             row_id = self.normalize_ruleset_id(row.get("ruleset_id") or "")
             if row_id != normalized:
@@ -273,6 +327,8 @@ class RuleService:
                 updates["description"] = incoming_desc
             if scope and not (row.get("mechanism_scope") or "").strip():
                 updates["mechanism_scope"] = scope
+            if cat and not (row.get("category") or "").strip():
+                updates["category"] = cat
 
             if updates:
                 updates["updated_at"] = now_iso_utc()
@@ -286,6 +342,7 @@ class RuleService:
                 "display_name": (display_name or normalized).strip() or normalized,
                 "description": (description or "").strip(),
                 "mechanism_scope": scope,
+                "category": cat,
                 "created_at": now,
                 "updated_at": now,
             }
@@ -307,9 +364,17 @@ class RuleService:
 
     # ── Web CRUD ──────────────────────────────────────────────────────────────
 
-    def list_rules(self) -> list[dict]:
-        """Return all rules ordered by newest first."""
-        return rows_desc_by_id(self._rules)
+    def list_rules(self, category: str | None = None) -> list[dict]:
+        """Return all rules ordered by newest first, optionally filtered by category."""
+        rows = rows_desc_by_id(self._rules)
+        if category:
+            norm = self.normalize_category(category)
+            rows = [
+                r
+                for r in rows
+                if (r.get("category") == norm or self.infer_category(r) == norm)
+            ]
+        return rows
 
     def get_rule(self, rule_id: int) -> dict | None:
         """Return a single rule by primary key."""
@@ -353,9 +418,17 @@ class RuleService:
         mechanism: str = "",
         ruleset_id: str = "",
         rule_category: str = "property_check",
+        category: str = "",
     ):
         """Insert a rule row into the rules table."""
         now = now_iso_utc()
+        norm_cat = self.normalize_category(category, default="") or self.infer_category(
+            {
+                "mechanism": mechanism,
+                "ruleset_id": ruleset_id,
+                "target_ifc_class": target_ifc_class,
+            }
+        )
         saved = self._rules.insert(
             {
                 "reference": reference.strip(),
@@ -392,25 +465,27 @@ class RuleService:
                 "mechanism": mechanism or "",
                 "ruleset_id": self.normalize_ruleset_id(ruleset_id),
                 "rule_category": rule_category or "property_check",
+                "category": norm_cat,
                 "created_at": now,
                 "updated_at": now,
             }
         )
-        self._ensure_folder(ruleset_id, mechanism_scope=mechanism)
+        self._ensure_folder(ruleset_id, mechanism_scope=mechanism, category=norm_cat)
         return saved
 
     def update_rule(
         self,
         rule_id: int,
-        reference: str,
-        rule_type: str,
-        description: str,
-        target_ifc_class: str,
+        reference: str = "",
+        rule_type: str = "",
+        description: str = "",
+        target_ifc_class: str = "",
         parameters: str = "{}",
         # identity
         mechanism: str = "",
         ruleset_id: str = "",
         rule_category: str = "",
+        category: str = "",
         # ifc target
         property_set: str = "",
         property_name: str = "",
@@ -442,45 +517,51 @@ class RuleService:
         existing = self.get_rule(rule_id)
         old_ruleset_id = (existing or {}).get("ruleset_id") or ""
 
+        updates: dict[str, Any] = {
+            "reference": reference.strip() if reference else (existing or {}).get("reference", ""),
+            "rule_type": (rule_type.strip() or "numeric_comparison") if rule_type else (existing or {}).get("rule_type", ""),
+            "description": description.strip() if description else (existing or {}).get("description", ""),
+            "target_ifc_class": target_ifc_class.strip() if target_ifc_class else (existing or {}).get("target_ifc_class", ""),
+            "parameters": self._norm_json(parameters) if parameters != "{}" else (existing or {}).get("parameters", "{}"),
+            "mechanism": mechanism or (existing or {}).get("mechanism", ""),
+            "ruleset_id": self.normalize_ruleset_id(ruleset_id or (existing or {}).get("ruleset_id", "")),
+            "rule_category": rule_category or (existing or {}).get("rule_category", ""),
+            "property_set": property_set or (existing or {}).get("property_set", ""),
+            "property_name": property_name or (existing or {}).get("property_name", ""),
+            "fallback_property": fallback_property or (existing or {}).get("fallback_property", ""),
+            "operator": operator or (existing or {}).get("operator", ""),
+            "check_value": json.dumps(self._parse_numeric(check_value)) if check_value is not None else (existing or {}).get("check_value", "null"),
+            "value_min": json.dumps(self._parse_numeric(value_min)) if value_min is not None else (existing or {}).get("value_min", "null"),
+            "value_max": json.dumps(self._parse_numeric(value_max)) if value_max is not None else (existing or {}).get("value_max", "null"),
+            "value_min_property": value_min_property or (existing or {}).get("value_min_property", ""),
+            "value_max_property": value_max_property or (existing or {}).get("value_max_property", ""),
+            "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
+            "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
+            "compare_property": compare_property or (existing or {}).get("compare_property", ""),
+            "name_pattern": name_pattern or (existing or {}).get("name_pattern", ""),
+            "uniqueness_scope": uniqueness_scope or (existing or {}).get("uniqueness_scope", ""),
+            "unit": unit or (existing or {}).get("unit", ""),
+            "severity": severity or (existing or {}).get("severity", "mandatory"),
+            "keyword": keyword or (existing or {}).get("keyword", ""),
+            "compliance_type": compliance_type or (existing or {}).get("compliance_type", ""),
+            "source_text": source_text or (existing or {}).get("source_text", ""),
+            "confidence": str(confidence) if confidence is not None else (existing or {}).get("confidence", ""),
+            "needs_review": int(bool(needs_review)),
+            "updated_at": now_iso_utc(),
+        }
+        if category:
+            updates["category"] = self.normalize_category(category)
+
         self._rules.update(
-            updates={
-                "reference": reference.strip(),
-                "rule_type": rule_type.strip() or "numeric_comparison",
-                "description": description.strip(),
-                "target_ifc_class": target_ifc_class.strip(),
-                "parameters": self._norm_json(parameters),
-                "mechanism": mechanism or "",
-                "ruleset_id": self.normalize_ruleset_id(ruleset_id),
-                "rule_category": rule_category or "",
-                "property_set": property_set or "",
-                "property_name": property_name or "",
-                "fallback_property": fallback_property or "",
-                "operator": operator or "",
-                "check_value": json.dumps(self._parse_numeric(check_value)),
-                "value_min": json.dumps(self._parse_numeric(value_min)),
-                "value_max": json.dumps(self._parse_numeric(value_max)),
-                "value_min_property": value_min_property or "",
-                "value_max_property": value_max_property or "",
-                "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
-                "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
-                "compare_property": compare_property or "",
-                "name_pattern": name_pattern or "",
-                "uniqueness_scope": uniqueness_scope or "",
-                "unit": unit or "",
-                "severity": severity or "mandatory",
-                "keyword": keyword or "",
-                "compliance_type": compliance_type or "",
-                "source_text": source_text or "",
-                "confidence": str(confidence) if confidence is not None else "",
-                "needs_review": int(bool(needs_review)),
-                "updated_at": now_iso_utc(),
-            },
+            updates=updates,
             pk_values=rule_id,
         )
 
-        self._ensure_folder(ruleset_id, mechanism_scope=mechanism)
+        target_ruleset = updates["ruleset_id"]
+        cat_for_folder = updates.get("category") or ""
+        self._ensure_folder(target_ruleset, mechanism_scope=updates["mechanism"], category=cat_for_folder)
         old_normalized = self.normalize_ruleset_id(old_ruleset_id)
-        new_normalized = self.normalize_ruleset_id(ruleset_id)
+        new_normalized = self.normalize_ruleset_id(target_ruleset)
         if old_normalized and old_normalized != new_normalized:
             self._drop_folder_if_orphan(old_normalized)
 
@@ -554,6 +635,7 @@ class RuleService:
         display_name: str = "",
         description: str = "",
         mechanism_scope: str = "",
+        category: str = "Arch",
     ) -> bool:
         """Create an empty folder row for later rule assignment."""
         normalized = self.normalize_ruleset_id(ruleset_id)
@@ -565,41 +647,50 @@ class RuleService:
             display_name=display_name,
             description=description,
             mechanism_scope=mechanism_scope,
+            category=category,
         )
         return self.folder_exists(normalized)
 
     def update_folder_metadata(
         self,
         ruleset_id: str,
-        display_name: str,
-        description: str,
-        mechanism_scope: str,
+        display_name: str | None = None,
+        description: str | None = None,
+        mechanism_scope: str | None = None,
+        category: str | None = None,
     ) -> bool:
         """Update metadata fields for an existing folder by ruleset_id."""
         normalized = self.normalize_ruleset_id(ruleset_id)
         if not normalized:
             return False
 
+        now = now_iso_utc()
         for folder in self._folder_rows():
             if self.normalize_ruleset_id(folder.get("ruleset_id") or "") != normalized:
                 continue
-            self._folder_update(
-                folder["id"],
-                {
-                    "display_name": (display_name or "").strip(),
-                    "description": (description or "").strip(),
-                    "mechanism_scope": self._normalize_mechanism_scope(mechanism_scope),
-                    "updated_at": now_iso_utc(),
-                },
-            )
+            updates: dict[str, Any] = {"updated_at": now}
+            if display_name is not None:
+                updates["display_name"] = display_name.strip()
+            if description is not None:
+                updates["description"] = description.strip()
+            if mechanism_scope is not None:
+                updates["mechanism_scope"] = self._normalize_mechanism_scope(mechanism_scope)
+            if category is not None:
+                cat_val = self.normalize_category(category)
+                updates["category"] = cat_val
+                for rule in self.list_by_ruleset(normalized):
+                    self._rules.update(updates={"category": cat_val, "updated_at": now}, pk_values=rule["id"])
+
+            self._folder_update(folder["id"], updates)
             return True
 
         if self.has_ruleset(normalized):
             self._ensure_folder(
                 normalized,
-                display_name=display_name,
-                description=description,
-                mechanism_scope=mechanism_scope,
+                display_name=display_name or "",
+                description=description or "",
+                mechanism_scope=mechanism_scope or "",
+                category=category or "",
             )
             return True
 
@@ -627,14 +718,16 @@ class RuleService:
             return []
         return list(self._rules.rows_where("ruleset_id = ?", [normalized]))
 
-    def list_folders(self) -> list[dict]:
+    def list_folders(self, category: str | None = None) -> list[dict]:
         """Return folder rows with current rule counts, ordered by ruleset_id."""
-        rows = self.list_folders_with_rules()
+        rows = self.list_folders_with_rules(category=category)
         for row in rows:
             row.pop("rules", None)
         return rows
 
-    def list_folders_with_rules(self, rules: list[dict] | None = None) -> list[dict]:
+    def list_folders_with_rules(
+        self, rules: list[dict] | None = None, category: str | None = None
+    ) -> list[dict]:
         """Return folder rows with current rule counts and member rules attached.
 
         Groups the already-fetched rules table in one pass instead of issuing a
@@ -659,14 +752,17 @@ class RuleService:
                 continue
             seen.add(ruleset_id)
             members = by_ruleset.get(ruleset_id, [])
+            f_cat = folder.get("category") or self.infer_category(folder)
             rows.append(
                 {
+                    "id": folder.get("id"),
                     "ruleset_id": ruleset_id,
                     "display_name": (folder.get("display_name") or "").strip() or ruleset_id,
                     "description": (folder.get("description") or "").strip(),
                     "mechanism_scope": self._normalize_mechanism_scope(
                         folder.get("mechanism_scope")
                     ),
+                    "category": self.normalize_category(f_cat),
                     "count": len(members),
                     "rules": members,
                 }
@@ -675,16 +771,23 @@ class RuleService:
         for ruleset_id, members in by_ruleset.items():
             if ruleset_id in seen:
                 continue
+            inferred_cat = self.infer_category({"ruleset_id": ruleset_id, "rules": members})
             rows.append(
                 {
+                    "id": None,
                     "ruleset_id": ruleset_id,
                     "display_name": ruleset_id,
                     "description": "",
                     "mechanism_scope": "",
+                    "category": inferred_cat,
                     "count": len(members),
                     "rules": members,
                 }
             )
+
+        if category:
+            filter_cat = self.normalize_category(category)
+            rows = [r for r in rows if r.get("category") == filter_cat]
 
         rows.sort(key=lambda row: ((row.get("display_name") or "").lower(), row["ruleset_id"]))
         return rows
@@ -741,9 +844,14 @@ class RuleService:
             deleted += 1
         return deleted
 
-    def list_by_category(self, rule_category: str) -> list[dict]:
-        """Return all rules matching the provided rule category."""
-        return list(self._rules.rows_where("rule_category = ?", [rule_category]))
+    def list_by_category(self, category: str) -> list[dict]:
+        """Return all rules matching the provided domain category (Arch, Piping, or seismic)."""
+        norm = self.normalize_category(category)
+        return [
+            r
+            for r in self._rules.rows
+            if (r.get("category") == norm or self.infer_category(r) == norm)
+        ]
 
     @staticmethod
     def normalize_theme(theme: str | None) -> str:
@@ -874,6 +982,7 @@ class RuleService:
             raise ValueError("JSON ruleset must have a 'rules' array.")
 
         top_mechanism = str(json_data.get("mechanism") or "")
+        top_category = str(json_data.get("category") or "")
         saved = 0
         for rule in rules:
             if not isinstance(rule, dict):
@@ -914,6 +1023,7 @@ class RuleService:
                 mechanism=str(rule.get("mechanism") or top_mechanism),
                 ruleset_id=ruleset_id,
                 rule_category=str(rule.get("rule_category") or "property_check"),
+                category=str(rule.get("category") or top_category),
                 parameters=json.dumps(rule.get("parameters") or {}),
             )
             saved += 1

@@ -28,16 +28,18 @@
     Compass,
     SlidersHorizontal,
   } from "lucide-svelte";
-  import { analyzeApi, projectsApi } from "../lib/api";
+  import { analyzeApi, projectsApi, rulesApi } from "../lib/api";
   import type {
     AnalysisResult,
     Project,
     AuditIssue,
     AnalysisInputItem,
+    RuleFolder,
   } from "../lib/types";
   import PipelineProgress from "../lib/components/PipelineProgress.svelte";
 
   export let initialProjectId: number | null = null;
+  export let activeCategory: "Piping" | "seismic" = "Piping";
   export let onSelectProjectForViewer: (
     projectId: number,
     elementGuid?: string,
@@ -47,10 +49,29 @@
   let projects: Project[] = [];
   let selectedProjectId: number | null = initialProjectId;
   let selectedSlug: "corrosion" | "seismic" = "corrosion";
+  $: selectedSlug = activeCategory === "seismic" ? "seismic" : "corrosion";
   let isRunning = false;
   let error = "";
   let result: AnalysisResult | null = null;
   let analysisInputs: AnalysisInputItem[] = [];
+
+  let categoryFolders: RuleFolder[] = [];
+  let isFoldersLoading = false;
+
+  async function loadCategoryFolders(cat: "Piping" | "seismic") {
+    isFoldersLoading = true;
+    try {
+      categoryFolders = await rulesApi.folders(cat);
+    } catch {
+      categoryFolders = [];
+    } finally {
+      isFoldersLoading = false;
+    }
+  }
+
+  $: {
+    loadCategoryFolders(activeCategory);
+  }
 
   // Options & Filters
   let searchQuery = "";
@@ -232,12 +253,28 @@
       >
         <span>Analysis Gateway</span>
         <span>•</span>
-        <span class="text-slate-400">Phase 6–9 Pipeline</span>
+        <span class="text-slate-400">
+          {activeCategory === "seismic"
+            ? "Seismic Clearance (SB-001)"
+            : "MEP Piping Corrosion (GC/CC/MC)"}
+        </span>
       </div>
       <h1
-        class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3"
+        class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3 flex-wrap"
       >
-        <span>MEP Piping &amp; Seismic Audit</span>
+        <span
+          >{activeCategory === "seismic"
+            ? "Seismic Buffer & Bracing Audit"
+            : "Piping System Corrosion Audit"}</span
+        >
+        <span
+          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono border {activeCategory ===
+          'seismic'
+            ? 'bg-purple-950/60 text-purple-300 border-purple-800/80 shadow-sm'
+            : 'bg-amber-950/60 text-amber-300 border-amber-800/80 shadow-sm'}"
+        >
+          Category: {activeCategory}
+        </span>
         {#if result?.cached}
           <span
             class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/80 shadow-sm"
@@ -248,48 +285,40 @@
         {/if}
       </h1>
       <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
-        Execute verified Galvanic (GC-001), Crevice (CC-001), and
-        Microbiological (MC-001) compliance audits or Blue Halo Seismic
-        Clearance (SB-001 / EN 1998-1 / DIN 4149) envelopes.
+        {#if activeCategory === "seismic"}
+          Execute verified Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN
+          4149) buffer volume and bracing audits.
+        {:else}
+          Execute verified Galvanic (GC-001), Crevice (CC-001), and
+          Microbiological (MC-001) piping compliance audits.
+        {/if}
       </p>
+
+      <!-- Active Rulesets within this category -->
+      {#if categoryFolders.length > 0}
+        <div class="flex items-center gap-1.5 flex-wrap mt-3">
+          <span
+            class="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+            >Active Rulesets:</span
+          >
+          {#each categoryFolders as folder}
+            <span
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium border {activeCategory ===
+              'seismic'
+                ? 'bg-purple-950/40 border-purple-800/50 text-purple-300'
+                : 'bg-amber-950/40 border-amber-800/50 text-amber-300'}"
+              title={folder.description || folder.display_name}
+            >
+              <span>{folder.display_name}</span>
+              <span class="opacity-60">({folder.rules.length})</span>
+            </span>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Actions & Project Selector -->
     <div class="flex flex-wrap items-center gap-3">
-      <!-- Domain Toggle -->
-      <div
-        class="bg-slate-900/90 border border-slate-800 p-1 rounded-2xl flex items-center shadow-inner"
-      >
-        <button
-          type="button"
-          on:click={() => {
-            selectedSlug = "corrosion";
-            fetchResults();
-          }}
-          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug ===
-          'corrosion'
-            ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20'
-            : 'text-slate-400 hover:text-white'}"
-        >
-          <Layers class="w-3.5 h-3.5" />
-          <span>Piping Corrosion (GC/CC/MC)</span>
-        </button>
-        <button
-          type="button"
-          on:click={() => {
-            selectedSlug = "seismic";
-            fetchResults();
-          }}
-          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 {selectedSlug ===
-          'seismic'
-            ? 'bg-[#0071e3] text-white shadow-md shadow-blue-500/20'
-            : 'text-slate-400 hover:text-white'}"
-        >
-          <Compass class="w-3.5 h-3.5" />
-          <span>Seismic Clearance (Halo)</span>
-        </button>
-      </div>
-
       <!-- Project Dropdown -->
       <div class="relative">
         <select

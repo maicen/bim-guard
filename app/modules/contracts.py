@@ -163,6 +163,7 @@ class RuleCreateRequest(BaseModel):
     mechanism: Optional[str] = Field(default="CODE", description="Domain or mechanism (e.g. GC-001, CODE)")
     ruleset_id: Optional[str] = Field(default=None, description="Group or folder ruleset identifier")
     rule_category: Optional[str] = Field(default="property_check", description="Rule classification")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
     property_set: Optional[str] = None
     property_name: Optional[str] = None
     operator: Optional[str] = Field(default="==", description="Evaluation operator")
@@ -203,6 +204,7 @@ class RuleUpdateRequest(BaseModel):
     unit: Optional[str] = None
     severity: Optional[str] = None
     needs_review: Optional[int] = None
+    category: Optional[str] = None
 
 
 class RuleResponse(BaseModel):
@@ -215,6 +217,7 @@ class RuleResponse(BaseModel):
     mechanism: Optional[str] = None
     ruleset_id: Optional[str] = None
     rule_category: Optional[str] = None
+    category: Optional[str] = Field(default="Arch", description="Domain category: Arch, Piping, or seismic")
     property_set: Optional[str] = None
     property_name: Optional[str] = None
     operator: Optional[str] = None
@@ -245,7 +248,27 @@ class RuleFolderResponse(BaseModel):
     display_name: str
     description: Optional[str] = ""
     mechanism_scope: Optional[str] = ""
+    category: str = Field(default="Arch", description="Ruleset category: Arch, Piping, or seismic")
     rules: list[RuleResponse] = Field(default_factory=list)
+
+
+class RuleFolderCreateRequest(BaseModel):
+    """Payload for creating a new ruleset folder."""
+
+    ruleset_id: str = Field(..., description="Unique ruleset identifier")
+    display_name: Optional[str] = Field(default=None, description="Display name")
+    description: Optional[str] = Field(default="", description="Description")
+    mechanism_scope: Optional[str] = Field(default="", description="Mechanism scope (e.g. CODE, GC-001, SEISMIC)")
+    category: str = Field(default="Arch", description="Ruleset category: Arch, Piping, or seismic")
+
+
+class RuleFolderUpdateRequest(BaseModel):
+    """Payload for updating an existing ruleset folder."""
+
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    mechanism_scope: Optional[str] = None
+    category: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

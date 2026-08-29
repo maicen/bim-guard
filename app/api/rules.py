@@ -11,7 +11,9 @@ from app.api.dependencies import get_rules_service
 from app.logging_config import get_logger
 from app.modules.contracts import (
     RuleCreateRequest,
+    RuleFolderCreateRequest,
     RuleFolderResponse,
+    RuleFolderUpdateRequest,
     RuleResponse,
     RuleUpdateRequest,
 )
@@ -28,6 +30,7 @@ def list_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
     mechanism: Optional[str] = Query(None, description="Filter by mechanism (e.g. GC-001, CODE)"),
     ruleset_id: Optional[str] = Query(None, description="Filter by ruleset identifier"),
+    category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
     keyword: Optional[str] = Query(None, description="Keyword search query"),
     needs_review: Optional[int] = Query(None, description="Filter by review status (1 or 0)"),
 ) -> list[RuleResponse]:
@@ -36,8 +39,14 @@ def list_rules(
         rules = service.list_by_mechanism(mechanism)
     elif ruleset_id:
         rules = service.list_by_ruleset(ruleset_id)
+    elif category:
+        rules = service.list_by_category(category)
     else:
         rules = service.list_rules()
+
+    if category and (mechanism or ruleset_id):
+        norm_cat = service.normalize_category(category)
+        rules = [r for r in rules if (r.get("category") == norm_cat or service.infer_category(r) == norm_cat)]
 
     if needs_review is not None:
         rules = [r for r in rules if r.get("needs_review") == needs_review]
@@ -59,9 +68,10 @@ def list_rules(
 @router.get("/folders", response_model=list[RuleFolderResponse], summary="List ruleset folders")
 def list_rule_folders(
     service: Annotated[RuleService, Depends(get_rules_service)],
+    category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
 ) -> list[RuleFolderResponse]:
     """Return all rule folders along with their member rules."""
-    folders = service.list_folders_with_rules()
+    folders = service.list_folders_with_rules(category=category)
     result: list[RuleFolderResponse] = []
     for f in folders:
         rules_list = [RuleResponse(**r) for r in f.get("rules", [])]
@@ -72,10 +82,96 @@ def list_rule_folders(
                 display_name=f.get("display_name", ""),
                 description=f.get("description", ""),
                 mechanism_scope=f.get("mechanism_scope", ""),
+                category=f.get("category", "Arch"),
                 rules=rules_list,
             )
         )
     return result
+
+
+@router.post(
+    "/folders",
+    response_model=RuleFolderResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new ruleset folder",
+)
+def create_rule_folder(
+    payload: RuleFolderCreateRequest,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleFolderResponse:
+    """Create a new ruleset folder category."""
+    norm_cat = service.normalize_category(payload.category)
+    created = service.create_folder(
+        ruleset_id=payload.ruleset_id,
+        display_name=payload.display_name or payload.ruleset_id,
+        description=payload.description or "",
+        mechanism_scope=payload.mechanism_scope or "",
+        category=norm_cat,
+    )
+    if not created:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Folder '{payload.ruleset_id}' already exists or has invalid ID.",
+        )
+    folders = service.list_folders_with_rules()
+    for f in folders:
+        if service.normalize_ruleset_id(f.get("ruleset_id")) == service.normalize_ruleset_id(payload.ruleset_id):
+            return RuleFolderResponse(
+                id=f.get("id"),
+                ruleset_id=f.get("ruleset_id", ""),
+                display_name=f.get("display_name", ""),
+                description=f.get("description", ""),
+                mechanism_scope=f.get("mechanism_scope", ""),
+                category=f.get("category", norm_cat),
+                rules=[],
+            )
+    return RuleFolderResponse(
+        ruleset_id=payload.ruleset_id,
+        display_name=payload.display_name or payload.ruleset_id,
+        description=payload.description or "",
+        mechanism_scope=payload.mechanism_scope or "",
+        category=norm_cat,
+        rules=[],
+    )
+
+
+@router.put(
+    "/folders/{ruleset_id}",
+    response_model=RuleFolderResponse,
+    summary="Update an existing ruleset folder",
+)
+def update_rule_folder(
+    ruleset_id: str,
+    payload: RuleFolderUpdateRequest,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleFolderResponse:
+    """Update metadata and category for a ruleset folder."""
+    updated = service.update_folder_metadata(
+        ruleset_id=ruleset_id,
+        display_name=payload.display_name,
+        description=payload.description,
+        mechanism_scope=payload.mechanism_scope,
+        category=payload.category,
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ruleset folder '{ruleset_id}' not found.",
+        )
+    folders = service.list_folders_with_rules()
+    for f in folders:
+        if service.normalize_ruleset_id(f.get("ruleset_id")) == service.normalize_ruleset_id(ruleset_id):
+            rules_list = [RuleResponse(**r) for r in f.get("rules", [])]
+            return RuleFolderResponse(
+                id=f.get("id"),
+                ruleset_id=f.get("ruleset_id", ""),
+                display_name=f.get("display_name", ""),
+                description=f.get("description", ""),
+                mechanism_scope=f.get("mechanism_scope", ""),
+                category=f.get("category", "Arch"),
+                rules=rules_list,
+            )
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found after update")
 
 
 @router.get("/{rule_id}", response_model=RuleResponse, summary="Get rule by ID")
@@ -127,6 +223,7 @@ def create_rule(
             mechanism=payload.mechanism or "CODE",
             ruleset_id=payload.ruleset_id,
             rule_category=payload.rule_category or "property_check",
+            category=payload.category or "",
             confidence=payload.confidence or "1.0",
             extraction_method=payload.extraction_method or "manual",
             needs_review=payload.needs_review,

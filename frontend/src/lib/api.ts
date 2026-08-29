@@ -10,6 +10,9 @@ import type {
   ProjectUpdatePayload,
   Rule,
   RuleFolder,
+  RuleFolderCreatePayload,
+  RuleFolderUpdatePayload,
+  RulesetCategory,
   WorkflowStatus,
 } from './types';
 
@@ -87,10 +90,16 @@ export const projectsApi = {
 };
 
 export const rulesApi = {
-  async list(filters?: { mechanism?: string; ruleset_id?: string; keyword?: string }): Promise<Rule[]> {
+  async list(filters?: {
+    mechanism?: string;
+    ruleset_id?: string;
+    category?: RulesetCategory | string;
+    keyword?: string;
+  }): Promise<Rule[]> {
     const params = new URLSearchParams();
     if (filters?.mechanism) params.set('mechanism', filters.mechanism);
     if (filters?.ruleset_id) params.set('ruleset_id', filters.ruleset_id);
+    if (filters?.category) params.set('category', filters.category);
     if (filters?.keyword) params.set('keyword', filters.keyword);
 
     const query = params.toString() ? `?${params.toString()}` : '';
@@ -98,9 +107,28 @@ export const rulesApi = {
     return handleResponse<Rule[]>(res);
   },
 
-  async folders(): Promise<RuleFolder[]> {
-    const res = await fetch(`${API_BASE}/rules/folders`);
+  async folders(category?: RulesetCategory | string): Promise<RuleFolder[]> {
+    const query = category ? `?category=${encodeURIComponent(category)}` : '';
+    const res = await fetch(`${API_BASE}/rules/folders${query}`);
     return handleResponse<RuleFolder[]>(res);
+  },
+
+  async createFolder(payload: RuleFolderCreatePayload): Promise<RuleFolder> {
+    const res = await fetch(`${API_BASE}/rules/folders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<RuleFolder>(res);
+  },
+
+  async updateFolder(rulesetId: string, payload: RuleFolderUpdatePayload): Promise<RuleFolder> {
+    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<RuleFolder>(res);
   },
 
   async get(id: number): Promise<Rule> {

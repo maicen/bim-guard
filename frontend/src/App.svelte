@@ -137,8 +137,21 @@
           initialProjectId={targetProjectId}
           onSelectProjectForViewer={handleSelectProjectForViewer}
         />
+      {:else if activeView === 'piping'}
+        <AnalyzeView
+          activeCategory="Piping"
+          initialProjectId={targetProjectId}
+          onSelectProjectForViewer={handleSelectProjectForViewer}
+        />
+      {:else if activeView === 'seismic'}
+        <AnalyzeView
+          activeCategory="seismic"
+          initialProjectId={targetProjectId}
+          onSelectProjectForViewer={handleSelectProjectForViewer}
+        />
       {:else if activeView === 'analyze'}
         <AnalyzeView
+          activeCategory="Piping"
           initialProjectId={targetProjectId}
           onSelectProjectForViewer={handleSelectProjectForViewer}
         />

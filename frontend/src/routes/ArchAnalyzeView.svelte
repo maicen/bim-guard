@@ -90,7 +90,7 @@
   async function loadFolders(): Promise<void> {
     isFoldersLoading = true;
     try {
-      ruleFolders = await rulesApi.folders();
+      ruleFolders = await rulesApi.folders('Arch');
     } catch {
       ruleFolders = [];
     } finally {

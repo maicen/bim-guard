@@ -68,6 +68,7 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
             "unit": "m",
             "ruleset_id": "BUILDING-CODE-PART9",
             "mechanism": "CODE",
+            "category": "Arch",
             "severity": "mandatory",
         },
         {
@@ -82,6 +83,7 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
             "unit": "count",
             "ruleset_id": "BUILDING-CODE-PART9",
             "mechanism": "CODE",
+            "category": "Arch",
             "severity": "mandatory",
         },
         {
@@ -96,6 +98,7 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
             "unit": "ratio",
             "ruleset_id": "BUILDING-CODE-PART9",
             "mechanism": "CODE",
+            "category": "Arch",
             "severity": "mandatory",
         },
         {
@@ -110,6 +113,7 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
             "unit": "min",
             "ruleset_id": "BUILDING-CODE-PART9",
             "mechanism": "CODE",
+            "category": "Arch",
             "severity": "mandatory",
         },
     ]
@@ -521,12 +525,102 @@ def _seed_mc001(svc: RuleService) -> int:
     return count
 
 
+def seed_seismic_rules(svc: RuleService) -> int:
+    """Seed Blue Halo seismic bracing clearance rules (BIMGUARD-SB-001) per EN 1998-1 / DIN 4149."""
+    rules_to_seed = [
+        {
+            "reference": "SB-001.01",
+            "rule_type": "numeric_comparison",
+            "rule_category": "property_check",
+            "category": "seismic",
+            "description": "Seismic pipe bracing threshold — pipe diameter >= 63.0 mm requires Blue Halo clearance envelope",
+            "target_ifc_class": "IfcPipeSegment",
+            "property_name": "NominalDiameter",
+            "operator": ">=",
+            "check_value": 63.0,
+            "unit": "mm",
+            "ruleset_id": "BIMGUARD-SB-001",
+            "mechanism": "SEISMIC",
+            "severity": "mandatory",
+        },
+        {
+            "reference": "SB-001.02",
+            "rule_type": "spatial_clearance",
+            "rule_category": "property_check",
+            "category": "seismic",
+            "description": "Seismic bracing access clearance envelope — 200 mm buffer volume around braced services",
+            "target_ifc_class": "IfcPipeSegment",
+            "property_name": "ClearanceZone",
+            "operator": ">=",
+            "check_value": 200.0,
+            "unit": "mm",
+            "ruleset_id": "BIMGUARD-SB-001",
+            "mechanism": "SEISMIC",
+            "severity": "mandatory",
+        },
+        {
+            "reference": "SB-001.03",
+            "rule_type": "numeric_comparison",
+            "rule_category": "property_check",
+            "category": "seismic",
+            "description": "Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",
+            "target_ifc_class": "IfcPipeSegment",
+            "property_name": "TransverseBraceSpacing",
+            "operator": "<=",
+            "check_value": 1.0,
+            "unit": "m",
+            "ruleset_id": "BIMGUARD-SB-001",
+            "mechanism": "SEISMIC",
+            "severity": "mandatory",
+        },
+        {
+            "reference": "SB-001.04",
+            "rule_type": "numeric_comparison",
+            "rule_category": "property_check",
+            "category": "seismic",
+            "description": "Maximum longitudinal seismic brace spacing — 1.5 m per EN 1998-1 / DIN 4149",
+            "target_ifc_class": "IfcPipeSegment",
+            "property_name": "LongitudinalBraceSpacing",
+            "operator": "<=",
+            "check_value": 1.5,
+            "unit": "m",
+            "ruleset_id": "BIMGUARD-SB-001",
+            "mechanism": "SEISMIC",
+            "severity": "mandatory",
+        },
+        {
+            "reference": "SB-001.05",
+            "rule_type": "numeric_range",
+            "rule_category": "property_check",
+            "category": "seismic",
+            "description": "Seismic brace installation angle — permissible range 35° to 70° from horizontal",
+            "target_ifc_class": "IfcPipeSegment",
+            "property_name": "BraceAngle",
+            "operator": "between",
+            "value_min": 35.0,
+            "value_max": 70.0,
+            "unit": "deg",
+            "ruleset_id": "BIMGUARD-SB-001",
+            "mechanism": "SEISMIC",
+            "severity": "mandatory",
+        },
+    ]
+
+    count = 0
+    existing_refs = {str(r.get("reference") or "") for r in svc.list_rules()}
+    for item in rules_to_seed:
+        if item["reference"] not in existing_refs:
+            _create(svc, **item)
+            count += 1
+    return count
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 
 def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
     """
-    Seed GC-001, CC-001, MC-001, and architectural code rules.
+    Seed GC-001, CC-001, MC-001, architectural code rules, and Blue Halo seismic rules.
 
     Idempotent: skips any ruleset already present in the DB.
     Returns a dict of {ruleset_id: rows_inserted}.
@@ -536,11 +630,13 @@ def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
         cc = _seed_cc001(svc)
         mc = _seed_mc001(svc)
         arch = seed_architectural_code_rules(svc)
+        seismic = seed_seismic_rules(svc)
         return {
             "BIMGUARD-GC-001": gc,
             "BIMGUARD-CC-001": cc,
             "BIMGUARD-MC-001": mc,
             "BUILDING-CODE-PART9-ARCH": arch,
+            "BIMGUARD-SB-001": seismic,
         }
     except Exception as exc:
         print(f"[RulesetSeeder] Warning: {exc}")

@@ -253,3 +253,31 @@ Owner: unassigned.
 - **ARCH Audit Ruleset Scoping & Manual Trigger**: Added dynamic ruleset folder selection loaded via `rulesApi.folders()` in `ArchAnalyzeView.svelte`, replaced auto-runs on mount and project change with intentional manual execution, and added real-time BCF save status indicators with direct download and 3D ThatOpen viewer transitions.
 - **ARCH Compliance BCF Reports**: Expanded `ReportsView.svelte` with a dedicated, filterable ARCH BCF artifacts table sourced from `GET /api/analyze/bcf/list`, showing issue counts, file sizes, timestamps, and one-click 3D viewer and `.bcfzip` download actions.
 - **Typed BCF Contracts**: Added `BcfArtifact` schema to `frontend/src/lib/types.ts` and typed `analyzeApi.listBcfArtifacts()` in `frontend/src/lib/api.ts`.
+
+---
+
+# Verification Plan
+
+- [ ] Navigate to http://localhost:5173
+- [ ] Inspect Sidebar under "Analysis":
+  - Verify types: "Architectural", "Piping", "Seismic"
+- [ ] Click "Architectural":
+  - Verify it opens Architectural Compliance view
+  - Verify "Category: Arch"
+  - Verify only architectural rulesets
+- [ ] Click "Piping":
+  - Verify it opens Piping System Corrosion Audit
+  - Verify "Category: Piping"
+  - Verify Piping rulesets (BIMGUARD-GC-001, CC-001, MC-001)
+- [ ] Click "Seismic":
+  - Verify it opens Seismic Buffer & Bracing Audit
+  - Verify "Category: seismic"
+  - Verify Seismic rulesets (BIMGUARD-SB-001)
+- [ ] Click "Rules Catalog" in Library:
+  - Verify category selector pills (All Categories, Arch, Piping, seismic)
+  - Verify table contains Category column
+- [ ] Take screenshots for each step
+
+## Status
+
+Verification blocked: The open_browser_url tool failed multiple times because the Playwright environment driver could not be installed (HTTP 404 from playwright.azureedge.net).
