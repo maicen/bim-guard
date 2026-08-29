@@ -20,6 +20,7 @@ CACHING
 from __future__ import annotations
 
 from app.logging_config import get_logger
+from app.modules.module4_comparator.issue_schema import Issue, RiskBand
 from app.modules.phase_6.phase_6b_parsing import parse_ifc_bytes, sha256_of
 from app.modules.phase_6.phase_6c_corrosion_ui import DATA_QUALITY, run_corrosion_analysis
 from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
@@ -47,7 +48,7 @@ TRACKED_ENGINES: tuple[str, ...] = (GC_ENGINE, CC_ENGINE)
 
 #: Analysis slugs this runner can produce, matching the values of
 #: ``app.constants.ANALYSIS_ROUTES`` that have an engine behind them.
-RUNNABLE_SLUGS: tuple[str, ...] = ("corrosion", "seismic")
+RUNNABLE_SLUGS: tuple[str, ...] = ("corrosion", "seismic", "architecture")
 
 
 def failure_result(error: str) -> dict:
@@ -164,6 +165,97 @@ def _run_corrosion_tracked(content: bytes, project_id: int) -> dict:
         return result
 
 
+#: Band names an ``AuditIssue`` dict may carry, mapped onto the enum the
+#: exporter sorts and prioritises by. Anything unrecognised becomes LOW rather
+#: than raising: a band typo should cost one finding its severity, not a
+#: coordinator the whole report.
+_BAND_BY_NAME: dict[str, RiskBand] = {band.value: band for band in RiskBand}
+
+#: Fields an ``Issue`` defines a default for that an ``AuditIssue`` dict has no
+#: column for. Copied only when actually present, so the dataclass defaults keep
+#: deciding what "unset" means rather than this module restating them.
+_OPTIONAL_ISSUE_FIELDS: tuple[str, ...] = (
+    "assignee_role",
+    "status",
+    "created_at",
+    "updated_at",
+)
+
+
+def as_issue(raw: Issue | dict) -> Issue:
+    """Adapt one audit finding to the :class:`Issue` the exporter consumes.
+
+    The architecture and MEP pipelines emit findings as ``asdict(AuditIssue)``
+    dicts -- a flat shape with a string ``band`` and a ``details`` mapping --
+    while Sessions C and D emit :class:`Issue` dataclasses with a
+    :class:`RiskBand` and ``metadata``. ``phase_6e_export`` reads attributes, so
+    a dict reaches it as ``AttributeError`` rather than as a report. Converting
+    here keeps that difference in one place and leaves the exporter free of the
+    per-pipeline branch its module docstring says it does not need.
+
+    An ``Issue`` passes through untouched, so this is safe to map over any
+    pipeline's output without first knowing which pipeline produced it.
+    """
+    if isinstance(raw, Issue):
+        return raw
+
+    optional = {f: raw[f] for f in _OPTIONAL_ISSUE_FIELDS if raw.get(f)}
+    return Issue(
+        id=str(raw.get("id", "")),
+        element_id=str(raw.get("element_id", "")),
+        rule_id=str(raw.get("rule_id", "")),
+        title=str(raw.get("title", "")),
+        description=raw.get("description") or None,
+        band=_BAND_BY_NAME.get(str(raw.get("band", "")).lower(), RiskBand.LOW),
+        score=float(raw.get("score") or 0.0),
+        mechanism=str(raw.get("mechanism", "")),
+        mitigation=str(raw.get("mitigation", "")),
+        # ``details`` is AuditIssue's name for what Issue calls ``metadata``.
+        metadata=dict(raw.get("details") or raw.get("metadata") or {}),
+        citations=list(raw.get("citations") or []),
+        **optional,
+    )
+
+
+def _run_architecture(project_id: int) -> dict:
+    """Run the Part 9 architectural checks, shaped as an ``AnalysisResult``.
+
+    Architecture does not reach its findings through Phase 6 the way corrosion
+    and seismic do: it runs the orchestrator's Architecture theme, which already
+    returns the ``AnalysisResult`` keys but fills ``audit_issues`` with dicts.
+    Mapping them through :func:`as_issue` is what lets one exporter serve all
+    three slugs.
+
+    Only the ``AnalysisResult`` keys are kept. The orchestrator also returns the
+    project record, parsed documents and per-rule tables, which the exporter
+    never reads and which would otherwise be held in the analysis cache for the
+    whole TTL.
+
+    Not tracked: the orchestrator reports progress through its own
+    ``log_progress`` and drives no engine the workflow endpoint knows about, so
+    binding a tracker here would reset a corrosion run's stages for the same
+    project -- the reason the seismic path stays untracked too.
+    """
+    from app.services.pipeline_services import PipelineOrchestratorService
+
+    raw = PipelineOrchestratorService.orchestrate_workflow(
+        project_id=project_id,
+        analysis_theme="Architecture",
+    )
+    # The orchestrator reports a hard stop under "error" and a soft one under
+    # "compliance_error"; only the first means no result was produced.
+    if raw.get("error"):
+        return failure_result(str(raw["error"]))
+
+    return {
+        "audit_issues": [as_issue(i) for i in raw.get("audit_issues", [])],
+        "issue_stats": raw.get("issue_stats", {}),
+        "cost_impact": raw.get("cost_impact"),
+        "compliance_error": raw.get("compliance_error"),
+        "compliance_is_demo": raw.get("compliance_is_demo", False),
+    }
+
+
 def run_analysis(slug: str, project_id: int, *, use_cache: bool = True) -> dict:
     """Return the ``AnalysisResult`` for ``slug`` on ``project_id``.
 
@@ -202,6 +294,8 @@ def run_analysis(slug: str, project_id: int, *, use_cache: bool = True) -> dict:
         # workflow endpoint reports, and binding a tracker here would reset a
         # corrosion run's progress for the same project.
         result = run_seismic_analysis(content)
+    elif slug == "architecture":
+        result = _run_architecture(project_id)
     else:
         result = _run_corrosion_tracked(content, project_id)
 
