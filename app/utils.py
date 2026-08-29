@@ -82,3 +82,35 @@ def find_row_by_field(table, field_name: str, value):
         if row.get(field_name) == value:
             return row
     return None
+
+
+from app.services.cache import (  # noqa: E402
+    cache_db_query,
+    cache_stats,
+    clear_cache,
+    get_cache,
+    invalidate_cache,
+    local_cache,
+)
+
+__all__ = [
+    "ALLOWED_DOCUMENT_MIME_BY_SUFFIX",
+    "ALLOWED_DOCUMENT_SUFFIXES",
+    "cache_db_query",
+    "cache_stats",
+    "clear_cache",
+    "find_row_by_field",
+    "get_cache",
+    "invalidate_cache",
+    "is_likely_text_content",
+    "local_cache",
+    "md5_hex",
+    "now_iso_utc",
+    "redirect_see_other",
+    "rows_desc_by_id",
+    "safe_upload_name",
+    "store_upload_bytes",
+    "validate_document_upload",
+]
+
+

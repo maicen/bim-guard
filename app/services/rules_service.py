@@ -6,7 +6,12 @@ from typing import Any
 from postgrest.exceptions import APIError
 
 from app.services.persistence import PersistenceService
-from app.utils import now_iso_utc, rows_desc_by_id
+from app.utils import (
+    cache_db_query,
+    invalidate_cache,
+    now_iso_utc,
+    rows_desc_by_id,
+)
 
 # ── Schema columns ────────────────────────────────────────────────────────────
 
@@ -246,6 +251,7 @@ class RuleService:
             return
         try:
             self._folders.insert(payload)
+            invalidate_cache("bimguard:rules")
         except APIError as exc:
             if not self._disable_folders_if_missing(exc):
                 raise
@@ -256,6 +262,7 @@ class RuleService:
             return
         try:
             self._folders.update(updates=updates, pk_values=folder_id)
+            invalidate_cache("bimguard:rules")
         except APIError as exc:
             if not self._disable_folders_if_missing(exc):
                 raise
@@ -266,9 +273,11 @@ class RuleService:
             return
         try:
             self._folders.delete(folder_id)
+            invalidate_cache("bimguard:rules")
         except APIError as exc:
             if not self._disable_folders_if_missing(exc):
                 raise
+
 
     def _sync_folders_from_rules(self) -> None:
         """Backfill folder rows from existing rule records during startup."""
@@ -364,6 +373,7 @@ class RuleService:
 
     # ── Web CRUD ──────────────────────────────────────────────────────────────
 
+    @cache_db_query(key_prefix="bimguard:rules:list")
     def list_rules(self, category: str | None = None) -> list[dict]:
         """Return all rules ordered by newest first, optionally filtered by category."""
         rows = rows_desc_by_id(self._rules)
@@ -376,6 +386,7 @@ class RuleService:
             ]
         return rows
 
+    @cache_db_query(key_prefix="bimguard:rules:item")
     def get_rule(self, rule_id: int) -> dict | None:
         """Return a single rule by primary key."""
         return self._rules.get(rule_id)
@@ -471,7 +482,9 @@ class RuleService:
             }
         )
         self._ensure_folder(ruleset_id, mechanism_scope=mechanism, category=norm_cat)
+        invalidate_cache("bimguard:rules")
         return saved
+
 
     def update_rule(
         self,
@@ -564,6 +577,7 @@ class RuleService:
         new_normalized = self.normalize_ruleset_id(target_ruleset)
         if old_normalized and old_normalized != new_normalized:
             self._drop_folder_if_orphan(old_normalized)
+        invalidate_cache("bimguard:rules")
 
     @staticmethod
     def _parse_numeric(value):
@@ -584,6 +598,7 @@ class RuleService:
         old_ruleset_id = (existing or {}).get("ruleset_id") or ""
         self._rules.delete(rule_id)
         self._drop_folder_if_orphan(old_ruleset_id)
+        invalidate_cache("bimguard:rules")
 
     def set_rule_parameter(self, rule_id: int, key: str, value) -> None:
         """Merge one key into a rule's `parameters` JSON blob.
@@ -607,6 +622,8 @@ class RuleService:
             updates={"parameters": json.dumps(params), "updated_at": now_iso_utc()},
             pk_values=rule_id,
         )
+        invalidate_cache("bimguard:rules")
+
 
     # ── Classification queries ────────────────────────────────────────────────
 
@@ -696,6 +713,7 @@ class RuleService:
 
         return False
 
+    @cache_db_query(key_prefix="bimguard:rules:mechanism")
     def list_by_mechanism(self, mechanism: str) -> list[dict]:
         """Return all rules for a corrosion or code-check mechanism."""
         return list(self._rules.rows_where("mechanism = ?", [mechanism]))
@@ -711,6 +729,7 @@ class RuleService:
                 selected.append(row)
         return selected
 
+    @cache_db_query(key_prefix="bimguard:rules:ruleset")
     def list_by_ruleset(self, ruleset_id: str) -> list[dict]:
         """Return all rules that belong to a ruleset identifier."""
         normalized = self.normalize_ruleset_id(ruleset_id)
@@ -718,9 +737,11 @@ class RuleService:
             return []
         return list(self._rules.rows_where("ruleset_id = ?", [normalized]))
 
+    @cache_db_query(key_prefix="bimguard:rules:folders")
     def list_folders(self, category: str | None = None) -> list[dict]:
         """Return folder rows with current rule counts, ordered by ruleset_id."""
         rows = self.list_folders_with_rules(category=category)
+
         for row in rows:
             row.pop("rules", None)
         return rows
@@ -832,6 +853,8 @@ class RuleService:
             self._rules.delete(rule["id"])
             deleted += 1
         self._drop_folder_if_orphan(ruleset_id)
+        if deleted:
+            invalidate_cache("bimguard:rules")
         return deleted
 
     def delete_rules(self, rule_ids: list[int]) -> int:
@@ -842,7 +865,10 @@ class RuleService:
                 continue
             self._rules.delete(rule_id)
             deleted += 1
+        if deleted:
+            invalidate_cache("bimguard:rules")
         return deleted
+
 
     def list_by_category(self, category: str) -> list[dict]:
         """Return all rules matching the provided domain category (Arch, Piping, or seismic)."""
@@ -887,6 +913,7 @@ class RuleService:
         """Return the total number of rules in storage."""
         return len(list(self._rules.rows))
 
+    @cache_db_query(key_prefix="bimguard:rules:target")
     def fetch_rules_for_target(self, target_ifc_class: str) -> list[dict]:
         """Return rules targeting a specific IFC class."""
         return list(self._rules.rows_where("target_ifc_class = ?", [target_ifc_class]))
@@ -923,9 +950,11 @@ class RuleService:
         """Return a small sample of mandatory rules for previews."""
         return list(self._rules.rows_where("severity = 'mandatory'", limit=limit))
 
+    @cache_db_query(key_prefix="bimguard:rules:summary")
     def summary(self) -> dict:
         """Return aggregate counts of rules by entity, source, and mechanism."""
         rules = list(self._rules.rows)
+
         by_entity: dict[str, int] = {}
         by_source: dict[str, int] = {}
         by_mechanism: dict[str, int] = {}
@@ -1054,3 +1083,7 @@ class RuleService:
         from app.modules.module3_rule_builder.ids_exporter import import_ids_ruleset
 
         return import_ids_ruleset(xml_text)
+
+
+RulesService = RuleService
+

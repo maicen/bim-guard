@@ -15,6 +15,8 @@ from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import (
+    cache_db_query,
+    invalidate_cache,
     md5_hex,
     now_iso_utc,
     rows_desc_by_id,
@@ -103,6 +105,7 @@ class ProjectsService:
             )
         )
 
+    @cache_db_query(key_prefix="bimguard:projects:list")
     def list_projects(self):
         """Return all projects ordered by newest first."""
         return rows_desc_by_id(self._projects)
@@ -111,6 +114,7 @@ class ProjectsService:
         """Return the number of stored projects."""
         return len(self.list_projects())
 
+    @cache_db_query(key_prefix="bimguard:projects:item")
     def get_project(self, project_id: int):
         """Return a single project by primary key."""
         return self._projects.get(project_id)
@@ -192,6 +196,7 @@ class ProjectsService:
                 "updated_at": now,
             }
         )
+        invalidate_cache("bimguard:projects:list")
         logger.info(
             "Project created project_id=%s status=%s country=%s analysis_type=%s has_ifc=%s",
             project.get("id"),
@@ -232,6 +237,8 @@ class ProjectsService:
             updates=updates,
             pk_values=project_id,
         )
+        invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
+        invalidate_cache("bimguard:projects:list")
         logger.info("Project updated project_id=%d status=%s", project_id, status)
         return self.get_project(project_id)
 
@@ -252,6 +259,8 @@ class ProjectsService:
             updates={"ifc_file_path": storage_ref, "updated_at": now_iso_utc()},
             pk_values=project_id,
         )
+        invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
+        invalidate_cache("bimguard:projects:list")
         logger.info("Project IFC attached project_id=%d ref=%s", project_id, storage_ref)
 
     def delete_project(self, project_id: int):
@@ -260,7 +269,12 @@ class ProjectsService:
         if project is not None:
             self._storage.delete(project.get("ifc_file_path") or "")
         self._projects.delete(project_id)
+        invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
+        invalidate_cache("bimguard:projects:list")
+        invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
+        invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
         logger.info("Project deleted project_id=%d existed=%s", project_id, project is not None)
+
 
     def resolve_ifc_file(self, project_id: int) -> Path | None:
         """Return an existing IFC file path for a project, if present."""
@@ -314,6 +328,7 @@ class ProjectsService:
         return improved_path, lineage
     # ── standards ────────────────────────────────────────────────────────────
 
+    @cache_db_query(key_prefix="bimguard:projects:standards")
     def get_standards_by_project(self, project_id: int) -> list[dict]:
         """Return the standards selected for a project.
 
@@ -372,6 +387,7 @@ class ProjectsService:
                 "updated_at": now,
             }
         )
+        invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
         logger.info(
             "Standard linked project_id=%d standard_id=%s source=%s", project_id, standard_id, source
         )
@@ -395,6 +411,7 @@ class ProjectsService:
         for standard_id in standard_ids:
             self.add_standard_to_project(project_id, standard_id, source="notebook")
 
+        invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
         logger.info("Standards set project_id=%d count=%d", project_id, len(wanted))
         return len(wanted)
 
@@ -421,6 +438,7 @@ class ProjectsService:
         row = self.add_standard_to_project(
             project_id, standard_id=filename, source="uploaded", file_path=storage_ref
         )
+        invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
         logger.info(
             "Custom standard uploaded project_id=%d filename=%s bytes=%d",
             project_id,
@@ -434,13 +452,19 @@ class ProjectsService:
         row = self._standards.get(standard_row_id)
         if row is None:
             return
+        project_id = row.get("project_id")
         if row.get("source") == "uploaded" and row.get("file_path"):
             self._storage.delete(row["file_path"])
         self._standards.delete(standard_row_id)
-        logger.info("Standard unlinked id=%d project_id=%s", standard_row_id, row.get("project_id"))
+        if project_id:
+            invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
+        else:
+            invalidate_cache("bimguard:projects:standards")
+        logger.info("Standard unlinked id=%d project_id=%s", standard_row_id, project_id)
 
     # ── client documents ─────────────────────────────────────────────────────
 
+    @cache_db_query(key_prefix="bimguard:projects:docs")
     def get_client_documents_by_project(self, project_id: int) -> list[dict]:
         """Return the client documents uploaded against a project."""
         rows = list(self._client_documents.rows_where("project_id = ?", [project_id]))
@@ -502,6 +526,7 @@ class ProjectsService:
                 "updated_at": now,
             }
         )
+        invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
         logger.info(
             "Client document stored project_id=%d filename=%s category=%s bytes=%d",
             project_id,
@@ -516,10 +541,16 @@ class ProjectsService:
         row = self._client_documents.get(document_id)
         if row is None:
             return
+        project_id = row.get("project_id")
         if row.get("file_path"):
             self._storage.delete(row["file_path"])
         self._client_documents.delete(document_id)
-        logger.info("Client document deleted id=%d project_id=%s", document_id, row.get("project_id"))
+        if project_id:
+            invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
+        else:
+            invalidate_cache("bimguard:projects:docs")
+        logger.info("Client document deleted id=%d project_id=%s", document_id, project_id)
+
 
     def get_analysis_inputs(self, project_id: int) -> list[dict]:
         """Return standards and client documents as one list for the analyze forms.
