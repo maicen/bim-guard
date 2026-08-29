@@ -625,19 +625,23 @@ def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
     Idempotent: skips any ruleset already present in the DB.
     Returns a dict of {ruleset_id: rows_inserted}.
     """
-    try:
-        gc = _seed_gc001(svc)
-        cc = _seed_cc001(svc)
-        mc = _seed_mc001(svc)
-        arch = seed_architectural_code_rules(svc)
-        seismic = seed_seismic_rules(svc)
-        return {
-            "BIMGUARD-GC-001": gc,
-            "BIMGUARD-CC-001": cc,
-            "BIMGUARD-MC-001": mc,
-            "BUILDING-CODE-PART9-ARCH": arch,
-            "BIMGUARD-SB-001": seismic,
-        }
-    except Exception as exc:
-        print(f"[RulesetSeeder] Warning: {exc}")
-        return {}
+    seeders = (
+        ("BIMGUARD-GC-001", _seed_gc001),
+        ("BIMGUARD-CC-001", _seed_cc001),
+        ("BIMGUARD-MC-001", _seed_mc001),
+        ("BUILDING-CODE-PART9-ARCH", seed_architectural_code_rules),
+        ("BIMGUARD-SB-001", seed_seismic_rules),
+    )
+
+    # Isolated per ruleset. A shared try/except let one unreachable static
+    # asset abort every seeder after it: a missing GC-001 payload took CC-001,
+    # MC-001, the architectural rules and the seismic rules down with it, so
+    # the rules catalogue showed no Piping or seismic folders and the cause
+    # was a single warning line.
+    seeded: dict[str, int] = {}
+    for ruleset_id, seeder in seeders:
+        try:
+            seeded[ruleset_id] = seeder(svc)
+        except Exception as exc:
+            print(f"[RulesetSeeder] Warning: {ruleset_id} not seeded: {exc}")
+    return seeded
