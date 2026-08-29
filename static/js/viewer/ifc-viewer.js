@@ -6,6 +6,16 @@ import * as THREE from "https://esm.sh/three@0.182.0";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
+// Camera framing. The viewport used to open at a hardcoded setLookAt() pose
+// tuned for one sample model, so anything with different bounds — or with IFC
+// coordinates surveyed far from the origin, which is the norm — rendered as a
+// speck or off screen entirely. The pose below is derived from the loaded
+// geometry instead.
+const FIT_VIEW_DIRECTION = new THREE.Vector3(1, 0.6, 1).normalize();
+const FIT_PADDING = 1.2; // slight zoom-out so the model clears the viewport edges
+const MIN_FIT_RADIUS = 0.05; // only catches a degenerate (zero-size) box, which would otherwise
+                            // put the camera on top of the model, inside its own near plane
+
 // The BCF viewpoints the corrosion engine generates carry the failing
 // element's GUID in their selection (see bcf_generator._viewpoint_xml), but
 // Viewpoint.go() only moves the camera and applies visibility — it never
@@ -349,6 +359,69 @@ export async function initViewer(containerOrId) {
     const workspace = createTopicsWorkspace(components, world, viewport, highlightTopics);
     container.replaceChildren(workspace.app);
 
+    function isFiniteBox(box) {
+        return [box.min, box.max].every(
+            (v) => Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z),
+        );
+    }
+
+    // Union of every loaded model's bounds, or null when nothing measurable is
+    // loaded. FragmentsModel.box maps its cached local bbox through the
+    // object's world matrix, and auto-coordination shifts that object after
+    // setup, so the matrix has to be refreshed before reading it.
+    function getModelsBoundingBox() {
+        const box = new THREE.Box3().makeEmpty();
+        for (const [, model] of fragments.list) {
+            if (!model.object) continue;
+            model.object.updateMatrixWorld(true);
+            const modelBox = model.box;
+            // A model whose geometry failed to stream reports an empty or
+            // non-finite box; unioning that would poison the whole result.
+            if (!modelBox || modelBox.isEmpty() || !isFiniteBox(modelBox)) continue;
+            box.union(modelBox);
+        }
+        return box.isEmpty() ? null : box;
+    }
+
+    // Both of the library's default cameras clip at 1000 units (perspective
+    // also starts at 1), which cuts a site model off at the far plane and
+    // slices a small assembly open at the near one. Scale both planes to the
+    // model so the fit below is actually visible.
+    function updateClippingPlanes(radius) {
+        for (const camera of [world.camera.threePersp, world.camera.threeOrtho]) {
+            if (!camera) continue;
+            camera.near = Math.max(radius / 1000, 0.01);
+            camera.far = Math.max(radius * 100, 1000);
+            camera.updateProjectionMatrix();
+        }
+    }
+
+    // Frames the loaded geometry. fitToSphere works out the distance for
+    // whichever projection is active (perspective FOV, ortho zoom) but only
+    // moves the camera along its current view direction, so the camera is
+    // aimed from a fixed isometric angle first — otherwise the framing
+    // inherits whatever angle was left over from the previous model.
+    async function fitToModel({ transition = false } = {}) {
+        const box = getModelsBoundingBox();
+        if (!box) return false;
+
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        // Half the box diagonal is the true bounding sphere, so every corner
+        // is guaranteed inside the view once fitToSphere has framed it.
+        const boundingRadius = size.length() / 2;
+        const radius = Math.max(boundingRadius, MIN_FIT_RADIUS) * FIT_PADDING;
+
+        updateClippingPlanes(radius);
+
+        const eye = center.clone().addScaledVector(FIT_VIEW_DIRECTION, radius * 2);
+        const controls = world.camera.controls;
+        await controls.setLookAt(eye.x, eye.y, eye.z, center.x, center.y, center.z, false);
+        await controls.fitToSphere(new THREE.Sphere(center, radius), transition);
+        await fragments.core.update(true);
+        return true;
+    }
+
     async function clearModels() {
         try {
             for (const [, model] of fragments.list) {
@@ -373,6 +446,10 @@ export async function initViewer(containerOrId) {
             const data = await file.arrayBuffer();
             const buffer = new Uint8Array(data);
             await fragmentIfcLoader.load(buffer, true, file.name.replace(/\.ifc$/i, ""));
+            // load() only resolves once the model's bounding box is final, so
+            // the camera can be framed straight away — no need to wait for the
+            // remaining geometry to stream in.
+            await fitToModel();
         } catch (error) {
             console.error("Error loading IFC file", error);
             throw error;
@@ -433,6 +510,7 @@ export async function initViewer(containerOrId) {
         topics: workspace.topics,
         loadBcf,
         loadIfc,
+        fitToModel,
         setupFileLoader,
         selectTopic: workspace.selectTopic,
         findTopicByElementGuid,
