@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount } from "svelte";
   import {
     Plus,
     Search,
@@ -12,24 +12,24 @@
     XCircle,
     SlidersHorizontal,
     Wand2,
-  } from 'lucide-svelte';
-  import { projectsApi } from '../lib/api';
-  import type { Project } from '../lib/types';
-  import ProjectWizardModal from '../lib/components/ProjectWizardModal.svelte';
-  import ProjectEnhancementsModal from '../lib/components/ProjectEnhancementsModal.svelte';
-  import ConfirmModal from '../lib/components/ConfirmModal.svelte';
+  } from "lucide-svelte";
+  import { projectsApi } from "../lib/api";
+  import type { Project } from "../lib/types";
+  import ProjectWizardModal from "../lib/components/ProjectWizardModal.svelte";
+  import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
+  import ConfirmModal from "../lib/components/ConfirmModal.svelte";
 
   export let onSelectProjectForAudit: (projectId: number) => void;
   export let onSelectProjectForViewer: (projectId: number) => void;
 
   let projects: Project[] = [];
   let isLoading = true;
-  let error = '';
+  let error = "";
 
   // Filter state
-  let searchQuery = '';
-  let statusFilter = 'all';
-  let domainFilter = 'all';
+  let searchQuery = "";
+  let statusFilter = "all";
+  let domainFilter = "all";
 
   // Modals state
   let isWizardOpen = false;
@@ -40,12 +40,12 @@
 
   async function loadProjects() {
     isLoading = true;
-    error = '';
+    error = "";
     try {
       const data = await projectsApi.list();
       projects = data.projects || [];
     } catch (err: any) {
-      error = err.message || 'Failed to load projects';
+      error = err.message || "Failed to load projects";
     } finally {
       isLoading = false;
     }
@@ -57,11 +57,12 @@
 
   $: filteredProjects = projects.filter((p) => {
     const matchesSearch =
-      searchQuery === '' ||
+      searchQuery === "" ||
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-    const matchesDomain = domainFilter === 'all' || p.analysis_type === domainFilter;
+      (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+    const matchesDomain =
+      domainFilter === "all" || p.analysis_type === domainFilter;
     return matchesSearch && matchesStatus && matchesDomain;
   });
 
@@ -87,13 +88,21 @@
   }
 </script>
 
-<div class="space-y-6 max-w-6xl mx-auto">
+<div class="space-y-6 mx-auto">
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Registry</div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">Project Registry</h1>
-      <p class="text-xs sm:text-sm text-slate-400">Manage OpenBIM models, analysis scopes, and compliance records.</p>
+      <div
+        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
+      >
+        Registry
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+        Project Registry
+      </h1>
+      <p class="text-xs sm:text-sm text-slate-400">
+        Manage OpenBIM models, analysis scopes, and compliance records.
+      </p>
     </div>
 
     <div class="flex items-center gap-2">
@@ -109,15 +118,21 @@
   </div>
 
   {#if error}
-    <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+    <div
+      class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs"
+    >
       {error}
     </div>
   {/if}
 
   <!-- Filters and Search Bar -->
-  <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row items-center gap-3">
+  <div
+    class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row items-center gap-3"
+  >
     <div class="relative flex-1 w-full">
-      <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+      <Search
+        class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
+      />
       <input
         type="text"
         bind:value={searchQuery}
@@ -150,9 +165,13 @@
   </div>
 
   <!-- Projects Table -->
-  <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
+  <div
+    class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40"
+  >
     {#if isLoading}
-      <div class="p-12 text-center text-xs text-slate-400">Loading project registry...</div>
+      <div class="p-12 text-center text-xs text-slate-400">
+        Loading project registry...
+      </div>
     {:else if filteredProjects.length === 0}
       <div class="p-12 text-center text-xs text-slate-500 space-y-2">
         <p>No projects match your current filters.</p>
@@ -167,7 +186,9 @@
     {:else}
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-300">
-          <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+          <thead
+            class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
+          >
             <tr>
               <th class="py-3 px-4">ID</th>
               <th class="py-3 px-4">Name</th>
@@ -182,15 +203,25 @@
           <tbody class="divide-y divide-slate-800/60">
             {#each filteredProjects as project}
               <tr class="hover:bg-slate-900/60 transition-colors">
-                <td class="py-3 px-4 font-mono text-slate-500">#{project.id}</td>
+                <td class="py-3 px-4 font-mono text-slate-500">#{project.id}</td
+                >
                 <td class="py-3 px-4">
-                  <div class="font-semibold text-white truncate max-w-xs">{project.name}</div>
+                  <div class="font-semibold text-white truncate max-w-xs">
+                    {project.name}
+                  </div>
                   {#if project.description}
-                    <div class="text-[11px] text-slate-400 truncate max-w-xs">{project.description}</div>
+                    <div class="text-[11px] text-slate-400 truncate max-w-xs">
+                      {project.description}
+                    </div>
                   {/if}
                 </td>
                 <td class="py-3 px-4">
-                  <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold {project.status === 'Active' ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/60' : 'bg-slate-800 text-slate-400'}">
+                  <span
+                    class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold {project.status ===
+                    'Active'
+                      ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/60'
+                      : 'bg-slate-800 text-slate-400'}"
+                  >
                     {project.status}
                   </span>
                 </td>
@@ -215,10 +246,13 @@
                     </div>
                   {/if}
                 </td>
-                <td class="py-3 px-4 text-slate-300">{project.analysis_type}</td>
+                <td class="py-3 px-4 text-slate-300">{project.analysis_type}</td
+                >
                 <td class="py-3 px-4 text-slate-400">{project.country}</td>
                 <td class="py-3 px-4 text-slate-500 whitespace-nowrap">
-                  {project.created_at ? project.created_at.substring(0, 10) : '-'}
+                  {project.created_at
+                    ? project.created_at.substring(0, 10)
+                    : "-"}
                 </td>
                 <td class="py-3 px-4 text-right whitespace-nowrap">
                   <div class="flex items-center justify-end gap-1.5">
@@ -291,7 +325,7 @@
 <ConfirmModal
   bind:isOpen={isDeleteModalOpen}
   title="Delete Project"
-  message={`Are you sure you want to delete project "${projectToDelete?.name || ''}" and its associated artifacts? This cannot be undone.`}
+  message={`Are you sure you want to delete project "${projectToDelete?.name || ""}" and its associated artifacts? This cannot be undone.`}
   confirmText="Delete Project"
   danger={true}
   onConfirm={confirmDelete}

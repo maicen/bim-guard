@@ -11,20 +11,25 @@
     Boxes,
     Terminal,
     ArrowRight,
-  } from 'lucide-svelte';
-  import { revitSyncApi } from '../lib/api';
-  import type { RevitSyncRequest, RevitSyncResponse, RevitRuleResult } from '../lib/types';
-  import Badge from '../lib/components/Badge.svelte';
-  import BentoBox from '../lib/components/BentoBox.svelte';
+  } from "lucide-svelte";
+  import { revitSyncApi } from "../lib/api";
+  import type {
+    RevitSyncRequest,
+    RevitSyncResponse,
+    RevitRuleResult,
+  } from "../lib/types";
+  import Badge from "../lib/components/Badge.svelte";
+  import BentoBox from "../lib/components/BentoBox.svelte";
 
   let copied = false;
   let isSendingTest = false;
   let testResponse: RevitSyncResponse | null = null;
   let testError: string | null = null;
 
-  const endpointUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/analyze/revit-sync`
-    : 'http://localhost:8000/api/analyze/revit-sync';
+  const endpointUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/analyze/revit-sync`
+      : "http://localhost:8000/api/analyze/revit-sync";
 
   const pyRevitScript = `"""
 BIM Guard — Direct pyRevit Push Script
@@ -89,7 +94,7 @@ print(response.read())
         guid: "d41a0f82-8301-4985-9c74-236eb965b802",
         storey: "Level 2",
         properties: {
-          Width: 850.0,  // Failing: < 900mm
+          Width: 850.0, // Failing: < 900mm
           RiserHeight: 210.0, // Failing: > 200mm
           TreadLength: 220.0,
         },
@@ -124,25 +129,28 @@ print(response.read())
     try {
       testResponse = await revitSyncApi.sync(samplePayload);
     } catch (err: any) {
-      testError = err.message || 'Direct sync failed.';
+      testError = err.message || "Direct sync failed.";
     } finally {
       isSendingTest = false;
     }
   }
 </script>
 
-<div class="space-y-8 max-w-6xl mx-auto">
+<div class="space-y-8 mx-auto">
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
+      <div
+        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
+      >
         Integrations
       </div>
       <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
         Revit Direct Sync
       </h1>
       <p class="text-xs sm:text-sm text-slate-400">
-        Push live BIM element data directly from Autodesk Revit using pyRevit — zero IFC export required.
+        Push live BIM element data directly from Autodesk Revit using pyRevit —
+        zero IFC export required.
       </p>
     </div>
 
@@ -154,7 +162,8 @@ print(response.read())
         class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
       >
         <Send class="w-3.5 h-3.5" />
-        <span>{isSendingTest ? 'Sending Test...' : 'Simulate Direct Push'}</span>
+        <span>{isSendingTest ? "Sending Test..." : "Simulate Direct Push"}</span
+        >
       </button>
     </div>
   </div>
@@ -184,33 +193,64 @@ print(response.read())
   <!-- Setup Instructions & pyRevit Template -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Steps Card -->
-    <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 flex flex-col justify-between">
+    <div
+      class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 flex flex-col justify-between"
+    >
       <div class="space-y-3">
-        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+        <div
+          class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400"
+        >
           <Code class="w-4 h-4 text-blue-400" />
           <span>Connection Guide</span>
         </div>
         <h2 class="text-lg font-bold text-white tracking-tight">
           How to connect your Revit model
         </h2>
-        <ol class="list-decimal list-inside space-y-3 text-xs text-slate-300 leading-relaxed">
+        <ol
+          class="list-decimal list-inside space-y-3 text-xs text-slate-300 leading-relaxed"
+        >
           <li>
-            <strong class="text-white">Install pyRevit:</strong> Download and install the open-source pyRevit CLI/GUI from <a href="https://pyrevitlabs.io" target="_blank" rel="noreferrer" class="text-blue-400 underline">pyrevitlabs.io</a>.
+            <strong class="text-white">Install pyRevit:</strong> Download and
+            install the open-source pyRevit CLI/GUI from
+            <a
+              href="https://pyrevitlabs.io"
+              target="_blank"
+              rel="noreferrer"
+              class="text-blue-400 underline">pyrevitlabs.io</a
+            >.
           </li>
           <li>
-            <strong class="text-white">Create Button:</strong> In your Revit extensions folder, create a pushbutton folder structure (e.g. <code class="font-mono bg-slate-800 px-1 py-0.5 rounded text-slate-200">BIMGuard.extension/BIMGuard.tab/Audit.panel/DirectSync.pushbutton</code>).
+            <strong class="text-white">Create Button:</strong> In your Revit
+            extensions folder, create a pushbutton folder structure (e.g.
+            <code
+              class="font-mono bg-slate-800 px-1 py-0.5 rounded text-slate-200"
+              >BIMGuard.extension/BIMGuard.tab/Audit.panel/DirectSync.pushbutton</code
+            >).
           </li>
           <li>
-            <strong class="text-white">Copy Template:</strong> Paste the IronPython script template on the right into <code class="font-mono bg-slate-800 px-1 py-0.5 rounded text-slate-200">script.py</code>.
+            <strong class="text-white">Copy Template:</strong> Paste the
+            IronPython script template on the right into
+            <code
+              class="font-mono bg-slate-800 px-1 py-0.5 rounded text-slate-200"
+              >script.py</code
+            >.
           </li>
           <li>
-            <strong class="text-white">Click &amp; Verify:</strong> Click the button in your Revit ribbon. Compliance findings appear instantly in this view and in your audit reports.
+            <strong class="text-white">Click &amp; Verify:</strong> Click the button
+            in your Revit ribbon. Compliance findings appear instantly in this view
+            and in your audit reports.
           </li>
         </ol>
       </div>
 
-      <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Active Sync Target</div>
+      <div
+        class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5"
+      >
+        <div
+          class="text-[11px] font-bold text-slate-400 uppercase tracking-widest"
+        >
+          Active Sync Target
+        </div>
         <div class="font-mono text-xs text-blue-400 break-all select-all">
           {endpointUrl}
         </div>
@@ -218,7 +258,9 @@ print(response.read())
     </div>
 
     <!-- Script Template Card -->
-    <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 flex flex-col justify-between">
+    <div
+      class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 flex flex-col justify-between"
+    >
       <div class="flex items-center justify-between">
         <div class="text-xs font-bold uppercase tracking-wider text-slate-400">
           pyRevit Script Template
@@ -238,7 +280,8 @@ print(response.read())
         </button>
       </div>
 
-      <pre class="bg-slate-950/90 border border-slate-800/80 rounded-xl p-4 overflow-x-auto text-[11px] font-mono text-slate-300 leading-relaxed max-h-80 select-all">
+      <pre
+        class="bg-slate-950/90 border border-slate-800/80 rounded-xl p-4 overflow-x-auto text-[11px] font-mono text-slate-300 leading-relaxed max-h-80 select-all">
 {pyRevitScript}
       </pre>
     </div>
@@ -246,33 +289,56 @@ print(response.read())
 
   <!-- Test Simulation Results -->
   {#if testError}
-    <div class="p-4 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-start gap-2.5">
+    <div
+      class="p-4 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-start gap-2.5"
+    >
       <AlertTriangle class="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
       <div>{testError}</div>
     </div>
   {/if}
 
   {#if testResponse}
-    <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+    <div
+      class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6"
+    >
+      <div
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4"
+      >
         <div>
-          <div class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1">
+          <div
+            class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1"
+          >
             Sync Results Received
           </div>
           <h2 class="text-lg font-bold text-white">
             {samplePayload.project_name}
           </h2>
           <p class="text-xs text-slate-400">
-            Assessed {testResponse.element_count} elements against OBC rules • Theme: {testResponse.theme}
+            Assessed {testResponse.element_count} elements against OBC rules • Theme:
+            {testResponse.theme}
           </p>
         </div>
 
         <div class="flex items-center gap-3">
-          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
-            <span>Pass: {testResponse.results.reduce((acc, r) => acc + (r.pass_count || 0), 0)}</span>
+          <div
+            class="flex items-center gap-1.5 text-xs font-bold text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700"
+          >
+            <span
+              >Pass: {testResponse.results.reduce(
+                (acc, r) => acc + (r.pass_count || 0),
+                0,
+              )}</span
+            >
           </div>
-          <div class="flex items-center gap-1.5 text-xs font-bold text-rose-400 bg-rose-950/80 px-3 py-1.5 rounded-full border border-rose-800">
-            <span>Fail: {testResponse.results.reduce((acc, r) => acc + (r.fail_count || 0), 0)}</span>
+          <div
+            class="flex items-center gap-1.5 text-xs font-bold text-rose-400 bg-rose-950/80 px-3 py-1.5 rounded-full border border-rose-800"
+          >
+            <span
+              >Fail: {testResponse.results.reduce(
+                (acc, r) => acc + (r.fail_count || 0),
+                0,
+              )}</span
+            >
           </div>
         </div>
       </div>
@@ -281,7 +347,9 @@ print(response.read())
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs border-collapse">
           <thead>
-            <tr class="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+            <tr
+              class="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider"
+            >
               <th class="py-2.5 px-3">Rule Reference</th>
               <th class="py-2.5 px-3">Target</th>
               <th class="py-2.5 px-3">Property</th>
@@ -294,34 +362,51 @@ print(response.read())
             {#each testResponse.results as rule}
               <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="py-3 px-3 font-semibold text-white font-mono">
-                  {rule.rule_ref || 'Custom Rule'}
+                  {rule.rule_ref || "Custom Rule"}
                   {#if rule.rule_desc}
-                    <div class="text-[11px] text-slate-400 font-sans font-normal mt-0.5">
+                    <div
+                      class="text-[11px] text-slate-400 font-sans font-normal mt-0.5"
+                    >
                       {rule.rule_desc}
                     </div>
                   {/if}
                 </td>
                 <td class="py-3 px-3 font-mono text-slate-300">
-                  {rule.target || '—'}
+                  {rule.target || "—"}
                 </td>
                 <td class="py-3 px-3 text-slate-300 font-mono">
-                  {rule.property_name || '—'}
+                  {rule.property_name || "—"}
                 </td>
                 <td class="py-3 px-3">
-                  <Badge variant={rule.status === 'PASS' ? 'low' : rule.status === 'FAIL' ? 'critical' : 'medium'}>
-                    {rule.status || 'UNKNOWN'}
+                  <Badge
+                    variant={rule.status === "PASS"
+                      ? "low"
+                      : rule.status === "FAIL"
+                        ? "critical"
+                        : "medium"}
+                  >
+                    {rule.status || "UNKNOWN"}
                   </Badge>
                 </td>
                 <td class="py-3 px-3 font-mono">
-                  <span class="text-emerald-400 font-semibold">{rule.pass_count || 0}</span> /
-                  <span class="text-rose-400 font-semibold">{rule.fail_count || 0}</span> /
+                  <span class="text-emerald-400 font-semibold"
+                    >{rule.pass_count || 0}</span
+                  >
+                  /
+                  <span class="text-rose-400 font-semibold"
+                    >{rule.fail_count || 0}</span
+                  >
+                  /
                   <span class="text-slate-400">{rule.missing_count || 0}</span>
                 </td>
                 <td class="py-3 px-3 max-w-xs">
                   {#if rule.failures && rule.failures.length > 0}
                     <div class="space-y-1">
                       {#each rule.failures as f}
-                        <div class="text-[11px] text-rose-300 font-mono truncate" title={f.reason || f.guid}>
+                        <div
+                          class="text-[11px] text-rose-300 font-mono truncate"
+                          title={f.reason || f.guid}
+                        >
                           • {f.reason || f.guid}
                         </div>
                       {/each}

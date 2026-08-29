@@ -58,7 +58,7 @@
   }
 </script>
 
-<div class="space-y-6 max-w-4xl mx-auto">
+<div class="space-y-6 mx-auto">
   <!-- Header -->
   <div class="flex items-center justify-between">
     <div>
