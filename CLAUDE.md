@@ -60,37 +60,48 @@ uv run ruff check .
 uv run pytest tests/test_api_*.py -v
 ```
 
-## Architecture
+## Architecture & Migration Status
 
-BIM-Guard is evolving from a FastHTML + MonsterUI monolith into a modern, decoupled architecture: a **FastAPI API Gateway** providing strict Pydantic REST contracts and real-time Server-Sent Events (SSE) tracking, and a **standalone Vite + Svelte 5 Single-Page Application (SPA)** client.
+BIM-Guard is transitioning from a legacy FastHTML + MonsterUI monolith into a modern, decoupled architecture:
+1. **Primary Backend API**: **FastAPI** (`app/api/`) mounted at `/api` on the ASGI app, exposing RESTful endpoints, typed Pydantic data contracts (`app/modules/contracts.py`), and real-time Server-Sent Events (SSE) tracking (`/api/events/{project_id}`).
+2. **Primary Frontend Client**: **Decoupled SPA Frontend** (`frontend/`) built with **Svelte 5**, Vite, TypeScript, and Tailwind CSS, consuming `/api` endpoints via `src/lib/api.ts` and SSE via `src/lib/sse.ts`.
+3. **Legacy Monolith (Deprecated / Maintenance Only)**: FastHTML + MonsterUI routes (`app/routes/`) and UI components (`app/components/`) mounted at `/` during the transition period. **Do not create new user-facing features in FastHTML**; build all new views, forms, and interactive components in `frontend/`.
+4. **Compute Kernels & Engines**: Pure Python compliance kernels (`app/engines/`, `app/modules/`, `app/services/`) remain framework-agnostic.
 
 ### Layer Structure
 
 ```text
-Frontend (frontend/)       → Vite + Svelte 5 SPA, TypeScript, Tailwind CSS
-API Gateway (app/api/)     → FastAPI routers (/projects, /rules, /analyze, /events)
-Data Contracts (app/modules/contracts.py) → Pydantic request/response schemas
-Routes (app/routes/)       → FastHTML handlers, HTMX responses (legacy/coexistence)
-Services (app/services/)   → Business logic, pipeline runner, tracker, Supabase persistence
+Primary Frontend (frontend/)       → Vite + Svelte 5 SPA, TypeScript, Tailwind CSS
+API Gateway (app/api/)             → FastAPI routers (/projects, /rules, /analyze, /events)
+Data Contracts (app/modules/contracts.py) → Pydantic request/response schemas (mirrored in frontend/src/lib/types.ts)
+Services (app/services/)           → Business logic, pipeline runner, tracker, Supabase persistence
 Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernels (GC-001, CC-001, MC-001, Blue Halo)
+Legacy Monolith (app/routes/, app/components/) → FastHTML + MonsterUI (deprecated / maintenance only)
 ```
-
-### Key Technologies
-
-- **FastAPI** — Modern API framework serving `/api` with automatic OpenAPI documentation (`/api/docs`), CORS, Pydantic model validation, and SSE streaming.
-- **Svelte 5** — Modern reactive frontend framework powering the decoupled SPA under `frontend/`.
-- **FastHTML & MonsterUI** — Coexisting Python UI layer mounted at `/` for backward compatibility during migration.
-- **Server-Sent Events (SSE)** — Real-time event streaming (`/api/events/{project_id}`) for 6-stage compliance pipelines.
-- **Supabase** — Managed Postgres persistence accessed through `PersistenceService` and object storage.
-- **IfcOpenShell** — Server-side IFC parsing engine.
 
 ### Data Flow
 
-1. `main.py` (root) → boots uvicorn
-2. `app/main.py` → initializes FastHTML app and mounts FastAPI gateway at `/api`
-3. Svelte client (`frontend/`) talks to `/api/*` via `src/lib/api.ts` and listens to real-time events via `src/lib/sse.ts`
-4. FastAPI routers call service layer (`app/services/`); compute kernels execute without UI framework dependencies
-5. Results return as validated Pydantic models or stream over SSE connections
+1. `main.py` (root) → boots uvicorn ASGI server
+2. `app/main.py` → registers FastAPI router at `/api` and legacy FastHTML routes at `/`
+3. Svelte client (`frontend/`) talks to `/api/*` via `src/lib/api.ts` and listens to live SSE progress events via `src/lib/sse.ts`
+4. FastAPI routers validate requests using Pydantic schemas (`app/modules/contracts.py`), invoke domain services (`app/services/`), and run compute engines
+5. Results return as typed Pydantic JSON or stream incrementally over SSE connections
+
+### Frontend Guidelines (`frontend/`)
+
+- **Framework**: Svelte 5 using the modern runes syntax (`$state`, `$derived`, `$props`, `$effect`).
+- **Styling**: Tailwind CSS with custom theme variables matching BIM-Guard design tokens.
+- **Contract Parity**: When Pydantic schemas in `app/modules/contracts.py` change, immediately update corresponding TypeScript interfaces in `frontend/src/lib/types.ts`.
+- **API Client**: All HTTP calls go through `src/lib/api.ts`. Never use raw `fetch()` directly in components.
+- **Real-Time Streaming**: Consume pipeline stage transitions (Validation → Parsing → Engine Run → Scoring → Reporting) using `subscribeToEvents()` from `src/lib/sse.ts`.
+- **IFC 3D Viewer**: Encapsulated in `src/lib/components/IfcViewer.svelte` using `@thatopen/fragments`, `@thatopen/components`, and `web-ifc`.
+
+### API & Backend Guidelines (`app/api/`)
+
+- **Strict Contracts**: Every endpoint must accept and return strict Pydantic schemas defined in `app/modules/contracts.py`. Never return raw dicts or unvalidated payloads.
+- **Dependency Injection**: Use FastAPI `Depends(...)` with providers from `app/api/dependencies.py` to obtain service instances.
+- **Error Handling**: Raise standard `fastapi.HTTPException` with appropriate status codes (400, 404, 409, 500) and clear detail messages.
+- **Real-Time Events**: Publish progress through `PipelineTracker` and stream via `/api/events/{project_id}`.
 
 ### Database & Rule Management
 
@@ -107,29 +118,11 @@ All compliance and corrosion analysis workflows are strictly database-driven:
 - **Live Catalog Reloading**: In-memory engine catalogs are refreshed via `reload_all_catalogs()` (calling `bimguard_*_engine.reload_rules()`) at the start of each analysis run, allowing DB rule edits to take effect immediately without server restarts.
 - **Targeted Ruleset Execution**: Selecting a `rule_folder` queries rules directly from the DB via `RuleService().list_by_ruleset(rule_folder)` so custom or extracted rulesets execute immediately against the model.
 
-### Compliance Pipeline (app/modules/)
+### Legacy FastHTML UI (Maintenance Only)
 
-Five sequential modules — most are stubs awaiting implementation:
-
-1. **Module1_DocParser** — PDF text extraction and section preprocessing
-2. **Module2_IFCRead** — IFC file parsing (stub)
-3. **Module3_RuleBuilder** — NLP → structured rules (stub, AI integration point)
-4. **Module4_Comparator** — IFC vs rules validation (stub)
-5. **Module5_Reporter** — Report generation (stub)
-
-`orchestrator.py` contains `BIMGuard_App` as the entry point for running the full pipeline.
-
-### IFC Viewer
-
-The viewer route (`app/routes/viewer.py`) loads a 3D model in-browser using `@thatopen/fragments`, `@thatopen/components`, and `web-ifc` loaded from CDN. The loader script is at `static/js/ifc-viewer-loader.js`.
-
-### UI Conventions
-
-- Page structure: `DashboardLayout` wraps all pages, with `AppSidebar` and `AppHeader` from `app/components/layout.py`
-- Action icon buttons (`ViewAction`, `EditAction`, `CreateAction`, `BackAction`) are in `app/components/ui.py`
-- Each domain has a `*_ui.py` component file and a `*_service.py` service file
-- File uploads are stored in Supabase Storage with UUID-prefixed object keys; downloaded objects are cached under `data/cache/supabase-storage/`
+- Code under `app/routes/` and `app/components/` is legacy FastHTML + MonsterUI.
+- **Maintenance rule**: Only modify legacy FastHTML files when fixing existing bugs or preserving backward compatibility during the migration phase. Do NOT build new pages or features in FastHTML.
 
 ## Coding Guidelines
 
-Detailed coding rules covering UI patterns, HTMX conventions, route structure, database operations, file uploads, and the BIM module pipeline are in [.github/instructions/project-specific.instructions.md](.github/instructions/project-specific.instructions.md). This file applies automatically to all code under `app/` and is the authoritative reference for how to write code in this project.
+Detailed coding rules covering the FastAPI backend, Svelte 5 frontend, database operations, and legacy maintenance are in [.github/instructions/project-specific.instructions.md](.github/instructions/project-specific.instructions.md).

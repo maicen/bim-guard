@@ -1,52 +1,45 @@
-# BIMGUARD AI — Architecture & FastHTML Integration Plan
+# BIMGUARD AI — System Architecture & Decoupled Migration Plan
 
 | | |
 | --- | --- |
 | **Document** | `docs/architecture.md` |
-| **Version** | 0.1 (target architecture / integration plan) |
-| **Status** | Living document — update as the FastHTML migration lands |
-| **Scope** | Backend structure, FastHTML/MonsterUI full-stack wiring, request lifecycle |
+| **Version** | 1.0 (Decoupled Target Architecture) |
+| **Status** | Active — Transition from FastHTML monolith to FastAPI + Svelte 5 SPA |
+| **Scope** | FastAPI API Gateway, Svelte 5 SPA, Pydantic contracts, SSE streaming, compute engines, database-driven rules |
 | **Owner** | Group 5 — Masters in BIM Management, Zigurat Global Institute of Technology |
 
-> Note: some sections below are historical migration-plan material retained for thesis context. For current runtime setup, treat `README.md`, `docker-compose.yml`, and `render.yaml` as the operational source of truth.
+> Note: BIM-Guard is evolving from a FastHTML + MonsterUI monolith into a modern, decoupled architecture: a **FastAPI API Gateway** (`app/api/`) providing strict Pydantic REST contracts and real-time Server-Sent Events (SSE) tracking, and a **standalone Vite + Svelte 5 Single-Page Application (SPA)** client (`frontend/`). Legacy FastHTML routes remain mounted at `/` during the transition.
 
 ---
 
 ## 1. Purpose and scope
 
-This document describes how the BIMGUARD AI application is structured as a FastHTML / MonsterUI full-stack web application. It maps the repository layout to runtime responsibilities, shows how HTTP routes delegate to workflow modules and persistence services, and explains how the validated corrosion engines (GC-001 galvanic, CC-001 crevice) and LLM-translated engineering rulesets plug into that pipeline.
+This document describes how the BIMGUARD AI application is architected across its decoupled layers:
+1. **Backend API Gateway (FastAPI)**: Serves typed REST endpoints and real-time Server-Sent Events (SSE) from `/api` with strict Pydantic request/response validation (`app/modules/contracts.py`).
+2. **Frontend Client (Svelte 5 SPA)**: Reactive client under `frontend/` powered by Vite, TypeScript, and Tailwind CSS.
+3. **Legacy Web Interface (FastHTML + MonsterUI)**: Monolithic server-rendered pages mounted at `/` for backwards compatibility during migration.
+4. **Compute Kernels & Pipelines**: Framework-agnostic Python physics engines (GC-001 galvanic, CC-001 crevice, MC-001 microbiological) and compliance orchestrator (`app/engines/`, `app/modules/`, `app/services/`) driven dynamically by database-stored rules.
 
-It is intentionally a **developer-facing** document. Academic rationale for OpenBIM, IFC, BCF 2.1 and the corrosion scoring model lives in the thesis chapters; this file assumes those decisions and concentrates on how they are wired together in code.
+## 2. Transition context
 
-## 2. Context — what this replaces
-
-The first working prototype of BIMGUARD AI was a six-page Streamlit application (`BIMGUARD_AI_App.zip`) which proved the end-to-end workflow against 25 synthetic elements: 9 Critical / 7 High / 9 Medium issues, 25 BCF issues generated, £170,600 estimated remediation cost, 162 working days delay.
-
-Streamlit was the right choice for rapid prototyping but has several limitations for a FMP deliverable and any future production deployment:
-
-- No proper HTTP routing — every interaction re-runs the whole script top-to-bottom.
-- Difficult to test routes and business logic independently.
-- No clean separation between presentation and domain logic.
-- Session state is awkward to persist across users or restarts.
-- Not a good fit for multi-user project workspaces or API consumers.
-
-The FastHTML / MonsterUI stack addresses these issues while keeping the implementation language (Python), the corrosion engines, and the OpenBIM-only methodology unchanged.
+- **Phase 1 (Streamlit Prototype)**: Proved the physics algorithms against synthetic BIM elements.
+- **Phase 2 (FastHTML Monolith)**: Combined backend logic and server-side UI using FastHTML and MonsterUI.
+- **Phase 3 (Current: Decoupled API + SPA)**: Transitioning to an enterprise-grade decoupled architecture. FastAPI acts as the single source of truth for data contracts, validation, and real-time progress streaming, while Svelte 5 delivers a modern client-side user experience with client-side routing, interactive OpenBIM 3D viewports, and reactive state management.
 
 ## 3. Runtime stack
 
-| Layer | Choice | Role |
+| Layer | Technology | Role |
 | --- | --- | --- |
-| Package / environment manager | **uv** (Astral) | Resolve, lock and install dependencies; run commands in the project venv |
-| ASGI server | **uvicorn** | Serve the ASGI app; auto-reload during development |
-| Web framework | **FastHTML** | Routing, request/response, FT (FastTags) rendering, HTMX integration |
-| UI components | **MonsterUI** | Tailwind + FrankenUI component library exposed as Python FT functions |
-| Partial rendering | **HTMX** (bundled by FastHTML) | Form submission and fragment swaps without writing JS |
-| IFC processing | **ifcopenshell** | Open-source IFC 2x3 / IFC4 parser |
-| Point clouds | **laspy**, **pye57** | `.las` / `.laz` / `.e57` readers (open formats) |
-| Plotting | **plotly** | 3D risk maps, Gantt, charts (rendered as HTML fragments) |
-| Persistence | **Supabase Postgres** (default) via adapter layer | Project state, documents, rules, audit-style records |
-| Object storage | **Supabase Storage** (default) via adapter layer | IFC files, uploaded documents, generated artifacts |
-| LLM rule extraction | **Gemini API** | Translate engineering standards text into structured JSON rulesets |
+| **Backend API Gateway** | **FastAPI** (Python 3.12) | REST endpoints at `/api`, OpenAPI docs at `/api/docs`, Pydantic validation, dependency injection |
+| **Real-Time Streaming** | **Server-Sent Events (SSE)** | Live pipeline tracking (`/api/events/{project_id}`) via `PipelineTracker` |
+| **Data Contracts** | **Pydantic v2** | Strict schemas in `app/modules/contracts.py` mirrored in `frontend/src/lib/types.ts` |
+| **Frontend SPA Client** | **Svelte 5** + **Vite** + **TypeScript** | Decoupled client under `frontend/`, modern runes syntax (`$state`, `$derived`, `$props`) |
+| **Frontend Styling** | **Tailwind CSS** | Design tokens, responsive components, dark/light themes |
+| **3D Viewport** | **ThatOpenCompany / Web-IFC** | Client-side IFC geometry parsing and 3D rendering |
+| **Database & Storage** | **Supabase (Postgres & Storage)** | Primary persistence for projects, documents, and rules; S3-compatible object storage |
+| **Compute Engines** | **Pure Python** | `bimguard_corrosion_engine`, `bimguard_crevice_engine`, `bimguard_mic_engine`, `orchestrator` |
+| **Rule System** | **Database-Driven Catalog** | Rules, thresholds, scoring weights, and mitigations loaded dynamically via `RuleService` |
+| **Legacy UI** | **FastHTML + MonsterUI** | Deprecated server-side rendered UI mounted at `/` during migration |
 
 ### 3.1 How the app is started
 

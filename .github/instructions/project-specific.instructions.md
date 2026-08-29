@@ -1,6 +1,6 @@
 ---
-description: "Use when writing, reviewing, or modifying any code in this project. Covers FastHTML + MonsterUI UI patterns, route conventions, database operations, and BIM module structure."
-applyTo: "app/**"
+description: "Authoritative instructions for BIM-Guard: covers FastAPI backend API, Svelte 5 decoupled frontend, database-driven rules, and legacy FastHTML maintenance."
+applyTo: "**"
 ---
 
 # BIM Guard — Project-Specific Coding Guidelines
@@ -15,15 +15,15 @@ applyTo: "app/**"
 | DESIGN.md | Design agents | How the project should look and feel |
 
 
-## Project Overview
+## Project Overview & Transition Architecture
 
-**BIM Guard** is an OpenBIM compliance platform supporting:
-1. A **FastAPI API Gateway** (`app/api/`) delivering strict Pydantic REST contracts, file streaming, and real-time Server-Sent Events (SSE).
-2. A **Decoupled SPA Frontend** (`frontend/`) built with Svelte 5, Vite, TypeScript, and Tailwind CSS.
-3. A **Legacy FastHTML + MonsterUI monolith** (`app/routes/`, `app/components/`) coexisting during the transition period.
-4. **Compute engines & pipelines** (`app/engines/`, `app/modules/`) that operate framework-agnostic.
+**BIM Guard** is an OpenBIM compliance platform transitioning from a legacy FastHTML monolith to a modern decoupled architecture:
+1. **Primary Backend API**: A **FastAPI API Gateway** (`app/api/`) delivering strict Pydantic REST contracts (`app/modules/contracts.py`), file streaming, and real-time Server-Sent Events (SSE) tracking (`/api/events/{project_id}`).
+2. **Primary Frontend Client**: A **Decoupled SPA Frontend** (`frontend/`) built with **Svelte 5**, Vite, TypeScript, and Tailwind CSS. **All new UI features and views must be built here**.
+3. **Legacy Monolith (Deprecated / Maintenance Only)**: FastHTML + MonsterUI (`app/routes/`, `app/components/`) mounted alongside the API gateway at `/` during migration. Do not build new features here; only perform critical maintenance fixes.
+4. **Compute engines & pipelines**: Physics engines and compliance evaluators (`app/engines/`, `app/modules/`) operating framework-agnostic, driven dynamically by database-stored rules.
 
-**Tech stack:** FastAPI · Svelte 5 · FastHTML · MonsterUI · Supabase (Postgres) · IfcOpenShell · Server-Sent Events
+**Tech stack:** FastAPI · Svelte 5 (Vite + TypeScript) · Tailwind CSS · Supabase (Postgres & Storage) · IfcOpenShell · Server-Sent Events
 
 ---
 
@@ -33,7 +33,7 @@ applyTo: "app/**"
 # Install backend dependencies
 uv sync
 
-# Run backend with auto-reload (available at http://127.0.0.1:8000, API docs at /api/docs)
+# Run backend with auto-reload (available at http://127.0.0.1:8000, OpenAPI docs at /api/docs)
 uv run uvicorn main:app --reload
 
 # Run frontend in development (available at http://localhost:5173 with proxy to /api)
@@ -50,12 +50,25 @@ run_server.bat          # Windows
 
 1. **Always use Pydantic schemas**: Every route in `app/api/` must accept and return strict Pydantic models defined in `app/modules/contracts.py`. Never return raw HTML or unvalidated dictionaries.
 2. **Dependency Injection**: Use FastAPI `Depends(...)` with provider functions in `app/api/dependencies.py` to access services.
-3. **HTTP Status & Errors**: Raise standard `HTTPException` with appropriate status codes (400 for bad parameters, 404 for missing entities, 409 for pipeline conflicts).
+3. **HTTP Status & Errors**: Raise standard `fastapi.HTTPException` with appropriate status codes (400 for bad parameters, 404 for missing entities, 409 for pipeline conflicts, 500 for unhandled exceptions).
 4. **Real-Time Streaming**: Use Server-Sent Events via `app/api/events.py` and `pipeline_tracker.py` for tracking multi-stage analysis workflows.
+5. **Contract Parity**: When modifying API schemas, synchronize the corresponding TypeScript interfaces in `frontend/src/lib/types.ts`.
 
 ---
 
-## UI / Frontend Rules (FastHTML legacy)
+## Decoupled Frontend Rules (`frontend/**`)
+
+1. **Svelte 5 Runes**: Use Svelte 5 modern syntax (`$state`, `$derived`, `$props`, `$effect`). Avoid legacy Svelte 3/4 stores or `export let`.
+2. **TypeScript & Type Safety**: Always use `<script lang="ts">`. All API responses and model data must be typed via `src/lib/types.ts`.
+3. **API Client Integration**: Make all backend calls through `src/lib/api.ts`. Never write ad hoc `fetch()` calls in individual components.
+4. **Real-Time Updates via SSE**: Connect to `/api/events/{project_id}` using `subscribeToEvents()` from `src/lib/sse.ts` to stream analysis progress without polling.
+5. **Styling**: Use Tailwind CSS utility classes following the design tokens in `DESIGN.md`.
+6. **3D Viewport**: Reuse or extend `src/lib/components/IfcViewer.svelte` for IFC 3D visualization and BCF camera viewpoints.
+7. **New Features**: All new UI views (projects, dashboards, analysis, rule editors) MUST be added to `frontend/src/routes/` or `frontend/src/lib/components/`.
+
+---
+
+## Legacy FastHTML UI Rules (Deprecated / Maintenance Only)
 
 ### 1. Always use MonsterUI components — never raw HTML tags
 
@@ -479,22 +492,27 @@ result = workflow.orchestrate_workflow()
 
 ## Testing Conventions
 
-There are no automated tests currently. Use manual verification via the running Uvicorn server (`uv run uvicorn main:app --reload`). When writing new functionality:
+Automated testing is active and required for all changes:
 
-- Verify happy path in the browser
-- Verify empty-state rendering (no DB records)
-- Verify form validation (missing required fields)
+### Backend Testing
+- **Test execution**: `uv run pytest tests/`
+- **Linting**: `uv run ruff check .`
+- **API Tests**: Validate endpoint request/response payloads against Pydantic models (e.g. `tests/test_api_*.py`).
+- **Engine Tests**: Validate that all physics and compliance rules pull dynamically from the database without hardcoded cutoffs (e.g. `tests/test_db_rules_workflow.py`, `tests/test_phase_6c_corrosion_ui.py`).
 
-Automated tests are not currently required. Use manual browser verification by default unless test work is explicitly requested.
+### Frontend Testing & Verification
+- **Build validation**: `cd frontend && npm run build` (verifies TypeScript types and Vite bundle)
+- **Local testing**: `cd frontend && npm run dev` (runs at http://localhost:5173 with proxy to backend `/api`)
 
 ---
 
-## General Python Conventions
+## General Python & TypeScript Conventions
 
-- **No type annotation required** on return types, but annotate parameters
-- Use Python 3.10+ union syntax: `dict | None` not `Optional[dict]`
-- Database access via `app.db` and `PersistenceService` — never create a local database in a route or service
-- Functional style preferred; no unnecessary abstractions
+- Python 3.12: Use `X | None` union syntax (avoid `Optional[X]`).
+- Strict Pydantic models for API request/response schemas in `app/modules/contracts.py`.
+- Strict TypeScript types mirroring Pydantic schemas in `frontend/src/lib/types.ts`.
+- Database access exclusively via `PersistenceService` (`app/services/persistence.py`) and `RuleService` (`app/services/rules_service.py`).
+- Object storage exclusively via `ObjectStorage` (`app/services/object_storage.py`).
 
 ---
 
@@ -502,14 +520,14 @@ Automated tests are not currently required. Use manual browser verification by d
 
 Never use any of the following:
 
-| Forbidden | Use instead |
+| Forbidden | Reason / Use instead |
 |---|---|
-| `datetime.utcnow()` | `datetime.now(timezone.utc)` |
-| `from sqlalchemy import ...` | `PersistenceService` and `SupabaseTableAdapter` |
-| `from pydantic import BaseModel` | plain `dict` or the existing table schema |
-| `from flask import ...` / `@app.route(...)` | FastHTML `@rt(...)` inside `setup_routes(rt)` |
-| `from typing import Optional` | `X | None` (Python 3.10+ union syntax) |
-| Returning raw HTML strings | Return FastHTML component trees |
-| `raise HTTPException(...)` | Return component with `Alert(cls=AlertT.danger)` |
-| Registering routes globally outside `setup_routes` | Always use `setup_routes(rt)` pattern |
-| Creating a local database or hardcoding database paths | Use `PersistenceService.get_table(...)` |
+| Creating new UI pages in FastHTML (`app/routes/`) | **FastHTML is deprecated**. Build all new views and features in `frontend/` using Svelte 5. |
+| Hardcoding engineering cutoffs or scoring weights | **Rules must be DB-driven**. Read from database via `RuleService` and `corrosion_rule_catalog.py`. |
+| Returning raw unvalidated dicts from `app/api/**` | **API contract violation**. Return typed Pydantic models from `app/modules/contracts.py`. |
+| Ad hoc `fetch()` calls in Svelte components | Call backend methods via `frontend/src/lib/api.ts`. |
+| Polling backend for analysis progress | Use Server-Sent Events via `subscribeToEvents()` in `frontend/src/lib/sse.ts`. |
+| `datetime.utcnow()` | Use `datetime.now(timezone.utc)` or `datetime.now(UTC)`. |
+| Direct SQL/SQLAlchemy queries in routes | Use `PersistenceService.get_table(...)` and service methods. |
+| Creating local databases or hardcoding paths | Use Supabase via `PersistenceService`. |
+| `from typing import Optional` | Use Python 3.10+ union syntax (`X | None`). |

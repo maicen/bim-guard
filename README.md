@@ -145,16 +145,30 @@ the environment for one run. Inside the agent, `/model` fetches the current
 OpenRouter catalogue, `/new` starts a fresh session, and `/help` lists commands.
 Session logs are written under `data/agent-sessions/` and ignored by Git.
 
-## Main Routes
+## Application Architecture & Routes
 
-- `/` landing page
-- `/dashboard` dashboard
-- `/projects` project management
-- `/library` document and rule library
-- `/library/documents` document uploads
-- `/library/rules/extract` AI-assisted rule extraction
-- `/analyze` compliance analysis
-- `/viewer` IFC viewer
+### Svelte 5 SPA Client (`frontend/`)
+The primary modern client runs on `http://localhost:5173`:
+- **Dashboard**: System overview, recent runs, and status
+- **Projects**: Project creation, IFC upload, and metadata inspection
+- **Documents**: Document management and text extraction
+- **Rule Library**: Rule and folder catalog management
+- **Rule Extraction**: AI-assisted rule extraction from documents
+- **Audit / Analyze**: Multi-engine MEP corrosion & architectural compliance
+- **3D Viewer**: Interactive OpenBIM viewport and BCF clash inspection
+- **Reports**: BCF issue export, Excel/PDF compliance reports
+
+### FastAPI API Gateway (`/api`)
+The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/docs`:
+- `/api/projects` — Project CRUD, model file uploads, IFC metadata
+- `/api/documents` — Document upload, PDF text extraction
+- `/api/rules` — Rule folders, rulesets, and custom rule CRUD
+- `/api/analyze` — Compliance and corrosion analysis execution
+- `/api/events/{project_id}` — Real-time Server-Sent Events (SSE) progress streaming
+
+### Legacy Web UI (Deprecated / Maintenance Only)
+Mounted at `http://127.0.0.1:8000/` during transition:
+- `/` landing page, `/dashboard`, `/projects`, `/library`, `/analyze`, `/viewer`
 
 ## Deployment
 

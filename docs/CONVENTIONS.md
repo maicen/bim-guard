@@ -1,68 +1,74 @@
 # BIM-Guard Coding Conventions
 
-This document consolidates conventions from `CLAUDE.md` and
-`.github/instructions/project-specific.instructions.md` into one scannable reference.
-When in doubt, the project-specific instructions file is authoritative.
+This document consolidates authoritative conventions across the decoupled architecture:
+1. **Backend API**: FastAPI (REST + SSE) mounted with Pydantic contracts
+2. **Frontend Client**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
+3. **Database & Engines**: Pure Python physics kernels, Supabase persistence, database-driven rules
+4. **Legacy Web UI**: FastHTML + MonsterUI (deprecated / maintenance only)
+
+When in doubt, `CLAUDE.md` and `.github/instructions/project-specific.instructions.md` are authoritative.
 
 ---
 
-## Route Conventions
+## 1. FastAPI API Conventions (`app/api/**`)
 
-- Every route module **must** expose `setup_routes(rt)` and never register routes globally.
-- Call `setup_routes` from `app/main.py → _setup_routes()`.
-- POST mutations redirect with HTTP **303** via `redirect_see_other("/target")`.
-- HTMX endpoints return **HTML fragments only** — no `Title(...)` or `DashboardLayout(...)`.
-- Prefix route-internal helpers with `_` (e.g., `_build_row`).
-- Handle errors by returning a component (e.g., `MessageAlert`), never `raise HTTPException`.
+- **Routing**: Use `APIRouter(prefix="/...", tags=["..."])` and register in `app/api/__init__.py`.
+- **Strict Pydantic Contracts**: All endpoints must accept and return strict Pydantic models defined in `app/modules/contracts.py`. Never return raw dicts or unvalidated payloads.
+- **Dependency Injection**: Use FastAPI `Depends(...)` with providers in `app/api/dependencies.py` to access services (`ProjectsService`, `RuleService`, etc.).
+- **Error Handling**: Raise standard `fastapi.HTTPException` with appropriate status codes (400, 404, 409, 500) and descriptive detail strings.
+- **Real-Time Progress Streaming**: Use Server-Sent Events via `app/api/events.py` and `PipelineTracker` for multi-stage analysis workflows.
 
-## UI Composition
+---
 
-- Every full page: `Title("…"), DashboardLayout(Container(…))`.
-- Use MonsterUI components (`Card`, `Grid`, `Button`, `Alert`, …). Do **not** hand-write raw HTML tags.
-- Status feedback → `Alert` component.
-- Action icon buttons (`ViewAction`, `EditAction`, `CreateAction`, `BackAction`) live in `app/components/ui/`.
-- Repeated UI must be extracted to `app/components/` — prefer `app/components/ui.py` patterns.
+## 2. Decoupled Frontend Conventions (`frontend/**`)
 
-## Database Access
+- **Svelte 5 Runes**: Use modern runes (`$state`, `$derived`, `$props`, `$effect`). Avoid legacy Svelte 3/4 stores or `export let`.
+- **TypeScript**: Always use `<script lang="ts">`. Keep contracts synchronized with `app/modules/contracts.py` via `frontend/src/lib/types.ts`.
+- **API Client**: Make all HTTP calls through `frontend/src/lib/api.ts`. Never write ad hoc `fetch()` calls in individual components.
+- **Real-Time Updates via SSE**: Connect to `/api/events/{project_id}` using `subscribeToEvents()` from `src/lib/sse.ts` to stream analysis progress without polling.
+- **Styling**: Use Tailwind CSS utility classes following the design tokens in `DESIGN.md`.
+- **3D Viewport**: Reuse or extend `src/lib/components/IfcViewer.svelte` for IFC 3D visualization and BCF camera viewpoints.
+- **New Feature Development**: All new UI views (projects, dashboards, analysis, rule editors) MUST be added to `frontend/src/routes/` or `frontend/src/lib/components/`.
 
-- Single accessor: `PersistenceService.get_table(...)` in `app/services/persistence.py`.
-- Runtime database is Supabase only.
-- Do not query Supabase directly from routes; keep DB access inside services.
-- Table adapters expose a unified interface for `projects`, `documents`, and `rules`.
+---
 
-## File Uploads
+## 3. Database & Engine Access
 
-- Handler must be `async def` and accept `UploadFile`.
-- Save through `ObjectStorage.save_upload(...)` in `app/services/object_storage.py`.
-- Runtime storage is Supabase Storage. Local disk is used only as a disposable cache under `data/cache/supabase-storage`.
-- Store returned Supabase references (`sb://bucket/key`) in DB records instead of constructing paths in routes.
+- **Persistence Access**: Exclusively via `PersistenceService.get_table(...)` in `app/services/persistence.py`.
+- **Rule Management**: Exclusively via `RuleService` in `app/services/rules_service.py`.
+- **Dynamic Rule Catalogs**: Lookups and scoring models for corrosion engines are loaded via `app/services/corrosion_rule_catalog.py`.
+- **Zero Hardcoded Cutoffs**: All scoring weights, risk band thresholds, material tables, and velocity intervals must be read dynamically from the database.
+- **Live Catalog Reloading**: Call `reload_all_catalogs()` at the start of analysis runs so that database rule edits take effect immediately without server restarts.
+- **File Uploads**: Save through `ObjectStorage.save_upload(...)` in `app/services/object_storage.py` using Supabase Storage. Local disk under `data/cache/supabase-storage` is a disposable cache only.
 
-## Naming Conventions
+---
+
+## 4. Timestamps & Timezones
+
+- Use Python's standard UTC timezone: `datetime.now(timezone.utc).isoformat()` or `datetime.now(UTC).isoformat()`.
+- Never use deprecated `datetime.utcnow()`.
+- Store as ISO 8601 string timestamp columns in DB records.
+
+---
+
+## 5. Naming Conventions
 
 | Layer | Pattern | Example |
-|-------|---------|---------|
-| Route module | `{domain}.py` | `projects.py` |
-| Service module | `{domain}_service.py` | `projects_service.py` |
-| UI component module | `{domain}_ui.py` | `projects_ui.py` |
-| Internal helper | `_{name}` | `_build_row` |
+|---|---|---|
+| API router module | `app/api/{domain}.py` | `app/api/projects.py` |
+| Service module | `app/services/{domain}_service.py` | `projects_service.py` |
+| Svelte page component | `frontend/src/routes/{Domain}View.svelte` | `ProjectsView.svelte` |
+| Svelte reusable component | `frontend/src/lib/components/{Name}.svelte` | `IfcViewer.svelte` |
+| Internal Python helper | `_{name}` | `_build_row` |
 
-- Class names: `PascalCase` (`ProjectsService`, `RuleService`).
-- DB table names: `snake_case` plural (`projects`, `documents`, `rules`).
+---
 
-## Module Pipeline
+## 6. Legacy FastHTML Conventions (Deprecated / Maintenance Only)
 
-- Routes call the pipeline **only** through `orchestrator.py` (`BIMGuard_App`).
-- Never import pipeline modules (Module1–5) directly in route files.
-- Module methods are scaffolded stubs; implementation goes inside each module, not in routes or services.
-
-## IFC Viewer (JS)
-
-- Pure CDN ESM approach — no bundler.
-- Imports pinned to specific versions from `esm.sh` in `static/js/ifc-viewer.js`.
-- Entry point exported as `initViewer(containerId)`.
-- Do not change CDN import strategy without a compelling reason.
-
-## Timestamps
-
-- Use ISO 8601 UTC strings: `datetime.utcnow().isoformat()`.
-- Store as string timestamp columns in DB records (Supabase default backend).
+- Code under `app/routes/` and `app/components/` is legacy FastHTML + MonsterUI.
+- **Do not create new user-facing features in FastHTML**.
+- For maintenance bug fixes in legacy files:
+  - Route modules expose `setup_routes(rt)`.
+  - Full pages return `Title(...), DashboardLayout(Container(...))`.
+  - HTMX endpoints return HTML fragments.
+  - Return `Alert(cls=AlertT.danger)` for in-page error alerts.
