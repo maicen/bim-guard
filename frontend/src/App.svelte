@@ -21,6 +21,7 @@
   import SettingsView from './routes/SettingsView.svelte';
 
   import { dashboardApi, projectsApi } from './lib/api';
+  import { initTheme } from './lib/theme';
   import type { Project } from './lib/types';
 
   let activeView = 'dashboard';
@@ -55,6 +56,7 @@
   }
 
   onMount(() => {
+    initTheme();
     checkHealth();
     const interval = setInterval(checkHealth, 20000);
     return () => clearInterval(interval);
@@ -85,7 +87,7 @@
   }
 </script>
 
-<div class="min-h-screen bg-[#020617] text-slate-100 flex font-sans antialiased selection:bg-[#0071e3]/30 selection:text-white">
+<div class="min-h-screen bg-slate-950 text-slate-100 flex font-sans antialiased selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-200">
   <!-- Apple-Style Sidebar -->
   <Sidebar
     {activeView}

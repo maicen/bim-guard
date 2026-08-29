@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Plus, ExternalLink, Activity } from 'lucide-svelte';
+  import ThemeToggle from './ThemeToggle.svelte';
   import type { Project } from '../types';
 
   export let activeView: string;
@@ -58,6 +59,9 @@
       <span>API Docs</span>
       <ExternalLink class="w-3 h-3" />
     </a>
+
+    <!-- Theme Toggle Button -->
+    <ThemeToggle />
 
     <!-- New Check CTA Button -->
     <button
