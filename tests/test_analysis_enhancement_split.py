@@ -2,14 +2,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import app.modules.module2_ifc_read as ifc_read_module
-from app.modules.pipeline_services import (
+from app.services.persistence import PersistenceService, _MemoryClient
+from app.services.pipeline_services import (
     AnalysisService,
     EnhancementService,
     enhance_model,
     execute_model_enhancement,
     run_compliance_analysis,
 )
-from app.services.persistence import PersistenceService, _MemoryClient
 from app.services.projects_service import ProjectsService
 
 

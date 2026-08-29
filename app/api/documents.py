@@ -2,37 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from pydantic import BaseModel
 
 from app.api.dependencies import get_documents_service
 from app.logging_config import get_logger
+from app.modules.contracts import (
+    DocumentDetailResponse,
+    DocumentResponse,
+    DocumentUpdateRequest,
+)
 from app.services.documents_service import DocumentService
 from app.utils import md5_hex, safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
 
 router = APIRouter()
-
-
-class DocumentResponse(BaseModel):
-    id: int
-    filename: str
-    file_path: Optional[str] = None
-    upload_date: Optional[str] = None
-    extracted_text_preview: Optional[str] = None
-    char_count: int = 0
-
-
-class DocumentDetailResponse(BaseModel):
-    id: int
-    filename: str
-    file_path: Optional[str] = None
-    upload_date: Optional[str] = None
-    extracted_text: str = ""
-    char_count: int = 0
 
 
 @router.get("", response_model=list[DocumentResponse], summary="List all uploaded specification documents")
@@ -140,6 +126,39 @@ async def upload_document(
         upload_date=created.get("upload_date"),
         extracted_text=extracted_text,
         char_count=len(extracted_text),
+    )
+
+
+@router.put("/{document_id}", response_model=DocumentDetailResponse, summary="Update document")
+def update_document(
+    document_id: int,
+    payload: DocumentUpdateRequest,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> DocumentDetailResponse:
+    """Update specification document metadata and/or extracted text."""
+    existing = service.get_document(document_id)
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    filename = payload.filename if payload.filename is not None else existing.get("filename", "")
+    extracted_text = (
+        payload.extracted_text if payload.extracted_text is not None else existing.get("extracted_text", "")
+    )
+
+    service.update_document(document_id, filename=filename.strip(), extracted_text=extracted_text)
+    updated = service.get_document(document_id) or existing
+    text = updated.get("extracted_text") or ""
+
+    return DocumentDetailResponse(
+        id=updated["id"],
+        filename=updated.get("filename", filename),
+        file_path=updated.get("file_path"),
+        upload_date=updated.get("upload_date"),
+        extracted_text=text,
+        char_count=len(text),
     )
 
 

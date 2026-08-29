@@ -28,6 +28,37 @@ export interface ProjectCreatePayload {
   analysis_type?: string;
 }
 
+export interface ProjectUpdatePayload {
+  name?: string;
+  description?: string;
+  status?: string;
+  country?: string;
+  analysis_type?: string;
+}
+
+export interface DocumentItem {
+  id: number;
+  filename: string;
+  file_path?: string | null;
+  upload_date?: string | null;
+  extracted_text_preview?: string | null;
+  char_count: number;
+}
+
+export interface DocumentDetail {
+  id: number;
+  filename: string;
+  file_path?: string | null;
+  upload_date?: string | null;
+  extracted_text: string;
+  char_count: number;
+}
+
+export interface DocumentUpdatePayload {
+  filename?: string;
+  extracted_text?: string;
+}
+
 export interface Rule {
   id: number;
   rule_id?: string;

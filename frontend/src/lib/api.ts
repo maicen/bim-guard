@@ -1,8 +1,12 @@
 import type {
   AnalysisResult,
+  DocumentDetail,
+  DocumentItem,
+  DocumentUpdatePayload,
   Project,
   ProjectCreatePayload,
   ProjectListResponse,
+  ProjectUpdatePayload,
   Rule,
   RuleFolder,
   WorkflowStatus,
@@ -56,6 +60,15 @@ export const projectsApi = {
     const res = await fetch(`${API_BASE}/projects/upload`, {
       method: 'POST',
       body: formData,
+    });
+    return handleResponse<Project>(res);
+  },
+
+  async update(id: number, payload: ProjectUpdatePayload): Promise<Project> {
+    const res = await fetch(`${API_BASE}/projects/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
     return handleResponse<Project>(res);
   },
@@ -185,24 +198,33 @@ export const dashboardApi = {
 };
 
 export const documentsApi = {
-  async list(): Promise<any[]> {
+  async list(): Promise<DocumentItem[]> {
     const res = await fetch(`${API_BASE}/documents`);
-    return handleResponse<any[]>(res);
+    return handleResponse<DocumentItem[]>(res);
   },
 
-  async get(id: number): Promise<any> {
+  async get(id: number): Promise<DocumentDetail> {
     const res = await fetch(`${API_BASE}/documents/${id}`);
-    return handleResponse<any>(res);
+    return handleResponse<DocumentDetail>(res);
   },
 
-  async upload(file: File): Promise<any> {
+  async upload(file: File): Promise<DocumentDetail> {
     const form = new FormData();
     form.append('file', file);
     const res = await fetch(`${API_BASE}/documents`, {
       method: 'POST',
       body: form,
     });
-    return handleResponse<any>(res);
+    return handleResponse<DocumentDetail>(res);
+  },
+
+  async update(id: number, payload: DocumentUpdatePayload): Promise<DocumentDetail> {
+    const res = await fetch(`${API_BASE}/documents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<DocumentDetail>(res);
   },
 
   async delete(id: number): Promise<void> {
@@ -235,11 +257,11 @@ export const lineageApi = {
     return handleResponse<any[]>(res);
   },
 
-  async enhance(projectId: number, token: string): Promise<any> {
+  async enhance(projectId: number, token?: string): Promise<any> {
     const res = await fetch(`${API_BASE}/projects/${projectId}/enhance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify(token ? { token } : {}),
     });
     return handleResponse<any>(res);
   },

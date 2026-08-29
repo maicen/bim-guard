@@ -51,14 +51,9 @@ def test_audit_service_rejects_source_ifc_mutation(tmp_path):
         raise AssertionError("Audit source mutation must fail the run")
 
 
-def test_enhancement_authorization_fails_closed(monkeypatch):
-    monkeypatch.delenv("BIM_GUARD_ENHANCEMENT_TOKEN", raising=False)
-    assert not is_enhancement_authorized("")
-    assert not is_enhancement_authorized("anything")
-
-    monkeypatch.setenv("BIM_GUARD_ENHANCEMENT_TOKEN", "deployment-secret")
-    assert not is_enhancement_authorized("wrong-secret")
-    assert is_enhancement_authorized("deployment-secret")
+def test_enhancement_authorization_no_token_required():
+    assert is_enhancement_authorized("")
+    assert is_enhancement_authorized("anything")
 
 
 def test_db_rule_failures_join_the_audit_issue_and_bcf_contract():

@@ -13,6 +13,7 @@
     AlertCircle,
     SlidersHorizontal,
     Edit3,
+    Eye,
     X,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
@@ -26,6 +27,8 @@
   let successMessage = "";
   let isDeleteModalOpen = false;
   let ruleToDelete: { id: number; ruleId: string } | null = null;
+  let isViewModalOpen = false;
+  let ruleToView: Rule | null = null;
 
   // Filter state
   let searchQuery = "";
@@ -140,6 +143,11 @@
     formSeverity = "Medium";
     formNeedsReview = 0;
     isModalOpen = true;
+  }
+
+  function openViewModal(rule: Rule) {
+    ruleToView = rule;
+    isViewModalOpen = true;
   }
 
   function openEditModal(rule: Rule) {
@@ -499,6 +507,14 @@
                     </td>
                     <td class="py-3 px-4 text-right whitespace-nowrap">
                       <div class="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          on:click={() => openViewModal(rule)}
+                          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                          title="View rule specifications"
+                        >
+                          <Eye class="w-3.5 h-3.5" />
+                        </button>
                         <button
                           type="button"
                           on:click={() => openEditModal(rule)}
@@ -908,3 +924,100 @@
   onConfirm={confirmDelete}
   onCancel={() => (ruleToDelete = null)}
 />
+
+<!-- View Rule Details Modal -->
+{#if isViewModalOpen && ruleToView}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <ListChecks class="w-5 h-5" />
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white font-mono">{ruleToView.rule_id || `Rule #${ruleToView.id}`}</h2>
+            <p class="text-xs text-slate-400">Rule Specification &amp; Conditions</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          on:click={() => (isViewModalOpen = false)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-6 space-y-4 overflow-y-auto text-xs">
+        <div>
+          <span class="text-slate-400 font-semibold block mb-1">Description</span>
+          <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-slate-200">
+            {ruleToView.description || 'No description provided.'}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <div class="p-2.5 bg-slate-950/40 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Mechanism</span>
+            <span class="font-mono text-white font-semibold">{ruleToView.mechanism || 'CODE'}</span>
+          </div>
+
+          <div class="p-2.5 bg-slate-950/40 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Severity</span>
+            <span class="font-semibold text-amber-400">{ruleToView.severity}</span>
+          </div>
+
+          <div class="p-2.5 bg-slate-950/40 rounded-xl border border-slate-800">
+            <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Ruleset / Folder</span>
+            <span class="font-mono text-slate-300 truncate block">{ruleToView.ruleset_id || 'Global'}</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800 space-y-2">
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">Target &amp; Condition</span>
+          <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+            <div><span class="text-slate-500">Pset:</span> <span class="text-slate-300">{ruleToView.property_set || 'Pset_Compliance'}</span></div>
+            <div><span class="text-slate-500">Property:</span> <span class="text-slate-300">{ruleToView.property_name || '—'}</span></div>
+            <div><span class="text-slate-500">Operator:</span> <span class="text-cyan-300">{ruleToView.operator || '=='}</span></div>
+            <div><span class="text-slate-500">Target Value:</span> <span class="text-emerald-300">{ruleToView.check_value || (ruleToView.value_min ? `[${ruleToView.value_min}..${ruleToView.value_max}]` : '—')} {ruleToView.unit || ''}</span></div>
+          </div>
+          {#if ruleToView.compare_property}
+            <div class="text-[11px] font-mono text-amber-300 pt-1">
+              Compare with: {ruleToView.compare_property}
+            </div>
+          {/if}
+        </div>
+
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Raw JSON Definition</span>
+          <pre class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-400 font-mono text-[11px] overflow-auto max-h-40">{JSON.stringify(ruleToView, null, 2)}</pre>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
+        <button
+          type="button"
+          on:click={() => {
+            isViewModalOpen = false;
+            if (ruleToView) openEditModal(ruleToView);
+          }}
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        >
+          <Edit3 class="w-3.5 h-3.5" />
+          <span>Edit this Rule</span>
+        </button>
+
+        <button
+          type="button"
+          on:click={() => (isViewModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

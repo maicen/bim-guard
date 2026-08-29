@@ -12,9 +12,15 @@
     Sparkles,
     CheckCircle2,
     Database,
+    Eye,
+    Pencil,
+    Trash2,
   } from "lucide-svelte";
   import { dashboardApi, projectsApi } from "../lib/api";
   import type { DashboardStats, Project } from "../lib/types";
+  import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
+  import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
+  import ConfirmModal from "../lib/components/ConfirmModal.svelte";
 
   export let onSelectProjectForAudit: (projectId: number) => void;
   export let onSelectProjectForViewer: (projectId: number) => void;
@@ -31,6 +37,45 @@
   };
   let recentProjects: Project[] = [];
   let isLoading = true;
+
+  // Modals for CRUD operations on recent projects
+  let isEditModalOpen = false;
+  let isDetailsModalOpen = false;
+  let isDeleteModalOpen = false;
+  let selectedProjectForEdit: Project | null = null;
+  let selectedProjectForDetails: Project | null = null;
+  let projectToDelete: { id: number; name: string } | null = null;
+
+  function openEdit(project: Project) {
+    selectedProjectForEdit = project;
+    isEditModalOpen = true;
+  }
+
+  function openDetails(project: Project) {
+    selectedProjectForDetails = project;
+    isDetailsModalOpen = true;
+  }
+
+  function promptDelete(id: number, name: string) {
+    projectToDelete = { id, name };
+    isDeleteModalOpen = true;
+  }
+
+  async function confirmDelete() {
+    if (!projectToDelete) return;
+    try {
+      await projectsApi.delete(projectToDelete.id);
+      recentProjects = recentProjects.filter((p) => p.id !== projectToDelete!.id);
+      stats.total_projects = Math.max(0, stats.total_projects - 1);
+      projectToDelete = null;
+    } catch (err: any) {
+      console.error("Could not delete project:", err);
+    }
+  }
+
+  function handleProjectUpdated(updated: Project) {
+    recentProjects = recentProjects.map((p) => (p.id === updated.id ? updated : p));
+  }
 
   onMount(async () => {
     try {
@@ -247,7 +292,16 @@
                   {/if}
                 </td>
                 <td class="py-3 px-3 text-right">
-                  <div class="flex items-center justify-end gap-2">
+                  <div class="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      on:click={() => openDetails(project)}
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      title="View project details"
+                    >
+                      <Eye class="w-3.5 h-3.5" />
+                    </button>
+
                     {#if project.ifc_file_path}
                       <button
                         type="button"
@@ -258,12 +312,31 @@
                         <ScanEye class="w-3.5 h-3.5" />
                       </button>
                     {/if}
+
                     <button
                       type="button"
                       on:click={() => onSelectProjectForAudit(project.id)}
                       class="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors"
                     >
                       Audit
+                    </button>
+
+                    <button
+                      type="button"
+                      on:click={() => openEdit(project)}
+                      class="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/30 transition-colors"
+                      title="Edit project"
+                    >
+                      <Pencil class="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      on:click={() => promptDelete(project.id, project.name)}
+                      class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                      title="Delete project"
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </td>
@@ -341,3 +414,34 @@
     </button>
   </div>
 </div>
+
+<ProjectEditModal
+  isOpen={isEditModalOpen}
+  project={selectedProjectForEdit}
+  onClose={() => {
+    isEditModalOpen = false;
+    selectedProjectForEdit = null;
+  }}
+  onProjectUpdated={handleProjectUpdated}
+/>
+
+<ProjectDetailsModal
+  isOpen={isDetailsModalOpen}
+  project={selectedProjectForDetails}
+  onClose={() => {
+    isDetailsModalOpen = false;
+    selectedProjectForDetails = null;
+  }}
+  onOpenViewer={onSelectProjectForViewer}
+  onOpenEnhancements={null}
+/>
+
+<ConfirmModal
+  bind:isOpen={isDeleteModalOpen}
+  title="Delete Project"
+  message={`Are you sure you want to delete project "${projectToDelete?.name || ""}" and its associated artifacts? This cannot be undone.`}
+  confirmText="Delete Project"
+  danger={true}
+  onConfirm={confirmDelete}
+  onCancel={() => (projectToDelete = null)}
+/>

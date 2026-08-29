@@ -10,6 +10,10 @@
     ChevronDown,
     CheckCircle2,
     FileText,
+    Plus,
+    Trash2,
+    Eye,
+    X,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi } from "../lib/api";
   import type { DocumentItem, ExtractedRule } from "../lib/types";
@@ -18,6 +22,25 @@
   let selectedDocId: number | null = null;
   let rawText = "";
   let selectedModel = "gemini-2.5-flash";
+  let viewingDraftRule: ExtractedRule | null = null;
+
+  function addManualDraftRule() {
+    const newRule: ExtractedRule = {
+      rule_id: `CUSTOM-${extractedRules.length + 1}`,
+      description: "Custom compliance requirement",
+      property_set: "Pset_Compliance",
+      property_name: "",
+      operator: "==",
+      check_value: "",
+      severity: "Medium",
+      selected: true,
+    };
+    extractedRules = [newRule, ...extractedRules];
+  }
+
+  function removeDraftRule(index: number) {
+    extractedRules = extractedRules.filter((_, i) => i !== index);
+  }
   let isExtracting = false;
   let isSaving = false;
   let error = "";
@@ -252,15 +275,26 @@
           </p>
         </div>
 
-        <button
-          type="button"
-          disabled={isSaving}
-          on:click={handleSaveSelected}
-          class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 transition-all disabled:opacity-50"
-        >
-          <Save class="w-3.5 h-3.5" />
-          <span>{isSaving ? "Saving..." : "Save Selected to Library"}</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            on:click={addManualDraftRule}
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-all hover:scale-[1.02]"
+          >
+            <Plus class="w-3.5 h-3.5" />
+            <span>Add Rule</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={isSaving}
+            on:click={handleSaveSelected}
+            class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 transition-all disabled:opacity-50 hover:scale-[1.02]"
+          >
+            <Save class="w-3.5 h-3.5" />
+            <span>{isSaving ? "Saving..." : "Save Selected to Library"}</span>
+          </button>
+        </div>
       </div>
 
       <div
@@ -293,6 +327,7 @@
                 <th class="py-3 px-3">Op</th>
                 <th class="py-3 px-3">Target Value</th>
                 <th class="py-3 px-3">Severity</th>
+                <th class="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
@@ -353,6 +388,26 @@
                       <option value="Low">Low</option>
                     </select>
                   </td>
+                  <td class="py-3 px-3 text-right whitespace-nowrap">
+                    <div class="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        on:click={() => (viewingDraftRule = rule)}
+                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                        title="Inspect draft details"
+                      >
+                        <Eye class="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        on:click={() => removeDraftRule(i)}
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                        title="Remove draft rule"
+                      >
+                        <Trash2 class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               {/each}
             </tbody>
@@ -362,3 +417,50 @@
     </div>
   {/if}
 </div>
+
+{#if viewingDraftRule}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <FileText class="w-4 h-4 text-[#0071e3]" />
+          <h3 class="text-sm font-bold text-white font-mono">{viewingDraftRule.rule_id || 'Draft Rule'}</h3>
+        </div>
+        <button
+          type="button"
+          on:click={() => (viewingDraftRule = null)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <span class="text-slate-400 font-semibold block mb-1">Description</span>
+          <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-slate-200">
+            {viewingDraftRule.description || 'No description'}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-[11px] font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
+          <div><span class="text-slate-500">Pset:</span> <span class="text-slate-300">{viewingDraftRule.property_set || '—'}</span></div>
+          <div><span class="text-slate-500">Property:</span> <span class="text-slate-300">{viewingDraftRule.property_name || '—'}</span></div>
+          <div><span class="text-slate-500">Operator:</span> <span class="text-cyan-300">{viewingDraftRule.operator || '=='}</span></div>
+          <div><span class="text-slate-500">Target Value:</span> <span class="text-emerald-300">{viewingDraftRule.check_value || '—'}</span></div>
+          <div><span class="text-slate-500">Severity:</span> <span class="text-amber-400 font-semibold">{viewingDraftRule.severity}</span></div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button
+          type="button"
+          on:click={() => (viewingDraftRule = null)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

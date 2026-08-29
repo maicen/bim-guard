@@ -117,6 +117,40 @@ class ProjectListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Document Contracts
+# ---------------------------------------------------------------------------
+
+
+class DocumentUpdateRequest(BaseModel):
+    """Payload for updating document metadata or extracted text."""
+
+    filename: Optional[str] = Field(None, min_length=1, description="Updated document filename")
+    extracted_text: Optional[str] = Field(None, description="Updated extracted text content")
+
+
+class DocumentResponse(BaseModel):
+    """Summary document item returned in lists."""
+
+    id: int
+    filename: str
+    file_path: Optional[str] = None
+    upload_date: Optional[str] = None
+    extracted_text_preview: Optional[str] = None
+    char_count: int = 0
+
+
+class DocumentDetailResponse(BaseModel):
+    """Complete document record including full extracted text."""
+
+    id: int
+    filename: str
+    file_path: Optional[str] = None
+    upload_date: Optional[str] = None
+    extracted_text: str = ""
+    char_count: int = 0
+
+
+# ---------------------------------------------------------------------------
 # Rule & Ruleset Contracts
 # ---------------------------------------------------------------------------
 

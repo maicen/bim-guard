@@ -12,10 +12,14 @@
     XCircle,
     SlidersHorizontal,
     Wand2,
+    Eye,
+    Pencil,
   } from "lucide-svelte";
   import { projectsApi } from "../lib/api";
   import type { Project } from "../lib/types";
   import ProjectWizardModal from "../lib/components/ProjectWizardModal.svelte";
+  import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
+  import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
 
@@ -33,8 +37,12 @@
 
   // Modals state
   let isWizardOpen = false;
+  let isEditModalOpen = false;
+  let isDetailsModalOpen = false;
   let isEnhancementsOpen = false;
   let isDeleteModalOpen = false;
+  let selectedProjectForEdit: Project | null = null;
+  let selectedProjectForDetails: Project | null = null;
   let selectedProjectForEnhance: Project | null = null;
   let projectToDelete: { id: number; name: string } | null = null;
 
@@ -85,6 +93,20 @@
   function openEnhancements(project: Project) {
     selectedProjectForEnhance = project;
     isEnhancementsOpen = true;
+  }
+
+  function openEdit(project: Project) {
+    selectedProjectForEdit = project;
+    isEditModalOpen = true;
+  }
+
+  function openDetails(project: Project) {
+    selectedProjectForDetails = project;
+    isDetailsModalOpen = true;
+  }
+
+  function handleProjectUpdated(updated: Project) {
+    projects = projects.map((p) => (p.id === updated.id ? updated : p));
   }
 </script>
 
@@ -256,6 +278,15 @@
                 </td>
                 <td class="py-3 px-4 text-right whitespace-nowrap">
                   <div class="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      on:click={() => openDetails(project)}
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      title="View project details"
+                    >
+                      <Eye class="w-3.5 h-3.5" />
+                    </button>
+
                     {#if project.ifc_file_path}
                       <button
                         type="button"
@@ -286,6 +317,15 @@
 
                     <button
                       type="button"
+                      on:click={() => openEdit(project)}
+                      class="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/30 transition-colors"
+                      title="Edit project"
+                    >
+                      <Pencil class="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
                       on:click={() => promptDelete(project.id, project.name)}
                       class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
                       title="Delete project"
@@ -311,6 +351,27 @@
     projects = [newProject, ...projects];
     onSelectProjectForAudit(newProject.id);
   }}
+/>
+
+<ProjectEditModal
+  isOpen={isEditModalOpen}
+  project={selectedProjectForEdit}
+  onClose={() => {
+    isEditModalOpen = false;
+    selectedProjectForEdit = null;
+  }}
+  onProjectUpdated={handleProjectUpdated}
+/>
+
+<ProjectDetailsModal
+  isOpen={isDetailsModalOpen}
+  project={selectedProjectForDetails}
+  onClose={() => {
+    isDetailsModalOpen = false;
+    selectedProjectForDetails = null;
+  }}
+  onOpenViewer={onSelectProjectForViewer}
+  onOpenEnhancements={openEnhancements}
 />
 
 <ProjectEnhancementsModal

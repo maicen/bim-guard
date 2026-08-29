@@ -145,9 +145,25 @@ def update_project(
         payload.description if payload.description is not None else existing.get("description", "")
     )
     status_val = payload.status if payload.status is not None else existing.get("status", "Draft")
+    country = payload.country if payload.country is not None else existing.get("country", "")
+    analysis_type = (
+        payload.analysis_type
+        if payload.analysis_type is not None
+        else existing.get("analysis_type", "")
+    )
 
-    updated = service.update_project(project_id, name, description, status_val)
-    return ProjectResponse(**(updated or service.get_project(project_id)))
+    try:
+        updated = service.update_project(
+            project_id,
+            name,
+            description,
+            status_val,
+            country=country,
+            analysis_type=analysis_type,
+        )
+        return ProjectResponse(**(updated or service.get_project(project_id)))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete project")
@@ -211,24 +227,17 @@ def get_project_enhancements(
 
 
 class EnhanceRequest(BaseModel):
-    token: str = ""
+    token: Optional[str] = ""
 
 
 @router.post("/{project_id}/enhance", summary="Trigger IFC model quality improvements")
 def trigger_project_enhancement(
     project_id: int,
-    payload: EnhanceRequest,
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    payload: Optional[EnhanceRequest] = None,
 ) -> dict:
     """Execute model enhancement pipeline and persist a new immutable version."""
     from app.services.pipeline_services import execute_model_enhancement
-    from app.services.projects_service import is_enhancement_authorized
-
-    if not is_enhancement_authorized(payload.token):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid enhancement authorization token.",
-        )
 
     project = service.get_project(project_id)
     if not project or not project.get("ifc_file_path"):

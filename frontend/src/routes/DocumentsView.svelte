@@ -7,6 +7,7 @@
     Trash2,
     FileText,
     Eye,
+    Pencil,
     X,
     CheckCircle2,
     Search,
@@ -20,6 +21,14 @@
   let error = "";
   let isDeleteModalOpen = false;
   let docToDelete: { id: number; filename: string } | null = null;
+
+  // Edit modal state
+  let isEditModalOpen = false;
+  let docToEdit: DocumentItem | null = null;
+  let editFilename = "";
+  let editExtractedText = "";
+  let isSavingEdit = false;
+  let editError = "";
 
   // Upload modal state
   let isUploadModalOpen = false;
@@ -77,6 +86,54 @@
       alert(`Could not load document text: ${err.message}`);
     } finally {
       isLoadingDocDetail = false;
+    }
+  }
+
+  async function openEdit(doc: DocumentItem) {
+    docToEdit = doc;
+    editFilename = doc.filename;
+    editExtractedText = "";
+    editError = "";
+    isEditModalOpen = true;
+    try {
+      const detail = await documentsApi.get(doc.id);
+      editExtractedText = detail.extracted_text || "";
+    } catch {
+      editExtractedText = doc.extracted_text_preview || "";
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!docToEdit) return;
+    if (!editFilename.trim()) {
+      editError = "Filename is required.";
+      return;
+    }
+    isSavingEdit = true;
+    editError = "";
+    try {
+      const updated = await documentsApi.update(docToEdit.id, {
+        filename: editFilename.trim(),
+        extracted_text: editExtractedText,
+      });
+      documents = documents.map((d) =>
+        d.id === updated.id
+          ? {
+              ...d,
+              filename: updated.filename,
+              extracted_text_preview:
+                updated.extracted_text.slice(0, 200) +
+                (updated.extracted_text.length > 200 ? "..." : ""),
+              char_count: updated.char_count,
+            }
+          : d,
+      );
+      isEditModalOpen = false;
+      docToEdit = null;
+    } catch (err: any) {
+      editError = err.message || "Failed to update document.";
+    } finally {
+      isSavingEdit = false;
     }
   }
 
@@ -219,6 +276,14 @@
                     </button>
                     <button
                       type="button"
+                      on:click={() => openEdit(doc)}
+                      class="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/30 transition-colors"
+                      title="Edit document"
+                    >
+                      <Pencil class="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
                       on:click={() => promptDelete(doc.id, doc.filename)}
                       class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
                       title="Delete document"
@@ -357,14 +422,122 @@
       </div>
 
       <div
-        class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex justify-end"
+        class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between"
       >
+        <button
+          type="button"
+          on:click={() => {
+            const doc = documents.find((d) => d.id === selectedDoc!.id);
+            selectedDoc = null;
+            if (doc) openEdit(doc);
+          }}
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        >
+          <Pencil class="w-3.5 h-3.5" />
+          <span>Edit Document</span>
+        </button>
+
         <button
           type="button"
           on:click={() => (selectedDoc = null)}
           class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
         >
           Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Edit Document Modal -->
+{#if isEditModalOpen && docToEdit}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+  >
+    <div
+      class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+    >
+      <!-- Header -->
+      <div
+        class="px-6 py-4 border-b border-slate-800 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <Pencil class="w-5 h-5" />
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white tracking-tight">
+              Edit Document #{docToEdit.id}
+            </h2>
+            <p class="text-xs text-slate-400">
+              Update specification filename and parsed text content
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          on:click={() => (isEditModalOpen = false)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Body Form -->
+      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+        {#if editError}
+          <div
+            class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs"
+          >
+            {editError}
+          </div>
+        {/if}
+
+        <div class="space-y-1.5">
+          <label for="edit-doc-filename" class="block text-xs font-semibold text-slate-300">
+            Filename <span class="text-rose-400">*</span>
+          </label>
+          <input
+            id="edit-doc-filename"
+            type="text"
+            bind:value={editFilename}
+            placeholder="e.g. OBC_Part9_Specifications.pdf"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+          />
+        </div>
+
+        <div class="space-y-1.5 flex-1 flex flex-col">
+          <label for="edit-doc-text" class="block text-xs font-semibold text-slate-300">
+            Extracted Specification Text
+          </label>
+          <textarea
+            id="edit-doc-text"
+            rows="10"
+            bind:value={editExtractedText}
+            placeholder="Parsed specification clauses and text content..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#0071e3] leading-relaxed resize-y"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div
+        class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2"
+      >
+        <button
+          type="button"
+          on:click={() => (isEditModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={isSavingEdit || !editFilename.trim()}
+          on:click={handleSaveEdit}
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+        >
+          <span>{isSavingEdit ? "Saving..." : "Save Changes"}</span>
         </button>
       </div>
     </div>

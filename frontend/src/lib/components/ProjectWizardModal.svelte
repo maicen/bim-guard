@@ -262,7 +262,7 @@
                 class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
               >
                 <option value="Piping (Corrosive)">Piping (Corrosive) — GC-001, CC-001, MC-001</option>
-                <option value="Piping (Seismic)">Piping (Seismic) — Blue Halo Clearance Detection</option>
+                <option value="Halo">Halo — Blue Halo Clearance Detection</option>
                 <option value="Architecture">Architecture — Doors, Egress, Daylight, Stairs</option>
               </select>
             </div>
