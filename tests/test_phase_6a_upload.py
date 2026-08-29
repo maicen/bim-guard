@@ -52,7 +52,28 @@ class FakeTable:
         self.rows.append(row)
 
     def rows_where(self, where: str, params: list):
-        return [r for r in self.rows if r.get("file_hash_sha256") == params[0]]
+        """Honour the predicate's field rather than assuming a hash lookup.
+
+        The adapter parses a single ``<field> = ?`` comparison (see
+        ``db_adapters.parse_where``), so mirroring that here is enough -- and
+        it keeps this fake from silently answering a project query with hash
+        results.
+        """
+        field = where.split(" = ?", 1)[0].strip()
+        return [r for r in self.rows if r.get(field) == params[0]]
+
+    def get(self, pk_value):
+        return next((r for r in self.rows if r.get("id") == pk_value), None)
+
+
+class RaisingTable(FakeTable):
+    """A table whose reads fail, standing in for an unreachable database."""
+
+    def rows_where(self, where: str, params: list):
+        raise RuntimeError("relation does not exist")
+
+    def get(self, pk_value):
+        raise RuntimeError("relation does not exist")
 
 
 @pytest.fixture
@@ -254,3 +275,129 @@ class TestMetadata:
     def test_find_by_hash_is_empty_for_unknown_content(self, service):
         service.upload("model.ifc", IFC_BYTES)
         assert service.find_by_hash("0" * 64) == []
+
+
+# ---------------------------------------------------------------------------
+# Listing a project's uploads — the viewer's data source
+# ---------------------------------------------------------------------------
+
+PROJECT_ID = 42
+OTHER_PROJECT_ID = 99
+
+
+def _row(file_id: int, project_id: int | None, kind: str, filename: str, created_at: str) -> dict:
+    """Build an ``uploaded_files`` row.
+
+    The key set mirrors the columns declared in
+    ``FileUploadService._default_table`` and created by migration
+    ``20260827004000_create_uploaded_files``. Note there is no ``status``
+    column: a row's existence *is* its status, so anything wanting one needs a
+    migration first.
+    """
+    return {
+        "id": file_id,
+        "project_id": project_id,
+        "kind": kind,
+        "filename": filename,
+        "storage_ref": f"sb://bucket/uploads/{kind}/{file_id}_{filename}",
+        "file_hash_sha256": f"{file_id:064d}",
+        "size_bytes": len(IFC_BYTES),
+        "created_at": created_at,
+    }
+
+
+@pytest.fixture
+def populated(table) -> FileUploadService:
+    """Return a service over four rows spanning both projects and two kinds."""
+    table.rows.extend(
+        [
+            _row(1, PROJECT_ID, "ifc", "tower.ifc", "2026-08-01T00:00:00Z"),
+            _row(2, PROJECT_ID, "ifc", "podium.ifc", "2026-08-03T00:00:00Z"),
+            _row(3, PROJECT_ID, "document", "spec.pdf", "2026-08-02T00:00:00Z"),
+            _row(4, OTHER_PROJECT_ID, "ifc", "secret.ifc", "2026-08-04T00:00:00Z"),
+            # project_id NULL: uploaded before the project row existed. The
+            # migration allows this on purpose for the wizard's step 4.
+            _row(5, None, "ifc", "orphan.ifc", "2026-08-05T00:00:00Z"),
+        ]
+    )
+    return FileUploadService(storage=FakeStorage(), table=table)
+
+
+class TestListForProject:
+    """``list_for_project`` — what the multi-model viewer reads."""
+
+    def test_returns_rows_for_a_valid_project_id(self, populated):
+        rows = populated.list_for_project(PROJECT_ID, kind="ifc")
+
+        assert [row["filename"] for row in rows] == ["podium.ifc", "tower.ifc"]
+
+    def test_rows_carry_the_fields_the_viewer_needs(self, populated):
+        row = populated.list_for_project(PROJECT_ID, kind="ifc")[0]
+
+        # id, filename, storage_ref and size_bytes are what ViewerModel reads.
+        assert row["id"] == 2
+        assert row["filename"] == "podium.ifc"
+        assert row["storage_ref"].startswith("sb://bucket/uploads/ifc/")
+        assert row["size_bytes"] == len(IFC_BYTES)
+
+    def test_orders_newest_first(self, populated):
+        rows = populated.list_for_project(PROJECT_ID, kind="ifc")
+
+        assert [row["created_at"] for row in rows] == [
+            "2026-08-03T00:00:00Z",
+            "2026-08-01T00:00:00Z",
+        ]
+
+    def test_filters_out_other_kinds(self, populated):
+        assert all(
+            row["kind"] == "ifc" for row in populated.list_for_project(PROJECT_ID, kind="ifc")
+        )
+
+    def test_omitting_kind_returns_every_kind(self, populated):
+        kinds = {row["kind"] for row in populated.list_for_project(PROJECT_ID)}
+
+        assert kinds == {"ifc", "document"}
+
+    def test_excludes_other_projects(self, populated):
+        names = {row["filename"] for row in populated.list_for_project(PROJECT_ID)}
+
+        assert "secret.ifc" not in names
+
+    def test_orphan_uploads_are_unreachable_by_project(self, populated):
+        """A NULL ``project_id`` row cannot be found by any project id.
+
+        This is the constraint the wizard integration runs into: a file
+        uploaded before the project exists is only recoverable by its own id,
+        because ``project_id = ?`` never matches NULL.
+        """
+        for project_id in (PROJECT_ID, OTHER_PROJECT_ID, 0):
+            assert "orphan.ifc" not in {
+                row["filename"] for row in populated.list_for_project(project_id)
+            }
+
+    def test_empty_for_a_project_with_no_uploads(self, populated):
+        assert populated.list_for_project(123_456) == []
+
+    def test_returns_empty_rather_than_raising_when_the_lookup_fails(self, storage):
+        service = FileUploadService(storage=storage, table=RaisingTable())
+
+        assert service.list_for_project(PROJECT_ID, kind="ifc") == []
+
+
+class TestGetRecorded:
+    """``get_recorded`` — what the per-file download route reads."""
+
+    def test_returns_the_row_for_a_known_id(self, populated):
+        row = populated.get_recorded(1)
+
+        assert row is not None
+        assert row["filename"] == "tower.ifc"
+        assert row["project_id"] == PROJECT_ID
+
+    def test_returns_none_for_an_unknown_id(self, populated):
+        assert populated.get_recorded(999_999) is None
+
+    def test_returns_none_rather_than_raising_when_the_lookup_fails(self, storage):
+        service = FileUploadService(storage=storage, table=RaisingTable())
+
+        assert service.get_recorded(1) is None
