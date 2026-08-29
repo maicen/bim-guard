@@ -4,7 +4,6 @@ This document consolidates authoritative conventions across the decoupled archit
 1. **Backend API**: FastAPI (REST + SSE) mounted with Pydantic contracts
 2. **Frontend Client**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
 3. **Database & Engines**: Pure Python physics kernels, Supabase persistence, database-driven rules
-4. **Legacy Web UI**: FastHTML + MonsterUI (deprecated / maintenance only)
 
 When in doubt, `CLAUDE.md` and `.github/instructions/project-specific.instructions.md` are authoritative.
 
@@ -60,15 +59,3 @@ When in doubt, `CLAUDE.md` and `.github/instructions/project-specific.instructio
 | Svelte page component | `frontend/src/routes/{Domain}View.svelte` | `ProjectsView.svelte` |
 | Svelte reusable component | `frontend/src/lib/components/{Name}.svelte` | `IfcViewer.svelte` |
 | Internal Python helper | `_{name}` | `_build_row` |
-
----
-
-## 6. Legacy FastHTML Conventions (Deprecated / Maintenance Only)
-
-- Code under `app/routes/` and `app/components/` is legacy FastHTML + MonsterUI.
-- **Do not create new user-facing features in FastHTML**.
-- For maintenance bug fixes in legacy files:
-  - Route modules expose `setup_routes(rt)`.
-  - Full pages return `Title(...), DashboardLayout(Container(...))`.
-  - HTMX endpoints return HTML fragments.
-  - Return `Alert(cls=AlertT.danger)` for in-page error alerts.

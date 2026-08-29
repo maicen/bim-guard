@@ -175,7 +175,7 @@
                         <td class="px-4 py-3 text-right whitespace-nowrap">
                           {#if row.output_reference}
                             <a
-                              href={`/projects/${project.id}/enhancements/${row.id}/download`}
+                              href={`/api/projects/${project.id}/enhancements/${row.id}/download`}
                               class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-white transition-colors"
                             >
                               <Download class="w-3 h-3" />

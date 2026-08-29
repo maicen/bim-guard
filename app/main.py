@@ -1,4 +1,4 @@
-"""BIM Guard Application Entrypoint — Dual FastAPI Gateway & MonsterUI Monolith."""
+"""BIM Guard Application Entrypoint — FastAPI Gateway & Svelte 5 SPA."""
 
 from __future__ import annotations
 
@@ -7,13 +7,33 @@ from pathlib import Path
 from threading import Thread
 from time import perf_counter
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.compat.monsterui import ensure_monsterui_compat
+from app.api import (
+    analyze as api_analyze,
+)
+from app.api import (
+    dashboard as api_dashboard,
+)
+from app.api import (
+    documents as api_documents,
+)
+from app.api import (
+    events as api_events,
+)
+from app.api import (
+    projects as api_projects,
+)
+from app.api import (
+    rules as api_rules,
+)
+from app.api import (
+    settings as api_settings,
+)
 from app.environment import load_env_file
 from app.logging_config import configure_logging, get_logger
 
@@ -103,96 +123,11 @@ _schedule_seed_library_once_per_host()
 
 
 # ==============================================================================
-# FastHTML / MonsterUI Legacy Monolith Setup
-# ==============================================================================
-ensure_monsterui_compat()
-from fasthtml.common import FileResponse, Title, fast_app
-from monsterui.all import Container, DivLAligned, H1, Subtitle
-
-from app.components.layout import DashboardLayout
-from app.components.project_setup_wizard import handle_wizard_get, handle_wizard_post
-from app.components.themed_ui import SiteTheme
-from app.components.ui import ViewAction
-from app.routes import (
-    analyze,
-    analyze_architecture,
-    analyze_corrosion,
-    analyze_download,
-    analyze_pipeline,
-    analyze_seismic,
-    dashboard,
-    library,
-    modeling_manual,
-    projects,
-    revit_sync,
-    settings,
-    user_manual,
-    viewer,
-    workflow_api,
-    workflow_page,
-)
-
-APP_HEADERS = SiteTheme()
-
-fasthtml_app, rt = fast_app(
-    hdrs=APP_HEADERS,
-    cls="antialiased",
-)
-
-_ROUTE_INSTALLERS = (
-    viewer.setup_routes,
-    analyze.setup_routes,
-    analyze_corrosion.setup_routes,
-    analyze_seismic.setup_routes,
-    analyze_architecture.setup_routes,
-    analyze_pipeline.setup_routes,
-    analyze_download.setup_routes,
-    workflow_api.setup_routes,
-    workflow_page.setup_routes,
-    dashboard.setup_routes,
-    library.setup_routes,
-    modeling_manual.setup_routes,
-    projects.setup_routes,
-    revit_sync.setup_routes,
-    settings.setup_routes,
-    user_manual.setup_routes,
-)
-
-for installer in _ROUTE_INSTALLERS:
-    logger.debug("Registering FastHTML routes from %s", installer.__module__)
-    installer(rt)
-
-
-@fasthtml_app.get("/wizard")
-def wizard_get():
-    """GET /wizard — Render project setup wizard."""
-    return handle_wizard_get()
-
-
-@fasthtml_app.post("/wizard")
-async def wizard_post(request: Request):
-    """POST /wizard — Handle wizard navigation."""
-    form_data = await request.form()
-    return await handle_wizard_post(form_data)
-
-
-@rt("/")
-def get():
-    return Title("BIM Guard"), DashboardLayout(
-        Container(
-            H1("Welcome to BIM Guard"),
-            Subtitle("Open the IFC viewer to start a new compliance workflow."),
-            DivLAligned(ViewAction(href="/viewer", title="Go to Viewer")),
-        )
-    )
-
-
-# ==============================================================================
 # Main FastAPI Gateway & Routing
 # ==============================================================================
 app = FastAPI(
     title="BIM Guard",
-    description="OpenBIM Compliance Gateway & Decoupled Svelte SPA Architecture",
+    description="OpenBIM Compliance Gateway & Decoupled Svelte 5 SPA Architecture",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -228,7 +163,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         started = perf_counter()
         response = await call_next(request)
         path = request.url.path
-        if not path.startswith("/static/"):
+        if not path.startswith("/static/") and not path.startswith("/assets/"):
             duration_ms = (perf_counter() - started) * 1000
             logger.debug(
                 "Request method=%s path=%s status=%d duration_ms=%.1f",
@@ -243,16 +178,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 
 # Register API Gateway routers directly under /api prefix
-from app.api import (
-    analyze as api_analyze,
-    dashboard as api_dashboard,
-    documents as api_documents,
-    events as api_events,
-    projects as api_projects,
-    rules as api_rules,
-    settings as api_settings,
-)
-
 app.include_router(api_dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(api_projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
@@ -268,13 +193,38 @@ def health_check() -> dict:
     return {"status": "ok", "service": "bim-guard-api", "version": "1.0.0"}
 
 
-# Mount static files for both FastAPI and FastHTML/Viewer
+# Mount static assets directory
 static_dir = Path("static")
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Mount FastHTML / MonsterUI Monolith at root to catch all browser routes
-app.mount("/", fasthtml_app)
+# Production SPA Client Serving & Fallback
+frontend_dist = Path("frontend/dist")
+if (frontend_dist / "index.html").exists():
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend-assets")
+
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_spa(full_path: str):
+        """Serve Svelte 5 Single Page Application client-side routing."""
+        if full_path.startswith("api/") or full_path.startswith("static/"):
+            raise HTTPException(status_code=404, detail="Endpoint not found.")
+        file_candidate = frontend_dist / full_path
+        if full_path and file_candidate.is_file():
+            return FileResponse(file_candidate)
+        return FileResponse(frontend_dist / "index.html")
+else:
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+    def root_dev():
+        """Development fallback when frontend is not built."""
+        return {
+            "name": "BIM Guard API Gateway",
+            "version": "1.0.0",
+            "docs": "/api/docs",
+            "frontend_dev_server": "http://localhost:5173",
+            "status": "ready",
+        }
 
 
 if __name__ == "__main__":

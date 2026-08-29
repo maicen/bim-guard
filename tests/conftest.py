@@ -49,9 +49,6 @@ KNOWN_IMPORT_FAILURES: dict[str, str] = {
         "needs scikit-learn from the optional ml-pipeline group "
         "(uv sync --group ml-pipeline)"
     ),
-    "app.modules.module3_rule_builder.module3_rule_builder_mock": (
-        "imports app.models, a package that has never existed in this repository"
-    ),
 }
 
 IMPORT_REGRESSIONS: dict[str, str] = {}

@@ -4,6 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Instructions Files Map
 
+YOU MUST FOLLOW THEM.
 | File | Who reads it | What it defines |
 | --- | --- | --- |
 | README.md | Humans | What the project is |
@@ -15,9 +16,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Install backend dependencies
 uv sync
-
-# Install optional ML pipeline dependency group
-uv sync --group ml-pipeline
 
 # Run development backend server
 uv run uvicorn main:app --reload
@@ -60,13 +58,13 @@ uv run ruff check .
 uv run pytest tests/test_api_*.py -v
 ```
 
-## Architecture & Migration Status
+## Architecture & Decoupled Stack
 
-BIM-Guard is transitioning from a legacy FastHTML + MonsterUI monolith into a modern, decoupled architecture:
+BIM-Guard uses a modern, decoupled architecture:
+
 1. **Primary Backend API**: **FastAPI** (`app/api/`) mounted at `/api` on the ASGI app, exposing RESTful endpoints, typed Pydantic data contracts (`app/modules/contracts.py`), and real-time Server-Sent Events (SSE) tracking (`/api/events/{project_id}`).
-2. **Primary Frontend Client**: **Decoupled SPA Frontend** (`frontend/`) built with **Svelte 5**, Vite, TypeScript, and Tailwind CSS, consuming `/api` endpoints via `src/lib/api.ts` and SSE via `src/lib/sse.ts`.
-3. **Legacy Monolith (Deprecated / Maintenance Only)**: FastHTML + MonsterUI routes (`app/routes/`) and UI components (`app/components/`) mounted at `/` during the transition period. **Do not create new user-facing features in FastHTML**; build all new views, forms, and interactive components in `frontend/`.
-4. **Compute Kernels & Engines**: Pure Python compliance kernels (`app/engines/`, `app/modules/`, `app/services/`) remain framework-agnostic.
+2. **Primary Frontend Client**: **Decoupled SPA Frontend** (`frontend/`) built with **Svelte 5**, Vite, TypeScript, and Tailwind CSS, consuming `/api` endpoints via `src/lib/api.ts` and SSE via `src/lib/sse.ts`. In production, the build output is served directly as an SPA by FastAPI.
+3. **Compute Kernels & Engines**: Pure Python compliance kernels (`app/engines/`, `app/modules/`, `app/services/`) remain framework-agnostic.
 
 ### Layer Structure
 
@@ -76,13 +74,12 @@ API Gateway (app/api/)             → FastAPI routers (/projects, /rules, /anal
 Data Contracts (app/modules/contracts.py) → Pydantic request/response schemas (mirrored in frontend/src/lib/types.ts)
 Services (app/services/)           → Business logic, pipeline runner, tracker, Supabase persistence
 Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernels (GC-001, CC-001, MC-001, Blue Halo)
-Legacy Monolith (app/routes/, app/components/) → FastHTML + MonsterUI (deprecated / maintenance only)
 ```
 
 ### Data Flow
 
 1. `main.py` (root) → boots uvicorn ASGI server
-2. `app/main.py` → registers FastAPI router at `/api` and legacy FastHTML routes at `/`
+2. `app/main.py` → registers FastAPI router at `/api` and serves Svelte 5 SPA at `/`
 3. Svelte client (`frontend/`) talks to `/api/*` via `src/lib/api.ts` and listens to live SSE progress events via `src/lib/sse.ts`
 4. FastAPI routers validate requests using Pydantic schemas (`app/modules/contracts.py`), invoke domain services (`app/services/`), and run compute engines
 5. Results return as typed Pydantic JSON or stream incrementally over SSE connections
@@ -112,17 +109,14 @@ Supabase Postgres stores application data. The primary tables are:
 - `rules` — Unified compliance rules table with typed fields and JSON `parameters`
 
 #### Database-Driven Analysis Engine Architecture
+
 All compliance and corrosion analysis workflows are strictly database-driven:
+
 - **Zero Hardcoded Logic**: Multi-criteria scoring weights, risk band thresholds, material tables, flow velocity/dead-leg intervals, zone-to-environment mappings, and mitigations are read dynamically from database rules (`RuleService`), not hardcoded constants.
 - **Corrosion Engine Catalogs**: `app/services/corrosion_rule_catalog.py` translates DB rules into engine lookups for `BIMGUARD-GC-001`, `BIMGUARD-CC-001`, and `BIMGUARD-MC-001`.
 - **Live Catalog Reloading**: In-memory engine catalogs are refreshed via `reload_all_catalogs()` (calling `bimguard_*_engine.reload_rules()`) at the start of each analysis run, allowing DB rule edits to take effect immediately without server restarts.
 - **Targeted Ruleset Execution**: Selecting a `rule_folder` queries rules directly from the DB via `RuleService().list_by_ruleset(rule_folder)` so custom or extracted rulesets execute immediately against the model.
 
-### Legacy FastHTML UI (Maintenance Only)
-
-- Code under `app/routes/` and `app/components/` is legacy FastHTML + MonsterUI.
-- **Maintenance rule**: Only modify legacy FastHTML files when fixing existing bugs or preserving backward compatibility during the migration phase. Do NOT build new pages or features in FastHTML.
-
 ## Coding Guidelines
 
-Detailed coding rules covering the FastAPI backend, Svelte 5 frontend, database operations, and legacy maintenance are in [.github/instructions/project-specific.instructions.md](.github/instructions/project-specific.instructions.md).
+Detailed coding rules covering the FastAPI backend, Svelte 5 frontend, and database operations are in [.github/instructions/project-specific.instructions.md](.github/instructions/project-specific.instructions.md).

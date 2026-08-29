@@ -1,6 +1,8 @@
 """Project service for IFC-backed project CRUD and file handling."""
 
 import hashlib
+import hmac
+import os
 from pathlib import Path
 
 from app.constants import (
@@ -10,9 +12,9 @@ from app.constants import (
     get_standard,
 )
 from app.logging_config import get_logger
+from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
-from app.services.model_lineage import SupabaseModelLineageRepository
 from app.utils import (
     md5_hex,
     now_iso_utc,
@@ -21,6 +23,13 @@ from app.utils import (
 )
 
 logger = get_logger(__name__)
+
+
+def is_enhancement_authorized(token: str) -> bool:
+    """Authorize explicit model mutation with a deployment-managed secret."""
+    expected = os.getenv("BIM_GUARD_ENHANCEMENT_TOKEN", "").strip()
+    supplied = (token or "").strip()
+    return bool(expected and supplied and hmac.compare_digest(supplied, expected))
 
 
 class ProjectsService:

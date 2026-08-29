@@ -2,10 +2,9 @@
 
 ## Sources
 
-- [Components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui) _(visual reference implemented in MonsterUI and Svelte 5 Tailwind components)_
+- [Components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui) _(visual reference implemented in Svelte 5 Tailwind components)_
 - [This Design](https://raw.githubusercontent.com/VoltAgent/awesome-design-md/refs/heads/main/design-md/apple/DESIGN.md)
 - [What is DESIGN.md?](https://stitch.withgoogle.com/docs/design-md/overview)
-- [MonsterUI](https://monsterui.answer.ai/)
 - [Svelte Frontend](frontend/README.md)
 - [basecoat/src/js](https://github.com/hunvreus/basecoat/tree/main/src/js)
 - [basecoat/src/css](https://github.com/hunvreus/basecoat/tree/main/src/css)

@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fasthtml.common import RedirectResponse
+from starlette.responses import RedirectResponse
 
 ALLOWED_DOCUMENT_SUFFIXES = {".pdf", ".md", ".txt"}
 ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {

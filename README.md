@@ -6,15 +6,12 @@ View the published demo at [https://maicen.github.io/bim-guard/](https://maicen.
 
 ## Overview
 
-BIM-Guard is an OpenBIM compliance platform supporting a **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, run multi-engine audits (galvanic corrosion, crevice corrosion, MIC, seismic clearance), and stream live progress via Server-Sent Events (SSE).
-
-During migration, the legacy FastHTML + MonsterUI interface remains mounted alongside the API Gateway.
+BIM-Guard is an OpenBIM compliance platform built on a modern decoupled architecture: a high-performance **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, run multi-engine audits (galvanic corrosion, crevice corrosion, MIC, seismic clearance), and stream live progress via Server-Sent Events (SSE).
 
 ## Stack
 
-- **Backend API**: FastAPI (REST + SSE) mounted with Pydantic contracts
+- **Backend API**: FastAPI (REST + SSE) with strict Pydantic data contracts
 - **Frontend SPA**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
-- **Legacy UI**: FastHTML and MonsterUI (coexisting during transition)
 - **IFC & BIM Processing**: IfcOpenShell, ThatOpenCompany / Web-IFC viewer
 - **Database & Storage**: Supabase (Postgres) and Supabase Object Storage
 - **LLM Engine**: LiteLLM for rule extraction across multiple providers
@@ -25,16 +22,13 @@ During migration, the legacy FastHTML + MonsterUI interface remains mounted alon
 bim-guard/
 ├── app/
 │   ├── api/             # FastAPI routers (/projects, /rules, /analyze, /events)
-│   ├── main.py          # App bootstrap, FastHTML + FastAPI mount at /api
-│   ├── components/      # Reusable FastHTML UI building blocks
-│   ├── routes/          # FastHTML HTTP handlers and HTMX responses
+│   ├── main.py          # App bootstrap, FastAPI API Gateway, and SPA static mount
 │   ├── services/        # Persistence, runner, tracker, and extraction services
 │   ├── modules/         # Compliance pipeline stages & Pydantic contracts
-│   ├── engines/         # Corrosion physics engines (GC-001, CC-001, MC-001)
-│   └── views/           # Shared page layout helpers
+│   └── engines/         # Corrosion physics engines (GC-001, CC-001, MC-001)
 ├── frontend/            # Standalone Vite + Svelte 5 Single-Page App (SPA)
 │   ├── src/
-│   │   ├── lib/         # Typed API client, SSE subscriber, UI components
+│   │   ├── lib/         # Typed API client, SSE subscriber, Svelte 5 components
 │   │   └── routes/      # Projects, Audit, Rules, and 3D Viewer views
 │   ├── package.json     # Frontend dependencies (Svelte 5, Tailwind CSS)
 │   └── vite.config.ts   # Dev server with /api proxy to FastAPI

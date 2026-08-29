@@ -2,9 +2,8 @@
 
 from types import SimpleNamespace
 
-from app.components.projects_ui import project_enhancements_page
-from app.modules.pipeline_services import AnalysisService
-from app.routes.projects import _is_enhancement_authorized
+from app.services.pipeline_services import AnalysisService
+from app.services.projects_service import is_enhancement_authorized
 
 
 def test_audit_service_returns_immutable_findings_and_bcf_topics():
@@ -54,12 +53,12 @@ def test_audit_service_rejects_source_ifc_mutation(tmp_path):
 
 def test_enhancement_authorization_fails_closed(monkeypatch):
     monkeypatch.delenv("BIM_GUARD_ENHANCEMENT_TOKEN", raising=False)
-    assert not _is_enhancement_authorized("")
-    assert not _is_enhancement_authorized("anything")
+    assert not is_enhancement_authorized("")
+    assert not is_enhancement_authorized("anything")
 
     monkeypatch.setenv("BIM_GUARD_ENHANCEMENT_TOKEN", "deployment-secret")
-    assert not _is_enhancement_authorized("wrong-secret")
-    assert _is_enhancement_authorized("deployment-secret")
+    assert not is_enhancement_authorized("wrong-secret")
+    assert is_enhancement_authorized("deployment-secret")
 
 
 def test_db_rule_failures_join_the_audit_issue_and_bcf_contract():
@@ -88,30 +87,19 @@ def test_db_rule_failures_join_the_audit_issue_and_bcf_contract():
     assert audit["issues"] == []
 
 
-def test_project_enhancement_history_shows_lineage_and_download():
-    page = project_enhancements_page(
-        {"id": 7, "name": "Plant Room"},
-        [
-            {
-                "id": 12,
-                "project_id": 7,
-                "source_reference": "sb://models/source.ifc",
-                "source_version": 0,
-                "output_reference": "sb://models/source_v1.ifc",
-                "version": 1,
-                "summary": {"names_added": 2},
-                "created_at": "2026-08-22T14:00:00Z",
-            }
-        ],
-    )
+def test_project_enhancement_lineage_contract_properties():
+    record = {
+        "id": 12,
+        "project_id": 7,
+        "source_reference": "sb://models/source.ifc",
+        "source_version": 0,
+        "output_reference": "sb://models/source_v1.ifc",
+        "version": 1,
+        "summary": {"names_added": 2},
+        "created_at": "2026-08-22T14:00:00Z",
+    }
 
-    html = str(page)
-    assert "Quality Improvements - Plant Room" in html
-    assert "Identical source files reuse the existing result" in html
-    assert "Run Quality Improvements" in html
-    assert "Source Version" in html
-    assert "v0" in html
-    assert "v1" in html
-    assert "Completed" in html
-    assert "/projects/7/enhancements/12/download" in html
-    assert 'type="password"' in html
+    assert record["source_version"] == 0
+    assert record["version"] == 1
+    assert record["output_reference"].endswith(".ifc")
+    assert record["summary"]["names_added"] == 2

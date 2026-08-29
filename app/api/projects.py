@@ -221,14 +221,10 @@ def trigger_project_enhancement(
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ) -> dict:
     """Execute model enhancement pipeline and persist a new immutable version."""
-    import hmac
-    import os
-
     from app.services.pipeline_services import execute_model_enhancement
+    from app.services.projects_service import is_enhancement_authorized
 
-    expected = os.getenv("BIM_GUARD_ENHANCEMENT_TOKEN", "").strip()
-    supplied = payload.token.strip()
-    if not (expected and supplied and hmac.compare_digest(supplied, expected)):
+    if not is_enhancement_authorized(payload.token):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid enhancement authorization token.",
@@ -253,5 +249,38 @@ def trigger_project_enhancement(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Model quality enhancement failed: {exc}",
         )
+
+
+@router.get("/{project_id}/enhancements/{lineage_id}/download", summary="Download enhanced IFC model version")
+def download_project_enhancement(
+    project_id: int,
+    lineage_id: int,
+):
+    """Download quality-improved IFC model artifact for a specific lineage version."""
+    from app.services.model_lineage import SupabaseModelLineageRepository
+    from app.services.object_storage import ObjectStorage
+
+    repo = SupabaseModelLineageRepository()
+    lineage = repo.get(lineage_id)
+    if lineage is None or int(lineage.get("project_id") or 0) != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Model lineage version not found for project.",
+        )
+
+    storage = ObjectStorage()
+    output_ref = str(lineage.get("output_reference") or "")
+    local_path = storage.materialize_local_path(output_ref)
+    if local_path is None or not local_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Generated enhanced model file not found in storage.",
+        )
+
+    return FileResponse(
+        str(local_path),
+        media_type="application/octet-stream",
+        filename=local_path.name,
+    )
 
 
