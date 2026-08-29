@@ -467,7 +467,9 @@
         {/if}
       </div>
       {#if selectedFolder}
-        <span class="text-[10px] text-slate-500 shrink-0">Selected: <span class="text-slate-300 font-mono">{selectedFolder}</span></span>
+        <span class="text-[10px] text-slate-500 shrink-0">Selected: <span class="text-slate-300 font-mono">{selectedFolder}</span> (scopes audit to this ruleset only)</span>
+      {:else}
+        <span class="text-[10px] text-slate-500 shrink-0">Scope: <span class="text-slate-300">All building code rules</span></span>
       {/if}
     </div>
   {/if}
