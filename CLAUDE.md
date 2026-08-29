@@ -92,13 +92,20 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
 4. FastAPI routers call service layer (`app/services/`); compute kernels execute without UI framework dependencies
 5. Results return as validated Pydantic models or stream over SSE connections
 
-### Database
+### Database & Rule Management
 
-Supabase Postgres stores the application data. The primary tables are:
+Supabase Postgres stores application data. The primary tables are:
 
 - `projects` — IFC project metadata + file paths
 - `documents` — Uploaded PDFs with extracted text
-- `rules` — Compliance rules with JSON `parameters` field
+- `rules` — Unified compliance rules table with typed fields and JSON `parameters`
+
+#### Database-Driven Analysis Engine Architecture
+All compliance and corrosion analysis workflows are strictly database-driven:
+- **Zero Hardcoded Logic**: Multi-criteria scoring weights, risk band thresholds, material tables, flow velocity/dead-leg intervals, zone-to-environment mappings, and mitigations are read dynamically from database rules (`RuleService`), not hardcoded constants.
+- **Corrosion Engine Catalogs**: `app/services/corrosion_rule_catalog.py` translates DB rules into engine lookups for `BIMGUARD-GC-001`, `BIMGUARD-CC-001`, and `BIMGUARD-MC-001`.
+- **Live Catalog Reloading**: In-memory engine catalogs are refreshed via `reload_all_catalogs()` (calling `bimguard_*_engine.reload_rules()`) at the start of each analysis run, allowing DB rule edits to take effect immediately without server restarts.
+- **Targeted Ruleset Execution**: Selecting a `rule_folder` queries rules directly from the DB via `RuleService().list_by_ruleset(rule_folder)` so custom or extracted rulesets execute immediately against the model.
 
 ### Compliance Pipeline (app/modules/)
 

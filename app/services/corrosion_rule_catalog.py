@@ -360,25 +360,36 @@ def load_gc_catalog() -> dict[str, Any]:
         "description": json_data.get("description", ""),
         "galvanic_series": galvanic_series,
         "environment_classes": environment_classes,
-        "zone_to_env": {
-            "pool": "E6_POOL",
-            "swimming pool": "E6_POOL",
-            "spa": "E6_POOL",
-            "plant room": "E3_HUMID",
-            "plantroom": "E3_HUMID",
-            "mechanical room": "E3_HUMID",
-            "boiler room": "E3_HUMID",
-            "pump room": "E3_HUMID",
-            "external": "E5_EXPOSED",
-            "roof": "E5_EXPOSED",
-            "car park": "E4_SHELTERED",
-            "coastal": "E7_COASTAL",
-            "marine": "E7_COASTAL",
-            "cleanroom": "E1_CONTROLLED",
-            "laboratory": "E1_CONTROLLED",
-            "server room": "E1_CONTROLLED",
-            "data centre": "E1_CONTROLLED",
-        },
+        "zone_to_env": (
+            next(
+                (
+                    _decode_json(row.get("parameters")).get("zone_map")
+                    for row in rows
+                    if row.get("rule_type") == "reference_config"
+                    and _decode_json(row.get("parameters")).get("zone_map")
+                ),
+                None,
+            )
+            or {
+                "pool": "E6_POOL",
+                "swimming pool": "E6_POOL",
+                "spa": "E6_POOL",
+                "plant room": "E3_HUMID",
+                "plantroom": "E3_HUMID",
+                "mechanical room": "E3_HUMID",
+                "boiler room": "E3_HUMID",
+                "pump room": "E3_HUMID",
+                "external": "E5_EXPOSED",
+                "roof": "E5_EXPOSED",
+                "car park": "E4_SHELTERED",
+                "coastal": "E7_COASTAL",
+                "marine": "E7_COASTAL",
+                "cleanroom": "E1_CONTROLLED",
+                "laboratory": "E1_CONTROLLED",
+                "server room": "E1_CONTROLLED",
+                "data centre": "E1_CONTROLLED",
+            }
+        ),
         "area_ratio_bands": _build_area_ratio_bands(rows, json_data),
         "pren_thresholds": pren_thresholds,
         "pren_values": pren_values,
@@ -388,8 +399,41 @@ def load_gc_catalog() -> dict[str, Any]:
             for row in rows
             if row.get("rule_type") == "mitigation"
         },
+        "scoring_model": _decode_json(
+            next(
+                (row.get("parameters") for row in rows if row.get("rule_type") == "scoring_model"),
+                {},
+            )
+        ),
         "rules": rows,
     }
+
+
+def reload_all_catalogs() -> None:
+    """Reload all in-memory corrosion engine catalogs from the database."""
+    try:
+        from app.engines import bimguard_corrosion_engine
+
+        if hasattr(bimguard_corrosion_engine, "reload_rules"):
+            bimguard_corrosion_engine.reload_rules()
+    except Exception:
+        pass
+
+    try:
+        from app.engines import bimguard_crevice_engine
+
+        if hasattr(bimguard_crevice_engine, "reload_rules"):
+            bimguard_crevice_engine.reload_rules()
+    except Exception:
+        pass
+
+    try:
+        from app.engines import bimguard_mic_engine
+
+        if hasattr(bimguard_mic_engine, "reload_rules"):
+            bimguard_mic_engine.reload_rules()
+    except Exception:
+        pass
 
 
 def load_cc_catalog() -> dict[str, Any]:
@@ -535,6 +579,12 @@ def load_cc_catalog() -> dict[str, Any]:
             for row in rows
             if row.get("rule_type") == "mitigation"
         },
+        "scoring_model": _decode_json(
+            next(
+                (row.get("parameters") for row in rows if row.get("rule_type") == "scoring_model"),
+                {},
+            )
+        ),
         "rules": rows,
     }
 

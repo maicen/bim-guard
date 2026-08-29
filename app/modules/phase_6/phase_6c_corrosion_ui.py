@@ -401,6 +401,12 @@ def run_corrosion_analysis(
     allocator = IssueIdAllocator(run_id)
     issues: list[Issue] = []
 
+    try:
+        from app.services.corrosion_rule_catalog import reload_all_catalogs
+        reload_all_catalogs()
+    except Exception:
+        pass
+
     for element in elements:
         for spec in MECHANISMS:
             result, citations, error = _assess(element, spec)

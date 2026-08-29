@@ -231,19 +231,27 @@ def calculate_gc001_score(
     environment_multiplier: float,
 ) -> float:
     """
-    GC-001 composite score formula:
-    Score = (0.50 × voltage_risk) + (0.30 × area_ratio_risk) + (0.20 × environment_multiplier)
+    GC-001 composite score formula using DB scoring model weights:
+    Score = (w_v × voltage_risk) + (w_ar × area_ratio_risk) + (w_env × environment_multiplier)
     """
-    return min(1.0, (0.50 * voltage_risk + 0.30 * area_ratio_risk + 0.20 * environment_multiplier))
+    weights = _GC_CATALOG.get("scoring_model", {}).get("weights") or {}
+    w_v = weights.get("voltage_risk", 0.50)
+    w_ar = weights.get("area_ratio_risk", 0.30)
+    w_env = weights.get("environment_multiplier", 0.20)
+    return min(1.0, (w_v * voltage_risk + w_ar * area_ratio_risk + w_env * environment_multiplier))
 
 
 def classify_gc001_risk(score: float) -> tuple[str, str]:
-    """Map composite score to risk band and BCF priority."""
-    if score < 0.35:
+    """Map composite score to risk band and BCF priority based on DB thresholds."""
+    thresholds = _GC_CATALOG.get("risk_band_thresholds") or {}
+    med = thresholds.get("medium", 0.35)
+    high = thresholds.get("high", 0.65)
+    crit = thresholds.get("critical", 0.85)
+    if score < med:
         return "Low", "Minor"
-    elif score < 0.65:
+    elif score < high:
         return "Medium", "Normal"
-    elif score < 0.85:
+    elif score < crit:
         return "High", "Major"
     else:
         return "Critical", "Critical"
@@ -262,6 +270,8 @@ MITIGATIONS_GC = {
     "MIT-GC-009": "Use corrosion-inhibiting sealant at all dissimilar metal joints",
     "MIT-GC-010": "Implement corrosion monitoring programme at identified high-risk junctions",
 }
+if _GC_CATALOG.get("mitigations"):
+    MITIGATIONS_GC.update(_GC_CATALOG["mitigations"])
 
 
 def select_gc_mitigation(
@@ -283,6 +293,21 @@ def select_gc_mitigation(
         mits.append("MIT-GC-004")
     mits.append("MIT-GC-010")
     return list(dict.fromkeys(mits))
+
+
+def reload_rules() -> None:
+    """Reload all GC-001 tables and thresholds from the database catalog."""
+    global _GC_CATALOG, GALVANIC_SERIES, ENVIRONMENT_CLASSES, ZONE_TO_ENV
+    global AREA_RATIO_BANDS, PREN_THRESHOLDS, PREN_VALUES, MITIGATIONS_GC
+    _GC_CATALOG = load_gc_catalog()
+    GALVANIC_SERIES = _GC_CATALOG["galvanic_series"]
+    ENVIRONMENT_CLASSES = _GC_CATALOG["environment_classes"]
+    ZONE_TO_ENV = _GC_CATALOG.get("zone_to_env", {})
+    AREA_RATIO_BANDS = _GC_CATALOG.get("area_ratio_bands", [])
+    PREN_THRESHOLDS = _GC_CATALOG.get("pren_thresholds", {})
+    PREN_VALUES = _GC_CATALOG.get("pren_values", {})
+    if _GC_CATALOG.get("mitigations"):
+        MITIGATIONS_GC.update(_GC_CATALOG["mitigations"])
 
 
 # ── ELEMENT DATACLASS ─────────────────────────────────────────────────────────

@@ -553,7 +553,15 @@ async def _run_analysis_request(req: Request, forced_theme: str | None = None):
         len(doc_ids),
         rule_folder or "all",
     )
-    result = PipelineOrchestratorService.orchestrate_workflow()
+    result = PipelineOrchestratorService.orchestrate_workflow(
+        project_id=project_id,
+        doc_ids=doc_ids,
+        analysis_theme=analysis_theme,
+        rule_folder=rule_folder,
+        include_openings=include_openings,
+        include_spaces=include_spaces,
+        include_type_definitions=include_type_definitions,
+    )
 
     if "error" in result:
         logger.warning("Analysis request failed project_id=%d error=%s", project_id, result["error"])
@@ -3093,7 +3101,11 @@ def setup_routes(rt):
             project_id,
             rule_folder or "all",
         )
-        result = PipelineOrchestratorService.orchestrate_workflow()
+        result = PipelineOrchestratorService.orchestrate_workflow(
+            project_id=project_id,
+            analysis_theme="Architecture",
+            rule_folder=rule_folder,
+        )
         if "error" in result:
             logger.warning(
                 "ARCH request step=analysis-failed project_id=%d error=%s",

@@ -287,19 +287,27 @@ def calculate_cc001_score(
     environment_severity: float,
 ) -> float:
     """
-    CC-001 composite score:
-    Score = (0.35 × geometry_risk) + (0.40 × CCT_adequacy) + (0.25 × environment_severity)
+    CC-001 composite score using DB scoring model weights:
+    Score = (w_geom × geometry_risk) + (w_cct × CCT_adequacy) + (w_env × environment_severity)
     """
-    return min(1.0, (0.35 * geometry_risk + 0.40 * cct_adequacy + 0.25 * environment_severity))
+    weights = _CC_CATALOG.get("scoring_model", {}).get("weights") or {}
+    w_geom = weights.get("geometry_risk", 0.35)
+    w_cct = weights.get("CCT_adequacy", 0.40)
+    w_env = weights.get("environment_severity", 0.25)
+    return min(1.0, (w_geom * geometry_risk + w_cct * cct_adequacy + w_env * environment_severity))
 
 
 def classify_cc001_risk(score: float) -> tuple[str, str]:
-    """Map composite score to risk band and BCF priority."""
-    if score < 0.30:
+    """Map composite score to risk band and BCF priority based on DB thresholds."""
+    thresholds = _CC_CATALOG.get("risk_band_thresholds") or {}
+    med = thresholds.get("medium", 0.30)
+    high = thresholds.get("high", 0.55)
+    crit = thresholds.get("critical", 0.80)
+    if score < med:
         return "Low", "Minor"
-    elif score < 0.55:
+    elif score < high:
         return "Medium", "Normal"
-    elif score < 0.80:
+    elif score < crit:
         return "High", "Major"
     else:
         return "Critical", "Critical"
@@ -316,6 +324,8 @@ MITIGATIONS_CC = {
     "MIT-CC-007": "Specify titanium (CCT +120°C) for elements in permanent high-chloride high-temperature service",
     "MIT-CC-008": "Implement periodic inspection regime at identified crevice geometry locations",
 }
+if _CC_CATALOG.get("mitigations"):
+    MITIGATIONS_CC.update(_CC_CATALOG["mitigations"])
 
 
 def select_cc_mitigation(
@@ -340,6 +350,18 @@ def select_cc_mitigation(
         mits.append("MIT-CC-004")
     mits.append("MIT-CC-008")
     return list(dict.fromkeys(mits))
+
+
+def reload_rules() -> None:
+    """Reload all CC-001 tables and thresholds from the database catalog."""
+    global _CC_CATALOG, CCT_TABLE, GEOMETRY_CLASSES, JOINT_TYPES, ENVIRONMENT_SEVERITY, MITIGATIONS_CC
+    _CC_CATALOG = load_cc_catalog()
+    CCT_TABLE = _CC_CATALOG["cct_table"]
+    GEOMETRY_CLASSES = _CC_CATALOG.get("geometry_classes", {})
+    JOINT_TYPES = _CC_CATALOG.get("joint_type_library", {}).get("types", {})
+    ENVIRONMENT_SEVERITY = _CC_CATALOG.get("environment_severity", {})
+    if _CC_CATALOG.get("mitigations"):
+        MITIGATIONS_CC.update(_CC_CATALOG["mitigations"])
 
 
 # ── ELEMENT DATACLASS ─────────────────────────────────────────────────────────

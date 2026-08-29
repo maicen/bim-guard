@@ -58,6 +58,12 @@ class AnalysisService:
             evaluator = run_compliance_checks
 
         source_hash = self._file_sha256(source_path) if source_path is not None else None
+        try:
+            from app.services.corrosion_rule_catalog import reload_all_catalogs
+
+            reload_all_catalogs()
+        except Exception:
+            pass
         rows = evaluator(elements)
         if source_path is not None and self._file_sha256(source_path) != source_hash:
             raise RuntimeError("Audit pipeline modified the source IFC file")

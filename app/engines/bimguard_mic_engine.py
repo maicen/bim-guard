@@ -44,19 +44,21 @@ FLOW_VELOCITY_CLASSES = _MC_CATALOG["flow_velocity_classes"]
 
 
 def classify_flow_velocity(velocity_ms: float) -> tuple[str, dict]:
-    """Classify flow velocity and return risk class and metadata."""
+    """Classify flow velocity and return risk class and metadata from DB."""
+    if not FLOW_VELOCITY_CLASSES:
+        return "FV0_STAGNANT", {"risk": 1.0, "label": "Stagnant"}
     if velocity_ms <= 0.0:
-        return "FV0_STAGNANT", FLOW_VELOCITY_CLASSES["FV0_STAGNANT"]
-    elif velocity_ms < 0.1:
-        return "FV1_VERY_LOW", FLOW_VELOCITY_CLASSES["FV1_VERY_LOW"]
-    elif velocity_ms < 0.3:
-        return "FV2_LOW", FLOW_VELOCITY_CLASSES["FV2_LOW"]
-    elif velocity_ms < 0.6:
-        return "FV3_ACCEPTABLE", FLOW_VELOCITY_CLASSES["FV3_ACCEPTABLE"]
-    elif velocity_ms <= 1.5:
-        return "FV4_GOOD", FLOW_VELOCITY_CLASSES["FV4_GOOD"]
-    else:
-        return "FV5_TURBULENT", FLOW_VELOCITY_CLASSES["FV5_TURBULENT"]
+        return "FV0_STAGNANT", FLOW_VELOCITY_CLASSES.get("FV0_STAGNANT", {"risk": 1.0})
+    # Evaluate in ascending threshold order
+    sorted_classes = sorted(
+        FLOW_VELOCITY_CLASSES.items(),
+        key=lambda item: item[1].get("threshold_ms", 0.0),
+    )
+    for class_key, class_data in sorted_classes:
+        thresh = class_data.get("threshold_ms", 0.0)
+        if thresh > 0 and velocity_ms < thresh:
+            return class_key, class_data
+    return "FV5_TURBULENT", FLOW_VELOCITY_CLASSES.get("FV5_TURBULENT", {"risk": 0.02})
 
 
 TEMPERATURE_CLASSES = _MC_CATALOG["temperature_classes"]
@@ -65,13 +67,13 @@ TEMPERATURE_CLASSES = _MC_CATALOG["temperature_classes"]
 def classify_temperature(temp_c: Optional[float]) -> tuple[str, dict]:
     """Classify operating temperature and return risk class."""
     if temp_c is None:
-        return "T5_UNKNOWN", TEMPERATURE_CLASSES["T5_UNKNOWN"]
+        return "T5_UNKNOWN", TEMPERATURE_CLASSES.get("T5_UNKNOWN", {"risk": 0.5})
     for key, data in TEMPERATURE_CLASSES.items():
         if key == "T5_UNKNOWN":
             continue
         if data["t_min"] <= temp_c < data["t_max"]:
             return key, data
-    return "T4_SAFE_HOT", TEMPERATURE_CLASSES["T4_SAFE_HOT"]
+    return "T4_SAFE_HOT", TEMPERATURE_CLASSES.get("T4_SAFE_HOT", {"risk": 0.1})
 
 
 DEAD_LEG_CLASSES = _MC_CATALOG["dead_leg_classes"]
@@ -80,21 +82,21 @@ DEAD_LEG_CLASSES = _MC_CATALOG["dead_leg_classes"]
 def classify_dead_leg(length_m: Optional[float], diameter_m: Optional[float]) -> tuple[str, dict]:
     """
     Classify dead-leg by length-to-diameter ratio per HSE HSG274.
-    Returns risk class key and metadata dict.
+    Returns risk class key and metadata dict from DB.
     """
-    if length_m is None or diameter_m is None or diameter_m == 0:
-        return "DL5_UNKNOWN", DEAD_LEG_CLASSES["DL5_UNKNOWN"]
+    if length_m is None or diameter_m is None or diameter_m <= 0:
+        return "DL5_UNKNOWN", DEAD_LEG_CLASSES.get("DL5_UNKNOWN", {"risk": 0.5})
     if length_m <= 0:
-        return "DL0_THROUGH", DEAD_LEG_CLASSES["DL0_THROUGH"]
+        return "DL0_THROUGH", DEAD_LEG_CLASSES.get("DL0_THROUGH", {"risk": 0.05})
     ratio = length_m / diameter_m
     if ratio < 3:
-        return "DL1_SHORT", DEAD_LEG_CLASSES["DL1_SHORT"]
+        return "DL1_SHORT", DEAD_LEG_CLASSES.get("DL1_SHORT", {"risk": 0.3})
     elif ratio < 10:
-        return "DL2_MODERATE", DEAD_LEG_CLASSES["DL2_MODERATE"]
+        return "DL2_MODERATE", DEAD_LEG_CLASSES.get("DL2_MODERATE", {"risk": 0.65})
     elif ratio < 20:
-        return "DL3_LONG", DEAD_LEG_CLASSES["DL3_LONG"]
+        return "DL3_LONG", DEAD_LEG_CLASSES.get("DL3_LONG", {"risk": 0.85})
     else:
-        return "DL4_CRITICAL", DEAD_LEG_CLASSES["DL4_CRITICAL"]
+        return "DL4_CRITICAL", DEAD_LEG_CLASSES.get("DL4_CRITICAL", {"risk": 1.0})
 
 
 MATERIAL_SUSCEPTIBILITY = _MC_CATALOG["material_susceptibility"]
@@ -152,14 +154,18 @@ def get_system_modifier(system_type: str) -> tuple[float, str]:
 # ── RISK BAND CLASSIFICATION ──────────────────────────────────────────────────
 def classify_mic_risk(score: float) -> tuple[str, str]:
     """
-    Map composite score to risk band.
+    Map composite score to risk band based on DB thresholds.
     Returns (band_label, bcf_priority).
     """
-    if score < 0.25:
+    thresholds = _MC_CATALOG.get("risk_band_thresholds") or {}
+    med = thresholds.get("medium", 0.25)
+    high = thresholds.get("high", 0.50)
+    crit = thresholds.get("critical", 0.75)
+    if score < med:
         return "Low", "Minor"
-    elif score < 0.50:
+    elif score < high:
         return "Medium", "Normal"
-    elif score < 0.75:
+    elif score < crit:
         return "High", "Major"
     else:
         return "Critical", "Critical"
@@ -178,6 +184,23 @@ MITIGATIONS = {
     "MIT-MIC-009": "Introduce microbiological monitoring programme — EN ISO 9308-1 sampling at identified risk points",
     "MIT-MIC-010": "Conduct thermal disinfection — pasteurisation at minimum 70°C for 1 hour (CIBSE TM13 emergency response)",
 }
+if _MC_CATALOG.get("mitigations"):
+    MITIGATIONS.update(_MC_CATALOG["mitigations"])
+
+
+def reload_rules() -> None:
+    """Reload all MC-001 tables and thresholds from the database catalog."""
+    global _MC_CATALOG, FLOW_VELOCITY_CLASSES, TEMPERATURE_CLASSES, DEAD_LEG_CLASSES
+    global MATERIAL_SUSCEPTIBILITY, UNDER_INSULATION_RISK, SYSTEM_TYPE_MODIFIERS, MITIGATIONS
+    _MC_CATALOG = load_mc_catalog()
+    FLOW_VELOCITY_CLASSES = _MC_CATALOG.get("flow_velocity_classes", {})
+    TEMPERATURE_CLASSES = _MC_CATALOG.get("temperature_classes", {})
+    DEAD_LEG_CLASSES = _MC_CATALOG.get("dead_leg_classes", {})
+    MATERIAL_SUSCEPTIBILITY = _MC_CATALOG.get("material_susceptibility", {})
+    UNDER_INSULATION_RISK = _MC_CATALOG.get("under_insulation_risk", {})
+    SYSTEM_TYPE_MODIFIERS = _MC_CATALOG.get("system_type_modifiers", {})
+    if _MC_CATALOG.get("mitigations"):
+        MITIGATIONS.update(_MC_CATALOG["mitigations"])
 
 
 def select_mitigation(
@@ -293,8 +316,13 @@ def assess_mic_risk(element: MICElement) -> MICResult:
         element.insulation_condition.lower(), UNDER_INSULATION_RISK["unknown"]
     )
 
-    # Base composite score
-    base_score = 0.35 * fv_risk + 0.30 * t_risk + 0.25 * dl_risk + 0.10 * mat_score
+    # Base composite score using DB weights
+    weights = _MC_CATALOG.get("scoring_model", {}).get("weights") or {}
+    w_fv = weights.get("flow_velocity_risk", 0.35)
+    w_t = weights.get("temperature_risk", 0.30)
+    w_dl = weights.get("dead_leg_risk", 0.25)
+    w_mat = weights.get("material_susceptibility", 0.10)
+    base_score = w_fv * fv_risk + w_t * t_risk + w_dl * dl_risk + w_mat * mat_score
 
     # Apply system modifier
     modified_score = base_score * sys_mult

@@ -632,11 +632,10 @@ class BIMGuard_App:
             from .module4_comparator import Module4_Comparator
             from .module5_reporter import Module5_Reporter
 
-            library_rules = RuleService().list_by_theme(selected_theme)
             if rule_folder:
-                library_rules = [
-                    r for r in library_rules if (r.get("ruleset_id") or "") == rule_folder
-                ]
+                library_rules = RuleService().list_by_ruleset(rule_folder)
+            else:
+                library_rules = RuleService().list_by_theme(selected_theme)
             log_progress(70, "rules-loaded", rules=len(library_rules))
             for rule_index, rule in enumerate(library_rules, start=1):
                 logger.info(
