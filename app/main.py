@@ -17,7 +17,6 @@ from monsterui.all import (
 )
 
 from app.components.layout import DashboardLayout
-from app.components.project_setup_wizard import handle_wizard_get, handle_wizard_post
 from app.components.themed_ui import SiteTheme
 from app.components.ui import ViewAction
 from app.logging_config import configure_logging, get_logger
@@ -72,6 +71,7 @@ from app.routes import (
     settings,
     user_manual,
     viewer,
+    wizard_routes,
     workflow_api,
     workflow_page,
 )
@@ -141,6 +141,8 @@ _ROUTE_INSTALLERS = (
     revit_sync.setup_routes,
     settings.setup_routes,
     user_manual.setup_routes,
+    # GET/POST /wizard 5-step setup wizard (+ staged IFC upload).
+    wizard_routes.setup_routes,
 )
 _ROUTES_REGISTERED = False
 
@@ -149,20 +151,6 @@ _ROUTES_REGISTERED = False
 @rt("/static/{path:path}")
 def serve_static(path: str):
     return FileResponse(f"static/{path}")
-
-
-# Project Setup Wizard Routes
-@app.get("/wizard")
-def wizard_get():
-    """GET /wizard — Render project setup wizard."""
-    return handle_wizard_get()
-
-
-@app.post("/wizard")
-async def wizard_post(request):
-    """POST /wizard — Handle wizard navigation."""
-    form_data = await request.form()
-    return await handle_wizard_post(form_data)
 
 
 # Compatibility endpoint for stale browser tabs that still attempt FastHTML's

@@ -1,774 +1,1207 @@
-"""
-BIMGUARD AI — Project Setup Wizard (Phase 3b)
-Complete 5-step wizard component with stateless POST state management.
+"""Five-step project setup wizard: UI, state and validation only.
 
-File: app/components/project_setup_wizard.py
-Copy this entire file into your repo.
+    Step 1  Project details -- eight fields on one screen
+    Step 2  IFC model -- dropped, stored immediately, carried as a reference
+    Step 3  Documents -- at least one
+    Step 4  Settings -- standards and config, all optional
+    Step 5  Review -- read-only summary, then Create Project
+
+WHAT THIS MODULE DOES NOT DO
+
+    It does not write anything. No persistence import, no create call, no POST
+    to a create endpoint. Step 5 builds a dict via :func:`emit_form_data` and
+    hands it to the ``on_submit`` callback the caller supplies;
+    :mod:`app.routes.wizard_routes` is what turns that into a project row.
+
+    The two things the wizard cannot do for itself are supplied the same way:
+    the document rows for step 3 are passed into :func:`handle_wizard_get` and
+    :func:`handle_wizard_post`, and the model dropped at step 2 is stored by
+    the endpoint named in :data:`UPLOAD_ENDPOINT`.
+
+WHY IT KEEPS NO STATE
+
+    Each step posts the whole form and the answers so far come back as hidden
+    inputs. Nothing is held between requests, so a reload cannot resurrect a
+    half-finished project and two tabs cannot overwrite each other.
+
+    One field cannot travel that way: an ``<input type=file>`` value is not
+    settable from script, so a model chosen at step 2 would be gone by step 3.
+    It is stored the moment it is dropped and only the returned reference rides
+    forward, in ``ifc_file_reference``.
+
+WHAT "UNLOCKED" MEANS
+
+    Two layers, and the server one is the real one. The server renders exactly
+    one step and refuses to advance past a step that does not validate, so a
+    hand-made POST cannot skip ahead. The browser re-checks the same fields as
+    you type and enables Next only when they pass. :func:`validate_step` is the
+    single definition of valid; the script only decides whether a button looks
+    pressable.
 """
+
+from __future__ import annotations
+
+from typing import Any, Callable, Iterable, Mapping
 
 from fasthtml.common import (
-    Div, Form, Input, Select, Option, Button, Label, H1, H2, H3, P, Span, Img,
-    Textarea, Fieldset, Legend, Ul, Li, A, Script, Style
+    Button,
+    Div,
+    Form,
+    Input,
+    Label,
+    NotStr,
+    Option,
+    P,
+    Script,
+    Select,
+    Span,
+    Textarea,
 )
-from typing import Dict, List, Any, Optional, Tuple
 
+from app.components.ui import (
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    Checkbox,
+)
 from app.constants import (
-    ANALYSIS_ROUTES,
     ANALYSIS_TYPES,
     COUNTRIES,
-    DEFAULT_ANALYSIS_TYPE,
-    normalise_analysis_types,
+    DEFAULT_COUNTRY,
     NOTEBOOK_STANDARDS,
     PROJECT_TYPES,
 )
+from app.logging_config import get_logger
 
-#: Wizard default. Must be a member of COUNTRIES, or no option renders as
-#: selected. Deliberately not app.constants.DEFAULT_COUNTRY ("UK"), which
-#: tracks the migration_001 column default for the legacy /projects/create form.
-DEFAULT_COUNTRY = "United Kingdom"
+logger = get_logger(__name__)
 
-WIZARD_STYLES = """
-:root {
-  --primary: #006BA6;
-  --primary-light: #00AEEF;
-  --accent: #6D5BD0;
-  --error: #BE3A34;
-  --success: #00B050;
-  --bg: #F0F2F7;
-  --card: #fff;
-  --text-primary: #0F172A;
-  --text-muted: #475569;
-  --border: #E2E8F0;
+#: Where step 2's drop zone sends the file. Stored the instant it is dropped,
+#: because a file input cannot be carried forward as a hidden value.
+UPLOAD_ENDPOINT = "/wizard/upload"
+
+#: Where every step posts.
+FORM_ENDPOINT = "/wizard"
+
+TOTAL_STEPS = 5
+
+#: Step number -> (title, one-line lead).
+STEP_TITLES: dict[int, tuple[str, str]] = {
+    1: ("Project details", "Tell us about the project. Everything here is needed."),
+    2: ("IFC model", "Drop the model in. It uploads as soon as you do."),
+    3: ("Documents", "Which uploaded documents should the analysis read?"),
+    4: ("Settings", "Standards and configuration. All optional — you can skip this."),
+    5: ("Review", "Check it over, then create the project."),
 }
 
-/* ---- Shell ---- */
-.wiz-container {
-  background: #ffffff;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  max-width: 640px;
-  margin: 0 auto;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+#: Scalar fields, in the order step 1 renders them.
+_SCALAR_KEYS: tuple[str, ...] = (
+    "project_name",
+    "description",
+    "location",
+    "project_size_sqm",
+    "buildings",
+    "floors",
+    "project_type",
+    "ifc_file_reference",
+    "ifc_filename",
+    "ifc_size_bytes",
+    "status",
+)
+
+#: Multi-valued fields, which carry one hidden input per selected value.
+_MULTI_KEYS: tuple[str, ...] = ("analysis_types", "document_ids", "standards_codes")
+
+#: Optional analysis configuration collected on step 4, with its defaults.
+#: These are the same filters the analysis pages offer, so a project set up
+#: here starts from the same place a run would.
+SETTINGS_FLAGS: tuple[tuple[str, str, bool], ...] = (
+    ("include_openings", "Include openings (IfcOpeningElement)", True),
+    ("include_spaces", "Include spaces (IfcSpace)", True),
+    ("include_type_definitions", "Include type definitions (IfcElementType)", False),
+)
+
+#: Statuses a new project may be created in.
+STATUS_CHOICES: tuple[str, ...] = ("Draft", "Active")
+
+
+# ---------------------------------------------------------------------------
+# Validation -- the single definition of "valid"
+# ---------------------------------------------------------------------------
+
+
+def _as_list(value: Any) -> list[str]:
+    """Coerce a possibly-missing, possibly-scalar field to a list of strings."""
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [str(v) for v in value if str(v).strip()]
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _positive_number(raw: Any) -> float | None:
+    """Return ``raw`` as a positive number, or ``None`` when it is not one."""
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        value = float(text)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _positive_int(raw: Any) -> int | None:
+    """Return ``raw`` as a positive whole number, or ``None``."""
+    value = _positive_number(raw)
+    if value is None or value != int(value):
+        return None
+    return int(value)
+
+
+def validate_step(step: int, form_data: Mapping[str, Any]) -> list[str]:
+    """Return the reasons ``step`` cannot be left, or an empty list.
+
+    The one place a step's rules are written. The browser re-checks the same
+    fields to enable Next, and the handler calls this before advancing, so a
+    hand-made POST is held to the same standard as the UI.
+
+    Args:
+        step: Step number, 1-5.
+        form_data: Everything collected so far.
+
+    Returns:
+        Human-readable reasons, empty when the step is satisfied.
+    """
+    problems: list[str] = []
+
+    if step == 1:
+        if not str(form_data.get("project_name") or "").strip():
+            problems.append("Project name is required.")
+        location = str(form_data.get("location") or "").strip()
+        if not location:
+            problems.append("Location is required.")
+        elif location not in COUNTRIES:
+            problems.append("Choose a location from the list.")
+        if _positive_number(form_data.get("project_size_sqm")) is None:
+            problems.append("Project size must be a number greater than zero.")
+        if _positive_int(form_data.get("buildings")) is None:
+            problems.append("Enter a whole number of buildings, greater than zero.")
+        if _positive_int(form_data.get("floors")) is None:
+            problems.append("Enter a whole number of floors, greater than zero.")
+        project_type = str(form_data.get("project_type") or "").strip()
+        if not project_type:
+            problems.append("Choose a project type.")
+        elif project_type not in PROJECT_TYPES:
+            problems.append("Choose one of the listed project types.")
+        chosen = _as_list(form_data.get("analysis_types"))
+        if not chosen:
+            problems.append("Choose at least one analysis type.")
+        else:
+            unknown = [a for a in chosen if a not in ANALYSIS_TYPES]
+            if unknown:
+                problems.append(f"Unrecognised analysis type: {', '.join(unknown)}.")
+
+    elif step == 2:
+        if not str(form_data.get("ifc_file_reference") or "").strip():
+            problems.append("Upload an IFC model to continue.")
+
+    elif step == 3:
+        if not _as_list(form_data.get("document_ids")):
+            problems.append("Select at least one document.")
+
+    elif step == 4:
+        # Optional by definition: an empty step 4 is a complete step 4. Only a
+        # value that is present and wrong is worth reporting.
+        known = {s["id"] for s in NOTEBOOK_STANDARDS}
+        unknown = [s for s in _as_list(form_data.get("standards_codes")) if s not in known]
+        if unknown:
+            problems.append(f"Unrecognised standard: {', '.join(unknown)}.")
+        status = str(form_data.get("status") or "").strip()
+        if status and status not in STATUS_CHOICES:
+            problems.append("Choose a valid status.")
+
+    elif step == 5:
+        # The review re-checks everything behind it: reaching step 5 with an
+        # earlier answer edited away should not be submittable.
+        for earlier in range(1, TOTAL_STEPS):
+            problems.extend(validate_step(earlier, form_data))
+
+    else:
+        problems.append(f"Step {step} does not exist.")
+
+    return problems
+
+
+def validate_all_steps(form_data: Mapping[str, Any]) -> list[str]:
+    """Return every reason the wizard cannot be submitted."""
+    problems: list[str] = []
+    for step in range(1, TOTAL_STEPS):
+        problems.extend(validate_step(step, form_data))
+    return problems
+
+
+def first_incomplete_step(form_data: Mapping[str, Any]) -> int:
+    """Return the earliest step still blocking submission.
+
+    ``TOTAL_STEPS`` when every step is satisfied -- step 5 is the review, which
+    is reachable exactly when nothing before it is outstanding.
+    """
+    for step in range(1, TOTAL_STEPS):
+        if validate_step(step, form_data):
+            return step
+    return TOTAL_STEPS
+
+
+def clamp_step(requested: int, form_data: Mapping[str, Any]) -> int:
+    """Hold ``requested`` to a step the answers so far actually permit.
+
+    Bounds into 1..TOTAL_STEPS, then refuses to jump past the first unanswered
+    step. Going *back* is always allowed -- editing an earlier answer is the
+    point of Previous.
+    """
+    try:
+        target = int(requested)
+    except (TypeError, ValueError):
+        target = 1
+    target = max(1, min(target, TOTAL_STEPS))
+    return min(target, first_incomplete_step(form_data))
+
+
+def collect_form_data(request_data: Any) -> dict[str, Any]:
+    """Read one POST into the wizard's own shape.
+
+    Multi-valued fields are read with ``getlist`` so a three-analysis selection
+    does not collapse to its last entry, which is what ``FormData.get`` would
+    do.
+    """
+    getlist: Callable[[str], list[str]] = getattr(
+        request_data, "getlist", lambda key: _as_list(request_data.get(key))
+    )
+
+    data: dict[str, Any] = {
+        key: str(request_data.get(key) or "").strip() for key in _SCALAR_KEYS
+    }
+    for key in _MULTI_KEYS:
+        data[key] = [v for v in getlist(key) if str(v).strip()]
+    for flag, _, _ in SETTINGS_FLAGS:
+        data[flag] = bool(request_data.get(flag))
+    if not data.get("location"):
+        data["location"] = DEFAULT_COUNTRY
+    if not data.get("status"):
+        data["status"] = STATUS_CHOICES[0]
+    return data
+
+
+def emit_form_data(form_data: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the completed answers as the dict the wizard exists to produce.
+
+    Numbers come back as numbers rather than the strings the form carried, so
+    the caller is not left re-parsing what has already been validated. Nothing
+    here writes: turning this into a project row is the caller's job.
+
+    Args:
+        form_data: Collected answers. Call :func:`validate_all_steps` first --
+            this converts, it does not re-validate.
+
+    Returns:
+        ``project_name``, ``description``, ``location``, ``project_size_sqm``,
+        ``buildings``, ``floors``, ``project_type``, ``analysis_types``,
+        ``ifc_file_reference``, ``document_ids``, ``standards_codes`` and a
+        ``settings`` dict.
+    """
+    size = _positive_number(form_data.get("project_size_sqm"))
+    raw_bytes = str(form_data.get("ifc_size_bytes") or "").strip()
+
+    return {
+        "project_name": str(form_data.get("project_name") or "").strip(),
+        "description": str(form_data.get("description") or "").strip(),
+        "location": str(form_data.get("location") or DEFAULT_COUNTRY).strip(),
+        "project_size_sqm": int(size) if size is not None else None,
+        "buildings": _positive_int(form_data.get("buildings")),
+        "floors": _positive_int(form_data.get("floors")),
+        "project_type": str(form_data.get("project_type") or "").strip(),
+        "analysis_types": _as_list(form_data.get("analysis_types")),
+        "ifc_file_reference": str(form_data.get("ifc_file_reference") or "").strip(),
+        "document_ids": [
+            int(v) for v in _as_list(form_data.get("document_ids")) if str(v).isdigit()
+        ],
+        "standards_codes": _as_list(form_data.get("standards_codes")),
+        "settings": {
+            "status": str(form_data.get("status") or STATUS_CHOICES[0]).strip(),
+            **{flag: bool(form_data.get(flag)) for flag, _, _ in SETTINGS_FLAGS},
+            "ifc_filename": str(form_data.get("ifc_filename") or "").strip(),
+            "ifc_size_bytes": int(raw_bytes) if raw_bytes.isdigit() else None,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Project-type icons
+# ---------------------------------------------------------------------------
+
+#: One glyph per :data:`app.constants.PROJECT_TYPES` entry, drawn rather than
+#: imported so the grid needs no icon font and no network request. Each is a
+#: 48x48 line drawing on ``currentColor``, so a selected card recolours its own
+#: icon with the rest of its text.
+_TYPE_ICONS: dict[str, str] = {
+    "Commercial Office": (
+        '<rect x="10" y="8" width="28" height="34" rx="2"/>'
+        '<path d="M17 15h4M27 15h4M17 22h4M27 22h4M17 29h4M27 29h4"/>'
+        '<path d="M20 42v-6h8v6"/>'
+    ),
+    "Residential": (
+        '<path d="M8 22 24 9l16 13"/><path d="M12 22v20h24V22"/><path d="M20 42V31h8v11"/>'
+    ),
+    "Healthcare": (
+        '<rect x="9" y="12" width="30" height="30" rx="3"/>'
+        '<path d="M24 20v14M17 27h14"/><path d="M17 12V7h14v5"/>'
+    ),
+    "Educational": (
+        '<path d="M6 19 24 11l18 8-18 8z"/>'
+        '<path d="M14 23v10c0 2 4.5 4 10 4s10-2 10-4V23"/><path d="M40 20v10"/>'
+    ),
+    "Industrial": (
+        '<path d="M7 42V22l10 6V22l10 6V22l10 6v14z"/>'
+        '<path d="M13 34h4M23 34h4M33 34h4"/><path d="M37 22V9h5v19"/>'
+    ),
+    "Retail": (
+        '<path d="M8 17h32l-2 25H10z"/>'
+        '<path d="M17 17V12a7 7 0 0 1 14 0v5"/><path d="M17 25h14"/>'
+    ),
+    "Mixed-Use": (
+        '<rect x="7" y="18" width="15" height="24" rx="2"/>'
+        '<rect x="26" y="8" width="15" height="34" rx="2"/>'
+        '<path d="M12 25h5M12 32h5M31 15h5M31 22h5M31 29h5"/>'
+    ),
+    "Infrastructure": (
+        '<path d="M5 32h38"/><path d="M12 32V16M36 32V16"/>'
+        '<path d="M5 20h38"/><path d="M12 20 24 32l12-12"/>'
+    ),
 }
 
-.wiz-head {
-  padding: 20px;
-  border-bottom: 1px solid var(--border);
-}
 
-.wiz-body {
-  padding: 20px;
-  min-height: 300px;
-}
+def _type_icon(project_type: str) -> NotStr:
+    """Return the inline SVG for one project type.
 
-.wiz-foot {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
+    A type with no drawing yet falls back to a plain frame rather than a broken
+    box, so adding a PROJECT_TYPES entry cannot break the grid.
+    """
+    body = _TYPE_ICONS.get(project_type, '<rect x="10" y="10" width="28" height="28" rx="3"/>')
+    return NotStr(
+        '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10" '
+        f'aria-hidden="true">{body}</svg>'
+    )
 
-/* One step is rendered per request, so no display toggle here -- the fade is
-   purely cosmetic and must apply to every step, not just the "active" one. */
-.wiz-step {
-  animation: fadeIn 0.2s;
-}
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+# ---------------------------------------------------------------------------
+# Shared Tailwind class strings
+# ---------------------------------------------------------------------------
 
-.wiz-fieldset {
-  margin-bottom: 14px;
-}
+_INPUT = (
+    "w-full rounded-md border border-input bg-background px-3 py-2 text-sm "
+    "text-foreground placeholder:text-muted-foreground focus:outline-none "
+    "focus:ring-2 focus:ring-ring focus:border-ring"
+)
+_LABEL = "block text-xs font-semibold text-muted-foreground mb-1.5"
+#: The app's global sheets set a width on ``button[type=submit]`` (0,1,1),
+#: which outranks a ``w-auto`` utility (0,1,0) and stretches every control to
+#: the full row. :data:`_BTN_STYLE` is applied inline to win that outright.
+_BTN = (
+    "inline-flex w-auto items-center justify-center gap-1.5 rounded-md border "
+    "border-border bg-background px-4 py-2 text-sm font-medium text-foreground "
+    "transition-colors hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+)
+_BTN_PRIMARY = (
+    "inline-flex w-auto items-center justify-center gap-1.5 rounded-md bg-primary "
+    "px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors "
+    "hover:bg-primary/90 disabled:opacity-40 disabled:pointer-events-none"
+)
+#: Applied inline to every button, for the specificity reason above.
+_BTN_STYLE = "width:auto;flex:0 0 auto"
 
-.wiz-group {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
+_CHK_ROW = "flex items-start gap-2.5 py-1.5 cursor-pointer text-sm"
+_PANEL = "rounded-md border border-border bg-muted/30 p-3"
 
-/* ---- Progress + step indicator ---- */
-.wiz-progress {
-  height: 6px;
-  background: #E8EDF3;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
+#: Client-side mirror of step 1-3's rules, so Next enables as you type rather
+#: than after a round trip. The server re-checks everything regardless -- this
+#: only decides whether a button looks pressable.
+_WIZARD_JS = """
+(function(){
+  var form = document.getElementById('wiz-form');
+  if (!form || form.dataset.wired === '1') return;
+  form.dataset.wired = '1';
 
-.wiz-progress .wiz-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--primary), var(--primary-light));
-  border-radius: 4px;
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
+  var step = Number(form.dataset.step);
+  var next = form.querySelector('[data-role=next]');
 
-.wiz-steps {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
-}
+  function val(name){
+    var el = form.querySelector('[name="' + name + '"]');
+    return el ? String(el.value || '').trim() : '';
+  }
+  function checkedCount(name){
+    return form.querySelectorAll('[name="' + name + '"]:checked').length;
+  }
+  function positive(name, whole){
+    var n = Number(val(name));
+    if (!val(name) || !isFinite(n) || n <= 0) return false;
+    return whole ? n === Math.floor(n) : true;
+  }
 
-.wiz-stepitem {
-  flex: 1;
-  text-align: center;
-  position: relative;
-}
+  function valid(){
+    if (step === 1){
+      return !!val('project_name') && !!val('location')
+        && positive('project_size_sqm', false)
+        && positive('buildings', true) && positive('floors', true)
+        && checkedCount('project_type') === 1
+        && checkedCount('analysis_types') >= 1;
+    }
+    if (step === 2) return !!val('ifc_file_reference');
+    if (step === 3) return checkedCount('document_ids') >= 1;
+    return true;  // step 4 is optional, step 5 submits
+  }
 
-.wiz-stepitem .dot {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #E8EDF3;
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  transition: 0.25s;
-  border: 2px solid transparent;
-}
+  function sync(){ if (next) next.disabled = !valid(); }
+  form.addEventListener('input', sync);
+  form.addEventListener('change', sync);
+  sync();
 
-.wiz-stepitem.done .dot {
-  background: var(--success);
-  color: #fff;
-}
+  // ---- step 1: reflect the chosen type card ----
+  form.querySelectorAll('[data-role=typecard]').forEach(function(card){
+    card.addEventListener('click', function(){
+      form.querySelectorAll('[data-role=typecard]').forEach(function(c){
+        c.classList.remove('border-primary','bg-primary/10');
+        c.classList.add('border-border');
+      });
+      card.classList.remove('border-border');
+      card.classList.add('border-primary','bg-primary/10');
+    });
+  });
 
-.wiz-stepitem.current .dot {
-  background: var(--primary);
-  color: #fff;
-  border-color: rgba(0, 107, 166, 0.22);
-}
+  // ---- step 2: store the model on drop, carry only its reference ----
+  var drop = form.querySelector('[data-role=drop]');
+  if (drop){
+    var picker = drop.querySelector('input[type=file]');
+    var state  = form.querySelector('[data-role=upstate]');
+    var refEl  = form.querySelector('input[name=ifc_file_reference]');
+    var nameEl = form.querySelector('input[name=ifc_filename]');
+    var sizeEl = form.querySelector('input[name=ifc_size_bytes]');
 
-.wiz-stepitem .nm {
-  font-size: 10px;
-  margin-top: 5px;
-  color: #475569;
-  font-weight: 600;
-}
+    function say(msg, bad){
+      if (!state) return;
+      state.textContent = msg;
+      state.className = 'mt-3 text-xs ' + (bad ? 'text-destructive' : 'text-muted-foreground');
+    }
 
-.wiz-stepitem.current .nm {
-  color: #006BA6;
-}
+    function send(file){
+      if (!file) return;
+      if (!/\\.ifc$/i.test(file.name)){
+        say('That is not an .ifc file.', true);
+        return;
+      }
+      say('Uploading ' + file.name + '\\u2026');
+      if (next) next.disabled = true;
+      var body = new FormData();
+      body.append('ifc_file', file);
+      fetch(form.dataset.uploadEndpoint, {method:'POST', body:body})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d.ok){ say(d.error || 'The upload failed.', true); sync(); return; }
+          refEl.value = d.storage_ref;
+          nameEl.value = d.filename;
+          sizeEl.value = String(d.size_bytes);
+          say('Stored ' + d.filename + '.');
+          sync();
+        })
+        .catch(function(){ say('The upload could not be sent.', true); sync(); });
+    }
 
-/* ---- Form fields ---- */
-label.fld {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: #0F172A;
-}
-
-label.fld .req {
-  color: #BE3A34;
-}
-
-p {
-  color: #0F172A;
-}
-
-.wiz-head p {
-  color: #0F172A;
-}
-
-.inp {
-  width: 100%;
-  font-size: 12.5px;
-  padding: 8px 10px;
-  border: 1px solid #E2E8F0;
-  border-radius: 6px;
-  background: #fff;
-  color: #0F172A;
-  font-family: inherit;
-  box-sizing: border-box;
-}
-
-.inp:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 107, 166, 0.12);
-}
-
-.inp::placeholder {
-  color: #94A3B8;
-}
-
-textarea.inp {
-  min-height: 78px;
-  resize: vertical;
-}
-
-/* ---- Buttons ---- */
-.tbtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 5px 11px;
-  border-radius: 5px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: 0.12s;
-  white-space: nowrap;
-  font-family: inherit;
-}
-
-.tbtn:hover:not(:disabled) {
-  background: #F8FAFC;
-  border-color: #CBD5E1;
-}
-
-.tbtn-lg {
-  font-size: 12.5px;
-  padding: 9px 20px;
-  border-radius: 6px;
-}
-
-.tbtn-primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-
-.tbtn-primary:hover:not(:disabled) {
-  background: #005A8C;
-}
-
-/* The page also loads Pico / Franken UI / DaisyUI / Basecoat, which stretch bare
-   <button>s. Scope these so the footer buttons stay their natural width. */
-.wiz-foot .tbtn {
-  width: auto;
-  flex: 0 0 auto;
-  display: inline-flex;
-}
-
-/* ---- Card selectors (project type / analysis type) ---- */
-.card-selector {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.card-select-item {
-  padding: 12px;
-  border: 2px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: 0.15s;
-  text-align: center;
-  background: #fff;
-}
-
-.card-select-item:hover {
-  border-color: var(--primary);
-  background: rgba(0, 107, 166, 0.03);
-}
-
-.card-select-item input[type="radio"] {
-  display: none;
-}
-
-.card-select-item.selected {
-  border-color: var(--primary);
-  background: rgba(0, 107, 166, 0.06);
-}
-
-.card-select-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  color: #0F172A;
-}
-
-.card-select-item p {
-  color: var(--text-muted);
-  margin: 2px 0 0 0;
-}
-
-/* ---- IFC upload (step 4) ---- */
-.file-input-wrapper input[type="file"] {
-  display: none;
-}
-
-.file-input-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 9px 20px;
-  border: 1px dashed #CBD5E1;
-  border-radius: 6px;
-  background: #F8FAFC;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: 0.12s;
-}
-
-.file-input-label:hover {
-  border-color: var(--primary);
-  background: rgba(0, 107, 166, 0.04);
-}
-
-/* ---- Notes ---- */
-.note {
-  background: #F8FAFC;
-  border-left: 3px solid #00AEEF;
-  padding: 9px 12px;
-  font-size: 11px;
-  color: #0F172A;
-  border-radius: 0 5px 5px 0;
-  margin-top: 12px;
-}
-
-/* ---- Standards picker (step 5A) ---- */
-.standards-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: 280px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px;
-}
-
-.standard-item {
-  padding: 8px;
-  border-radius: 4px;
-}
-
-.standard-item:hover {
-  background: #F8FAFC;
-}
-
-.standard-item label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  margin-bottom: 2px;
-  color: #0F172A;
-}
-
-.standard-item p {
-  color: var(--text-muted);
-  margin: 0;
-}
-
-/* ---- Review (step 5B) ---- */
-.review-section {
-  background: #F8FAFC;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.review-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  padding: 4px 0;
-  border-bottom: 1px solid #E2E8F0;
-}
-
-.review-label {
-  font-weight: 600;
-  color: #0F172A;
-}
-
-.review-value {
-  color: #475569;
-}
+    picker.addEventListener('change', function(){ send(picker.files[0]); });
+    ['dragenter','dragover'].forEach(function(e){
+      drop.addEventListener(e, function(ev){
+        ev.preventDefault(); drop.classList.add('border-primary','bg-primary/5');
+      });
+    });
+    ['dragleave','drop'].forEach(function(e){
+      drop.addEventListener(e, function(ev){
+        ev.preventDefault(); drop.classList.remove('border-primary','bg-primary/5');
+      });
+    });
+    drop.addEventListener('drop', function(ev){
+      send(ev.dataTransfer && ev.dataTransfer.files[0]);
+    });
+  }
+})();
 """
 
 
+def human_size(num_bytes: int) -> str:
+    """Render a byte count the way the staged-file row shows it."""
+    value = float(num_bytes)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
 class ProjectSetupWizard:
-    """5-step project creation wizard with stateless POST state."""
+    """Renders the wizard. Holds no state between requests."""
 
-    def __init__(self):
-        self.steps = [
-            {"n": 1, "name": "Details"},
-            {"n": 2, "name": "Project Type"},
-            {"n": 3, "name": "Analysis"},
-            {"n": 4, "name": "IFC Upload"},
-            {"n": 5, "name": "Standards & Review"}
-        ]
+    #: How many steps there are, for callers that iterate.
+    total_steps = TOTAL_STEPS
 
-    def render_progress_bar(self, current_step: int) -> Div:
-        fill_width = (current_step - 1) * 20 + 20
-        return Div(Div(style=f"width: {fill_width}%", cls="wiz-fill"), cls="wiz-progress")
+    # -- pieces ------------------------------------------------------------
 
-    def render_step_indicator(self, current_step: int) -> Div:
-        step_items = []
-        for step in self.steps:
-            n, name = step["n"], step["name"]
-            if n < current_step:
-                state, dot = "done", "✓"
-            elif n == current_step:
-                state, dot = "current", str(n)
-            else:
-                state, dot = "pending", str(n)
-            step_items.append(Div(Div(dot, cls="dot"), Div(name, cls="nm"), cls=f"wiz-stepitem {state}"))
-        return Div(*step_items, cls="wiz-steps")
-
-    def render_step_1_details(self, fd: Dict = None) -> Div:
-        fd = fd or {}
+    def render_progress(self, current_step: int) -> Div:
+        """Render the bar, the ``Step X of 5`` counter and the Reset button."""
+        shown = max(1, min(current_step, TOTAL_STEPS))
+        percent = round(shown / TOTAL_STEPS * 100)
+        title, _ = STEP_TITLES[shown]
         return Div(
-            Div(Label("Country", Span("*", style="color: var(--error)"), cls="fld"),
-                Select(*[Option(c, value=c, selected=(c == fd.get("country", DEFAULT_COUNTRY))) for c in COUNTRIES],
-                       name="country", cls="inp", required=True),
-                cls="wiz-fieldset"),
-            Div(Label("Project Name", Span("*", style="color: var(--error)"), cls="fld"),
-                Input(type="text", name="name", value=fd.get("name", ""),
-                      placeholder="e.g., Hospital MEP Services Phase 2",
-                      cls="inp", required=True, minlength=3),
-                cls="wiz-fieldset"),
-            Div(Label("Description (optional)", cls="fld"),
-                Textarea(fd.get("description", ""), name="description",
-                         placeholder="Brief project overview...", cls="inp"),
-                cls="wiz-fieldset"),
             Div(
-                Div(Label("Building Size (m²)", cls="fld"),
-                    Input(type="number", name="size", value=fd.get("size", ""), cls="inp"),
-                    cls="wiz-fieldset"),
-                Div(Label("Number of Buildings", cls="fld"),
-                    Input(type="number", name="buildings", value=fd.get("buildings", ""), cls="inp"),
-                    cls="wiz-fieldset"),
-                Div(Label("Number of Floors", cls="fld"),
-                    Input(type="number", name="floors", value=fd.get("floors", ""), cls="inp"),
-                    cls="wiz-fieldset"),
-                cls="wiz-group"),
-            cls="wiz-step active")
-
-    def render_step_2_project_type(self, fd: Dict = None) -> Div:
-        fd = fd or {}
-        selected = fd.get("project_type", "")
-        cards = [Div(
-            Input(type="radio", name="project_type", value=ptype, id=f"ptype-{ptype}"),
-            Label(ptype, cls="card-select-label"),
-            cls=f"card-select-item {'selected' if selected == ptype else ''}",
-            onclick="selectCard(this)")
-            for ptype in PROJECT_TYPES]
-        return Div(
-            P("Select project type:", style="font-size: 12px; margin: 0 0 12px 0;"),
-            Div(*cards, cls="card-selector"),
-            cls="wiz-step")
-
-    def render_step_3_analysis_type(self, fd: Dict = None) -> Div:
-        fd = fd or {}
-        selected = normalise_analysis_types(fd.get("analysis_types"))
-        descs = {
-            "Piping (Corrosive)": "Galvanic & crevice corrosion risk",
-            "Halo": "Seismic bracing clearance (LOD 200/300)",
-            "Architecture": "Architectural compliance (TBD)"
-        }
-        cards = [Div(
-            Input(
-                type="checkbox",
-                name="analysis_types",
-                value=atype,
-                id=f"atype-{atype}",
-                checked=atype in selected,
-            ),
-            Div(Label(atype, cls="card-select-label"),
-                P(descs.get(atype, ""), style="font-size: 10px; color: var(--text-muted);")),
-            cls=f"card-select-item {'selected' if atype in selected else ''}",
-            onclick="selectCard(this)")
-            for atype in ANALYSIS_TYPES]
-        return Div(
-            P("Select one or more analyses:", style="font-size: 12px; margin: 0 0 12px 0;"),
-            Div(*cards, cls="card-selector"),
-            cls="wiz-step")
-
-    def render_step_4_ifc_upload(self, fd: Dict = None) -> Div:
-        return Div(
-            P("Upload IFC (optional):", style="font-size: 12px; margin: 0 0 12px 0;"),
-            Div(Input(type="file", name="ifc_file", accept=".ifc", id="ifc-input"),
-                Label("📁 Choose IFC file", _for="ifc-input", cls="file-input-label"),
-                cls="file-input-wrapper"),
-            Div("Models can be uploaded after project creation too.", cls="note"),
-            cls="wiz-step")
-
-    def render_step_5_standards_review(self, fd: Dict = None) -> Div:
-        fd = fd or {}
-        selected_standards = fd.get("standards", [])
-        standards_by_domain = {}
-        for std in NOTEBOOK_STANDARDS:
-            domain = std.get("domain", "Other")
-            if domain not in standards_by_domain:
-                standards_by_domain[domain] = []
-            standards_by_domain[domain].append(std)
-
-        standards_items = []
-        for domain in sorted(standards_by_domain.keys()):
-            standards_items.append(
-                Div(Div(domain, style="font-size: 10px; font-weight: 700; color: var(--text-muted);")))
-            for std in standards_by_domain[domain]:
-                is_checked = std["id"] in selected_standards
-                standards_items.append(Div(
-                    Input(type="checkbox", name="standards", value=std["id"], checked=is_checked),
-                    Div(Label(std["name"]),
-                        P(std["description"], style="font-size: 10px; color: var(--text-muted);")),
-                    cls="standard-item"))
-
-        country = fd.get("country", DEFAULT_COUNTRY)
-        name = fd.get("name", "")
-        project_type = fd.get("project_type", "")
-        analysis_types = normalise_analysis_types(fd.get("analysis_types"))
-
-        return Div(
-            Div(H3("Step 5A: Select Standards", style="font-size: 12px;"),
-                P("Choose relevant standards:", style="font-size: 11px; color: var(--text-muted);"),
-                Div(*standards_items, cls="standards-grid"),
-                cls="wiz-fieldset"),
-            Div(H3("Step 5B: Review", style="font-size: 12px;"),
                 Div(
-                    Div(Div("Project Details", style="font-size: 11px; font-weight: 700; color: var(--text-muted);"),
-                        Div(Span("Country", cls="review-label"), Span(country or "—", cls="review-value"), cls="review-row"),
-                        Div(Span("Name", cls="review-label"), Span(name or "—", cls="review-value"), cls="review-row"),
-                        Div(Span("Type", cls="review-label"), Span(project_type or "—", cls="review-value"), cls="review-row"),
-                        cls="review-section"),
-                    Div(Div("Analysis", style="font-size: 11px; font-weight: 700; color: var(--text-muted);"),
-                        Div(Span("Analysis Types", cls="review-label"), Span(", ".join(analysis_types) or "—", cls="review-value"), cls="review-row"),
-                        Div(Span("Standards", cls="review-label"), Span(f"{len(selected_standards)} chosen", cls="review-value"), cls="review-row"),
-                        cls="review-section")),
-                Div("Review and click 'Create Project' to proceed.", cls="note"),
-                cls="wiz-fieldset"),
-            cls="wiz-step")
+                    Span(f"Step {shown} of {TOTAL_STEPS}", cls="text-primary font-semibold"),
+                    Span(" · ", cls="text-muted-foreground"),
+                    Span(title, cls="text-muted-foreground"),
+                    cls="text-xs",
+                ),
+                Button(
+                    "Reset",
+                    type="submit",
+                    name="action",
+                    value="reset",
+                    cls=(
+                        "inline-flex w-auto border-0 bg-transparent p-0 text-xs font-medium "
+                        "text-muted-foreground underline hover:text-foreground"
+                    ),
+                    style=_BTN_STYLE,
+                ),
+                cls="flex items-center justify-between mb-2",
+            ),
+            Div(
+                Div(
+                    cls="h-full rounded-full bg-primary transition-all duration-300",
+                    style=f"width:{percent}%",
+                ),
+                cls="h-1.5 w-full rounded-full bg-muted overflow-hidden",
+            ),
+            cls="mb-6",
+        )
 
-    #: Fields each step renders as visible inputs. They are omitted from the
-    #: hidden carry-over block below: a duplicate name would shadow the real
-    #: value, because Starlette's ``FormData.get()`` returns the LAST match and
-    #: the hidden inputs are emitted after the step body.
-    STEP_FIELDS = {
-        1: ("country", "name", "description", "size", "buildings", "floors"),
-        2: ("project_type",),
-        3: ("analysis_types",),
-        4: (),
-        5: ("standards",),
-    }
+    def _field(self, label: str, control, *, required: bool = False, help_text: str = "") -> Div:
+        """Render one labelled control."""
+        caption: list[Any] = [label]
+        if required:
+            caption.append(Span(" *", cls="text-destructive"))
+        return Div(
+            Label(*caption, cls=_LABEL),
+            control,
+            *(
+                [P(help_text, cls="mt-1 text-xs text-muted-foreground")]
+                if help_text
+                else []
+            ),
+            cls="space-y-0",
+        )
 
-    def render_form(self, current_step: int = 1, form_data: Dict = None) -> Form:
-        fd = form_data or {}
-        owned = self.STEP_FIELDS.get(current_step, ())
-        carry_over = [
-            ("country", fd.get("country", DEFAULT_COUNTRY)),
-            ("name", fd.get("name", "")),
-            ("description", fd.get("description", "")),
-            ("size", fd.get("size", "")),
-            ("buildings", fd.get("buildings", "")),
-            ("floors", fd.get("floors", "")),
-            ("project_type", fd.get("project_type", "")),
-        ]
-        # analysis_types is multi-valued, so it carries as one hidden input per
-        # selected value. A single input would collapse the list to its last
-        # entry, which is exactly the bug FormData.get() causes on the way in.
-        multi_carry_over = [
-            ("analysis_types", value)
-            for value in normalise_analysis_types(fd.get("analysis_types"))
-        ]
-        hidden_fields = [Input(type="hidden", name="wizard_step", value=str(current_step))]
-        hidden_fields += [
-            Input(type="hidden", name=key, value=value)
-            for key, value in carry_over + multi_carry_over
-            if key not in owned
-        ]
-        if "standards" not in owned:
-            for std_id in fd.get("standards", []):
-                hidden_fields.append(Input(type="hidden", name="standards", value=std_id))
+    def _checkbox_row(
+        self, name: str, value: str, label: str, detail: str, checked: bool
+    ) -> Label:
+        """Render one checkbox as a full-width clickable row."""
+        return Label(
+            Checkbox(name=name, value=value, checked=checked, cls="mt-0.5 shrink-0"),
+            Div(
+                Span(label, cls="font-medium text-foreground"),
+                *(
+                    [P(detail, cls="text-xs text-muted-foreground mt-0.5")]
+                    if detail
+                    else []
+                ),
+            ),
+            cls=_CHK_ROW,
+        )
 
-        step_renderers = {
-            1: self.render_step_1_details,
-            2: self.render_step_2_project_type,
-            3: self.render_step_3_analysis_type,
-            4: self.render_step_4_ifc_upload,
-            5: self.render_step_5_standards_review
+    # -- steps -------------------------------------------------------------
+
+    def render_step_1_details(self, fd: Mapping[str, Any]) -> Div:
+        """Eight fields on one screen."""
+        location = str(fd.get("location") or DEFAULT_COUNTRY)
+        selected_type = str(fd.get("project_type") or "")
+        chosen_analyses = set(_as_list(fd.get("analysis_types")))
+        analysis_details = {
+            "Piping (Corrosive)": "Galvanic, crevice and microbial corrosion across the piping.",
+            "Halo": "Seismic bracing clearance and restraint checks.",
+            "Architecture": "Architectural code compliance across the model.",
         }
-        step_body = step_renderers[current_step](fd)
 
-        footer_buttons = []
-        if current_step > 1:
-            footer_buttons.append(Button("← Back", type="submit", name="action", value="prev", cls="tbtn tbtn-lg"))
-        if current_step < 5:
-            footer_buttons.append(Button("Next →", type="submit", name="action", value="next", cls="tbtn tbtn-lg tbtn-primary"))
+        return Div(
+            Div(
+                self._field(
+                    "Project name",
+                    Input(
+                        type="text",
+                        name="project_name",
+                        value=str(fd.get("project_name") or ""),
+                        cls=_INPUT,
+                    ),
+                    required=True,
+                ),
+                self._field(
+                    "Location",
+                    Select(
+                        *[
+                            Option(c, value=c, selected=c == location)
+                            for c in COUNTRIES
+                        ],
+                        name="location",
+                        cls=_INPUT,
+                    ),
+                    required=True,
+                ),
+                cls="grid gap-4 md:grid-cols-2",
+            ),
+            self._field(
+                "Description",
+                Textarea(
+                    str(fd.get("description") or ""),
+                    name="description",
+                    rows="3",
+                    cls=_INPUT,
+                ),
+                help_text="Optional.",
+            ),
+            Div(
+                self._field(
+                    "Project size (m²)",
+                    Input(
+                        type="number",
+                        name="project_size_sqm",
+                        value=str(fd.get("project_size_sqm") or ""),
+                        min="1",
+                        step="any",
+                        cls=_INPUT,
+                    ),
+                    required=True,
+                ),
+                self._field(
+                    "Buildings",
+                    Input(
+                        type="number",
+                        name="buildings",
+                        value=str(fd.get("buildings") or ""),
+                        min="1",
+                        step="1",
+                        cls=_INPUT,
+                    ),
+                    required=True,
+                ),
+                self._field(
+                    "Floors",
+                    Input(
+                        type="number",
+                        name="floors",
+                        value=str(fd.get("floors") or ""),
+                        min="1",
+                        step="1",
+                        cls=_INPUT,
+                    ),
+                    required=True,
+                ),
+                cls="grid gap-4 sm:grid-cols-3",
+            ),
+            Div(
+                Label("Project type", Span(" *", cls="text-destructive"), cls=_LABEL),
+                Div(
+                    *[
+                        Label(
+                            Input(
+                                type="radio",
+                                name="project_type",
+                                value=ptype,
+                                checked=ptype == selected_type,
+                                cls="sr-only",
+                            ),
+                            Div(_type_icon(ptype), cls="flex justify-center mb-2"),
+                            Span(ptype, cls="block text-xs font-semibold"),
+                            cls=(
+                                "cursor-pointer rounded-lg border-2 p-3 text-center "
+                                "transition-colors hover:border-primary/60 "
+                                + (
+                                    "border-primary bg-primary/10"
+                                    if ptype == selected_type
+                                    else "border-border"
+                                )
+                            ),
+                            data_role="typecard",
+                        )
+                        for ptype in PROJECT_TYPES
+                    ],
+                    cls="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+                ),
+            ),
+            Div(
+                Label("Analysis type", Span(" *", cls="text-destructive"), cls=_LABEL),
+                Div(
+                    *[
+                        self._checkbox_row(
+                            "analysis_types",
+                            a,
+                            a,
+                            analysis_details.get(a, ""),
+                            a in chosen_analyses,
+                        )
+                        for a in ANALYSIS_TYPES
+                    ],
+                    cls=_PANEL,
+                ),
+            ),
+            cls="space-y-5",
+        )
+
+    def render_step_2_ifc(self, fd: Mapping[str, Any]) -> Div:
+        """Drag-drop upload; only the returned reference travels on."""
+        ref = str(fd.get("ifc_file_reference") or "")
+        filename = str(fd.get("ifc_filename") or "")
+        raw_size = str(fd.get("ifc_size_bytes") or "")
+
+        staged = (
+            Div(
+                Span(filename or "Model stored", cls="text-sm font-medium truncate"),
+                Span(
+                    human_size(int(raw_size)) if raw_size.isdigit() else "",
+                    cls="text-xs text-muted-foreground shrink-0",
+                ),
+                cls=(
+                    "mt-3 flex items-center justify-between gap-3 rounded-md "
+                    "border border-primary/40 bg-primary/10 px-3 py-2"
+                ),
+            )
+            if ref
+            else None
+        )
+
+        return Div(
+            Label(
+                Input(type="file", accept=".ifc", cls="hidden"),
+                Div("Drop an IFC model here", cls="text-sm font-semibold"),
+                Div(
+                    "or click to choose one. Only .ifc is accepted, and it "
+                    "uploads immediately.",
+                    cls="mt-1 text-xs text-muted-foreground",
+                ),
+                cls=(
+                    "block cursor-pointer rounded-lg border-2 border-dashed border-border "
+                    "bg-muted/20 px-6 py-10 text-center transition-colors hover:border-primary"
+                ),
+                data_role="drop",
+            ),
+            *([staged] if staged else []),
+            Div(
+                "" if ref else "No model uploaded yet.",
+                cls="mt-3 text-xs text-muted-foreground",
+                data_role="upstate",
+            ),
+            # The reference, not the file: an <input type=file> value cannot be
+            # set from script, so only what the upload returned can travel on.
+            Input(type="hidden", name="ifc_file_reference", value=ref),
+            Input(type="hidden", name="ifc_filename", value=filename),
+            Input(type="hidden", name="ifc_size_bytes", value=raw_size),
+        )
+
+    def render_step_3_documents(
+        self, fd: Mapping[str, Any], documents: Iterable[Mapping[str, Any]]
+    ) -> Div:
+        """Multi-select over rows the caller supplies.
+
+        Passed in rather than looked up, which is what keeps this module free
+        of the persistence layer.
+        """
+        chosen = set(_as_list(fd.get("document_ids")))
+        rows = [
+            self._checkbox_row(
+                "document_ids",
+                str(doc.get("id")),
+                str(doc.get("filename") or f"Document {doc.get('id')}"),
+                "",
+                str(doc.get("id")) in chosen,
+            )
+            for doc in documents
+        ]
+        if not rows:
+            return Div(
+                P(
+                    "No documents have been uploaded yet. Upload one from the "
+                    "Documents page, then come back to this step.",
+                    cls="text-sm text-muted-foreground",
+                ),
+                cls=_PANEL,
+            )
+        return Div(*rows, cls=f"{_PANEL} max-h-72 overflow-y-auto")
+
+    def render_step_4_settings(self, fd: Mapping[str, Any]) -> Div:
+        """Standards and optional configuration."""
+        chosen = set(_as_list(fd.get("standards_codes")))
+        status = str(fd.get("status") or STATUS_CHOICES[0])
+
+        by_domain: dict[str, list[Mapping[str, Any]]] = {}
+        for std in NOTEBOOK_STANDARDS:
+            by_domain.setdefault(str(std.get("domain") or "Other"), []).append(std)
+
+        standards: list[Any] = []
+        for domain in sorted(by_domain):
+            standards.append(
+                P(
+                    domain,
+                    cls="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-3 first:mt-0",
+                )
+            )
+            standards.extend(
+                self._checkbox_row(
+                    "standards_codes",
+                    str(std["id"]),
+                    str(std.get("name") or std["id"]),
+                    str(std.get("description") or ""),
+                    str(std["id"]) in chosen,
+                )
+                for std in by_domain[domain]
+            )
+
+        return Div(
+            Div(
+                Label("Standards and codes", cls=_LABEL),
+                Div(*standards, cls=f"{_PANEL} max-h-72 overflow-y-auto"),
+                P(
+                    "Optional. Leave everything unticked to decide later.",
+                    cls="mt-1 text-xs text-muted-foreground",
+                ),
+            ),
+            Div(
+                self._field(
+                    "Status",
+                    Select(
+                        *[
+                            Option(s, value=s, selected=s == status)
+                            for s in STATUS_CHOICES
+                        ],
+                        name="status",
+                        cls=_INPUT,
+                    ),
+                ),
+                Div(
+                    Label("Analysis defaults", cls=_LABEL),
+                    Div(
+                        *[
+                            self._checkbox_row(
+                                flag, "1", label, "", bool(fd.get(flag, default))
+                            )
+                            for flag, label, default in SETTINGS_FLAGS
+                        ],
+                        cls=_PANEL,
+                    ),
+                ),
+                cls="grid gap-4 md:grid-cols-2 mt-5",
+            ),
+        )
+
+    def render_step_5_review(
+        self, fd: Mapping[str, Any], documents: Iterable[Mapping[str, Any]]
+    ) -> Div:
+        """Read-only summary of everything collected."""
+        emitted = emit_form_data(fd)
+        by_id = {str(doc.get("id")): doc for doc in documents}
+        doc_names = [
+            str(by_id[str(i)].get("filename") or i)
+            for i in emitted["document_ids"]
+            if str(i) in by_id
+        ]
+        settings = emitted["settings"]
+        flags_on = [
+            label for flag, label, _ in SETTINGS_FLAGS if settings.get(flag)
+        ]
+
+        pairs: list[tuple[str, Any]] = [
+            ("Project name", emitted["project_name"]),
+            ("Description", emitted["description"]),
+            ("Location", emitted["location"]),
+            ("Project size", f"{emitted['project_size_sqm']} m²" if emitted["project_size_sqm"] else ""),
+            ("Buildings", emitted["buildings"]),
+            ("Floors", emitted["floors"]),
+            ("Project type", emitted["project_type"]),
+            ("Analysis types", ", ".join(emitted["analysis_types"])),
+            ("IFC model", settings.get("ifc_filename") or emitted["ifc_file_reference"]),
+            ("Documents", ", ".join(doc_names) or len(emitted["document_ids"])),
+            ("Standards", len(emitted["standards_codes"]) or "None selected"),
+            ("Status", settings.get("status")),
+            ("Analysis defaults", ", ".join(flags_on) or "None"),
+        ]
+
+        rows = [
+            Div(
+                Span(label, cls="text-xs font-semibold text-muted-foreground"),
+                Span(
+                    str(value) if value not in (None, "", 0) else "—",
+                    cls="text-sm text-foreground break-words",
+                ),
+                cls="grid grid-cols-[10rem_1fr] gap-4 py-2 border-b border-border last:border-0",
+            )
+            for label, value in pairs
+        ]
+        return Div(*rows, cls=_PANEL)
+
+    # -- assembly ----------------------------------------------------------
+
+    def render_form(
+        self,
+        current_step: int = 1,
+        form_data: Mapping[str, Any] | None = None,
+        *,
+        documents: Iterable[Mapping[str, Any]] = (),
+        errors: Iterable[str] = (),
+    ) -> Form:
+        """Render one step, carrying every other answer as hidden inputs."""
+        fd = dict(form_data or {})
+        shown = max(1, min(int(current_step), TOTAL_STEPS))
+        docs = list(documents)
+        problems = list(errors)
+        title, lead = STEP_TITLES[shown]
+
+        bodies: dict[int, Callable[[], Any]] = {
+            1: lambda: self.render_step_1_details(fd),
+            2: lambda: self.render_step_2_ifc(fd),
+            3: lambda: self.render_step_3_documents(fd, docs),
+            4: lambda: self.render_step_4_settings(fd),
+            5: lambda: self.render_step_5_review(fd, docs),
+        }
+
+        footer_right: list[Any] = []
+        if shown == TOTAL_STEPS:
+            footer_right.append(
+                Button(
+                    "Cancel",
+                    type="submit",
+                    name="action",
+                    value="reset",
+                    cls=_BTN,
+                    style=_BTN_STYLE,
+                )
+            )
+            footer_right.append(
+                Button(
+                    "Create Project",
+                    type="submit",
+                    name="action",
+                    value="submit",
+                    cls=_BTN_PRIMARY,
+                    style=_BTN_STYLE,
+                    data_role="next",
+                )
+            )
         else:
-            footer_buttons.append(Button("Create Project & Proceed", type="submit", name="action", value="submit", cls="tbtn tbtn-lg tbtn-primary"))
+            footer_right.append(
+                Button(
+                    "Next →",
+                    type="submit",
+                    name="action",
+                    value="next",
+                    cls=_BTN_PRIMARY,
+                    style=_BTN_STYLE,
+                    data_role="next",
+                )
+            )
 
         return Form(
-            Div(self.render_progress_bar(current_step), self.render_step_indicator(current_step), cls="wiz-head"),
-            Div(step_body, cls="wiz-body"),
-            *hidden_fields,
-            Div(*footer_buttons, cls="wiz-foot"),
+            self.render_progress(shown),
+            Card(
+                CardHeader(
+                    CardTitle(title, cls="text-lg"),
+                    P(lead, cls="text-sm text-muted-foreground"),
+                ),
+                CardContent(
+                    *(
+                        [
+                            Div(
+                                *[P(p, cls="text-sm text-destructive") for p in problems],
+                                cls=(
+                                    "mb-4 rounded-md border border-destructive/40 "
+                                    "bg-destructive/10 p-3 space-y-1"
+                                ),
+                            )
+                        ]
+                        if problems
+                        else []
+                    ),
+                    bodies[shown](),
+                ),
+            ),
+            *self._hidden_carry_over(shown, fd),
+            Input(type="hidden", name="wizard_step", value=str(shown)),
+            Div(
+                # Rendered on every step and disabled on the first, rather than
+                # omitted there: a control that appears once you are past step 1
+                # makes the footer jump.
+                Button(
+                    "← Previous",
+                    type="submit",
+                    name="action",
+                    value="prev",
+                    cls=_BTN,
+                    style=_BTN_STYLE,
+                    disabled=shown == 1,
+                ),
+                Div(*footer_right, cls="flex items-center gap-2"),
+                cls="wiz-foot flex items-center justify-between gap-3 mt-6",
+            ),
+            id="wiz-form",
             method="POST",
             enctype="multipart/form-data",
-            hx_post="/wizard",
+            hx_post=FORM_ENDPOINT,
             hx_target="#wizard",
-            hx_swap="outerHTML"
+            hx_swap="outerHTML",
+            data_step=str(shown),
+            data_upload_endpoint=UPLOAD_ENDPOINT,
         )
 
-    def render(self, current_step: int = 1, form_data: Dict = None) -> Div:
+    def _hidden_carry_over(self, shown: int, fd: Mapping[str, Any]) -> list[Any]:
+        """Re-emit every answer the visible step does not own.
+
+        A duplicate name would shadow the real value: Starlette's
+        ``FormData.get`` returns the LAST match and these are emitted after the
+        step body, so anything the step renders itself is skipped here.
+        """
+        owned: dict[int, set[str]] = {
+            1: {
+                "project_name",
+                "description",
+                "location",
+                "project_size_sqm",
+                "buildings",
+                "floors",
+                "project_type",
+                "analysis_types",
+            },
+            2: {"ifc_file_reference", "ifc_filename", "ifc_size_bytes"},
+            3: {"document_ids"},
+            4: {"standards_codes", "status", *(f for f, _, _ in SETTINGS_FLAGS)},
+            5: set(),
+        }[shown]
+
+        hidden: list[Any] = []
+        for key in _SCALAR_KEYS:
+            if key in owned:
+                continue
+            value = str(fd.get(key) or "").strip()
+            if value:
+                hidden.append(Input(type="hidden", name=key, value=value))
+        for key in _MULTI_KEYS:
+            if key in owned:
+                continue
+            hidden.extend(
+                Input(type="hidden", name=key, value=v) for v in _as_list(fd.get(key))
+            )
+        for flag, _, _ in SETTINGS_FLAGS:
+            if flag in owned:
+                continue
+            if fd.get(flag):
+                hidden.append(Input(type="hidden", name=flag, value="1"))
+        return hidden
+
+    def render(
+        self,
+        current_step: int = 1,
+        form_data: Mapping[str, Any] | None = None,
+        *,
+        documents: Iterable[Mapping[str, Any]] = (),
+        errors: Iterable[str] = (),
+    ) -> Div:
+        """Render the whole wizard: the current step and its script."""
         return Div(
-            Style(WIZARD_STYLES),
-            Div(self.render_form(current_step, form_data), cls="wiz-container"),
-            Script("""function selectCard(el) {
-              const radio = el.querySelector('input[type="radio"]');
-              if (radio) {
-                radio.checked = true;
-                el.parentElement.querySelectorAll('.card-select-item').forEach(c => c.classList.remove('selected'));
-                el.classList.add('selected');
-              }
-            }"""),
-            id="wizard"
+            self.render_form(current_step, form_data, documents=documents, errors=errors),
+            Script(_WIZARD_JS),
+            id="wizard",
         )
 
 
-def handle_wizard_get():
-    """GET /wizard — Render wizard at step 1."""
-    wizard = ProjectSetupWizard()
-    return wizard.render(current_step=1, form_data={})
+# ---------------------------------------------------------------------------
+# Request handling
+# ---------------------------------------------------------------------------
 
 
-async def handle_wizard_post(request_data) -> Div:
-    """POST /wizard — Handle wizard navigation."""
-    current_step = int(request_data.get("wizard_step", 1))
-    action = request_data.get("action", "next")
-
-    form_data = {
-        "country": request_data.get("country", DEFAULT_COUNTRY),
-        "name": request_data.get("name", ""),
-        "description": request_data.get("description", ""),
-        "size": request_data.get("size", ""),
-        "buildings": request_data.get("buildings", ""),
-        "floors": request_data.get("floors", ""),
-        "project_type": request_data.get("project_type", ""),
-        "analysis_types": (
-            request_data.getlist("analysis_types")
-            if hasattr(request_data, "getlist")
-            else []
-        ),
-        "standards": request_data.getlist("standards") if hasattr(request_data, 'getlist') else [],
-    }
-
-    if action == "next":
-        errors = validate_step(current_step, form_data)
-        if errors:
-            wizard = ProjectSetupWizard()
-            return wizard.render(current_step=current_step, form_data=form_data)
-        current_step += 1
-    elif action == "prev":
-        current_step = max(1, current_step - 1)
-    elif action == "submit":
-        errors = validate_all_steps(form_data)
-        if errors:
-            wizard = ProjectSetupWizard()
-            return wizard.render(current_step=5, form_data=form_data)
-        project_id = create_project_from_wizard(form_data)
-        analysis_route = get_analysis_route(
-            normalise_analysis_types(form_data.get("analysis_types"))
-        )
-        return Div(Script(f"window.location.href = '/analyze/{analysis_route}?project_id={project_id}'"))
-
-    wizard = ProjectSetupWizard()
-    return wizard.render(current_step=current_step, form_data=form_data)
+def handle_wizard_get(documents: Iterable[Mapping[str, Any]] = ()) -> Div:
+    """Render the wizard at step 1."""
+    return ProjectSetupWizard().render(current_step=1, form_data={}, documents=documents)
 
 
-def validate_step(step: int, form_data: Dict) -> List[str]:
-    """Validate a specific step."""
-    errors = []
-    if step == 1:
-        if not form_data.get("country"):
-            errors.append("Country is required")
-        if not form_data.get("name") or len(form_data.get("name", "")) < 3:
-            errors.append("Project name must be at least 3 characters")
-    elif step == 2:
-        if not form_data.get("project_type"):
-            errors.append("Project type is required")
-    elif step == 3:
-        if not normalise_analysis_types(form_data.get("analysis_types")):
-            errors.append("At least one analysis type is required")
-    elif step == 5:
-        if not form_data.get("standards"):
-            errors.append("At least one standard must be selected")
-    return errors
-
-
-def validate_all_steps(form_data: Dict) -> List[str]:
-    """Validate all required fields before submission."""
-    errors = []
-    for step in range(1, 6):
-        errors.extend(validate_step(step, form_data))
-    return errors
-
-
-def create_project_from_wizard(form_data: Dict) -> int:
-    """Create the project and link its standards; return the new project id.
-
-    Synchronous, because ``ProjectsService.create_project`` and
-    ``set_standards_for_project`` are both synchronous. The service is imported
-    inside the function so that importing this component does not pull in the
-    persistence layer at module load time.
+async def handle_wizard_post(
+    request_data: Any,
+    *,
+    documents: Iterable[Mapping[str, Any]] = (),
+    on_submit: Callable[[dict[str, Any]], Any] | None = None,
+) -> Any:
+    """Advance, retreat, reset or submit.
 
     Args:
-        form_data: Collected wizard state. ``name``, ``country`` and
-            ``analysis_types`` must be present -- ``validate_all_steps`` runs
-            before this is called, and ``create_project`` raises ValueError on
-            any of them being blank or unrecognised.
+        request_data: The parsed form.
+        documents: Rows for step 3, supplied by the caller.
+        on_submit: Called with the emitted dict when step 5 submits and every
+            step validates. Whatever it returns is returned to the caller --
+            which is how the wizard hands off without importing persistence.
+            When omitted, the review is re-rendered instead.
 
     Returns:
-        The ``id`` of the inserted project row.
+        The wizard node for the step to show, or ``on_submit``'s return value.
     """
-    from app.services.projects_service import ProjectsService
+    data = collect_form_data(request_data)
+    action = str(request_data.get("action") or "next")
+    wizard = ProjectSetupWizard()
+    docs = list(documents)
 
-    service = ProjectsService()
+    if action == "reset":
+        logger.info("Wizard reset to step 1")
+        return wizard.render(current_step=1, form_data={}, documents=docs)
 
-    # create_project returns the inserted ROW, not an id.
-    project = service.create_project(
-        name=form_data.get("name", ""),
-        description=form_data.get("description", ""),
-        status="Active",
-        country=form_data.get("country", DEFAULT_COUNTRY),
-        analysis_types=(
-            normalise_analysis_types(form_data.get("analysis_types")) or [DEFAULT_ANALYSIS_TYPE]
-        ),
+    # Clamp before doing anything else. The step number arrives in the POST
+    # body, so a hand-made request can claim to be on step 5 with step 1 blank;
+    # without this the handler would validate step 5 and render step 5.
+    current = clamp_step(request_data.get("wizard_step") or 1, data)
+
+    if action == "prev":
+        return wizard.render(
+            current_step=max(1, current - 1), form_data=data, documents=docs
+        )
+
+    if action == "submit":
+        problems = validate_all_steps(data)
+        if problems:
+            blocking = first_incomplete_step(data)
+            logger.info("Wizard submit blocked at step=%d", blocking)
+            return wizard.render(
+                current_step=blocking,
+                form_data=data,
+                documents=docs,
+                errors=validate_step(blocking, data),
+            )
+        emitted = emit_form_data(data)
+        logger.info(
+            "Wizard emitted name=%r type=%s analyses=%s documents=%d standards=%d ifc=%s",
+            emitted["project_name"],
+            emitted["project_type"],
+            ",".join(emitted["analysis_types"]),
+            len(emitted["document_ids"]),
+            len(emitted["standards_codes"]),
+            emitted["ifc_file_reference"] or "none",
+        )
+        if on_submit is not None:
+            return on_submit(emitted)
+        return wizard.render(current_step=TOTAL_STEPS, form_data=data, documents=docs)
+
+    problems = validate_step(current, data)
+    if problems:
+        return wizard.render(
+            current_step=current, form_data=data, documents=docs, errors=problems
+        )
+    return wizard.render(
+        current_step=clamp_step(current + 1, data), form_data=data, documents=docs
     )
-    project_id = project["id"]
-
-    # set_standards_for_project takes a list of standard-id STRINGS; it builds
-    # the junction rows itself, defaulting source to "notebook".
-    standards = form_data.get("standards", [])
-    if standards:
-        service.set_standards_for_project(project_id, standards)
-
-    return project_id
-
-
-def get_analysis_route(analysis_types: list[str] | str) -> str:
-    """Map a project's analyses to the slug it should land on.
-
-    The primary analysis wins -- the first one selected -- matching where
-    ``POST /projects/create`` sends you. Reads
-    :data:`app.constants.ANALYSIS_ROUTES` rather than repeating the mapping, so
-    a new analysis type cannot be routable in one place and not the other.
-
-    Args:
-        analysis_types: The project's analyses, or a single one as a string.
-
-    Returns:
-        The slug for the primary analysis, falling back to ``"corrosion"`` when
-        nothing recognisable was selected.
-    """
-    ordered = normalise_analysis_types(analysis_types)
-    for analysis_type in ordered:
-        slug = ANALYSIS_ROUTES.get(analysis_type)
-        if slug:
-            return slug
-    return "corrosion"
