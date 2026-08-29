@@ -267,8 +267,18 @@
                 <td class="py-3 px-3 font-semibold text-white truncate max-w-xs"
                   >{project.name}</td
                 >
-                <td class="py-3 px-3 text-slate-400">{project.analysis_type}</td
-                >
+                <td class="py-3 px-3">
+                  <span
+                    class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold font-mono {project.analysis_type ===
+                    'Piping'
+                      ? 'bg-amber-950/60 border border-amber-800/50 text-amber-300'
+                      : project.analysis_type === 'Seismic'
+                      ? 'bg-purple-950/60 border border-purple-800/50 text-purple-300'
+                      : 'bg-blue-950/60 border border-blue-800/50 text-blue-300'}"
+                  >
+                    {project.analysis_type}
+                  </span>
+                </td>
                 <td class="py-3 px-3">
                   <span
                     class="px-2 py-0.5 rounded-full text-[10px] font-semibold {project.status ===

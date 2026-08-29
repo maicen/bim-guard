@@ -68,9 +68,12 @@
       searchQuery === "" ||
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
     const matchesDomain =
-      domainFilter === "all" || p.analysis_type === domainFilter;
+      domainFilter === "all" ||
+      p.analysis_type === domainFilter ||
+      (domainFilter === "Arch" && (p.analysis_type === "Architecture" || p.analysis_type === "Architectural")) ||
+      (domainFilter === "Piping" && p.analysis_type === "Piping (Corrosive)") ||
+      (domainFilter === "seismic" && (p.analysis_type === "Seismic" || p.analysis_type === "Halo"));
     return matchesSearch && matchesStatus && matchesDomain;
   });
 
@@ -179,9 +182,9 @@
         class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
       >
         <option value="all">All Domains</option>
-        <option value="Piping (Corrosive)">Piping (Corrosive)</option>
-        <option value="Piping (Seismic)">Piping (Seismic)</option>
-        <option value="Architecture">Architecture</option>
+        <option value="Arch">Arch</option>
+        <option value="Piping">Piping</option>
+        <option value="seismic">seismic</option>
       </select>
     </div>
   </div>
@@ -199,10 +202,14 @@
         <p>No projects match your current filters.</p>
         <button
           type="button"
-          on:click={() => (isWizardOpen = true)}
-          class="text-[#0071e3] hover:underline font-medium"
+          on:click={() => {
+            searchQuery = "";
+            statusFilter = "all";
+            domainFilter = "all";
+          }}
+          class="text-[#0071e3] hover:underline"
         >
-          Launch setup wizard to create one
+          Reset filters
         </button>
       </div>
     {:else}
@@ -212,11 +219,10 @@
             class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
           >
             <tr>
-              <th class="py-3 px-4">ID</th>
-              <th class="py-3 px-4">Name</th>
+              <th class="py-3 px-4">Project Name</th>
               <th class="py-3 px-4">Status</th>
               <th class="py-3 px-4">IFC Model</th>
-              <th class="py-3 px-4">Domain</th>
+              <th class="py-3 px-4">Analysis Domain</th>
               <th class="py-3 px-4">Jurisdiction</th>
               <th class="py-3 px-4">Created</th>
               <th class="py-3 px-4 text-right">Actions</th>
@@ -225,41 +231,33 @@
           <tbody class="divide-y divide-slate-800/60">
             {#each filteredProjects as project}
               <tr class="hover:bg-slate-900/60 transition-colors">
-                <td class="py-3 px-4 font-mono text-slate-500">#{project.id}</td
-                >
-                <td class="py-3 px-4">
-                  <div class="font-semibold text-white truncate max-w-xs">
-                    {project.name}
+                <td class="py-3 px-4 font-semibold text-white">
+                  <div class="flex flex-col">
+                    <span class="text-sm">{project.name}</span>
+                    {#if project.description}
+                      <span class="text-[11px] text-slate-400 font-normal truncate max-w-sm">
+                        {project.description}
+                      </span>
+                    {/if}
                   </div>
-                  {#if project.description}
-                    <div class="text-[11px] text-slate-400 truncate max-w-xs">
-                      {project.description}
-                    </div>
-                  {/if}
                 </td>
                 <td class="py-3 px-4">
                   <span
-                    class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold {project.status ===
+                    class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border {project.status ===
                     'Active'
-                      ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/60'
-                      : 'bg-slate-800 text-slate-400'}"
+                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
+                      : project.status === 'Archived'
+                      ? 'bg-slate-800 text-slate-400 border-slate-700'
+                      : 'bg-amber-950/40 text-amber-400 border-amber-800/60'}"
                   >
                     {project.status}
                   </span>
                 </td>
                 <td class="py-3 px-4">
                   {#if project.ifc_file_path}
-                    <div class="flex items-center gap-1.5 text-emerald-400">
-                      <CheckCircle2 class="w-4 h-4" />
-                      <span class="text-[11px] font-medium">Attached</span>
-                      <a
-                        href={projectsApi.getIfcUrl(project.id)}
-                        download
-                        class="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors ml-1"
-                        title="Download attached IFC file"
-                      >
-                        <Download class="w-3 h-3" />
-                      </a>
+                    <div class="flex items-center gap-1.5 text-emerald-400 font-medium">
+                      <CheckCircle2 class="w-4 h-4 text-emerald-400" />
+                      <span class="text-[11px] truncate max-w-[120px]" title={project.ifc_file_path}>Attached</span>
                     </div>
                   {:else}
                     <div class="flex items-center gap-1.5 text-slate-500">
@@ -268,8 +266,18 @@
                     </div>
                   {/if}
                 </td>
-                <td class="py-3 px-4 text-slate-300">{project.analysis_type}</td
-                >
+                <td class="py-3 px-4">
+                  <span
+                    class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold font-mono {project.analysis_type ===
+                    'Piping'
+                      ? 'bg-amber-950/60 border border-amber-800/50 text-amber-300'
+                      : project.analysis_type === 'Seismic'
+                      ? 'bg-purple-950/60 border border-purple-800/50 text-purple-300'
+                      : 'bg-blue-950/60 border border-blue-800/50 text-blue-300'}"
+                  >
+                    {project.analysis_type}
+                  </span>
+                </td>
                 <td class="py-3 px-4 text-slate-400">{project.country}</td>
                 <td class="py-3 px-4 text-slate-500 whitespace-nowrap">
                   {project.created_at

@@ -81,7 +81,7 @@ class ProjectCreateRequest(BaseModel):
     description: Optional[str] = Field(default="", description="Project description")
     status: str = Field(default="Draft", description="Workflow status (e.g. Draft, Active)")
     country: str = Field(default="US", description="Regulatory jurisdiction or country code")
-    analysis_type: str = Field(default="Architecture", description="Target analysis domain")
+    analysis_type: str = Field(default="Arch", description="Target analysis domain")
 
 
 class ProjectUpdateRequest(BaseModel):
@@ -102,7 +102,7 @@ class ProjectResponse(BaseModel):
     description: Optional[str] = ""
     status: Optional[str] = "Draft"
     country: Optional[str] = "US"
-    analysis_type: Optional[str] = "Architecture"
+    analysis_type: Optional[str] = "Arch"
     ifc_file_path: Optional[str] = None
     ifc_md5_hash: Optional[str] = None
     created_at: Optional[str] = None

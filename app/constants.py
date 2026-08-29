@@ -7,18 +7,16 @@ regenerate rather than editing this module by hand.
 
 from typing import Any
 
-#: Analysis types a project can be routed to. Mirrors the ``valid_analysis_type``
-#: check constraint on ``public.projects`` (migration_001).
+#: Analysis types a project can be routed to matching rules categories: Arch, Piping, or seismic.
 ANALYSIS_TYPES: list[str] = [
-    "Piping (Corrosive)",
-    "Halo",
-    "Architecture",
+    "Arch",
+    "Piping",
+    "seismic",
 ]
 
-#: Defaults matching the column defaults migration_001 applied to existing rows.
-#: Used by the legacy /projects/create form, which predates the wizard.
+#: Defaults matching migration column defaults.
 DEFAULT_COUNTRY: str = "UK"
-DEFAULT_ANALYSIS_TYPE: str = "Piping (Corrosive)"
+DEFAULT_ANALYSIS_TYPE: str = "Arch"
 
 #: LLM extraction defaults
 DEFAULT_LLM_MODEL: str = "openrouter/auto"
@@ -27,10 +25,36 @@ MAX_TOKENS_RULE_EXTRACTION: int = 4096
 
 #: Analysis type -> URL slug served by app/routes/analyze_*.py.
 ANALYSIS_ROUTES: dict[str, str] = {
-    "Piping (Corrosive)": "corrosion",
-    "Halo": "seismic",
+    "Arch": "architecture",
+    "Piping": "corrosion",
+    "seismic": "seismic",
+    # Legacy aliases
+    "Architectural": "architecture",
     "Architecture": "architecture",
+    "Piping (Corrosive)": "corrosion",
+    "Seismic": "seismic",
+    "Halo": "seismic",
 }
+
+_ANALYSIS_TYPE_ALIASES: dict[str, set[str]] = {
+    "Arch": {"Arch", "Architectural", "Architecture", "arch"},
+    "Piping": {"Piping", "Piping (Corrosive)", "piping", "corrosion"},
+    "seismic": {"seismic", "Seismic", "Halo", "Piping (Seismic)"},
+}
+
+
+def normalize_analysis_type(analysis_type: str, default: str = "Arch") -> str:
+    """Normalize legacy or alias analysis domain string into canonical domain name: Arch, Piping, or seismic."""
+    if not analysis_type:
+        return default
+    s = analysis_type.strip()
+    if s in ("Arch", "Architectural", "Architecture", "arch"):
+        return "Arch"
+    if s in ("Piping", "Piping (Corrosive)", "piping", "corrosion"):
+        return "Piping"
+    if s in ("seismic", "Seismic", "Halo", "Piping (Seismic)"):
+        return "seismic"
+    return s
 
 #: Building types offered by the project setup wizard.
 PROJECT_TYPES: list[str] = [
@@ -492,7 +516,13 @@ def get_standards_by_domain(domain: str) -> list[dict[str, Any]]:
 
 def get_standards_by_analysis_type(analysis_type: str) -> list[dict[str, Any]]:
     """Return the standards applicable to ``analysis_type``."""
-    return [s for s in NOTEBOOK_STANDARDS if analysis_type in s.get("applicable_to", [])]
+    canon = normalize_analysis_type(analysis_type)
+    aliases = _ANALYSIS_TYPE_ALIASES.get(canon, {analysis_type})
+    return [
+        s
+        for s in NOTEBOOK_STANDARDS
+        if any(a in s.get("applicable_to", []) for a in aliases)
+    ]
 
 
 def get_all_domains() -> list[str]:
@@ -515,10 +545,19 @@ def group_standards_by_domain(analysis_type: str | None = None):
     Passing ``analysis_type`` narrows each group to the standards that apply to
     it; domains left with no standards are skipped.
     """
+    aliases = (
+        _ANALYSIS_TYPE_ALIASES.get(normalize_analysis_type(analysis_type), {analysis_type})
+        if analysis_type is not None
+        else None
+    )
     for domain in STANDARD_DOMAINS:
         items = get_standards_by_domain(domain)
-        if analysis_type is not None:
-            items = [s for s in items if analysis_type in s.get("applicable_to", [])]
+        if aliases is not None:
+            items = [
+                s
+                for s in items
+                if any(a in s.get("applicable_to", []) for a in aliases)
+            ]
         if items:
             yield domain, items
 
@@ -527,9 +566,11 @@ def route_for_analysis_type(analysis_type: str) -> str:
     """Return the URL slug for ``analysis_type``.
 
     Raises:
-        ValueError: if ``analysis_type`` is not one of :data:`ANALYSIS_TYPES`.
+        ValueError: if ``analysis_type`` is not one of :data:`ANALYSIS_TYPES` or recognized aliases.
     """
-    try:
+    canon = normalize_analysis_type(analysis_type)
+    if canon in ANALYSIS_ROUTES:
+        return ANALYSIS_ROUTES[canon]
+    if analysis_type in ANALYSIS_ROUTES:
         return ANALYSIS_ROUTES[analysis_type]
-    except KeyError:
-        raise ValueError(f"Unknown analysis type: {analysis_type!r}") from None
+    raise ValueError(f"Unknown analysis type: {analysis_type!r}")

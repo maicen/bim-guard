@@ -60,7 +60,23 @@
   let bcfSaveMessage = '';
   let bcfSaveType: 'success' | 'error' = 'success';
 
-  $: selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
+  $: relevantProjects = projects.filter(
+    (p) =>
+      p.analysis_type === 'Arch' ||
+      p.analysis_type === 'Architectural' ||
+      p.analysis_type === 'Architecture'
+  );
+  $: selectedProject = relevantProjects.find((p) => p.id === selectedProjectId) || null;
+
+  let prevArchKey = '';
+  $: currentArchKey = relevantProjects.map((p) => p.id).join(',');
+  $: if (relevantProjects.length > 0 && currentArchKey !== prevArchKey) {
+    prevArchKey = currentArchKey;
+    if (!selectedProjectId || !relevantProjects.some((p) => p.id === selectedProjectId)) {
+      selectedProjectId = relevantProjects[0].id;
+      checkEnhancedModel();
+    }
+  }
 
   // Collapsible state tracking
   let openDomains: Record<string, boolean> = {};
@@ -75,8 +91,14 @@
         loadFolders(),
       ]);
       projects = projectData.projects || [];
-      if (!selectedProjectId && projects.length > 0) {
-        selectedProjectId = projects[0].id;
+      const archProjs = projects.filter(
+        (p) =>
+          p.analysis_type === 'Arch' ||
+          p.analysis_type === 'Architectural' ||
+          p.analysis_type === 'Architecture'
+      );
+      if (!selectedProjectId && archProjs.length > 0) {
+        selectedProjectId = archProjs[0].id;
       }
       // Only check for enhanced model — do not auto-run
       if (selectedProjectId) {
@@ -366,9 +388,13 @@
         on:change={handleProjectChange}
         class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
       >
-        {#each projects as project}
-          <option value={project.id}>{project.name}</option>
-        {/each}
+        {#if relevantProjects.length === 0}
+          <option value={null}>No Arch projects found</option>
+        {:else}
+          {#each relevantProjects as project}
+            <option value={project.id}>{project.name}</option>
+          {/each}
+        {/if}
       </select>
 
       {#if result && selectedProjectId}

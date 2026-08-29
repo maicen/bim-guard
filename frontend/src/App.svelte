@@ -83,7 +83,13 @@
   function handleProjectCreated(project: Project) {
     targetProjectId = project.id;
     selectedProject = project;
-    activeView = project.analysis_type === 'Architecture' ? 'arch' : 'analyze';
+    if (project.analysis_type === 'Architectural' || project.analysis_type === 'Architecture') {
+      activeView = 'arch';
+    } else if (project.analysis_type === 'Seismic' || project.analysis_type === 'Halo') {
+      activeView = 'seismic';
+    } else {
+      activeView = 'piping';
+    }
   }
 </script>
 

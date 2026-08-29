@@ -2,13 +2,15 @@
  * Type contracts corresponding directly to backend Pydantic models in app/modules/contracts.py
  */
 
+export type AnalysisDomain = 'Arch' | 'Piping' | 'seismic';
+
 export interface Project {
   id: number;
   name: string;
   description?: string;
   status: string;
   country: string;
-  analysis_type: string;
+  analysis_type: AnalysisDomain | string;
   ifc_file_path?: string | null;
   ifc_md5_hash?: string | null;
   created_at?: string | null;
@@ -25,7 +27,7 @@ export interface ProjectCreatePayload {
   description?: string;
   status?: string;
   country?: string;
-  analysis_type?: string;
+  analysis_type?: AnalysisDomain | string;
 }
 
 export interface ProjectUpdatePayload {
@@ -33,7 +35,7 @@ export interface ProjectUpdatePayload {
   description?: string;
   status?: string;
   country?: string;
-  analysis_type?: string;
+  analysis_type?: AnalysisDomain | string;
 }
 
 export interface DocumentItem {

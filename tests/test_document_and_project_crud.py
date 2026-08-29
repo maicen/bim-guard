@@ -24,7 +24,7 @@ def test_project_update_endpoint(client: TestClient) -> None:
         description="Original description",
         status="Draft",
         country="US",
-        analysis_type="Architecture",
+        analysis_type="Arch",
     )
     project_id = project["id"]
 
@@ -36,7 +36,7 @@ def test_project_update_endpoint(client: TestClient) -> None:
                 "description": "Updated description",
                 "status": "Active",
                 "country": "Canada",
-                "analysis_type": "Piping (Corrosive)",
+                "analysis_type": "Piping",
             },
         )
         assert response.status_code == 200
@@ -45,7 +45,7 @@ def test_project_update_endpoint(client: TestClient) -> None:
         assert data["description"] == "Updated description"
         assert data["status"] == "Active"
         assert data["country"] == "Canada"
-        assert data["analysis_type"] == "Piping (Corrosive)"
+        assert data["analysis_type"] == "Piping"
     finally:
         service.delete_project(project_id)
 
@@ -56,7 +56,7 @@ def test_project_enhance_endpoint_requires_no_token(client: TestClient) -> None:
     project = service.create_project(
         name="Enhancement Token Test",
         country="US",
-        analysis_type="Architecture",
+        analysis_type="Arch",
     )
     project_id = project["id"]
 

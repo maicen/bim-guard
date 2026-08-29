@@ -88,12 +88,50 @@
   // Inspection Drawer/Modal state
   let inspectedIssue: AuditIssue | null = null;
 
+  $: relevantProjects = projects.filter((p) => {
+    if (activeCategory === "seismic") {
+      return (
+        p.analysis_type === "seismic" ||
+        p.analysis_type === "Seismic" ||
+        p.analysis_type === "Halo"
+      );
+    }
+    return (
+      p.analysis_type === "Piping" ||
+      p.analysis_type === "Piping (Corrosive)"
+    );
+  });
+  $: currentProject = relevantProjects.find((p) => p.id === selectedProjectId) || null;
+
+  let prevRelevantKey = "";
+  $: currentRelevantKey = `${activeCategory}_${relevantProjects.map((p) => p.id).join(",")}`;
+  $: if (relevantProjects.length > 0 && currentRelevantKey !== prevRelevantKey) {
+    prevRelevantKey = currentRelevantKey;
+    if (!selectedProjectId || !relevantProjects.some((p) => p.id === selectedProjectId)) {
+      selectedProjectId = relevantProjects[0].id;
+      handleProjectChange();
+    }
+  }
+
   onMount(async () => {
     try {
       const data = await projectsApi.list();
       projects = data.projects || [];
-      if (!selectedProjectId && projects.length > 0) {
-        selectedProjectId = projects[0].id;
+      const relevant = projects.filter((p) => {
+        if (activeCategory === "seismic") {
+          return (
+            p.analysis_type === "seismic" ||
+            p.analysis_type === "Seismic" ||
+            p.analysis_type === "Halo"
+          );
+        }
+        return (
+          p.analysis_type === "Piping" ||
+          p.analysis_type === "Piping (Corrosive)"
+        );
+      });
+      if (!selectedProjectId && relevant.length > 0) {
+        selectedProjectId = relevant[0].id;
       }
       if (selectedProjectId) {
         await Promise.all([fetchResults(), loadInputs()]);
@@ -326,9 +364,13 @@
           on:change={handleProjectChange}
           class="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs font-medium text-white focus:outline-none focus:border-[#0071e3] shadow-sm appearance-none pr-8 cursor-pointer"
         >
-          {#each projects as p}
-            <option value={p.id}>{p.name} ({p.country})</option>
-          {/each}
+          {#if relevantProjects.length === 0}
+            <option value={null}>No {activeCategory} projects found</option>
+          {:else}
+            {#each relevantProjects as p}
+              <option value={p.id}>{p.name} ({p.country})</option>
+            {/each}
+          {/if}
         </select>
         <ChevronRight
           class="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none"

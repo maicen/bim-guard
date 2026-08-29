@@ -17,7 +17,7 @@
   let description = '';
   let status = 'Active';
   let country = 'Canada';
-  let analysisType = 'Piping (Corrosive)';
+  let analysisType = 'Arch';
   let ifcFile: File | null = null;
 
   // Available Documents for Step 4
@@ -261,9 +261,9 @@
                 bind:value={analysisType}
                 class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
               >
-                <option value="Piping (Corrosive)">Piping (Corrosive) — GC-001, CC-001, MC-001</option>
-                <option value="Halo">Halo — Blue Halo Clearance Detection</option>
-                <option value="Architecture">Architecture — Doors, Egress, Daylight, Stairs</option>
+                <option value="Arch">Arch — Doors, Egress, Daylight, Stairs</option>
+                <option value="Piping">Piping — GC-001, CC-001, MC-001</option>
+                <option value="seismic">seismic — Blue Halo Clearance Detection</option>
               </select>
             </div>
           </div>

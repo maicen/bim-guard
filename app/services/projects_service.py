@@ -8,6 +8,7 @@ from app.constants import (
     DOCUMENT_CATEGORIES,
     STANDARD_UPLOAD_EXTENSIONS,
     get_standard,
+    normalize_analysis_type,
 )
 from app.logging_config import get_logger
 from app.services.model_lineage import SupabaseModelLineageRepository
@@ -167,7 +168,7 @@ class ProjectsService:
         """
         name = name.strip()
         country = country.strip()
-        analysis_type = analysis_type.strip()
+        analysis_type = normalize_analysis_type(analysis_type.strip())
         if not name:
             raise ValueError("Project name is required")
         if not country:
@@ -220,11 +221,12 @@ class ProjectsService:
         if country:
             updates["country"] = country.strip()
         if analysis_type:
+            analysis_type = normalize_analysis_type(analysis_type.strip())
             if analysis_type not in ANALYSIS_TYPES:
                 raise ValueError(
                     f"analysis_type must be one of {ANALYSIS_TYPES!r}, got {analysis_type!r}"
                 )
-            updates["analysis_type"] = analysis_type.strip()
+            updates["analysis_type"] = analysis_type
 
         self._projects.update(
             updates=updates,

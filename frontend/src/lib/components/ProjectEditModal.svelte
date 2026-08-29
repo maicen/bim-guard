@@ -21,7 +21,7 @@
     description = project.description || '';
     status = project.status || 'Active';
     country = project.country || 'Canada';
-    analysisType = project.analysis_type || 'Architecture';
+    analysisType = project.analysis_type || 'Arch';
     errorMessage = '';
   }
 
@@ -152,9 +152,9 @@
             bind:value={analysisType}
             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
           >
-            <option value="Architecture">Architecture</option>
-            <option value="Piping (Corrosive)">Piping (Corrosive)</option>
-            <option value="Halo">Halo (Blue Halo)</option>
+            <option value="Arch">Arch</option>
+            <option value="Piping">Piping</option>
+            <option value="seismic">seismic</option>
           </select>
         </div>
       </div>
