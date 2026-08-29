@@ -69,6 +69,9 @@ ml-pipeline = [
 dev = [
     "pytest>=8.0.0",
     "pytest-json-report>=1.5.0",
+    # Validates generated BCF archives against the vendored buildingSMART
+    # 2.1 XSDs in tests/schemas/bcf21/ (tests/test_bcf_generator.py).
+    "xmlschema>=3.0.0",
 ]
 
 [tool.pytest.ini_options]

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import ifcopenshell
+import ifcopenshell.guid
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
 
@@ -623,7 +624,13 @@ def generate_synthetic_elements(n: int = 25) -> list[ServiceElement]:
         name, ifc_type, mat_a, mat_b, env, joint, floor, system, aa, ca, pos = sc
         elements.append(
             ServiceElement(
-                guid=str(uuid.uuid4()).upper()[:22],
+                # A real IfcGuid, not a sliced UUID. BCF's IfcGuid type is
+                # 22 characters drawn from [0-9A-Za-z_$]; truncating a UUID
+                # string hits the length but keeps the hyphens, so every
+                # viewpoint built from synthetic elements failed schema
+                # validation. ifcopenshell.guid.compress does the real
+                # base64 encoding IFC specifies.
+                guid=ifcopenshell.guid.compress(uuid.uuid4().hex),
                 name=name,
                 ifc_type=ifc_type,
                 description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
