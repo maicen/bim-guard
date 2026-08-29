@@ -77,6 +77,25 @@
   let searchQuery = "";
   let severityFilter = "all";
   let mechanismFilter = "all";
+
+  // Engine selector (PIPING only). SEISMIC runs the single Blue Halo kernel,
+  // so a selector there would offer a choice of one.
+  const PIPING_ENGINES = [
+    { id: "GC", label: "GC-001", title: "Galvanic corrosion" },
+    { id: "CC", label: "CC-001", title: "Crevice corrosion" },
+    { id: "MC", label: "MC-001", title: "Microbiologically influenced corrosion" },
+  ] as const;
+  let selectedEngines: string[] = PIPING_ENGINES.map((e) => e.id);
+
+  // Leaving the category resets the selector, so a narrowed PIPING view never
+  // silently hides findings after a route change.
+  $: if (activeCategory) selectedEngines = PIPING_ENGINES.map((e) => e.id);
+
+  function toggleEngine(id: string) {
+    selectedEngines = selectedEngines.includes(id)
+      ? selectedEngines.filter((e) => e !== id)
+      : [...selectedEngines, id];
+  }
   let showLowRisk = true;
   let isUploadModalOpen = false;
   let uploadFile: File | null = null;
@@ -263,7 +282,21 @@
           : issue.rule_id.startsWith(mechanismFilter) ||
             issue.mechanism.includes(mechanismFilter));
 
-      return matchesSearch && matchesSeverity && matchesMechanism;
+      // Engine selector, PIPING only. Data-quality findings are doctrine-exempt:
+      // they report what could not be assessed and belong to no single engine.
+      const isDataQuality =
+        issue.mechanism === "data_quality" || issue.mechanism === "Data Quality";
+      const matchesEngine =
+        activeCategory === "seismic" ||
+        isDataQuality ||
+        selectedEngines.some(
+          (id) =>
+            issue.rule_id.startsWith(id) || issue.mechanism.includes(id),
+        );
+
+      return (
+        matchesSearch && matchesSeverity && matchesMechanism && matchesEngine
+      );
     },
   );
 
@@ -392,6 +425,41 @@
           <span>Run Audit</span>
         {/if}
       </button>
+
+      <!-- Engine Selector (PIPING only) -->
+      {#if activeCategory !== "seismic"}
+        <div
+          class="flex items-center gap-2 pl-1 border-l border-slate-800"
+          role="group"
+          aria-label="Corrosion engines"
+        >
+          <span
+            class="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+            >Engines</span
+          >
+          {#each PIPING_ENGINES as engine}
+            <label
+              title={engine.title}
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border cursor-pointer select-none transition-colors {selectedEngines.includes(
+                engine.id,
+              )
+                ? 'bg-amber-950/60 text-amber-300 border-amber-800/80'
+                : 'bg-slate-900/60 text-slate-500 border-slate-800 hover:text-slate-300'}"
+            >
+              <input
+                type="checkbox"
+                class="sr-only"
+                checked={selectedEngines.includes(engine.id)}
+                on:change={() => toggleEngine(engine.id)}
+              />
+              {#if selectedEngines.includes(engine.id)}
+                <Check class="w-3 h-3" />
+              {/if}
+              <span>{engine.label}</span>
+            </label>
+          {/each}
+        </div>
+      {/if}
 
       <!-- Recompute (force uncached) -->
       {#if result}
