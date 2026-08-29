@@ -5,22 +5,22 @@ Last reviewed: 2026-08-29
 ## Completed Foundations
 
 - [x] Centralize deterministic `.env` loading for application startup, logging,
-  persistence, object storage, and module configuration.
+      persistence, object storage, and module configuration.
 - [x] Remove stale database-backed storage/model settings and legacy configuration
-  paths.
+      paths.
 - [x] Separate enhancement planning/execution from read-only analysis services.
 - [x] Execute IFC enhancement against a temporary output instead of overwriting the
-  source model.
+      source model.
 - [x] Upload versioned enhanced IFC artifacts to Supabase Storage under
-  `enhancements/{project_id}`.
+      `enhancements/{project_id}`.
 - [x] Deploy the `model_enhancement_lineage` ledger with project/version uniqueness,
-  source/output validation, and append-only application privileges.
+      source/output validation, and append-only application privileges.
 - [x] Add dependency-injected storage, improver, and lineage contracts to the
-  enhancement pipeline.
+      enhancement pipeline.
 - [x] Add a rule-evaluator protocol and registry for GC-001, CC-001, and MC-001.
 - [x] Add IDS XML import/export for compatible property rules.
 - [x] Add extracted-rule preview, inline correction, confidence/review badges, and
-  per-rule save controls.
+      per-rule save controls.
 
 ## Priority 1: Production Pipeline Separation
 
@@ -30,11 +30,11 @@ Last reviewed: 2026-08-29
 - [x] Return typed audit issues and BCF topics from the audit pipeline.
 - [x] Connect DB-backed rules to audit execution. Owner: Osama.
 - [x] Add a separately authorized enhancement command/API; do not expose enhancement
-  as an audit option.
+      as an audit option.
 - [x] Allocate enhancement versions transactionally from the lineage repository rather
-  than accepting arbitrary caller-provided versions.
+      than accepting arbitrary caller-provided versions.
 - [x] Add project UI for enhancement history, source version, generated version, status,
-  summary, and artifact download.
+      summary, and artifact download.
 
 Completion evidence (2026-08-22):
 
@@ -54,12 +54,12 @@ Completion evidence (2026-08-22):
 
 - [ ] Replace broad evaluator `Any`/`dict` contracts with typed request and result models.
 - [ ] Make each physics engine implement the evaluator interface directly instead of
-  relying on `CallableRuleEvaluator` adapters.
+      relying on `CallableRuleEvaluator` adapters.
 - [ ] Keep custom Python evaluators limited to geometry, topology, proximity, and other
-  checks IDS cannot express.
+      checks IDS cannot express.
 - [x] Provide central dependency injection for FastAPI service layer in `app/api/dependencies.py`.
 - [ ] Inject project, document, rule, storage, and lineage repositories into services;
-  remove internal construction of Supabase adapters from business logic.
+      remove internal construction of Supabase adapters from business logic.
 - [ ] Move default engine/repository composition to an application bootstrap module.
 
 ## Priority 3: Rules and IDS
@@ -71,35 +71,35 @@ Completion evidence (2026-08-22):
 - [x] Scope architectural analysis runs by rule folder / ruleset ID in `orchestrator.py` via `RuleService.list_by_ruleset(rule_folder)`.
 - [ ] Replace handwritten LLM rule normalization with strict Pydantic schemas in `rule_extractor.py`.
 - [ ] Reject or quarantine invalid structured responses with actionable validation
-  messages instead of silently returning an empty rule list.
+      messages instead of silently returning an empty rule list.
 - [ ] Define a durable extraction-draft model separate from canonical rules.
 - [ ] Add explicit approve/reject decisions, reviewer identity, timestamps, comments,
-  and an immutable review audit trail.
+      and an immutable review audit trail.
 - [ ] Prevent `Save all` from inserting unapproved or `needs_review` drafts into the
-  canonical rule table.
+      canonical rule table.
 - [ ] Preserve source text and extraction metadata through draft approval.
 - [ ] Transition alphanumeric and Property Set checks to `ifcopenshell.ids` validation.
 - [ ] Map IDS validation results into the shared issue and BCF model.
 - [ ] Validate imported/exported IDS documents with the buildingSMART IDS schema.
 - [ ] Retire TF-IDF, dependency-parser, confidence-scorer, and BERT routing only after
-  the Pydantic LLM workflow meets an agreed evaluation threshold.
+      the Pydantic LLM workflow meets an agreed evaluation threshold.
 - [ ] Add precision, recall, F1, and confusion-matrix evaluation for extraction.
 - [ ] Expose the architectural rule folder selector in `ArchAnalyzeView.svelte` UI dropdown (backend endpoint already supports `rule_folder`). Owner: Marc / Osama.
 - [ ] Review and retire non-production rule folders (`door_mock`, `test`,
-  `test_folder`), or exclude them from the folder picker.
+      `test_folder`), or exclude them from the folder picker.
 - [ ] Document that selecting a named rule folder excludes the built-in seeded code
-  rules rather than narrowing them; update help text in UI.
+      rules rather than narrowing them; update help text in UI.
 
 Owner: Osama.
 
 ## Priority 4: Background Processing and Progress
 
 - [ ] Select and document the queue architecture (Celery, Supabase Queues/pgmq, or
-  external n8n orchestration).
+      external n8n orchestration).
 - [ ] Add a persistent job repository with queued, running, completed, failed, and
-  cancelled states.
+      cancelled states.
 - [ ] Move IFC parsing, geometry extraction, compliance analysis, enhancement, and
-  report generation out of request handlers into dedicated background workers.
+      report generation out of request handlers into dedicated background workers.
 - [ ] Add retry, idempotency, timeout, cancellation, and worker recovery behavior.
 - [x] Add authenticated Server-Sent Events endpoints for job progress (`GET /api/events/{project_id}`).
 - [x] Replace polling and HTMX swaps with Server-Sent Events (SSE) stream in FastAPI gateway and Svelte client.
@@ -142,7 +142,7 @@ Owner: Osama.
 - [x] Implement camera viewpoint navigation and highlight framing from compliance issue selection.
 - [x] Add direct local IFC file upload and client-side rendering.
 - [ ] Add desktop/mobile Playwright checks for nonblank rendering, framing, loading,
-  interaction, and overlap.
+      interaction, and overlap.
 - [ ] Profile and optimize WebGL memory usage for multi-model loading sessions.
 
 ## Priority 6: Analysis and Reporting UX
@@ -171,26 +171,26 @@ Owner: Osama.
 ## Priority 8: IFC Ingestion Correctness
 
 - [ ] Coerce numeric strings before the `isinstance(value, (int, float))` guard in
-  Module 2's unit-conversion pass. Quantities stored as `IfcLabel('1.2')` currently
-  skip conversion and are compared raw, so a 1.2 m window is evaluated as 1.2 mm and
-  fails every dimensional rule.
+      Module 2's unit-conversion pass. Quantities stored as `IfcLabel('1.2')` currently
+      skip conversion and are compared raw, so a 1.2 m window is evaluated as 1.2 mm and
+      fails every dimensional rule.
 - [ ] Log a warning when a length-typed or length-named property is found but skipped
-  by unit conversion, so silent misreporting is visible in the run log.
+      by unit conversion, so silent misreporting is visible in the run log.
 - [ ] Surface the `_get_length_unit_scale_mm` fallback-to-1.0 path as an explicit model
-  warning instead of a silent default. Read from source, not reproduced — the reference
-  models both declare a valid `LENGTHUNIT`.
+      warning instead of a silent default. Read from source, not reproduced — the reference
+      models both declare a valid `LENGTHUNIT`.
 - [ ] Investigate `ClearWidth` and `OverallWidth` resolving to 2,125 mm on `IfcDoor`
-  in the same report where `Width` correctly resolves to 950 mm; 2,125 mm is the door
-  height. `_GEOMETRY_PROPERTY_MAP` maps `overallwidth` to the width extractor and
-  `clearwidth` to the corridor-width extractor, so the mapping alone does not explain
-  it. Cause not yet identified. Reproduction: golden reference model, Doors card,
-  rule folder "All folders".
+      in the same report where `Width` correctly resolves to 950 mm; 2,125 mm is the door
+      height. `_GEOMETRY_PROPERTY_MAP` maps `overallwidth` to the width extractor and
+      `clearwidth` to the corridor-width extractor, so the mapping alone does not explain
+      it. Cause not yet identified. Reproduction: golden reference model, Doors card,
+      rule folder "All folders".
 - [ ] Confirm precedence between a declared property value and the geometry
-  bounding-box fallback. `Pset_DoorCommon_Egress.ClearWidth` is declared as
-  `IFCREAL(0.95)` on the reference model but does not appear as 950 mm in the report.
+      bounding-box fallback. `Pset_DoorCommon_Egress.ClearWidth` is declared as
+      `IFCREAL(0.95)` on the reference model but does not appear as 950 mm in the report.
 - [ ] Add `requiredheadroom` to `_LENGTH_DIRECT_ATTRS`; the list contains
-  `requireheadroom`, so `Pset_StairCommon.RequiredHeadroom` only converts when it
-  carries an explicit measure type.
+      `requireheadroom`, so `Pset_StairCommon.RequiredHeadroom` only converts when it
+      carries an explicit measure type.
 
 Owner: unassigned.
 
@@ -204,25 +204,25 @@ Owner: unassigned.
 - [x] Supabase security and performance advisors have no unresolved high-severity items.
 - [ ] Evaluator contract tests cover every registered engine.
 - [ ] IDS conformance tests cover representative property, range, enumeration, and
-  applicability checks.
+      applicability checks.
 - [ ] Review workflow tests prove unapproved drafts cannot enter canonical rules.
 - [ ] Queue tests cover retry, duplicate submission, cancellation, and worker failure.
 - [ ] Playwright tests verify 3D viewer rendering and lifecycle cleanup on desktop and mobile.
 - [ ] Add the golden/broken reference IFC pair as regression fixtures. The golden model
-  must pass its architectural checks; the broken model must report all four planted
-  faults.
+      must pass its architectural checks; the broken model must report all four planted
+      faults.
 - [ ] Assert unit conversion end to end: a 1.2 m window height on a metre-based model
-  must evaluate as 1200 mm.
+      must evaluate as 1200 mm.
 - [ ] Assert that fire separation reports a missing `FireRating` on a party wall, and
-  that its absent-boundary path is reported as "not checked" rather than as a pass.
+      that its absent-boundary path is reported as "not checked" rather than as a pass.
 
 ## Product Ownership and Delivery
 
 - [ ] Leticia to manage milestones, dependencies, acceptance criteria, and delivery
-  reporting as product manager.
+      reporting as product manager.
 - [x] Confirm Marc's ownership area and deliverables — architectural slice: reference
-  models, architectural rule set, IFC modelling and export guidance, and validation of
-  the ARCH pipeline.
+      models, architectural rule set, IFC modelling and export guidance, and validation of
+      the ARCH pipeline.
 - [ ] Assign an owner and target milestone to every unchecked priority item.
 
 ---
@@ -235,3 +235,136 @@ Owner: unassigned.
 - **Native 3D Viewer**: `IfcViewer.svelte` natively integrates `@thatopen/components` into the DOM with camera viewpoint transitions and BCF 2.1 guideline synchronization, eliminating legacy iframe embeds.
 - **Database-Driven Rules**: Galvanic, crevice, and microbiological engines dynamically consume thresholds, scoring models, and velocity classes from Supabase Postgres; in-memory catalogs reload seamlessly on execution (`tests/test_db_rules_workflow.py`).
 - **Real-Time Streaming**: Server-Sent Events (`/api/events/{project_id}`) stream stage transitions and duration metrics directly to `PipelineProgress.svelte`.
+
+---
+
+# 2026-08-29 (Osama)
+
+Key design decisions I want your input on:
+
+IMPORTANT
+
+BCF "Store" button behavior: The backend already auto-saves BCF to Supabase on every ARCH run. So after a successful run, a bcf_artifact_id is always returned in the result. Rather than adding a separate "Store" button (which would just re-save), I plan to show a "✓ BCF Saved" green badge when the artifact exists, and only show a manual "Save BCF" button if the auto-save failed (rare edge case). Does this match what you want, or do you specifically want an explicit user-triggered "Save to DB" button regardless?
+
+IMPORTANT
+
+Folder selection UX: The backend accepts a single rule_folder string (one folder at a time). The request says "Folder(s)" (plural). Do you want multi-select (running multiple passes) or single-select (one folder per run)? I'll default to single-select + "All" unless you want otherwise.
+
+## Tasks
+
+- [x] Add `BcfArtifact` type to `types.ts`
+- [ ] Add `listBcfArtifacts()` to `api.ts`
+- [ ] Update `ArchAnalyzeView.svelte`:
+  - [ ] Load rule folders on mount
+  - [ ] Remove auto-run on mount + project change
+  - [ ] Add folder selector UI (single-select + "All")
+  - [ ] Pass selected folder to `runArch()`
+  - [ ] Add BCF saved badge / save button after run
+- [ ] Update `ReportsView.svelte`:
+  - [ ] Load BCF artifacts list
+  - [ ] Add ARCH BCF artifacts table section
+- [ ] Build validation
+
+## Summary
+
+Four related improvements to the ARCH Compliance Audit view and Reports view:
+
+1. **Ruleset Folder Selection** — Before running, let the user pick which rule folder(s) to audit against (fetched from `GET /api/rules/folders`). Default to "All".
+2. **Manual Run** — Remove the auto-run on project/page load. The user clicks "Run ARCH Audit" to trigger it.
+3. **Store BCF Button** — After a successful run, a dedicated "Save BCF Report" button persists the BCF to Supabase (DB + Storage). The backend already does this automatically on every run via `ReportArtifactService.persist_bcf()`; this button lets the user explicitly trigger a re-save or confirm the save, and shows a success toast.
+4. **ARCH Reports in Compliance Reports view** — The `ReportsView.svelte` already exists but only shows corrosion data. Expand it to also list stored ARCH BCF artifacts from `GET /api/analyze/bcf/list` with per-project download links.
+
+## Open Questions
+
+> [!NOTE]
+> The backend **already auto-persists** BCF on every ARCH run. The "Store BCF" button in the UI will either re-trigger persistence from the latest result already in-memory, or simply show a confirmation badge that it's already been saved. I'll implement it as: after a run, show a "✓ BCF Saved" badge if `bcf_artifact_id` is set, and a "Save BCF" button if it is not (edge case where BCF generation failed). This is the cleanest UX.
+
+## Proposed Changes
+
+---
+
+### Backend: `app/api/analyze.py`
+
+No changes needed — BCF is already auto-persisted per run. The `GET /api/analyze/bcf/list` endpoint already exists.
+
+---
+
+### Frontend: `src/lib/api.ts`
+
+#### [MODIFY] [api.ts](file:///c:/Users/osama/coding/bim-guard/frontend/src/lib/api.ts)
+
+Add `listBcfArtifacts()` to `analyzeApi` (calls existing `GET /api/analyze/bcf/list`).
+
+---
+
+### Frontend: `src/lib/types.ts`
+
+#### [MODIFY] [types.ts](file:///c:/Users/osama/coding/bim-guard/frontend/src/lib/types.ts)
+
+Add `BcfArtifact` interface:
+
+```ts
+export interface BcfArtifact {
+  id: number;
+  project_id: number;
+  artifact_type: string;
+  filename: string;
+  storage_ref: string;
+  content_type: string;
+  byte_size: number;
+  sha256?: string;
+  issue_count: number;
+  created_at?: string;
+}
+```
+
+---
+
+### Frontend: `src/routes/ArchAnalyzeView.svelte`
+
+#### [MODIFY] [ArchAnalyzeView.svelte](file:///c:/Users/osama/coding/bim-guard/frontend/src/routes/ArchAnalyzeView.svelte)
+
+**Changes:**
+
+1. **Load rule folders on mount** via `rulesApi.folders()` — populate a multi-select or pill-toggle UI for folder selection.
+2. **Remove auto-run** — `onMount` and `on:change` no longer call `checkEnhancedModelAndRun()`. Only the Run button triggers analysis.
+3. **Pass selected folder** to `analyzeApi.runArch(projectId, selectedFolder)`.
+4. **BCF status indicator** — After a run, if `result.bcf_artifact_id` is set, show a green "✓ BCF Saved" pill. The backend already saves it automatically. No extra button needed for the happy path.
+5. Add `FolderOpen` / `FolderCheck` icon for the folder selector UI.
+
+**UX for folder selection:**
+
+- Show available rule folders as a compact radio/button group below the project selector.
+- Default to "All" (empty `rule_folder` string → backend uses all rules).
+- Selected folder is passed as the `rule_folder` form field.
+
+---
+
+### Frontend: `src/routes/ReportsView.svelte`
+
+#### [MODIFY] [ReportsView.svelte](file:///c:/Users/osama/coding/bim-guard/frontend/src/routes/ReportsView.svelte)
+
+**Changes:**
+
+1. Load all BCF artifacts from `analyzeApi.listBcfArtifacts()` on mount.
+2. Add a new "ARCH Compliance BCF Reports" section below the existing export cards showing:
+   - Table of all BCF artifacts: project (lookup by `project_id`), filename, issue count, date, download button.
+   - Filterable by selected project.
+3. Keep existing corrosion export cards unchanged.
+
+## Verification Plan
+
+### Automated
+
+```bash
+cd frontend && npm run build
+```
+
+### Manual
+
+1. Open ARCH Compliance Audit view — confirm no auto-run occurs.
+2. Folder selector shows available folders + "All" option.
+3. Select a folder, click "Run ARCH Audit" → analysis runs with that folder.
+4. After run, confirm "✓ BCF Saved" badge appears (artifact ID present in result).
+5. Navigate to Compliance Reports & Exports — confirm ARCH BCF table shows the artifact.
+6. Download link works.
