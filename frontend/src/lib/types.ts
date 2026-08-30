@@ -22,6 +22,34 @@ export interface Project {
   updated_at?: string | null;
 }
 
+/**
+ * Discipline an attached IFC model carries. The backend column has no CHECK
+ * constraint -- the vocabulary is open -- so this is the set the wizard offers,
+ * not the set the API accepts.
+ */
+export const IFC_FILE_ROLES = ['primary', 'architectural', 'structural', 'context'] as const;
+
+export type IfcFileRole = (typeof IFC_FILE_ROLES)[number];
+
+/** One IFC model attached to a project. Mirrors ProjectIfcFileResponse. */
+export interface ProjectIfcFile {
+  /** project_ifc_files.id; null for a model attached before that table existed. */
+  id: number | null;
+  project_id: number;
+  file_path: string;
+  file_name: string;
+  is_primary: boolean;
+  role: IfcFileRole | string;
+  uploaded_at?: string | null;
+}
+
+/** Outcome of attaching one or more IFC models. Mirrors ProjectIfcUploadResponse. */
+export interface ProjectIfcUploadResponse {
+  success: boolean;
+  files: ProjectIfcFile[];
+  primary_id: number | null;
+}
+
 export interface ProjectListResponse {
   total: number;
   projects: Project[];

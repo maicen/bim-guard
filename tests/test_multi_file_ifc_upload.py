@@ -362,6 +362,74 @@ def test_a_project_with_no_models_lists_nothing(client: TestClient) -> None:
     assert response.json() == []
 
 
+# ── serving one attached model to the viewer ─────────────────────────────────
+#
+# GET /{id}/ifc resolves through projects.ifc_file_path and so always serves the
+# primary. A viewer offering the project's models as a list has to be able to
+# fetch the one the user picked, which is what these cover.
+
+
+def test_each_attached_model_downloads_its_own_bytes(client: TestClient) -> None:
+    """Every row serves the model it names, not the project's primary."""
+    attached = upload(client).json()["files"]
+    by_name = {f["file_name"]: f["id"] for f in attached}
+
+    piping = client.get(f"/api/projects/7/files/{by_name['plumbing.ifc']}/ifc")
+    structural = client.get(f"/api/projects/7/files/{by_name['structural.ifc']}/ifc")
+
+    assert piping.status_code == 200
+    assert structural.status_code == 200
+    # The non-primary request must not be quietly answered with the primary,
+    # which is the failure that would make a file picker look like it works.
+    assert SPF["pipe"] in piping.content
+    assert SPF["beam"] in structural.content
+    assert SPF["beam"] not in piping.content
+
+
+def test_downloaded_model_is_named_after_its_row(client: TestClient) -> None:
+    """The response is attached under the uploaded filename."""
+    attached = upload(client).json()["files"]
+    file_id = next(f["id"] for f in attached if f["file_name"] == "architectural.ifc")
+
+    response = client.get(f"/api/projects/7/files/{file_id}/ifc")
+
+    assert response.status_code == 200
+    assert "architectural.ifc" in response.headers["content-disposition"]
+
+
+def test_download_rejects_a_file_belonging_to_no_project_of_that_id(
+    client: TestClient,
+) -> None:
+    """An id the project does not hold is 404, not another project's model."""
+    upload(client)
+
+    response = client.get("/api/projects/7/files/9999/ifc")
+
+    assert response.status_code == 404
+    assert "9999" in response.json()["detail"]
+
+
+def test_download_reports_storage_failure_apart_from_a_missing_model(
+    client: TestClient, service: ProjectsService
+) -> None:
+    """Bytes storage cannot produce are a 502; the row still exists."""
+    attached = upload(client).json()["files"]
+    target = attached[1]
+    service._storage.delete(target["file_path"])
+
+    response = client.get(f"/api/projects/7/files/{target['id']}/ifc")
+
+    assert response.status_code == 502
+
+
+def test_download_from_an_unknown_project_is_404(client: TestClient) -> None:
+    """A missing project is reported as such before any row is looked up."""
+    response = client.get("/api/projects/404/files/1/ifc")
+
+    assert response.status_code == 404
+    assert "404" in response.json()["detail"]
+
+
 # ── 2. corrosion reads the primary only ──────────────────────────────────────
 
 

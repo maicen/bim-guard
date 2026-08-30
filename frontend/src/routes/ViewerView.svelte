@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { projectsApi } from "../lib/api";
-  import type { Project } from "../lib/types";
+  import type { Project, ProjectIfcFile } from "../lib/types";
   import IfcViewer from "../lib/components/IfcViewer.svelte";
   import { ScanEye, Layers } from "lucide-svelte";
 
@@ -13,6 +13,45 @@
   let selectedProjectId: number | null = initialProjectId;
   let selectedElementGuid: string | null = initialElementGuid;
   let selectedBcfArtifactId: number | null = initialBcfArtifactId;
+
+  // The project's attached models. A project predating project_ifc_files
+  // reports its one model here too, with a null id, so this list is the single
+  // shape the picker renders either side of that migration.
+  let ifcFiles: ProjectIfcFile[] = [];
+  let selectedFileId: number | null = null;
+  let filesProjectId: number | null = null;
+  // The viewport is held back until the list arrives. Loading the project's
+  // primary first and the picked model a moment later would fetch two IFCs to
+  // show one, and these files are large.
+  let filesReady = false;
+
+  $: selectedFile = ifcFiles.find((f) => f.id === selectedFileId) ?? ifcFiles[0] ?? null;
+
+  async function loadIfcFiles(projectId: number) {
+    // Guarded so the reactive statement below re-fetches on a project change
+    // but not on every unrelated state change that re-runs it.
+    if (filesProjectId === projectId) return;
+    filesProjectId = projectId;
+    // Cleared before the await, not after: leaving the previous project's rows
+    // in place would briefly pair a new project id with an old file id, and the
+    // viewer would ask for a model that project does not have.
+    ifcFiles = [];
+    selectedFileId = null;
+    filesReady = false;
+    try {
+      ifcFiles = await projectsApi.listIfcFiles(projectId);
+      // Falls back to the primary, which list_project_ifc_files returns first.
+      selectedFileId = ifcFiles.find((f) => f.is_primary)?.id ?? ifcFiles[0]?.id ?? null;
+    } catch (err) {
+      console.error("Failed to load project IFC files:", err);
+      ifcFiles = [];
+      selectedFileId = null;
+    } finally {
+      // Ready either way: on failure the viewer falls back to the project's
+      // primary, which is what it rendered before there was a picker at all.
+      filesReady = true;
+    }
+  }
 
   async function loadProjects() {
     try {
@@ -29,6 +68,10 @@
   onMount(() => {
     loadProjects();
   });
+
+  $: if (selectedProjectId) {
+    loadIfcFiles(selectedProjectId);
+  }
 
   $: if (initialProjectId) {
     selectedProjectId = initialProjectId;
@@ -65,7 +108,7 @@
           for="viewer-project-select"
           class="text-xs uppercase tracking-wider font-semibold text-slate-400"
         >
-          Model:
+          Project:
         </label>
         <select
           id="viewer-project-select"
@@ -76,9 +119,44 @@
             <option value={p.id}>{p.name} (#{p.id})</option>
           {/each}
         </select>
+
+        {#if ifcFiles.length > 1}
+          <label
+            for="viewer-file-select"
+            class="text-xs uppercase tracking-wider font-semibold text-slate-400"
+          >
+            Viewing:
+          </label>
+          <select
+            id="viewer-file-select"
+            bind:value={selectedFileId}
+            class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-[#0071e3] max-w-[260px]"
+          >
+            {#each ifcFiles as file}
+              <option value={file.id}>
+                {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
+                  ? " (primary)"
+                  : ""}
+              </option>
+            {/each}
+          </select>
+        {/if}
       </div>
     {/if}
   </div>
+
+  {#if ifcFiles.length > 1}
+    <div
+      class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 flex items-center gap-2"
+    >
+      <Layers class="w-4 h-4 text-blue-400 shrink-0" />
+      <span>
+        This project carries {ifcFiles.length} models. Switching between them changes
+        what the viewport renders only — the analysis results already on screen are
+        left as they are.
+      </span>
+    </div>
+  {/if}
 
   {#if selectedElementGuid}
     <div
@@ -114,7 +192,9 @@
   {/if}
 
   <IfcViewer
-    projectId={selectedProjectId}
+    projectId={filesReady ? selectedProjectId : null}
+    fileId={selectedFile?.id ?? null}
+    fileName={selectedFile?.file_name ?? ""}
     elementGuid={selectedElementGuid}
     bcfArtifactId={selectedBcfArtifactId}
   />

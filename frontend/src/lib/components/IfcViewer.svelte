@@ -6,6 +6,14 @@
   export let projectId: number | null = null;
   export let elementGuid: string | null = null;
   export let bcfArtifactId: number | null = null;
+  /**
+   * Which of the project's attached models to render, by project_ifc_files.id.
+   * null renders the project's primary, which is also what a project whose
+   * model predates that table resolves to.
+   */
+  export let fileId: number | null = null;
+  /** Display name for the model on screen, shown in the viewport title bar. */
+  export let fileName: string = '';
 
   let containerEl: HTMLDivElement;
   let fileInputEl: HTMLInputElement;
@@ -14,6 +22,7 @@
   let loadingMessage = 'Initializing OpenBIM 3D Viewport...';
   let error: string | null = null;
   let loadedProjectId: number | null = null;
+  let loadedFileId: number | null = null;
   let loadedBcfArtifactId: number | null = null;
   let isInitialized = false;
 
@@ -25,13 +34,13 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = '/static/js/viewer/ifc-viewer.js?v=viewer-controls-2';
+      const viewerModuleUrl = '/static/js/viewer/ifc-viewer.js?v=viewer-camera-state-3';
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer(containerEl);
       isInitialized = true;
 
       if (projectId) {
-        await loadProjectModel(projectId);
+        await loadProjectModel(projectId, fileId);
       }
     } catch (err: any) {
       console.error('Failed to initialize 3D viewer:', err);
@@ -41,16 +50,30 @@
     }
   }
 
-  async function loadProjectModel(id: number) {
+  async function loadProjectModel(id: number, targetFileId: number | null = null) {
     if (!viewerAPI) return;
     try {
       loading = true;
-      loadingMessage = `Loading IFC geometry for Project #${id}...`;
+      loadingMessage = fileName
+        ? `Loading ${fileName}...`
+        : `Loading IFC geometry for Project #${id}...`;
       error = null;
 
-      const ifcUrl = projectsApi.getIfcUrl(id);
+      // Only when swapping one model of a project for another. Coming to a
+      // project fresh should frame that model, not inherit a viewpoint chosen
+      // for whatever was on screen before.
+      const isModelSwap = loadedProjectId === id;
+      const camera = isModelSwap ? viewerAPI.getCameraState?.() ?? null : null;
+
+      const ifcUrl =
+        targetFileId === null
+          ? projectsApi.getIfcUrl(id)
+          : projectsApi.getIfcFileUrl(id, targetFileId);
       await viewerAPI.loadIfc(ifcUrl);
       loadedProjectId = id;
+      loadedFileId = targetFileId;
+
+      if (camera) await viewerAPI.setCameraState?.(camera);
 
       if (bcfArtifactId) {
         loadingMessage = 'Loading BCF viewpoints...';
@@ -82,6 +105,7 @@
       error = null;
       await viewerAPI.loadIfc(file);
       loadedProjectId = null;
+      loadedFileId = null;
     } catch (err: any) {
       console.error('Failed to parse local IFC file:', err);
       error = err?.message || 'Failed to parse local IFC model';
@@ -103,8 +127,8 @@
     isInitialized = false;
   });
 
-  $: if (viewerAPI && projectId && projectId !== loadedProjectId) {
-    loadProjectModel(projectId);
+  $: if (viewerAPI && projectId && (projectId !== loadedProjectId || fileId !== loadedFileId)) {
+    loadProjectModel(projectId, fileId);
   }
 
   $: if (viewerAPI && bcfArtifactId && bcfArtifactId !== loadedBcfArtifactId && loadedProjectId) {
@@ -148,6 +172,15 @@
         </span>
       {/if}
 
+      {#if fileName}
+        <span
+          class="px-2.5 py-0.5 rounded-md bg-blue-950/60 border border-blue-800/40 text-xs font-medium text-blue-300 max-w-[220px] truncate"
+          title={fileName}
+        >
+          Viewing: {fileName}
+        </span>
+      {/if}
+
       <!-- Local File Upload Button -->
       <button
         type="button"
@@ -178,7 +211,7 @@
       {#if projectId}
         <button
           type="button"
-          on:click={() => loadProjectModel(projectId)}
+          on:click={() => loadProjectModel(projectId, fileId)}
           class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-900/80 hover:bg-red-800 text-white text-[11px] font-medium transition-colors"
         >
           <RefreshCw class="w-3 h-3" />

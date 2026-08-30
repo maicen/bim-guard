@@ -6,6 +6,8 @@ import type {
   DocumentUpdatePayload,
   Project,
   ProjectCreatePayload,
+  ProjectIfcFile,
+  ProjectIfcUploadResponse,
   ProjectOptions,
   ProjectListResponse,
   ProjectUpdatePayload,
@@ -175,6 +177,45 @@ export const projectsApi = {
 
   getIfcUrl(id: number): string {
     return `${API_BASE}/projects/${id}/ifc`;
+  },
+
+  /** URL for one specific attached model, rather than the project's primary. */
+  getIfcFileUrl(projectId: number, fileId: number): string {
+    return `${API_BASE}/projects/${projectId}/files/${fileId}/ifc`;
+  },
+
+  async listIfcFiles(projectId: number): Promise<ProjectIfcFile[]> {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/files`);
+    return handleResponse<ProjectIfcFile[]>(res);
+  },
+
+  /**
+   * Attach IFC models to an existing project.
+   *
+   * `roles` goes over the wire as one repeated form entry per file, not as a
+   * JSON blob: the endpoint declares `roles: list[str] = Form()`, which FastAPI
+   * fills from repeated entries. A single JSON string would arrive as a
+   * one-element list and be rejected for not matching the file count.
+   */
+  async uploadIfcFiles(
+    projectId: number,
+    files: File[],
+    primaryIndex: number,
+    roles: string[],
+  ): Promise<ProjectIfcUploadResponse> {
+    const form = new FormData();
+    files.forEach((file) => form.append('files', file));
+    form.append('primary_index', String(primaryIndex));
+    roles.forEach((role) => form.append('roles', role));
+
+    const res = await fetch(`${API_BASE}/projects/${projectId}/upload`, {
+      method: 'POST',
+      body: form,
+    });
+    // The primary is mirrored onto projects.ifc_file_path server-side, so a
+    // caller holding a project row fetched before this call should re-read it
+    // with { forceRefresh: true } -- the cache cannot know the column moved.
+    return handleResponse<ProjectIfcUploadResponse>(res);
   },
 };
 

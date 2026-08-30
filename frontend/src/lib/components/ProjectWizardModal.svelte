@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { X, Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from 'lucide-svelte';
   import { projectsApi, documentsApi } from '../api';
+  import { IFC_FILE_ROLES } from '../types';
   import type { Project, DocumentItem, ProjectOptions } from '../types';
 
   export let isOpen: boolean = false;
@@ -22,7 +23,23 @@
   // question about the audit's scope, and only the Arch domain is judged
   // against one at all.
   let buildingCode = '';
-  let ifcFile: File | null = null;
+  // A project can carry several discipline models -- an architectural model, a
+  // structural one, the site context -- and exactly one of them is primary: the
+  // model an analysis run starts from, and the one projects.ifc_file_path keeps
+  // naming. ifcRoles is parallel to ifcFiles, and the primary is the entry
+  // whose role is PRIMARY_ROLE, so the two can never disagree.
+  const PRIMARY_ROLE = 'primary';
+  const DEFAULT_ROLE = 'context';
+  let ifcFiles: File[] = [];
+  let ifcRoles: string[] = [];
+  let primaryIndex = 0;
+  let isDraggingIfc = false;
+  let ifcNotice = '';
+  // Set once the project row exists. A failed model upload must not make the
+  // retry create a second project, so handleFinish reuses this id if it is set.
+  let createdProjectId: number | null = null;
+
+  $: primaryIfcFile = ifcFiles[primaryIndex] ?? null;
 
   // Step 1 building details. Held as strings because an empty number input
   // yields '', and sending '' is how the wizard says "not answered" — coercing
@@ -97,11 +114,120 @@
     }
   });
 
+  /** Add .ifc files, skipping non-IFC uploads and ones already in the list. */
+  function addIfcFiles(incoming: FileList | null | undefined) {
+    const candidates = Array.from(incoming ?? []);
+    if (!candidates.length) return;
+
+    const accepted = candidates.filter((file) => /\.ifc$/i.test(file.name));
+    const rejectedCount = candidates.length - accepted.length;
+
+    const mergedFiles = [...ifcFiles];
+    const mergedRoles = [...ifcRoles];
+    let duplicateCount = 0;
+    for (const file of accepted) {
+      const isDuplicate = mergedFiles.some(
+        (existing) => existing.name === file.name && existing.size === file.size,
+      );
+      if (isDuplicate) {
+        duplicateCount += 1;
+        continue;
+      }
+      mergedFiles.push(file);
+      // The first model attached is the primary; anything added after it is
+      // context until the user says otherwise.
+      mergedRoles.push(mergedFiles.length === 1 ? PRIMARY_ROLE : DEFAULT_ROLE);
+    }
+    ifcFiles = mergedFiles;
+    ifcRoles = mergedRoles;
+    if (primaryIndex >= ifcFiles.length) primaryIndex = 0;
+    if (ifcFiles.length) setPrimaryIfc(primaryIndex);
+
+    const notices: string[] = [];
+    if (rejectedCount) {
+      notices.push(`${rejectedCount} file${rejectedCount === 1 ? '' : 's'} skipped — only .ifc models are accepted.`);
+    }
+    if (duplicateCount) {
+      notices.push(`${duplicateCount} file${duplicateCount === 1 ? '' : 's'} already in the list.`);
+    }
+    ifcNotice = notices.join(' ');
+  }
+
   function handleFileChange(event: Event) {
     const target = event.target as HTMLInputElement;
-    if (target.files && target.files[0]) {
-      ifcFile = target.files[0];
+    addIfcFiles(target.files);
+    // Cleared so re-picking the same file after removing it still fires change.
+    target.value = '';
+  }
+
+  function handleIfcDrop(event: DragEvent) {
+    isDraggingIfc = false;
+    addIfcFiles(event.dataTransfer?.files);
+  }
+
+  function handleIfcDragLeave(event: DragEvent) {
+    // Moving onto a child fires dragleave on the zone; only unhighlight once
+    // the pointer has actually left the drop zone's subtree.
+    const zone = event.currentTarget as HTMLElement;
+    const next = event.relatedTarget as Node | null;
+    if (next && zone.contains(next)) return;
+    isDraggingIfc = false;
+  }
+
+  function removeIfcFile(index: number) {
+    const wasPrimary = index === primaryIndex;
+    ifcFiles = ifcFiles.filter((_, idx) => idx !== index);
+    ifcRoles = ifcRoles.filter((_, idx) => idx !== index);
+    if (!ifcFiles.length) {
+      primaryIndex = 0;
+    } else if (wasPrimary) {
+      // Removing the primary leaves a set with none; the first model takes over
+      // rather than the project going to the server with primary_index dangling.
+      setPrimaryIfc(0);
+    } else if (index < primaryIndex) {
+      primaryIndex -= 1;
     }
+    ifcNotice = '';
+  }
+
+  /** Make one model the primary, demoting whichever held the role before. */
+  function setPrimaryIfc(index: number) {
+    if (index < 0 || index >= ifcFiles.length) return;
+    ifcRoles = ifcRoles.map((role, idx) => {
+      if (idx === index) return PRIMARY_ROLE;
+      return role === PRIMARY_ROLE ? DEFAULT_ROLE : role;
+    });
+    primaryIndex = index;
+    ifcNotice = '';
+  }
+
+  /**
+   * Apply a role chosen from one file's dropdown.
+   *
+   * Returns false when the change was refused, which the caller uses to snap
+   * the select back to the role the file actually still has.
+   */
+  function setIfcRole(index: number, role: string): boolean {
+    if (role === PRIMARY_ROLE) {
+      setPrimaryIfc(index);
+      return true;
+    }
+    if (index === primaryIndex) {
+      const successor = ifcFiles.findIndex((_, idx) => idx !== index);
+      if (successor === -1) {
+        ifcNotice = 'The only attached model has to be the primary one.';
+        return false;
+      }
+      const next = [...ifcRoles];
+      next[index] = role;
+      ifcRoles = next;
+      setPrimaryIfc(successor);
+      return true;
+    }
+    const next = [...ifcRoles];
+    next[index] = role;
+    ifcRoles = next;
+    return true;
   }
 
   function toggleDocument(id: number) {
@@ -136,40 +262,45 @@
       const documentIds = Array.from(selectedDocIds);
       const standardsCodes = Array.from(selectedStandardIds);
 
-      let createdProject: Project;
-      if (ifcFile) {
-        const formData = new FormData();
-        formData.append('name', name);
-        formData.append('description', description);
-        formData.append('status', status);
-        formData.append('country', country);
-        formData.append('analysis_type', analysisType);
-        if (buildingCode) formData.append('building_code', buildingCode);
-        if (projectType) formData.append('project_type', projectType);
-        if (projectSizeSqm) formData.append('project_size_sqm', projectSizeSqm);
-        if (buildingsCount) formData.append('buildings_count', buildingsCount);
-        if (floorsCount) formData.append('floors_count', floorsCount);
-        // Repeated fields, not a JSON blob: FastAPI reads a list[int] Form
-        // parameter from one entry per value.
-        documentIds.forEach((id) => formData.append('document_ids', String(id)));
-        standardsCodes.forEach((id) => formData.append('standards_codes', id));
-        formData.append('ifc_file', ifcFile);
-        createdProject = await projectsApi.uploadWithIfc(formData);
-      } else {
-        createdProject = await projectsApi.create({
-          name,
-          description,
-          status,
-          country,
-          analysis_type: analysisType,
-          building_code: buildingCode || null,
-          project_type: projectType || null,
-          project_size_sqm: projectSizeSqm ? Number(projectSizeSqm) : null,
-          buildings_count: buildingsCount ? Number(buildingsCount) : null,
-          floors_count: floorsCount ? Number(floorsCount) : null,
-          document_ids: documentIds,
-          standards_codes: standardsCodes,
-        });
+      // Create first, attach after: the multi-model endpoint attaches to a
+      // project that already exists, so the single-shot multipart create is no
+      // longer the path a model takes into a project.
+      let createdProject: Project =
+        createdProjectId !== null
+          ? await projectsApi.get(createdProjectId)
+          : await projectsApi.create({
+              name,
+              description,
+              status,
+              country,
+              analysis_type: analysisType,
+              building_code: buildingCode || null,
+              project_type: projectType || null,
+              project_size_sqm: projectSizeSqm ? Number(projectSizeSqm) : null,
+              buildings_count: buildingsCount ? Number(buildingsCount) : null,
+              floors_count: floorsCount ? Number(floorsCount) : null,
+              document_ids: documentIds,
+              standards_codes: standardsCodes,
+            });
+      createdProjectId = createdProject.id;
+
+      if (ifcFiles.length) {
+        try {
+          await projectsApi.uploadIfcFiles(createdProject.id, ifcFiles, primaryIndex, ifcRoles);
+        } catch (uploadErr: any) {
+          // The project row is already saved. Reporting that plainly and
+          // staying open is better than closing on an error the user would
+          // then try to fix by creating the project a second time.
+          errorMessage =
+            `Project "${name}" was saved, but attaching the models failed: ` +
+            `${uploadErr.message || 'unknown error'}. Adjust the selection and press ` +
+            `Create again — the models will attach to the project that already exists.`;
+          currentStep = 2;
+          return;
+        }
+        // The primary is mirrored onto projects.ifc_file_path server-side, so
+        // the row fetched before the upload names no model yet.
+        createdProject = await projectsApi.get(createdProject.id, { forceRefresh: true });
       }
 
       onProjectCreated(createdProject);
@@ -192,7 +323,12 @@
     // created against a domain the user was never shown.
     analysisType = 'Arch';
     buildingCode = '';
-    ifcFile = null;
+    ifcFiles = [];
+    ifcRoles = [];
+    primaryIndex = 0;
+    isDraggingIfc = false;
+    ifcNotice = '';
+    createdProjectId = null;
     projectType = '';
     projectSizeSqm = '';
     buildingsCount = '';
@@ -396,32 +532,96 @@
 
         {:else if currentStep === 2}
           <!-- Step 2: IFC Upload -->
-          <div class="space-y-4 text-center">
-            <div class="border-2 border-dashed border-slate-700 hover:border-[#0071e3] transition-colors rounded-2xl p-8 bg-slate-950/40">
-              <Upload class="w-10 h-10 text-slate-400 mx-auto mb-3" />
-              <h3 class="text-sm font-semibold text-white mb-1">Upload OpenBIM IFC Model</h3>
+          <div class="space-y-4">
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div
+              role="region"
+              aria-label="IFC model drop zone"
+              on:dragover|preventDefault={() => (isDraggingIfc = true)}
+              on:dragleave={handleIfcDragLeave}
+              on:drop|preventDefault={handleIfcDrop}
+              class="border-2 border-dashed rounded-2xl p-8 text-center transition-colors {isDraggingIfc
+                ? 'border-[#0071e3] bg-blue-950/20'
+                : 'border-slate-700 hover:border-[#0071e3] bg-slate-950/40'}"
+            >
+              <Upload class="w-10 h-10 {isDraggingIfc ? 'text-[#0071e3]' : 'text-slate-400'} mx-auto mb-3" />
+              <h3 class="text-sm font-semibold text-white mb-1">Upload OpenBIM IFC Models</h3>
               <p class="text-xs text-slate-400 max-w-sm mx-auto mb-4">
-                Attach an IFC 2x3 or IFC4 building/piping model for compliance checks.
+                Drag and drop IFC 2x3 or IFC4 models here, or browse. Attach one model per
+                discipline — the primary is the one the compliance run analyses.
               </p>
               <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium cursor-pointer transition-colors">
-                <span>Browse File (.ifc)</span>
-                <input type="file" accept=".ifc" on:change={handleFileChange} class="hidden" />
+                <span>Browse Files (.ifc)</span>
+                <input type="file" accept=".ifc" multiple on:change={handleFileChange} class="hidden" />
               </label>
             </div>
-            {#if ifcFile}
-              <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-left">
-                <div class="flex items-center gap-2.5 truncate">
-                  <CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span class="text-xs font-medium text-white truncate">{ifcFile.name}</span>
-                  <span class="text-[11px] text-slate-500">({(ifcFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-                </div>
-                <button
-                  type="button"
-                  on:click={() => (ifcFile = null)}
-                  class="text-xs text-rose-400 hover:text-rose-300 ml-2"
-                >
-                  Remove
-                </button>
+
+            {#if ifcNotice}
+              <p class="text-[11px] text-amber-400">{ifcNotice}</p>
+            {/if}
+
+            {#if ifcFiles.length}
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-slate-400">
+                  {ifcFiles.length} model{ifcFiles.length === 1 ? '' : 's'} selected
+                </span>
+                {#if ifcFiles.length > 1}
+                  <span class="text-[11px] text-slate-500">Click a model to make it primary</span>
+                {/if}
+              </div>
+
+              <div class="space-y-2 max-h-64 overflow-y-auto">
+                {#each ifcFiles as file, idx (`${file.name}:${file.size}`)}
+                  <div
+                    class="p-3 rounded-xl border flex items-center gap-2 transition-all {idx === primaryIndex
+                      ? 'bg-blue-950/30 border-[#0071e3]'
+                      : 'bg-slate-950 border-slate-800'}"
+                  >
+                    <button
+                      type="button"
+                      on:click={() => setPrimaryIfc(idx)}
+                      title="Make this the primary model"
+                      class="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                    >
+                      <CheckCircle2
+                        class="w-4 h-4 shrink-0 {idx === primaryIndex ? 'text-[#0071e3]' : 'text-emerald-400'}"
+                      />
+                      <span class="text-xs font-medium text-white truncate">{file.name}</span>
+                      <span class="text-[11px] text-slate-500 shrink-0">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                      {#if idx === primaryIndex}
+                        <span
+                          class="px-1.5 py-0.5 rounded-md bg-[#0071e3] text-white text-[10px] font-semibold uppercase tracking-wide shrink-0"
+                        >
+                          Primary
+                        </span>
+                      {/if}
+                    </button>
+
+                    <select
+                      aria-label="Role for {file.name}"
+                      value={ifcRoles[idx]}
+                      on:change={(event) => {
+                        const select = event.currentTarget;
+                        if (!setIfcRole(idx, select.value)) select.value = ifcRoles[idx];
+                      }}
+                      class="shrink-0 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#0071e3]"
+                    >
+                      {#each IFC_FILE_ROLES as roleOption}
+                        <option value={roleOption}>{roleOption}</option>
+                      {/each}
+                    </select>
+
+                    <button
+                      type="button"
+                      on:click={() => removeIfcFile(idx)}
+                      class="shrink-0 text-xs text-rose-400 hover:text-rose-300"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                {/each}
               </div>
             {/if}
           </div>
@@ -618,8 +818,16 @@
                 <span class="font-semibold text-white">{analysisType}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
-                <span class="text-slate-400 font-medium">Attached Model:</span>
-                <span class="font-semibold text-emerald-400">{ifcFile ? ifcFile.name : 'None (can attach later)'}</span>
+                <span class="text-slate-400 font-medium">Attached Models:</span>
+                <span class="font-semibold text-emerald-400">
+                  {#if primaryIfcFile}
+                    {primaryIfcFile.name}{ifcFiles.length > 1
+                      ? ` + ${ifcFiles.length - 1} more`
+                      : ''}
+                  {:else}
+                    None (can attach later)
+                  {/if}
+                </span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Linked Documents:</span>

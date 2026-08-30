@@ -809,12 +809,43 @@ export async function initViewer(containerOrId) {
         }
     }
 
+    // Switching which of a project's models is on screen is a change of subject,
+    // not of viewpoint: the user is looking at one corner of one building and
+    // wants the structural model of that same corner. loadIfc refits the camera
+    // to the new model's bounds, so the caller reads the state first and puts it
+    // back afterwards.
+    function getCameraState() {
+        try {
+            const position = new THREE.Vector3();
+            const target = new THREE.Vector3();
+            world.camera.controls.getPosition(position);
+            world.camera.controls.getTarget(target);
+            return { position: position.toArray(), target: target.toArray() };
+        } catch (e) {
+            console.warn("Could not read camera state:", e);
+            return null;
+        }
+    }
+
+    async function setCameraState(state) {
+        if (!state || !state.position || !state.target) return;
+        try {
+            const [px, py, pz] = state.position;
+            const [tx, ty, tz] = state.target;
+            await world.camera.controls.setLookAt(px, py, pz, tx, ty, tz, false);
+        } catch (e) {
+            console.warn("Could not restore camera state:", e);
+        }
+    }
+
     return {
         components,
         world,
         topics: workspace.topics,
         loadBcf,
         loadIfc,
+        getCameraState,
+        setCameraState,
         setupFileLoader,
         selectTopic: workspace.selectTopic,
         findTopicByElementGuid,

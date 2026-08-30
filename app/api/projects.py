@@ -573,3 +573,54 @@ def list_project_ifc_files(
         ProjectIfcFileResponse(**{"project_id": project_id, **row})
         for row in service.get_ifc_files_by_project(project_id)
     ]
+
+
+@router.get(
+    "/{project_id}/files/{file_id}/ifc",
+    summary="Download one of a project's attached IFC models",
+)
+def download_project_ifc_file(
+    project_id: int,
+    file_id: int,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+):
+    """Retrieve the bytes of one attached model, by ``project_ifc_files.id``.
+
+    ``GET /{project_id}/ifc`` resolves through ``projects.ifc_file_path`` and so
+    always serves the primary. A viewer offering the project's models as a list
+    needs to fetch the one the user picked, which is what this addresses.
+
+    Args:
+        project_id: Project owning the model.
+        file_id: ``project_ifc_files.id`` of the model to download.
+
+    Raises:
+        HTTPException: 404 if the project does not exist or holds no such model;
+            502 if the row names bytes that storage cannot produce.
+    """
+    if service.get_project(project_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found.",
+        )
+
+    resolved, missing = service.resolve_ifc_file_paths(project_id)
+    for row, local_path in resolved:
+        if row.get("id") == file_id and local_path.exists():
+            return FileResponse(
+                str(local_path),
+                media_type="application/octet-stream",
+                filename=row.get("file_name") or f"model-{file_id}.ifc",
+            )
+
+    # Separated so "storage is down" does not read to the caller as "you asked
+    # for a model this project never had".
+    if any(row.get("id") == file_id for row in missing):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve the IFC file from storage.",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Project {project_id} has no attached model with ID {file_id}.",
+    )
