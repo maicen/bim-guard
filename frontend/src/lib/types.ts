@@ -11,6 +11,7 @@ export interface Project {
   status: string;
   country: string;
   analysis_type: AnalysisDomain | string;
+  building_code?: string | null;
   project_type?: string | null;
   project_size_sqm?: number | null;
   buildings_count?: number | null;
@@ -32,6 +33,7 @@ export interface ProjectCreatePayload {
   status?: string;
   country?: string;
   analysis_type?: AnalysisDomain | string;
+  building_code?: string | null;
   project_type?: string | null;
   project_size_sqm?: number | null;
   buildings_count?: number | null;
@@ -49,12 +51,24 @@ export interface StandardOption {
   applicable_to?: string[];
 }
 
+/** One building code offered by the wizard, scoped to the jurisdictions it governs. */
+export interface BuildingCodeOption {
+  id: string;
+  name: string;
+  description?: string;
+  /** Countries the code governs; empty means it applies everywhere. */
+  jurisdictions?: string[];
+  /** Seeded ruleset executed for this code, if one is bundled. */
+  ruleset_id?: string;
+}
+
 /** Reference data the wizard renders its choices from (GET /projects/options). */
 export interface ProjectOptions {
   countries: string[];
   project_types: string[];
   analysis_types: string[];
   standards: StandardOption[];
+  building_codes: BuildingCodeOption[];
 }
 
 export interface ProjectUpdatePayload {

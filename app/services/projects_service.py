@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.constants import (
     ANALYSIS_TYPES,
+    BUILDING_CODES,
     DOCUMENT_CATEGORIES,
     STANDARD_UPLOAD_EXTENSIONS,
     get_standard,
@@ -24,6 +25,10 @@ from app.utils import (
 )
 
 logger = get_logger(__name__)
+
+#: Valid ``building_code`` values, derived from the catalog so the two
+#: cannot drift apart as codes are added.
+_BUILDING_CODE_IDS: frozenset[str] = frozenset(c["id"] for c in BUILDING_CODES)
 
 
 def is_enhancement_authorized(token: str = "") -> bool:
@@ -161,10 +166,11 @@ class ProjectsService:
         logger.info("IFC upload prepared filename=%s bytes=%d", filename, len(content))
         return storage_ref, ifc_md5_hash
 
-    #: Columns added by the wizard-fields migration. Held separately so an
-    #: insert can be retried without them on a database where that migration
-    #: has not been run yet.
+    #: Columns added by the wizard-fields migrations. Held separately so an
+    #: insert can be retried without them on a database where those migrations
+    #: have not been run yet.
     _WIZARD_COLUMNS = (
+        "building_code",
         "project_type",
         "project_size_sqm",
         "buildings_count",
@@ -198,8 +204,8 @@ class ProjectsService:
                 raise
             logger.warning(
                 "Projects table is missing the wizard columns; created without "
-                "them. Apply the add_wizard_fields_to_projects migration. "
-                "dropped=%s",
+                "them. Apply the add_wizard_fields_to_projects and "
+                "add_building_code_to_projects migrations. dropped=%s",
                 sorted(set(row) - set(trimmed)),
             )
             return self._projects.insert(trimmed)
@@ -213,6 +219,7 @@ class ProjectsService:
         ifc_md5_hash: str = "",
         country: str = "",
         analysis_type: str = "",
+        building_code: str | None = None,
         project_type: str | None = None,
         project_size_sqm: float | None = None,
         buildings_count: int | None = None,
@@ -228,6 +235,10 @@ class ProjectsService:
             ifc_md5_hash: MD5 of the uploaded IFC model.
             country: Jurisdiction governing which codes apply. Required.
             analysis_type: One of :data:`app.constants.ANALYSIS_TYPES`. Required.
+            building_code: Building code ID from
+                :data:`app.constants.BUILDING_CODES`. Optional: a corrosion
+                project is judged against material and media rules, not a
+                jurisdiction's code, so it legitimately has none.
             project_type: Building type from :data:`app.constants.PROJECT_TYPES`.
             project_size_sqm: Gross floor area in square metres.
             buildings_count: Number of buildings.
@@ -253,6 +264,12 @@ class ProjectsService:
             raise ValueError(
                 f"analysis_type must be one of {ANALYSIS_TYPES!r}, got {analysis_type!r}"
             )
+        building_code = (building_code or "").strip() or None
+        if building_code is not None and building_code not in _BUILDING_CODE_IDS:
+            raise ValueError(
+                f"building_code must be one of {sorted(_BUILDING_CODE_IDS)!r}, "
+                f"got {building_code!r}"
+            )
 
         now = now_iso_utc()
         row = {
@@ -270,6 +287,7 @@ class ProjectsService:
         # project created through the plain API is not written a row full of
         # NULLs for fields it never had an opinion about.
         for column, value in (
+            ("building_code", building_code),
             ("project_type", project_type),
             ("project_size_sqm", project_size_sqm),
             ("buildings_count", buildings_count),

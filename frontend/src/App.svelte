@@ -21,6 +21,7 @@
   import SettingsView from './routes/SettingsView.svelte';
 
   import { dashboardApi, projectsApi } from './lib/api';
+  import { viewForAnalysisDomain } from './lib/analysisDomain';
   import { initTheme } from './lib/theme';
   import type { Project } from './lib/types';
 
@@ -88,16 +89,15 @@
     activeView = 'viewer';
   }
 
+  // The wizard closes itself once the project is saved; this puts the new
+  // project on screen in the analysis view for the domain it was created with.
+  // Routed through viewForAnalysisDomain rather than compared inline: the
+  // wizard sends the canonical 'Arch' / 'Piping' / 'seismic', and matching only
+  // the legacy spellings sent every Arch project to the piping view.
   function handleProjectCreated(project: Project) {
     targetProjectId = project.id;
     selectedProject = project;
-    if (project.analysis_type === 'Architectural' || project.analysis_type === 'Architecture') {
-      activeView = 'arch';
-    } else if (project.analysis_type === 'Seismic' || project.analysis_type === 'Halo') {
-      activeView = 'seismic';
-    } else {
-      activeView = 'piping';
-    }
+    activeView = viewForAnalysisDomain(project.analysis_type);
   }
 </script>
 

@@ -56,6 +56,103 @@ def normalize_analysis_type(analysis_type: str, default: str = "Arch") -> str:
         return "seismic"
     return s
 
+#: Building codes offered by wizard step 3, keyed to the jurisdiction chosen in
+#: step 1. Hand-maintained, unlike the generated COUNTRIES and NOTEBOOK_STANDARDS
+#: lists in this module: a code belongs here once someone has confirmed it
+#: governs the jurisdiction it is listed under.
+#:
+#: ``jurisdictions`` empty means the code applies everywhere and is offered
+#: whatever the project's country -- that is how the ISO/IFC fallback reaches
+#: the 190-odd jurisdictions with no bundled national ruleset.
+#:
+#: ``ruleset_id`` names the seeded ruleset the engines actually execute, or is
+#: empty where the code is named for the record but has no bundled rules yet.
+#: Selecting such a code is still worth recording: it is what the project is
+#: judged against, and it is what a later ruleset import will attach to.
+BUILDING_CODES: list[dict[str, Any]] = [
+    {
+        "id": "OBC-PART9",
+        "name": "Ontario Building Code Part 9",
+        "jurisdictions": ["Canada"],
+        "description": "Housing and small buildings: stairs, egress, guards, fire separation.",
+        "ruleset_id": "BUILDING-CODE-PART9",
+    },
+    {
+        "id": "OBC-PART9-EXT",
+        "name": "Ontario Building Code Part 9 (extended QA)",
+        "jurisdictions": ["Canada"],
+        "description": "Part 9 plus the BIM-Guard model-quality checks on required properties.",
+        "ruleset_id": "BUILDING-CODE-PART9-EXT",
+    },
+    {
+        "id": "NBC-2020",
+        "name": "National Building Code of Canada 2020",
+        "jurisdictions": ["Canada"],
+        "description": "Federal model code applied where a province has not published its own.",
+        "ruleset_id": "",
+    },
+    {
+        "id": "UK-PART-B",
+        "name": "Building Regulations Part B (Fire Safety)",
+        "jurisdictions": ["United Kingdom"],
+        "description": "Means of warning and escape, internal and external fire spread.",
+        "ruleset_id": "",
+    },
+    {
+        "id": "UK-PART-M",
+        "name": "Building Regulations Part M (Access and Use)",
+        "jurisdictions": ["United Kingdom"],
+        "description": "Accessible approach, entrance doors, sanitary accommodation.",
+        "ruleset_id": "",
+    },
+    {
+        "id": "IBC",
+        "name": "International Building Code (IBC)",
+        "jurisdictions": ["United States"],
+        "description": "Model code adopted, with amendments, by most US jurisdictions.",
+        "ruleset_id": "",
+    },
+    {
+        "id": "NFPA-101",
+        "name": "NFPA 101 Life Safety Code",
+        "jurisdictions": ["United States"],
+        "description": "Egress capacity, travel distance, and occupancy life-safety provisions.",
+        "ruleset_id": "",
+    },
+    {
+        "id": "ISO-IFC-INTL",
+        "name": "ISO / IFC international standards",
+        "jurisdictions": [],
+        "description": "Fallback where no national ruleset is bundled: the engines apply the ISO and IFC provisions.",
+        "ruleset_id": "",
+    },
+]
+
+
+def building_codes_for(country: str | None = None) -> list[dict[str, Any]]:
+    """Return the building codes offered for ``country``.
+
+    Args:
+        country: Jurisdiction name as it appears in :data:`COUNTRIES`. ``None``
+            or blank returns the whole catalog, which is what the wizard's
+            options endpoint serves so the client can re-filter as the user
+            changes jurisdiction without a round trip.
+
+    Returns:
+        The codes scoped to that jurisdiction, plus the codes that apply
+        everywhere. Never empty: the ISO/IFC fallback is offered even for a
+        jurisdiction with no bundled national code.
+    """
+    if not country or not country.strip():
+        return list(BUILDING_CODES)
+    name = country.strip()
+    return [
+        code
+        for code in BUILDING_CODES
+        if not code["jurisdictions"] or name in code["jurisdictions"]
+    ]
+
+
 #: Building types offered by the project setup wizard.
 PROJECT_TYPES: list[str] = [
     "Commercial Office",

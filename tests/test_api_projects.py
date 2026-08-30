@@ -37,3 +37,90 @@ def test_download_ifc_not_found():
     response = client.get(f"/api/projects/{NONEXISTENT_ID}/ifc")
     assert response.status_code == 404
 
+
+
+def test_project_options_offer_building_codes():
+    """Verify /api/projects/options serves the building-code catalog the wizard filters."""
+    response = client.get("/api/projects/options")
+    assert response.status_code == 200
+    codes = response.json()["building_codes"]
+    assert codes, "the wizard's step-3 selector has nothing to render without codes"
+
+    by_id = {code["id"]: code for code in codes}
+    # Ontario Part 9 is bundled as a seeded ruleset, so the catalog must name it
+    # and point at the rules the engines actually execute.
+    assert by_id["OBC-PART9"]["jurisdictions"] == ["Canada"]
+    assert by_id["OBC-PART9"]["ruleset_id"] == "BUILDING-CODE-PART9"
+    # The international fallback carries no jurisdictions, which is how it stays
+    # on offer for the countries with no bundled national code.
+    assert by_id["ISO-IFC-INTL"]["jurisdictions"] == []
+
+
+def test_building_codes_filter_by_jurisdiction():
+    """Verify a jurisdiction is offered its own codes plus the ones applying everywhere."""
+    from app.constants import BUILDING_CODES, building_codes_for
+
+    canadian = [code["id"] for code in building_codes_for("Canada")]
+    assert "OBC-PART9" in canadian
+    assert "IBC" not in canadian
+    assert "ISO-IFC-INTL" in canadian
+
+    # A jurisdiction with no bundled national code still gets an offer rather
+    # than an empty select.
+    assert [code["id"] for code in building_codes_for("France")] == ["ISO-IFC-INTL"]
+
+    # No jurisdiction means the whole catalog: that is what the options endpoint
+    # serves so the client can re-filter without a round trip.
+    assert building_codes_for("") == BUILDING_CODES
+
+
+def test_create_project_rejects_unknown_building_code():
+    """Verify a building code outside the catalog is refused before the row is written."""
+    response = client.post(
+        "/api/projects",
+        json={
+            "name": "Unknown code project",
+            "country": "Canada",
+            "analysis_type": "Arch",
+            "building_code": "NOT-A-CODE",
+        },
+    )
+    assert response.status_code == 400
+    assert "building_code" in response.json()["detail"]
+
+
+def test_create_project_persists_building_code():
+    """Verify the wizard's step-3 code choice round-trips onto the created project."""
+    from app.services.projects_service import ProjectsService
+
+    response = client.post(
+        "/api/projects",
+        json={
+            "name": "Building code round-trip",
+            "country": "Canada",
+            "analysis_type": "Arch",
+            "building_code": "OBC-PART9",
+        },
+    )
+    assert response.status_code == 201
+    created = response.json()
+    try:
+        assert created["building_code"] == "OBC-PART9"
+    finally:
+        ProjectsService().delete_project(created["id"])
+
+
+def test_create_project_without_building_code_is_allowed():
+    """Verify a Piping project may be created with no code, as step 3 says it may."""
+    from app.services.projects_service import ProjectsService
+
+    response = client.post(
+        "/api/projects",
+        json={"name": "Corrosion, no code", "country": "Canada", "analysis_type": "Piping"},
+    )
+    assert response.status_code == 201
+    created = response.json()
+    try:
+        assert created["building_code"] is None
+    finally:
+        ProjectsService().delete_project(created["id"])

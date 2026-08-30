@@ -84,6 +84,21 @@ class StandardOption(BaseModel):
     applicable_to: list[str] = Field(default_factory=list)
 
 
+class BuildingCodeOption(BaseModel):
+    """One building code the wizard offers under a jurisdiction."""
+
+    id: str
+    name: str
+    description: str = ""
+    jurisdictions: list[str] = Field(
+        default_factory=list,
+        description="Countries the code governs; empty means it applies everywhere",
+    )
+    ruleset_id: str = Field(
+        default="", description="Seeded ruleset executed for this code, if one is bundled"
+    )
+
+
 class ProjectOptionsResponse(BaseModel):
     """Reference data the project setup wizard renders its choices from.
 
@@ -95,6 +110,9 @@ class ProjectOptionsResponse(BaseModel):
     project_types: list[str]
     analysis_types: list[str]
     standards: list[StandardOption]
+    # The whole catalog, not the codes for one country: the wizard re-filters it
+    # by jurisdiction as the user changes step 1, with no second round trip.
+    building_codes: list[BuildingCodeOption] = Field(default_factory=list)
 
 
 class ProjectCreateRequest(BaseModel):
@@ -105,6 +123,10 @@ class ProjectCreateRequest(BaseModel):
     status: str = Field(default="Draft", description="Workflow status (e.g. Draft, Active)")
     country: str = Field(default="US", description="Regulatory jurisdiction or country code")
     analysis_type: str = Field(default="Arch", description="Target analysis domain")
+    building_code: Optional[str] = Field(
+        default=None,
+        description="Building code ID from app.constants.BUILDING_CODES; optional outside Arch",
+    )
 
     # Wizard step 1. Optional so that the plain API stays usable without them,
     # and so a client that predates these fields keeps working.
@@ -150,6 +172,7 @@ class ProjectResponse(BaseModel):
     status: Optional[str] = "Draft"
     country: Optional[str] = "US"
     analysis_type: Optional[str] = "Arch"
+    building_code: Optional[str] = None
     project_type: Optional[str] = None
     project_size_sqm: Optional[float] = None
     buildings_count: Optional[int] = None

@@ -18,6 +18,10 @@
   let status = 'Active';
   let country = 'Canada';
   let analysisType = 'Arch';
+  // Chosen on step 3 rather than step 1: which code governs a model is a
+  // question about the audit's scope, and only the Arch domain is judged
+  // against one at all.
+  let buildingCode = '';
   let ifcFile: File | null = null;
 
   // Step 1 building details. Held as strings because an empty number input
@@ -40,18 +44,26 @@
     project_types: [],
     analysis_types: [],
     standards: [],
+    building_codes: [],
   };
 
-  //: Building code framework shown alongside the chosen jurisdiction. Only the
-  //: four jurisdictions with a bundled ruleset are named; everywhere else falls
-  //: back to the international standards, which is what the engines apply.
-  const CODE_FRAMEWORKS: Record<string, string> = {
-    Canada: 'Ontario Building Code Part 9',
-    'United Kingdom': 'Building Regulations Part B/M',
-    'United States': 'IBC / NFPA',
-  };
-
-  $: codeFramework = CODE_FRAMEWORKS[country] || 'ISO / IFC international standards';
+  // Codes are served for every jurisdiction at once and filtered here, so
+  // changing the jurisdiction on step 1 re-scopes step 3 without a round trip.
+  // An entry with no jurisdictions applies everywhere -- that is the ISO/IFC
+  // fallback for the jurisdictions with no bundled national code.
+  $: buildingCodesForJurisdiction = (options.building_codes || []).filter(
+    (c) => !c.jurisdictions?.length || c.jurisdictions.includes(country),
+  );
+  // A code chosen for one jurisdiction must not survive a move to another:
+  // clearing it is better than quietly auditing an Ontario model against the IBC.
+  $: if (buildingCode && !buildingCodesForJurisdiction.some((c) => c.id === buildingCode)) {
+    buildingCode = '';
+  }
+  $: selectedBuildingCode = buildingCodesForJurisdiction.find((c) => c.id === buildingCode) || null;
+  $: buildingCodeRequired = analysisType === 'Arch';
+  // Named so the confirm step can say which analysis page the button opens.
+  $: analysisDomainLabel =
+    analysisType === 'Piping' ? 'Piping' : analysisType === 'seismic' ? 'Seismic' : 'Architectural';
   $: standardsForDomain = options.standards.filter(
     (s) => !s.applicable_to?.length || s.applicable_to.includes(analysisType),
   );
@@ -80,6 +92,7 @@
         project_types: [],
         analysis_types: [],
         standards: [],
+        building_codes: [],
       };
     }
   });
@@ -131,6 +144,7 @@
         formData.append('status', status);
         formData.append('country', country);
         formData.append('analysis_type', analysisType);
+        if (buildingCode) formData.append('building_code', buildingCode);
         if (projectType) formData.append('project_type', projectType);
         if (projectSizeSqm) formData.append('project_size_sqm', projectSizeSqm);
         if (buildingsCount) formData.append('buildings_count', buildingsCount);
@@ -148,6 +162,7 @@
           status,
           country,
           analysis_type: analysisType,
+          building_code: buildingCode || null,
           project_type: projectType || null,
           project_size_sqm: projectSizeSqm ? Number(projectSizeSqm) : null,
           buildings_count: buildingsCount ? Number(buildingsCount) : null,
@@ -172,7 +187,11 @@
     description = '';
     status = 'Active';
     country = 'Canada';
-    analysisType = 'Piping (Corrosive)';
+    // Back to the same domain the wizard opens on. Resetting to a legacy alias
+    // left the step-3 select matching no option, so a second project could be
+    // created against a domain the user was never shown.
+    analysisType = 'Arch';
+    buildingCode = '';
     ifcFile = null;
     projectType = '';
     projectSizeSqm = '';
@@ -277,11 +296,11 @@
             </div>
 
             <div>
-              <label for="wizard-location" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Location *
+              <label for="wizard-jurisdiction" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Jurisdiction *
               </label>
               <select
-                id="wizard-location"
+                id="wizard-jurisdiction"
                 bind:value={country}
                 class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
               >
@@ -299,7 +318,8 @@
                 {/if}
               </select>
               <p class="text-[11px] text-slate-500 mt-1">
-                Building code framework: {codeFramework}
+                Required for Architectural compliance checks; optional for Piping corrosion analysis.
+                The building code is chosen on step 3, from the codes this jurisdiction publishes.
               </p>
             </div>
 
@@ -407,25 +427,8 @@
           </div>
 
         {:else if currentStep === 3}
-          <!-- Step 3: Scope & Jurisdiction -->
+          <!-- Step 3: Scope -->
           <div class="space-y-4">
-            <!-- Jurisdiction is chosen on step 1, where the full country list
-                 lives. Shown here read-only so this step still states which
-                 code the domain below will be judged against. -->
-            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
-              <div class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                Jurisdiction &amp; Building Code
-              </div>
-              <div class="text-sm text-white">{country}</div>
-              <div class="text-[11px] text-slate-400 mt-0.5">{codeFramework}</div>
-              <button
-                type="button"
-                on:click={() => (currentStep = 1)}
-                class="text-[11px] text-[#0071e3] hover:underline mt-1.5"
-              >
-                Change on step 1
-              </button>
-            </div>
             <div>
               <label for="wizard-type" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                 Primary Analysis Domain
@@ -439,6 +442,64 @@
                 <option value="Piping">Piping — GC-001, CC-001, MC-001</option>
                 <option value="seismic">seismic — Blue Halo Clearance Detection</option>
               </select>
+              <p class="text-[11px] text-slate-500 mt-1">
+                Determines which analysis page opens once the project is created.
+              </p>
+            </div>
+
+            <!-- Specifications: the code the model is judged against. Filtered
+                 by the jurisdiction chosen on step 1, and only asked for here
+                 because it is the analysis domain above that decides whether it
+                 matters at all. -->
+            <div class="pt-3 border-t border-slate-800">
+              <span class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Specifications
+              </span>
+              <label for="wizard-building-code" class="block text-[11px] font-medium text-slate-400 mb-1.5">
+                Building Code — {country}
+              </label>
+              {#if buildingCodesForJurisdiction.length === 0}
+                <div class="p-3 rounded-xl border border-slate-800 text-[11px] text-slate-500">
+                  Building codes are unavailable — the project can be created without one and the
+                  engines will apply the ISO / IFC international standards.
+                </div>
+              {:else}
+                <select
+                  id="wizard-building-code"
+                  bind:value={buildingCode}
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
+                >
+                  <option value="">Not specified</option>
+                  {#each buildingCodesForJurisdiction as code}
+                    <option value={code.id}>{code.name}</option>
+                  {/each}
+                </select>
+                {#if selectedBuildingCode}
+                  <p class="text-[11px] text-slate-500 mt-1">
+                    {selectedBuildingCode.description}
+                    {#if selectedBuildingCode.ruleset_id}
+                      <span class="text-slate-400">Ruleset: <span class="font-mono">{selectedBuildingCode.ruleset_id}</span>.</span>
+                    {/if}
+                  </p>
+                {:else if buildingCodeRequired}
+                  <p class="text-[11px] text-amber-400/80 mt-1">
+                    Architectural checks are judged against a code — without one the audit falls back
+                    to the ISO / IFC international standards.
+                  </p>
+                {:else}
+                  <p class="text-[11px] text-slate-500 mt-1">
+                    Optional for {analysisType}: corrosion and clearance checks are judged against
+                    material and geometry rules, not a jurisdiction's code.
+                  </p>
+                {/if}
+              {/if}
+              <button
+                type="button"
+                on:click={() => (currentStep = 1)}
+                class="text-[11px] text-[#0071e3] hover:underline mt-2"
+              >
+                Change jurisdiction on step 1
+              </button>
             </div>
           </div>
 
@@ -549,6 +610,10 @@
                 </span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
+                <span class="text-slate-400 font-medium">Building Code:</span>
+                <span class="font-semibold text-white">{selectedBuildingCode?.name || 'Not specified'}</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Analysis Domain:</span>
                 <span class="font-semibold text-white">{analysisType}</span>
               </div>
@@ -566,7 +631,8 @@
               </div>
             </div>
             <p class="text-[11px] text-slate-400">
-              Clicking "Create &amp; Launch Audit" will register the project in the repository and prepare the compliance analysis engines.
+              Clicking "Create &amp; Launch Audit" saves the project, closes this wizard and opens the
+              <span class="text-slate-200 font-semibold">{analysisDomainLabel}</span> analysis page with it selected.
             </p>
           </div>
         {/if}
@@ -610,7 +676,7 @@
             on:click={handleFinish}
             class="inline-flex items-center gap-1.5 px-6 py-2 rounded-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 transition-all disabled:opacity-50"
           >
-            <span>{isSubmitting ? 'Creating Project...' : 'Create & Launch Audit'}</span>
+            <span>{isSubmitting ? 'Creating & launching...' : 'Create & Launch Audit'}</span>
             <Check class="w-3.5 h-3.5" />
           </button>
         {/if}

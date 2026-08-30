@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.api.dependencies import get_projects_service
 from app.constants import (
     ANALYSIS_TYPES,
+    BUILDING_CODES,
     COUNTRIES,
     DEFAULT_ANALYSIS_TYPE,
     DEFAULT_COUNTRY,
@@ -20,6 +21,7 @@ from app.constants import (
 from app.logging_config import get_logger
 from app.modules.contracts import (
     AnalysisInputItemContract,
+    BuildingCodeOption,
     ProjectCreateRequest,
     ProjectListResponse,
     ProjectOptionsResponse,
@@ -64,6 +66,7 @@ def get_project_options(response: Response) -> ProjectOptionsResponse:
         project_types=PROJECT_TYPES,
         analysis_types=ANALYSIS_TYPES,
         standards=[StandardOption(**standard) for standard in NOTEBOOK_STANDARDS],
+        building_codes=[BuildingCodeOption(**code) for code in BUILDING_CODES],
     )
 
 
@@ -144,6 +147,7 @@ def create_project(
             status=payload.status,
             country=payload.country,
             analysis_type=payload.analysis_type,
+            building_code=payload.building_code,
             project_type=payload.project_type,
             project_size_sqm=payload.project_size_sqm,
             buildings_count=payload.buildings_count,
@@ -174,6 +178,7 @@ async def create_project_with_ifc(
     status_field: Annotated[str, Form(alias="status")] = "Draft",
     country: Annotated[str, Form()] = DEFAULT_COUNTRY,
     analysis_type: Annotated[str, Form()] = DEFAULT_ANALYSIS_TYPE,
+    building_code: Annotated[Optional[str], Form()] = None,
     project_type: Annotated[Optional[str], Form()] = None,
     project_size_sqm: Annotated[Optional[float], Form()] = None,
     buildings_count: Annotated[Optional[int], Form()] = None,
@@ -197,6 +202,7 @@ async def create_project_with_ifc(
             ifc_md5_hash=ifc_md5_hash,
             country=country,
             analysis_type=analysis_type,
+            building_code=building_code,
             project_type=project_type,
             project_size_sqm=project_size_sqm,
             buildings_count=buildings_count,
