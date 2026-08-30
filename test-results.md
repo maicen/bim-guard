@@ -366,7 +366,7 @@ rules in both cases, so the input is identical.
 Every rule observed flipping targets `IfcSpace` on a numeric property
 (`Height`, `Width`).
 
-**Root cause, found and fixed in `%%COMMIT%%`** — the full investigation is in
+**Root cause, found and fixed in `3659bcf`** — the full investigation is in
 `findings.txt`. `IFCGeometryExtractor._get_shape` cached tessellated shapes
 under `id(element)`, the CPython address of an ifcopenshell wrapper.
 ifcopenshell creates a fresh wrapper on every entity access and frees it when
