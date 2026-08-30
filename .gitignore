@@ -67,5 +67,7 @@ validation_sweep_retry.log
 # Local MCP server config (machine-specific, may hold credentials)
 .mcp.json
 
-# E2E test model dataset (cloned from maicen/bimguard-test-models, ~1.3 GB)
-test-models/
+# E2E test model dataset (cloned from maicen/bimguard-test-models, ~1.3 GB).
+# No trailing slash: the dataset is often a symlink to a clone kept outside
+# the working tree, and "test-models/" matches only a real directory.
+test-models
