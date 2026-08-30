@@ -3,6 +3,21 @@
 These helpers turn the seeded rule rows back into the lookup tables used by
 the corrosion engines and the module 4 compliance runner. The database is the
 source of truth, including static ruleset payloads stored in static_data_assets.
+
+PRECEDENCE, HIGHEST FIRST
+
+    1. Seeded rule rows for the ruleset (:func:`_rules_for`). When present these
+       build the catalog directly.
+    2. The stored ``static_data_assets`` JSON payload, used to synthesise
+       equivalent rows when the rules table holds none for that ruleset.
+    3. :data:`_FALLBACK_RULESETS`, a hardcoded reduced table kept only for a
+       database that is missing, unseeded or unreachable.
+
+    Every step down is a degradation, not an equivalent path, and step 3 is
+    logged at warning level. The fallback tables are strict subsets of the
+    stored payloads -- fewer materials, fewer environment classes -- so a
+    catalog built from them scores real couples against reference data that
+    does not contain them.
 """
 
 from __future__ import annotations
@@ -10,8 +25,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.logging_config import get_logger
 from app.services.rules_service import RuleService
 from app.services.static_data_service import StaticDataService
+
+logger = get_logger(__name__)
 
 _FALLBACK_RULESETS: dict[str, dict[str, Any]] = {
     "galvanic_corrosion_ruleset.json": {
@@ -99,24 +117,65 @@ def _decode_json(value: Any) -> dict[str, Any]:
 
 
 def _load_json_ruleset(filename: str) -> dict[str, Any]:
-    """Load a canonical ruleset JSON payload from database static assets."""
+    """Load a canonical ruleset JSON payload, database first.
+
+    DATABASE PRIMARY, HARDCODED FALLBACK SECONDARY
+
+        The stored ``static_data_assets`` payload is the auditable, versioned
+        source and is tried first. :data:`_FALLBACK_RULESETS` is a safety net
+        for a database that is missing, unseeded or unreachable -- never the
+        preferred answer.
+
+        This order was previously inverted: the fallback was returned before
+        the asset lookup was reached, and because every filename this function
+        is called with has a fallback entry, the database branch below was
+        unreachable for all three engines. The module docstring said the
+        database was the source of truth while the code guaranteed it was
+        never consulted.
+
+        The difference is not cosmetic. The stored GC-001 payload carries 20
+        galvanic-series materials against the fallback's 8, and 7 environment
+        classes against 4, with identical values for every entry the two share.
+        Materials present only in the stored payload -- the active stainless
+        states, zinc, titanium, bronze, the noble metals -- resolved to nothing
+        under the fallback, so couples involving them were scored from an
+        incomplete table rather than from their real potentials.
+
+    Falling back is logged at warning level. Silently scoring an audit from the
+    reduced table is exactly the condition that needs to be visible in a log.
+    """
     asset_map = {
         "galvanic_corrosion_ruleset.json": "ruleset:BIMGUARD-GC-001",
         "crevice_corrosion_ruleset.json": "ruleset:BIMGUARD-CC-001",
         "mic_corrosion_ruleset.json": "ruleset:BIMGUARD-MC-001",
     }
-    fallback = _FALLBACK_RULESETS.get(filename)
-    if fallback is not None:
-        return fallback
 
     asset_key = asset_map.get(filename)
     if asset_key:
         try:
             payload = StaticDataService().get_asset_json(asset_key)
         except Exception:
+            logger.warning(
+                "Static ruleset asset lookup failed for %s; trying fallback", asset_key,
+                exc_info=True,
+            )
             payload = None
-        if isinstance(payload, dict):
+        # An empty dict is treated as absent: a payload with no tables would
+        # otherwise satisfy the isinstance check and yield a catalog with no
+        # materials at all, which is worse than the reduced fallback.
+        if isinstance(payload, dict) and payload:
             return payload
+
+    fallback = _FALLBACK_RULESETS.get(filename)
+    if fallback is not None:
+        logger.warning(
+            "Using hardcoded fallback ruleset for %s -- stored asset %s unavailable. "
+            "Scores come from a reduced lookup table.",
+            filename,
+            asset_key or "(unmapped)",
+        )
+        return fallback
+
     raise RuntimeError(f"Missing static ruleset asset: {filename}")
 
 
