@@ -46,6 +46,50 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+#: Corrosion engine codes a corrosion run may be narrowed to, matching the
+#: ``MechanismSpec.code`` values in ``phase_6c_corrosion_ui``. Issues carry rule
+#: ids like "GC-001.01" and "GC-001.DATA", so a prefix match selects an engine's
+#: verdicts and its data-quality notes together.
+SELECTABLE_ENGINES: tuple[str, ...] = ("GC-001", "CC-001", "MC-001")
+
+
+def _filter_issues_by_engine(result: dict, engines: list[str]) -> dict:
+    """Narrow an ``AnalysisResult`` to the issues the given engines raised.
+
+    Applied to what ``run_analysis`` returns rather than inside it, deliberately:
+    the analysis cache is keyed on (project, slug, model digest) with no engine
+    dimension, so narrowing before the cache write would store a partial run
+    under the key that the next caller asking for everything would hit.
+
+    An empty or unrecognised selection returns the result untouched, so a
+    caller cannot accidentally narrow a run down to nothing.
+    """
+    wanted = [e for e in engines if e in SELECTABLE_ENGINES]
+    if not wanted:
+        return result
+
+    kept = [
+        i
+        for i in result.get("audit_issues", [])
+        if any(i.rule_id.startswith(code) for code in wanted)
+    ]
+
+    # issue_stats describes the whole run, so it is recomputed rather than
+    # carried across: a narrowed list under unnarrowed totals reads as data
+    # silently going missing.
+    stats = {"total": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "data_quality": 0}
+    for issue in kept:
+        if issue.mechanism == "data_quality":
+            stats["data_quality"] += 1
+            continue
+        stats["total"] += 1
+        band = getattr(issue.band, "value", str(issue.band)).lower()
+        if band in stats:
+            stats[band] += 1
+
+    return {**result, "audit_issues": kept, "issue_stats": stats}
+
+
 def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultContract:
     """Format raw analysis result dictionary into strict Pydantic model."""
     raw_issues = result.get("audit_issues", [])
@@ -172,6 +216,11 @@ def run_analysis_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=raw_result["compliance_error"],
         )
+    # Only corrosion has an engine subset. Applying a corrosion engine list to
+    # another slug would match no rule ids and silently return an empty run
+    # rather than the findings the caller asked for.
+    if payload.rule_ids and slug == "corrosion":
+        raw_result = _filter_issues_by_engine(raw_result, payload.rule_ids)
     return _format_result(slug, payload.project_id, raw_result)
 
 

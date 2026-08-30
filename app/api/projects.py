@@ -9,14 +9,23 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.dependencies import get_projects_service
-from app.constants import DEFAULT_ANALYSIS_TYPE, DEFAULT_COUNTRY
+from app.constants import (
+    ANALYSIS_TYPES,
+    COUNTRIES,
+    DEFAULT_ANALYSIS_TYPE,
+    DEFAULT_COUNTRY,
+    NOTEBOOK_STANDARDS,
+    PROJECT_TYPES,
+)
 from app.logging_config import get_logger
 from app.modules.contracts import (
     AnalysisInputItemContract,
     ProjectCreateRequest,
     ProjectListResponse,
+    ProjectOptionsResponse,
     ProjectResponse,
     ProjectUpdateRequest,
+    StandardOption,
 )
 from app.services.projects_service import ProjectsService
 
@@ -33,6 +42,26 @@ def list_projects(
     rows = service.list_projects()
     projects = [ProjectResponse(**row) for row in rows]
     return ProjectListResponse(total=len(projects), projects=projects)
+
+
+@router.get(
+    "/options",
+    response_model=ProjectOptionsResponse,
+    summary="Reference data for the project setup wizard",
+)
+def get_project_options() -> ProjectOptionsResponse:
+    """Return the choice lists the wizard renders.
+
+    Declared above ``/{project_id}`` on purpose: FastAPI matches routes in
+    declaration order, and the other way round this path would be tried as a
+    project id and rejected as a 422.
+    """
+    return ProjectOptionsResponse(
+        countries=COUNTRIES,
+        project_types=PROJECT_TYPES,
+        analysis_types=ANALYSIS_TYPES,
+        standards=[StandardOption(**standard) for standard in NOTEBOOK_STANDARDS],
+    )
 
 
 @router.get("/{project_id}", response_model=ProjectResponse, summary="Get project by ID")
@@ -66,6 +95,32 @@ def get_project_inputs(
     return [AnalysisInputItemContract(**i) for i in inputs]
 
 
+def _link_project_inputs(
+    service: ProjectsService,
+    project_id: int,
+    *,
+    document_ids: list[int],
+    standards_codes: list[str],
+) -> None:
+    """Link the wizard's chosen documents and standards to a new project.
+
+    Deliberately non-fatal. The project row already exists by the time this
+    runs, and handing the caller a 500 would leave them with a created project
+    and an error page. A failure to link is logged and the project is returned.
+    """
+    if document_ids:
+        try:
+            service.link_library_documents(project_id, document_ids)
+        except Exception:
+            logger.exception("Could not link documents project_id=%d", project_id)
+
+    if standards_codes:
+        try:
+            service.set_standards_for_project(project_id, standards_codes)
+        except Exception:
+            logger.exception("Could not link standards project_id=%d", project_id)
+
+
 @router.post(
     "",
     response_model=ProjectResponse,
@@ -84,10 +139,21 @@ def create_project(
             status=payload.status,
             country=payload.country,
             analysis_type=payload.analysis_type,
+            project_type=payload.project_type,
+            project_size_sqm=payload.project_size_sqm,
+            buildings_count=payload.buildings_count,
+            floors_count=payload.floors_count,
         )
-        return ProjectResponse(**created)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    _link_project_inputs(
+        service,
+        int(created["id"]),
+        document_ids=payload.document_ids,
+        standards_codes=payload.standards_codes,
+    )
+    return ProjectResponse(**created)
 
 
 @router.post(
@@ -103,6 +169,12 @@ async def create_project_with_ifc(
     status_field: Annotated[str, Form(alias="status")] = "Draft",
     country: Annotated[str, Form()] = DEFAULT_COUNTRY,
     analysis_type: Annotated[str, Form()] = DEFAULT_ANALYSIS_TYPE,
+    project_type: Annotated[Optional[str], Form()] = None,
+    project_size_sqm: Annotated[Optional[float], Form()] = None,
+    buildings_count: Annotated[Optional[int], Form()] = None,
+    floors_count: Annotated[Optional[int], Form()] = None,
+    document_ids: Annotated[list[int], Form()] = [],
+    standards_codes: Annotated[list[str], Form()] = [],
     ifc_file: Optional[UploadFile] = File(None),
 ) -> ProjectResponse:
     """Create a project and optionally attach an uploaded IFC model."""
@@ -120,10 +192,21 @@ async def create_project_with_ifc(
             ifc_md5_hash=ifc_md5_hash,
             country=country,
             analysis_type=analysis_type,
+            project_type=project_type,
+            project_size_sqm=project_size_sqm,
+            buildings_count=buildings_count,
+            floors_count=floors_count,
         )
-        return ProjectResponse(**created)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    _link_project_inputs(
+        service,
+        int(created["id"]),
+        document_ids=document_ids,
+        standards_codes=standards_codes,
+    )
+    return ProjectResponse(**created)
 
 
 @router.put("/{project_id}", response_model=ProjectResponse, summary="Update project")

@@ -44,17 +44,16 @@ ORCHESTRATOR_PATH = APP_DIR / "modules" / "module4_comparator" / "compliance_orc
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: produce_piping_elements_from_model() has no caller under app/. "
-        "Only produce_piping_elements(), in the same file, delegates to it, so "
-        "the 'avoid a second ifcopenshell.open on large models' win it was "
-        "written for is never realised in production."
-    ),
-)
 def test_producer_overload_has_a_production_caller():
-    """Something outside piping_producer.py must use the open-model overload."""
+    """Something outside piping_producer.py must use the open-model overload.
+
+    This was an xfail: the overload existed and nothing under app/ called it,
+    so the "avoid a second ifcopenshell.open on large models" win it was
+    written for was never realised. ``phase_6b_parsing.parse_ifc_bytes`` now
+    calls it, under ``with_piping``, to build the network MM-001 and XM-001
+    read -- from the model it already has open, which is the whole point of the
+    overload. The assertion is kept, now as a regression guard.
+    """
     callers = [
         path.relative_to(REPO_ROOT).as_posix()
         for path in APP_DIR.rglob("*.py")

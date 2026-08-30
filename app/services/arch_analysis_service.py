@@ -57,7 +57,9 @@ class ArchAnalysisService:
             raise ValueError(result["error"])
 
         categories = result.get("categories", {})
-        issues = result.get("issues", [])
+        # The workflow payload names its findings "audit_issues"; there is no
+        # "issues" key, so the old read reported zero findings on every project.
+        issues = result.get("audit_issues", [])
         project = result.get("project", {})
         rule_compliance_summary = result.get("rule_compliance_summary", {})
         bcf_topics = result.get("bcf_topics", [])

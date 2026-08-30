@@ -63,6 +63,13 @@
   });
 
   function handleSelectView(view: string) {
+    // "New Project" is an action, not a destination: it opens the wizard over
+    // whatever is on screen. Changing activeView would leave the sidebar
+    // highlighting a view that renders nothing once the modal is dismissed.
+    if (view === 'newproject') {
+      isGlobalWizardOpen = true;
+      return;
+    }
     activeView = view;
   }
 
@@ -108,7 +115,6 @@
     <TopHeader
       {activeView}
       {selectedProject}
-      onOpenWizard={() => (isGlobalWizardOpen = true)}
       {apiOnline}
     />
 

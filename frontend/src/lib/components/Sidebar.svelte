@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     LayoutDashboard,
+    Plus,
     FolderOpen,
     ScanEye,
     LayoutList,
@@ -30,6 +31,7 @@
     {
       title: "Platform",
       items: [
+        { id: "newproject", label: "New Project", icon: Plus },
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
         { id: "projects", label: "Projects", icon: FolderOpen },
         { id: "viewer", label: "3D Viewer", icon: ScanEye },

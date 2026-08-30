@@ -18,9 +18,16 @@ class Phase6Service:
         self.upload_service = FileUploadService()
 
     @staticmethod
-    def parse_ifc(content: bytes) -> dict[str, Any]:
-        """Parse raw IFC file bytes into structured dictionary payload."""
-        return parse_ifc_bytes(content)
+    def parse_ifc(content: bytes, *, with_piping: bool = False) -> dict[str, Any]:
+        """Parse raw IFC file bytes into structured dictionary payload.
+
+        Args:
+            content: Raw bytes of an IFC file.
+            with_piping: Also build the PipingElement view, which MM-001 and
+                XM-001 need. Pass this when the result feeds
+                :meth:`run_corrosion`; the other analyses do not read it.
+        """
+        return parse_ifc_bytes(content, with_piping=with_piping)
 
     @staticmethod
     def run_corrosion(parsed_ifc: dict[str, Any]) -> dict[str, Any]:

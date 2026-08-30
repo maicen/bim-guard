@@ -127,14 +127,14 @@
         >
       </div>
 
-      <!-- New Check CTA -->
+      <!-- New Project CTA -->
       <button
         type="button"
         on:click={onOpenWizard}
         class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
       >
         <Plus class="w-3.5 h-3.5" />
-        <span>New Check</span>
+        <span>New Project</span>
       </button>
     </div>
   </div>
@@ -245,7 +245,7 @@
       <div
         class="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl"
       >
-        No projects found. Click "New Check" above to create your first project.
+        No projects found. Click "New Project" to create your first project.
       </div>
     {:else}
       <div class="overflow-x-auto">

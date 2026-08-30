@@ -74,6 +74,29 @@ class ReportPayloadContract(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class StandardOption(BaseModel):
+    """One selectable normative reference offered by the wizard."""
+
+    id: str
+    name: str
+    domain: str
+    description: str = ""
+    applicable_to: list[str] = Field(default_factory=list)
+
+
+class ProjectOptionsResponse(BaseModel):
+    """Reference data the project setup wizard renders its choices from.
+
+    Served from :mod:`app.constants` so the lists live in one place rather than
+    being duplicated into the Svelte client, where they would drift.
+    """
+
+    countries: list[str]
+    project_types: list[str]
+    analysis_types: list[str]
+    standards: list[StandardOption]
+
+
 class ProjectCreateRequest(BaseModel):
     """Payload for creating a new project via the API."""
 
@@ -82,6 +105,30 @@ class ProjectCreateRequest(BaseModel):
     status: str = Field(default="Draft", description="Workflow status (e.g. Draft, Active)")
     country: str = Field(default="US", description="Regulatory jurisdiction or country code")
     analysis_type: str = Field(default="Arch", description="Target analysis domain")
+
+    # Wizard step 1. Optional so that the plain API stays usable without them,
+    # and so a client that predates these fields keeps working.
+    project_type: Optional[str] = Field(
+        default=None, description="Building type, one of app.constants.PROJECT_TYPES"
+    )
+    project_size_sqm: Optional[float] = Field(
+        default=None, ge=0, description="Gross floor area in square metres"
+    )
+    buildings_count: Optional[int] = Field(
+        default=None, ge=0, description="Number of buildings in the project"
+    )
+    floors_count: Optional[int] = Field(
+        default=None, ge=0, description="Number of floors in the project"
+    )
+
+    # Wizard steps 4 and 5. Linked after the project row exists, so a failure
+    # to link does not cost the caller the project.
+    document_ids: list[int] = Field(
+        default_factory=list, description="IDs of library documents to link"
+    )
+    standards_codes: list[str] = Field(
+        default_factory=list, description="Notebook standard IDs to link"
+    )
 
 
 class ProjectUpdateRequest(BaseModel):
@@ -103,6 +150,10 @@ class ProjectResponse(BaseModel):
     status: Optional[str] = "Draft"
     country: Optional[str] = "US"
     analysis_type: Optional[str] = "Arch"
+    project_type: Optional[str] = None
+    project_size_sqm: Optional[float] = None
+    buildings_count: Optional[int] = None
+    floors_count: Optional[int] = None
     ifc_file_path: Optional[str] = None
     ifc_md5_hash: Optional[str] = None
     created_at: Optional[str] = None

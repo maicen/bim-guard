@@ -20,12 +20,17 @@ from __future__ import annotations
 
 import pytest
 
+from app.modules.module2_ifc_read import piping_fixtures
 from app.modules.module2_ifc_read.ifc_parser import ServiceElement
+from app.modules.module2_ifc_read.piping_schema import CANONICAL_MATERIALS
 from app.modules.module4_comparator.issue_schema import RiskBand
 from app.modules.phase_6.phase_6c_corrosion_ui import (
     BAND_RANK,
     DATA_QUALITY,
+    ELEMENT_MECHANISMS,
     MECHANISMS,
+    NETWORK_MECHANISMS,
+    XM_MATERIAL_TO_SERIES_KEY,
     issue_stats,
     normalise_band,
     run_corrosion_analysis,
@@ -58,8 +63,18 @@ def service_element(
     )
 
 
-def parsed_ifc(elements: list[ServiceElement] | None = None, valid: bool = True) -> dict:
-    """Build a minimal ParsedIFC envelope around ``elements``."""
+def parsed_ifc(
+    elements: list[ServiceElement] | None = None,
+    valid: bool = True,
+    piping_elements: list | None = None,
+) -> dict:
+    """Build a minimal ParsedIFC envelope around ``elements``.
+
+    ``piping_elements`` defaults to empty, matching a parse that did not ask
+    for the piping view. The network mechanisms then have nothing to assess,
+    which is what keeps the per-element assertions in this file about the
+    per-element engines.
+    """
     elements = [service_element()] if elements is None else elements
     return {
         "source_ref": "uploads/ifc/test.ifc",
@@ -69,6 +84,7 @@ def parsed_ifc(elements: list[ServiceElement] | None = None, valid: bool = True)
         "elements": elements,
         "element_count": len(elements),
         "type_counts": {"IfcPipeSegment": len(elements)},
+        "piping_elements": piping_elements or [],
         "quality": {
             "valid": valid,
             "error": None if valid else "The file could not be read as IFC.",
@@ -336,3 +352,109 @@ class TestResultShape:
 
     def test_empty_model_produces_no_issues(self):
         assert run_corrosion_analysis(parsed_ifc([]))["audit_issues"] == []
+
+
+# ---------------------------------------------------------------------------
+# The network mechanisms — MM-001 and XM-001
+# ---------------------------------------------------------------------------
+
+
+class TestNetworkMechanisms:
+    """MM-001 and XM-001 run over the piping network, not over one element.
+
+    The fixture network is the same one tests/test_material_media.py and
+    tests/test_cross_material.py score directly. Using it here asserts the
+    wiring, not the engines: that a corrosion run reaches both comparators,
+    hands them a network, and folds what they return into ``audit_issues``.
+    """
+
+    @pytest.fixture(scope="class")
+    def network(self):
+        return piping_fixtures.generate_synthetic_piping_network()
+
+    def test_all_five_mechanisms_are_declared(self):
+        assert [spec.code for spec in MECHANISMS] == [
+            "GC-001",
+            "CC-001",
+            "MC-001",
+            "MM-001",
+            "XM-001",
+        ]
+
+    def test_the_two_halves_partition_the_whole(self):
+        """Every mechanism runs exactly once, on exactly one of the two paths."""
+        assert ELEMENT_MECHANISMS + NETWORK_MECHANISMS == MECHANISMS
+        codes = [spec.code for spec in MECHANISMS]
+        assert len(set(codes)) == len(codes)
+
+    def test_both_network_mechanisms_produce_findings(self, network):
+        """The live path reaches MM-001 and XM-001 and keeps what they say."""
+        issues = run_corrosion_analysis(
+            parsed_ifc([], piping_elements=network), include_low=True
+        )["audit_issues"]
+        # The comparators version their rule ids ("MM-001.01", "MM-001.DQ"),
+        # so the assertion is on the ruleset each finding cites, not on a bare
+        # code no rule actually carries.
+        rulesets = {i.rule_id.split(".")[0] for i in issues}
+        assert "MM-001" in rulesets
+        assert "XM-001" in rulesets
+
+    def test_findings_are_real_verdicts_not_data_quality(self, network):
+        """A wiring that only ever emits data_quality would look like success."""
+        issues = run_corrosion_analysis(
+            parsed_ifc([], piping_elements=network), include_low=True
+        )["audit_issues"]
+        verdicts = [i for i in issues if i.mechanism != DATA_QUALITY]
+        assert any(i.mechanism.startswith("MM-001") for i in verdicts)
+        assert any(i.mechanism.startswith("XM-001") for i in verdicts)
+
+    def test_ids_do_not_collide_across_mechanisms(self, network):
+        """One run, one allocator — the collision IssueIdAllocator exists for."""
+        issues = run_corrosion_analysis(
+            parsed_ifc(piping_elements=network), include_low=True
+        )["audit_issues"]
+        ids = [i.id for i in issues]
+        assert len(set(ids)) == len(ids)
+
+    def test_low_band_findings_obey_include_low(self, network):
+        """XM-001 reports every couple; the run's own filter still applies."""
+        strict = run_corrosion_analysis(
+            parsed_ifc([], piping_elements=network), include_low=False
+        )["audit_issues"]
+        assert not [
+            i for i in strict if i.band is RiskBand.LOW and i.mechanism != DATA_QUALITY
+        ]
+
+    def test_data_quality_survives_the_filter(self, network):
+        """Step 4, on the network path: an unassessed element is still reported."""
+        strict = run_corrosion_analysis(
+            parsed_ifc([], piping_elements=network), include_low=False
+        )["audit_issues"]
+        assert [i for i in strict if i.mechanism == DATA_QUALITY]
+
+    def test_absent_piping_view_is_not_a_finding(self):
+        """A caller that did not ask for the network has found no defect."""
+        assert run_corrosion_analysis(parsed_ifc([]))["audit_issues"] == []
+
+
+class TestGalvanicSeriesJoin:
+    """XM-001 reads GC-001's series, so the two taxonomies must actually meet."""
+
+    def test_every_mapped_material_is_canonical(self):
+        """A key no PipingElement can carry would never be looked up."""
+        assert set(XM_MATERIAL_TO_SERIES_KEY) <= CANONICAL_MATERIALS
+
+    def test_non_metallics_are_absent(self):
+        """Plastics have no galvanic potential; giving them one would be false."""
+        for material in ("PVC", "HDPE", "PEX", "PPR", "Unknown"):
+            assert material not in XM_MATERIAL_TO_SERIES_KEY
+
+    def test_galvanised_steel_is_not_carbon_steel(self):
+        """The substring fallback in resolve_material() conflates these two.
+
+        ``"steel"`` is tested before ``"galvanised"``, so GalvanisedSteel
+        resolves to carbon_steel and a galvanised-to-carbon junction scores as
+        no couple at all. This table is explicit precisely to avoid that.
+        """
+        assert XM_MATERIAL_TO_SERIES_KEY["GalvanisedSteel"] == "galv_steel"
+        assert XM_MATERIAL_TO_SERIES_KEY["CarbonSteel"] == "carbon_steel"
