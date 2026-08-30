@@ -176,7 +176,47 @@ throughout, a 20x–90x speedup.
 
 # Open findings
 
-## Finding 1 — GC-001 reports nothing against a seeded database
+## Finding 1 — GC-001 reports nothing — RESOLVED, and the reason was a bug
+
+**The silence was correct; the earlier noise was not.** GC-001 was scoring
+elements that are not galvanic couples at all.
+
+`phase_6c_corrosion_ui._gc_element` fills the second side of the junction with
+the first material when the IFC carries only one for an element — which is
+every element in this dataset. `resolve_material` widens it further by
+defaulting any unrecognised name to `carbon_steel`. So every element reached
+the engine as *the same material against itself*.
+
+The engine set the voltage term to 0 for those, correctly, but still summed the
+area-ratio and environment terms, which are non-zero by construction. Copper
+against copper scored 0.26; under the fallback catalog the same sum reached
+0.38 and banded **Medium**. Those were galvanic verdicts on junctions that are
+not galvanic — 926 of them on Duplex_MEP, 6 587 on Clinic_Plumbing, 88 563
+across the 15 piping models.
+
+The composite is now gated on a real bimetallic junction. Measured through the
+pipeline:
+
+| Model | Before | After |
+| --- | --- | --- |
+| test_hospital_mep_scenario | 4 Medium | 0 (4 Low with `include_low=True`) |
+| Duplex_MEP | 926 Medium | 0 (926 Low) |
+| Clinic_Plumbing | 6 587 Medium | 0 (6 587 Low) |
+
+Real dissimilar pairs are untouched — copper/carbon steel still scores 0.53
+Medium, aluminium/SS316 0.76 High — and PREN escalation still fires without a
+couple, since pitting resistance is a property of the alloy and its
+environment. `tests/test_galvanic_self_coupling.py` pins all of it; all nine
+tests fail without the fix.
+
+**What this leaves open is a coverage gap, not a defect**: this dataset
+contains no dissimilar-metal junctions, so GC-001's scoring path is now
+effectively unexercised by it. Validating GC-001 needs a model with real
+bimetallic connections.
+
+### The original observation, for the record
+
+
 
 The same model, the same code, the same elements; only the catalog source
 differs (Duplex_MEP, 926 elements, `include_low=True` so nothing is hidden):
@@ -196,15 +236,21 @@ The database catalog is the richer one and is meant to win: 20 galvanic series
 entries against 8, 7 environment classes against 4, 10 mitigations against 1,
 and a `scoring_model` with 4 weights where the fallback has none.
 
-**Two decisions needed**: whether the DB weights genuinely place these couples
-at Low, and whether Low findings should reach the API at all when an entire
-mechanism can vanish behind that filter.
+The catalog-source question is now moot for these models — a self-couple scores
+0.0 under either catalog. It returns only for genuine couples, which this
+dataset does not contain. The second question stands on its own: whether Low
+findings should reach the API at all, when `include_low=False` can make an
+entire mechanism invisible.
 
 ## Finding 2 — GC/CC/MC band material they cannot identify
 
 Coverage in this dataset is **0%** (see §1). MM-001 and XM-001 report that
 honestly as data quality. CC-001 and MC-001 return Medium and Critical for the
-same elements, and GC-001 returns Medium under the fallback catalog. CC-001 has
+same elements. GC-001 no longer does (finding 1), but the mechanism behind all
+three is the same and is worth naming: `resolve_material` returns
+`carbon_steel` for any unrecognised name, including an empty one — "conservative
+default" in its own docstring. The engines therefore never see unknown
+material; they see carbon steel that nobody chose. CC-001 has
 a data-quality path and used it 167 times on wr_mech_ifc4, 197 on
 wr_mech_ifc2x3 and 9 on Schependomlaan — but material absence is not among the
 reasons it fires.
@@ -293,7 +339,7 @@ raise at import. Whatever fixes finding 4 should let them import.
 | Architecture, reproducible output | **Verified** — identical across four processes |
 | Architecture, 47 rules | **Runs when seeded**; the app does not seed them (finding 4) |
 | Architecture risk bands | **No** — every band reports 0 (finding 5) |
-| Piping corrosion, 5 engines | **Qualified** — GC-001 silent against a seeded DB (finding 1) |
+| Piping corrosion, 5 engines | **Qualified** — GC-001's silence is now correct; the dataset has no couples to exercise it (finding 1) |
 | Material handling | **Qualified** — 0% coverage; only MM/XM say so (finding 2) |
 
 **Verdict: not yet, but the remaining work is small and well-defined.**
@@ -307,9 +353,10 @@ Three things remain, none of them large:
 
 1. **One line** — call `seed_default_code_rulesets` at startup (finding 4), and
    the 47-rule claim becomes true of the running system.
-2. **One decision** — whether GC-001's database weights are right, and whether
-   Low findings should reach the API (finding 1). A galvanic engine that cannot
-   surface a finding is worse than no engine.
+2. **One coverage gap** — GC-001 no longer scores non-couples, so it is silent
+   on this dataset for the right reason. Nothing here contains a
+   dissimilar-metal junction, so its scoring path needs a model that does
+   before the engine can be called validated (finding 1).
 3. **One threshold review** — SB-001 now evaluates; 200 mm needs a domain
    judgement before its counts mean anything.
 

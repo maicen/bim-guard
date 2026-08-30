@@ -363,6 +363,9 @@ class GCResult:
     # Metadata
     ruleset_version: str = RULESET_VERSION
     assessment_date: str = ASSESSMENT_DATE
+    #: Whether the two sides are dissimilar metals. False means there is no
+    #: bimetallic junction, so the galvanic mechanism cannot act at all.
+    couple_present: bool = True
 
 
 # ── CORE ASSESSMENT FUNCTION ──────────────────────────────────────────────────
@@ -432,10 +435,27 @@ def assess_galvanic_risk(element: GCElement) -> GCResult:
             pren_ok = False
             pren_note = pren_note_c
 
-    # Composite score
-    score = calculate_gc001_score(v_risk, ar_risk, multiplier)
+    # A galvanic cell needs two DISSIMILAR metals. Where both sides resolve to
+    # the same material there is no bimetallic junction and the mechanism
+    # cannot act, whatever the geometry or the environment.
+    #
+    # This has to gate the score, not just the voltage term. The area ratio and
+    # the environment multiplier describe how bad a couple would be if one
+    # existed; summing them on their own returned 0.26 for copper against
+    # copper -- a galvanic verdict on a junction that is not galvanic. Every
+    # element in a model whose IFC carries a single material per element
+    # reaches here as a self-couple, because _gc_element fills the second side
+    # with the first when the file offers only one, so that non-zero floor was
+    # being applied to entire models at a time.
+    couple_present = (
+        anode_key is not None and cathode_key is not None and anode_key != cathode_key
+    )
+    score = calculate_gc001_score(v_risk, ar_risk, multiplier) if couple_present else 0.0
 
-    # PREN failure escalates minimum score to Medium
+    # PREN failure escalates minimum score to Medium. This survives the gate
+    # above deliberately: pitting resistance in an aggressive environment is a
+    # property of the alloy itself, not of a couple, so a same-material
+    # stainless run that is under-specified for its environment still reports.
     if not pren_ok and score < 0.35:
         score = 0.35
 
@@ -477,6 +497,7 @@ def assess_galvanic_risk(element: GCElement) -> GCResult:
         risk_band=risk_band,
         bcf_priority=bcf_priority,
         mitigations=mitigations,
+        couple_present=couple_present,
     )
 
 
