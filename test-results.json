@@ -1,0 +1,232 @@
+{
+  "summary": {
+    "PASS": 13,
+    "FAIL": 1,
+    "WARN": 0,
+    "SKIP": 18
+  },
+  "checks": [
+    {
+      "test": "piping/local-mep/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 4, 'GC-001': 4, 'MC-001': 4, 'MM-001': 4} in 0.02s",
+      "data": {
+        "CC-001": 4,
+        "GC-001": 4,
+        "MC-001": 4,
+        "MM-001": 4
+      }
+    },
+    {
+      "test": "piping/local-mep/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 4, 'GC-001': 4, 'MC-001': 4} (no MM/XM)",
+      "data": {
+        "CC-001": 4,
+        "GC-001": 4,
+        "MC-001": 4
+      }
+    },
+    {
+      "test": "piping/local-mep/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 4} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 4
+      }
+    },
+    {
+      "test": "piping/local-mep/1d-single-engine",
+      "status": "PASS",
+      "detail": "{'GC-001': 4} (GC-001 only)",
+      "data": {
+        "GC-001": 4
+      }
+    },
+    {
+      "test": "piping/local-mep/1d2-no-engine",
+      "status": "PASS",
+      "detail": "no findings, as selected",
+      "data": {}
+    },
+    {
+      "test": "piping/local-mep/1e-cache",
+      "status": "PASS",
+      "detail": "miss 0.01s, other-selection 0.00s, hit 0.00s, identical=True, faster=True",
+      "data": {
+        "miss_s": 0.011,
+        "hit_s": 0.002,
+        "speedup": 5.5
+      }
+    },
+    {
+      "test": "export/local-mep/corrosion/csv",
+      "status": "PASS",
+      "detail": "HTTP 200, 16 rows vs 16 findings",
+      "data": {}
+    },
+    {
+      "test": "export/local-mep/corrosion/json",
+      "status": "PASS",
+      "detail": "HTTP 200, parseable=True",
+      "data": {}
+    },
+    {
+      "test": "export/local-mep/corrosion/bcf",
+      "status": "PASS",
+      "detail": "HTTP 200, 50 entries, 16 markup, 16 viewpoints",
+      "data": {}
+    },
+    {
+      "test": "piping/clinic-plumbing/gating",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "piping/clinic-plumbing/1e-cache",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "export/clinic-plumbing/corrosion",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "piping/west-riverside-ifc4/gating",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "piping/west-riverside-ifc4/1e-cache",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "export/west-riverside-ifc4/corrosion",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "piping/craslabbim/gating",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "piping/craslabbim/1e-cache",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "export/craslabbim/corrosion",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "seismic/local-mep",
+      "status": "PASS",
+      "detail": "4 findings in 0.01s, stats={'total': 4, 'critical': 1, 'high': 0, 'medium': 3, 'low': 0, 'data_quality': 0}",
+      "data": {
+        "stats": {
+          "total": 4,
+          "critical": 1,
+          "high": 0,
+          "medium": 3,
+          "low": 0,
+          "data_quality": 0
+        },
+        "rulesets": {
+          "SB-001": 4
+        },
+        "seconds": 0.007
+      }
+    },
+    {
+      "test": "export/local-mep/seismic/csv",
+      "status": "PASS",
+      "detail": "HTTP 200, 4 rows vs 4 findings",
+      "data": {}
+    },
+    {
+      "test": "export/local-mep/seismic/json",
+      "status": "PASS",
+      "detail": "HTTP 200, parseable=True",
+      "data": {}
+    },
+    {
+      "test": "export/local-mep/seismic/bcf",
+      "status": "PASS",
+      "detail": "HTTP 200, 14 entries, 4 markup, 4 viewpoints",
+      "data": {}
+    },
+    {
+      "test": "seismic/clinic-structural",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "seismic/west-riverside-str",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "architecture/local-mep",
+      "status": "FAIL",
+      "detail": "HTTP 400: The architectural analysis could not be run: Missing static asset ruleset:BUILDING-CODE-PART9",
+      "data": {}
+    },
+    {
+      "test": "architecture/clinic-architectural",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "schema/west-riverside-plumbing",
+      "status": "SKIP",
+      "detail": "one or both twin models not present",
+      "data": {}
+    },
+    {
+      "test": "seismic/geometry/aisc-brep",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "seismic/geometry/aisc-param",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "perf/fire-ifc4-small",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "perf/clinic-plumbing-medium",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    },
+    {
+      "test": "perf/mech-ifc4-large",
+      "status": "SKIP",
+      "detail": "model file not present",
+      "data": {}
+    }
+  ]
+}

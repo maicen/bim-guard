@@ -265,12 +265,22 @@ def _run_architecture(project_id: int) -> dict:
     binding a tracker here would reset a corrosion run's stages for the same
     project -- the reason the seismic path stays untracked too.
     """
-    from app.services.pipeline_services import PipelineOrchestratorService
+    # Errors cross this boundary as values, not exceptions -- the rule this
+    # module opens with. The orchestrator breaks it in one place: its rule packs
+    # are loaded at import time and a missing one raises, so an environment
+    # without the BUILDING-CODE-PART9 asset answered a request for this analysis
+    # with a 500 and a stack trace rather than saying what was missing.
+    try:
+        from app.services.pipeline_services import PipelineOrchestratorService
 
-    raw = PipelineOrchestratorService.orchestrate_workflow(
-        project_id=project_id,
-        analysis_theme="Architecture",
-    )
+        raw = PipelineOrchestratorService.orchestrate_workflow(
+            project_id=project_id,
+            analysis_theme="Architecture",
+        )
+    except Exception as exc:
+        logger.exception("Architectural analysis failed project_id=%d", project_id)
+        return failure_result(f"The architectural analysis could not be run: {exc}")
+
     # The orchestrator reports a hard stop under "error" and a soft one under
     # "compliance_error"; only the first means no result was produced.
     if raw.get("error"):

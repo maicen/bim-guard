@@ -1,0 +1,25 @@
+{
+  "_comment": "Project id -> IFC path. Ids are arbitrary handles; scripts/e2e_server.py serves each file as that project's model. Point these at the bimguard-test-models checkout once it has content.",
+  "models": {
+    "1": "data/test_hospital_mep_scenario.ifc",
+    "2": "test-models/models/hospital/Clinic_Plumbing.ifc",
+    "3": "test-models/models/schemas/west_riverside_hospital_plumb_ifc4.ifc",
+    "4": "test-models/models/schemas/west_riverside_hospital_plumb_ifc2x3.ifc",
+    "5": "test-models/models/industrial/craslabbim.ifc",
+    "10": "test-models/models/hospital/Clinic_Structural.ifc",
+    "11": "test-models/models/hospital/west_riverside_hospital_str_ifc4.ifc",
+    "20": "test-models/models/hospital/Clinic_Architectural.ifc",
+    "30": "test-models/models/industrial/aisc_sculpture_brep.ifc",
+    "31": "test-models/models/industrial/aisc_sculpture_param.ifc",
+    "40": "test-models/models/hospital/west_riverside_hospital_fire_ifc4.ifc",
+    "41": "test-models/models/hospital/west_riverside_hospital_mech_ifc4.ifc"
+  },
+  "roles": {
+    "piping": {"local-mep": 1, "clinic-plumbing": 2, "west-riverside-ifc4": 3, "craslabbim": 5},
+    "seismic": {"local-mep": 1, "clinic-structural": 10, "west-riverside-str": 11},
+    "architecture": {"local-mep": 1, "clinic-architectural": 20},
+    "schema_twins": {"west-riverside-plumbing": {"ifc4": 3, "ifc2x3": 4}},
+    "geometry": {"aisc-brep": 30, "aisc-param": 31},
+    "performance": {"fire-ifc4-small": 40, "clinic-plumbing-medium": 2, "mech-ifc4-large": 41}
+  }
+}
