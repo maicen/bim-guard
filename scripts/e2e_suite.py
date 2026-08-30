@@ -17,11 +17,11 @@ two passes can be compared instead of one replacing the other.
 
 USAGE
 
-    uv run python scripts/e2e_suite.py --manifest e2e-models.json
-        --base-url http://127.0.0.1:8010 --out test-results.json
-    uv run python scripts/e2e_suite.py --manifest e2e-models.json
+    uv run python scripts/e2e_suite.py --manifest tests/e2e/e2e-models.json
+        --base-url http://127.0.0.1:8010 --out docs/validation/data/test-results.json
+    uv run python scripts/e2e_suite.py --manifest tests/e2e/e2e-models.json
         --base-url http://127.0.0.1:8011 --only architecture,seismic
-        --quick-piping --out test-results-seeded.json
+        --quick-piping --out docs/validation/data/test-results-seeded.json
 """
 
 from __future__ import annotations
@@ -305,9 +305,9 @@ class Suite:
 def main() -> None:
     """Run every category the manifest has models for and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", required=True)
+    parser.add_argument("--manifest", default="tests/e2e/e2e-models.json")
     parser.add_argument("--base-url", default="http://127.0.0.1:8010")
-    parser.add_argument("--out", default="test-results.json")
+    parser.add_argument("--out", default="docs/validation/data/test-results.json")
     parser.add_argument(
         "--only",
         default="",

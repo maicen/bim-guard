@@ -47,7 +47,7 @@ The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to back
 - **Contract Parity**: When modifying API endpoints in `app/api/**`, always update or create strict Pydantic schemas in `app/modules/contracts.py` and synchronize TypeScript interfaces in `frontend/src/lib/types.ts`.
 - **Database-Driven Rules**: Never hardcode engineering cutoffs, scoring weights, or rule classifications in Python engines. Rules must be read dynamically from the database via `RuleService` and `corrosion_rule_catalog.py`.
 - **Real-Time Streaming**: Use Server-Sent Events (`/api/events/{project_id}`) for pipeline progress; avoid polling loops.
-- **Package Management**: Use `uv` and `pyproject.toml` for Python dependencies; use `npm` in `frontend/` for frontend dependencies. Do not maintain a `requirements.txt`.
+- **Root Directory Protection**: NEVER create or place new files (code, tests, reports, data, JSON manifests, scratch files) in the repository root. Always use the appropriate subdirectories (`app/`, `frontend/`, `tests/`, `scripts/`, `docs/`, `data/`, `supabase/migrations/`).
 - **Quality & Docs**: For public modules, classes, and functions, add or update PEP 257 docstrings.
 
 ## Documentation map

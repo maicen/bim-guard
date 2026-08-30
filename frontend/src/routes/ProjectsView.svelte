@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import {
     Plus,
     Search,
@@ -13,6 +13,7 @@
     SlidersHorizontal,
     Eye,
     Pencil,
+    RotateCw,
   } from "lucide-svelte";
   import { projectsApi } from "../lib/api";
   import type { Project } from "../lib/types";
@@ -24,9 +25,13 @@
   export let onSelectProjectForAudit: (projectId: number) => void;
   export let onSelectProjectForViewer: (projectId: number) => void;
 
-  let projects: Project[] = [];
-  let isLoading = true;
+  // Initialize immediately from synchronous client cache for 0ms render time
+  const initialCache = projectsApi.getCachedList();
+  let projects: Project[] = initialCache ? initialCache.projects || [] : [];
+  let isLoading = !initialCache;
+  let isRefreshing = false;
   let error = "";
+  let unsubscribe: (() => void) | null = null;
 
   // Filter state
   let searchQuery = "";
@@ -43,21 +48,39 @@
   let selectedProjectForEnhance: Project | null = null;
   let projectToDelete: { id: number; name: string } | null = null;
 
-  async function loadProjects() {
-    isLoading = true;
+  async function loadProjects(force = false) {
+    if (!projects.length) {
+      isLoading = true;
+    } else {
+      isRefreshing = true;
+    }
     error = "";
     try {
-      const data = await projectsApi.list();
+      const data = await projectsApi.list({ forceRefresh: force });
       projects = data.projects || [];
     } catch (err: any) {
-      error = err.message || "Failed to load projects";
+      if (!projects.length) {
+        error = err.message || "Failed to load projects";
+      }
     } finally {
       isLoading = false;
+      isRefreshing = false;
     }
   }
 
   onMount(() => {
+    // Subscribe to cache updates so changes from modals/wizards reflect immediately
+    unsubscribe = projectsApi.subscribe((updatedProjects) => {
+      projects = updatedProjects;
+    });
+    // Silent background load/revalidation
     loadProjects();
+  });
+
+  onDestroy(() => {
+    if (unsubscribe) {
+      unsubscribe();
+    }
   });
 
   $: filteredProjects = projects.filter((p) => {
@@ -65,6 +88,8 @@
       searchQuery === "" ||
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || p.status === statusFilter;
     const matchesDomain =
       domainFilter === "all" ||
       p.analysis_type === domainFilter ||
@@ -125,6 +150,17 @@
       <p class="text-xs sm:text-sm text-slate-400">
         Manage OpenBIM models, analysis scopes, and compliance records.
       </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        on:click={() => loadProjects(true)}
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white text-xs transition-colors"
+        title="Refresh project registry"
+      >
+        <RotateCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
+        <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+      </button>
     </div>
   </div>
 

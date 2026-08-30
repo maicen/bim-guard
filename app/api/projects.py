@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -37,8 +37,10 @@ router = APIRouter()
 @router.get("", response_model=ProjectListResponse, summary="List all projects")
 def list_projects(
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    response: Response,
 ) -> ProjectListResponse:
     """Return all projects ordered newest first."""
+    response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"
     rows = service.list_projects()
     projects = [ProjectResponse(**row) for row in rows]
     return ProjectListResponse(total=len(projects), projects=projects)
@@ -49,13 +51,14 @@ def list_projects(
     response_model=ProjectOptionsResponse,
     summary="Reference data for the project setup wizard",
 )
-def get_project_options() -> ProjectOptionsResponse:
+def get_project_options(response: Response) -> ProjectOptionsResponse:
     """Return the choice lists the wizard renders.
 
     Declared above ``/{project_id}`` on purpose: FastAPI matches routes in
     declaration order, and the other way round this path would be tried as a
     project id and rejected as a 422.
     """
+    response.headers["Cache-Control"] = "private, max-age=300, stale-while-revalidate=600"
     return ProjectOptionsResponse(
         countries=COUNTRIES,
         project_types=PROJECT_TYPES,
@@ -68,8 +71,10 @@ def get_project_options() -> ProjectOptionsResponse:
 def get_project(
     project_id: int,
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    response: Response,
 ) -> ProjectResponse:
     """Retrieve a single project by primary key."""
+    response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=30"
     row = service.get_project(project_id)
     if not row:
         raise HTTPException(

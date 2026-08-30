@@ -74,6 +74,16 @@ REM 5. Launch FastAPI Backend Server in a new window
 echo [1/2] Launching FastAPI Backend on http://127.0.0.1:8000 ...
 start "BIM Guard Backend (FastAPI)" cmd /k "uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 
+REM Poll until port 8000 is actually listening (up to 60 s)
+echo     Waiting for backend to become ready...
+:WAIT_BACKEND
+powershell -NoProfile -Command "try{$c=New-Object Net.Sockets.TcpClient('127.0.0.1',8000);$c.Close();exit 0}catch{exit 1}" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    timeout /t 1 /nobreak >nul
+    goto WAIT_BACKEND
+)
+echo     Backend is ready.
+
 REM 6. Launch Svelte Frontend Dev Server in a new window
 echo [2/2] Launching Svelte 5 Frontend on http://localhost:5173 ...
 start "BIM Guard Frontend (Vite)" cmd /k "cd frontend && npm run dev"

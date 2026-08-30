@@ -40,6 +40,19 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+
+@pytest.fixture(autouse=True)
+def reset_in_memory_cache():
+    """Reset the global database query cache before and after every test."""
+    try:
+        from app.services.cache import clear_cache
+
+        clear_cache()
+        yield
+        clear_cache()
+    except ImportError:
+        yield
+
 # The commit this suite treats as the last known-good state: the point before
 # the F-series (producer overload, issue adapter, band casing, MM/XM wiring).
 BASELINE_COMMIT = "4edba3a"

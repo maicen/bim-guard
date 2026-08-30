@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import {
     FolderOpen,
     BookOpen,
@@ -15,6 +15,7 @@
     Eye,
     Pencil,
     Trash2,
+    RotateCw,
   } from "lucide-svelte";
   import { dashboardApi, projectsApi } from "../lib/api";
   import type { DashboardStats, Project } from "../lib/types";
@@ -27,16 +28,21 @@
   export let onOpenWizard: () => void;
   export let onNavigate: (view: string) => void;
 
-  let stats: DashboardStats = {
-    total_projects: 0,
+  const cachedStats = dashboardApi.getCachedStats();
+  const cachedProjects = projectsApi.getCachedList();
+
+  let stats: DashboardStats = cachedStats || {
+    total_projects: cachedProjects ? cachedProjects.total : 0,
     total_documents: 0,
     total_rules: 0,
     issues_found: 34,
     db_ok: true,
     db_backend: "SUPABASE",
   };
-  let recentProjects: Project[] = [];
-  let isLoading = true;
+  let recentProjects: Project[] = cachedProjects ? (cachedProjects.projects || []).slice(0, 5) : [];
+  let isLoading = !cachedStats && !cachedProjects;
+  let isRefreshing = false;
+  let unsubscribeProjects: (() => void) | null = null;
 
   // Modals for CRUD operations on recent projects
   let isEditModalOpen = false;
@@ -77,18 +83,44 @@
     recentProjects = recentProjects.map((p) => (p.id === updated.id ? updated : p));
   }
 
-  onMount(async () => {
+  async function refreshDashboard(force = false) {
+    if (!cachedStats && !recentProjects.length) {
+      isLoading = true;
+    } else {
+      isRefreshing = true;
+    }
+
     try {
       const [statsData, projectsData] = await Promise.all([
-        dashboardApi.getStats(),
-        projectsApi.list(),
+        dashboardApi.getStats({ forceRefresh: force }),
+        projectsApi.list({ forceRefresh: force }),
       ]);
       stats = statsData;
       recentProjects = (projectsData.projects || []).slice(0, 5);
     } catch {
-      // Fallback defaults
+      // Keep cached or fallback
     } finally {
       isLoading = false;
+      isRefreshing = false;
+    }
+  }
+
+  onMount(() => {
+    unsubscribeProjects = projectsApi.subscribe((updatedProjects) => {
+      recentProjects = updatedProjects.slice(0, 5);
+      stats = { ...stats, total_projects: updatedProjects.length };
+    });
+
+    // Load fresh data
+    refreshDashboard();
+
+    // Proactively warm up and prefetch all other pages from the dashboard
+    dashboardApi.prefetchAll();
+  });
+
+  onDestroy(() => {
+    if (unsubscribeProjects) {
+      unsubscribeProjects();
     }
   });
 </script>

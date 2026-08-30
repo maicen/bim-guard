@@ -197,6 +197,46 @@ def health_check() -> dict:
     return {"status": "ok", "service": "bim-guard-api", "version": "1.0.0"}
 
 
+@app.get("/download/{fmt}/{project_id}", tags=["Analysis"], summary="Download report endpoint alias")
+def download_report_alias(
+    fmt: str,
+    project_id: int,
+    slug: str = "corrosion",
+):
+    """Download analysis report in CSV, JSON, or BCF format."""
+    from fastapi import Response
+    from app.modules.phase_6.phase_6e_export import export
+    from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
+
+    if project_id <= 0:
+        raise HTTPException(status_code=400, detail="project_id must be a positive integer")
+
+    if fmt not in ("csv", "json", "bcf"):
+        raise HTTPException(status_code=404, detail=f"Unsupported export format '{fmt}'")
+
+    if slug not in RUNNABLE_SLUGS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown slug '{slug}'. Must be one of: {', '.join(RUNNABLE_SLUGS)}",
+        )
+
+    result = run_analysis(slug, project_id)
+    if result.get("compliance_error"):
+        raise HTTPException(status_code=409, detail=result["compliance_error"])
+
+    content, media_type, extension = export(result, fmt)
+    filename = f"bimguard-{slug}-project-{project_id}.{extension}"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "Content-Length": str(len(content)),
+        },
+    )
+
+
 # Mount static assets directory
 static_dir = Path("static")
 if static_dir.exists():
@@ -212,7 +252,7 @@ if (frontend_dist / "index.html").exists():
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     async def serve_spa(full_path: str):
         """Serve Svelte 5 Single Page Application client-side routing."""
-        if full_path.startswith("api/") or full_path.startswith("static/"):
+        if full_path.startswith("api/") or full_path.startswith("static/") or full_path.startswith("download/"):
             raise HTTPException(status_code=404, detail="Endpoint not found.")
         file_candidate = frontend_dist / full_path
         if full_path and file_candidate.is_file():

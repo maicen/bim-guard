@@ -51,7 +51,7 @@ def test_api_openapi_json(client: TestClient) -> None:
 
 def test_known_static_asset_is_served(client: TestClient) -> None:
     """Verify static files are served properly."""
-    response = client.get("/static/js/ifc-viewer.js")
+    response = client.get("/static/js/viewer/ifc-viewer.js")
     assert response.status_code == 200
     assert len(response.content) > 0
 

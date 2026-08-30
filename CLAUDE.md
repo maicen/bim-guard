@@ -11,6 +11,42 @@ YOU MUST FOLLOW THEM.
 | AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
 | DESIGN.md | Design agents | How the project should look and feel |
 
+## Repository Structure & Root Directory Protection (STRICT)
+
+**CRITICAL RULE: NEVER CREATE OR PLACE FILES IN THE REPOSITORY ROOT.**
+
+The repository root is strictly reserved for primary configuration files (`pyproject.toml`, `uv.lock`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `DESIGN.md`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, `main.py`, `.gitignore`, `run_server.*`, etc.).
+
+All newly generated files (code, tests, scripts, fixtures, data manifests, reports, documentation, temporary files) **MUST ALWAYS** be placed in the appropriate subfolder:
+
+- **`app/`** — Backend application code:
+  - `app/api/` — FastAPI routers, dependency injection, and SSE streaming
+  - `app/modules/contracts.py` — Pydantic request/response schemas
+  - `app/engines/` — Pure Python computation and compliance engines (GC-001, CC-001, MC-001, ARCH-*, etc.)
+  - `app/services/` — Business logic, persistence, and pipeline runner services
+  - `app/modules/` — Orchestration and parsing modules
+- **`frontend/`** — Svelte 5 frontend client:
+  - `frontend/src/routes/` — Svelte page views
+  - `frontend/src/lib/components/` — Reusable Svelte components
+  - `frontend/src/lib/types.ts` — TypeScript interfaces (mirrors Pydantic contracts)
+  - `frontend/src/lib/api.ts` — Typed backend API client
+  - `frontend/src/lib/sse.ts` — Server-Sent Events subscriber
+- **`tests/`** — Automated test suites & test fixtures:
+  - `tests/` — Pytest unit and integration test files (`test_*.py`)
+  - `tests/e2e/` — End-to-end test configs and manifests (e.g. `tests/e2e/e2e-models.json`)
+  - `tests/schemas/` — Test schemas and sample datasets
+- **`scripts/`** — Standalone utilities, runner harnesses, benchmarking tools, and migration helpers (e.g. `scripts/e2e_server.py`, `scripts/e2e_suite.py`).
+- **`docs/`** — Documentation, research, benchmarks, and validation reports:
+  - `docs/validation/` — Validation reports and markdown summaries (e.g. `docs/validation/test-results.md`)
+  - `docs/validation/data/` — Validation output datasets and JSON machine records (e.g. `docs/validation/data/test-results.json`)
+  - `docs/benchmarks/` — Benchmark results, charts, and summaries
+  - `docs/architecture/` — System architecture design documents
+- **`data/`** — Seed data, static rulesets (`data/rulesets/`), schema configs, and sample IFC files.
+- **`supabase/migrations/`** — Database migration SQL scripts.
+
+**NEVER output test results, machine logs, JSON dumps, markdown summaries, or scratch scripts to the root directory `./`. Always direct outputs to the designated subdirectories above.**
+
+
 ## Commands
 
 ```bash

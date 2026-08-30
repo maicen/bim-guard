@@ -4,8 +4,8 @@ Date: 2026-08-30
 Code state: after `7aa8cf0` (seismic mapped/boundary geometry) and `3659bcf`
 (geometry shape-cache key)
 Dataset: maicen/bimguard-test-models — 34 IFC models, 807.4 MB of IFC
-Harness: `scripts/e2e_server.py` + `scripts/e2e_suite.py`, manifest `e2e-models.json`
-Machine record: `test-results.json`
+Harness: `scripts/e2e_server.py` + `scripts/e2e_suite.py`, manifest `tests/e2e/e2e-models.json`
+Machine record: `docs/validation/data/test-results.json`
 
 ## Summary
 
@@ -126,7 +126,7 @@ Every count above is reproducible. Before `3659bcf` the same model returned
 it, six consecutive runs, a restart, and this suite run in a fresh process all
 returned identical figures rule-by-rule. The cause was a shape cache keyed on
 `id(element)` — a recycled CPython address — so a space could be measured with
-another element's geometry. `findings.txt` has the investigation.
+another element's geometry. `docs/validation/architecture-determinism.txt` has the investigation.
 
 The deterministic answer is the lower count and it is the correct one: every
 space in wbdg_office_arc is at least 2 500 mm tall, so none can violate the
@@ -323,17 +323,17 @@ report it as such.
 git clone https://github.com/maicen/bimguard-test-models.git test-models
 cd frontend && npm install && npm run build && cd ..
 
-MODELS="$(python -c 'import json;print(json.dumps(json.load(open("e2e-models.json"))["models"]))')"
+MODELS="$(python -c 'import json;print(json.dumps(json.load(open("tests/e2e/e2e-models.json"))["models"]))')"
 
 # Run A — seeded database, all categories (~60 min on 4 cores)
 BIMGUARD_E2E_MODELS="$MODELS" uv run python scripts/e2e_server.py \
   --port 8010 --seed-code-rulesets &
-uv run python scripts/e2e_suite.py --manifest e2e-models.json \
-  --base-url http://127.0.0.1:8010 --out test-results.json
+uv run python scripts/e2e_suite.py --manifest tests/e2e/e2e-models.json \
+  --base-url http://127.0.0.1:8010 --out docs/validation/data/test-results.json
 
 # Run B — no database, piping and timing only (~30 min)
 BIMGUARD_E2E_MODELS="$MODELS" uv run python scripts/e2e_server.py --port 8011 &
-uv run python scripts/e2e_suite.py --manifest e2e-models.json \
+uv run python scripts/e2e_suite.py --manifest tests/e2e/e2e-models.json \
   --base-url http://127.0.0.1:8011 --only piping,perf --quick-piping \
-  --out test-results-nodb.json
+  --out docs/validation/data/test-results-nodb.json
 ```
