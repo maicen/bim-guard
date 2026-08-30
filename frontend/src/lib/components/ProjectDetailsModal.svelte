@@ -101,8 +101,9 @@
                   <button
                     type="button"
                     on:click={() => {
+                      const id = project!.id;
                       onClose();
-                      onOpenViewer(project.id);
+                      onOpenViewer(id);
                     }}
                     class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 transition-colors"
                   >

@@ -303,6 +303,7 @@ function createViewerToolbar(components, world, viewport, grids) {
     const clipper = components.get(OBC.Clipper);
     clipper.enabled = false;   // start with clipping disabled
 
+    // ── Mutable toolbar UI state ───────────────────────────────────────────
     let clippingActive = false;
     let clippingEnabled = true; // visibility toggle when planes exist
 
@@ -315,215 +316,219 @@ function createViewerToolbar(components, world, viewport, grids) {
     // ── Grid visibility ────────────────────────────────────────────────────
     let gridVisible = true;
 
-    // ── Toolbar: inline BIM-style element ─────────────────────────────────
-    const toolbar = BUI.Component.create(() => {
-        // Camera projection
-        const toggleProjection = () => {
-            const cam = world.camera;
-            const current = cam.projection.current;
-            cam.projection.set(current === "Perspective" ? "Orthographic" : "Perspective");
-            toolbar.update();
-        };
+    // ── Toolbar: stateful BUI component so updateToolbar() triggers re-renders ─
+    const [toolbar, updateToolbar] = BUI.Component.create(
+        (state) => {
+            const { clippingActive, clippingEnabled, gridVisible } = state;
 
-        // Navigation mode
-        const setNavMode = (mode) => {
-            world.camera.set(mode);
-            toolbar.update();
-        };
+            // Camera projection
+            const toggleProjection = () => {
+                const cam = world.camera;
+                const current = cam.projection.current;
+                cam.projection.set(current === "Perspective" ? "Orthographic" : "Perspective");
+                updateToolbar({});
+            };
 
-        // Fit all models in view
-        const fitModel = async () => {
-            const meshes = [];
-            for (const [, model] of components.get(OBC.FragmentsManager).list) {
-                if (model.object) meshes.push(model.object);
-            }
-            if (meshes.length > 0) {
-                await world.camera.fit(meshes, 0.5);
-            }
-        };
+            // Navigation mode
+            const setNavMode = (mode) => {
+                world.camera.set(mode);
+                updateToolbar({});
+            };
 
-        // Clipping plane controls
-        const toggleClipping = () => {
-            clippingActive = !clippingActive;
-            clipper.enabled = clippingActive;
-            toolbar.update();
-        };
+            // Fit all models in view
+            const fitModel = async () => {
+                const meshes = [];
+                for (const [, model] of components.get(OBC.FragmentsManager).list) {
+                    if (model.object) meshes.push(model.object);
+                }
+                if (meshes.length > 0) {
+                    await world.camera.fit(meshes, 0.5);
+                }
+            };
 
-        const toggleClippingVisibility = () => {
-            clippingEnabled = !clippingEnabled;
-            clipper.visible = clippingEnabled;
-            toolbar.update();
-        };
+            // Clipping plane controls
+            const toggleClipping = () => {
+                const next = !clippingActive;
+                clipper.enabled = next;
+                updateToolbar({ clippingActive: next });
+            };
 
-        const deleteAllClippingPlanes = () => {
-            clipper.deleteAll();
-            clippingActive = false;
-            clipper.enabled = false;
-            toolbar.update();
-        };
+            const toggleClippingVisibility = () => {
+                const next = !clippingEnabled;
+                clipper.visible = next;
+                updateToolbar({ clippingEnabled: next });
+            };
 
-        // Grid toggle
-        const toggleGrid = () => {
-            gridVisible = !gridVisible;
-            for (const [, grid] of grids.list) {
-                grid.three.visible = gridVisible;
-            }
-            toolbar.update();
-        };
+            const deleteAllClippingPlanes = () => {
+                clipper.deleteAll();
+                clipper.enabled = false;
+                updateToolbar({ clippingActive: false });
+            };
 
-        // Fullscreen
-        const toggleFullscreen = () => {
-            const container = viewport.closest(".bimguard-viewer-root") || viewport.parentElement;
-            if (!document.fullscreenElement) {
-                (container || viewport).requestFullscreen().catch(() => {});
-            } else {
-                document.exitFullscreen();
-            }
-        };
+            // Grid toggle
+            const toggleGrid = () => {
+                const next = !gridVisible;
+                for (const [, grid] of grids.list) {
+                    grid.three.visible = next;
+                }
+                updateToolbar({ gridVisible: next });
+            };
 
-        const projCurrent = world.camera.projection?.current ?? "Perspective";
-        const navCurrent = world.camera.mode?.id ?? "Orbit";
+            // Fullscreen
+            const toggleFullscreen = () => {
+                const container = viewport.closest(".bimguard-viewer-root") || viewport.parentElement;
+                if (!document.fullscreenElement) {
+                    (container || viewport).requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen();
+                }
+            };
 
-        return BUI.html`
-            <div class="bimguard-toolbar">
-                <!-- Camera Projection -->
-                <div class="bimguard-toolbar-group" title="Camera projection">
-                    <button
-                        class="bimguard-tb-btn ${projCurrent === 'Perspective' ? 'active' : ''}"
-                        @click=${() => { world.camera.projection.set("Perspective"); toolbar.update(); }}
-                        title="Perspective camera">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 20V4l16 8-16 8zm2-2.7L16.85 12 6 6.7V9.4l6 2.6-6 2.6v2.7z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Persp</span>
-                    </button>
-                    <button
-                        class="bimguard-tb-btn ${projCurrent === 'Orthographic' ? 'active' : ''}"
-                        @click=${() => { world.camera.projection.set("Orthographic"); toolbar.update(); }}
-                        title="Orthographic camera">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M20 3H4v18h16V3zm-2 16H6V5h12v14z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Ortho</span>
-                    </button>
-                </div>
+            const projCurrent = world.camera.projection?.current ?? "Perspective";
+            const navCurrent = world.camera.mode?.id ?? "Orbit";
 
-                <div class="bimguard-toolbar-divider"></div>
-
-                <!-- Navigation Modes -->
-                <div class="bimguard-toolbar-group" title="Navigation mode">
-                    <button
-                        class="bimguard-tb-btn ${navCurrent === 'Orbit' ? 'active' : ''}"
-                        @click=${() => { world.camera.set("Orbit"); toolbar.update(); }}
-                        title="Orbit navigation">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Orbit</span>
-                    </button>
-                    <button
-                        class="bimguard-tb-btn ${navCurrent === 'FirstPerson' ? 'active' : ''}"
-                        @click=${() => { world.camera.set("FirstPerson"); toolbar.update(); }}
-                        title="First person navigation (WASD)">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Walk</span>
-                    </button>
-                    <button
-                        class="bimguard-tb-btn ${navCurrent === 'Plan' ? 'active' : ''}"
-                        @click=${() => { world.camera.set("Plan"); toolbar.update(); }}
-                        title="Plan (2D top-down) navigation">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path fill="currentColor" d="M7 7h10v2H7zm0 4h10v2H7zm0 4h7v2H7z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Plan</span>
-                    </button>
-                </div>
-
-                <div class="bimguard-toolbar-divider"></div>
-
-                <!-- Fit to view -->
-                <div class="bimguard-toolbar-group">
-                    <button class="bimguard-tb-btn" @click=${fitModel} title="Fit model to view">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3h-6zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3v6zm6 12l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6h6zm12-6l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87L15 21h6v-6z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Fit</span>
-                    </button>
-                </div>
-
-                <div class="bimguard-toolbar-divider"></div>
-
-                <!-- Clipping planes -->
-                <div class="bimguard-toolbar-group" title="Section clipping planes">
-                    <button
-                        class="bimguard-tb-btn ${clippingActive ? 'active warning' : ''}"
-                        @click=${toggleClipping}
-                        title="${clippingActive ? 'Disable clipping mode (double-click adds planes)' : 'Enable clipping mode (double-click to add planes)'}">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M11 15H6l7-14v8h5l-7 14v-8z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Section</span>
-                    </button>
-                    <button
-                        class="bimguard-tb-btn"
-                        @click=${toggleClippingVisibility}
-                        title="${clippingEnabled ? 'Hide clipping planes' : 'Show clipping planes'}">
-                        <span class="bimguard-tb-icon">
-                            ${clippingEnabled
-                                ? BUI.html`<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`
-                                : BUI.html`<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`
-                            }
-                        </span>
-                        <span class="bimguard-tb-label">${clippingEnabled ? 'Visible' : 'Hidden'}</span>
-                    </button>
-                    <button
-                        class="bimguard-tb-btn danger"
-                        @click=${deleteAllClippingPlanes}
-                        title="Delete all clipping planes">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Clear</span>
-                    </button>
-                </div>
-
-                <div class="bimguard-toolbar-divider"></div>
-
-                <!-- Grid toggle -->
-                <div class="bimguard-toolbar-group">
-                    <button
-                        class="bimguard-tb-btn ${gridVisible ? 'active' : ''}"
-                        @click=${toggleGrid}
-                        title="${gridVisible ? 'Hide grid' : 'Show grid'}">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-9 17H4v-7h7v7zm0-9H4V4h7v6zm9 9h-7v-7h7v7zm0-9h-7V4h7v6z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Grid</span>
-                    </button>
-                </div>
-
-                <div class="bimguard-toolbar-divider"></div>
-
-                <!-- Fullscreen -->
-                <div class="bimguard-toolbar-group">
-                    <button class="bimguard-tb-btn" @click=${toggleFullscreen} title="Toggle fullscreen">
-                        <span class="bimguard-tb-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-                        </span>
-                        <span class="bimguard-tb-label">Full</span>
-                    </button>
-                </div>
-
-                ${clippingActive ? BUI.html`
-                    <div class="bimguard-toolbar-hint">
-                        ✂️ Double-click model surface to add a section plane
+            return BUI.html`
+                <div class="bimguard-toolbar">
+                    <!-- Camera Projection -->
+                    <div class="bimguard-toolbar-group" title="Camera projection">
+                        <button
+                            class="bimguard-tb-btn ${projCurrent === 'Perspective' ? 'active' : ''}"
+                            @click=${() => { world.camera.projection.set("Perspective"); updateToolbar({}); }}
+                            title="Perspective camera">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 20V4l16 8-16 8zm2-2.7L16.85 12 6 6.7V9.4l6 2.6-6 2.6v2.7z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Persp</span>
+                        </button>
+                        <button
+                            class="bimguard-tb-btn ${projCurrent === 'Orthographic' ? 'active' : ''}"
+                            @click=${() => { world.camera.projection.set("Orthographic"); updateToolbar({}); }}
+                            title="Orthographic camera">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M20 3H4v18h16V3zm-2 16H6V5h12v14z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Ortho</span>
+                        </button>
                     </div>
-                ` : ''}
-            </div>
-        `;
-    });
+
+                    <div class="bimguard-toolbar-divider"></div>
+
+                    <!-- Navigation Modes -->
+                    <div class="bimguard-toolbar-group" title="Navigation mode">
+                        <button
+                            class="bimguard-tb-btn ${navCurrent === 'Orbit' ? 'active' : ''}"
+                            @click=${() => { world.camera.set("Orbit"); updateToolbar({}); }}
+                            title="Orbit navigation">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Orbit</span>
+                        </button>
+                        <button
+                            class="bimguard-tb-btn ${navCurrent === 'FirstPerson' ? 'active' : ''}"
+                            @click=${() => { world.camera.set("FirstPerson"); updateToolbar({}); }}
+                            title="First person navigation (WASD)">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Walk</span>
+                        </button>
+                        <button
+                            class="bimguard-tb-btn ${navCurrent === 'Plan' ? 'active' : ''}"
+                            @click=${() => { world.camera.set("Plan"); updateToolbar({}); }}
+                            title="Plan (2D top-down) navigation">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path fill="currentColor" d="M7 7h10v2H7zm0 4h10v2H7zm0 4h7v2H7z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Plan</span>
+                        </button>
+                    </div>
+
+                    <div class="bimguard-toolbar-divider"></div>
+
+                    <!-- Fit to view -->
+                    <div class="bimguard-toolbar-group">
+                        <button class="bimguard-tb-btn" @click=${fitModel} title="Fit model to view">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3h-6zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3v6zm6 12l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6h6zm12-6l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87L15 21h6v-6z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Fit</span>
+                        </button>
+                    </div>
+
+                    <div class="bimguard-toolbar-divider"></div>
+
+                    <!-- Clipping planes -->
+                    <div class="bimguard-toolbar-group" title="Section clipping planes">
+                        <button
+                            class="bimguard-tb-btn ${clippingActive ? 'active warning' : ''}"
+                            @click=${toggleClipping}
+                            title="${clippingActive ? 'Disable clipping mode (double-click adds planes)' : 'Enable clipping mode (double-click to add planes)'}">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M11 15H6l7-14v8h5l-7 14v-8z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Section</span>
+                        </button>
+                        <button
+                            class="bimguard-tb-btn"
+                            @click=${toggleClippingVisibility}
+                            title="${clippingEnabled ? 'Hide clipping planes' : 'Show clipping planes'}">
+                            <span class="bimguard-tb-icon">
+                                ${clippingEnabled
+                                    ? BUI.html`<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`
+                                    : BUI.html`<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`
+                                }
+                            </span>
+                            <span class="bimguard-tb-label">${clippingEnabled ? 'Visible' : 'Hidden'}</span>
+                        </button>
+                        <button
+                            class="bimguard-tb-btn danger"
+                            @click=${deleteAllClippingPlanes}
+                            title="Delete all clipping planes">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Clear</span>
+                        </button>
+                    </div>
+
+                    <div class="bimguard-toolbar-divider"></div>
+
+                    <!-- Grid toggle -->
+                    <div class="bimguard-toolbar-group">
+                        <button
+                            class="bimguard-tb-btn ${gridVisible ? 'active' : ''}"
+                            @click=${toggleGrid}
+                            title="${gridVisible ? 'Hide grid' : 'Show grid'}">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-9 17H4v-7h7v7zm0-9H4V4h7v6zm9 9h-7v-7h7v7zm0-9h-7V4h7v6z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Grid</span>
+                        </button>
+                    </div>
+
+                    <div class="bimguard-toolbar-divider"></div>
+
+                    <!-- Fullscreen -->
+                    <div class="bimguard-toolbar-group">
+                        <button class="bimguard-tb-btn" @click=${toggleFullscreen} title="Toggle fullscreen">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">Full</span>
+                        </button>
+                    </div>
+
+                    ${clippingActive ? BUI.html`
+                        <div class="bimguard-toolbar-hint">
+                            ✂️ Double-click model surface to add a section plane
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        },
+        { clippingActive: false, clippingEnabled: true, gridVisible: true }
+    );
 
     // Wrap the viewport with a relative-positioned container to overlay the toolbar
     const viewportWrapper = document.createElement("div");
