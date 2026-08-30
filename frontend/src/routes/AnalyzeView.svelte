@@ -84,12 +84,24 @@
     { id: "GC", label: "GC-001", title: "Galvanic corrosion" },
     { id: "CC", label: "CC-001", title: "Crevice corrosion" },
     { id: "MC", label: "MC-001", title: "Microbiologically influenced corrosion" },
+    { id: "MM", label: "MM-001", title: "Material-media compatibility" },
+    { id: "XM", label: "XM-001", title: "Cross-material compatibility" },
   ] as const;
   let selectedEngines: string[] = PIPING_ENGINES.map((e) => e.id);
 
   // Leaving the category resets the selector, so a narrowed PIPING view never
   // silently hides findings after a route change.
   $: if (activeCategory) selectedEngines = PIPING_ENGINES.map((e) => e.id);
+
+  // What the backend is asked to run. SEISMIC is a single kernel with nothing
+  // to select between, so it sends no selection at all.
+  $: requestedEngines =
+    activeCategory === "seismic" ? undefined : selectedEngines;
+
+  // A run with no engine selected assesses nothing, so the button is disabled
+  // rather than returning an empty audit that looks like a clean model.
+  $: engineSelectionEmpty =
+    activeCategory !== "seismic" && selectedEngines.length === 0;
 
   function toggleEngine(id: string) {
     selectedEngines = selectedEngines.includes(id)
@@ -176,6 +188,7 @@
         selectedProjectId,
         selectedSlug,
         useCache,
+        requestedEngines,
       );
     } catch {
       result = null;
@@ -193,6 +206,7 @@
         selectedSlug,
         false,
         !forceRecompute,
+        requestedEngines,
       );
     } catch (err: any) {
       error = err.message || "Analysis failed";
@@ -413,7 +427,12 @@
       <!-- Run Action Button -->
       <button
         type="button"
-        disabled={isRunning || !currentProject?.ifc_file_path}
+        disabled={isRunning ||
+          !currentProject?.ifc_file_path ||
+          engineSelectionEmpty}
+        title={engineSelectionEmpty
+          ? "Select at least one engine to run"
+          : "Run the audit against the selected engines"}
         on:click={() => handleRun(false)}
         class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:pointer-events-none"
       >
@@ -465,7 +484,9 @@
       {#if result}
         <button
           type="button"
-          disabled={isRunning || !currentProject?.ifc_file_path}
+          disabled={isRunning ||
+            !currentProject?.ifc_file_path ||
+            engineSelectionEmpty}
           on:click={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
           class="p-2 rounded-full border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
@@ -800,6 +821,7 @@
                 selectedProjectId,
                 selectedSlug,
                 "bcf",
+                requestedEngines,
               )}
               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm transition-all hover:scale-[1.02]"
               title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
@@ -812,6 +834,7 @@
                 selectedProjectId,
                 selectedSlug,
                 "csv",
+                requestedEngines,
               )}
               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
               title="Download tabulated audit spreadsheet with lineage and citations"
@@ -824,6 +847,7 @@
                 selectedProjectId,
                 selectedSlug,
                 "json",
+                requestedEngines,
               )}
               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
               title="Download structured machine-readable JSON analysis report"
@@ -876,6 +900,8 @@
               <option value="GC">GC-001 Galvanic</option>
               <option value="CC">CC-001 Crevice</option>
               <option value="MC">MC-001 Microbiological</option>
+              <option value="MM">MM-001 Material-media</option>
+              <option value="XM">XM-001 Cross-material</option>
             {:else}
               <option value="SB">SB-001 Seismic Halo</option>
             {/if}

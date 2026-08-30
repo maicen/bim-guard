@@ -154,6 +154,19 @@ def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultCo
     )
 
 
+def _selected_engines(payload: AnalysisRunRequest) -> list[str] | None:
+    """Return the engine codes a run request selected, or ``None`` for all.
+
+    ``engines`` is the field the analyse page sends. ``rule_ids`` predates it
+    and names the same thing in rule-id form, so it is honoured as a fallback
+    rather than silently ignored — an existing caller that narrowed a run
+    through it keeps working.
+    """
+    if payload.engines is not None:
+        return payload.engines
+    return payload.rule_ids
+
+
 @router.post("/upload", summary="Attach an IFC model to a project")
 async def analyze_upload_ifc(
     project_id: Annotated[int, Form(...)],
@@ -201,8 +214,16 @@ def run_analysis_endpoint(
             detail=f"Unknown analysis slug {slug!r}. Supported: {RUNNABLE_SLUGS}",
         )
 
+    engines = _selected_engines(payload)
+
     if background:
-        background_tasks.add_task(run_analysis, slug, payload.project_id, use_cache=payload.use_cache)
+        background_tasks.add_task(
+            run_analysis,
+            slug,
+            payload.project_id,
+            use_cache=payload.use_cache,
+            engines=engines,
+        )
         return {
             "status": "queued",
             "project_id": payload.project_id,
@@ -210,7 +231,9 @@ def run_analysis_endpoint(
             "message": "Analysis started in background.",
         }
 
-    raw_result = run_analysis(slug, payload.project_id, use_cache=payload.use_cache)
+    raw_result = run_analysis(
+        slug, payload.project_id, use_cache=payload.use_cache, engines=engines
+    )
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -227,9 +250,14 @@ def run_analysis_endpoint(
 @router.post("/corrosion", summary="Run corrosion analysis")
 def run_corrosion(
     project_id: Annotated[int, Form(...)],
+    engines: Annotated[list[str] | None, Form()] = None,
 ) -> AnalysisResultContract:
-    """Run GC-001, CC-001, MC-001 corrosion engines."""
-    raw_result = run_analysis("corrosion", project_id, use_cache=False)
+    """Run the selected corrosion engines (GC-001, CC-001, MC-001).
+
+    Omitting ``engines`` runs all three; naming a subset runs only those, and
+    the rest are never entered.
+    """
+    raw_result = run_analysis("corrosion", project_id, use_cache=False, engines=engines)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -257,6 +285,9 @@ def get_analysis_results(
     project_id: int,
     slug: str,
     use_cache: bool = Query(True, description="Whether to read from cache"),
+    engines: list[str] | None = Query(
+        None, description="Engine codes to run; omit to run every engine"
+    ),
 ) -> AnalysisResultContract:
     """Get analysis results (retrieved from cache or computed on-demand)."""
     if slug not in RUNNABLE_SLUGS:
@@ -264,7 +295,7 @@ def get_analysis_results(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown analysis slug {slug!r}.",
         )
-    raw_result = run_analysis(slug, project_id, use_cache=use_cache)
+    raw_result = run_analysis(slug, project_id, use_cache=use_cache, engines=engines)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -292,12 +323,19 @@ def export_analysis_report(
     project_id: int = Query(...),
     slug: str = Query("corrosion"),
     fmt: str = Query("bcf", description="Export format: bcf, csv, or json"),
+    engines: list[str] | None = Query(
+        None, description="Engine codes the export covers; omit for every engine"
+    ),
 ):
-    """Export compliance analysis findings into requested format."""
+    """Export compliance analysis findings into requested format.
+
+    ``engines`` must match the selection the page ran, or the export reports a
+    different set of findings from the results it was downloaded from.
+    """
     if slug not in RUNNABLE_SLUGS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown slug {slug!r}")
 
-    result = run_analysis(slug, project_id)
+    result = run_analysis(slug, project_id, engines=engines)
     if result.get("compliance_error"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result["compliance_error"])
 

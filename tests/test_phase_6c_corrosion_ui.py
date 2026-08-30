@@ -28,11 +28,15 @@ from app.modules.phase_6.phase_6c_corrosion_ui import (
     BAND_RANK,
     DATA_QUALITY,
     ELEMENT_MECHANISMS,
+    GALVANIC,
     MECHANISMS,
+    MIC,
     NETWORK_MECHANISMS,
     XM_MATERIAL_TO_SERIES_KEY,
     issue_stats,
     normalise_band,
+    resolve_engine_codes,
+    resolve_mechanisms,
     run_corrosion_analysis,
     worst_band,
 )
@@ -458,3 +462,143 @@ class TestGalvanicSeriesJoin:
         """
         assert XM_MATERIAL_TO_SERIES_KEY["GalvanisedSteel"] == "galv_steel"
         assert XM_MATERIAL_TO_SERIES_KEY["CarbonSteel"] == "carbon_steel"
+
+
+# ---------------------------------------------------------------------------
+# Engine gating — an unselected engine is not run, not run-and-filtered
+# ---------------------------------------------------------------------------
+
+
+class TestResolveMechanisms:
+    """The selection is resolved once, before any element is assessed."""
+
+    def test_no_selection_runs_every_mechanism(self):
+        assert resolve_mechanisms(None) == MECHANISMS
+
+    @pytest.mark.parametrize("spelling", ["GC", "gc", "GC-001", "gc-001", "GC-001.01"])
+    def test_prefix_code_and_rule_id_all_name_the_same_engine(self, spelling):
+        """The checkbox sends "GC"; the rules table stores "GC-001.01"."""
+        assert resolve_mechanisms([spelling]) == (GALVANIC,)
+
+    def test_selection_order_follows_declaration_not_the_caller(self):
+        """Two spellings of one selection must run the same engines in one order."""
+        assert resolve_mechanisms(["MC", "GC"]) == resolve_mechanisms(["GC", "MC"])
+
+    def test_empty_selection_runs_nothing(self):
+        """An empty list is a request for nothing, not a request for everything."""
+        assert resolve_mechanisms([]) == ()
+
+    def test_blank_entries_are_not_a_selection(self):
+        """A query string carrying one empty value still means "none"."""
+        assert resolve_mechanisms([""]) == ()
+
+    def test_unknown_code_selects_no_engine(self):
+        assert resolve_mechanisms(["ZZ-999"]) == ()
+
+    def test_engine_codes_are_the_codes_that_would_run(self):
+        assert resolve_engine_codes(["cc"]) == ("CC-001",)
+        assert resolve_engine_codes(None) == tuple(m.code for m in MECHANISMS)
+
+
+class TestEngineGating:
+    """Only the selected engines execute."""
+
+    @pytest.fixture(scope="class")
+    def network(self):
+        """Build the piping network MM-001 and XM-001 need to report anything."""
+        return piping_fixtures.generate_synthetic_piping_network()
+
+    def test_unselected_engine_produces_no_issues(self):
+        issues = run_corrosion_analysis(
+            parsed_ifc(), include_low=True, engines=["CC", "MC"]
+        )["audit_issues"]
+        assert issues, "the two selected engines should still report"
+        assert not [i for i in issues if i.rule_id.startswith("GC")]
+
+    def test_selected_engine_still_reports(self):
+        issues = run_corrosion_analysis(
+            parsed_ifc(), include_low=True, engines=["GC"]
+        )["audit_issues"]
+        assert [i for i in issues if i.rule_id.startswith("GC")]
+
+    def test_unselected_engine_is_never_called(self, monkeypatch):
+        """The point of the gate: skipped work, not filtered output.
+
+        Filtering afterwards would produce the same Issue list at full cost, so
+        the assertion is on the call, not on the findings.
+        """
+        calls: list[str] = []
+
+        def spy(_element):
+            calls.append("gc")
+            raise AssertionError("GC-001 ran despite being unselected")
+
+        monkeypatch.setattr(
+            "app.modules.phase_6.phase_6c_corrosion_ui.assess_galvanic_risk", spy
+        )
+        run_corrosion_analysis(parsed_ifc(), include_low=True, engines=["CC"])
+        assert calls == []
+
+    def test_no_selection_runs_all_five(self, network):
+        """The default is unchanged: omitting engines assesses everything."""
+        issues = run_corrosion_analysis(
+            parsed_ifc(piping_elements=network), include_low=True
+        )["audit_issues"]
+        codes = {i.rule_id.split(".")[0] for i in issues}
+        assert codes == {m.code for m in MECHANISMS}
+
+    def test_a_network_mechanism_can_be_selected_alone(self, network):
+        """MM-001 and XM-001 gate on the same selection as GC/CC/MC."""
+        issues = run_corrosion_analysis(
+            parsed_ifc(piping_elements=network), include_low=True, engines=["MM"]
+        )["audit_issues"]
+        codes = {i.rule_id.split(".")[0] for i in issues}
+        assert codes == {"MM-001"}
+
+    def test_an_unselected_network_mechanism_does_not_run(self, network):
+        """Selecting only the per-element engines leaves the comparators alone."""
+        issues = run_corrosion_analysis(
+            parsed_ifc(piping_elements=network), include_low=True, engines=["GC"]
+        )["audit_issues"]
+        codes = {i.rule_id.split(".")[0] for i in issues}
+        assert codes == {"GC-001"}
+
+    def test_an_unselected_network_mechanism_is_never_called(self, network, monkeypatch):
+        """Skipped, not filtered: the comparator is not entered at all."""
+        def spy(*_args, **_kwargs):
+            raise AssertionError("XM-001 ran despite being unselected")
+
+        monkeypatch.setattr(
+            "app.modules.module4_comparator.cross_material.compare", spy
+        )
+        run_corrosion_analysis(
+            parsed_ifc(piping_elements=network), include_low=True, engines=["MM"]
+        )
+
+    def test_empty_selection_assesses_nothing(self):
+        result = run_corrosion_analysis(parsed_ifc(), include_low=True, engines=[])
+        assert result["audit_issues"] == []
+        assert result["compliance_error"] is None
+
+    def test_gating_does_not_suppress_data_quality_for_a_selected_engine(
+        self, mic_engine_fails
+    ):
+        """Step 4 still holds inside a narrowed run."""
+        issues = run_corrosion_analysis(
+            parsed_ifc(), include_low=False, engines=["MC"]
+        )["audit_issues"]
+        assert [i for i in issues if i.mechanism == DATA_QUALITY]
+
+    def test_an_unselected_engine_raises_no_data_quality_issue(self, mic_engine_fails):
+        """Not assessed by choice is not the same as could not be assessed."""
+        issues = run_corrosion_analysis(
+            parsed_ifc(), include_low=False, engines=["GC"]
+        )["audit_issues"]
+        assert not [
+            i for i in issues if i.metadata.get("mechanism_code") == MIC.code
+        ]
+
+    def test_invalid_model_still_reports_its_error_under_a_selection(self):
+        """The model check precedes the gate; a narrowed run cannot hide it."""
+        result = run_corrosion_analysis(parsed_ifc(valid=False), engines=["GC"])
+        assert result["compliance_error"]

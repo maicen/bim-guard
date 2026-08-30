@@ -14,6 +14,11 @@ DESIGN CONSTRAINTS, AND WHY
     Session A on upload and Session B on parse, so this reuses an existing
     value rather than inventing a second key.
 
+    **Keyed on the engines that ran, too.** The engine selection is part of
+    what produced the result, so it is part of the key. A run of GC-001 alone
+    and a run of all three engines over the same model are different results,
+    and one must never be served for the other.
+
     **A miss is never an error.** Callers run the analysis on a miss. The cache
     is an optimisation; nothing depends on it for correctness. That matters
     because this store is per-process: under multiple uvicorn workers a request
@@ -62,11 +67,18 @@ class CacheKey:
             analyses of one model are different results.
         source_sha256: Digest of the model the result was computed from. This
             is what makes staleness impossible rather than merely unlikely.
+        engines: Ruleset codes the result was computed from, canonicalised and
+            in a stable order. A partial run is a different result from a full
+            one, so without this a GC-001-only run would be served back to a
+            request that asked for every engine — the same staleness the digest
+            rules out, arriving through the selection instead of the model.
+            Empty means the caller made no selection.
     """
 
     project_id: int
     slug: str
     source_sha256: str
+    engines: tuple[str, ...] = ()
 
 
 class AnalysisCache:

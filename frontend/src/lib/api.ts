@@ -168,6 +168,18 @@ export const rulesApi = {
   },
 };
 
+// FastAPI reads a repeated query parameter as a list, so each code is its own
+// `engines=` pair. `undefined` sends nothing at all, which the API reads as
+// "every engine".
+function engineQuery(engines?: string[]): string {
+  if (!engines) return '';
+  // An empty selection asks for nothing, not for everything. Sending one blank
+  // value keeps that distinction on the wire: the API reads it as an empty
+  // list, where omitting the parameter would read as "no selection made".
+  if (engines.length === 0) return '&engines=';
+  return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join('');
+}
+
 export const analyzeApi = {
   async uploadIfc(projectId: number, file: File): Promise<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }> {
     const form = new FormData();
@@ -181,19 +193,20 @@ export const analyzeApi = {
     return handleResponse<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }>(res);
   },
 
-  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true, ruleIds?: string[]): Promise<AnalysisResult> {
+  // `engines` names the engine codes to execute (e.g. ['GC', 'CC']). Omit it to
+  // run every engine; an unselected engine is skipped on the server rather than
+  // run and filtered out here.
+  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true, engines?: string[]): Promise<AnalysisResult> {
     const res = await fetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // rule_ids narrows a corrosion run to the selected engines; omitted (null)
-      // means every engine, which is what the seismic slug always wants.
-      body: JSON.stringify({ project_id: projectId, slug, use_cache: useCache, rule_ids: ruleIds ?? null }),
+      body: JSON.stringify({ project_id: projectId, slug, use_cache: useCache, engines: engines ?? null }),
     });
     return handleResponse<AnalysisResult>(res);
   },
 
-  async getResults(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', useCache = true): Promise<AnalysisResult> {
-    const res = await fetch(`${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}`);
+  async getResults(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', useCache = true, engines?: string[]): Promise<AnalysisResult> {
+    const res = await fetch(`${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}`);
     return handleResponse<AnalysisResult>(res);
   },
 
@@ -202,8 +215,11 @@ export const analyzeApi = {
     return handleResponse<WorkflowStatus>(res);
   },
 
-  getExportUrl(projectId: number, slug: string, fmt: 'bcf' | 'csv' | 'json'): string {
-    return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}`;
+  // The export re-runs the analysis, so it takes the same engine selection the
+  // page ran under — without it a narrowed run would export findings from
+  // engines the user unchecked.
+  getExportUrl(projectId: number, slug: string, fmt: 'bcf' | 'csv' | 'json', engines?: string[]): string {
+    return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}`;
   },
 
   getBcfArtifactUrl(artifactId: number): string {

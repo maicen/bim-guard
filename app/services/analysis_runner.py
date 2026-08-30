@@ -15,6 +15,14 @@ CACHING
 
     A miss is never an error — it just recomputes. Nothing here depends on the
     cache for correctness.
+
+ENGINE SELECTION
+
+    A corrosion run assesses only the engines the caller selected, and the
+    selection is part of the cache key. Two things follow: an unselected engine
+    costs nothing, because it is never entered rather than filtered out
+    afterwards, and a narrowed run cannot be served back to a request that
+    asked for more.
 """
 
 from __future__ import annotations
@@ -22,7 +30,11 @@ from __future__ import annotations
 from app.logging_config import get_logger
 from app.modules.module4_comparator.issue_schema import Issue, RiskBand
 from app.modules.phase_6.phase_6b_parsing import parse_ifc_bytes, sha256_of
-from app.modules.phase_6.phase_6c_corrosion_ui import DATA_QUALITY, run_corrosion_analysis
+from app.modules.phase_6.phase_6c_corrosion_ui import (
+    DATA_QUALITY,
+    resolve_engine_codes,
+    run_corrosion_analysis,
+)
 from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
 from app.services.analysis_cache import ANALYSIS_CACHE, CacheKey
 from app.services.pipeline_tracker import (
@@ -91,7 +103,9 @@ def model_bytes(project_id: int) -> tuple[bytes | None, str | None]:
         return None, f"The IFC model could not be read: {exc}"
 
 
-def _run_corrosion_tracked(content: bytes, project_id: int) -> dict:
+def _run_corrosion_tracked(
+    content: bytes, project_id: int, engines: list[str] | None = None
+) -> dict:
     """Parse and assess a model, reporting each stage to the pipeline tracker.
 
     This is the driver half of the six-stage split documented in
@@ -113,16 +127,25 @@ def _run_corrosion_tracked(content: bytes, project_id: int) -> dict:
     Args:
         content: Raw IFC bytes.
         project_id: Project being analysed; the tracker key.
+        engines: Ruleset codes to run, or ``None`` for all of them. Only the
+            selected engines are tracked: reporting stages for an engine that
+            was never entered would describe work that did not happen.
 
     Returns:
         The ``AnalysisResult`` from :func:`run_corrosion_analysis`, unchanged.
         Tracking never alters the result, so a tracker failure could not change
         what a report says.
     """
+    # Only the selected engines are tracked. An engine that will not run has no
+    # stages to report, and showing it as pending forever would misdescribe the
+    # run rather than merely look untidy.
+    selected = resolve_engine_codes(engines)
+    tracked = tuple(code for code in TRACKED_ENGINES if code in selected)
+
     with tracking(project_id):
-        for code in TRACKED_ENGINES:
+        for code in tracked:
             emit(code, Stage.VALIDATION, model_bytes=len(content))
-        for code in TRACKED_ENGINES:
+        for code in tracked:
             emit(code, Stage.IFC_PARSING)
 
         # with_piping: MM-001 and XM-001 read the PipingElement view, which
@@ -136,20 +159,20 @@ def _run_corrosion_tracked(content: bytes, project_id: int) -> dict:
 
         if not quality.get("valid", False):
             reason = quality.get("error") or "The IFC model could not be read."
-            for code in TRACKED_ENGINES:
+            for code in tracked:
                 track_failure(code, reason)
             # Still routed through run_corrosion_analysis so the error result is
             # shaped in exactly one place.
-            return run_corrosion_analysis(parsed, include_low=False)
+            return run_corrosion_analysis(parsed, include_low=False, engines=engines)
 
         elements_total = len(parsed.get("elements", []))
-        for code in TRACKED_ENGINES:
+        for code in tracked:
             emit(code, Stage.ENGINE_EXECUTION, elements_total=elements_total)
 
-        result = run_corrosion_analysis(parsed, include_low=False)
+        result = run_corrosion_analysis(parsed, include_low=False, engines=engines)
 
         issues = result.get("audit_issues", [])
-        for code in TRACKED_ENGINES:
+        for code in tracked:
             mine = [i for i in issues if i.rule_id.startswith(code)]
             emit(
                 code,
@@ -262,7 +285,13 @@ def _run_architecture(project_id: int) -> dict:
     }
 
 
-def run_analysis(slug: str, project_id: int, *, use_cache: bool = True) -> dict:
+def run_analysis(
+    slug: str,
+    project_id: int,
+    *,
+    use_cache: bool = True,
+    engines: list[str] | None = None,
+) -> dict:
     """Return the ``AnalysisResult`` for ``slug`` on ``project_id``.
 
     Args:
@@ -270,6 +299,9 @@ def run_analysis(slug: str, project_id: int, *, use_cache: bool = True) -> dict:
         project_id: Project whose model to analyse.
         use_cache: Set ``False`` to force a recompute. The result is still
             stored, so a forced run refreshes the entry rather than bypassing it.
+        engines: Corrosion ruleset codes to run, e.g. ``["GC-001", "CC"]``.
+            ``None`` runs every engine. Ignored for ``"seismic"``, which is a
+            single kernel with nothing to select between.
 
     Returns:
         An ``AnalysisResult``. An unknown slug, a missing project or an
@@ -285,7 +317,15 @@ def run_analysis(slug: str, project_id: int, *, use_cache: bool = True) -> dict:
     if error:
         return failure_result(error)
 
-    key = CacheKey(project_id=project_id, slug=slug, source_sha256=sha256_of(content))
+    # Canonicalised, not stored as the caller spelled it: ["gc"] and ["GC-001"]
+    # run the same engine and must therefore share one entry.
+    engine_codes = resolve_engine_codes(engines) if slug == "corrosion" else ()
+    key = CacheKey(
+        project_id=project_id,
+        slug=slug,
+        source_sha256=sha256_of(content),
+        engines=engine_codes,
+    )
 
     if use_cache:
         cached = ANALYSIS_CACHE.get(key)
@@ -303,7 +343,7 @@ def run_analysis(slug: str, project_id: int, *, use_cache: bool = True) -> dict:
     elif slug == "architecture":
         result = _run_architecture(project_id)
     else:
-        result = _run_corrosion_tracked(content, project_id)
+        result = _run_corrosion_tracked(content, project_id, engines)
 
     # Failures are not cached: an unreachable storage object or an unreadable
     # model is usually transient, and caching it would make one bad moment
@@ -312,9 +352,10 @@ def run_analysis(slug: str, project_id: int, *, use_cache: bool = True) -> dict:
         ANALYSIS_CACHE.put(key, result)
 
     logger.info(
-        "Analysis computed project_id=%d slug=%s issues=%d cached=%s",
+        "Analysis computed project_id=%d slug=%s engines=%s issues=%d cached=%s",
         project_id,
         slug,
+        ",".join(engine_codes) or "-",
         len(result.get("audit_issues", [])),
         not result.get("compliance_error"),
     )
