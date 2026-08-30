@@ -6,10 +6,36 @@ statistics the analyse pages render.
 
 WHAT THIS DOES NOT DO
 
-    It does not implement GC-001, CC-001 or MC-001. Those engines already exist
-    in ``app/engines/`` and are thesis-backing work; this module is the wiring
-    that feeds them ``ServiceElement`` rows and turns their results into the
-    shared ``Issue`` shape.
+    It does not implement GC-001, CC-001, MC-001, MM-001 or XM-001. Those
+    engines already exist — GC/CC/MC in ``app/engines/``, MM/XM in
+    ``app/modules/module4_comparator/`` — and are thesis-backing work; this
+    module is the wiring that feeds them elements and turns their results into
+    the shared ``Issue`` shape.
+
+TWO KINDS OF MECHANISM
+
+    GC-001, CC-001 and MC-001 score one element at a time and return an engine
+    result carrying a band, which this module turns into an Issue. MM-001 and
+    XM-001 do not: they are comparators that take a whole network and return
+    ``Issue`` objects directly, already banded, already cited.
+
+    XM-001 in particular *cannot* be run per element — it derives dissimilar
+    metal couples from what each element is joined to, so an element handed to
+    it alone has nothing to couple with and would score clean every time.
+    Calling it once per element would report a model with no galvanic couples,
+    which is a false all-clear rather than a missing feature.
+
+    So :data:`MECHANISMS` names all five, and the run splits into
+    :data:`ELEMENT_MECHANISMS` (per element, via :func:`_assess`) and
+    :data:`NETWORK_MECHANISMS` (once over the network, via
+    :func:`_assess_network`).
+
+    The two halves also read different element shapes. GC/CC/MC take the
+    ``ServiceElement`` rows in ``parsed["elements"]``; MM/XM take the
+    ``PipingElement`` rows in ``parsed["piping_elements"]``, because they need
+    the operating temperature and the connectivity that ``ServiceElement`` does
+    not carry. A parse that did not request the piping view leaves MM/XM with
+    nothing to assess, which is reported, not assumed clean.
 
     It also leaves ``compliance_runner``/``issue_adapter`` untouched. Those feed
     the shipped analyse routes, where changing the element set or the Issue list
@@ -61,6 +87,7 @@ from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
 from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
 from app.logging_config import get_logger
 from app.modules.module2_ifc_read.ifc_parser import ServiceElement
+from app.modules.module4_comparator import cross_material, material_media
 from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
 from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
 
@@ -103,8 +130,19 @@ class MechanismSpec:
 GALVANIC = MechanismSpec("GC-001", "GC-001.01", "GC", "Galvanic corrosion")
 CREVICE = MechanismSpec("CC-001", "CC-001.01", "CC", "Crevice corrosion")
 MIC = MechanismSpec("MC-001", "MC-001.01", "MC", "Microbiologically influenced corrosion")
+MM = MechanismSpec("MM-001", "MM-001.01", "MM", "Material-media compatibility")
+XM = MechanismSpec("XM-001", "XM-001.01", "XM", "Cross-material compatibility")
 
-MECHANISMS: tuple[MechanismSpec, ...] = (GALVANIC, CREVICE, MIC)
+#: Scored one element at a time; each returns an engine result carrying a band.
+ELEMENT_MECHANISMS: tuple[MechanismSpec, ...] = (GALVANIC, CREVICE, MIC)
+
+#: Scored once over the whole network; each returns finished Issues. See "TWO
+#: KINDS OF MECHANISM" in the module docstring for why these cannot be folded
+#: into the per-element loop.
+NETWORK_MECHANISMS: tuple[MechanismSpec, ...] = (MM, XM)
+
+#: Every mechanism a corrosion run drives, in report order.
+MECHANISMS: tuple[MechanismSpec, ...] = ELEMENT_MECHANISMS + NETWORK_MECHANISMS
 
 
 def normalise_band(raw: Any, *, element: str, mechanism: str) -> RiskBand:
@@ -271,7 +309,11 @@ def _mic_citations(result) -> list[dict]:
 
 
 def _assess(element: ServiceElement, spec: MechanismSpec):
-    """Run one mechanism against one element.
+    """Run one :data:`ELEMENT_MECHANISMS` mechanism against one element.
+
+    MM-001 and XM-001 are not reachable from here: they take a network, not an
+    element, and return finished Issues rather than a bandable engine result.
+    They are dispatched by :func:`_assess_network` instead.
 
     Returns:
         ``(result, citations, error)``. On success ``error`` is ``None``; on
@@ -279,14 +321,18 @@ def _assess(element: ServiceElement, spec: MechanismSpec):
         can raise a data-quality Issue instead of inventing a band.
     """
     try:
-        if spec is GALVANIC:
+        if spec.code == "GC-001":
             result = assess_galvanic_risk(_gc_element(element))
             return result, _galvanic_citations(result), None
-        if spec is CREVICE:
+        if spec.code == "CC-001":
             result = assess_crevice_risk(_cc_element(element))
             return result, _crevice_citations(result), None
-        result = assess_mic_risk(_mic_element(element))
-        return result, _mic_citations(result), None
+        if spec.code == "MC-001":
+            result = assess_mic_risk(_mic_element(element))
+            return result, _mic_citations(result), None
+        raise ValueError(
+            f"{spec.code} is not a per-element mechanism; it runs over the network"
+        )
     except Exception as exc:
         logger.warning(
             "Mechanism did not run element=%s mechanism=%s error=%s",
@@ -295,6 +341,198 @@ def _assess(element: ServiceElement, spec: MechanismSpec):
             exc,
         )
         return None, [], str(exc)
+
+
+# ---------------------------------------------------------------------------
+# Network mechanisms: MM-001 and XM-001
+# ---------------------------------------------------------------------------
+
+
+class _PrefixedAllocator:
+    """Adapts the run-wide allocator to the comparators' ``allocate()`` call.
+
+    ``issue_adapter.IssueIdAllocator`` allocates per prefix off one run so that
+    ids never collide between mechanisms; the Module 4 comparators expect an
+    object with a zero-argument ``allocate()``. Binding the prefix here keeps
+    MM-001 and XM-001 ids inside the run's numbering instead of each engine
+    minting its own sequence from 1 -- the collision ``IssueIdAllocator`` was
+    written to prevent.
+    """
+
+    def __init__(self, allocator: IssueIdAllocator, prefix: str) -> None:
+        """Bind ``allocator`` to ``prefix`` for the life of one mechanism run."""
+        self._allocator = allocator
+        self._prefix = prefix
+
+    def allocate(self) -> str:
+        """Return the next run-wide id under this mechanism's prefix."""
+        return self._allocator.next(self._prefix)
+
+
+#: NASA-STD-6012 compatibility class -> the GC-001 environment class carrying
+#: that class's max safe voltage. XM-001's pack maps its own environment values
+#: onto the three NASA classes but deliberately omits the voltages, so that the
+#: numbers live in exactly one place; this is the other half of that mapping.
+#: The three GC-001 classes named here carry 0.50 V, 0.25 V and 0.15 V, which
+#: are the published NASA-STD-6012 limits for controlled, normal and harsh.
+XM_THRESHOLD_ENVIRONMENTS: dict[str, str] = {
+    "controlled": "E1_CONTROLLED",
+    "normal": "E2_NORMAL",
+    "harsh": "E3_HUMID",
+}
+
+
+#: Canonical piping material -> GC-001 galvanic series key.
+#:
+#: The two taxonomies name the same metals differently: ``PipingElement.material``
+#: uses the Module 2 canonical set (``"SS316L"``, ``"Copper_C12200"``) and the
+#: GC-001 series uses its own keys (``"ss316_passive"``, ``"copper"``). Every
+#: pairing below is the one GC-001's own ``MATERIAL_ALIASES`` already makes for
+#: the same metal, so this table introduces no new corrosion judgement -- it
+#: only states the join explicitly.
+#:
+#: ``resolve_material`` is deliberately not used for this. Its substring
+#: fallback resolves ``"GalvanisedSteel"`` to ``carbon_steel``, because
+#: ``"steel"`` is tested before ``"galvanised"``, which would score a
+#: galvanised-to-carbon-steel junction as no couple at all.
+#:
+#: Absences are meaningful. The non-metallics (PVC, HDPE, PEX, PPR) and
+#: ``"Unknown"`` have no entry, and neither do the cupronickels, which the
+#: GC-001 series does not carry. XM-001 reports an unlisted material as a
+#: data-quality Issue -- once per material, not once per couple -- rather than
+#: assuming it benign, which is the correct answer for a material whose
+#: position in the series this project has not established.
+XM_MATERIAL_TO_SERIES_KEY: dict[str, str] = {
+    "Aluminium": "aluminium",
+    "BlackSteel": "carbon_steel",
+    "Brass_C46400": "brass",
+    "CarbonSteel": "carbon_steel",
+    "CastIron": "cast_iron",
+    "Copper_C12200": "copper",
+    "DuctileIron": "cast_iron",
+    "Duplex2205": "ss316_passive",
+    "GalvanisedSteel": "galv_steel",
+    "SS304": "ss304_passive",
+    "SS304L": "ss304_passive",
+    "SS316": "ss316_passive",
+    "SS316L": "ss316_passive",
+    "SS316Ti": "ss316_passive",
+    "SuperDuplex2507": "ss316_passive",
+    "Titanium": "titanium",
+}
+
+
+def _xm_galvanic_series() -> dict:
+    """Return the GC-001 series keyed and shaped the way XM-001 reads it.
+
+    There is one galvanic series in this project and it belongs to GC-001.
+    XM-001 stores none of its own -- its pack has no ``galvanic_series`` key at
+    all -- so the series is injected at load time rather than duplicated under
+    a second name.
+
+    Two things are translated: the key, via
+    :data:`XM_MATERIAL_TO_SERIES_KEY`, so that the series is looked up by the
+    material name a ``PipingElement`` actually carries; and the potential
+    field, which GC-001 calls ``potential`` and XM-001 reads as
+    ``potential_v``. Both are renames. The values are GC-001's throughout,
+    including the ``noble`` flags XM-001 uses to name the anode.
+
+    A material whose series entry is missing from the catalog is omitted rather
+    than given a null potential: a null would make every couple it appears in
+    score a zero voltage gap, which reads as a safe pairing.
+    """
+    from app.engines.bimguard_corrosion_engine import GALVANIC_SERIES
+
+    series: dict[str, dict] = {}
+    for material, series_key in XM_MATERIAL_TO_SERIES_KEY.items():
+        entry = GALVANIC_SERIES.get(series_key)
+        if not entry or entry.get("potential") is None:
+            continue
+        series[material] = {
+            "potential_v": float(entry["potential"]),
+            "noble": entry.get("noble"),
+            "label": entry.get("label", material),
+        }
+    return series
+
+
+def _xm_compatibility_thresholds() -> dict:
+    """Return the NASA-STD-6012 max safe voltages, read from the GC-001 catalog.
+
+    Same single-source rule as the series: the voltages already exist as GC-001
+    environment thresholds, so they are read from there rather than restated.
+    A class the catalog does not carry is omitted, which XM-001 treats as an
+    unresolvable floor and therefore fails open -- a finding, never silence.
+    """
+    from app.engines.bimguard_corrosion_engine import ENVIRONMENT_CLASSES
+
+    thresholds: dict[str, dict] = {}
+    for nasa_class, env_key in XM_THRESHOLD_ENVIRONMENTS.items():
+        limit = (ENVIRONMENT_CLASSES.get(env_key) or {}).get("voltage_threshold")
+        if limit is not None:
+            thresholds[nasa_class] = {"max_safe_voltage_v": float(limit)}
+    return thresholds
+
+
+def _assess_mm001(elements: list, spec: MechanismSpec, allocator: IssueIdAllocator):
+    """Run MM-001 over the piping network.
+
+    Args:
+        elements: The ``PipingElement`` network.
+        spec: The MM-001 mechanism spec, for the id prefix and logging.
+        allocator: The run-wide id allocator.
+
+    Returns:
+        ``(issues, error)``. On failure ``issues`` is empty and ``error`` says
+        why, so the caller reports the absence rather than an empty all-clear.
+    """
+    try:
+        rule_pack = material_media.load_rule_pack()
+        issues = material_media.compare(
+            elements, rule_pack, _PrefixedAllocator(allocator, spec.prefix)
+        )
+        return issues, None
+    except Exception as exc:
+        logger.warning("Mechanism did not run mechanism=%s error=%s", spec.code, exc)
+        return [], str(exc)
+
+
+def _assess_xm001(elements: list, spec: MechanismSpec, allocator: IssueIdAllocator):
+    """Run XM-001 over the piping network.
+
+    The pack on disk carries neither the galvanic series nor the compatibility
+    voltages; both are injected from the GC-001 catalog so that no galvanic
+    constant exists twice in the repository.
+
+    Args:
+        elements: The ``PipingElement`` network.
+        spec: The XM-001 mechanism spec, for the id prefix and logging.
+        allocator: The run-wide id allocator.
+
+    Returns:
+        ``(issues, error)``, with the same contract as :func:`_assess_mm001`.
+    """
+    try:
+        rule_pack = cross_material.load_rule_pack(
+            galvanic_series=_xm_galvanic_series(),
+            compatibility_thresholds=_xm_compatibility_thresholds(),
+        )
+        issues = cross_material.compare(
+            elements, rule_pack, _PrefixedAllocator(allocator, spec.prefix)
+        )
+        return issues, None
+    except Exception as exc:
+        logger.warning("Mechanism did not run mechanism=%s error=%s", spec.code, exc)
+        return [], str(exc)
+
+
+def _assess_network(elements: list, spec: MechanismSpec, allocator: IssueIdAllocator):
+    """Route one :data:`NETWORK_MECHANISMS` mechanism to its comparator."""
+    if spec.code == "MM-001":
+        return _assess_mm001(elements, spec, allocator)
+    if spec.code == "XM-001":
+        return _assess_xm001(elements, spec, allocator)
+    return [], f"{spec.code} is not a network mechanism"
 
 
 def _data_quality_issue(
@@ -330,6 +568,42 @@ def _data_quality_issue(
             "reason": reason,
             "ifc_type": element.ifc_type,
             "material_a": element.material_a,
+        },
+        citations=[],
+    )
+
+
+def _network_data_quality_issue(
+    spec: MechanismSpec,
+    reason: str,
+    allocator: IssueIdAllocator,
+) -> Issue:
+    """Report that a network mechanism could not be evaluated at all.
+
+    The four-step rule applies to MM-001 and XM-001 exactly as it does to the
+    per-element engines, but the absence is not attributable to one element:
+    the engine either ran over the network or it did not. ``element_id`` is
+    therefore empty, which is the honest answer -- inventing an element to hang
+    it on would be worse than an unattributed finding.
+    """
+    return make_issue(
+        id=allocator.next(spec.prefix),
+        element_id="",
+        rule_id=f"{spec.code}.DATA",
+        title=f"{spec.label} could not be evaluated on this model",
+        mechanism=DATA_QUALITY,
+        band=RiskBand.LOW,
+        score=0.10,
+        mitigation=(
+            f"Review the IFC source for this model. {spec.label} compliance "
+            "cannot be evaluated until the missing data is corrected."
+        ),
+        assignee_role="BIM coordinator",
+        description=f"{spec.code} did not run against this model.",
+        metadata={
+            "check": "network_unassessed",
+            "mechanism_code": spec.code,
+            "reason": reason,
         },
         citations=[],
     )
@@ -408,7 +682,7 @@ def run_corrosion_analysis(
         pass
 
     for element in elements:
-        for spec in MECHANISMS:
+        for spec in ELEMENT_MECHANISMS:
             result, citations, error = _assess(element, spec)
 
             # Step 1: never invent a band.
@@ -434,6 +708,11 @@ def run_corrosion_analysis(
 
             issues.append(_finding_issue(element, spec, result, band, citations, allocator))
 
+    # The network mechanisms. Their comparators return finished Issues -- banded
+    # and cited -- so there is nothing here to band, only the same include_low
+    # filter the per-element loop applies, under the same step 4 exemption.
+    issues.extend(_run_network_mechanisms(parsed, allocator, include_low=include_low))
+
     logger.info(
         "Corrosion analysis complete elements=%d issues=%d data_quality=%d include_low=%s",
         len(elements),
@@ -442,6 +721,66 @@ def run_corrosion_analysis(
         include_low,
     )
     return _result(issues)
+
+
+def _run_network_mechanisms(
+    parsed: dict, allocator: IssueIdAllocator, *, include_low: bool = False
+) -> list[Issue]:
+    """Run MM-001 and XM-001 over the model's piping network.
+
+    An empty network produces nothing. A model that holds no piping has nothing
+    for these two to assess and nothing was missed, and a caller that did not
+    ask ``parse_ifc_bytes`` for the piping view has made a configuration choice
+    rather than uncovered a defect in the model -- neither is a finding about
+    the building. Both are logged, and a piping extraction that actually failed
+    is already reported as a parse quality warning where it happened.
+
+    What *is* a finding is a mechanism that had a network and still could not
+    run: that is reported as a data-quality Issue, because an engine that did
+    not run has not cleared the model and step 1 of the four-step rule forbids
+    saying otherwise.
+
+    MM-001 suppresses its own Low band, but XM-001 reports every surviving
+    couple including Low ones, so the filter is applied here rather than
+    assumed. ``data_quality`` Issues are exempt, which is step 4: they are the
+    record that something was not assessed, and dropping them is what turns a
+    gap back into a silent pass.
+
+    Args:
+        parsed: The ``ParsedIFC`` being assessed.
+        allocator: The run-wide id allocator, shared with the per-element loop
+            so ids stay unique across all five mechanisms.
+        include_low: Keep Low-band findings. Matches
+            :func:`run_corrosion_analysis`.
+
+    Returns:
+        Every Issue the network mechanisms produced, after the filter.
+    """
+    piping = parsed.get("piping_elements") or []
+    issues: list[Issue] = []
+
+    if not piping:
+        logger.info(
+            "Network mechanisms skipped; no piping network on this parse "
+            "(mechanisms=%s)",
+            ", ".join(spec.code for spec in NETWORK_MECHANISMS),
+        )
+        return issues
+
+    for spec in NETWORK_MECHANISMS:
+        found, error = _assess_network(piping, spec, allocator)
+        if error is not None:
+            issues.append(_network_data_quality_issue(spec, error, allocator))
+            continue
+        issues.extend(
+            issue
+            for issue in found
+            if include_low
+            or issue.band is not RiskBand.LOW
+            or issue.mechanism == DATA_QUALITY
+        )
+
+    return issues
 
 
 def _result(issues: list[Issue], *, error: str | None = None) -> dict:

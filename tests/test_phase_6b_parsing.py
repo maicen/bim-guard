@@ -100,6 +100,7 @@ class TestEnvelopeShape:
             "elements",
             "element_count",
             "type_counts",
+            "piping_elements",
             "quality",
         }
 
@@ -117,6 +118,7 @@ class TestEnvelopeShape:
             "elements",
             "element_count",
             "type_counts",
+            "piping_elements",
             "quality",
         }
         assert set(bad["quality"]) == {"valid", "error", "warnings", "improvements"}

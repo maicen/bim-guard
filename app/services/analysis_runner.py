@@ -125,7 +125,13 @@ def _run_corrosion_tracked(content: bytes, project_id: int) -> dict:
         for code in TRACKED_ENGINES:
             emit(code, Stage.IFC_PARSING)
 
-        parsed = parse_ifc_bytes(content, source_ref=f"project-{project_id}")
+        # with_piping: MM-001 and XM-001 read the PipingElement view, which
+        # carries the operating temperature and the connectivity ServiceElement
+        # does not. Built from the model this parse already has open rather than
+        # by reopening the file, which dominates runtime on large models.
+        parsed = parse_ifc_bytes(
+            content, source_ref=f"project-{project_id}", with_piping=True
+        )
         quality = parsed.get("quality", {})
 
         if not quality.get("valid", False):

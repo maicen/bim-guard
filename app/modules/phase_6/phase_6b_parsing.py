@@ -20,6 +20,24 @@ drive every design decision here:
 The element shape is :class:`~app.modules.module2_ifc_read.ifc_parser.ServiceElement`,
 which already exists and is **not** redefined here — this module composes the
 Module 2 reader into the envelope the Phase 6+ sessions agreed on.
+
+THE SECOND ELEMENT VIEW: ``piping_elements``
+
+    ``ServiceElement`` carries no operating temperature and no connectivity, so
+    it cannot drive MM-001 (which needs the temperature the medium runs at) or
+    XM-001 (which needs to know what touches what). Those two engines read
+    :class:`~app.modules.module2_ifc_read.piping_schema.PipingElement`, which
+    the Module 2 piping producer builds from the same model.
+
+    It is produced here, from the model this module already has open, rather
+    than by reopening the file downstream: ``produce_piping_elements_from_model``
+    exists precisely to avoid a second ``ifcopenshell.open``, which dominates
+    runtime on large models.
+
+    It is opt-in via ``with_piping`` because it is not free — it resolves
+    geometry and adjacency for every piping entity — and only the corrosion
+    path needs it. The key is always present, so no caller has to branch on
+    whether it was requested.
 """
 
 from __future__ import annotations
@@ -35,6 +53,8 @@ from app.modules.module2_ifc_read.ifc_parser import (
     get_schema_compatibility_note,
     parse_ifc_model,
 )
+from app.modules.module2_ifc_read.piping_producer import produce_piping_elements_from_model
+from app.modules.module2_ifc_read.piping_schema import PipingElement
 
 logger = get_logger(__name__)
 
@@ -62,6 +82,10 @@ class ParsedIFC(TypedDict):
     elements: list[ServiceElement]
     element_count: int
     type_counts: dict[str, int]
+    #: The piping view of the same model, for MM-001 and XM-001. Empty unless
+    #: the caller asked for it with ``with_piping=True``, and empty (never
+    #: absent) when the producer could not run — see the module docstring.
+    piping_elements: list[PipingElement]
     quality: ParsedIFCQuality
 
 
@@ -93,6 +117,7 @@ def _empty_result(source_ref: str, source_sha256: str, error: str) -> ParsedIFC:
         elements=[],
         element_count=0,
         type_counts={},
+        piping_elements=[],
         quality=ParsedIFCQuality(valid=False, error=error, warnings=[], improvements=[]),
     )
 
@@ -186,7 +211,9 @@ def _quality_warnings(elements: list[ServiceElement]) -> list[str]:
     return warnings
 
 
-def parse_ifc_bytes(content: bytes, *, source_ref: str = "") -> ParsedIFC:
+def parse_ifc_bytes(
+    content: bytes, *, source_ref: str = "", with_piping: bool = False
+) -> ParsedIFC:
     """Parse IFC ``content`` into the ``ParsedIFC`` contract.
 
     The primary entry point. Takes bytes rather than a path so an object can be
@@ -200,6 +227,10 @@ def parse_ifc_bytes(content: bytes, *, source_ref: str = "") -> ParsedIFC:
         content: Raw bytes of an IFC (SPF) file.
         source_ref: Storage reference these bytes came from, recorded on the
             result so a caller can trace it. Optional.
+        with_piping: Also build ``piping_elements`` from the same open model,
+            for the engines that need connectivity and operating temperature.
+            Off by default because it resolves geometry and adjacency for every
+            piping entity, which the seismic and architecture paths do not use.
 
     Returns:
         A :class:`ParsedIFC`. ``element_count`` always equals
@@ -252,10 +283,33 @@ def parse_ifc_bytes(content: bytes, *, source_ref: str = "") -> ParsedIFC:
 
     elements, collapsed = _deduplicate_by_guid(elements)
 
+    # The piping view. Failure here is never fatal: the corrosion run still has
+    # its ServiceElements for GC/CC/MC, and MM-001/XM-001 simply have no network
+    # to assess. Reported as a quality warning so the gap is visible rather than
+    # silent.
+    piping_elements: list[PipingElement] = []
+    piping_warning: str | None = None
+    if with_piping:
+        try:
+            piping_elements = produce_piping_elements_from_model(model, source_path=source_ref)
+        except Exception as exc:
+            piping_warning = (
+                "The piping network could not be extracted, so the material-media "
+                f"(MM-001) and cross-material (XM-001) checks did not run: {exc}"
+            )
+            logger.warning(
+                "Piping extraction failed source_ref=%s sha256=%s error=%s",
+                source_ref,
+                source_sha256,
+                exc,
+            )
+
     schema = str(getattr(model, "schema", "") or "")
     schema_note = get_schema_compatibility_note(model)
     type_counts = dict(Counter(e.ifc_type for e in elements))
     warnings = _quality_warnings(elements)
+    if piping_warning:
+        warnings.append(piping_warning)
     if collapsed:
         warnings.append(
             f"{collapsed} duplicate element row(s) were collapsed. IFC classes are "
@@ -264,11 +318,13 @@ def parse_ifc_bytes(content: bytes, *, source_ref: str = "") -> ParsedIFC:
         )
 
     logger.info(
-        "IFC parsed source_ref=%s sha256=%s schema=%s elements=%d types=%d warnings=%d",
+        "IFC parsed source_ref=%s sha256=%s schema=%s elements=%d piping=%d "
+        "types=%d warnings=%d",
         source_ref,
         source_sha256,
         schema,
         len(elements),
+        len(piping_elements),
         len(type_counts),
         len(warnings),
     )
@@ -281,6 +337,7 @@ def parse_ifc_bytes(content: bytes, *, source_ref: str = "") -> ParsedIFC:
         elements=elements,
         element_count=len(elements),
         type_counts=type_counts,
+        piping_elements=piping_elements,
         # improvements stays empty by design: generating them runs the quality
         # improver, which writes a new model. Rule 3 forbids that here, so it
         # belongs to an explicit enhancement step rather than to parsing.
@@ -288,7 +345,9 @@ def parse_ifc_bytes(content: bytes, *, source_ref: str = "") -> ParsedIFC:
     )
 
 
-def parse_ifc_file(path: str | Path, *, source_ref: str = "") -> ParsedIFC:
+def parse_ifc_file(
+    path: str | Path, *, source_ref: str = "", with_piping: bool = False
+) -> ParsedIFC:
     """Parse an IFC file from the local filesystem.
 
     Convenience wrapper over :func:`parse_ifc_bytes` for callers that already
@@ -298,6 +357,7 @@ def parse_ifc_file(path: str | Path, *, source_ref: str = "") -> ParsedIFC:
     Args:
         path: Path to a ``.ifc`` file.
         source_ref: Storage reference to record. Defaults to ``str(path)``.
+        with_piping: Passed through to :func:`parse_ifc_bytes`.
 
     Returns:
         A :class:`ParsedIFC`. A missing or unreadable file returns the failure
@@ -310,7 +370,7 @@ def parse_ifc_file(path: str | Path, *, source_ref: str = "") -> ParsedIFC:
     except OSError as exc:
         logger.warning("IFC file unreadable path=%s error=%s", path, exc)
         return _empty_result(ref, "", f"The IFC file could not be opened: {exc}")
-    return parse_ifc_bytes(content, source_ref=ref)
+    return parse_ifc_bytes(content, source_ref=ref, with_piping=with_piping)
 
 
 def elements_by_guid(parsed: ParsedIFC) -> dict[str, ServiceElement]:
