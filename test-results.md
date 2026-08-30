@@ -244,9 +244,10 @@ material they could not identify.
 XM-001 does produce real cross-material verdicts where a network exists:
 Clinic_HVAC gave 16 268 Medium couples alongside 507 data-quality ones.
 
-## Finding 4 — seismic still cannot evaluate any element of any real model
+## Finding 4 — seismic could not evaluate any element of any real model — FIXED
 
-Unchanged from the previous run and re-confirmed at this HEAD.
+**Resolved in commit `7aa8cf0`.** What the run measured, and what changed,
+is recorded below; the fix is described at the end of this finding.
 
 - Three structural models (Clinic_Structural, wr_str_ifc4, wbdg_office_str):
   **0 findings**. They carry beams, columns and footings but no distribution
@@ -271,9 +272,35 @@ which is the contrast that makes finding 6 a bug rather than a design choice.
 Seeding the database does not touch this: the 5 seeded `BIMGUARD-SB-001` rules
 are thresholds, and the blocker is geometry.
 
-**Fix sketch** (not applied — it changes engine behaviour and wants domain
-review): resolve `IfcMappedItem` by recursing into its mapping source and
-composing `MappingTarget`, and collect vertices from `IfcFacetedBrep` faces.
+**Fix applied** (`7aa8cf0`): `_local_vertices` now walks representation items
+recursively. `IfcMappedItem` resolves through its mapping source with the
+vertices transformed by `get_mappeditem_transformation`; boundary
+representations (`IfcFacetedBrep` and the rest of `IfcManifoldSolidBrep`,
+`IfcFaceBasedSurfaceModel`, `IfcShellBasedSurfaceModel`) are read through their
+faces; `IfcBooleanResult` takes its first operand, whose extent contains the
+result. Swept solids are still reduced to their extrusion axis.
+
+**After the fix**, all 926 `IfcDistributionElement` in Duplex_MEP resolve a
+bounding box (median extent 35 mm), and seismic reports clearance instead of
+data quality:
+
+| Model | Before | After |
+| --- | --- | --- |
+| Duplex_MEP | 427 data-quality | **4 773 verdicts** — 39 critical, 151 high, 4 583 medium |
+| wbdg_office_mep | 1 959 data-quality | **17 406 verdicts** — 131 critical, 1 018 high |
+| Clinic_Plumbing | 10 data-quality | **12 245 verdicts** — 97 critical, 474 high |
+
+Findings carry overlap volumes, percentages, EN 1998-1 / DIN 4149 citations and
+mitigations. The structural models still return nothing, which is a dataset
+property — they carry no distribution services — not a geometry one.
+
+**Still open**: the counts are large because a 200 mm halo around densely
+packed MEP catches most neighbours. Whether that threshold is right for these
+models is a domain question this change does not settle; it only makes the
+engine able to ask it. The identical geometry limitation also remains in
+`module2_ifc_read/piping_producer._local_vertices`, which feeds the corrosion
+network geometry — left alone deliberately, since changing it would move the
+corrosion numbers reported above.
 
 ## Finding 5 — the schema twins are not the same model
 
@@ -319,7 +346,7 @@ ruleset:BUILDING-CODE-PART9` at import, and `test_imports` fails by name
 because they are in neither the known-failure nor the regression registry.
 Whatever the fix for finding 1 is, it should let these modules import.
 
-## Finding 8 — architecture does not return the same answer twice
+## Finding 8 — architecture did not return the same answer twice — FIXED
 
 The same model, the same server, four consecutive runs with `use_cache=false`:
 
@@ -337,13 +364,30 @@ other. Both models parse the same element count (3 298) and load the same 51
 rules in both cases, so the input is identical.
 
 Every rule observed flipping targets `IfcSpace` on a numeric property
-(`Height`, `Width`). I did not root-cause it — it is not a warm-up effect
-(runs 3 and 4 reverted) and it is not `PYTHONHASHSEED`, since it varies inside
-one process.
+(`Height`, `Width`).
 
-**This matters more than its size suggests.** A compliance report that a client
-acts on has to be reproducible; "we ran it twice and got different violations"
-is not a defensible position for a thesis submission or an audit.
+**Root cause, found and fixed in `%%COMMIT%%`** — the full investigation is in
+`findings.txt`. `IFCGeometryExtractor._get_shape` cached tessellated shapes
+under `id(element)`, the CPython address of an ifcopenshell wrapper.
+ifcopenshell creates a fresh wrapper on every entity access and frees it when
+the caller drops it, so those addresses are recycled: fetching
+wbdg_office_arc's 99 spaces twice, 32 addresses were reused and **31 of them
+came back pointing at a different space**. A cache hit therefore returned
+another element's geometry, or a cached `None`. Only geometry-derived
+properties were affected, which is why the flipping rules were all `IfcSpace`
+measurements.
+
+The cache is now keyed on the STEP entity id. After the fix, wbdg_office_arc
+returns 1 304 findings on six consecutive runs with an identical rule-by-rule
+breakdown, and Clinic_Architectural returns 2 847 both within a boot and across
+a restart.
+
+**The deterministic answer is the lower count, and it is the right one.** Every
+space in wbdg_office_arc is at least 2 500 mm tall (median 2 500, max 9 757), so
+none can violate the 1 950 mm bathroom-ceiling rule. The three `CODE 9.5.1.2`
+findings that came and went were **false violations** produced by measuring a
+space with another element's shape. The bug was inventing findings, not hiding
+them — which makes it a correctness bug, not only a reproducibility one.
 
 ## Notes
 
@@ -379,21 +423,23 @@ is not a defensible position for a thesis submission or an audit.
 | Piping corrosion, 5 engines | **Qualified** — GC-001 reports nothing against a seeded database (finding 2) |
 | Material handling | **Qualified** — MM/XM report data quality honestly; GC/CC/MC band unidentified material as if known (finding 3) |
 | Architecture, 47 rules | **Not as claimed** — the packs work, nothing seeds them; the app evaluates 4 (finding 1) |
-| Architecture, reproducible output | **No** (finding 8) |
+| Architecture, reproducible output | **Fixed** — identical across 6 runs and a restart (finding 8) |
 | Architecture risk bands | **No** — every band reports 0 (finding 6) |
-| Seismic SB-001 | **Not production-ready** — evaluates nothing on real exports (finding 4) |
+| Seismic SB-001 | **Fixed** — reads mapped and boundary geometry; now returns clearance verdicts, thresholds need review (finding 4) |
 
-**Ready for submission: NOT YET.** The piping pipeline is genuinely validated at
-scale, and the export, cache, gating and schema behaviour is solid. Three things
-stand between this and a defensible submission, in order of cost to fix:
+**Ready for submission: CLOSER, NOT YET.** Findings 4 and 8 are fixed —
+seismic reads real geometry and architecture is reproducible. The piping
+pipeline was already validated at scale, and export, cache, gating and schema
+behaviour is solid. What is left:
 
 1. **Seed the Part 9 packs** (finding 1) — one line, and the 47-rule claim
    becomes true.
 2. **Decide the GC-001 band question** (finding 2) — a galvanic engine that
    cannot surface a finding is worse than no engine, and the answer depends on
    whether the DB weights are right.
-3. **Make architecture deterministic** (finding 8) and **fix the seismic
-   geometry reader** (finding 4) — both are real engineering, not wiring.
+3. **Review the seismic clearance threshold** — SB-001 now evaluates, and a
+   200 mm halo flags most neighbours in dense MEP. That number needs a domain
+   decision before the counts mean anything.
 
 Findings 3, 6 and 7 are honest-description and presentation issues that should
 be fixed before the material-coverage story is written up: the dataset's

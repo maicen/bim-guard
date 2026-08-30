@@ -128,7 +128,9 @@ class IFCGeometryExtractor:
         self.model = ifc_model
         self._settings = None
         self._unit_scale: float = 1.0        # model-unit → mm
-        self._shape_cache: dict[int, object] = {}  # element id → shape
+        # Keyed on the STEP entity instance id, never on id(element): see
+        # _get_shape for why the Python object address is not an identity.
+        self._shape_cache: dict[int, object] = {}  # STEP #id → shape
 
         if IFCOS_AVAILABLE and ifc_model is not None:
             try:
@@ -187,19 +189,38 @@ class IFCGeometryExtractor:
     # ── Shape helper (cached) ─────────────────────────────────────────────────
 
     def _get_shape(self, element):
-        """Return tessellated shape for *element*, cached by element id."""
+        """Return tessellated shape for *element*, cached by STEP entity id.
+
+        The cache key must be the entity's own ``#id``, not ``id(element)``.
+        ifcopenshell hands out a fresh ``entity_instance`` wrapper on every
+        lookup and frees it when the caller drops it, so CPython reuses those
+        addresses: fetching a model's spaces twice in a row, 31 of 99 addresses
+        came back pointing at a *different* space. Keyed that way the cache
+        silently answered one element with another element's geometry -- or
+        with a cached ``None``, which is what made a space's derived Height or
+        Width vanish and a rule stop firing between two otherwise identical
+        runs.
+        """
         if self._settings is None or element is None:
             return None
-        eid = id(element)
+        try:
+            eid = element.id()
+        except Exception:
+            # Not an ifcopenshell entity; nothing stable to key on, so measure
+            # it and do not cache.
+            return self._create_shape(element)
         if eid in self._shape_cache:
             return self._shape_cache[eid]
+        shape = self._create_shape(element)
+        self._shape_cache[eid] = shape
+        return shape
+
+    def _create_shape(self, element):
+        """Tessellate *element*, returning None if ifcopenshell cannot."""
         try:
-            shape = ifcopenshell.geom.create_shape(self._settings, element)
-            self._shape_cache[eid] = shape
-            return shape
+            return ifcopenshell.geom.create_shape(self._settings, element)
         except Exception as exc:
             logger.debug(f"create_shape failed for {element}: {exc}")
-            self._shape_cache[eid] = None
             return None
 
     # ── BOUNDING BOX ─────────────────────────────────────────────────────────
