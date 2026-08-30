@@ -35,8 +35,8 @@ NO DEMO MODE
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 from app.logging_config import get_logger
 from app.modules.module2_producer.halo_volume_generator import (
@@ -56,6 +56,11 @@ from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
 from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
 
 logger = get_logger(__name__)
+
+#: Label the primary model's elements are attributed to when a project federates
+#: several. Not the file's name: the caller may have none, and the primary is
+#: identified by its role rather than by what it happens to be called.
+PRIMARY_MODEL_LABEL = "primary model"
 
 #: Jurisdiction config shipped with the Blue Halo work. Phase 2 output.
 DEFAULT_CONFIG_PATH = Path("data/config_en_1998_1_din_4149.json")
@@ -133,8 +138,15 @@ def _data_quality_issue(
     ifc_class: str,
     reason: str,
     allocator: IssueIdAllocator,
+    source_model: str = "",
 ) -> Issue:
-    """Report that an element could not be assessed for seismic clearance."""
+    """Report that an element could not be assessed for seismic clearance.
+
+    Args:
+        source_model: The model the element came from. Carried so a coordinator
+            reading a federated run knows which file to open, and defaulted to
+            empty for a single-model run where there is no ambiguity.
+    """
     return make_issue(
         id=allocator.next("SB"),
         element_id=element_id,
@@ -154,6 +166,7 @@ def _data_quality_issue(
             "mechanism_code": MECHANISM_CODE,
             "reason": reason,
             "ifc_class": ifc_class,
+            "source_model": source_model,
         },
         citations=[],
     )
@@ -164,8 +177,16 @@ def _clash_issue(
     halo: HaloVolume,
     config: ClearanceConfig,
     allocator: IssueIdAllocator,
+    source_of: dict[str, str] | None = None,
 ) -> Issue:
-    """Convert one :class:`ClashReport` into an :class:`Issue`."""
+    """Convert one :class:`ClashReport` into an :class:`Issue`.
+
+    Args:
+        source_of: Element id to source model. A clash between two models is the
+            finding a federated run exists to produce, and it is only actionable
+            if the report says which two.
+    """
+    sources = source_of or {}
     band = _severity_band(clash.severity, element=clash.halo_source_element_id)
     return make_issue(
         id=allocator.next("SB"),
@@ -194,6 +215,8 @@ def _clash_issue(
             "halo_id": clash.halo_id,
             "clashing_element_id": clash.clashing_element_id,
             "clashing_element_class": clash.clashing_element_class,
+            "source_model": sources.get(clash.halo_source_element_id, ""),
+            "clashing_source_model": sources.get(clash.clashing_element_id, ""),
             "overlap_volume_mm3": clash.overlap_volume_mm3,
             "clearance_mm": halo.clearance_mm,
             "brace_type": halo.brace_type.value,
@@ -242,18 +265,34 @@ def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[
 def run_seismic_analysis(
     ifc_bytes: bytes,
     *,
+    extra_models: Sequence[tuple[str, bytes]] = (),
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     brace_type: BraceType = BraceType.ANGLE_IRON,
     seismic_zone: bool = True,
     building_type: str = "standard",
     run_id: str = "BGR",
 ) -> dict:
-    """Run Blue Halo over a model and return the seismic ``AnalysisResult``.
+    """Run Blue Halo over a building and return the seismic ``AnalysisResult``.
+
+    WHY THIS ONE READS EVERY MODEL
+
+        A clearance envelope is a question about a building, not about a file.
+        The brace is in the mechanical model and the beam it has to clear is in
+        the structural one, so running this over a single discipline model finds
+        the clashes that discipline has with itself and reports silence about
+        the rest. Every model attached to the project is therefore read into one
+        geometry set, and clash detection runs across the union.
+
+        Corrosion is the opposite case and stays single-model: galvanic and
+        crevice assessment is a question about a pipe run and its materials, and
+        a second discipline's copy of the same run would double every finding.
 
     Args:
-        ifc_bytes: The model, as stored. Read directly rather than via
+        ifc_bytes: The primary model, as stored. Read directly rather than via
             ``ParsedIFC`` because clearance envelopes need real geometry and
             ``ServiceElement`` does not carry it.
+        extra_models: ``(label, bytes)`` for the project's other models. The
+            label names the file in any Issue raised against its elements.
         config_path: Jurisdiction clearance config (Blue Halo Phase 2 output).
         brace_type: Hardware category assumed installed on braced services.
         seismic_zone: Whether the site is in a declared seismic zone.
@@ -284,16 +323,45 @@ def run_seismic_analysis(
 
     try:
         import ifcopenshell
-
-        model = ifcopenshell.file.from_string(ifc_bytes.decode("utf-8", errors="replace"))
     except ImportError:
         return _result([], error="ifcopenshell is not installed, so IFC files cannot be read.")
-    except Exception as exc:
-        return _result([], error=f"The file could not be read as IFC: {exc}")
 
-    scale = unit_scale_to_mm(model)
-    geometries, failures = _geometries(model, scale)
-    by_id = {g.element_id: g for g in geometries}
+    geometries: list[ElementGeometry] = []
+    failures: list[tuple[str, str, str]] = []
+    source_of: dict[str, str] = {}
+    read: set[str] = set()
+    unread: dict[str, tuple[str, str, str]] = {}
+    duplicates = 0
+
+    for label, content in ((PRIMARY_MODEL_LABEL, ifc_bytes), *extra_models):
+        try:
+            model = ifcopenshell.file.from_string(content.decode("utf-8", errors="replace"))
+        except Exception as exc:
+            return _result([], error=f"{label} could not be read as IFC: {exc}")
+
+        model_geometries, model_failures = _geometries(model, unit_scale_to_mm(model))
+        for geometry in model_geometries:
+            # One element, one envelope. The same GlobalId in two models is the
+            # same element federated twice -- a linked reference, or one
+            # discipline's copy of another's -- and keeping both would have it
+            # clash with itself and report a clearance failure nobody can fix.
+            # The primary model is read first, so it is the copy that survives.
+            if geometry.element_id in read:
+                duplicates += 1
+                continue
+            read.add(geometry.element_id)
+            geometries.append(geometry)
+            source_of[geometry.element_id] = label
+        for element_id, ifc_class, reason in model_failures:
+            unread.setdefault(element_id, (element_id, ifc_class, reason))
+            source_of.setdefault(element_id, label)
+
+    # An element is unreadable only if no model could read it. One discipline
+    # federating a placeholder for an element another models properly is the
+    # normal case, and reporting it as unassessed there would be a finding about
+    # the federation rather than about the building. Deduplicated for the same
+    # reason the geometries are: one element, one report.
+    failures = [entry for element_id, entry in unread.items() if element_id not in read]
 
     allocator = IssueIdAllocator(run_id)
     issues: list[Issue] = []
@@ -301,7 +369,11 @@ def run_seismic_analysis(
     # An element whose geometry could not be read is reported, never skipped.
     for element_id, ifc_class, reason in failures:
         if ifc_class in BRACED_CLASSES:
-            issues.append(_data_quality_issue(element_id, ifc_class, reason, allocator))
+            issues.append(
+                _data_quality_issue(
+                    element_id, ifc_class, reason, allocator, source_of.get(element_id, "")
+                )
+            )
 
     braced = [g for g in geometries if g.ifc_class in BRACED_CLASSES]
     for geometry in braced:
@@ -314,14 +386,17 @@ def run_seismic_analysis(
         )
         candidates = [g for g in geometries if g.element_id != geometry.element_id]
         for clash in detect_halo_clash_against_geometry(halo, candidates):
-            issues.append(_clash_issue(clash, halo, config, allocator))
+            issues.append(_clash_issue(clash, halo, config, allocator, source_of))
 
     logger.info(
-        "Seismic analysis complete elements=%d braced=%d clashes=%d data_quality=%d",
+        "Seismic analysis complete models=%d elements=%d braced=%d clashes=%d "
+        "data_quality=%d federated_duplicates=%d",
+        1 + len(extra_models),
         len(geometries),
         len(braced),
         sum(1 for i in issues if i.mechanism != DATA_QUALITY),
         sum(1 for i in issues if i.mechanism == DATA_QUALITY),
+        duplicates,
     )
     return _result(issues)
 

@@ -79,10 +79,18 @@ def failure_result(error: str) -> dict:
 
 
 def model_bytes(project_id: int) -> tuple[bytes | None, str | None]:
-    """Return a project's IFC content, or a reason it is unavailable.
+    """Return a project's primary IFC content, or a reason it is unavailable.
 
-    Reads through ``resolve_ifc_file``, which materialises the object from
-    storage into the local cache when needed. A read path; nothing here writes.
+    The primary model and only the primary model. A project may hold several --
+    the discipline models of one building -- but corrosion assessment is a
+    question about a pipe run and its materials, and a second model's copy of
+    the same run would double every finding rather than add one. The analysis
+    that does want the whole building is seismic; it uses
+    :func:`model_bytes_all`.
+
+    Reads through ``resolve_primary_ifc_file``, which materialises the object
+    from storage into the local cache when needed. A read path; nothing here
+    writes.
 
     Returns:
         ``(content, None)`` on success, ``(None, reason)`` on failure.
@@ -90,17 +98,67 @@ def model_bytes(project_id: int) -> tuple[bytes | None, str | None]:
     project = _projects_service.get_project(project_id)
     if project is None:
         return None, "That project no longer exists."
-    if not project.get("ifc_file_path"):
-        return None, "No IFC model is attached to this project yet."
 
-    path = _projects_service.resolve_ifc_file(project_id)
+    path = _projects_service.resolve_primary_ifc_file(project_id)
     if path is None:
+        if not _projects_service.get_ifc_files_by_project(project_id):
+            return None, "No IFC model is attached to this project yet."
         return None, "The IFC model could not be retrieved from storage."
     try:
         return path.read_bytes(), None
     except OSError as exc:
         logger.warning("IFC unreadable project_id=%d error=%s", project_id, exc)
         return None, f"The IFC model could not be read: {exc}"
+
+
+def _federated_sha256(models: list[tuple[str, bytes]]) -> str:
+    """Digest a set of models as one, so any change to any of them is a miss.
+
+    Digests the per-model digests rather than the concatenated bytes: it is the
+    same one-pass cost, and it keeps the result independent of how the models
+    happen to be chunked in memory.
+    """
+    return sha256_of("".join(sha256_of(content) for _, content in models).encode("ascii"))
+
+
+def model_bytes_all(
+    project_id: int,
+) -> tuple[list[tuple[str, bytes]], str | None]:
+    """Return every IFC model attached to a project, primary first.
+
+    WHY A MISSING FILE FAILS THE WHOLE RUN
+
+        The caller federates these into one geometry set and looks for clashes
+        between them. Dropping a model that could not be fetched would not cost
+        detail, it would remove the clashes that model takes part in -- and the
+        run would report clearance where it had simply stopped looking. A
+        partial set is therefore refused by name rather than analysed quietly.
+
+    Returns:
+        ``([(file_name, content), ...], None)`` on success, ``([], reason)`` on
+        failure.
+    """
+    if _projects_service.get_project(project_id) is None:
+        return [], "That project no longer exists."
+
+    resolved, missing = _projects_service.resolve_ifc_file_paths(project_id)
+    if missing:
+        names = ", ".join(row.get("file_name") or row.get("file_path", "?") for row in missing)
+        return [], f"These models could not be retrieved from storage: {names}."
+    if not resolved:
+        return [], "No IFC model is attached to this project yet."
+
+    models: list[tuple[str, bytes]] = []
+    for row, path in resolved:
+        name = row.get("file_name") or path.name
+        try:
+            models.append((name, path.read_bytes()))
+        except OSError as exc:
+            logger.warning(
+                "IFC unreadable project_id=%d file=%s error=%s", project_id, name, exc
+            )
+            return [], f"{name} could not be read: {exc}"
+    return models, None
 
 
 def _run_corrosion_tracked(
@@ -323,7 +381,15 @@ def run_analysis(
             f"Unknown analysis {slug!r}; expected one of {', '.join(RUNNABLE_SLUGS)}."
         )
 
-    content, error = model_bytes(project_id)
+    # Seismic reads every model the project holds; the others read the primary.
+    # The two are loaded through different helpers rather than one with a flag,
+    # so which analysis federates is visible here rather than several calls away.
+    models: list[tuple[str, bytes]] = []
+    if slug == "seismic":
+        models, error = model_bytes_all(project_id)
+        content = models[0][1] if models else b""
+    else:
+        content, error = model_bytes(project_id)
     if error:
         return failure_result(error)
 
@@ -333,7 +399,11 @@ def run_analysis(
     key = CacheKey(
         project_id=project_id,
         slug=slug,
-        source_sha256=sha256_of(content),
+        # A federated run is stale if any of its models changed, so the digest
+        # covers all of them. Attaching a second model to a project therefore
+        # misses the entry its primary alone produced, which is the point:
+        # the answer genuinely differs once there is more geometry to clash with.
+        source_sha256=_federated_sha256(models) if models else sha256_of(content),
         engines=engine_codes,
     )
 
@@ -349,7 +419,7 @@ def run_analysis(
         # Not tracked: the seismic analysis is not one of the engines the
         # workflow endpoint reports, and binding a tracker here would reset a
         # corrosion run's progress for the same project.
-        result = run_seismic_analysis(content)
+        result = run_seismic_analysis(content, extra_models=models[1:])
     elif slug == "architecture":
         result = _run_architecture(project_id)
     else:

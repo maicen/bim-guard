@@ -183,6 +183,37 @@ class ProjectResponse(BaseModel):
     updated_at: Optional[str] = None
 
 
+class ProjectIfcFileResponse(BaseModel):
+    """One IFC model attached to a project."""
+
+    id: Optional[int] = Field(
+        default=None,
+        description=(
+            "project_ifc_files.id; None for a model attached before that table "
+            "existed, which is reported from projects.ifc_file_path"
+        ),
+    )
+    project_id: int
+    file_path: str = Field(..., description="ObjectStorage reference for the stored model")
+    file_name: str = ""
+    is_primary: bool = False
+    role: str = Field(
+        default="context",
+        description="Discipline the model carries, e.g. structural; an open vocabulary",
+    )
+    uploaded_at: Optional[str] = None
+
+
+class ProjectIfcUploadResponse(BaseModel):
+    """Outcome of attaching one or more IFC models to a project."""
+
+    success: bool = True
+    files: list[ProjectIfcFileResponse] = Field(default_factory=list)
+    primary_id: Optional[int] = Field(
+        default=None, description="id of the model the analysis runs start from"
+    )
+
+
 class ProjectListResponse(BaseModel):
     """Paginated or listed collection of projects."""
 

@@ -54,8 +54,17 @@ def calls(monkeypatch) -> list:
         return empty_result()
 
     monkeypatch.setattr(runner, "model_bytes", lambda project_id: (b"IFC", None))
+    # Seismic federates every model the project holds, so it loads through
+    # model_bytes_all rather than model_bytes and hands the rest to the kernel
+    # as extra_models. Both loaders are stubbed: this file is about the cache
+    # key and the engine selection, not about storage.
+    monkeypatch.setattr(
+        runner, "model_bytes_all", lambda project_id: ([("primary.ifc", b"IFC")], None)
+    )
     monkeypatch.setattr(runner, "_run_corrosion_tracked", fake_corrosion)
-    monkeypatch.setattr(runner, "run_seismic_analysis", lambda content: empty_result())
+    monkeypatch.setattr(
+        runner, "run_seismic_analysis", lambda content, **kwargs: empty_result()
+    )
     return recorded
 
 

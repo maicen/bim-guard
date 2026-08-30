@@ -505,6 +505,204 @@ class ProjectsService:
             "uploaded_at": (project or {}).get("created_at") or "",
         }
 
+
+    #: Role recorded for a model that carries no discipline of its own: the one
+    #: the migration's backfill uses, so a row this service writes and a row the
+    #: backfill wrote describe the primary model the same way.
+    PRIMARY_ROLE = "primary"
+
+    def _invalidate_ifc_files(self, project_id: int) -> None:
+        """Drop the cached file list for a project after writing to it."""
+        invalidate_cache(f"bimguard:projects:ifc_files:project_id={project_id}")
+
+    def _demote_primary_ifc_files(self, project_id: int) -> None:
+        """Clear ``is_primary`` on every row of a project.
+
+        Called before a row claims primary, never after: the unique partial
+        index on ``(project_id) WHERE is_primary`` rejects a second claimant, so
+        demoting first is what makes the promotion succeed rather than a
+        tidy-up that happens to follow it.
+        """
+        for row in self._read_ifc_file_rows(project_id):
+            if row.get("is_primary") and row.get("id") is not None:
+                self._ifc_files.update(updates={"is_primary": False}, pk_values=row["id"])
+
+    def _adopt_legacy_ifc_file(self, project_id: int) -> None:
+        """Give a pre-migration model a row of its own before others join it.
+
+        ``get_ifc_files_by_project`` reports ``projects.ifc_file_path`` only
+        while the child table holds nothing for the project. The first row
+        written therefore ends that fallback, and a model attached before this
+        table existed would drop out of the list at exactly the moment a second
+        model arrived. Writing it in first is what stops an upload from
+        detaching the model already there.
+        """
+        if self._read_ifc_file_rows(project_id):
+            return
+        legacy = self._legacy_ifc_file(project_id)
+        if legacy is None:
+            return
+        self._ifc_files.insert(
+            {
+                "project_id": project_id,
+                "file_path": legacy["file_path"],
+                "file_name": legacy["file_name"],
+                "is_primary": True,
+                "role": self.PRIMARY_ROLE,
+                "uploaded_at": legacy.get("uploaded_at") or now_iso_utc(),
+            }
+        )
+        logger.info(
+            "Adopted pre-migration IFC into project_ifc_files project_id=%d ref=%s",
+            project_id,
+            legacy["file_path"],
+        )
+
+    def add_ifc_file(
+        self,
+        project_id: int,
+        *,
+        file_path: str,
+        file_name: str = "",
+        role: str = "context",
+        is_primary: bool = False,
+    ) -> dict:
+        """Attach one IFC model to a project and return the row written.
+
+        Args:
+            project_id: Project the model belongs to.
+            file_path: ``ObjectStorage`` reference for the stored bytes.
+            file_name: Display name; the basename of ``file_path`` when blank.
+            role: Discipline the model carries, e.g. ``"structural"``. An open
+                vocabulary — the column has no CHECK for the same reason.
+            is_primary: Whether this becomes the model an analysis run starts
+                from. Any previous primary is demoted first, and
+                ``projects.ifc_file_path`` is repointed so the two agree.
+
+        Returns:
+            The inserted row.
+
+        Raises:
+            ValueError: if ``file_path`` is blank. A row with no reference
+                names no model and would only fail later, at read time.
+        """
+        file_path = (file_path or "").strip()
+        if not file_path:
+            raise ValueError("file_path is required to attach an IFC model")
+
+        self._adopt_legacy_ifc_file(project_id)
+        if is_primary:
+            self._demote_primary_ifc_files(project_id)
+
+        row = {
+            "project_id": project_id,
+            "file_path": file_path,
+            "file_name": (file_name or "").strip() or Path(file_path.replace("\\", "/")).name,
+            "is_primary": bool(is_primary),
+            "role": (role or "").strip() or "context",
+            "uploaded_at": now_iso_utc(),
+        }
+        inserted = self._ifc_files.insert(row)
+        self._invalidate_ifc_files(project_id)
+
+        # The mirror, not a duplicate: every reader that predates this table --
+        # the analysis runner, the IFC download, model lineage -- resolves a
+        # project's model through projects.ifc_file_path, so the primary is only
+        # really primary once that column names it too.
+        if is_primary:
+            self.attach_ifc(project_id, file_path)
+
+        logger.info(
+            "IFC file attached project_id=%d role=%s primary=%s ref=%s",
+            project_id,
+            row["role"],
+            row["is_primary"],
+            file_path,
+        )
+        return inserted if isinstance(inserted, dict) else row
+
+    def set_primary_ifc_file(self, project_id: int, file_id: int) -> dict | None:
+        """Promote one of a project's models to primary.
+
+        Args:
+            project_id: Project owning the row.
+            file_id: ``project_ifc_files.id`` to promote.
+
+        Returns:
+            The promoted row, or ``None`` if the project holds no such row --
+            including the case where ``file_id`` belongs to another project,
+            which is a caller error rather than grounds for repointing the
+            wrong project's model.
+        """
+        target = next(
+            (
+                row
+                for row in self._read_ifc_file_rows(project_id)
+                if row.get("id") == file_id
+            ),
+            None,
+        )
+        if target is None:
+            logger.warning(
+                "Primary IFC not set; no such file project_id=%d file_id=%s",
+                project_id,
+                file_id,
+            )
+            return None
+
+        self._demote_primary_ifc_files(project_id)
+        self._ifc_files.update(updates={"is_primary": True}, pk_values=file_id)
+        self._invalidate_ifc_files(project_id)
+        self.attach_ifc(project_id, target.get("file_path") or "")
+
+        logger.info("Primary IFC set project_id=%d file_id=%s", project_id, file_id)
+        return {**target, "is_primary": True}
+
+    def resolve_primary_ifc_file(self, project_id: int) -> Path | None:
+        """Materialise the one model an analysis of a single model reads.
+
+        Resolves through ``get_primary_ifc_file`` rather than through
+        ``projects.ifc_file_path`` directly. The two agree -- every writer here
+        mirrors the primary onto that column -- but reading the child table
+        makes "the corrosion engines assess the primary model" a fact about the
+        code rather than an invariant a reader has to know about.
+        """
+        primary = self.get_primary_ifc_file(project_id)
+        if primary is None:
+            return None
+        return self._storage.materialize_local_path(primary.get("file_path") or "")
+
+    def resolve_ifc_file_paths(
+        self, project_id: int
+    ) -> tuple[list[tuple[dict, Path]], list[dict]]:
+        """Materialise every attached model locally, primary first.
+
+        The unresolved rows are returned rather than dropped. A caller that
+        analyses several models together can then refuse a partial set instead
+        of quietly analysing fewer models than the project holds -- an omission
+        that would understate cross-discipline clashes rather than merely lose
+        detail, and would do it silently.
+
+        Returns:
+            ``([(row, local_path), ...], [unresolved_row, ...])``, the first
+            list in ``get_ifc_files_by_project`` order.
+        """
+        resolved: list[tuple[dict, Path]] = []
+        missing: list[dict] = []
+        for row in self.get_ifc_files_by_project(project_id):
+            local_path = self._storage.materialize_local_path(row.get("file_path") or "")
+            if local_path is None:
+                missing.append(row)
+            else:
+                resolved.append((row, local_path))
+        logger.debug(
+            "Resolved project IFC files project_id=%d resolved=%d missing=%d",
+            project_id,
+            len(resolved),
+            len(missing),
+        )
+        return resolved, missing
+
     # ── standards ────────────────────────────────────────────────────────────
 
     @cache_db_query(key_prefix="bimguard:projects:standards")
