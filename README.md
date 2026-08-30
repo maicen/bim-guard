@@ -160,10 +160,6 @@ The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/
 - `/api/analyze` — Compliance and corrosion analysis execution
 - `/api/events/{project_id}` — Real-time Server-Sent Events (SSE) progress streaming
 
-### Legacy Web UI (Deprecated / Maintenance Only)
-Mounted at `http://127.0.0.1:8000/` during transition:
-- `/` landing page, `/dashboard`, `/projects`, `/library`, `/analyze`, `/viewer`
-
 ## Deployment
 
 ### Docker Compose
