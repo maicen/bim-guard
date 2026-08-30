@@ -162,3 +162,4 @@ Never use any of the following:
 | Polling backend for analysis progress | Use Server-Sent Events via `subscribeToEvents()` in `frontend/src/lib/sse.ts`. |
 | `datetime.utcnow()` | Use `datetime.now(timezone.utc)`. |
 | `from typing import Optional` | Use Python 3.10+ union syntax (`X | None`). |
+| Creating files in repo root (`./`) | Always place files in designated subfolders (`app/`, `frontend/`, `tests/`, `scripts/`, `docs/`, `data/`). |

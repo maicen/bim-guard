@@ -11,8 +11,8 @@ PASS: a test that did not run has not passed. Run against a server started by
 
 USAGE
 
-    uv run python scripts/e2e_suite.py --manifest e2e-models.json
-        --base-url http://127.0.0.1:8010 --out test-results.json
+    uv run python scripts/e2e_suite.py --manifest tests/e2e/e2e-models.json
+        --base-url http://127.0.0.1:8010 --out docs/validation/data/test-results.json
 """
 
 from __future__ import annotations
@@ -276,9 +276,9 @@ class Suite:
 def main() -> None:
     """Run every category the manifest has models for and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", required=True)
+    parser.add_argument("--manifest", default="tests/e2e/e2e-models.json")
     parser.add_argument("--base-url", default="http://127.0.0.1:8010")
-    parser.add_argument("--out", default="test-results.json")
+    parser.add_argument("--out", default="docs/validation/data/test-results.json")
     args = parser.parse_args()
 
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))

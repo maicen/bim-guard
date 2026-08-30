@@ -3,8 +3,8 @@
 Date: 2026-08-30
 Commit: d56e824 (+ this run)
 Dataset: maicen/bimguard-test-models — 38 rows, 34 IFC files, 1.3 GB checked out
-Harness: `scripts/e2e_server.py` + `scripts/e2e_suite.py`, manifest `e2e-models.json`
-Machine record: `test-results.json`
+Harness: `scripts/e2e_server.py` + `scripts/e2e_suite.py`, manifest `tests/e2e/e2e-models.json`
+Machine record: `docs/validation/data/test-results.json`
 
 ## Summary
 
