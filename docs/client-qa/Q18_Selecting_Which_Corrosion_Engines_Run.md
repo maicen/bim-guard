@@ -12,21 +12,42 @@
 Yes to the first, and no to the second — but the mechanism is worth understanding
 because it is not quite what most people assume.
 
-The interface offers checkboxes for three engines: **GC-001 Galvanic**,
-**CC-001 Crevice** and **MC-001 Microbiological**. GC and CC are selected by
-default. You can run any subset of the three, and the interface will not let you
-run with nothing selected. Seismic has no equivalent selector because it is a
+The interface offers checkboxes for **all five engines**, each independently
+toggleable, and **all five are selected by default**. The interface will not let
+you run with nothing selected. Seismic has no equivalent selector because it is a
 single engine with no subsets.
 
-The two network engines — **MM-001** (material-media) and **XM-001**
-(cross-material) — are **not currently in the selector**. They are network
-mechanisms rather than per-element ones: they run once over the whole extracted
-piping graph rather than element by element, and they execute on every corrosion
-run. So a "GC-only" run today means GC-001 plus the two network engines, not
-GC-001 alone. If you need their findings excluded from a report, filter by
-`rule_id` prefix in the CSV. This is a known gap between the five engines the
-pipeline runs and the three the selector exposes, and it is worth being explicit
-about rather than letting a "GC-only" label imply something it does not deliver.
+The five split into two kinds, and the selector labels them as such:
+
+| Engine | Kind | What it scores |
+| --- | --- | --- |
+| **GC-001 Galvanic** | Element | Dissimilar metals in contact, scored per element |
+| **CC-001 Crevice** | Element | Joint geometry and trapped electrolyte, per element |
+| **MC-001 Microbiological** | Element | Flow, temperature and dead legs, per element |
+| **MM-001 Material-Media** | Network | The medium each pipe carries against its material, scored across the system |
+| **XM-001 Cross-Material** | Network | Dissimilar metals joined across the network — cannot be scored one element at a time |
+
+MM-001 and XM-001 are **network mechanisms**: they analyse the piping system as a
+whole rather than individual segments, because the questions they ask do not
+exist at the level of a single element. A dissimilar-metal couple is a property
+of a *junction between two elements*, and a medium/material mismatch is resolved
+through a run's system assignment — neither can be answered by looking at one
+segment in isolation. That is a difference in scope, not in status: all five are
+equally selectable, and unchecking a network engine works exactly like unchecking
+an element one.
+
+> **Note.** Being a network mechanism has one practical consequence worth
+> knowing. Because MM-001 and XM-001 need the extracted piping graph, they depend
+> on connectivity and system assignments having survived the IFC export. If those
+> are missing, the two network engines will return `data_quality` findings rather
+> than verdicts even when they are selected — see Q04 and Q17.
+
+This is a recent correction. Previously the selector exposed only the three
+element engines while all five executed on every run, and the result filter
+dropped MM-001 and XM-001 findings whenever any selection was applied. Since a
+selection was always applied by default, those two engines ran on every audit and
+their findings were never shown. If you are comparing against a report issued
+before this change, that is why the network engines appear absent from it.
 
 ## What Selection Actually Does — and Why It Is Not a Speed Optimisation
 
@@ -154,9 +175,9 @@ totals. Export the unnarrowed JSON alongside it if you need the complete record.
 2. Use selection to shape the *packages* you issue — mechanical designer, water
    safety group, modeller — rather than to shape the run.
 3. State the scope in the cover note whenever you issue a narrowed report.
-4. Remember that MM-001 and XM-001 findings will appear regardless of the
-   checkbox selection. Filter by `rule_id` prefix if you need them out of a
-   specific package.
+4. Leave all five on unless you have a reason to narrow. Unchecking an engine
+   removes findings from the report; it does not remove work from the run, and it
+   does not make the analysis faster.
 5. Re-run after model revisions. An unchanged model returns the cached result,
    which is also a useful signal that the file you uploaded is the file you
    uploaded last time.
