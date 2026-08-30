@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from starlette.testclient import TestClient
 
+from app.api.analyze import _selected_engines
 from app.main import app
+from app.modules.contracts import AnalysisRunRequest
 
 client = TestClient(app)
 NONEXISTENT_ID = 999_999_999
@@ -34,3 +36,31 @@ def test_analyze_export_invalid_slug():
     response = client.get("/api/analyze/export?project_id=1&slug=invalid_slug&fmt=bcf")
     assert response.status_code == 400
 
+
+def test_run_request_accepts_an_engine_selection():
+    """The analyse page sends the checked engines; the contract must carry them."""
+    payload = AnalysisRunRequest(project_id=1, slug="corrosion", engines=["GC", "CC"])
+    assert _selected_engines(payload) == ["GC", "CC"]
+
+
+def test_run_request_without_engines_selects_everything():
+    """``None`` is "no selection made", which runs every engine."""
+    assert _selected_engines(AnalysisRunRequest(project_id=1)) is None
+
+
+def test_empty_engine_selection_is_preserved():
+    """An empty list must not be rounded up to "all" on the way through."""
+    payload = AnalysisRunRequest(project_id=1, engines=[])
+    assert _selected_engines(payload) == []
+
+
+def test_rule_ids_still_narrow_a_run():
+    """The older field names the same thing, so it is honoured as a fallback."""
+    payload = AnalysisRunRequest(project_id=1, rule_ids=["GC-001.01"])
+    assert _selected_engines(payload) == ["GC-001.01"]
+
+
+def test_engines_wins_over_rule_ids():
+    """When both are sent, the explicit engine selection is the request."""
+    payload = AnalysisRunRequest(project_id=1, engines=["CC"], rule_ids=["GC-001.01"])
+    assert _selected_engines(payload) == ["CC"]

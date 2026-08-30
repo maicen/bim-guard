@@ -91,6 +91,11 @@
   // silently hides findings after a route change.
   $: if (activeCategory) selectedEngines = PIPING_ENGINES.map((e) => e.id);
 
+  // What the backend is asked to run. SEISMIC is a single kernel with nothing
+  // to select between, so it sends no selection at all.
+  $: requestedEngines =
+    activeCategory === "seismic" ? undefined : selectedEngines;
+
   function toggleEngine(id: string) {
     selectedEngines = selectedEngines.includes(id)
       ? selectedEngines.filter((e) => e !== id)
@@ -176,6 +181,7 @@
         selectedProjectId,
         selectedSlug,
         useCache,
+        requestedEngines,
       );
     } catch {
       result = null;
@@ -193,6 +199,7 @@
         selectedSlug,
         false,
         !forceRecompute,
+        requestedEngines,
       );
     } catch (err: any) {
       error = err.message || "Analysis failed";
@@ -800,6 +807,7 @@
                 selectedProjectId,
                 selectedSlug,
                 "bcf",
+                requestedEngines,
               )}
               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm transition-all hover:scale-[1.02]"
               title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
@@ -812,6 +820,7 @@
                 selectedProjectId,
                 selectedSlug,
                 "csv",
+                requestedEngines,
               )}
               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
               title="Download tabulated audit spreadsheet with lineage and citations"
@@ -824,6 +833,7 @@
                 selectedProjectId,
                 selectedSlug,
                 "json",
+                requestedEngines,
               )}
               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
               title="Download structured machine-readable JSON analysis report"

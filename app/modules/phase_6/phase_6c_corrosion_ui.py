@@ -107,6 +107,48 @@ MIC = MechanismSpec("MC-001", "MC-001.01", "MC", "Microbiologically influenced c
 MECHANISMS: tuple[MechanismSpec, ...] = (GALVANIC, CREVICE, MIC)
 
 
+def resolve_mechanisms(engines: list[str] | None) -> tuple[MechanismSpec, ...]:
+    """Return the mechanisms an ``engines`` selection asks this run to execute.
+
+    Selection is resolved once, before the element loop, so an unselected
+    mechanism is never assessed. Filtering its findings out afterwards would
+    produce the same list at the cost of running the engine anyway.
+
+    Args:
+        engines: Engine codes from the caller, e.g. ``["GC-001", "CC"]``.
+            ``None`` means no selection was made and every mechanism runs.
+            An empty list is an explicit selection of nothing and runs none.
+            Entries match case-insensitively against the ruleset code
+            (``"GC-001"``), its Issue-id prefix (``"GC"``) and any rule id
+            built on the code (``"GC-001.01"``), because the checkbox UI sends
+            prefixes while the rules table stores full ids.
+
+    Returns:
+        The subset of :data:`MECHANISMS` to run, in declaration order.
+    """
+    if engines is None:
+        return MECHANISMS
+
+    wanted = {str(code).strip().upper() for code in engines if str(code).strip()}
+    # "GC-001.01" selects GC-001: a rule id names the ruleset it belongs to.
+    wanted |= {code.split(".", 1)[0] for code in wanted}
+    return tuple(
+        spec
+        for spec in MECHANISMS
+        if spec.code.upper() in wanted or spec.prefix.upper() in wanted
+    )
+
+
+def resolve_engine_codes(engines: list[str] | None) -> tuple[str, ...]:
+    """Return the ruleset codes :func:`resolve_mechanisms` would run.
+
+    The canonical form of a selection: ``None``, ``["gc"]`` and ``["GC-001"]``
+    all reduce to what actually executes, which is what a cache key and a
+    progress report need rather than the caller's spelling.
+    """
+    return tuple(spec.code for spec in resolve_mechanisms(engines))
+
+
 def normalise_band(raw: Any, *, element: str, mechanism: str) -> RiskBand:
     """Convert an engine's band label to a :class:`RiskBand` member.
 
@@ -378,6 +420,7 @@ def run_corrosion_analysis(
     *,
     include_low: bool = False,
     run_id: str = "BGR",
+    engines: list[str] | None = None,
 ) -> dict:
     """Assess every element in ``parsed`` and return the corrosion result.
 
@@ -386,6 +429,10 @@ def run_corrosion_analysis(
         include_low: Emit Low-band findings too. ``data_quality`` Issues are
             emitted regardless — see step 4.
         run_id: Prefix for allocated Issue ids.
+        engines: Ruleset codes to execute, as resolved by
+            :func:`resolve_mechanisms`. ``None`` runs every mechanism; a list
+            runs only the mechanisms it names, and the others are not assessed
+            at all rather than assessed and filtered.
 
     Returns:
         A dict carrying the ``AnalysisResult`` keys this session owns:
@@ -401,6 +448,14 @@ def run_corrosion_analysis(
     allocator = IssueIdAllocator(run_id)
     issues: list[Issue] = []
 
+    active = resolve_mechanisms(engines)
+    if not active:
+        # An empty selection is a valid request for nothing, not a fault: the
+        # caller unchecked every engine. Returning here also keeps the catalog
+        # reload below off the DB for a run that would assess nothing.
+        logger.info("Corrosion analysis selected no mechanism engines=%s", engines)
+        return _result([])
+
     try:
         from app.services.corrosion_rule_catalog import reload_all_catalogs
         reload_all_catalogs()
@@ -408,7 +463,7 @@ def run_corrosion_analysis(
         pass
 
     for element in elements:
-        for spec in MECHANISMS:
+        for spec in active:
             result, citations, error = _assess(element, spec)
 
             # Step 1: never invent a band.
@@ -435,11 +490,13 @@ def run_corrosion_analysis(
             issues.append(_finding_issue(element, spec, result, band, citations, allocator))
 
     logger.info(
-        "Corrosion analysis complete elements=%d issues=%d data_quality=%d include_low=%s",
+        "Corrosion analysis complete elements=%d issues=%d data_quality=%d "
+        "include_low=%s mechanisms=%s",
         len(elements),
         len(issues),
         sum(1 for i in issues if i.mechanism == DATA_QUALITY),
         include_low,
+        ",".join(spec.code for spec in active),
     )
     return _result(issues)
 

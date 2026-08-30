@@ -16,8 +16,15 @@ import pytest
 from app.services.analysis_cache import AnalysisCache, CacheKey
 
 
-def key(project_id: int = 1, slug: str = "corrosion", digest: str = "a" * 64) -> CacheKey:
-    return CacheKey(project_id=project_id, slug=slug, source_sha256=digest)
+def key(
+    project_id: int = 1,
+    slug: str = "corrosion",
+    digest: str = "a" * 64,
+    engines: tuple[str, ...] = (),
+) -> CacheKey:
+    return CacheKey(
+        project_id=project_id, slug=slug, source_sha256=digest, engines=engines
+    )
 
 
 def result(n: int = 1) -> dict:
@@ -172,3 +179,36 @@ class TestThreadSafety:
             t.join()
 
         assert cache.stats()["entries"] <= 50
+
+
+class TestEngineSelectionIsPartOfTheKey:
+    """A partial run and a full run are different results.
+
+    Without this dimension the first GC-001-only run would be served back to
+    every later request for the same model, reporting two engines' findings as
+    absent rather than as never asked for.
+    """
+
+    def test_a_narrowed_run_is_not_served_to_a_full_one(self, cache):
+        cache.put(key(engines=("GC-001",)), result(1))
+        assert cache.get(key(engines=("GC-001", "CC-001", "MC-001"))) is None
+
+    def test_a_full_run_is_not_served_to_a_narrowed_one(self, cache):
+        cache.put(key(engines=("GC-001", "CC-001", "MC-001")), result(9))
+        assert cache.get(key(engines=("CC-001",))) is None
+
+    def test_two_different_selections_do_not_collide(self, cache):
+        cache.put(key(engines=("GC-001",)), result(1))
+        cache.put(key(engines=("CC-001",)), result(7))
+        assert cache.get(key(engines=("GC-001",)))["issue_stats"]["total"] == 1
+        assert cache.get(key(engines=("CC-001",)))["issue_stats"]["total"] == 7
+
+    def test_the_same_selection_hits(self, cache):
+        cache.put(key(engines=("GC-001",)), result(3))
+        assert cache.get(key(engines=("GC-001",)))["issue_stats"]["total"] == 3
+
+    def test_no_selection_is_its_own_key(self, cache):
+        """An empty tuple records "the caller named no engines"."""
+        cache.put(key(engines=()), result(4))
+        assert cache.get(key(engines=("GC-001",))) is None
+        assert cache.get(key(engines=()))["issue_stats"]["total"] == 4

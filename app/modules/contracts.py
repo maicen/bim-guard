@@ -318,6 +318,14 @@ class AnalysisRunRequest(BaseModel):
     project_id: int = Field(..., description="Target project ID")
     slug: str = Field(default="corrosion", description="Analysis type slug (corrosion, seismic)")
     rule_ids: Optional[list[str]] = Field(default=None, description="Optional rule subset to evaluate")
+    engines: Optional[list[str]] = Field(
+        default=None,
+        description=(
+            "Engine codes to execute, e.g. ['GC-001', 'CC-001']. Prefixes ('GC') and "
+            "rule ids ('GC-001.01') are accepted. None runs every engine; an empty "
+            "list runs none. Unselected engines are skipped, not filtered afterwards."
+        ),
+    )
     use_cache: bool = Field(default=True, description="Whether to use cached analysis results")
 
 
