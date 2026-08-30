@@ -5,9 +5,12 @@ The seeding operations are idempotent: each routine checks whether its
 """
 
 import json
+from pathlib import Path
 
 from app.services.rules_service import RuleService
 from app.services.static_data_service import StaticDataService
+
+_RULESET_DIR = Path(__file__).resolve().parents[2] / "data" / "rulesets"
 
 _DEFAULT_CODE_RULESET_FILES = (
     "building_code_part9_ruleset.json",
@@ -24,6 +27,8 @@ def _load(filename: str) -> dict:
         "galvanic_corrosion_ruleset.json": "ruleset:BIMGUARD-GC-001",
         "crevice_corrosion_ruleset.json": "ruleset:BIMGUARD-CC-001",
         "mic_corrosion_ruleset.json": "ruleset:BIMGUARD-MC-001",
+        "mm_001_material_media.json": "ruleset:BIMGUARD-MM-001",
+        "xm_001_cross_material.json": "ruleset:BIMGUARD-XM-001",
     }
 
     asset_key = asset_key_map.get(filename)
@@ -31,6 +36,17 @@ def _load(filename: str) -> dict:
         payload = StaticDataService().get_asset_json(asset_key)
         if isinstance(payload, dict):
             return payload
+
+    # Database-primary, repository fallback: MM-001 and XM-001 ship as approved
+    # JSON documents in data/rulesets/ and are not yet registered in
+    # static_data_assets. Read them from disk so seeding is not blocked on a
+    # migration; the DB copy wins as soon as one exists.
+    local_path = _RULESET_DIR / filename
+    if local_path.is_file():
+        payload = json.loads(local_path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            return payload
+
     raise RuntimeError(f"Missing static ruleset asset: {filename}")
 
 
@@ -39,6 +55,20 @@ def _create(svc: RuleService, **kwargs) -> None:
     kwargs.setdefault("extraction_method", "seed")
     kwargs.setdefault("severity", "mandatory")
     svc.create_rule(**kwargs)
+
+
+def _existing_references(svc: RuleService, ruleset_id: str) -> set[str]:
+    """Return the references already stored for a ruleset.
+
+    Insertion is one network round trip per row, so a seeding run that is
+    interrupted part-way leaves the ruleset present but incomplete. Callers use
+    this to resume: skip the references already written, insert the rest.
+    """
+    return {
+        str(row.get("reference") or "").strip()
+        for row in svc.list_by_ruleset(ruleset_id)
+        if str(row.get("reference") or "").strip()
+    }
 
 
 def _seed_json_ruleset(svc: RuleService, filename: str) -> int:
@@ -445,21 +475,363 @@ def _seed_mc001(svc: RuleService) -> int:
     return count
 
 
+# ── MM-001 — Material / Media Compatibility ───────────────────────────────────
+
+
+def _seed_band_thresholds(
+    svc: RuleService,
+    *,
+    ruleset_id: str,
+    prefix: str,
+    mechanism: str,
+    target_ifc_class: str,
+    thresholds: dict,
+    existing: set[str] | None = None,
+) -> int:
+    """Seed numeric composite-score band thresholds ({'medium': 0.35, ...})."""
+    seen = existing if existing is not None else set()
+    count = 0
+    for band_name in ("medium", "high", "critical"):
+        if band_name not in thresholds:
+            continue
+        if f"{prefix}.BAND.{band_name.upper()}" in seen:
+            continue
+        seen.add(f"{prefix}.BAND.{band_name.upper()}")
+        _create(
+            svc,
+            mechanism=mechanism,
+            ruleset_id=ruleset_id,
+            target_ifc_class=target_ifc_class,
+            reference=f"{prefix}.BAND.{band_name.upper()}",
+            rule_type="risk_band",
+            rule_category="threshold_band",
+            description=(
+                f"Composite score >= {thresholds[band_name]} bands as {band_name.capitalize()}"
+            ),
+            check_value=thresholds[band_name],
+            operator=">=",
+            keyword=band_name.capitalize(),
+            parameters=json.dumps(
+                {
+                    "band": band_name.capitalize(),
+                    "min_score": thresholds[band_name],
+                    "note": thresholds.get("_note", ""),
+                }
+            ),
+        )
+        count += 1
+    return count
+
+
+def _seed_mm001(svc: RuleService) -> int:
+    """Decompose the MM-001 material/media pack into individual rule rows."""
+    RULESET_ID = "BIMGUARD-MM-001"
+    existing = _existing_references(svc, RULESET_ID)
+
+    mm = _load("mm_001_material_media.json")
+    params = mm.get("parameters", {})
+    meta = mm.get("metadata", {})
+    TARGET = "IfcPipeSegment"
+    MECH = "MM-001"
+    count = 0
+
+    def _r(**kw):
+        nonlocal count
+        if kw.get("reference") in existing:
+            return
+        _create(svc, mechanism=MECH, ruleset_id=RULESET_ID, target_ifc_class=TARGET, **kw)
+        existing.add(kw["reference"])
+        count += 1
+
+    # ── Scoring model ─────────────────────────────────────────────────────────
+    weights = params.get("weights", {})
+    _r(
+        reference="MM-001.SCORING",
+        rule_type="scoring_model",
+        rule_category="scoring_model",
+        description=meta.get(
+            "scoring_note",
+            "MM-001 composite = 0.40*material_media + 0.35*environment_severity "
+            "+ 0.25*temperature_stress",
+        ),
+        source_text="; ".join(str(s) for s in meta.get("standards", [])),
+        parameters=json.dumps({"weights": weights, "scoring_note": meta.get("scoring_note", "")}),
+    )
+
+    # ── Risk band thresholds ──────────────────────────────────────────────────
+    count += _seed_band_thresholds(
+        svc,
+        ruleset_id=RULESET_ID,
+        prefix="MM-001",
+        mechanism=MECH,
+        target_ifc_class=TARGET,
+        thresholds=params.get("risk_band_thresholds", {}),
+        existing=existing,
+    )
+
+    # ── Compatibility matrix (material × medium) ──────────────────────────────
+    for material, media in params.get("compatibility_matrix", {}).items():
+        if not isinstance(media, dict):
+            continue
+        for medium, cell in media.items():
+            if not isinstance(cell, dict):
+                continue
+            _r(
+                reference=f"MM-001.{material}.{medium}",
+                rule_type="material_media_compatibility",
+                rule_category="material_property",
+                description=(
+                    f"{material} carrying {medium}: compatibility score {cell.get('score')} "
+                    f"(higher = worse), predicted life {cell.get('years')} yr, "
+                    f"mechanism {cell.get('mech')}"
+                ),
+                check_value=cell.get("score"),
+                value_max=cell.get("years"),
+                unit="score",
+                keyword=material,
+                property_name=medium,
+                confidence=1.0 if cell.get("conf") == "established" else 0.5,
+                needs_review=cell.get("conf") != "established",
+                source_text=f"Source: {cell.get('cite', '')}",
+                parameters=json.dumps({**cell, "material": material, "medium": medium}),
+            )
+
+    # ── Environment severity classes ──────────────────────────────────────────
+    for env_key, data in params.get("environment_severity", {}).items():
+        if env_key.startswith("_") or not isinstance(data, dict):
+            continue
+        _r(
+            reference=f"MM-001.ENV.{env_key}",
+            rule_type="environment_severity",
+            rule_category="reference_config",
+            description=f"{env_key}: environment severity {data.get('severity')}",
+            check_value=data.get("severity"),
+            keyword=env_key,
+            source_text=f"Source: {data.get('cite', '')}",
+            parameters=json.dumps({**data, "class_key": env_key}),
+        )
+
+    # ── Temperature stress bands ──────────────────────────────────────────────
+    temp = params.get("temperature_stress", {})
+    for index, band in enumerate(temp.get("bands", []) or []):
+        if not isinstance(band, dict):
+            continue
+        low = band.get("min_c")
+        high = band.get("max_c")
+        _r(
+            reference=f"MM-001.TEMP.B{index + 1}",
+            rule_type="temperature_stress_band",
+            rule_category="threshold_band",
+            description=(
+                f"Operating temperature {low if low is not None else '-inf'}"
+                f"–{high if high is not None else '+inf'} °C: "
+                f"temperature stress {band.get('stress')}"
+            ),
+            check_value=band.get("stress"),
+            value_min=low,
+            value_max=high,
+            operator="between",
+            unit="°C",
+            source_text=f"Source: {band.get('cite', '')}",
+            parameters=json.dumps({**band, "band_index": index + 1}),
+        )
+
+    if temp.get("missing_temperature_policy"):
+        _r(
+            reference="MM-001.TEMP.MISSING_POLICY",
+            rule_type="data_quality_policy",
+            rule_category="reference_config",
+            description=str(temp["missing_temperature_policy"]),
+            severity="informational",
+            parameters=json.dumps({"policy": temp["missing_temperature_policy"]}),
+        )
+
+    # ── Kinetics guard ────────────────────────────────────────────────────────
+    guard = params.get("kinetics_guard")
+    if isinstance(guard, dict):
+        _r(
+            reference="MM-001.KINETICS_GUARD",
+            rule_type="kinetics_guard",
+            rule_category="reference_config",
+            description=(
+                f"Cells scoring below {guard.get('cell_below')} cap temperature stress at "
+                f"{guard.get('cap_temperature_stress_at')}"
+            ),
+            check_value=guard.get("cell_below"),
+            value_max=guard.get("cap_temperature_stress_at"),
+            operator="<",
+            source_text=f"Source: {guard.get('cite', '')}",
+            parameters=json.dumps(guard),
+        )
+
+    # ── Unmapped pairing policy ───────────────────────────────────────────────
+    if meta.get("unmapped_pairing_policy"):
+        _r(
+            reference="MM-001.UNMAPPED_PAIRING_POLICY",
+            rule_type="data_quality_policy",
+            rule_category="reference_config",
+            description=str(meta["unmapped_pairing_policy"]),
+            severity="informational",
+            parameters=json.dumps({"policy": meta["unmapped_pairing_policy"]}),
+        )
+
+    print(f"[RulesetSeeder] MM-001: {count} rules seeded")
+    return count
+
+
+# ── XM-001 — Cross-Material Contamination ─────────────────────────────────────
+
+
+def _seed_xm001(svc: RuleService) -> int:
+    """Decompose the XM-001 cross-material pack into individual rule rows."""
+    RULESET_ID = "BIMGUARD-XM-001"
+    existing = _existing_references(svc, RULESET_ID)
+
+    xm = _load("xm_001_cross_material.json")
+    params = xm.get("parameters", {})
+    meta = xm.get("metadata", {})
+    TARGET = "IfcPipeFitting"
+    MECH = "XM-001"
+    count = 0
+
+    def _r(**kw):
+        nonlocal count
+        if kw.get("reference") in existing:
+            return
+        _create(svc, mechanism=MECH, ruleset_id=RULESET_ID, target_ifc_class=TARGET, **kw)
+        existing.add(kw["reference"])
+        count += 1
+
+    # ── Scoring model ─────────────────────────────────────────────────────────
+    weights = params.get("weights", {})
+    _r(
+        reference="XM-001.SCORING",
+        rule_type="scoring_model",
+        rule_category="scoring_model",
+        description=(
+            f"XM-001 composite = {weights.get('voltage')}*voltage_risk + "
+            f"{weights.get('separation')}*separation_risk + "
+            f"{weights.get('environment')}*environment_risk"
+        ),
+        source_text="; ".join(str(s) for s in meta.get("standards", [])),
+        parameters=json.dumps({"weights": weights}),
+    )
+
+    # ── Risk band thresholds ──────────────────────────────────────────────────
+    count += _seed_band_thresholds(
+        svc,
+        ruleset_id=RULESET_ID,
+        prefix="XM-001",
+        mechanism=MECH,
+        target_ifc_class=TARGET,
+        thresholds=params.get("risk_band_thresholds", {}),
+        existing=existing,
+    )
+
+    # ── Environment → threshold class mapping ─────────────────────────────────
+    env_map = params.get("environment_threshold_class", {})
+    env_cite = str(env_map.get("cite", ""))
+    for env_key, value in env_map.items():
+        if env_key.startswith("_") or env_key in {"cite", "conf"}:
+            continue
+        _r(
+            reference=f"XM-001.ENV.{env_key}",
+            rule_type="environment_threshold_class",
+            rule_category="reference_config",
+            description=f"{env_key} maps to the '{value}' galvanic compatibility threshold class",
+            keyword=env_key,
+            check_value=value,
+            source_text=f"Source: {env_cite}",
+            parameters=json.dumps({"class_key": env_key, "threshold_class": value}),
+        )
+
+    # ── Separation factors ────────────────────────────────────────────────────
+    for sep_key, data in params.get("separation_factors", {}).items():
+        if sep_key.startswith("_") or not isinstance(data, dict):
+            continue
+        _r(
+            reference=f"XM-001.SEPARATION.{sep_key.upper()}",
+            rule_type="separation_factor",
+            rule_category="threshold_band",
+            description=f"Separation '{sep_key}': coupling factor {data.get('factor')}",
+            check_value=data.get("factor"),
+            keyword=sep_key,
+            source_text=f"Source: {data.get('cite', '')}",
+            parameters=json.dumps({**data, "separation_key": sep_key}),
+        )
+
+    # ── Mitigation factors by joint type ──────────────────────────────────────
+    for mit_key, data in params.get("mitigation_factors", {}).items():
+        if not isinstance(data, dict):
+            continue
+        _r(
+            reference=f"XM-001.MITIGATION.{mit_key.strip('_').upper()}",
+            rule_type="mitigation_factor",
+            rule_category="mitigation",
+            description=(
+                f"{data.get('label', mit_key)}: applies mitigation factor {data.get('factor')}"
+            ),
+            check_value=data.get("factor"),
+            keyword=mit_key,
+            severity="recommended",
+            source_text=f"Source: {data.get('cite', '')}",
+            parameters=json.dumps({**data, "mitigation_key": mit_key}),
+        )
+
+    # ── Single-value configuration entries ────────────────────────────────────
+    config_entries = (
+        ("VOLTAGE_NORMALISATION", "voltage_normalisation_v", "voltage_normalisation", "V"),
+        ("SERIES_CONVENTION", "series_convention", "series_convention", ""),
+        ("COMPATIBILITY_FLOOR", "compatibility_floor", "compatibility_floor", ""),
+        ("REPORT_ALL_COUPLES", "report_all_couples", "reporting_policy", ""),
+    )
+    for ref_key, param_key, rule_type, unit in config_entries:
+        data = params.get(param_key)
+        if not isinstance(data, dict):
+            continue
+        value = data.get("value", data.get("enabled"))
+        note = str(data.get("note") or "")
+        if not note:
+            rationale = data.get("rationale")
+            if isinstance(rationale, list):
+                note = " ".join(str(line) for line in rationale if line).strip()
+        _r(
+            reference=f"XM-001.{ref_key}",
+            rule_type=rule_type,
+            rule_category="reference_config",
+            description=f"{param_key} = {value}. {note}".strip(),
+            check_value=value,
+            unit=unit,
+            keyword=param_key,
+            source_text=f"Source: {data.get('cite', '')}",
+            parameters=json.dumps(data),
+        )
+
+    print(f"[RulesetSeeder] XM-001: {count} rules seeded")
+    return count
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 
 def seed_engine_rulesets(svc: RuleService) -> dict[str, int]:
     """
-    Seed GC-001, CC-001, and MC-001 from their JSON files.
+    Seed GC-001, CC-001, MC-001, MM-001, and XM-001 from their JSON payloads.
 
     Idempotent: skips any ruleset already present in the DB.
     Returns a dict of {ruleset_id: rows_inserted}.
     """
-    try:
-        gc = _seed_gc001(svc)
-        cc = _seed_cc001(svc)
-        mc = _seed_mc001(svc)
-        return {"BIMGUARD-GC-001": gc, "BIMGUARD-CC-001": cc, "BIMGUARD-MC-001": mc}
-    except Exception as exc:
-        print(f"[RulesetSeeder] Warning: {exc}")
-        return {}
+    seeders = (
+        ("BIMGUARD-GC-001", _seed_gc001),
+        ("BIMGUARD-CC-001", _seed_cc001),
+        ("BIMGUARD-MC-001", _seed_mc001),
+        ("BIMGUARD-MM-001", _seed_mm001),
+        ("BIMGUARD-XM-001", _seed_xm001),
+    )
+    seeded: dict[str, int] = {}
+    for ruleset_id, seeder in seeders:
+        try:
+            seeded[ruleset_id] = seeder(svc)
+        except Exception as exc:
+            print(f"[RulesetSeeder] Warning: {ruleset_id}: {exc}")
+    return seeded
