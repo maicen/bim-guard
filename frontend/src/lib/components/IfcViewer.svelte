@@ -25,7 +25,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = '/static/js/viewer/ifc-viewer.js?v=error-highlight-2';
+      const viewerModuleUrl = '/static/js/viewer/ifc-viewer.js?v=viewer-controls-1';
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer(containerEl);
       isInitialized = true;
