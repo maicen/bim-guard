@@ -449,11 +449,182 @@ def _apply(matrix: Any, x: float, y: float, z: float) -> tuple[float, float, flo
     )
 
 
+#: How deep the walker follows nested IfcMappedItem references. Real exports
+#: nest one level, occasionally two; the cap exists only so a malformed model
+#: that maps a representation onto itself cannot recurse forever.
+_MAX_MAPPED_DEPTH = 4
+
+
+def _face_vertices(faces: Any) -> list[tuple[float, float, float]]:
+    """Collect the polyloop points of a sequence of ``IfcFace``.
+
+    Args:
+        faces: Any iterable of ``IfcFace``, or None.
+
+    Returns:
+        Every explicit vertex on every bound of every face. A bound that is not
+        a polyloop (a trimmed curve, say) contributes nothing rather than
+        raising: for a clearance envelope a missing curve is a slightly small
+        box, not a failure.
+    """
+    vertices: list[tuple[float, float, float]] = []
+    for face in faces or []:
+        for bound in getattr(face, "Bounds", []) or []:
+            loop = getattr(bound, "Bound", None)
+            for point in getattr(loop, "Polygon", []) or []:
+                coords = getattr(point, "Coordinates", None)
+                if not coords:
+                    continue
+                vertices.append(
+                    (
+                        float(coords[0]),
+                        float(coords[1]),
+                        float(coords[2]) if len(coords) > 2 else 0.0,
+                    )
+                )
+    return vertices
+
+
+def _boundary_faces(item: Any) -> Any:
+    """Return the ``IfcFace`` list behind a boundary-representation item.
+
+    Args:
+        item: A representation item.
+
+    Returns:
+        The faces the item is built from, or an empty list when the item is not
+        a boundary representation.
+    """
+    if item.is_a("IfcManifoldSolidBrep"):
+        # Covers IfcFacetedBrep and IfcAdvancedBrep: the outer shell's faces.
+        return getattr(getattr(item, "Outer", None), "CfsFaces", []) or []
+    if item.is_a("IfcFaceBasedSurfaceModel"):
+        faces: list[Any] = []
+        for face_set in getattr(item, "FbsmFaces", []) or []:
+            faces.extend(getattr(face_set, "CfsFaces", []) or [])
+        return faces
+    if item.is_a("IfcShellBasedSurfaceModel"):
+        faces = []
+        for shell in getattr(item, "SbsmBoundary", []) or []:
+            faces.extend(getattr(shell, "CfsFaces", []) or [])
+        return faces
+    if item.is_a("IfcConnectedFaceSet"):
+        return getattr(item, "CfsFaces", []) or []
+    return []
+
+
+def _item_vertices(item: Any, depth: int = 0) -> list[tuple[float, float, float]]:
+    """Collect the local vertices of one representation item.
+
+    Handles the shapes real exports actually use: tessellated face sets,
+    boundary representations (the faceted breps and face-based surface models
+    that dominate Revit and ArchiCAD output), explicit curves, swept solids
+    reduced to their extrusion axis, and -- the reason this function is
+    recursive -- ``IfcMappedItem``.
+
+    A mapped item is a reference to a shared representation plus a placement.
+    Reading only the top level of a representation therefore sees nothing at
+    all on a model that maps its geometry, which is most of them: Duplex_MEP
+    holds 942 mapped items and 42 directly-placed solids. The vertices come
+    back from the mapping source and are transformed into the referencing
+    element's own space before being returned, so nesting composes.
+
+    Args:
+        item: The representation item to read.
+        depth: Current ``IfcMappedItem`` nesting level, used only to bound
+            recursion.
+
+    Returns:
+        Vertices in the item's local coordinate system. An item whose shape is
+        not understood yields none, which the caller reports as missing
+        geometry rather than as a clearance verdict.
+    """
+    try:
+        kind = item.is_a()
+
+        if kind in ("IfcTriangulatedFaceSet", "IfcPolygonalFaceSet"):
+            coords = item.Coordinates.CoordList or []
+            return [(float(c[0]), float(c[1]), float(c[2])) for c in coords]
+
+        if kind == "IfcPolyline":
+            points = []
+            for point in item.Points or []:
+                c = point.Coordinates
+                points.append(
+                    (float(c[0]), float(c[1]), float(c[2]) if len(c) > 2 else 0.0)
+                )
+            return points
+
+        if kind == "IfcExtrudedAreaSolid":
+            # Reduced to the extrusion axis: the profile is not read, so the
+            # box this contributes is a line along the sweep. Adequate for a
+            # first-pass envelope and unchanged from the original behaviour.
+            origin = (0.0, 0.0, 0.0)
+            if item.Position is not None:
+                c = item.Position.Location.Coordinates
+                origin = (float(c[0]), float(c[1]), float(c[2]))
+            ratios = item.ExtrudedDirection.DirectionRatios
+            depth_m = float(item.Depth)
+            return [
+                origin,
+                (
+                    origin[0] + float(ratios[0]) * depth_m,
+                    origin[1] + float(ratios[1]) * depth_m,
+                    origin[2] + float(ratios[2]) * depth_m,
+                ),
+            ]
+
+        if kind == "IfcMappedItem":
+            if depth >= _MAX_MAPPED_DEPTH:
+                return []
+            source = getattr(item, "MappingSource", None)
+            mapped = getattr(source, "MappedRepresentation", None)
+            if mapped is None:
+                return []
+            local: list[tuple[float, float, float]] = []
+            for sub_item in getattr(mapped, "Items", []) or []:
+                local.extend(_item_vertices(sub_item, depth + 1))
+            if not local:
+                return []
+            matrix = ifcopenshell.util.placement.get_mappeditem_transformation(item)
+            if matrix is None:
+                # A 2D transformation operator, which the helper does not
+                # parse. The untransformed vertices still bound the shape's
+                # size, so they are better than discarding the element.
+                return local
+            return [_apply(matrix, x, y, z) for x, y, z in local]
+
+        if kind in ("IfcBooleanResult", "IfcBooleanClippingResult"):
+            # The result of a difference or clip is contained in its first
+            # operand, so the operand's extent is a conservative envelope --
+            # never smaller than the true shape, which is the safe direction
+            # for a clearance check.
+            first = getattr(item, "FirstOperand", None)
+            return _item_vertices(first, depth) if first is not None else []
+
+        if kind == "IfcGeometricSet":
+            vertices: list[tuple[float, float, float]] = []
+            for element in getattr(item, "Elements", []) or []:
+                if element.is_a("IfcCartesianPoint"):
+                    c = element.Coordinates
+                    vertices.append(
+                        (float(c[0]), float(c[1]), float(c[2]) if len(c) > 2 else 0.0)
+                    )
+                else:
+                    vertices.extend(_item_vertices(element, depth))
+            return vertices
+
+        return _face_vertices(_boundary_faces(item))
+    except Exception:
+        return []
+
+
 def _local_vertices(entity: IfcElement) -> list[tuple[float, float, float]]:
     """Collect raw vertices from an entity's shape representation.
 
-    Handles tessellated face sets, explicit polylines, and swept solids
-    reduced to their extrusion axis. Anything else yields no vertices.
+    Walks every item of every representation through :func:`_item_vertices`,
+    which resolves mapped items and boundary representations. Anything it does
+    not understand yields no vertices.
     """
     representation = getattr(entity, "Representation", None)
     if representation is None:
@@ -462,32 +633,7 @@ def _local_vertices(entity: IfcElement) -> list[tuple[float, float, float]]:
     vertices: list[tuple[float, float, float]] = []
     for shape in getattr(representation, "Representations", []) or []:
         for item in getattr(shape, "Items", []) or []:
-            try:
-                kind = item.is_a()
-                if kind in ("IfcTriangulatedFaceSet", "IfcPolygonalFaceSet"):
-                    coords = item.Coordinates.CoordList or []
-                    vertices.extend((float(c[0]), float(c[1]), float(c[2])) for c in coords)
-                elif kind == "IfcPolyline":
-                    for point in item.Points or []:
-                        c = point.Coordinates
-                        vertices.append((float(c[0]), float(c[1]), float(c[2] if len(c) > 2 else 0)))
-                elif kind == "IfcExtrudedAreaSolid":
-                    origin = (0.0, 0.0, 0.0)
-                    if item.Position is not None:
-                        c = item.Position.Location.Coordinates
-                        origin = (float(c[0]), float(c[1]), float(c[2]))
-                    ratios = item.ExtrudedDirection.DirectionRatios
-                    depth = float(item.Depth)
-                    vertices.append(origin)
-                    vertices.append(
-                        (
-                            origin[0] + float(ratios[0]) * depth,
-                            origin[1] + float(ratios[1]) * depth,
-                            origin[2] + float(ratios[2]) * depth,
-                        )
-                    )
-            except Exception:
-                continue
+            vertices.extend(_item_vertices(item))
     return vertices
 
 
