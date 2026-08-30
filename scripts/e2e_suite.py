@@ -209,7 +209,9 @@ class Suite:
             names = archive.namelist()
             markup = [n for n in names if n.endswith("markup.bcf")]
             viewpoints = [n for n in names if n.endswith(".bcfv")]
-            ok = bcf.status_code == 200 and bool(markup)
+            # One topic per finding -- including none, which is the correct
+            # archive for an analysis that found nothing rather than a failure.
+            ok = bcf.status_code == 200 and len(markup) == findings
             detail = f"HTTP {bcf.status_code}, {len(names)} entries, {len(markup)} markup, {len(viewpoints)} viewpoints"
         except zipfile.BadZipFile:
             ok, detail = False, f"HTTP {bcf.status_code}, not a zip"

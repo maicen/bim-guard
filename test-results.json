@@ -1,232 +1,824 @@
 {
   "summary": {
-    "PASS": 13,
-    "FAIL": 1,
-    "WARN": 0,
-    "SKIP": 18
+    "PASS": 76,
+    "FAIL": 7,
+    "WARN": 5,
+    "SKIP": 0
   },
+  "note": "Seismic export checks re-run after correcting the BCF assertion (one topic per finding, so zero findings must yield zero topics).",
   "checks": [
     {
-      "test": "piping/local-mep/1a-all-engines",
+      "test": "piping/clinic-plumbing-2x3/1a-all-engines",
       "status": "PASS",
-      "detail": "{'CC-001': 4, 'GC-001': 4, 'MC-001': 4, 'MM-001': 4} in 0.02s",
+      "detail": "{'CC-001': 6587, 'GC-001': 6587, 'MC-001': 6587, 'MM-001': 6587, 'XM-001': 906} in 46.12s",
       "data": {
-        "CC-001": 4,
-        "GC-001": 4,
-        "MC-001": 4,
-        "MM-001": 4
+        "CC-001": 6587,
+        "GC-001": 6587,
+        "MC-001": 6587,
+        "MM-001": 6587,
+        "XM-001": 906
       }
     },
     {
-      "test": "piping/local-mep/1b-element-only",
+      "test": "piping/clinic-plumbing-2x3/1b-element-only",
       "status": "PASS",
-      "detail": "{'CC-001': 4, 'GC-001': 4, 'MC-001': 4} (no MM/XM)",
+      "detail": "{'CC-001': 6587, 'GC-001': 6587, 'MC-001': 6587} (no MM/XM)",
       "data": {
-        "CC-001": 4,
-        "GC-001": 4,
-        "MC-001": 4
+        "CC-001": 6587,
+        "GC-001": 6587,
+        "MC-001": 6587
       }
     },
     {
-      "test": "piping/local-mep/1c-network-only",
+      "test": "piping/clinic-plumbing-2x3/1c-network-only",
       "status": "PASS",
-      "detail": "{'MM-001': 4} (no GC/CC/MC)",
+      "detail": "{'MM-001': 6587, 'XM-001': 906} (no GC/CC/MC)",
       "data": {
-        "MM-001": 4
+        "MM-001": 6587,
+        "XM-001": 906
       }
     },
     {
-      "test": "piping/local-mep/1d-single-engine",
+      "test": "piping/clinic-plumbing-2x3/1d-single-engine",
       "status": "PASS",
-      "detail": "{'GC-001': 4} (GC-001 only)",
+      "detail": "{'GC-001': 6587} (GC-001 only)",
       "data": {
-        "GC-001": 4
+        "GC-001": 6587
       }
     },
     {
-      "test": "piping/local-mep/1d2-no-engine",
+      "test": "piping/clinic-plumbing-2x3/1d2-no-engine",
       "status": "PASS",
       "detail": "no findings, as selected",
       "data": {}
     },
     {
-      "test": "piping/local-mep/1e-cache",
+      "test": "piping/clinic-hvac-2x3/1a-all-engines",
       "status": "PASS",
-      "detail": "miss 0.01s, other-selection 0.00s, hit 0.00s, identical=True, faster=True",
+      "detail": "{'CC-001': 3704, 'GC-001': 3704, 'MC-001': 3704, 'MM-001': 3704, 'XM-001': 16775} in 20.41s",
       "data": {
-        "miss_s": 0.011,
-        "hit_s": 0.002,
-        "speedup": 5.5
+        "CC-001": 3704,
+        "GC-001": 3704,
+        "MC-001": 3704,
+        "MM-001": 3704,
+        "XM-001": 16775
       }
     },
     {
-      "test": "export/local-mep/corrosion/csv",
+      "test": "piping/clinic-hvac-2x3/1b-element-only",
       "status": "PASS",
-      "detail": "HTTP 200, 16 rows vs 16 findings",
+      "detail": "{'CC-001': 3704, 'GC-001': 3704, 'MC-001': 3704} (no MM/XM)",
+      "data": {
+        "CC-001": 3704,
+        "GC-001": 3704,
+        "MC-001": 3704
+      }
+    },
+    {
+      "test": "piping/clinic-hvac-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 3704, 'XM-001': 16775} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 3704,
+        "XM-001": 16775
+      }
+    },
+    {
+      "test": "piping/wr-plumb-ifc4/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 8539, 'GC-001': 8539, 'MC-001': 8539, 'MM-001': 8539} in 36.49s",
+      "data": {
+        "CC-001": 8539,
+        "GC-001": 8539,
+        "MC-001": 8539,
+        "MM-001": 8539
+      }
+    },
+    {
+      "test": "piping/wr-plumb-ifc4/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 8539, 'GC-001': 8539, 'MC-001': 8539} (no MM/XM)",
+      "data": {
+        "CC-001": 8539,
+        "GC-001": 8539,
+        "MC-001": 8539
+      }
+    },
+    {
+      "test": "piping/wr-plumb-ifc4/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 8539} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 8539
+      }
+    },
+    {
+      "test": "piping/wr-plumb-ifc4/1d-single-engine",
+      "status": "PASS",
+      "detail": "{'GC-001': 8539} (GC-001 only)",
+      "data": {
+        "GC-001": 8539
+      }
+    },
+    {
+      "test": "piping/wr-plumb-ifc4/1d2-no-engine",
+      "status": "PASS",
+      "detail": "no findings, as selected",
       "data": {}
     },
     {
-      "test": "export/local-mep/corrosion/json",
+      "test": "piping/wr-mech-ifc4/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 17424, 'GC-001': 17424, 'MC-001': 17424, 'MM-001': 17424} in 118.49s",
+      "data": {
+        "CC-001": 17424,
+        "GC-001": 17424,
+        "MC-001": 17424,
+        "MM-001": 17424
+      }
+    },
+    {
+      "test": "piping/wr-mech-ifc4/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 17424, 'GC-001': 17424, 'MC-001': 17424} (no MM/XM)",
+      "data": {
+        "CC-001": 17424,
+        "GC-001": 17424,
+        "MC-001": 17424
+      }
+    },
+    {
+      "test": "piping/wr-mech-ifc4/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 17424} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 17424
+      }
+    },
+    {
+      "test": "piping/wr-sprinkler-ifc4/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 13490, 'GC-001': 13490, 'MC-001': 13490, 'MM-001': 13490, 'XM-001': 5} in 74.75s",
+      "data": {
+        "CC-001": 13490,
+        "GC-001": 13490,
+        "MC-001": 13490,
+        "MM-001": 13490,
+        "XM-001": 5
+      }
+    },
+    {
+      "test": "piping/wr-sprinkler-ifc4/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 13490, 'GC-001': 13490, 'MC-001': 13490} (no MM/XM)",
+      "data": {
+        "CC-001": 13490,
+        "GC-001": 13490,
+        "MC-001": 13490
+      }
+    },
+    {
+      "test": "piping/wr-sprinkler-ifc4/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 13490, 'XM-001': 5} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 13490,
+        "XM-001": 5
+      }
+    },
+    {
+      "test": "piping/wr-plumb-2x3/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 9013, 'GC-001': 9013, 'MC-001': 9013, 'MM-001': 9013} in 45.52s",
+      "data": {
+        "CC-001": 9013,
+        "GC-001": 9013,
+        "MC-001": 9013,
+        "MM-001": 9013
+      }
+    },
+    {
+      "test": "piping/wr-plumb-2x3/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 9013, 'GC-001': 9013, 'MC-001': 9013} (no MM/XM)",
+      "data": {
+        "CC-001": 9013,
+        "GC-001": 9013,
+        "MC-001": 9013
+      }
+    },
+    {
+      "test": "piping/wr-plumb-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 9013} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 9013
+      }
+    },
+    {
+      "test": "piping/wr-mech-2x3/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 18488, 'GC-001': 18488, 'MC-001': 18488, 'MM-001': 18488} in 131.72s",
+      "data": {
+        "CC-001": 18488,
+        "GC-001": 18488,
+        "MC-001": 18488,
+        "MM-001": 18488
+      }
+    },
+    {
+      "test": "piping/wr-mech-2x3/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 18488, 'GC-001': 18488, 'MC-001': 18488} (no MM/XM)",
+      "data": {
+        "CC-001": 18488,
+        "GC-001": 18488,
+        "MC-001": 18488
+      }
+    },
+    {
+      "test": "piping/wr-mech-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 18488} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 18488
+      }
+    },
+    {
+      "test": "piping/duplex-mep-2x3/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 926, 'GC-001': 926, 'MC-001': 926, 'MM-001': 926} in 5.24s",
+      "data": {
+        "CC-001": 926,
+        "GC-001": 926,
+        "MC-001": 926,
+        "MM-001": 926
+      }
+    },
+    {
+      "test": "piping/duplex-mep-2x3/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 926, 'GC-001': 926, 'MC-001': 926} (no MM/XM)",
+      "data": {
+        "CC-001": 926,
+        "GC-001": 926,
+        "MC-001": 926
+      }
+    },
+    {
+      "test": "piping/duplex-mep-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 926} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 926
+      }
+    },
+    {
+      "test": "piping/duplex-mep-2x3/1d-single-engine",
+      "status": "PASS",
+      "detail": "{'GC-001': 926} (GC-001 only)",
+      "data": {
+        "GC-001": 926
+      }
+    },
+    {
+      "test": "piping/duplex-mep-2x3/1d2-no-engine",
+      "status": "PASS",
+      "detail": "no findings, as selected",
+      "data": {}
+    },
+    {
+      "test": "piping/duplex-plumbing-2x3/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 498, 'GC-001': 498, 'MC-001': 498, 'MM-001': 498, 'XM-001': 74} in 6.15s",
+      "data": {
+        "CC-001": 498,
+        "GC-001": 498,
+        "MC-001": 498,
+        "MM-001": 498,
+        "XM-001": 74
+      }
+    },
+    {
+      "test": "piping/duplex-plumbing-2x3/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 498, 'GC-001': 498, 'MC-001': 498} (no MM/XM)",
+      "data": {
+        "CC-001": 498,
+        "GC-001": 498,
+        "MC-001": 498
+      }
+    },
+    {
+      "test": "piping/duplex-plumbing-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 498, 'XM-001': 74} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 498,
+        "XM-001": 74
+      }
+    },
+    {
+      "test": "piping/digitalhub-heating-ifc4/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 1795, 'GC-001': 1795, 'MC-001': 1795, 'MM-001': 1795} in 8.79s",
+      "data": {
+        "CC-001": 1795,
+        "GC-001": 1795,
+        "MC-001": 1795,
+        "MM-001": 1795
+      }
+    },
+    {
+      "test": "piping/digitalhub-heating-ifc4/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 1795, 'GC-001': 1795, 'MC-001': 1795} (no MM/XM)",
+      "data": {
+        "CC-001": 1795,
+        "GC-001": 1795,
+        "MC-001": 1795
+      }
+    },
+    {
+      "test": "piping/digitalhub-heating-ifc4/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 1795} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 1795
+      }
+    },
+    {
+      "test": "piping/digitalhub-sanitary-ifc4/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 1010, 'GC-001': 1010, 'MC-001': 1010, 'MM-001': 1010} in 5.80s",
+      "data": {
+        "CC-001": 1010,
+        "GC-001": 1010,
+        "MC-001": 1010,
+        "MM-001": 1010
+      }
+    },
+    {
+      "test": "piping/digitalhub-sanitary-ifc4/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 1010, 'GC-001': 1010, 'MC-001': 1010} (no MM/XM)",
+      "data": {
+        "CC-001": 1010,
+        "GC-001": 1010,
+        "MC-001": 1010
+      }
+    },
+    {
+      "test": "piping/digitalhub-sanitary-ifc4/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 1010} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 1010
+      }
+    },
+    {
+      "test": "piping/digitalhub-sanitary-ifc4/1d-single-engine",
+      "status": "PASS",
+      "detail": "{'GC-001': 1010} (GC-001 only)",
+      "data": {
+        "GC-001": 1010
+      }
+    },
+    {
+      "test": "piping/digitalhub-sanitary-ifc4/1d2-no-engine",
+      "status": "PASS",
+      "detail": "no findings, as selected",
+      "data": {}
+    },
+    {
+      "test": "piping/wbdg-office-mep-2x3/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 5697, 'GC-001': 5697, 'MC-001': 5697, 'MM-001': 5697, 'XM-001': 830} in 45.33s",
+      "data": {
+        "CC-001": 5697,
+        "GC-001": 5697,
+        "MC-001": 5697,
+        "MM-001": 5697,
+        "XM-001": 830
+      }
+    },
+    {
+      "test": "piping/wbdg-office-mep-2x3/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 5697, 'GC-001': 5697, 'MC-001': 5697} (no MM/XM)",
+      "data": {
+        "CC-001": 5697,
+        "GC-001": 5697,
+        "MC-001": 5697
+      }
+    },
+    {
+      "test": "piping/wbdg-office-mep-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 5697, 'XM-001': 830} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 5697,
+        "XM-001": 830
+      }
+    },
+    {
+      "test": "piping/schependomlaan-2x3/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 82, 'GC-001': 82, 'MC-001': 82, 'MM-001': 73} in 6.70s",
+      "data": {
+        "CC-001": 82,
+        "GC-001": 82,
+        "MC-001": 82,
+        "MM-001": 73
+      }
+    },
+    {
+      "test": "piping/schependomlaan-2x3/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 82, 'GC-001': 82, 'MC-001': 82} (no MM/XM)",
+      "data": {
+        "CC-001": 82,
+        "GC-001": 82,
+        "MC-001": 82
+      }
+    },
+    {
+      "test": "piping/schependomlaan-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 73} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 73
+      }
+    },
+    {
+      "test": "piping/digitalhub-vent-ifc4/1a-all-engines",
+      "status": "PASS",
+      "detail": "{'CC-001': 1310, 'GC-001': 1310, 'MC-001': 1310, 'MM-001': 1310} in 6.03s",
+      "data": {
+        "CC-001": 1310,
+        "GC-001": 1310,
+        "MC-001": 1310,
+        "MM-001": 1310
+      }
+    },
+    {
+      "test": "piping/digitalhub-vent-ifc4/1b-element-only",
+      "status": "PASS",
+      "detail": "{'CC-001': 1310, 'GC-001': 1310, 'MC-001': 1310} (no MM/XM)",
+      "data": {
+        "CC-001": 1310,
+        "GC-001": 1310,
+        "MC-001": 1310
+      }
+    },
+    {
+      "test": "piping/digitalhub-vent-ifc4/1c-network-only",
+      "status": "PASS",
+      "detail": "{'MM-001': 1310} (no GC/CC/MC)",
+      "data": {
+        "MM-001": 1310
+      }
+    },
+    {
+      "test": "piping/craslab-2x3/1a-all-engines",
+      "status": "PASS",
+      "detail": "{} in 9.02s",
+      "data": {}
+    },
+    {
+      "test": "piping/craslab-2x3/1b-element-only",
+      "status": "PASS",
+      "detail": "{} (no MM/XM)",
+      "data": {}
+    },
+    {
+      "test": "piping/craslab-2x3/1c-network-only",
+      "status": "PASS",
+      "detail": "{} (no GC/CC/MC)",
+      "data": {}
+    },
+    {
+      "test": "piping/clinic-plumbing-2x3/1e-cache",
+      "status": "PASS",
+      "detail": "miss 42.68s, other-selection 30.06s, hit 1.77s, identical=True, faster=True",
+      "data": {
+        "miss_s": 42.677,
+        "hit_s": 1.768,
+        "speedup": 24.1
+      }
+    },
+    {
+      "test": "piping/wr-plumb-ifc4/1e-cache",
+      "status": "PASS",
+      "detail": "miss 35.12s, other-selection 19.23s, hit 1.92s, identical=True, faster=True",
+      "data": {
+        "miss_s": 35.122,
+        "hit_s": 1.916,
+        "speedup": 18.3
+      }
+    },
+    {
+      "test": "piping/digitalhub-sanitary-ifc4/1e-cache",
+      "status": "PASS",
+      "detail": "miss 5.43s, other-selection 0.09s, hit 0.15s, identical=True, faster=True",
+      "data": {
+        "miss_s": 5.434,
+        "hit_s": 0.155,
+        "speedup": 35.1
+      }
+    },
+    {
+      "test": "piping/duplex-mep-2x3/1e-cache",
+      "status": "PASS",
+      "detail": "miss 5.12s, other-selection 0.07s, hit 0.12s, identical=True, faster=True",
+      "data": {
+        "miss_s": 5.124,
+        "hit_s": 0.124,
+        "speedup": 41.5
+      }
+    },
+    {
+      "test": "export/wr-plumb-ifc4/corrosion/csv",
+      "status": "PASS",
+      "detail": "HTTP 200, 34156 rows vs 34156 findings",
+      "data": {}
+    },
+    {
+      "test": "export/wr-plumb-ifc4/corrosion/json",
       "status": "PASS",
       "detail": "HTTP 200, parseable=True",
       "data": {}
     },
     {
-      "test": "export/local-mep/corrosion/bcf",
+      "test": "export/wr-plumb-ifc4/corrosion/bcf",
       "status": "PASS",
-      "detail": "HTTP 200, 50 entries, 16 markup, 16 viewpoints",
+      "detail": "HTTP 200, 102470 entries, 34156 markup, 34156 viewpoints",
       "data": {}
     },
     {
-      "test": "piping/clinic-plumbing/gating",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "piping/clinic-plumbing/1e-cache",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "export/clinic-plumbing/corrosion",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "piping/west-riverside-ifc4/gating",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "piping/west-riverside-ifc4/1e-cache",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "export/west-riverside-ifc4/corrosion",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "piping/craslabbim/gating",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "piping/craslabbim/1e-cache",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "export/craslabbim/corrosion",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
-    },
-    {
-      "test": "seismic/local-mep",
+      "test": "export/clinic-plumbing-2x3/corrosion/csv",
       "status": "PASS",
-      "detail": "4 findings in 0.01s, stats={'total': 4, 'critical': 1, 'high': 0, 'medium': 3, 'low': 0, 'data_quality': 0}",
-      "data": {
-        "stats": {
-          "total": 4,
-          "critical": 1,
-          "high": 0,
-          "medium": 3,
-          "low": 0,
-          "data_quality": 0
-        },
-        "rulesets": {
-          "SB-001": 4
-        },
-        "seconds": 0.007
-      }
-    },
-    {
-      "test": "export/local-mep/seismic/csv",
-      "status": "PASS",
-      "detail": "HTTP 200, 4 rows vs 4 findings",
+      "detail": "HTTP 200, 27254 rows vs 27254 findings",
       "data": {}
     },
     {
-      "test": "export/local-mep/seismic/json",
+      "test": "export/clinic-plumbing-2x3/corrosion/json",
       "status": "PASS",
       "detail": "HTTP 200, parseable=True",
       "data": {}
     },
     {
-      "test": "export/local-mep/seismic/bcf",
+      "test": "export/clinic-plumbing-2x3/corrosion/bcf",
       "status": "PASS",
-      "detail": "HTTP 200, 14 entries, 4 markup, 4 viewpoints",
+      "detail": "HTTP 200, 81764 entries, 27254 markup, 27254 viewpoints",
+      "data": {}
+    },
+    {
+      "test": "export/duplex-mep-2x3/corrosion/csv",
+      "status": "PASS",
+      "detail": "HTTP 200, 3704 rows vs 3704 findings",
+      "data": {}
+    },
+    {
+      "test": "export/duplex-mep-2x3/corrosion/json",
+      "status": "PASS",
+      "detail": "HTTP 200, parseable=True",
+      "data": {}
+    },
+    {
+      "test": "export/duplex-mep-2x3/corrosion/bcf",
+      "status": "PASS",
+      "detail": "HTTP 200, 11114 entries, 3704 markup, 3704 viewpoints",
       "data": {}
     },
     {
       "test": "seismic/clinic-structural",
-      "status": "SKIP",
-      "detail": "model file not present",
+      "status": "WARN",
+      "detail": "0 findings in 2.65s, stats={'total': 0, 'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'data_quality': 0}",
+      "data": {
+        "stats": {
+          "total": 0,
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "data_quality": 0
+        },
+        "rulesets": {},
+        "seconds": 2.652
+      }
+    },
+    {
+      "test": "export/clinic-structural/seismic/csv",
+      "status": "PASS",
+      "detail": "HTTP 200, 0 rows vs 0 findings",
       "data": {}
     },
     {
-      "test": "seismic/west-riverside-str",
-      "status": "SKIP",
-      "detail": "model file not present",
+      "test": "export/clinic-structural/seismic/json",
+      "status": "PASS",
+      "detail": "HTTP 200, parseable=True",
       "data": {}
     },
     {
-      "test": "architecture/local-mep",
+      "test": "export/clinic-structural/seismic/bcf",
+      "status": "PASS",
+      "detail": "HTTP 200, 2 entries, 0 markup, 0 viewpoints",
+      "data": {}
+    },
+    {
+      "test": "seismic/wr-structural-ifc4",
+      "status": "WARN",
+      "detail": "0 findings in 2.12s, stats={'total': 0, 'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'data_quality': 0}",
+      "data": {
+        "stats": {
+          "total": 0,
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "data_quality": 0
+        },
+        "rulesets": {},
+        "seconds": 2.122
+      }
+    },
+    {
+      "test": "export/wr-structural-ifc4/seismic/csv",
+      "status": "PASS",
+      "detail": "HTTP 200, 0 rows vs 0 findings",
+      "data": {}
+    },
+    {
+      "test": "export/wr-structural-ifc4/seismic/json",
+      "status": "PASS",
+      "detail": "HTTP 200, parseable=True",
+      "data": {}
+    },
+    {
+      "test": "export/wr-structural-ifc4/seismic/bcf",
+      "status": "PASS",
+      "detail": "HTTP 200, 2 entries, 0 markup, 0 viewpoints",
+      "data": {}
+    },
+    {
+      "test": "seismic/wbdg-office-str",
+      "status": "WARN",
+      "detail": "0 findings in 1.39s, stats={'total': 0, 'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'data_quality': 0}",
+      "data": {
+        "stats": {
+          "total": 0,
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "data_quality": 0
+        },
+        "rulesets": {},
+        "seconds": 1.389
+      }
+    },
+    {
+      "test": "architecture/clinic-architectural",
       "status": "FAIL",
       "detail": "HTTP 400: The architectural analysis could not be run: Missing static asset ruleset:BUILDING-CODE-PART9",
       "data": {}
     },
     {
-      "test": "architecture/clinic-architectural",
-      "status": "SKIP",
-      "detail": "model file not present",
+      "test": "architecture/wr-arc-ifc4",
+      "status": "FAIL",
+      "detail": "HTTP 400: The architectural analysis could not be run: Missing static asset ruleset:BUILDING-CODE-PART9",
+      "data": {}
+    },
+    {
+      "test": "architecture/digitalhub-arc-ifc4",
+      "status": "FAIL",
+      "detail": "HTTP 400: The architectural analysis could not be run: Missing static asset ruleset:BUILDING-CODE-PART9",
+      "data": {}
+    },
+    {
+      "test": "architecture/wbdg-office-arc",
+      "status": "FAIL",
+      "detail": "HTTP 400: The architectural analysis could not be run: Missing static asset ruleset:BUILDING-CODE-PART9",
+      "data": {}
+    },
+    {
+      "test": "architecture/ac20-fzk-haus",
+      "status": "FAIL",
+      "detail": "HTTP 400: The architectural analysis could not be run: Missing static asset ruleset:BUILDING-CODE-PART9",
       "data": {}
     },
     {
       "test": "schema/west-riverside-plumbing",
-      "status": "SKIP",
-      "detail": "one or both twin models not present",
-      "data": {}
+      "status": "FAIL",
+      "detail": "IFC4 {'CC-001': 8539, 'GC-001': 8539, 'MC-001': 8539, 'MM-001': 8539} vs IFC2x3 {'CC-001': 9013, 'GC-001': 9013, 'MC-001': 9013, 'MM-001': 9013}",
+      "data": {
+        "ifc4": {
+          "CC-001": 8539,
+          "GC-001": 8539,
+          "MC-001": 8539,
+          "MM-001": 8539
+        },
+        "ifc2x3": {
+          "CC-001": 9013,
+          "GC-001": 9013,
+          "MC-001": 9013,
+          "MM-001": 9013
+        }
+      }
+    },
+    {
+      "test": "schema/west-riverside-mechanical",
+      "status": "FAIL",
+      "detail": "IFC4 {'CC-001': 17424, 'GC-001': 17424, 'MC-001': 17424, 'MM-001': 17424} vs IFC2x3 {'CC-001': 18488, 'GC-001': 18488, 'MC-001': 18488, 'MM-001': 18488}",
+      "data": {
+        "ifc4": {
+          "CC-001": 17424,
+          "GC-001": 17424,
+          "MC-001": 17424,
+          "MM-001": 17424
+        },
+        "ifc2x3": {
+          "CC-001": 18488,
+          "GC-001": 18488,
+          "MC-001": 18488,
+          "MM-001": 18488
+        }
+      }
     },
     {
       "test": "seismic/geometry/aisc-brep",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
+      "status": "WARN",
+      "detail": "0 findings in 0.32s, stats={'total': 0, 'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'data_quality': 0}",
+      "data": {
+        "stats": {
+          "total": 0,
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "data_quality": 0
+        },
+        "rulesets": {},
+        "seconds": 0.32
+      }
     },
     {
       "test": "seismic/geometry/aisc-param",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
+      "status": "WARN",
+      "detail": "0 findings in 0.30s, stats={'total': 0, 'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'data_quality': 0}",
+      "data": {
+        "stats": {
+          "total": 0,
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "data_quality": 0
+        },
+        "rulesets": {},
+        "seconds": 0.296
+      }
     },
     {
-      "test": "perf/fire-ifc4-small",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
+      "test": "perf/fire-ifc4-0.9MB",
+      "status": "PASS",
+      "detail": "0.86 MB: cold 2.00s, cached 0.09s (23x)",
+      "data": {
+        "size_mb": 0.86,
+        "cold_s": 2.001,
+        "warm_s": 0.087
+      }
     },
     {
-      "test": "perf/clinic-plumbing-medium",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
+      "test": "perf/wr-plumb-ifc4-22.7MB",
+      "status": "PASS",
+      "detail": "22.66 MB: cold 37.58s, cached 2.53s (15x)",
+      "data": {
+        "size_mb": 22.66,
+        "cold_s": 37.575,
+        "warm_s": 2.534
+      }
     },
     {
-      "test": "perf/mech-ifc4-large",
-      "status": "SKIP",
-      "detail": "model file not present",
-      "data": {}
+      "test": "perf/clinic-plumbing-53MB",
+      "status": "PASS",
+      "detail": "53.25 MB: cold 43.98s, cached 0.73s (60x)",
+      "data": {
+        "size_mb": 53.25,
+        "cold_s": 43.978,
+        "warm_s": 0.728
+      }
+    },
+    {
+      "test": "perf/wr-mech-ifc4-69.7MB",
+      "status": "PASS",
+      "detail": "69.66 MB: cold 164.72s, cached 3.82s (43x)",
+      "data": {
+        "size_mb": 69.66,
+        "cold_s": 164.722,
+        "warm_s": 3.818
+      }
     }
   ]
 }
