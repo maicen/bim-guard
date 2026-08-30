@@ -85,18 +85,24 @@ def _backfill_code_metadata(svc) -> None:
 
 
 def _seed_library() -> None:
-    """Populate the rule library with engine rulesets (corrosion mechanisms and building code)."""
+    """Populate the rule library with engine rulesets and building-code rulesets."""
     try:
         from app.bootstrap import get_container
         from app.services.ruleset_seeder import (
-            seed_architectural_code_rules,
+            seed_default_code_rulesets,
             seed_engine_rulesets,
         )
 
         svc = get_container().rules_service
         _backfill_code_metadata(svc)
         seed_engine_rulesets(svc)
-        seed_architectural_code_rules(svc)
+        # BUILDING-CODE-PART9 and its extension back the Architecture theme,
+        # which reads them through RuleService.list_code_rules(). The seeder
+        # existed but nothing called it, so the thresholds the theme checks
+        # against came from its hardcoded fallbacks on any database where the
+        # rules had not been loaded by hand. seed_default_code_rulesets() also
+        # calls seed_architectural_code_rules(), which this replaces.
+        seed_default_code_rulesets(svc)
     except Exception:
         logger.warning("Rule library seeding failed; continuing startup", exc_info=True)
 

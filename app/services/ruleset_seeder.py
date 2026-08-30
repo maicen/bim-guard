@@ -71,15 +71,56 @@ def _existing_references(svc: RuleService, ruleset_id: str) -> set[str]:
     }
 
 
+def _rule_key(reference: str, target: str, prop: str) -> tuple[str, str, str]:
+    """Identity of one code rule within its ruleset.
+
+    Reference alone is not unique: Part 9 cites one clause against several
+    element classes (9.8.2.2.(3) covers both IfcStairFlight and IfcSlab), and
+    the QA rules share the reference "BIMGuard QA" entirely. Target class and
+    property name are what separate them.
+    """
+    return (reference.strip(), target.strip(), prop.strip())
+
+
 def _seed_json_ruleset(svc: RuleService, filename: str) -> int:
-    """Seed one ruleset JSON document via RuleService.import_ruleset()."""
+    """Seed one ruleset JSON document via RuleService.import_ruleset().
+
+    Resumes rather than skipping: this previously returned 0 as soon as the
+    ruleset had any row at all, so a set that was interrupted part way through
+    stayed permanently incomplete. Only the rules not already stored are
+    imported.
+    """
     payload = _load(filename)
     ruleset_id = str(payload.get("ruleset_id") or "").strip()
     if not ruleset_id:
         raise ValueError(f"Ruleset file '{filename}' is missing ruleset_id")
-    if svc.has_ruleset(ruleset_id):
+
+    stored = {
+        _rule_key(
+            str(row.get("reference") or ""),
+            str(row.get("target_ifc_class") or ""),
+            str(row.get("property_name") or ""),
+        )
+        for row in svc.list_by_ruleset(ruleset_id)
+    }
+
+    pending = []
+    for rule in payload.get("rules") or []:
+        if not isinstance(rule, dict):
+            continue
+        key = _rule_key(
+            str(rule.get("ref") or rule.get("reference") or ""),
+            str(rule.get("target") or rule.get("target_ifc_class") or ""),
+            str(rule.get("property_name") or ""),
+        )
+        if key in stored:
+            continue
+        stored.add(key)
+        pending.append(rule)
+
+    if not pending:
         return 0
-    return svc.import_ruleset(payload)
+    return svc.import_ruleset({**payload, "rules": pending})
 
 
 def seed_architectural_code_rules(svc: RuleService) -> int:
@@ -181,9 +222,18 @@ def _seed_risk_bands(
     target_ifc_class: str = "IfcPipeSegment",
 ) -> None:
     """Seed composite-score threshold rows for a ruleset."""
+    existing = _existing_references(svc, ruleset_id)
     for band_name, band_data in bands.items():
         if band_name not in {"Medium", "High", "Critical"}:
             continue
+        if f"{prefix}.BAND.{band_name.upper()}" in existing:
+            # Callers reach this on every startup once the ruleset is present.
+            # Without the guard each boot inserted three more copies of the same
+            # band row: they had accumulated into the majority of the rules
+            # table and, carrying no mechanism, were being swept up by
+            # RuleService.list_code_rules() as if they were building-code rules.
+            continue
+        existing.add(f"{prefix}.BAND.{band_name.upper()}")
         range_text = str((band_data or {}).get("range") or "")
         threshold = None
         if "-" in range_text:
@@ -198,6 +248,7 @@ def _seed_risk_bands(
             description=band_data.get("bcf_action", band_name),
             check_value=threshold,
             keyword=band_name,
+            mechanism=prefix,
             ruleset_id=ruleset_id,
             target_ifc_class=target_ifc_class,
             parameters=json.dumps({"band": band_name, **band_data}),
