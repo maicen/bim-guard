@@ -88,8 +88,16 @@ class Suite:
 
     # -- categories --------------------------------------------------------
 
-    def piping_gating(self, project_id: int, label: str) -> None:
-        """TEST 1: only the selected engines execute."""
+    def piping_gating(self, project_id: int, label: str, deep: bool = True) -> None:
+        """TEST 1: only the selected engines execute.
+
+        Args:
+            project_id: The project whose model to assess.
+            label: Name this model appears under in the report.
+            deep: Also check a single-engine and an empty selection. Each
+                variant costs a full parse, so the two that re-prove what the
+                three-way split already shows run on a subset of models.
+        """
         name = f"piping/{label}"
         if not self.available(project_id):
             self.record(f"{name}/gating", "SKIP", "model file not present")
@@ -121,6 +129,9 @@ class Suite:
             f"{counts}" + (f" leaked {leaked}" if leaked else " (no GC/CC/MC)"),
             counts,
         )
+
+        if not deep:
+            return
 
         single, _, _ = self.run_analysis(project_id, "corrosion", ["GC"])
         counts = self.rulesets(single)
@@ -275,13 +286,18 @@ def main() -> None:
     client = httpx.Client(base_url=args.base_url, timeout=900)
     suite = Suite(client, models)
 
+    deep = roles.get("piping_deep", {})
     for label, project_id in roles.get("piping", {}).items():
-        suite.piping_gating(project_id, label)
+        suite.piping_gating(project_id, label, deep=label in deep)
+    for label, project_id in deep.items():
         suite.piping_cache(project_id, label)
+    for label, project_id in roles.get("exports", {}).items():
         suite.exports(project_id, "corrosion", label, ALL_ENGINES)
 
+    seismic_exports = roles.get("seismic_exports", {})
     for label, project_id in roles.get("seismic", {}).items():
-        if suite.simple_analysis(project_id, "seismic", label):
+        ran = suite.simple_analysis(project_id, "seismic", label)
+        if ran and label in seismic_exports:
             suite.exports(project_id, "seismic", label)
 
     for label, project_id in roles.get("architecture", {}).items():

@@ -1,25 +1,106 @@
 {
-  "_comment": "Project id -> IFC path. Ids are arbitrary handles; scripts/e2e_server.py serves each file as that project's model. Point these at the bimguard-test-models checkout once it has content.",
+  "_comment": "Project id -> IFC path. scripts/e2e_server.py serves each file as that project's model.",
   "models": {
     "1": "data/test_hospital_mep_scenario.ifc",
-    "2": "test-models/models/hospital/Clinic_Plumbing.ifc",
-    "3": "test-models/models/schemas/west_riverside_hospital_plumb_ifc4.ifc",
-    "4": "test-models/models/schemas/west_riverside_hospital_plumb_ifc2x3.ifc",
-    "5": "test-models/models/industrial/craslabbim.ifc",
-    "10": "test-models/models/hospital/Clinic_Structural.ifc",
-    "11": "test-models/models/hospital/west_riverside_hospital_str_ifc4.ifc",
-    "20": "test-models/models/hospital/Clinic_Architectural.ifc",
-    "30": "test-models/models/industrial/aisc_sculpture_brep.ifc",
-    "31": "test-models/models/industrial/aisc_sculpture_param.ifc",
-    "40": "test-models/models/hospital/west_riverside_hospital_fire_ifc4.ifc",
-    "41": "test-models/models/hospital/west_riverside_hospital_mech_ifc4.ifc"
+    "10": "test-models/models/hospital/Clinic_Plumbing.ifc",
+    "11": "test-models/models/hospital/Clinic_HVAC.ifc",
+    "12": "test-models/models/hospital/west_riverside_hospital_plumb_ifc4.ifc",
+    "13": "test-models/models/hospital/west_riverside_hospital_mech_ifc4.ifc",
+    "14": "test-models/models/hospital/west_riverside_hospital_sprinkle_ifc4.ifc",
+    "15": "test-models/models/schemas/west_riverside_hospital_plumb_ifc2x3.ifc",
+    "16": "test-models/models/schemas/west_riverside_hospital_mech_ifc2x3.ifc",
+    "20": "test-models/models/office/Duplex_MEP_20110907.ifc",
+    "21": "test-models/models/office/Duplex_Plumbing_20121113.ifc",
+    "22": "test-models/models/office/DigitalHub_FM-HZG_v2.ifc",
+    "23": "test-models/models/office/DigitalHub_FM-SAN_v2.ifc",
+    "24": "test-models/models/office/wbdg_office_mep.ifc",
+    "25": "test-models/models/office/IFC_Schependomlaan.ifc",
+    "26": "test-models/models/office/DigitalHub_FM-LFT_v2.ifc",
+    "30": "test-models/models/industrial/craslabbim.ifc",
+    "40": "test-models/models/hospital/Clinic_Structural.ifc",
+    "41": "test-models/models/hospital/west_riverside_hospital_str_ifc4.ifc",
+    "42": "test-models/models/office/wbdg_office_str.ifc",
+    "50": "test-models/models/hospital/Clinic_Architectural.ifc",
+    "51": "test-models/models/hospital/west_riverside_hospital_arc_ifc4.ifc",
+    "52": "test-models/models/office/DigitalHub_FM-ARC_v2.ifc",
+    "53": "test-models/models/office/wbdg_office_arc.ifc",
+    "54": "test-models/models/office/AC20-FZK-Haus.ifc",
+    "60": "test-models/models/industrial/aisc_sculpture_brep.ifc",
+    "61": "test-models/models/industrial/aisc_sculpture_param.ifc",
+    "70": "test-models/models/hospital/west_riverside_hospital_fire_ifc4.ifc",
+    "80": "test-models/models/hospital/GVA_Sanitario.ifc",
+    "81": "test-models/models/office/Molio_with_URIs.ifc",
+    "82": "test-models/models/office/AC20-Institute-Var-2.ifc",
+    "83": "test-models/models/office/Duplex_A_20110907.ifc",
+    "84": "test-models/models/office/Duplex_Electrical_20121207.ifc",
+    "85": "test-models/models/hospital/Clinic_Electrical.ifc",
+    "86": "test-models/models/hospital/west_riverside_hospital_elec_ifc4.ifc",
+    "87": "test-models/models/office/GVA_Administrativo.ifc"
   },
   "roles": {
-    "piping": {"local-mep": 1, "clinic-plumbing": 2, "west-riverside-ifc4": 3, "craslabbim": 5},
-    "seismic": {"local-mep": 1, "clinic-structural": 10, "west-riverside-str": 11},
-    "architecture": {"local-mep": 1, "clinic-architectural": 20},
-    "schema_twins": {"west-riverside-plumbing": {"ifc4": 3, "ifc2x3": 4}},
-    "geometry": {"aisc-brep": 30, "aisc-param": 31},
-    "performance": {"fire-ifc4-small": 40, "clinic-plumbing-medium": 2, "mech-ifc4-large": 41}
+    "piping": {
+      "clinic-plumbing-2x3": 10,
+      "clinic-hvac-2x3": 11,
+      "wr-plumb-ifc4": 12,
+      "wr-mech-ifc4": 13,
+      "wr-sprinkler-ifc4": 14,
+      "wr-plumb-2x3": 15,
+      "wr-mech-2x3": 16,
+      "duplex-mep-2x3": 20,
+      "duplex-plumbing-2x3": 21,
+      "digitalhub-heating-ifc4": 22,
+      "digitalhub-sanitary-ifc4": 23,
+      "wbdg-office-mep-2x3": 24,
+      "schependomlaan-2x3": 25,
+      "digitalhub-vent-ifc4": 26,
+      "craslab-2x3": 30
+    },
+    "seismic": {
+      "clinic-structural": 40,
+      "wr-structural-ifc4": 41,
+      "wbdg-office-str": 42
+    },
+    "architecture": {
+      "clinic-architectural": 50,
+      "wr-arc-ifc4": 51,
+      "digitalhub-arc-ifc4": 52,
+      "wbdg-office-arc": 53,
+      "ac20-fzk-haus": 54
+    },
+    "schema_twins": {
+      "west-riverside-plumbing": {
+        "ifc4": 12,
+        "ifc2x3": 15
+      },
+      "west-riverside-mechanical": {
+        "ifc4": 13,
+        "ifc2x3": 16
+      }
+    },
+    "geometry": {
+      "aisc-brep": 60,
+      "aisc-param": 61
+    },
+    "performance": {
+      "fire-ifc4-0.9MB": 70,
+      "wr-plumb-ifc4-22.7MB": 12,
+      "clinic-plumbing-53MB": 10,
+      "wr-mech-ifc4-69.7MB": 13
+    },
+    "piping_deep": {
+      "clinic-plumbing-2x3": 10,
+      "wr-plumb-ifc4": 12,
+      "digitalhub-sanitary-ifc4": 23,
+      "duplex-mep-2x3": 20
+    },
+    "exports": {
+      "wr-plumb-ifc4": 12,
+      "clinic-plumbing-2x3": 10,
+      "duplex-mep-2x3": 20
+    },
+    "seismic_exports": {
+      "clinic-structural": 40,
+      "wr-structural-ifc4": 41
+    }
   }
 }
