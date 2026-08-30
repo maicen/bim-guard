@@ -40,6 +40,7 @@ class ProjectsService:
         projects_repo=None,
         standards_repo=None,
         client_documents_repo=None,
+        ifc_files_repo=None,
         storage=None,
         lineage=None,
     ):
@@ -86,6 +87,22 @@ class ProjectsService:
                     "file_path": str,
                     "created_at": str,
                     "updated_at": str,
+                },
+            )
+        )
+        self._ifc_files = (
+            ifc_files_repo
+            if ifc_files_repo is not None
+            else PersistenceService.get_table(
+                "project_ifc_files",
+                {
+                    "id": int,
+                    "project_id": int,
+                    "file_path": str,
+                    "file_name": str,
+                    "is_primary": bool,
+                    "role": str,
+                    "uploaded_at": str,
                 },
             )
         )
@@ -393,6 +410,83 @@ class ProjectsService:
             source_sha256,
         )
         return improved_path, lineage
+    # ── ifc files ────────────────────────────────────────────────────────────
+
+    def _read_ifc_file_rows(self, project_id: int) -> list[dict]:
+        """Return raw ``project_ifc_files`` rows, or [] if the table is absent.
+
+        The migration that creates the table is applied out of band, so between
+        a deploy and that migration the table legitimately does not exist yet.
+        Reading it must degrade to "this project has no attached files" rather
+        than take down every caller, which is why the failure is swallowed here
+        and nowhere else.
+        """
+        try:
+            return list(self._ifc_files.rows_where("project_id = ?", [project_id]))
+        except Exception as exc:  # noqa: BLE001 - missing table is not a caller's problem
+            logger.debug(
+                "project_ifc_files unavailable project_id=%d error=%s", project_id, exc
+            )
+            return []
+
+    @cache_db_query(key_prefix="bimguard:projects:ifc_files")
+    def get_ifc_files_by_project(self, project_id: int) -> list[dict]:
+        """Return every IFC model attached to a project, primary first.
+
+        The primary model sorts first and the rest follow by insertion order, so
+        a caller that wants "the model" can take the head of the list and one
+        that wants "all the models" can iterate.
+
+        On a database where the ``project_ifc_files`` migration has not run, or
+        for a project created before it did, the project's own
+        ``ifc_file_path`` is reported as a single primary entry. Callers
+        therefore see one shape whichever side of the migration they are on.
+        """
+        rows = self._read_ifc_file_rows(project_id)
+        if not rows:
+            legacy = self._legacy_ifc_file(project_id)
+            return [legacy] if legacy else []
+
+        rows.sort(key=lambda row: (not row.get("is_primary"), row.get("id") or 0))
+        logger.debug("Loaded IFC files project_id=%d count=%d", project_id, len(rows))
+        return rows
+
+    def get_primary_ifc_file(self, project_id: int) -> dict | None:
+        """Return the model an analysis run starts from, or None.
+
+        The unique partial index on ``(project_id) WHERE is_primary`` means at
+        most one row can claim it. A project whose rows somehow all say
+        otherwise still resolves to its first file rather than to nothing: a
+        project that owns models has a model to analyse.
+        """
+        files = self.get_ifc_files_by_project(project_id)
+        if not files:
+            return None
+        for row in files:
+            if row.get("is_primary"):
+                return row
+        return files[0]
+
+    def _legacy_ifc_file(self, project_id: int) -> dict | None:
+        """Present ``projects.ifc_file_path`` in ``project_ifc_files`` shape.
+
+        Returned rows carry no ``id``: they are a view of the projects row, not
+        a record in the child table, and nothing should try to update them by
+        primary key.
+        """
+        project = self._projects.get(project_id)
+        path = (project or {}).get("ifc_file_path") or ""
+        if not path:
+            return None
+        return {
+            "project_id": project_id,
+            "file_path": path,
+            "file_name": Path(path.replace("\\", "/")).name,
+            "is_primary": True,
+            "role": "primary",
+            "uploaded_at": (project or {}).get("created_at") or "",
+        }
+
     # ── standards ────────────────────────────────────────────────────────────
 
     @cache_db_query(key_prefix="bimguard:projects:standards")
