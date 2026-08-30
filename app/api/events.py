@@ -6,7 +6,8 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from starlette.responses import StreamingResponse
 
 from app.logging_config import get_logger
@@ -86,12 +87,14 @@ async def _sse_generator(
 
 
 @router.get("/workflow/{project_id}", summary="Get pipeline workflow snapshot JSON")
-def get_workflow_snapshot(project_id: int):
+def get_workflow_snapshot(project_id: int, response: Response):
     """Return every engine's current stage and metrics as JSON."""
+    response.headers["Cache-Control"] = "no-store"
     if project_id <= 0:
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A positive project ID is required.",
+            content={"error": "A positive project ID is required."},
+            headers={"Cache-Control": "no-store"},
         )
     return snapshot(project_id)
 

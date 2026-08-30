@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import {
     ListChecks,
     Search,
@@ -15,20 +15,26 @@
     Edit3,
     Eye,
     X,
+    RotateCw,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
   import type { Rule, RuleFolder, RulesetCategory } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
 
-  let rules: Rule[] = [];
-  let folders: RuleFolder[] = [];
-  let isLoading = true;
+  const cachedRules = rulesApi.getCachedList();
+  const cachedFolders = rulesApi.getCachedFolders();
+
+  let rules: Rule[] = cachedRules || [];
+  let folders: RuleFolder[] = cachedFolders || [];
+  let isLoading = !cachedRules;
+  let isRefreshing = false;
   let error = "";
   let successMessage = "";
   let isDeleteModalOpen = false;
   let ruleToDelete: { id: number; ruleId: string } | null = null;
   let isViewModalOpen = false;
   let ruleToView: Rule | null = null;
+  let unsubscribeRules: (() => void) | null = null;
 
   // Filter state
   let searchQuery = "";
@@ -66,25 +72,41 @@
   let formSeverity = "Medium";
   let formNeedsReview = 0;
 
-  async function loadData() {
-    isLoading = true;
+  async function loadData(force = false) {
+    if (!rules.length) {
+      isLoading = true;
+    } else {
+      isRefreshing = true;
+    }
     error = "";
     try {
       const [rulesData, foldersData] = await Promise.all([
-        rulesApi.list(),
-        rulesApi.folders(),
+        rulesApi.list(undefined, { forceRefresh: force }),
+        rulesApi.folders(undefined, { forceRefresh: force }),
       ]);
       rules = rulesData;
       folders = foldersData;
     } catch (err: any) {
-      error = err.message || "Failed to load compliance rules";
+      if (!rules.length) {
+        error = err.message || "Failed to load compliance rules";
+      }
     } finally {
       isLoading = false;
+      isRefreshing = false;
     }
   }
 
   onMount(() => {
+    unsubscribeRules = rulesApi.subscribe((updatedRules) => {
+      rules = updatedRules;
+    });
     loadData();
+  });
+
+  onDestroy(() => {
+    if (unsubscribeRules) {
+      unsubscribeRules();
+    }
   });
 
   $: archCount = rules.filter((r) => (r.category || "").toLowerCase() === "arch").length;
@@ -288,6 +310,16 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <button
+        type="button"
+        on:click={() => loadData(true)}
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+        title="Refresh rules catalog"
+      >
+        <RotateCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
+        <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+      </button>
+
       <button
         type="button"
         on:click={handleSeedRules}

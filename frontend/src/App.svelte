@@ -58,6 +58,7 @@
   onMount(() => {
     initTheme();
     checkHealth();
+    dashboardApi.prefetchAll();
     const interval = setInterval(checkHealth, 20000);
     return () => clearInterval(interval);
   });

@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import PlainTextResponse
 
 from app.api.dependencies import get_rules_service
@@ -28,6 +38,7 @@ router = APIRouter()
 @router.get("", response_model=list[RuleResponse], summary="List rules with optional filters")
 def list_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
+    response: Response,
     mechanism: Optional[str] = Query(None, description="Filter by mechanism (e.g. GC-001, CODE)"),
     ruleset_id: Optional[str] = Query(None, description="Filter by ruleset identifier"),
     category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
@@ -35,6 +46,7 @@ def list_rules(
     needs_review: Optional[int] = Query(None, description="Filter by review status (1 or 0)"),
 ) -> list[RuleResponse]:
     """Retrieve compliance rules with optional multi-criteria filtering."""
+    response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
     if mechanism:
         rules = service.list_by_mechanism(mechanism)
     elif ruleset_id:
@@ -68,9 +80,11 @@ def list_rules(
 @router.get("/folders", response_model=list[RuleFolderResponse], summary="List ruleset folders")
 def list_rule_folders(
     service: Annotated[RuleService, Depends(get_rules_service)],
+    response: Response,
     category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
 ) -> list[RuleFolderResponse]:
     """Return all rule folders along with their member rules."""
+    response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
     folders = service.list_folders_with_rules(category=category)
     result: list[RuleFolderResponse] = []
     for f in folders:
@@ -178,8 +192,10 @@ def update_rule_folder(
 def get_rule(
     rule_id: int,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    response: Response,
 ) -> RuleResponse:
     """Retrieve a single rule by integer ID."""
+    response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
     rule = service.get_rule(rule_id)
     if not rule:
         raise HTTPException(

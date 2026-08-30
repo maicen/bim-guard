@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 
 from app.api.dependencies import get_documents_service
 from app.logging_config import get_logger
@@ -24,8 +24,10 @@ router = APIRouter()
 @router.get("", response_model=list[DocumentResponse], summary="List all uploaded specification documents")
 def list_documents(
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    response: Response,
 ) -> list[DocumentResponse]:
     """Retrieve all specification documents ordered newest first."""
+    response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"
     rows = service.list_documents()
     res = []
     for r in rows:
@@ -48,8 +50,10 @@ def list_documents(
 def get_document(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    response: Response,
 ) -> DocumentDetailResponse:
     """Retrieve a document by ID including its full extracted text."""
+    response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(

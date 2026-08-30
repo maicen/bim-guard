@@ -339,6 +339,7 @@ class ProjectsService:
         invalidate_cache("bimguard:projects:list")
         invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
         invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
+        invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         logger.info("Project deleted project_id=%d existed=%s", project_id, project is not None)
 
 
@@ -454,6 +455,7 @@ class ProjectsService:
             }
         )
         invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
+        invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         logger.info(
             "Standard linked project_id=%d standard_id=%s source=%s", project_id, standard_id, source
         )
@@ -478,6 +480,7 @@ class ProjectsService:
             self.add_standard_to_project(project_id, standard_id, source="notebook")
 
         invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
+        invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         logger.info("Standards set project_id=%d count=%d", project_id, len(wanted))
         return len(wanted)
 
@@ -505,6 +508,7 @@ class ProjectsService:
             project_id, standard_id=filename, source="uploaded", file_path=storage_ref
         )
         invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
+        invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         logger.info(
             "Custom standard uploaded project_id=%d filename=%s bytes=%d",
             project_id,
@@ -524,8 +528,10 @@ class ProjectsService:
         self._standards.delete(standard_row_id)
         if project_id:
             invalidate_cache(f"bimguard:projects:standards:project_id={project_id}")
+            invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         else:
             invalidate_cache("bimguard:projects:standards")
+            invalidate_cache("bimguard:projects:inputs")
         logger.info("Standard unlinked id=%d project_id=%s", standard_row_id, project_id)
 
     # ── client documents ─────────────────────────────────────────────────────
@@ -608,6 +614,10 @@ class ProjectsService:
             already_linked.add(file_path)
             linked += 1
 
+        if linked > 0:
+            invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
+            invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
+
         logger.info(
             "Library documents linked project_id=%d requested=%d linked=%d",
             project_id,
@@ -672,6 +682,7 @@ class ProjectsService:
             }
         )
         invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
+        invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         logger.info(
             "Client document stored project_id=%d filename=%s category=%s bytes=%d",
             project_id,
@@ -692,11 +703,13 @@ class ProjectsService:
         self._client_documents.delete(document_id)
         if project_id:
             invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
+            invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         else:
             invalidate_cache("bimguard:projects:docs")
+            invalidate_cache("bimguard:projects:inputs")
         logger.info("Client document deleted id=%d project_id=%s", document_id, project_id)
 
-
+    @cache_db_query(key_prefix="bimguard:projects:inputs")
     def get_analysis_inputs(self, project_id: int) -> list[dict]:
         """Return standards and client documents as one list for the analyze forms.
 

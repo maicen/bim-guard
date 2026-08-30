@@ -16,6 +16,13 @@ import type {
   RulesetCategory,
   WorkflowStatus,
 } from './types';
+import {
+  EntityCacheStore,
+  InMemoryCache,
+  SWRStore,
+  type SWROptions,
+  type Unsubscribe,
+} from './cache';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -36,15 +43,73 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json();
 }
 
+// ── Standardized Entity Cache Stores (SOLID Architecture) ─────────────────────
+const _projectsStore = new EntityCacheStore<Project, number>((p) => p.id, 60_000, 60_000);
+const _projectOptionsStore = new SWRStore<string, ProjectOptions>(new InMemoryCache(), 300_000);
+
+const _rulesStore = new EntityCacheStore<Rule, number>((r) => r.id, 60_000, 60_000);
+const _ruleFoldersStore = new SWRStore<string, RuleFolder[]>(new InMemoryCache(), 60_000);
+
+const _documentsStore = new EntityCacheStore<DocumentItem, number>((d) => d.id, 60_000, 60_000);
+const _documentDetailStore = new SWRStore<number, DocumentDetail>(new InMemoryCache(), 60_000);
+
+const _dashboardStatsStore = new SWRStore<string, any>(new InMemoryCache(), 15_000);
+
+// Helper for building rule filter cache key
+function buildRulesFilterKey(filters?: {
+  mechanism?: string;
+  ruleset_id?: string;
+  category?: RulesetCategory | string;
+  keyword?: string;
+}): string {
+  if (!filters) return '__default__';
+  return `${filters.mechanism || ''}_${filters.ruleset_id || ''}_${filters.category || ''}_${filters.keyword || ''}`;
+}
+
 export const projectsApi = {
-  async list(): Promise<ProjectListResponse> {
-    const res = await fetch(`${API_BASE}/projects`);
-    return handleResponse<ProjectListResponse>(res);
+  getCachedList(): ProjectListResponse | null {
+    const list = _projectsStore.getCachedList('__default__');
+    if (!list) return null;
+    return {
+      projects: list,
+      total: list.length,
+      limit: list.length,
+      offset: 0,
+    };
   },
 
-  async get(id: number): Promise<Project> {
-    const res = await fetch(`${API_BASE}/projects/${id}`);
-    return handleResponse<Project>(res);
+  subscribe(listener: (projects: Project[]) => void): Unsubscribe {
+    return _projectsStore.subscribe(listener);
+  },
+
+  async list(options: SWROptions = {}): Promise<ProjectListResponse> {
+    const list = await _projectsStore.fetchList(
+      '__default__',
+      async () => {
+        const res = await fetch(`${API_BASE}/projects`);
+        const data = await handleResponse<ProjectListResponse | Project[]>(res);
+        return Array.isArray(data) ? data : data.projects;
+      },
+      options,
+    );
+
+    return {
+      projects: list,
+      total: list.length,
+      limit: list.length,
+      offset: 0,
+    };
+  },
+
+  async get(id: number, options: SWROptions = {}): Promise<Project> {
+    return _projectsStore.fetchItem(
+      id,
+      async () => {
+        const res = await fetch(`${API_BASE}/projects/${id}`);
+        return handleResponse<Project>(res);
+      },
+      options,
+    );
   },
 
   async getInputs(id: number): Promise<any[]> {
@@ -52,9 +117,15 @@ export const projectsApi = {
     return handleResponse<any[]>(res);
   },
 
-  async options(): Promise<ProjectOptions> {
-    const res = await fetch(`${API_BASE}/projects/options`);
-    return handleResponse<ProjectOptions>(res);
+  async options(options: SWROptions = {}): Promise<ProjectOptions> {
+    return _projectOptionsStore.execute(
+      '__options__',
+      async () => {
+        const res = await fetch(`${API_BASE}/projects/options`);
+        return handleResponse<ProjectOptions>(res);
+      },
+      options,
+    );
   },
 
   async create(payload: ProjectCreatePayload): Promise<Project> {
@@ -63,7 +134,9 @@ export const projectsApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return handleResponse<Project>(res);
+    const created = await handleResponse<Project>(res);
+    _projectsStore.addOrUpdate(created);
+    return created;
   },
 
   async uploadWithIfc(formData: FormData): Promise<Project> {
@@ -71,7 +144,9 @@ export const projectsApi = {
       method: 'POST',
       body: formData,
     });
-    return handleResponse<Project>(res);
+    const created = await handleResponse<Project>(res);
+    _projectsStore.addOrUpdate(created);
+    return created;
   },
 
   async update(id: number, payload: ProjectUpdatePayload): Promise<Project> {
@@ -80,14 +155,22 @@ export const projectsApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return handleResponse<Project>(res);
+    const updated = await handleResponse<Project>(res);
+    _projectsStore.addOrUpdate(updated);
+    return updated;
   },
 
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/projects/${id}`, {
       method: 'DELETE',
     });
-    return handleResponse<void>(res);
+    await handleResponse<void>(res);
+    _projectsStore.remove(id);
+  },
+
+  invalidateCache() {
+    _projectsStore.clear();
+    _projectOptionsStore.clear();
   },
 
   getIfcUrl(id: number): string {
@@ -96,27 +179,67 @@ export const projectsApi = {
 };
 
 export const rulesApi = {
-  async list(filters?: {
+  getCachedList(filters?: {
     mechanism?: string;
     ruleset_id?: string;
     category?: RulesetCategory | string;
     keyword?: string;
-  }): Promise<Rule[]> {
-    const params = new URLSearchParams();
-    if (filters?.mechanism) params.set('mechanism', filters.mechanism);
-    if (filters?.ruleset_id) params.set('ruleset_id', filters.ruleset_id);
-    if (filters?.category) params.set('category', filters.category);
-    if (filters?.keyword) params.set('keyword', filters.keyword);
-
-    const query = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${API_BASE}/rules${query}`);
-    return handleResponse<Rule[]>(res);
+  }): Rule[] | null {
+    const key = buildRulesFilterKey(filters);
+    const cached = _rulesStore.getCachedList(key);
+    return cached || null;
   },
 
-  async folders(category?: RulesetCategory | string): Promise<RuleFolder[]> {
+  getCachedFolders(category?: RulesetCategory | string): RuleFolder[] | null {
+    const key = category || '__default__';
+    const cached = _ruleFoldersStore.getCached(key);
+    return cached || null;
+  },
+
+  subscribe(listener: (rules: Rule[]) => void): Unsubscribe {
+    return _rulesStore.subscribe(listener);
+  },
+
+  async list(
+    filters?: {
+      mechanism?: string;
+      ruleset_id?: string;
+      category?: RulesetCategory | string;
+      keyword?: string;
+    },
+    options: SWROptions = {},
+  ): Promise<Rule[]> {
+    const key = buildRulesFilterKey(filters);
+    return _rulesStore.fetchList(
+      key,
+      async () => {
+        const params = new URLSearchParams();
+        if (filters?.mechanism) params.set('mechanism', filters.mechanism);
+        if (filters?.ruleset_id) params.set('ruleset_id', filters.ruleset_id);
+        if (filters?.category) params.set('category', filters.category);
+        if (filters?.keyword) params.set('keyword', filters.keyword);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        const res = await fetch(`${API_BASE}/rules${query}`);
+        return handleResponse<Rule[]>(res);
+      },
+      options,
+    );
+  },
+
+  async folders(
+    category?: RulesetCategory | string,
+    options: SWROptions = {},
+  ): Promise<RuleFolder[]> {
+    const key = category || '__default__';
     const query = category ? `?category=${encodeURIComponent(category)}` : '';
-    const res = await fetch(`${API_BASE}/rules/folders${query}`);
-    return handleResponse<RuleFolder[]>(res);
+    return _ruleFoldersStore.execute(
+      key,
+      async () => {
+        const res = await fetch(`${API_BASE}/rules/folders${query}`);
+        return handleResponse<RuleFolder[]>(res);
+      },
+      options,
+    );
   },
 
   async createFolder(payload: RuleFolderCreatePayload): Promise<RuleFolder> {
@@ -125,7 +248,9 @@ export const rulesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return handleResponse<RuleFolder>(res);
+    const created = await handleResponse<RuleFolder>(res);
+    _ruleFoldersStore.clear();
+    return created;
   },
 
   async updateFolder(rulesetId: string, payload: RuleFolderUpdatePayload): Promise<RuleFolder> {
@@ -134,12 +259,20 @@ export const rulesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return handleResponse<RuleFolder>(res);
+    const updated = await handleResponse<RuleFolder>(res);
+    _ruleFoldersStore.clear();
+    return updated;
   },
 
-  async get(id: number): Promise<Rule> {
-    const res = await fetch(`${API_BASE}/rules/${id}`);
-    return handleResponse<Rule>(res);
+  async get(id: number, options: SWROptions = {}): Promise<Rule> {
+    return _rulesStore.fetchItem(
+      id,
+      async () => {
+        const res = await fetch(`${API_BASE}/rules/${id}`);
+        return handleResponse<Rule>(res);
+      },
+      options,
+    );
   },
 
   async create(payload: Partial<Rule>): Promise<Rule> {
@@ -148,7 +281,10 @@ export const rulesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return handleResponse<Rule>(res);
+    const created = await handleResponse<Rule>(res);
+    _rulesStore.addOrUpdate(created);
+    _ruleFoldersStore.clear();
+    return created;
   },
 
   async update(id: number, payload: Partial<Rule>): Promise<Rule> {
@@ -157,25 +293,29 @@ export const rulesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return handleResponse<Rule>(res);
+    const updated = await handleResponse<Rule>(res);
+    _rulesStore.addOrUpdate(updated);
+    _ruleFoldersStore.clear();
+    return updated;
   },
 
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/rules/${id}`, {
       method: 'DELETE',
     });
-    return handleResponse<void>(res);
+    await handleResponse<void>(res);
+    _rulesStore.remove(id);
+    _ruleFoldersStore.clear();
+  },
+
+  invalidateCache() {
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
   },
 };
 
-// FastAPI reads a repeated query parameter as a list, so each code is its own
-// `engines=` pair. `undefined` sends nothing at all, which the API reads as
-// "every engine".
 function engineQuery(engines?: string[]): string {
   if (!engines) return '';
-  // An empty selection asks for nothing, not for everything. Sending one blank
-  // value keeps that distinction on the wire: the API reads it as an empty
-  // list, where omitting the parameter would read as "no selection made".
   if (engines.length === 0) return '&engines=';
   return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join('');
 }
@@ -193,9 +333,6 @@ export const analyzeApi = {
     return handleResponse<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }>(res);
   },
 
-  // `engines` names the engine codes to execute (e.g. ['GC', 'CC']). Omit it to
-  // run every engine; an unselected engine is skipped on the server rather than
-  // run and filtered out here.
   async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true, engines?: string[]): Promise<AnalysisResult> {
     const res = await fetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: 'POST',
@@ -215,9 +352,6 @@ export const analyzeApi = {
     return handleResponse<WorkflowStatus>(res);
   },
 
-  // The export re-runs the analysis, so it takes the same engine selection the
-  // page ran under — without it a narrowed run would export findings from
-  // engines the user unchecked.
   getExportUrl(projectId: number, slug: string, fmt: 'bcf' | 'csv' | 'json', engines?: string[]): string {
     return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}`;
   },
@@ -249,21 +383,65 @@ export const analyzeApi = {
 };
 
 export const dashboardApi = {
-  async getStats(): Promise<any> {
-    const res = await fetch(`${API_BASE}/dashboard/stats`);
-    return handleResponse<any>(res);
+  getCachedStats(): any | null {
+    return _dashboardStatsStore.getCached('__stats__') || null;
+  },
+
+  async getStats(options: SWROptions = {}): Promise<any> {
+    return _dashboardStatsStore.execute(
+      '__stats__',
+      async () => {
+        const res = await fetch(`${API_BASE}/dashboard/stats`);
+        return handleResponse<any>(res);
+      },
+      options,
+    );
+  },
+
+  prefetchAll(): void {
+    Promise.allSettled([
+      projectsApi.list(),
+      rulesApi.list(),
+      rulesApi.folders(),
+      documentsApi.list(),
+      dashboardApi.getStats(),
+    ]).catch(() => {});
+  },
+
+  invalidateCache() {
+    _dashboardStatsStore.clear();
   },
 };
 
 export const documentsApi = {
-  async list(): Promise<DocumentItem[]> {
-    const res = await fetch(`${API_BASE}/documents`);
-    return handleResponse<DocumentItem[]>(res);
+  getCachedList(): DocumentItem[] | null {
+    return _documentsStore.getCachedList('__default__') || null;
   },
 
-  async get(id: number): Promise<DocumentDetail> {
-    const res = await fetch(`${API_BASE}/documents/${id}`);
-    return handleResponse<DocumentDetail>(res);
+  subscribe(listener: (docs: DocumentItem[]) => void): Unsubscribe {
+    return _documentsStore.subscribe(listener);
+  },
+
+  async list(options: SWROptions = {}): Promise<DocumentItem[]> {
+    return _documentsStore.fetchList(
+      '__default__',
+      async () => {
+        const res = await fetch(`${API_BASE}/documents`);
+        return handleResponse<DocumentItem[]>(res);
+      },
+      options,
+    );
+  },
+
+  async get(id: number, options: SWROptions = {}): Promise<DocumentDetail> {
+    return _documentDetailStore.execute(
+      id,
+      async () => {
+        const res = await fetch(`${API_BASE}/documents/${id}`);
+        return handleResponse<DocumentDetail>(res);
+      },
+      options,
+    );
   },
 
   async upload(file: File): Promise<DocumentDetail> {
@@ -273,7 +451,17 @@ export const documentsApi = {
       method: 'POST',
       body: form,
     });
-    return handleResponse<DocumentDetail>(res);
+    const created = await handleResponse<DocumentDetail>(res);
+    _documentsStore.addOrUpdate({
+      id: created.id,
+      filename: created.filename,
+      file_path: created.file_path,
+      upload_date: created.upload_date,
+      extracted_text_preview: created.extracted_text_preview || created.extracted_text?.slice(0, 200) || '',
+      char_count: created.char_count ?? created.extracted_text?.length ?? 0,
+    });
+    _documentDetailStore.set(created.id, created);
+    return created;
   },
 
   async update(id: number, payload: DocumentUpdatePayload): Promise<DocumentDetail> {
@@ -282,14 +470,31 @@ export const documentsApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return handleResponse<DocumentDetail>(res);
+    const updated = await handleResponse<DocumentDetail>(res);
+    _documentsStore.addOrUpdate({
+      id: updated.id,
+      filename: updated.filename,
+      file_path: updated.file_path,
+      upload_date: updated.upload_date,
+      extracted_text_preview: updated.extracted_text_preview || updated.extracted_text?.slice(0, 200) || '',
+      char_count: updated.char_count ?? updated.extracted_text?.length ?? 0,
+    });
+    _documentDetailStore.set(updated.id, updated);
+    return updated;
   },
 
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/documents/${id}`, {
       method: 'DELETE',
     });
-    return handleResponse<void>(res);
+    await handleResponse<void>(res);
+    _documentsStore.remove(id);
+    _documentDetailStore.delete(id);
+  },
+
+  invalidateCache() {
+    _documentsStore.clear();
+    _documentDetailStore.clear();
   },
 };
 
@@ -369,6 +574,3 @@ export const revitSyncApi = {
     return handleResponse<any>(res);
   },
 };
-
-
-

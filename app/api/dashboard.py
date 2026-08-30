@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from app.logging_config import get_logger
 from app.modules.contracts import DashboardStatsResponse
@@ -42,8 +42,9 @@ def _probe_db_health() -> bool:
 
 
 @router.get("/stats", response_model=DashboardStatsResponse, summary="Get dashboard summary stats")
-def get_dashboard_stats() -> DashboardStatsResponse:
+def get_dashboard_stats(response: Response) -> DashboardStatsResponse:
     """Return high-level counts for projects, documents, rules, and connectivity."""
+    response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=15"
     db_ok = _probe_db_health()
     backend = PersistenceService.DB_BACKEND.upper()
 

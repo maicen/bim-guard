@@ -3,7 +3,13 @@
 from app.logging_config import get_logger
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
-from app.utils import find_row_by_field, now_iso_utc, rows_desc_by_id
+from app.utils import (
+    cache_db_query,
+    find_row_by_field,
+    invalidate_cache,
+    now_iso_utc,
+    rows_desc_by_id,
+)
 
 logger = get_logger(__name__)
 
@@ -30,10 +36,12 @@ class DocumentService:
             )
         )
 
+    @cache_db_query(key_prefix="bimguard:documents:list")
     def list_documents(self):
         """Return all documents ordered by newest first."""
         return rows_desc_by_id(self._documents)
 
+    @cache_db_query(key_prefix="bimguard:documents:item")
     def get_document(self, document_id: int):
         """Return a single document row by primary key."""
         return self._documents.get(document_id)
@@ -53,6 +61,7 @@ class DocumentService:
                 "upload_date": now_iso_utc(),
             }
         )
+        invalidate_cache("bimguard:documents:list")
         logger.info(
             "Document created document_id=%s filename=%s extracted_chars=%d",
             document.get("id"),
@@ -73,11 +82,15 @@ class DocumentService:
             updates={"filename": filename, "extracted_text": extracted_text},
             pk_values=document_id,
         )
+        invalidate_cache(f"bimguard:documents:item:document_id={document_id}")
+        invalidate_cache("bimguard:documents:list")
         logger.info("Document updated document_id=%d extracted_chars=%d", document_id, len(extracted_text))
 
     def delete_document(self, document_id: int):
         """Delete a document row by primary key."""
         self._documents.delete(document_id)
+        invalidate_cache(f"bimguard:documents:item:document_id={document_id}")
+        invalidate_cache("bimguard:documents:list")
         logger.info("Document deleted document_id=%d", document_id)
 
     def delete_document_with_file(self, document_id: int):

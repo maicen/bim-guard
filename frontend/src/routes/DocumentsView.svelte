@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import {
     BookOpen,
     Plus,
@@ -11,16 +11,20 @@
     X,
     CheckCircle2,
     Search,
+    RotateCw,
   } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
   import type { DocumentItem, DocumentDetail } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
 
-  let documents: DocumentItem[] = [];
-  let isLoading = true;
+  const cachedDocs = documentsApi.getCachedList();
+  let documents: DocumentItem[] = cachedDocs || [];
+  let isLoading = !cachedDocs;
+  let isRefreshing = false;
   let error = "";
   let isDeleteModalOpen = false;
   let docToDelete: { id: number; filename: string } | null = null;
+  let unsubscribeDocs: (() => void) | null = null;
 
   // Edit modal state
   let isEditModalOpen = false;
@@ -42,20 +46,36 @@
 
   let searchQuery = "";
 
-  async function loadDocuments() {
-    isLoading = true;
+  async function loadDocuments(force = false) {
+    if (!documents.length) {
+      isLoading = true;
+    } else {
+      isRefreshing = true;
+    }
     error = "";
     try {
-      documents = await documentsApi.list();
+      documents = await documentsApi.list({ forceRefresh: force });
     } catch (err: any) {
-      error = err.message || "Failed to load document specifications.";
+      if (!documents.length) {
+        error = err.message || "Failed to load document specifications.";
+      }
     } finally {
       isLoading = false;
+      isRefreshing = false;
     }
   }
 
   onMount(() => {
+    unsubscribeDocs = documentsApi.subscribe((updatedDocs) => {
+      documents = updatedDocs;
+    });
     loadDocuments();
+  });
+
+  onDestroy(() => {
+    if (unsubscribeDocs) {
+      unsubscribeDocs();
+    }
   });
 
   $: filteredDocuments = documents.filter((d) =>
@@ -172,14 +192,26 @@
       </p>
     </div>
 
-    <button
-      type="button"
-      on:click={() => (isUploadModalOpen = true)}
-      class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
-    >
-      <Upload class="w-3.5 h-3.5" />
-      <span>Upload Specification</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        on:click={() => loadDocuments(true)}
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+        title="Refresh document specifications"
+      >
+        <RotateCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
+        <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+      </button>
+
+      <button
+        type="button"
+        on:click={() => (isUploadModalOpen = true)}
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
+      >
+        <Upload class="w-3.5 h-3.5" />
+        <span>Upload Specification</span>
+      </button>
+    </div>
   </div>
 
   {#if error}
