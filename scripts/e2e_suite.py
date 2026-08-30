@@ -9,10 +9,19 @@ A model the manifest names but the disk does not hold is reported SKIP, never
 PASS: a test that did not run has not passed. Run against a server started by
 ``scripts/e2e_server.py`` with the same manifest.
 
+``--only`` restricts the run to named categories and ``--quick-piping`` keeps
+just the all-engines call per piping model. Together they make a second pass
+against a differently configured server (say one booted with
+``e2e_server.py --seed-code-rulesets``) cost minutes rather than an hour, so the
+two passes can be compared instead of one replacing the other.
+
 USAGE
 
     uv run python scripts/e2e_suite.py --manifest e2e-models.json
         --base-url http://127.0.0.1:8010 --out test-results.json
+    uv run python scripts/e2e_suite.py --manifest e2e-models.json
+        --base-url http://127.0.0.1:8011 --only architecture,seismic
+        --quick-piping --out test-results-seeded.json
 """
 
 from __future__ import annotations
@@ -32,6 +41,18 @@ ALL_ENGINES = ["GC", "CC", "MC", "MM", "XM"]
 #: The two halves of the corrosion run: per element, and once over the network.
 ELEMENT_ENGINES = ["GC", "CC", "MC"]
 NETWORK_ENGINES = ["MM", "XM"]
+
+#: Category names ``--only`` accepts, in the order the run executes them.
+CATEGORIES = (
+    "piping",
+    "cache",
+    "exports",
+    "seismic",
+    "architecture",
+    "schema",
+    "geometry",
+    "perf",
+)
 
 
 class Suite:
@@ -88,7 +109,9 @@ class Suite:
 
     # -- categories --------------------------------------------------------
 
-    def piping_gating(self, project_id: int, label: str, deep: bool = True) -> None:
+    def piping_gating(
+        self, project_id: int, label: str, deep: bool = True, gate: bool = True
+    ) -> None:
         """TEST 1: only the selected engines execute.
 
         Args:
@@ -97,6 +120,10 @@ class Suite:
             deep: Also check a single-engine and an empty selection. Each
                 variant costs a full parse, so the two that re-prove what the
                 three-way split already shows run on a subset of models.
+            gate: Run the element-only and network-only splits. Passing False
+                records what all five engines report and nothing else, which is
+                what a second pass against a differently configured server
+                needs -- the gate itself does not depend on that configuration.
         """
         name = f"piping/{label}"
         if not self.available(project_id):
@@ -109,6 +136,8 @@ class Suite:
             return
         all_counts = self.rulesets(full)
         self.record(f"{name}/1a-all-engines", "PASS", f"{all_counts} in {seconds:.2f}s", all_counts)
+        if not gate:
+            return
 
         element, _, _ = self.run_analysis(project_id, "corrosion", ELEMENT_ENGINES)
         counts = self.rulesets(element)
@@ -279,7 +308,22 @@ def main() -> None:
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--base-url", default="http://127.0.0.1:8010")
     parser.add_argument("--out", default="test-results.json")
+    parser.add_argument(
+        "--only",
+        default="",
+        help=f"Comma-separated categories to run. One or more of: {', '.join(CATEGORIES)}.",
+    )
+    parser.add_argument(
+        "--quick-piping",
+        action="store_true",
+        help="Record only the all-engines call per piping model, skipping the gate splits.",
+    )
     args = parser.parse_args()
+
+    selected = {c.strip() for c in args.only.split(",") if c.strip()} or set(CATEGORIES)
+    unknown = selected - set(CATEGORIES)
+    if unknown:
+        parser.error(f"unknown categories: {', '.join(sorted(unknown))}")
 
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     models = manifest["models"]
@@ -289,32 +333,44 @@ def main() -> None:
     suite = Suite(client, models)
 
     deep = roles.get("piping_deep", {})
-    for label, project_id in roles.get("piping", {}).items():
-        suite.piping_gating(project_id, label, deep=label in deep)
-    for label, project_id in deep.items():
-        suite.piping_cache(project_id, label)
-    for label, project_id in roles.get("exports", {}).items():
-        suite.exports(project_id, "corrosion", label, ALL_ENGINES)
+    if "piping" in selected:
+        for label, project_id in roles.get("piping", {}).items():
+            suite.piping_gating(
+                project_id,
+                label,
+                deep=label in deep and not args.quick_piping,
+                gate=not args.quick_piping,
+            )
+    if "cache" in selected:
+        for label, project_id in deep.items():
+            suite.piping_cache(project_id, label)
+    if "exports" in selected:
+        for label, project_id in roles.get("exports", {}).items():
+            suite.exports(project_id, "corrosion", label, ALL_ENGINES)
 
-    seismic_exports = roles.get("seismic_exports", {})
-    for label, project_id in roles.get("seismic", {}).items():
-        ran = suite.simple_analysis(project_id, "seismic", label)
-        if ran and label in seismic_exports:
-            suite.exports(project_id, "seismic", label)
+    if "seismic" in selected:
+        seismic_exports = roles.get("seismic_exports", {})
+        for label, project_id in roles.get("seismic", {}).items():
+            ran = suite.simple_analysis(project_id, "seismic", label)
+            if ran and label in seismic_exports:
+                suite.exports(project_id, "seismic", label)
 
-    for label, project_id in roles.get("architecture", {}).items():
-        if suite.simple_analysis(project_id, "architecture", label):
-            suite.exports(project_id, "architecture", label)
+    if "architecture" in selected:
+        for label, project_id in roles.get("architecture", {}).items():
+            if suite.simple_analysis(project_id, "architecture", label):
+                suite.exports(project_id, "architecture", label)
 
-    twins = roles.get("schema_twins", {})
-    for label, pair in twins.items():
-        suite.schema_twins(pair["ifc4"], pair["ifc2x3"], label)
+    if "schema" in selected:
+        for label, pair in roles.get("schema_twins", {}).items():
+            suite.schema_twins(pair["ifc4"], pair["ifc2x3"], label)
 
-    for label, project_id in roles.get("geometry", {}).items():
-        suite.simple_analysis(project_id, "seismic", f"geometry/{label}")
+    if "geometry" in selected:
+        for label, project_id in roles.get("geometry", {}).items():
+            suite.simple_analysis(project_id, "seismic", f"geometry/{label}")
 
-    for label, project_id in roles.get("performance", {}).items():
-        suite.timing(project_id, label, ALL_ENGINES)
+    if "perf" in selected:
+        for label, project_id in roles.get("performance", {}).items():
+            suite.timing(project_id, label, ALL_ENGINES)
 
     counts = {s: sum(1 for r in suite.rows if r["status"] == s) for s in ("PASS", "FAIL", "WARN", "SKIP")}
     print(f"\n{counts}")
