@@ -10,12 +10,9 @@ import type {
   GitHubRepoUpdatePayload,
   Project,
   ProjectCreatePayload,
-<<<<<<< HEAD
   ProjectIfcFile,
   ProjectIfcUploadResponse,
-=======
   ProjectImportPayload,
->>>>>>> cd52c9f (feat: add multi-source project storage, GitHub repos CRUD, models manifest, and performance optimizations)
   ProjectOptions,
   ProjectListResponse,
   ProjectUpdatePayload,
