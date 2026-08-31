@@ -30,6 +30,9 @@
   import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
   import ProjectBulkEditModal from "../lib/components/ProjectBulkEditModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import TablePagination from "../lib/components/TablePagination.svelte";
+  import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import DataTableHeader from "../lib/components/DataTableHeader.svelte";
 
   export let onSelectProjectForAudit: (projectId: number) => void;
   export let onSelectProjectForViewer: (projectId: number) => void;
@@ -71,10 +74,6 @@
   let isBulkEditModalOpen = false;
   let isBulkDeleteModalOpen = false;
 
-  $: allFilteredSelected =
-    filteredProjects.length > 0 &&
-    filteredProjects.every((p) => selectedProjectIds.includes(p.id));
-
   function toggleSelectAll() {
     if (allFilteredSelected) {
       selectedProjectIds = [];
@@ -91,76 +90,10 @@
     }
   }
 
-  async function loadProjects(force = false) {
-    if (!projects.length) {
-      isLoading = true;
-    } else {
-      isRefreshing = true;
-    }
-    error = "";
-    try {
-      const data = await projectsApi.list({ forceRefresh: force });
-      projects = data.projects || [];
-    } catch (err: any) {
-      if (!projects.length) {
-        error = err.message || "Failed to load projects";
-      }
-    } finally {
-      isLoading = false;
-      isRefreshing = false;
-    }
-  }
-
-  async function loadRepos() {
-    try {
-      repos = await githubReposApi.list();
-    } catch (err) {
-      console.warn("Could not load GitHub repositories", err);
-    }
-  }
-
-  async function loadSelectedRepoStructure(repoId: number, force = false) {
-    if (!activeRepoStructure || force) {
-      isRepoLoading = true;
-    }
-    error = "";
-    try {
-      activeRepoStructure = await githubReposApi.getStructure(repoId, force);
-    } catch (err: any) {
-      error = err.message || "Failed to read GitHub repository structure.";
-    } finally {
-      isRepoLoading = false;
-    }
-  }
-
-  function handleSourceChange() {
-    if (selectedSource.startsWith("repo:")) {
-      const repoId = parseInt(selectedSource.split(":")[1], 10);
-      loadSelectedRepoStructure(repoId);
-    } else {
-      activeRepoStructure = null;
-      loadProjects();
-    }
-  }
-
-  onMount(() => {
-    unsubscribe = projectsApi.subscribe((updatedProjects) => {
-      projects = updatedProjects;
-    });
-    loadProjects();
-    loadRepos();
-  });
-
-  onDestroy(() => {
-    if (unsubscribe) {
-      unsubscribe();
-    }
-  });
-
-  $: filteredProjects = projects.filter((p) => {
+  $: filteredProjects = (projects || []).filter((p) => {
     const matchesSearch =
       searchQuery === "" ||
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || p.status === statusFilter;
     const matchesDomain =
@@ -171,6 +104,26 @@
       (domainFilter === "seismic" && (p.analysis_type === "Seismic" || p.analysis_type === "Halo"));
     return matchesSearch && matchesStatus && matchesDomain;
   });
+
+  $: allFilteredSelected =
+    filteredProjects.length > 0 &&
+    filteredProjects.every((p) => selectedProjectIds.includes(p.id));
+
+  let currentPage = 1;
+  let pageSize = 10;
+
+  $: totalItems = filteredProjects.length;
+  $: paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  $: {
+    searchQuery;
+    statusFilter;
+    domainFilter;
+    currentPage = 1;
+  }
 
   $: filteredRepoItems = (activeRepoStructure?.items || []).filter((item) => {
     const matchesSearch =
@@ -408,46 +361,13 @@
     </div>
 
     <!-- Bulk Operations Toolbar -->
-    {#if selectedProjectIds.length > 0}
-      <div class="p-3.5 px-4 rounded-2xl bg-blue-950/40 border border-blue-800/60 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-        <div class="flex items-center gap-2.5">
-          <span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold text-xs px-2.5 py-0.5 rounded-full">
-            {selectedProjectIds.length}
-          </span>
-          <span class="text-xs font-semibold text-slate-200">
-            project{selectedProjectIds.length > 1 ? "s" : ""} selected
-          </span>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            on:click={() => (isBulkEditModalOpen = true)}
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-sm shadow-blue-950/50"
-          >
-            <SlidersHorizontal class="w-3.5 h-3.5" />
-            <span>Bulk Edit</span>
-          </button>
-
-          <button
-            type="button"
-            on:click={() => (isBulkDeleteModalOpen = true)}
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition-all shadow-sm shadow-rose-950/50"
-          >
-            <Trash2 class="w-3.5 h-3.5" />
-            <span>Delete Selected</span>
-          </button>
-
-          <button
-            type="button"
-            on:click={() => (selectedProjectIds = [])}
-            class="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
-          >
-            Clear Selection
-          </button>
-        </div>
-      </div>
-    {/if}
+    <BulkActionBar
+      selectedCount={selectedProjectIds.length}
+      itemLabel="project"
+      onClearSelection={() => (selectedProjectIds = [])}
+      onBulkEdit={() => (isBulkEditModalOpen = true)}
+      onBulkDelete={() => (isBulkDeleteModalOpen = true)}
+    />
 
     <!-- Projects Table -->
     <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
@@ -494,7 +414,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
-              {#each filteredProjects as project}
+              {#each paginatedProjects as project}
                 <tr class="hover:bg-slate-900/60 transition-colors {selectedProjectIds.includes(project.id) ? 'bg-blue-950/20' : ''}">
                   <td class="py-3 px-4 w-10">
                     <input
@@ -618,6 +538,17 @@
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          {currentPage}
+          {pageSize}
+          totalItems={totalItems}
+          onPageChange={(p) => (currentPage = p)}
+          onPageSizeChange={(s) => {
+            pageSize = s;
+            currentPage = 1;
+          }}
+        />
       {/if}
     </div>
   {/if}

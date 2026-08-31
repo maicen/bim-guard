@@ -20,6 +20,9 @@
   import { rulesApi, ruleExtractionApi } from "../lib/api";
   import type { Rule, RuleFolder, RulesetCategory } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import TablePagination from "../lib/components/TablePagination.svelte";
+  import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import DataTableHeader from "../lib/components/DataTableHeader.svelte";
 
   const cachedRules = rulesApi.getCachedList();
   const cachedFolders = rulesApi.getCachedFolders();
@@ -144,6 +147,62 @@
 
     return matchesSearch && matchesFolder && matchesMechanism && matchesCategory && matchesReview;
   });
+
+  let selectedRuleIds: number[] = [];
+  let isBulkDeleteModalOpen = false;
+
+  let currentPage = 1;
+  let pageSize = 10;
+
+  $: totalItems = filteredRules.length;
+  $: paginatedRules = filteredRules.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  $: allFilteredSelected =
+    filteredRules.length > 0 &&
+    filteredRules.every((r) => selectedRuleIds.includes(r.id));
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      selectedRuleIds = [];
+    } else {
+      selectedRuleIds = filteredRules.map((r) => r.id);
+    }
+  }
+
+  function toggleSelectRule(id: number) {
+    if (selectedRuleIds.includes(id)) {
+      selectedRuleIds = selectedRuleIds.filter((rId) => rId !== id);
+    } else {
+      selectedRuleIds = [...selectedRuleIds, id];
+    }
+  }
+
+  async function confirmBulkDelete() {
+    if (!selectedRuleIds.length) return;
+    try {
+      for (const id of selectedRuleIds) {
+        await rulesApi.delete(id);
+      }
+      rules = rules.filter((r) => !selectedRuleIds.includes(r.id));
+      selectedRuleIds = [];
+      isBulkDeleteModalOpen = false;
+      successMessage = "Selected rules deleted successfully.";
+    } catch (err: any) {
+      error = `Could not delete selected rules: ${err.message}`;
+    }
+  }
+
+  $: {
+    searchQuery;
+    selectedFolderId;
+    selectedMechanism;
+    selectedCategory;
+    filterNeedsReview;
+    currentPage = 1;
+  }
 
   async function handleSeedRules() {
     try {
@@ -527,7 +586,15 @@
         </label>
       </div>
 
-      <!-- Table -->
+      <!-- Bulk Operations Bar -->
+      <BulkActionBar
+        selectedCount={selectedRuleIds.length}
+        itemLabel="rule"
+        onClearSelection={() => (selectedRuleIds = [])}
+        onBulkDelete={() => (isBulkDeleteModalOpen = true)}
+      />
+
+      <!-- Table Container -->
       <div
         class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40"
       >
@@ -546,6 +613,15 @@
                 class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
               >
                 <tr>
+                  <th class="py-3 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      on:change={toggleSelectAll}
+                      class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      title="Select or deselect all visible rules"
+                    />
+                  </th>
                   <th class="py-3 px-4">Rule Ref</th>
                   <th class="py-3 px-4">Category</th>
                   <th class="py-3 px-4">Mechanism</th>
@@ -556,8 +632,16 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
-                {#each filteredRules as rule}
-                  <tr class="hover:bg-slate-900/60 transition-colors">
+                {#each paginatedRules as rule}
+                  <tr class="hover:bg-slate-900/60 transition-colors {selectedRuleIds.includes(rule.id) ? 'bg-blue-950/20' : ''}">
+                    <td class="py-3 px-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedRuleIds.includes(rule.id)}
+                        on:change={() => toggleSelectRule(rule.id)}
+                        class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      />
+                    </td>
                     <td class="py-3 px-4">
                       <div class="font-mono font-bold text-white">
                         {rule.rule_id || `Rule #${rule.id}`}
@@ -677,6 +761,17 @@
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            {currentPage}
+            {pageSize}
+            totalItems={totalItems}
+            onPageChange={(p) => (currentPage = p)}
+            onPageSizeChange={(s) => {
+              pageSize = s;
+              currentPage = 1;
+            }}
+          />
         {/if}
       </div>
     </div>
@@ -1187,3 +1282,13 @@
     </div>
   </div>
 {/if}
+
+<ConfirmModal
+  bind:isOpen={isBulkDeleteModalOpen}
+  title="Delete Selected Compliance Rules"
+  message={`Are you sure you want to delete ${selectedRuleIds.length} selected compliance rule(s)? This action cannot be undone.`}
+  confirmText="Delete Selected Rules"
+  danger={true}
+  onConfirm={confirmBulkDelete}
+  onCancel={() => (selectedRuleIds = [])}
+/>
