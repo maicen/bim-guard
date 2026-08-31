@@ -6,6 +6,8 @@
   export let activeView: string;
   export let selectedProject: Project | null = null;
   export let apiOnline: boolean = true;
+  export let dbOk: boolean = true;
+  export let dbBackend: string = "SUPABASE";
 
   const TITLES: Record<string, { section: string; title: string }> = {
     dashboard: { section: "Platform", title: "Compliance Dashboard" },
@@ -50,7 +52,7 @@
   </div>
 
   <!-- Actions & Status -->
-  <div class="flex items-center gap-3">
+  <div class="flex items-center gap-2.5">
     <!-- Health status -->
     <span
       class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border {apiOnline
@@ -63,6 +65,20 @@
           : 'bg-rose-400'}"
       ></span>
       {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
+    </span>
+
+    <!-- DB Status indicator -->
+    <span
+      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border {dbOk
+        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
+        : 'bg-rose-950/40 text-rose-400 border-rose-800/60'}"
+    >
+      <span
+        class="w-1.5 h-1.5 rounded-full {dbOk
+          ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
+          : 'bg-rose-400'}"
+      ></span>
+      DB {dbBackend}: {dbOk ? "Connected" : "Degraded"}
     </span>
 
     <a

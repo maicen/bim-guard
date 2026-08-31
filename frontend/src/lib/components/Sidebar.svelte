@@ -22,8 +22,6 @@
 
   export let activeView: string = "dashboard";
   export let onSelectView: (view: string) => void;
-  export let dbOk: boolean = true;
-  export let dbBackend: string = "SUPABASE";
 
   let collapsed = false;
 
@@ -163,30 +161,8 @@
     {/each}
   </div>
 
-  <!-- Sidebar Footer: DB Status & Settings -->
+  <!-- Sidebar Footer: Settings -->
   <div class="border-t border-slate-800/80 p-2 space-y-1 bg-slate-950/60">
-    <!-- DB Status indicator -->
-    <div
-      class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs {collapsed
-        ? 'justify-center'
-        : ''}"
-      title="DB {dbBackend}: {dbOk ? 'Connected' : 'Degraded'}"
-    >
-      <span
-        class="w-2 h-2 rounded-full shrink-0 {dbOk
-          ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
-          : 'bg-rose-500'}"
-      ></span>
-      {#if !collapsed}
-        <span class="text-[11px] font-medium text-slate-400 truncate">
-          DB {dbBackend}:
-          <strong class={dbOk ? "text-emerald-400" : "text-rose-400"}
-            >{dbOk ? "Connected" : "Degraded"}</strong
-          >
-        </span>
-      {/if}
-    </div>
-
     <!-- Settings Button -->
     <button
       type="button"

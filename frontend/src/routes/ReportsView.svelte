@@ -244,14 +244,16 @@
             </div>
           </div>
           <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
-            <div class="text-xs text-slate-400 uppercase font-semibold">
-              Estimated Delay
+            <div class="text-xs text-slate-400 uppercase font-semibold flex items-center justify-between">
+              <span>Estimated Delay</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950/60 text-amber-400 border border-amber-800/50">Placeholder</span>
             </div>
             <div class="text-2xl font-bold text-amber-400 mt-1">162 days</div>
           </div>
           <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
-            <div class="text-xs text-slate-400 uppercase font-semibold">
-              Remediation Cost
+            <div class="text-xs text-slate-400 uppercase font-semibold flex items-center justify-between">
+              <span>Remediation Cost</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">Placeholder</span>
             </div>
             <div class="text-2xl font-bold text-emerald-400 mt-1">£170,600</div>
           </div>

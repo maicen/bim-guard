@@ -35,7 +35,7 @@
     total_projects: cachedProjects ? cachedProjects.total : 0,
     total_documents: 0,
     total_rules: 0,
-    issues_found: 34,
+    issues_found: 0,
     db_ok: true,
     db_backend: "SUPABASE",
   };
@@ -143,22 +143,6 @@
     </div>
 
     <div class="flex items-center gap-3">
-      <!-- DB Status Badge -->
-      <div
-        class="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium {stats.db_ok
-          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
-          : 'bg-rose-950/40 text-rose-400 border-rose-800/60'}"
-      >
-        <span
-          class="w-2 h-2 rounded-full {stats.db_ok
-            ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
-            : 'bg-rose-400'}"
-        ></span>
-        <span
-          >DB {stats.db_backend}: {stats.db_ok ? "Connected" : "Degraded"}</span
-        >
-      </div>
-
       <!-- New Project CTA -->
       <button
         type="button"
