@@ -9,6 +9,9 @@ import type {
   GitHubRepoStructure,
   GitHubRepoUpdatePayload,
   Project,
+  ProjectBulkActionResponse,
+  ProjectBulkDeletePayload,
+  ProjectBulkUpdatePayload,
   ProjectCreatePayload,
   ProjectIfcFile,
   ProjectIfcUploadResponse,
@@ -173,6 +176,28 @@ export const projectsApi = {
     });
     await handleResponse<void>(res);
     _projectsStore.remove(id);
+  },
+
+  async bulkDelete(ids: number[]): Promise<ProjectBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/projects/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_ids: ids }),
+    });
+    const result = await handleResponse<ProjectBulkActionResponse>(res);
+    ids.forEach((id) => _projectsStore.remove(id));
+    return result;
+  },
+
+  async bulkUpdate(payload: ProjectBulkUpdatePayload): Promise<ProjectBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/projects/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await handleResponse<ProjectBulkActionResponse>(res);
+    _projectsStore.clear();
+    return result;
   },
 
   invalidateCache() {

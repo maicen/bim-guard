@@ -28,6 +28,7 @@
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
+  import ProjectBulkEditModal from "../lib/components/ProjectBulkEditModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
 
   export let onSelectProjectForAudit: (projectId: number) => void;
@@ -64,6 +65,31 @@
   let selectedProjectForDetails: Project | null = null;
   let selectedProjectForEnhance: Project | null = null;
   let projectToDelete: { id: number; name: string } | null = null;
+
+  // Bulk selection state
+  let selectedProjectIds: number[] = [];
+  let isBulkEditModalOpen = false;
+  let isBulkDeleteModalOpen = false;
+
+  $: allFilteredSelected =
+    filteredProjects.length > 0 &&
+    filteredProjects.every((p) => selectedProjectIds.includes(p.id));
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      selectedProjectIds = [];
+    } else {
+      selectedProjectIds = filteredProjects.map((p) => p.id);
+    }
+  }
+
+  function toggleSelectProject(id: number) {
+    if (selectedProjectIds.includes(id)) {
+      selectedProjectIds = selectedProjectIds.filter((pId) => pId !== id);
+    } else {
+      selectedProjectIds = [...selectedProjectIds, id];
+    }
+  }
 
   async function loadProjects(force = false) {
     if (!projects.length) {
@@ -207,10 +233,28 @@
     try {
       await projectsApi.delete(projectToDelete.id);
       projects = projects.filter((p) => p.id !== projectToDelete!.id);
+      selectedProjectIds = selectedProjectIds.filter((id) => id !== projectToDelete!.id);
       projectToDelete = null;
     } catch (err: any) {
       error = `Could not delete project: ${err.message}`;
     }
+  }
+
+  async function confirmBulkDelete() {
+    if (!selectedProjectIds.length) return;
+    try {
+      await projectsApi.bulkDelete(selectedProjectIds);
+      projects = projects.filter((p) => !selectedProjectIds.includes(p.id));
+      selectedProjectIds = [];
+      isBulkDeleteModalOpen = false;
+    } catch (err: any) {
+      error = `Could not delete selected projects: ${err.message}`;
+    }
+  }
+
+  async function handleBulkUpdated() {
+    await loadProjects(true);
+    selectedProjectIds = [];
   }
 
   function openEnhancements(project: Project) {
@@ -363,6 +407,48 @@
       </div>
     </div>
 
+    <!-- Bulk Operations Toolbar -->
+    {#if selectedProjectIds.length > 0}
+      <div class="p-3.5 px-4 rounded-2xl bg-blue-950/40 border border-blue-800/60 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+        <div class="flex items-center gap-2.5">
+          <span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold text-xs px-2.5 py-0.5 rounded-full">
+            {selectedProjectIds.length}
+          </span>
+          <span class="text-xs font-semibold text-slate-200">
+            project{selectedProjectIds.length > 1 ? "s" : ""} selected
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            on:click={() => (isBulkEditModalOpen = true)}
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-sm shadow-blue-950/50"
+          >
+            <SlidersHorizontal class="w-3.5 h-3.5" />
+            <span>Bulk Edit</span>
+          </button>
+
+          <button
+            type="button"
+            on:click={() => (isBulkDeleteModalOpen = true)}
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition-all shadow-sm shadow-rose-950/50"
+          >
+            <Trash2 class="w-3.5 h-3.5" />
+            <span>Delete Selected</span>
+          </button>
+
+          <button
+            type="button"
+            on:click={() => (selectedProjectIds = [])}
+            class="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
+          >
+            Clear Selection
+          </button>
+        </div>
+      </div>
+    {/if}
+
     <!-- Projects Table -->
     <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
       {#if isLoading}
@@ -389,6 +475,15 @@
           <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
               <tr>
+                <th class="py-3 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    on:change={toggleSelectAll}
+                    class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                    title="Select or deselect all visible projects"
+                  />
+                </th>
                 <th class="py-3 px-4">Project Name</th>
                 <th class="py-3 px-4">Status</th>
                 <th class="py-3 px-4">IFC Model</th>
@@ -400,7 +495,15 @@
             </thead>
             <tbody class="divide-y divide-slate-800/60">
               {#each filteredProjects as project}
-                <tr class="hover:bg-slate-900/60 transition-colors">
+                <tr class="hover:bg-slate-900/60 transition-colors {selectedProjectIds.includes(project.id) ? 'bg-blue-950/20' : ''}">
+                  <td class="py-3 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedProjectIds.includes(project.id)}
+                      on:change={() => toggleSelectProject(project.id)}
+                      class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                    />
+                  </td>
                   <td class="py-3 px-4 font-semibold text-white">
                     <div class="flex flex-col">
                       <span class="text-sm">{project.name}</span>
@@ -728,4 +831,21 @@
   danger={true}
   onConfirm={confirmDelete}
   onCancel={() => (projectToDelete = null)}
+/>
+
+<ProjectBulkEditModal
+  isOpen={isBulkEditModalOpen}
+  selectedProjectIds={selectedProjectIds}
+  onClose={() => (isBulkEditModalOpen = false)}
+  onBulkUpdated={handleBulkUpdated}
+/>
+
+<ConfirmModal
+  bind:isOpen={isBulkDeleteModalOpen}
+  title="Delete Selected Projects"
+  message={`Are you sure you want to delete ${selectedProjectIds.length} project(s) and their associated artifacts? This cannot be undone.`}
+  confirmText={`Delete ${selectedProjectIds.length} Project(s)`}
+  danger={true}
+  onConfirm={confirmBulkDelete}
+  onCancel={() => (isBulkDeleteModalOpen = false)}
 />

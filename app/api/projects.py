@@ -22,6 +22,9 @@ from app.logging_config import get_logger
 from app.modules.contracts import (
     AnalysisInputItemContract,
     BuildingCodeOption,
+    ProjectBulkActionResponse,
+    ProjectBulkDeleteRequest,
+    ProjectBulkUpdateRequest,
     ProjectCreateRequest,
     ProjectIfcFileResponse,
     ProjectIfcUploadResponse,
@@ -71,6 +74,43 @@ def get_project_options(response: Response) -> ProjectOptionsResponse:
         standards=[StandardOption(**standard) for standard in NOTEBOOK_STANDARDS],
         building_codes=[BuildingCodeOption(**code) for code in BUILDING_CODES],
     )
+
+
+@router.post(
+    "/bulk-delete",
+    response_model=ProjectBulkActionResponse,
+    summary="Delete multiple projects in bulk",
+)
+def bulk_delete_projects(
+    payload: ProjectBulkDeleteRequest,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> ProjectBulkActionResponse:
+    """Delete multiple projects by their primary keys."""
+    deleted_ids = service.bulk_delete_projects(payload.project_ids)
+    return ProjectBulkActionResponse(success_count=len(deleted_ids), affected_ids=deleted_ids)
+
+
+@router.post(
+    "/bulk-update",
+    response_model=ProjectBulkActionResponse,
+    summary="Update metadata for multiple projects in bulk",
+)
+def bulk_update_projects(
+    payload: ProjectBulkUpdateRequest,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> ProjectBulkActionResponse:
+    """Update metadata for multiple projects in bulk."""
+    try:
+        updated_ids = service.bulk_update_projects(
+            payload.project_ids,
+            status=payload.status,
+            country=payload.country,
+            analysis_type=payload.analysis_type,
+        )
+        return ProjectBulkActionResponse(success_count=len(updated_ids), affected_ids=updated_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
 
 
 @router.get("/{project_id}", response_model=ProjectResponse, summary="Get project by ID")
