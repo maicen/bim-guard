@@ -218,6 +218,131 @@ html:not(.dark) .text-slate-100 {
   color: #0f172a !important; /* slate-900 */
 }
 
+/* Light mode high-contrast accent text (WCAG AA >= 4.5:1 contrast) */
+html.light .text-emerald-400,
+html.light .text-emerald-300,
+html:not(.dark) .text-emerald-400,
+html:not(.dark) .text-emerald-300 {
+  color: #047857 !important; /* emerald-700 (4.5+:1 on light) */
+}
+
+html.light .text-amber-400,
+html.light .text-amber-300,
+html:not(.dark) .text-amber-400,
+html:not(.dark) .text-amber-300 {
+  color: #b45309 !important; /* amber-700 (4.5+:1 on light) */
+}
+
+html.light .text-blue-400,
+html.light .text-blue-300,
+html:not(.dark) .text-blue-400,
+html:not(.dark) .text-blue-300 {
+  color: #1d4ed8 !important; /* blue-700 (4.5+:1 on light) */
+}
+
+html.light .text-purple-400,
+html.light .text-purple-300,
+html:not(.dark) .text-purple-400,
+html:not(.dark) .text-purple-300 {
+  color: #6b21a8 !important; /* purple-800 (4.5+:1 on light) */
+}
+
+html.light .text-cyan-400,
+html.light .text-cyan-300,
+html:not(.dark) .text-cyan-400,
+html:not(.dark) .text-cyan-300 {
+  color: #0e7490 !important; /* cyan-700 (4.5+:1 on light) */
+}
+
+html.light .text-rose-400,
+html.light .text-rose-300,
+html:not(.dark) .text-rose-400,
+html:not(.dark) .text-rose-300 {
+  color: #be123c !important; /* rose-700 (4.5+:1 on light) */
+}
+
+/* Light mode badges & status indicators */
+html.light [class*="bg-emerald-950"],
+html:not(.dark) [class*="bg-emerald-950"] {
+  background-color: #d1fae5 !important; /* emerald-100 */
+  border-color: #6ee7b7 !important; /* emerald-300 */
+  color: #047857 !important; /* emerald-700 */
+}
+html.light [class*="bg-emerald-950"] *,
+html:not(.dark) [class*="bg-emerald-950"] * {
+  color: #047857 !important;
+}
+
+html.light [class*="bg-amber-950"],
+html:not(.dark) [class*="bg-amber-950"] {
+  background-color: #fef3c7 !important; /* amber-100 */
+  border-color: #fde68a !important; /* amber-200 */
+  color: #92400e !important; /* amber-800 */
+}
+html.light [class*="bg-amber-950"] *,
+html:not(.dark) [class*="bg-amber-950"] * {
+  color: #92400e !important;
+}
+
+html.light [class*="bg-blue-950"],
+html:not(.dark) [class*="bg-blue-950"] {
+  background-color: #dbeafe !important; /* blue-100 */
+  border-color: #bfdbfe !important; /* blue-200 */
+  color: #1e40af !important; /* blue-800 */
+}
+html.light [class*="bg-blue-950"] *,
+html:not(.dark) [class*="bg-blue-950"] * {
+  color: #1e40af !important;
+}
+
+html.light [class*="bg-purple-950"],
+html:not(.dark) [class*="bg-purple-950"] {
+  background-color: #f3e8ff !important; /* purple-100 */
+  border-color: #e9d5ff !important; /* purple-200 */
+  color: #6b21a8 !important; /* purple-800 */
+}
+html.light [class*="bg-purple-950"] *,
+html:not(.dark) [class*="bg-purple-950"] * {
+  color: #6b21a8 !important;
+}
+
+html.light [class*="bg-rose-950"],
+html:not(.dark) [class*="bg-rose-950"] {
+  background-color: #ffe4e6 !important; /* rose-100 */
+  border-color: #fecdd3 !important; /* rose-200 */
+  color: #9f1239 !important; /* rose-800 */
+}
+html.light [class*="bg-rose-950"] *,
+html:not(.dark) [class*="bg-rose-950"] * {
+  color: #9f1239 !important;
+}
+
+/* Light mode action buttons */
+html.light [class*="bg-blue-600/20"],
+html:not(.dark) [class*="bg-blue-600/20"] {
+  background-color: #dbeafe !important; /* blue-100 */
+  color: #1d4ed8 !important; /* blue-700 */
+}
+html.light [class*="bg-blue-600/20"]:hover,
+html:not(.dark) [class*="bg-blue-600/20"]:hover {
+  background-color: #bfdbfe !important; /* blue-200 */
+  color: #1e40af !important; /* blue-800 */
+}
+
+/* Light mode status indicator dots */
+html.light span.bg-emerald-400,
+html:not(.dark) span.bg-emerald-400 {
+  background-color: #10b981 !important;
+}
+html.light span.bg-amber-400,
+html:not(.dark) span.bg-amber-400 {
+  background-color: #f59e0b !important;
+}
+html.light span.bg-rose-400,
+html:not(.dark) span.bg-rose-400 {
+  background-color: #f43f5e !important;
+}
+
 /* Protect white text on colored buttons, gradient badges, and brand elements ONLY */
 html.light button.bg-\[\#0071e3\],
 html.light button.bg-\[\#0071e3\] *,
