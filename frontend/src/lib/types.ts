@@ -23,11 +23,10 @@ export interface Project {
 }
 
 /**
- * Discipline an attached IFC model carries. The backend column has no CHECK
- * constraint -- the vocabulary is open -- so this is the set the wizard offers,
- * not the set the API accepts.
+ * Discipline/role an attached IFC model carries.
+ * Restriced to primary or context in the project setup wizard.
  */
-export const IFC_FILE_ROLES = ['primary', 'architectural', 'structural', 'context'] as const;
+export const IFC_FILE_ROLES = ['primary', 'context'] as const;
 
 export type IfcFileRole = (typeof IFC_FILE_ROLES)[number];
 
@@ -123,9 +122,24 @@ export interface ProjectBulkActionResponse {
   affected_ids: number[];
 }
 
+export const DOCUMENT_TYPES = [
+  'Specification',
+  'Code',
+  'Manual',
+  'Standard',
+  'Drawing',
+  'Schedule',
+  'Assessment',
+  'Report',
+  'Other',
+] as const;
+
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
 export interface DocumentItem {
   id: number;
   filename: string;
+  doc_type?: string | null;
   file_path?: string | null;
   upload_date?: string | null;
   extracted_text_preview?: string | null;
@@ -135,6 +149,7 @@ export interface DocumentItem {
 export interface DocumentDetail {
   id: number;
   filename: string;
+  doc_type?: string | null;
   file_path?: string | null;
   upload_date?: string | null;
   extracted_text: string;
@@ -143,6 +158,7 @@ export interface DocumentDetail {
 
 export interface DocumentUpdatePayload {
   filename?: string;
+  doc_type?: string | null;
   extracted_text?: string;
 }
 

@@ -248,6 +248,17 @@
     selectedStandardIds = new Set(selectedStandardIds);
   }
 
+  function goToStep(stepNum: number) {
+    if (stepNum === currentStep) return;
+    if (stepNum > 1 && !name.trim()) {
+      errorMessage = 'Please provide a project name first.';
+      currentStep = 1;
+      return;
+    }
+    errorMessage = '';
+    currentStep = stepNum;
+  }
+
   async function handleFinish() {
     if (!name.trim()) {
       errorMessage = 'Project name is required.';
@@ -359,27 +370,34 @@
       </div>
 
       <!-- Step Stepper -->
-      <div class="px-6 py-3 border-b border-slate-800/80 bg-slate-950/40 flex items-center justify-between">
+      <nav aria-label="Project setup steps" class="px-6 py-3 border-b border-slate-800/80 bg-slate-950/40 flex items-center justify-between">
         {#each STEPS as step, idx}
           <div class="flex items-center gap-2 {idx < STEPS.length - 1 ? 'flex-1' : ''}">
-            <div
-              class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors {currentStep === step.num ? 'bg-[#0071e3] text-white' : currentStep > step.num ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}"
+            <button
+              type="button"
+              on:click={() => goToStep(step.num)}
+              class="flex items-center gap-2 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] rounded-lg p-1 transition-all text-left"
+              title="Go to step {step.num}: {step.title}"
             >
-              {#if currentStep > step.num}
-                <Check class="w-3.5 h-3.5" />
-              {:else}
-                {step.num}
-              {/if}
-            </div>
-            <span class="text-xs font-medium {currentStep === step.num ? 'text-white' : 'text-slate-500'}">
-              {step.title}
-            </span>
+              <div
+                class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 {currentStep === step.num ? 'bg-[#0071e3] text-white shadow-sm shadow-blue-500/50 scale-105' : currentStep > step.num ? 'bg-emerald-600 text-white group-hover:bg-emerald-500' : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'}"
+              >
+                {#if currentStep > step.num}
+                  <Check class="w-3.5 h-3.5" />
+                {:else}
+                  {step.num}
+                {/if}
+              </div>
+              <span class="text-xs font-medium transition-colors {currentStep === step.num ? 'text-white font-semibold' : currentStep > step.num ? 'text-slate-300 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-300'}">
+                {step.title}
+              </span>
+            </button>
             {#if idx < STEPS.length - 1}
               <div class="h-0.5 flex-1 mx-2 {currentStep > step.num ? 'bg-emerald-600/60' : 'bg-slate-800'}"></div>
             {/if}
           </div>
         {/each}
-      </div>
+      </nav>
 
       <!-- Body -->
       <div class="p-6 flex-1 overflow-y-auto max-h-[60vh]">
@@ -724,7 +742,14 @@
                     <div class="flex items-center gap-2.5 truncate">
                       <FileText class="w-4 h-4 {selectedDocIds.has(doc.id) ? 'text-[#0071e3]' : 'text-slate-500'}" />
                       <div class="truncate">
-                        <div class="text-xs font-semibold text-white truncate">{doc.filename}</div>
+                        <div class="flex items-center gap-2">
+                          <span class="text-xs font-semibold text-white truncate">{doc.filename}</span>
+                          {#if doc.doc_type}
+                            <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+                              {doc.doc_type}
+                            </span>
+                          {/if}
+                        </div>
                         <div class="text-[10px] text-slate-400">{doc.char_count.toLocaleString()} chars extracted</div>
                       </div>
                     </div>

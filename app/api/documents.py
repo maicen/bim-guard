@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 
 from app.api.dependencies import get_documents_service
 from app.logging_config import get_logger
@@ -37,6 +37,7 @@ def list_documents(
             DocumentResponse(
                 id=r["id"],
                 filename=r.get("filename", "document"),
+                doc_type=r.get("doc_type") or "Specification",
                 file_path=r.get("file_path"),
                 upload_date=r.get("upload_date"),
                 extracted_text_preview=preview,
@@ -64,6 +65,7 @@ def get_document(
     return DocumentDetailResponse(
         id=doc["id"],
         filename=doc.get("filename", "document"),
+        doc_type=doc.get("doc_type") or "Specification",
         file_path=doc.get("file_path"),
         upload_date=doc.get("upload_date"),
         extracted_text=text,
@@ -74,6 +76,7 @@ def get_document(
 @router.post("", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Upload document")
 async def upload_document(
     file: UploadFile = File(...),
+    doc_type: Annotated[str, Form()] = "Specification",
     service: Annotated[DocumentService, Depends(get_documents_service)] = None,
 ) -> DocumentDetailResponse:
     """Upload a specification document (PDF, TXT, MD) and extract text."""
@@ -89,6 +92,7 @@ async def upload_document(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
 
     clean_filename = safe_upload_name(file.filename)
+    clean_doc_type = (doc_type or "").strip() or "Specification"
     file_md5 = md5_hex(content)
 
     existing = service.find_by_md5(file_md5)
@@ -97,6 +101,7 @@ async def upload_document(
         return DocumentDetailResponse(
             id=existing["id"],
             filename=existing.get("filename", clean_filename),
+            doc_type=existing.get("doc_type") or clean_doc_type,
             file_path=existing.get("file_path"),
             upload_date=existing.get("upload_date"),
             extracted_text=text,
@@ -121,11 +126,13 @@ async def upload_document(
         filename=clean_filename,
         file_path=file_path,
         extracted_text=extracted_text,
+        doc_type=clean_doc_type,
     )
 
     return DocumentDetailResponse(
         id=created["id"],
         filename=clean_filename,
+        doc_type=created.get("doc_type") or clean_doc_type,
         file_path=file_path,
         upload_date=created.get("upload_date"),
         extracted_text=extracted_text,
@@ -151,14 +158,21 @@ def update_document(
     extracted_text = (
         payload.extracted_text if payload.extracted_text is not None else existing.get("extracted_text", "")
     )
+    doc_type = payload.doc_type if payload.doc_type is not None else existing.get("doc_type", "Specification")
 
-    service.update_document(document_id, filename=filename.strip(), extracted_text=extracted_text)
+    service.update_document(
+        document_id,
+        filename=filename.strip(),
+        extracted_text=extracted_text,
+        doc_type=doc_type,
+    )
     updated = service.get_document(document_id) or existing
     text = updated.get("extracted_text") or ""
 
     return DocumentDetailResponse(
         id=updated["id"],
         filename=updated.get("filename", filename),
+        doc_type=updated.get("doc_type") or doc_type or "Specification",
         file_path=updated.get("file_path"),
         upload_date=updated.get("upload_date"),
         extracted_text=text,

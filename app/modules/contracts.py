@@ -253,6 +253,7 @@ class DocumentUpdateRequest(BaseModel):
     """Payload for updating document metadata or extracted text."""
 
     filename: Optional[str] = Field(None, min_length=1, description="Updated document filename")
+    doc_type: Optional[str] = Field(None, description="Updated document type classification")
     extracted_text: Optional[str] = Field(None, description="Updated extracted text content")
 
 
@@ -261,6 +262,7 @@ class DocumentResponse(BaseModel):
 
     id: int
     filename: str
+    doc_type: str = Field(default="Specification", description="Document classification type")
     file_path: Optional[str] = None
     upload_date: Optional[str] = None
     extracted_text_preview: Optional[str] = None
@@ -272,6 +274,7 @@ class DocumentDetailResponse(BaseModel):
 
     id: int
     filename: str
+    doc_type: str = Field(default="Specification", description="Document classification type")
     file_path: Optional[str] = None
     upload_date: Optional[str] = None
     extracted_text: str = ""

@@ -165,15 +165,32 @@ PROJECT_TYPES: list[str] = [
     "Infrastructure",
 ]
 
+#: Document classification types for specification library and project documents.
+DOCUMENT_TYPES: list[str] = [
+    "Specification",
+    "Code",
+    "Manual",
+    "Standard",
+    "Drawing",
+    "Schedule",
+    "Assessment",
+    "Report",
+    "Other",
+]
+
 #: Client document categories. Mirrors the ``category`` check constraint on
-#: ``public.client_documents`` (migration_003) -- keep the two in step.
+#: ``public.client_documents`` -- keep the two in step.
 DOCUMENT_CATEGORIES: list[str] = [
     "Specification",
-    "Schedule",
+    "Code",
+    "Manual",
+    "Standard",
     "Drawing",
+    "Schedule",
     "O&M Manual",
     "Warranty",
     "Assessment",
+    "Report",
     "RFI Log",
     "Other",
 ]

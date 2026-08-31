@@ -14,7 +14,8 @@
     RotateCw,
   } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
-  import type { DocumentItem, DocumentDetail } from "../lib/types";
+  import { DOCUMENT_TYPES } from "../lib/types";
+  import type { DocumentItem, DocumentDetail, DocumentType } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
@@ -33,6 +34,7 @@
   let isEditModalOpen = false;
   let docToEdit: DocumentItem | null = null;
   let editFilename = "";
+  let editDocType = "Specification";
   let editExtractedText = "";
   let isSavingEdit = false;
   let editError = "";
@@ -40,6 +42,7 @@
   // Upload modal state
   let isUploadModalOpen = false;
   let uploadFile: File | null = null;
+  let uploadDocType = "Specification";
   let isUploading = false;
   let uploadError = "";
 
@@ -48,6 +51,7 @@
   let isLoadingDocDetail = false;
 
   let searchQuery = "";
+  let selectedDocTypeFilter: string = "ALL";
 
   async function loadDocuments(force = false) {
     if (!documents.length) {
@@ -81,9 +85,13 @@
     }
   });
 
-  $: filteredDocuments = documents.filter((d) =>
-    d.filename.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  $: filteredDocuments = documents.filter((d) => {
+    const matchesSearch = d.filename.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType =
+      selectedDocTypeFilter === "ALL" ||
+      (d.doc_type || "Specification") === selectedDocTypeFilter;
+    return matchesSearch && matchesType;
+  });
 
   let selectedDocIds: number[] = [];
   let isBulkDeleteModalOpen = false;
@@ -133,6 +141,7 @@
 
   $: {
     searchQuery;
+    selectedDocTypeFilter;
     currentPage = 1;
   }
 
@@ -141,10 +150,11 @@
     isUploading = true;
     uploadError = "";
     try {
-      const created = await documentsApi.upload(uploadFile);
+      const created = await documentsApi.upload(uploadFile, uploadDocType);
       documents = [created, ...documents];
       isUploadModalOpen = false;
       uploadFile = null;
+      uploadDocType = "Specification";
     } catch (err: any) {
       uploadError = err.message || "Failed to upload document.";
     } finally {
@@ -166,6 +176,7 @@
   async function openEdit(doc: DocumentItem) {
     docToEdit = doc;
     editFilename = doc.filename;
+    editDocType = doc.doc_type || "Specification";
     editExtractedText = "";
     editError = "";
     isEditModalOpen = true;
@@ -188,6 +199,7 @@
     try {
       const updated = await documentsApi.update(docToEdit.id, {
         filename: editFilename.trim(),
+        doc_type: editDocType,
         extracted_text: editExtractedText,
       });
       documents = documents.map((d) =>
@@ -195,6 +207,7 @@
           ? {
               ...d,
               filename: updated.filename,
+              doc_type: updated.doc_type,
               extracted_text_preview:
                 updated.extracted_text.slice(0, 200) +
                 (updated.extracted_text.length > 200 ? "..." : ""),
@@ -293,7 +306,20 @@
       searchPlaceholder="Filter documents by file name..."
       {isRefreshing}
       onRefresh={() => loadDocuments(true)}
-    />
+    >
+      <div slot="filters" class="flex items-center gap-1.5">
+        <select
+          bind:value={selectedDocTypeFilter}
+          aria-label="Filter by document type"
+          class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none focus:border-[#0071e3]"
+        >
+          <option value="ALL">All Types</option>
+          {#each DOCUMENT_TYPES as type}
+            <option value={type}>{type}</option>
+          {/each}
+        </select>
+      </div>
+    </DataTableHeader>
 
     {#if isLoading}
       <div class="p-12 text-center text-xs text-slate-400">
@@ -328,6 +354,7 @@
               </th>
               <th class="py-3 px-4">ID</th>
               <th class="py-3 px-4">Document File</th>
+              <th class="py-3 px-4">Type</th>
               <th class="py-3 px-4">Extracted Text</th>
               <th class="py-3 px-4">Characters</th>
               <th class="py-3 px-4">Uploaded</th>
@@ -353,6 +380,11 @@
                       >{doc.filename}</span
                     >
                   </div>
+                </td>
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+                    {doc.doc_type || 'Specification'}
+                  </span>
                 </td>
                 <td
                   class="py-3 px-4 text-slate-400 text-[11px] max-w-sm truncate"
@@ -444,6 +476,21 @@
         </div>
       {/if}
 
+      <div class="space-y-1.5">
+        <label for="upload-doc-type" class="block text-xs font-semibold text-slate-300">
+          Document Type
+        </label>
+        <select
+          id="upload-doc-type"
+          bind:value={uploadDocType}
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        >
+          {#each DOCUMENT_TYPES as type}
+            <option value={type}>{type}</option>
+          {/each}
+        </select>
+      </div>
+
       <div
         class="border-2 border-dashed border-slate-700 hover:border-[#0071e3] transition-colors rounded-xl p-6 text-center bg-slate-950/40"
       >
@@ -511,10 +558,17 @@
         class="px-6 py-4 border-b border-slate-800 flex items-center justify-between"
       >
         <div>
-          <h2 class="text-base font-bold text-white tracking-tight">
-            {selectedDoc.filename}
-          </h2>
-          <p class="text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-bold text-white tracking-tight">
+              {selectedDoc.filename}
+            </h2>
+            {#if selectedDoc.doc_type}
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+                {selectedDoc.doc_type}
+              </span>
+            {/if}
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
             {selectedDoc.char_count.toLocaleString()} extracted characters
           </p>
         </div>
@@ -616,6 +670,21 @@
             placeholder="e.g. OBC_Part9_Specifications.pdf"
             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
           />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="edit-doc-type" class="block text-xs font-semibold text-slate-300">
+            Document Type
+          </label>
+          <select
+            id="edit-doc-type"
+            bind:value={editDocType}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            {#each DOCUMENT_TYPES as type}
+              <option value={type}>{type}</option>
+            {/each}
+          </select>
         </div>
 
         <div class="space-y-1.5 flex-1 flex flex-col">

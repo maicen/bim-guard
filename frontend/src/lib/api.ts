@@ -515,9 +515,10 @@ export const documentsApi = {
     );
   },
 
-  async upload(file: File): Promise<DocumentDetail> {
+  async upload(file: File, docType: string = 'Specification'): Promise<DocumentDetail> {
     const form = new FormData();
     form.append('file', file);
+    form.append('doc_type', docType);
     const res = await fetch(`${API_BASE}/documents`, {
       method: 'POST',
       body: form,
@@ -526,6 +527,7 @@ export const documentsApi = {
     _documentsStore.addOrUpdate({
       id: created.id,
       filename: created.filename,
+      doc_type: created.doc_type || docType,
       file_path: created.file_path,
       upload_date: created.upload_date,
       extracted_text_preview: created.extracted_text_preview || created.extracted_text?.slice(0, 200) || '',
@@ -545,6 +547,7 @@ export const documentsApi = {
     _documentsStore.addOrUpdate({
       id: updated.id,
       filename: updated.filename,
+      doc_type: updated.doc_type || payload.doc_type,
       file_path: updated.file_path,
       upload_date: updated.upload_date,
       extracted_text_preview: updated.extracted_text_preview || updated.extracted_text?.slice(0, 200) || '',

@@ -32,6 +32,7 @@ class DocumentService:
                     "file_path": str,
                     "extracted_text": str,
                     "upload_date": str,
+                    "doc_type": str,
                 },
             )
         )
@@ -50,8 +51,16 @@ class DocumentService:
         """Return a document row matching the provided file hash."""
         return find_row_by_field(self._documents, "md5_hash", md5_hash)
 
-    def create_document(self, md5_hash: str, filename: str, file_path: str, extracted_text: str):
+    def create_document(
+        self,
+        md5_hash: str,
+        filename: str,
+        file_path: str,
+        extracted_text: str,
+        doc_type: str = "Specification",
+    ):
         """Create and persist a new uploaded document record."""
+        clean_doc_type = (doc_type or "").strip() or "Specification"
         document = self._documents.insert(
             {
                 "md5_hash": md5_hash,
@@ -59,13 +68,15 @@ class DocumentService:
                 "file_path": file_path,
                 "extracted_text": extracted_text,
                 "upload_date": now_iso_utc(),
+                "doc_type": clean_doc_type,
             }
         )
         invalidate_cache("bimguard:documents:list")
         logger.info(
-            "Document created document_id=%s filename=%s extracted_chars=%d",
+            "Document created document_id=%s filename=%s doc_type=%s extracted_chars=%d",
             document.get("id"),
             filename,
+            clean_doc_type,
             len(extracted_text),
         )
         return document
@@ -76,10 +87,19 @@ class DocumentService:
         logger.info("Document file stored filename=%s bytes=%d", filename, len(content))
         return storage_ref
 
-    def update_document(self, document_id: int, filename: str, extracted_text: str):
+    def update_document(
+        self,
+        document_id: int,
+        filename: str,
+        extracted_text: str,
+        doc_type: str | None = None,
+    ):
         """Update mutable document metadata and extracted text."""
+        updates: dict = {"filename": filename, "extracted_text": extracted_text}
+        if doc_type is not None:
+            updates["doc_type"] = doc_type.strip() or "Specification"
         self._documents.update(
-            updates={"filename": filename, "extracted_text": extracted_text},
+            updates=updates,
             pk_values=document_id,
         )
         invalidate_cache(f"bimguard:documents:item:document_id={document_id}")

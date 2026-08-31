@@ -967,16 +967,16 @@ class ProjectsService:
 
             filename = str(document.get("filename") or f"document-{document_id}")
             extension = Path(filename).suffix.lstrip(".").lower()
+            doc_category = str(document.get("doc_type") or "Specification")
+            if doc_category not in DOCUMENT_CATEGORIES:
+                doc_category = "Specification"
             self._client_documents.insert(
                 {
                     "project_id": project_id,
                     "filename": filename,
                     "file_path": file_path,
                     "file_type": extension,
-                    # The check constraint only accepts the DOCUMENT_CATEGORIES
-                    # values; library documents are specifications by default,
-                    # and can be recategorised from the document library later.
-                    "category": "Specification",
+                    "category": doc_category,
                     "description": f"Linked from document library (id {document_id})",
                     "tags": "",
                     "upload_date": now,
