@@ -186,68 +186,88 @@
   <!-- Bento Stats Grid -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
     <!-- Total Projects -->
-    <div
-      class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all space-y-2"
+    <button
+      type="button"
+      on:click={() => onNavigate("projects")}
+      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider"
+        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
           >Total Projects</span
         >
-        <FolderOpen class="w-4 h-4 text-blue-400" />
+        <FolderOpen class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
       </div>
       <div class="text-3xl font-bold text-white tracking-tight">
         {stats.total_projects}
       </div>
-      <div class="text-xs text-slate-400">Active in project registry</div>
-    </div>
+      <div class="text-xs text-slate-400 flex items-center justify-between">
+        <span>Active in project registry</span>
+        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-blue-400" />
+      </div>
+    </button>
 
     <!-- Documents -->
-    <div
-      class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all space-y-2"
+    <button
+      type="button"
+      on:click={() => onNavigate("documents")}
+      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider"
+        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
           >Documents</span
         >
-        <BookOpen class="w-4 h-4 text-emerald-400" />
+        <BookOpen class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
       </div>
       <div class="text-3xl font-bold text-white tracking-tight">
         {stats.total_documents}
       </div>
-      <div class="text-xs text-slate-400">Uploaded specifications</div>
-    </div>
+      <div class="text-xs text-slate-400 flex items-center justify-between">
+        <span>Uploaded specifications</span>
+        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-emerald-400" />
+      </div>
+    </button>
 
     <!-- Rules Defined -->
-    <div
-      class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all space-y-2"
+    <button
+      type="button"
+      on:click={() => onNavigate("rules")}
+      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider"
+        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
           >Rules Library</span
         >
-        <ListChecks class="w-4 h-4 text-purple-400" />
+        <ListChecks class="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
       </div>
       <div class="text-3xl font-bold text-white tracking-tight">
         {stats.total_rules}
       </div>
-      <div class="text-xs text-slate-400">Compliance rules active</div>
-    </div>
+      <div class="text-xs text-slate-400 flex items-center justify-between">
+        <span>Compliance rules active</span>
+        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-purple-400" />
+      </div>
+    </button>
 
     <!-- Issues Tracked -->
-    <div
-      class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all space-y-2"
+    <button
+      type="button"
+      on:click={() => onNavigate("reports")}
+      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-amber-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider"
+        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
           >Issues Identified</span
         >
-        <AlertTriangle class="w-4 h-4 text-amber-400" />
+        <AlertTriangle class="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
       </div>
       <div class="text-3xl font-bold text-amber-400 tracking-tight">
         {stats.issues_found}
       </div>
-      <div class="text-xs text-slate-400">Across current models</div>
-    </div>
+      <div class="text-xs text-slate-400 flex items-center justify-between">
+        <span>Across current models</span>
+        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-amber-400" />
+      </div>
+    </button>
   </div>
 
   <!-- Recent Projects Table -->
