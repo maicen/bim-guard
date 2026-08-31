@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.bootstrap import get_container
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.documents_service import DocumentService
+from app.services.github_repo_service import GitHubRepoService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
 from app.services.projects_service import ProjectsService
@@ -45,5 +46,11 @@ def get_settings_service() -> SettingsService:
 def get_arch_analysis_service() -> ArchAnalysisService:
     """Return the configured ArchAnalysisService instance."""
     return get_container().arch_analysis_service
+
+
+def get_github_repo_service() -> GitHubRepoService:
+    """Return the configured GitHubRepoService instance."""
+    return get_container().github_repo_service
+
 
 

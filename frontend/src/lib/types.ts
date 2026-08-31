@@ -505,3 +505,59 @@ export interface RevitSyncResponse {
   results: RevitRuleResult[];
 }
 
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  owner: string;
+  url: string;
+  branch: string;
+  description: string;
+  is_active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface GitHubRepoItem {
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+  extension: string;
+  category: string;
+  download_url: string;
+}
+
+export interface GitHubRepoStructure {
+  repo_id: number;
+  owner: string;
+  name: string;
+  url: string;
+  branch: string;
+  total_files: number;
+  models_count: number;
+  categories: string[];
+  items: GitHubRepoItem[];
+}
+
+export interface GitHubRepoCreatePayload {
+  url: string;
+  name?: string;
+  branch?: string;
+  description?: string;
+}
+
+export interface GitHubRepoUpdatePayload {
+  name?: string;
+  branch?: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface ProjectImportPayload {
+  file_path: string;
+  name?: string;
+  country?: string;
+  analysis_type?: string;
+}
+
+

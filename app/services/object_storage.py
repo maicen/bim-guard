@@ -65,33 +65,70 @@ class ObjectStorage:
         if not reference:
             return None
 
-        if not reference.startswith("sb://"):
-            return None
+        # 1. Direct local filesystem path check
+        try:
+            local_candidate = Path(reference)
+            if local_candidate.is_file():
+                return local_candidate
+        except Exception:
+            pass
 
-        parsed = self._parse_supabase_reference(reference)
-        if parsed is None:
-            return None
+        # 2. HTTP/HTTPS URL (e.g. GitHub raw model URLs)
+        if reference.startswith("http://") or reference.startswith("https://"):
+            import hashlib
+            import httpx
+            url_hash = hashlib.md5(reference.encode("utf-8")).hexdigest()
+            filename = Path(reference.split("?")[0]).name or "model.ifc"
+            if not filename.endswith(".ifc") and not filename.endswith(".zip"):
+                filename += ".ifc"
+            cache_file = self._cache_dir / "http" / f"{url_hash}_{filename}"
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
 
-        bucket, key = parsed
-        cache_file = self._cache_dir / key
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
+            if cache_file.exists() and cache_file.is_file() and cache_file.stat().st_size > 0:
+                logger.debug("HTTP model storage cache hit ref=%s", reference)
+                return cache_file
 
-        if cache_file.exists() and cache_file.is_file():
-            logger.debug("Storage cache hit bucket=%s key=%s", bucket, key)
+            try:
+                logger.info("Downloading remote model from URL ref=%s", reference)
+                with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+                    resp = client.get(reference)
+                    resp.raise_for_status()
+                    cache_file.write_bytes(resp.content)
+                    logger.info("Downloaded remote model ref=%s bytes=%d", reference, len(resp.content))
+                    return cache_file
+            except Exception as exc:
+                logger.exception("Failed to download remote model ref=%s: %s", reference, exc)
+                return None
+
+        # 3. Supabase Storage reference (sb://bucket/key)
+        if reference.startswith("sb://"):
+            parsed = self._parse_supabase_reference(reference)
+            if parsed is None:
+                return None
+
+            bucket, key = parsed
+            cache_file = self._cache_dir / key
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+
+            if cache_file.exists() and cache_file.is_file():
+                logger.debug("Storage cache hit bucket=%s key=%s", bucket, key)
+                return cache_file
+
+            try:
+                content = self._supabase_client().storage.from_(bucket).download(key)
+            except Exception:
+                logger.exception("Storage download failed bucket=%s key=%s", bucket, key)
+                raise
+            if not content:
+                logger.warning("Storage download returned no content bucket=%s key=%s", bucket, key)
+                return None
+
+            cache_file.write_bytes(content)
+            logger.info("Storage object cached bucket=%s key=%s bytes=%d", bucket, key, len(content))
             return cache_file
 
-        try:
-            content = self._supabase_client().storage.from_(bucket).download(key)
-        except Exception:
-            logger.exception("Storage download failed bucket=%s key=%s", bucket, key)
-            raise
-        if not content:
-            logger.warning("Storage download returned no content bucket=%s key=%s", bucket, key)
-            return None
+        return None
 
-        cache_file.write_bytes(content)
-        logger.info("Storage object cached bucket=%s key=%s bytes=%d", bucket, key, len(content))
-        return cache_file
 
     def delete(self, reference: str) -> None:
         """Delete a stored object using either backend."""

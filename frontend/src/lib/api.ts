@@ -4,10 +4,18 @@ import type {
   DocumentDetail,
   DocumentItem,
   DocumentUpdatePayload,
+  GitHubRepo,
+  GitHubRepoCreatePayload,
+  GitHubRepoStructure,
+  GitHubRepoUpdatePayload,
   Project,
   ProjectCreatePayload,
+<<<<<<< HEAD
   ProjectIfcFile,
   ProjectIfcUploadResponse,
+=======
+  ProjectImportPayload,
+>>>>>>> cd52c9f (feat: add multi-source project storage, GitHub repos CRUD, models manifest, and performance optimizations)
   ProjectOptions,
   ProjectListResponse,
   ProjectUpdatePayload,
@@ -615,3 +623,89 @@ export const revitSyncApi = {
     return handleResponse<any>(res);
   },
 };
+
+let _cachedReposList: GitHubRepo[] | null = null;
+const _cachedStructureMap: Record<number, GitHubRepoStructure> = {};
+
+export const githubReposApi = {
+  async list(forceRefresh = false): Promise<GitHubRepo[]> {
+    if (_cachedReposList && !forceRefresh) {
+      fetch(`${API_BASE}/repositories`)
+        .then((res) => handleResponse<GitHubRepo[]>(res))
+        .then((data) => {
+          _cachedReposList = data;
+        })
+        .catch(() => {});
+      return _cachedReposList;
+    }
+    const res = await fetch(`${API_BASE}/repositories`);
+    const data = await handleResponse<GitHubRepo[]>(res);
+    _cachedReposList = data;
+    return data;
+  },
+
+  async get(id: number): Promise<GitHubRepo> {
+    const res = await fetch(`${API_BASE}/repositories/${id}`);
+    return handleResponse<GitHubRepo>(res);
+  },
+
+  async create(payload: GitHubRepoCreatePayload): Promise<GitHubRepo> {
+    const res = await fetch(`${API_BASE}/repositories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const created = await handleResponse<GitHubRepo>(res);
+    _cachedReposList = null;
+    return created;
+  },
+
+  async update(id: number, payload: GitHubRepoUpdatePayload): Promise<GitHubRepo> {
+    const res = await fetch(`${API_BASE}/repositories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const updated = await handleResponse<GitHubRepo>(res);
+    _cachedReposList = null;
+    return updated;
+  },
+
+  async delete(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/repositories/${id}`, {
+      method: 'DELETE',
+    });
+    await handleResponse<void>(res);
+    _cachedReposList = null;
+    delete _cachedStructureMap[id];
+  },
+
+  async getStructure(id: number, forceRefresh = false): Promise<GitHubRepoStructure> {
+    if (_cachedStructureMap[id] && !forceRefresh) {
+      fetch(`${API_BASE}/repositories/${id}/structure`)
+        .then((res) => handleResponse<GitHubRepoStructure>(res))
+        .then((data) => {
+          _cachedStructureMap[id] = data;
+        })
+        .catch(() => {});
+      return _cachedStructureMap[id];
+    }
+    const res = await fetch(`${API_BASE}/repositories/${id}/structure`);
+    const data = await handleResponse<GitHubRepoStructure>(res);
+    _cachedStructureMap[id] = data;
+    return data;
+  },
+
+  async importProject(repoId: number, payload: ProjectImportPayload): Promise<Project> {
+    const res = await fetch(`${API_BASE}/repositories/${repoId}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const created = await handleResponse<Project>(res);
+    _projectsStore.addOrUpdate(created);
+    return created;
+  },
+};
+
+

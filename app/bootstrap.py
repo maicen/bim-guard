@@ -18,6 +18,7 @@ from app.modules.module4_comparator.engine_registry import (
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.db_adapters import DatabaseAdapter
 from app.services.documents_service import DocumentService
+from app.services.github_repo_service import GitHubRepoService
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
@@ -54,12 +55,14 @@ class ApplicationContainer:
     lineage_repo: DatabaseAdapter
     assets_repo: DatabaseAdapter
     settings_repo: DatabaseAdapter
+    github_repos_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
     rules_service: RuleService
     documents_service: DocumentService
     settings_service: SettingsService
+    github_repo_service: GitHubRepoService
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
@@ -182,6 +185,21 @@ def build_default_container() -> ApplicationContainer:
         pk="key",
     )
 
+    github_repos_repo = PersistenceService.get_table(
+        "github_repositories",
+        {
+            "id": int,
+            "name": str,
+            "owner": str,
+            "url": str,
+            "branch": str,
+            "description": str,
+            "is_active": bool,
+            "created_at": str,
+            "updated_at": str,
+        },
+    )
+
     # 3. Model Lineage & Static Data
     lineage = SupabaseModelLineageRepository(lineage_repo=lineage_repo)
     static_data_service = StaticDataService(
@@ -212,6 +230,23 @@ def build_default_container() -> ApplicationContainer:
         static_data_service=static_data_service,
     )
 
+    github_repo_service = GitHubRepoService(
+        github_repos_repo=github_repos_repo,
+        projects_service=projects_service,
+    )
+
+    # Seed default repo if database is empty
+    try:
+        if not github_repo_service.list_repos():
+            github_repo_service.create_repo(
+                url="https://github.com/maicen/bimguard-test-models",
+                name="bimguard-test-models",
+                branch="main",
+                description="Official BIM-Guard test models repository containing architectural, structural, HVAC, electrical, and plumbing IFC models.",
+            )
+    except Exception:
+        logger.warning("Could not seed default GitHub repository; continuing startup", exc_info=True)
+
     analysis_service = AnalysisService()
     phase6_service = Phase6Service()
 
@@ -237,17 +272,20 @@ def build_default_container() -> ApplicationContainer:
         lineage_repo=lineage_repo,
         assets_repo=assets_repo,
         settings_repo=settings_repo,
+        github_repos_repo=github_repos_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
         rules_service=rules_service,
         documents_service=documents_service,
         settings_service=settings_service,
+        github_repo_service=github_repo_service,
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,
         engine_registry=registry,
     )
+
 
 
 def get_container() -> ApplicationContainer:

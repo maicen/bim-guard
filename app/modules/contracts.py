@@ -698,4 +698,77 @@ class RuleEvaluationResult(BaseModel):
         return self.model_dump()
 
 
+# ---------------------------------------------------------------------------
+# GitHub Repository Contracts
+# ---------------------------------------------------------------------------
+
+
+class GitHubRepoCreateRequest(BaseModel):
+    """Payload for creating or adding a GitHub repository project storage source."""
+
+    url: str = Field(..., min_length=5, description="Full GitHub repository URL (e.g. https://github.com/owner/repo)")
+    name: Optional[str] = Field(None, description="Display name for repository")
+    branch: Optional[str] = Field("main", description="Git branch to inspect")
+    description: Optional[str] = Field("", description="Optional repository description")
+
+
+class GitHubRepoUpdateRequest(BaseModel):
+    """Payload for updating GitHub repository storage configuration."""
+
+    name: Optional[str] = Field(None, description="Updated display name")
+    branch: Optional[str] = Field(None, description="Updated default git branch")
+    description: Optional[str] = Field(None, description="Updated description")
+    is_active: Optional[bool] = Field(None, description="Toggle active state")
+
+
+class GitHubRepoResponse(BaseModel):
+    """Response contract for a registered GitHub repository."""
+
+    id: int
+    name: str
+    owner: str
+    url: str
+    branch: str = "main"
+    description: str = ""
+    is_active: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class GitHubRepoItem(BaseModel):
+    """File item inside a GitHub repository tree."""
+
+    path: str
+    name: str
+    type: str = "file"  # file or folder
+    size: int = 0
+    extension: str = ""
+    category: str = "general"
+    download_url: str = ""
+
+
+class GitHubRepoStructureResponse(BaseModel):
+    """Complete structure response listing models in a GitHub repository."""
+
+    repo_id: int
+    owner: str
+    name: str
+    url: str
+    branch: str = "main"
+    total_files: int = 0
+    models_count: int = 0
+    categories: list[str] = []
+    items: list[GitHubRepoItem] = []
+
+
+class ProjectImportFromRepoRequest(BaseModel):
+    """Payload for importing an IFC model file from a GitHub repository into projects."""
+
+    file_path: str = Field(..., min_length=1, description="Relative file path in repository (e.g. models/hospital/Clinic_Architectural.ifc)")
+    name: Optional[str] = Field(None, description="Custom project name (defaults to file basename)")
+    country: Optional[str] = Field(None, description="Jurisdiction / country code")
+    analysis_type: Optional[str] = Field(None, description="Domain analysis type (Arch, Piping, seismic)")
+
+
+
 
