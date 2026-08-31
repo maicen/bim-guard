@@ -56,10 +56,30 @@
     }
   }
 
+  // The app is a client-state SPA with no URL-driven router, but the backend
+  // still hands out real links (e.g. "View in 3D" on analysis/report pages)
+  // built as /viewer?project_id=...&bcf_artifact_id=...&element_guid=....
+  // Without this, landing on one of those just shows the default Dashboard —
+  // the query string was never read. Only /viewer is handled here since it's
+  // the one path server-generated links actually point at today.
+  function applyDeepLinkFromLocation() {
+    if (window.location.pathname !== "/viewer") return;
+    const params = new URLSearchParams(window.location.search);
+    const projectId = Number(params.get("project_id"));
+    if (!projectId) return;
+    targetProjectId = projectId;
+    targetElementGuid = params.get("element_guid");
+    const bcfArtifactId = Number(params.get("bcf_artifact_id"));
+    targetBcfArtifactId = bcfArtifactId || null;
+    loadProjectDetails(projectId);
+    activeView = "viewer";
+  }
+
   onMount(() => {
     initTheme();
     checkHealth();
     dashboardApi.prefetchAll();
+    applyDeepLinkFromLocation();
     const interval = setInterval(checkHealth, 20000);
     return () => clearInterval(interval);
   });

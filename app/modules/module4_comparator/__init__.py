@@ -8,8 +8,15 @@ For each rule:
   - Returns PASS / FAIL / MISSING_DATA / PARTIAL / NO_ELEMENTS per rule
   - Collects per-element failure details for Module 5 reporting
 
-Operators: >= <= > < == != between exists not_exists matches
+Operators: >= <= > < == != between exists not_exists matches documented
            field_consistency unique_within_scope
+
+`exists`/`not_exists` treat a missing property as FAIL — use them for fields
+that must always be authored (e.g. GlobalId). `documented` is for fields that
+are frequently left blank by authoring tools and aren't being checked against
+a real threshold here: a present value (of any kind) is PASS, and a missing
+one flows through the normal actual-is-None path below as MISSING_DATA/
+PARTIAL rather than an asserted FAIL.
 """
 
 import re
@@ -289,6 +296,13 @@ class Module4_Comparator:
                             all_elements)
 
     def _compare(self, operator, actual, check_val, val_min, val_max, unit):
+        # `_compare` only runs once the caller has already confirmed
+        # `actual is not None` (the None case is MISSING_DATA territory,
+        # handled before this is called) — so any value reaching here for a
+        # "documented" rule already satisfies the check, whatever its type.
+        if operator == "documented":
+            return True, ""
+
         # Boolean-aware ==/!= — ifcopenshell returns real Python bool for any
         # IfcBoolean property, but rule check_values are usually authored as
         # text ("TRUE"/"FALSE", any case) straight from spec wording. A literal
