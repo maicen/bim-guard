@@ -377,6 +377,68 @@ class ProjectsService:
         invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         logger.info("Project deleted project_id=%d existed=%s", project_id, project is not None)
 
+    def bulk_update_projects(
+        self,
+        project_ids: list[int],
+        *,
+        status: str | None = None,
+        country: str | None = None,
+        analysis_type: str | None = None,
+    ) -> list[int]:
+        """Update specified fields for multiple existing projects in bulk."""
+        if not project_ids:
+            return []
+
+        updates: dict[str, str] = {"updated_at": now_iso_utc()}
+        if status is not None and status.strip():
+            updates["status"] = status.strip()
+        if country is not None and country.strip():
+            updates["country"] = country.strip()
+        if analysis_type is not None and analysis_type.strip():
+            norm_analysis = normalize_analysis_type(analysis_type.strip())
+            if norm_analysis not in ANALYSIS_TYPES:
+                raise ValueError(
+                    f"analysis_type must be one of {ANALYSIS_TYPES!r}, got {norm_analysis!r}"
+                )
+            updates["analysis_type"] = norm_analysis
+
+        if len(updates) <= 1:
+            return []
+
+        updated_ids: list[int] = []
+        for pid in project_ids:
+            existing = self.get_project(pid)
+            if existing is not None:
+                self._projects.update(updates=updates, pk_values=pid)
+                invalidate_cache(f"bimguard:projects:item:project_id={pid}")
+                updated_ids.append(pid)
+
+        if updated_ids:
+            invalidate_cache("bimguard:projects:list")
+            logger.info("Bulk updated %d projects fields=%s", len(updated_ids), list(updates.keys()))
+
+        return updated_ids
+
+    def bulk_delete_projects(self, project_ids: list[int]) -> list[int]:
+        """Delete multiple projects by primary keys."""
+        deleted_ids: list[int] = []
+        for pid in project_ids:
+            project = self.get_project(pid)
+            if project is not None:
+                self._storage.delete(project.get("ifc_file_path") or "")
+                self._projects.delete(pid)
+                invalidate_cache(f"bimguard:projects:item:project_id={pid}")
+                invalidate_cache(f"bimguard:projects:standards:project_id={pid}")
+                invalidate_cache(f"bimguard:projects:docs:project_id={pid}")
+                invalidate_cache(f"bimguard:projects:inputs:project_id={pid}")
+                deleted_ids.append(pid)
+
+        if deleted_ids:
+            invalidate_cache("bimguard:projects:list")
+            logger.info("Bulk deleted %d projects", len(deleted_ids))
+
+        return deleted_ids
+
 
     def resolve_ifc_file(self, project_id: int) -> Path | None:
         """Return an existing IFC file path for a project, if present."""

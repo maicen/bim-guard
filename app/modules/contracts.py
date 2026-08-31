@@ -163,6 +163,29 @@ class ProjectUpdateRequest(BaseModel):
     analysis_type: Optional[str] = None
 
 
+class ProjectBulkDeleteRequest(BaseModel):
+    """Payload for deleting multiple projects in bulk."""
+
+    project_ids: list[int] = Field(..., min_length=1, description="IDs of projects to delete")
+
+
+class ProjectBulkUpdateRequest(BaseModel):
+    """Payload for updating metadata on multiple projects in bulk."""
+
+    project_ids: list[int] = Field(..., min_length=1, description="IDs of projects to update")
+    status: Optional[str] = Field(None, description="Optional new status (Active, Draft, Archived)")
+    country: Optional[str] = Field(None, description="Optional new country/jurisdiction")
+    analysis_type: Optional[str] = Field(None, description="Optional new analysis domain")
+
+
+class ProjectBulkActionResponse(BaseModel):
+    """Response returned after executing a bulk project operation."""
+
+    success_count: int = Field(..., description="Number of projects affected")
+    affected_ids: list[int] = Field(default_factory=list, description="IDs of affected projects")
+
+
+
 class ProjectResponse(BaseModel):
     """Detailed response model for a project."""
 

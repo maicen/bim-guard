@@ -107,6 +107,22 @@ export interface ProjectUpdatePayload {
   analysis_type?: AnalysisDomain | string;
 }
 
+export interface ProjectBulkDeletePayload {
+  project_ids: number[];
+}
+
+export interface ProjectBulkUpdatePayload {
+  project_ids: number[];
+  status?: string;
+  country?: string;
+  analysis_type?: string;
+}
+
+export interface ProjectBulkActionResponse {
+  success_count: number;
+  affected_ids: number[];
+}
+
 export interface DocumentItem {
   id: number;
   filename: string;

@@ -124,3 +124,59 @@ def test_create_project_without_building_code_is_allowed():
         assert created["building_code"] is None
     finally:
         ProjectsService().delete_project(created["id"])
+
+
+def test_bulk_update_projects():
+    """Verify POST /api/projects/bulk-update updates multiple projects in batch."""
+    from app.services.projects_service import ProjectsService
+
+    svc = ProjectsService()
+    p1 = svc.create_project(name="Bulk Update 1", status="Draft", country="US", analysis_type="Arch")
+    p2 = svc.create_project(name="Bulk Update 2", status="Draft", country="US", analysis_type="Arch")
+    p1_id, p2_id = p1["id"], p2["id"]
+
+    try:
+        res = client.post(
+            "/api/projects/bulk-update",
+            json={
+                "project_ids": [p1_id, p2_id],
+                "status": "Active",
+                "country": "UK",
+                "analysis_type": "seismic",
+            },
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success_count"] == 2
+        assert set(data["affected_ids"]) == {p1_id, p2_id}
+
+        up1 = svc.get_project(p1_id)
+        up2 = svc.get_project(p2_id)
+        assert up1["status"] == "Active" and up1["country"] == "UK" and up1["analysis_type"] == "seismic"
+        assert up2["status"] == "Active" and up2["country"] == "UK" and up2["analysis_type"] == "seismic"
+    finally:
+        svc.delete_project(p1_id)
+        svc.delete_project(p2_id)
+
+
+def test_bulk_delete_projects():
+    """Verify POST /api/projects/bulk-delete deletes multiple projects in batch."""
+    from app.services.projects_service import ProjectsService
+
+    svc = ProjectsService()
+    p1 = svc.create_project(name="Bulk Delete 1", status="Draft", country="US", analysis_type="Arch")
+    p2 = svc.create_project(name="Bulk Delete 2", status="Draft", country="US", analysis_type="Arch")
+    p1_id, p2_id = p1["id"], p2["id"]
+
+    res = client.post(
+        "/api/projects/bulk-delete",
+        json={"project_ids": [p1_id, p2_id]},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success_count"] == 2
+    assert set(data["affected_ids"]) == {p1_id, p2_id}
+
+    assert svc.get_project(p1_id) is None
+    assert svc.get_project(p2_id) is None
+
