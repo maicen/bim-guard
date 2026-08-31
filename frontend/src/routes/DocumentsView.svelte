@@ -16,6 +16,9 @@
   import { documentsApi } from "../lib/api";
   import type { DocumentItem, DocumentDetail } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import TablePagination from "../lib/components/TablePagination.svelte";
+  import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import DataTableHeader from "../lib/components/DataTableHeader.svelte";
 
   const cachedDocs = documentsApi.getCachedList();
   let documents: DocumentItem[] = cachedDocs || [];
@@ -81,6 +84,57 @@
   $: filteredDocuments = documents.filter((d) =>
     d.filename.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  let selectedDocIds: number[] = [];
+  let isBulkDeleteModalOpen = false;
+
+  let currentPage = 1;
+  let pageSize = 10;
+
+  $: totalItems = filteredDocuments.length;
+  $: paginatedDocuments = filteredDocuments.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  $: allFilteredSelected =
+    filteredDocuments.length > 0 &&
+    filteredDocuments.every((d) => selectedDocIds.includes(d.id));
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      selectedDocIds = [];
+    } else {
+      selectedDocIds = filteredDocuments.map((d) => d.id);
+    }
+  }
+
+  function toggleSelectDoc(id: number) {
+    if (selectedDocIds.includes(id)) {
+      selectedDocIds = selectedDocIds.filter((dId) => dId !== id);
+    } else {
+      selectedDocIds = [...selectedDocIds, id];
+    }
+  }
+
+  async function confirmBulkDelete() {
+    if (!selectedDocIds.length) return;
+    try {
+      for (const id of selectedDocIds) {
+        await documentsApi.delete(id);
+      }
+      documents = documents.filter((d) => !selectedDocIds.includes(d.id));
+      selectedDocIds = [];
+      isBulkDeleteModalOpen = false;
+    } catch (err: any) {
+      error = `Could not delete selected documents: ${err.message}`;
+    }
+  }
+
+  $: {
+    searchQuery;
+    currentPage = 1;
+  }
 
   async function handleUpload() {
     if (!uploadFile) return;
@@ -222,27 +276,25 @@
     </div>
   {/if}
 
-  <!-- Search Filter -->
-  <div
-    class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center gap-3"
-  >
-    <div class="relative flex-1">
-      <Search
-        class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
-      />
-      <input
-        type="text"
-        bind:value={searchQuery}
-        placeholder="Filter documents by file name..."
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
-      />
-    </div>
-  </div>
+  <!-- Bulk Actions Bar -->
+  <BulkActionBar
+    selectedCount={selectedDocIds.length}
+    itemLabel="document"
+    onClearSelection={() => (selectedDocIds = [])}
+    onBulkDelete={() => (isBulkDeleteModalOpen = true)}
+  />
 
-  <!-- Documents Table -->
+  <!-- Documents Table Container -->
   <div
     class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40"
   >
+    <DataTableHeader
+      bind:searchQuery
+      searchPlaceholder="Filter documents by file name..."
+      {isRefreshing}
+      onRefresh={() => loadDocuments(true)}
+    />
+
     {#if isLoading}
       <div class="p-12 text-center text-xs text-slate-400">
         Loading document library...
@@ -265,6 +317,15 @@
             class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
           >
             <tr>
+              <th class="py-3 px-4 w-10">
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  on:change={toggleSelectAll}
+                  class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                  title="Select or deselect all visible documents"
+                />
+              </th>
               <th class="py-3 px-4">ID</th>
               <th class="py-3 px-4">Document File</th>
               <th class="py-3 px-4">Extracted Text</th>
@@ -274,8 +335,16 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
-            {#each filteredDocuments as doc}
-              <tr class="hover:bg-slate-900/60 transition-colors">
+            {#each paginatedDocuments as doc}
+              <tr class="hover:bg-slate-900/60 transition-colors {selectedDocIds.includes(doc.id) ? 'bg-blue-950/20' : ''}">
+                <td class="py-3 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedDocIds.includes(doc.id)}
+                    on:change={() => toggleSelectDoc(doc.id)}
+                    class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                  />
+                </td>
                 <td class="py-3 px-4 font-mono text-slate-500">#{doc.id}</td>
                 <td class="py-3 px-4">
                   <div class="flex items-center gap-2">
@@ -329,6 +398,17 @@
           </tbody>
         </table>
       </div>
+
+      <TablePagination
+        {currentPage}
+        {pageSize}
+        totalItems={totalItems}
+        onPageChange={(p) => (currentPage = p)}
+        onPageSizeChange={(s) => {
+          pageSize = s;
+          currentPage = 1;
+        }}
+      />
     {/if}
   </div>
 </div>
@@ -584,4 +664,14 @@
   danger={true}
   onConfirm={confirmDelete}
   onCancel={() => (docToDelete = null)}
+/>
+
+<ConfirmModal
+  bind:isOpen={isBulkDeleteModalOpen}
+  title="Delete Selected Documents"
+  message={`Are you sure you want to delete ${selectedDocIds.length} selected document specification(s)? This action cannot be undone.`}
+  confirmText="Delete Selected Documents"
+  danger={true}
+  onConfirm={confirmBulkDelete}
+  onCancel={() => (selectedDocIds = [])}
 />
