@@ -393,10 +393,10 @@ class RuleService:
 
     def create_rule(
         self,
-        reference: str,
-        rule_type: str,
-        description: str,
-        target_ifc_class: str,
+        reference: str = "",
+        rule_type: str = "numeric_comparison",
+        description: str = "",
+        target_ifc_class: str = "",
         parameters: str = "{}",
         # rich schema
         source_text: str = "",
@@ -424,14 +424,16 @@ class RuleService:
         overridden_by: str = "",
         confidence: float | None = None,
         extraction_method: str = "manual",
-        needs_review: bool = False,
+        needs_review: bool | int = False,
         # classification meta
         mechanism: str = "",
         ruleset_id: str = "",
         rule_category: str = "property_check",
         category: str = "",
+        rule_id: str = "",
     ):
         """Insert a rule row into the rules table."""
+        ref = (rule_id or reference or "").strip()
         now = now_iso_utc()
         norm_cat = self.normalize_category(category, default="") or self.infer_category(
             {
@@ -442,7 +444,7 @@ class RuleService:
         )
         saved = self._rules.insert(
             {
-                "reference": reference.strip(),
+                "reference": ref,
                 "rule_type": rule_type.strip() or "numeric_comparison",
                 "description": description.strip(),
                 "target_ifc_class": target_ifc_class.strip(),
@@ -843,7 +845,7 @@ class RuleService:
         return updated
 
     def delete_folder(self, ruleset_id: str) -> int:
-        """Delete every rule that belongs to a ruleset_id. Returns rows deleted."""
+        """Delete every rule that belongs to a ruleset_id and remove the folder row. Returns rows deleted."""
         ruleset_id = self.normalize_ruleset_id(ruleset_id)
         if not ruleset_id:
             return 0
@@ -852,10 +854,26 @@ class RuleService:
         for rule in self.list_by_ruleset(ruleset_id):
             self._rules.delete(rule["id"])
             deleted += 1
-        self._drop_folder_if_orphan(ruleset_id)
+
+        for folder in self._folder_rows():
+            if self.normalize_ruleset_id(folder.get("ruleset_id") or "") == ruleset_id:
+                self._folder_delete(folder["id"])
+                break
+
         if deleted:
             invalidate_cache("bimguard:rules")
+        invalidate_cache("bimguard:rules:folders")
         return deleted
+
+    def get_folder(self, ruleset_id: str) -> dict | None:
+        """Return a single folder dictionary matching ruleset_id with its member rules."""
+        norm_id = self.normalize_ruleset_id(ruleset_id)
+        if not norm_id:
+            return None
+        for f in self.list_folders_with_rules():
+            if self.normalize_ruleset_id(f.get("ruleset_id") or "") == norm_id:
+                return f
+        return None
 
     def delete_rules(self, rule_ids: list[int]) -> int:
         """Delete multiple rules by primary key. Returns rows deleted."""
@@ -867,7 +885,86 @@ class RuleService:
             deleted += 1
         if deleted:
             invalidate_cache("bimguard:rules")
+            invalidate_cache("bimguard:rules:folders")
         return deleted
+
+    def bulk_update_rules(self, rule_ids: list[int], updates: dict[str, Any]) -> list[int]:
+        """Update specified fields for multiple rules in bulk. Returns updated rule IDs."""
+        if not rule_ids or not updates:
+            return []
+
+        now = now_iso_utc()
+        cleaned_updates: dict[str, Any] = {"updated_at": now}
+
+        if "ruleset_id" in updates and updates["ruleset_id"] is not None:
+            norm_ruleset = self.normalize_ruleset_id(updates["ruleset_id"])
+            cleaned_updates["ruleset_id"] = norm_ruleset
+            self._ensure_folder(norm_ruleset)
+        if "category" in updates and updates["category"] is not None:
+            cleaned_updates["category"] = self.normalize_category(updates["category"])
+        if "mechanism" in updates and updates["mechanism"] is not None:
+            cleaned_updates["mechanism"] = updates["mechanism"].strip().upper()
+        if "severity" in updates and updates["severity"] is not None:
+            cleaned_updates["severity"] = updates["severity"].strip()
+        if "needs_review" in updates and updates["needs_review"] is not None:
+            cleaned_updates["needs_review"] = int(updates["needs_review"])
+        if "property_set" in updates and updates["property_set"] is not None:
+            cleaned_updates["property_set"] = updates["property_set"].strip()
+
+        updated_ids: list[int] = []
+        for rule_id in rule_ids:
+            if self.get_rule(rule_id) is None:
+                continue
+            self._rules.update(updates=cleaned_updates, pk_values=rule_id)
+            updated_ids.append(rule_id)
+
+        if updated_ids:
+            invalidate_cache("bimguard:rules")
+            invalidate_cache("bimguard:rules:folders")
+        return updated_ids
+
+    def bulk_update_folders(self, ruleset_ids: list[str], updates: dict[str, Any]) -> list[str]:
+        """Update metadata/category/scope for multiple ruleset folders in bulk."""
+        if not ruleset_ids or not updates:
+            return []
+
+        updated_folders: list[str] = []
+        for rid in ruleset_ids:
+            norm_id = self.normalize_ruleset_id(rid)
+            if not norm_id:
+                continue
+            success = self.update_folder_metadata(
+                ruleset_id=norm_id,
+                category=updates.get("category"),
+                mechanism_scope=updates.get("mechanism_scope"),
+            )
+            if success:
+                updated_folders.append(norm_id)
+
+        if updated_folders:
+            invalidate_cache("bimguard:rules")
+            invalidate_cache("bimguard:rules:folders")
+        return updated_folders
+
+    def bulk_delete_folders(self, ruleset_ids: list[str]) -> tuple[list[str], int]:
+        """Delete multiple ruleset folders and member rules. Returns (deleted_ruleset_ids, deleted_rules_count)."""
+        if not ruleset_ids:
+            return [], 0
+
+        deleted_folders: list[str] = []
+        total_rules_deleted = 0
+        for rid in ruleset_ids:
+            norm_id = self.normalize_ruleset_id(rid)
+            if not norm_id:
+                continue
+            deleted_count = self.delete_folder(norm_id)
+            deleted_folders.append(norm_id)
+            total_rules_deleted += deleted_count
+
+        if deleted_folders:
+            invalidate_cache("bimguard:rules")
+            invalidate_cache("bimguard:rules:folders")
+        return deleted_folders, total_rules_deleted
 
 
     def list_by_category(self, category: str) -> list[dict]:

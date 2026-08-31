@@ -20,7 +20,11 @@ import type {
   ProjectListResponse,
   ProjectUpdatePayload,
   Rule,
+  RuleBulkActionResponse,
+  RuleBulkUpdatePayload,
   RuleFolder,
+  RuleFolderBulkActionResponse,
+  RuleFolderBulkUpdatePayload,
   RuleFolderCreatePayload,
   RuleFolderUpdatePayload,
   RulesetCategory,
@@ -335,6 +339,45 @@ export const rulesApi = {
     return updated;
   },
 
+  async deleteFolder(rulesetId: string): Promise<{ success: boolean; ruleset_id: string; deleted_rules: number }> {
+    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
+      method: 'DELETE',
+    });
+    const result = await handleResponse<{ success: boolean; ruleset_id: string; deleted_rules: number }>(res);
+    _ruleFoldersStore.clear();
+    _rulesStore.clear();
+    return result;
+  },
+
+  async bulkUpdateFolders(payload: RuleFolderBulkUpdatePayload): Promise<RuleFolderBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/folders/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await handleResponse<RuleFolderBulkActionResponse>(res);
+    _ruleFoldersStore.clear();
+    _rulesStore.clear();
+    return result;
+  },
+
+  async bulkDeleteFolders(rulesetIds: string[]): Promise<RuleFolderBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/folders/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ruleset_ids: rulesetIds }),
+    });
+    const result = await handleResponse<RuleFolderBulkActionResponse>(res);
+    _ruleFoldersStore.clear();
+    _rulesStore.clear();
+    return result;
+  },
+
+  async getFolder(rulesetId: string): Promise<RuleFolder> {
+    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`);
+    return handleResponse<RuleFolder>(res);
+  },
+
   async get(id: number, options: SWROptions = {}): Promise<Rule> {
     return _rulesStore.fetchItem(
       id,
@@ -377,6 +420,30 @@ export const rulesApi = {
     await handleResponse<void>(res);
     _rulesStore.remove(id);
     _ruleFoldersStore.clear();
+  },
+
+  async bulkUpdate(payload: RuleBulkUpdatePayload): Promise<RuleBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await handleResponse<RuleBulkActionResponse>(res);
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
+    return result;
+  },
+
+  async bulkDelete(ruleIds: number[]): Promise<RuleBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rule_ids: ruleIds }),
+    });
+    const result = await handleResponse<RuleBulkActionResponse>(res);
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
+    return result;
   },
 
   invalidateCache() {

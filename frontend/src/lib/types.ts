@@ -221,6 +221,33 @@ export interface RuleFolderUpdatePayload {
   category?: RulesetCategory | string;
 }
 
+export interface RuleBulkUpdatePayload {
+  rule_ids: number[];
+  ruleset_id?: string;
+  category?: RulesetCategory | string;
+  mechanism?: string;
+  severity?: string;
+  needs_review?: number;
+  property_set?: string;
+}
+
+export interface RuleBulkActionResponse {
+  success_count: number;
+  affected_ids: number[];
+}
+
+export interface RuleFolderBulkUpdatePayload {
+  ruleset_ids: string[];
+  category?: RulesetCategory | string;
+  mechanism_scope?: string;
+}
+
+export interface RuleFolderBulkActionResponse {
+  success_count: number;
+  affected_ruleset_ids: string[];
+  deleted_rules_count: number;
+}
+
 export interface Citation {
   standard: string;
   clause: string;

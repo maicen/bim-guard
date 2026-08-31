@@ -402,6 +402,53 @@ class RuleFolderUpdateRequest(BaseModel):
     category: Optional[str] = None
 
 
+class RuleBulkUpdateRequest(BaseModel):
+    """Payload for updating multiple rules in bulk."""
+
+    rule_ids: list[int] = Field(..., min_length=1, description="Rule IDs to update")
+    ruleset_id: Optional[str] = Field(default=None, description="Assign to ruleset folder")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    mechanism: Optional[str] = Field(default=None, description="Mechanism: CODE, GC-001, CC-001, MC-001, SEISMIC")
+    severity: Optional[str] = Field(default=None, description="Severity: Critical, High, Medium, Low")
+    needs_review: Optional[int] = Field(default=None, description="Needs review flag: 0 or 1")
+    property_set: Optional[str] = Field(default=None, description="Property set name")
+
+
+class RuleBulkDeleteRequest(BaseModel):
+    """Payload for deleting multiple rules in bulk."""
+
+    rule_ids: list[int] = Field(..., min_length=1, description="Rule IDs to delete")
+
+
+class RuleBulkActionResponse(BaseModel):
+    """Response returned after executing a bulk rule operation."""
+
+    success_count: int
+    affected_ids: list[int] = Field(default_factory=list)
+
+
+class RuleFolderBulkUpdateRequest(BaseModel):
+    """Payload for updating multiple ruleset folders in bulk."""
+
+    ruleset_ids: list[str] = Field(..., min_length=1, description="Ruleset IDs to update")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    mechanism_scope: Optional[str] = Field(default=None, description="Mechanism scope")
+
+
+class RuleFolderBulkDeleteRequest(BaseModel):
+    """Payload for deleting multiple ruleset folders in bulk."""
+
+    ruleset_ids: list[str] = Field(..., min_length=1, description="Ruleset IDs to delete")
+
+
+class RuleFolderBulkActionResponse(BaseModel):
+    """Response returned after executing a bulk ruleset folder operation."""
+
+    success_count: int
+    affected_ruleset_ids: list[str] = Field(default_factory=list)
+    deleted_rules_count: int = 0
+
+
 # ---------------------------------------------------------------------------
 # Analysis & Finding Contracts
 # ---------------------------------------------------------------------------
