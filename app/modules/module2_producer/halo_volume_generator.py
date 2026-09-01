@@ -401,6 +401,14 @@ class ElementGeometry:
     ifc_class: str
     bbox_mm: BoundingBox
 
+    #: Cross-section declared by the element's swept profile, mm, where it
+    #: declares one. Read via element_diameter_mm rather than inferred from
+    #: bbox_mm, because a swept solid's box collapses to its extrusion axis and
+    #: carries no thickness. None when the element declares no profile
+    #: dimension; optional so existing callers that build geometry by hand are
+    #: unaffected.
+    nominal_diameter_mm: Optional[float] = None
+
 
 # ---------------------------------------------------------------------------
 # IFC geometry helpers
@@ -666,6 +674,103 @@ def element_bbox_mm(entity: IfcElement, scale_to_mm: float) -> Optional[Bounding
         min=Point3D(x=min(xs), y=min(ys), z=min(zs)),
         max=Point3D(x=max(xs), y=max(ys), z=max(zs)),
     )
+
+
+def _profile_diameter(profile: Any) -> Optional[float]:
+    """Return the governing cross-section of a swept profile, model units.
+
+    Circular profiles give a true diameter. A rectangular profile has no
+    diameter, so its smaller side is returned as the dimension a size threshold
+    should compare against. A profile whose shape is arbitrary yields None
+    rather than a guess.
+    """
+    try:
+        kind = profile.is_a()
+        if kind in ("IfcCircleProfileDef", "IfcCircleHollowProfileDef"):
+            radius = getattr(profile, "Radius", None)
+            return float(radius) * 2.0 if radius else None
+        if kind in ("IfcRectangleProfileDef", "IfcRectangleHollowProfileDef"):
+            x_dim = getattr(profile, "XDim", None)
+            y_dim = getattr(profile, "YDim", None)
+            if x_dim and y_dim:
+                return float(min(x_dim, y_dim))
+            return None
+        if kind == "IfcDerivedProfileDef":
+            return _profile_diameter(getattr(profile, "ParentProfile", None))
+    except Exception:  # pragma: no cover - malformed profile
+        return None
+    return None
+
+
+def _item_diameter(item: Any, depth: int = 0) -> Optional[float]:
+    """Return the largest cross-section declared by one representation item.
+
+    Mirrors :func:`_item_vertices` in the shapes it understands, and recurses
+    through ``IfcMappedItem`` for the same reason.
+    """
+    if depth >= _MAX_MAPPED_DEPTH:
+        return None
+    try:
+        kind = item.is_a()
+
+        if kind == "IfcExtrudedAreaSolid":
+            return _profile_diameter(getattr(item, "SweptArea", None))
+
+        if kind == "IfcSweptDiskSolid":
+            radius = getattr(item, "Radius", None)
+            return float(radius) * 2.0 if radius else None
+
+        if kind == "IfcMappedItem":
+            source = getattr(item, "MappingSource", None)
+            representation = getattr(source, "MappedRepresentation", None)
+            found = [
+                _item_diameter(sub, depth + 1)
+                for sub in (getattr(representation, "Items", []) or [])
+            ]
+            measured = [d for d in found if d]
+            return max(measured) if measured else None
+
+        if kind == "IfcBooleanResult" or kind == "IfcBooleanClippingResult":
+            # The first operand carries the body being clipped; the clipping
+            # volume is not the pipe.
+            return _item_diameter(getattr(item, "FirstOperand", None), depth + 1)
+    except Exception:  # pragma: no cover - malformed item
+        return None
+    return None
+
+
+def element_diameter_mm(entity: IfcElement, scale_to_mm: float) -> Optional[float]:
+    """Return an element's declared cross-section in mm, or None.
+
+    Reads the dimension off the swept profile rather than inferring it from the
+    bounding box. This matters because :func:`_item_vertices` reduces a swept
+    solid to its extrusion axis, so a pipe modelled as an
+    ``IfcExtrudedAreaSolid`` -- which is how Revit and ArchiCAD normally export
+    one -- has a bounding box with no thickness at all. Its
+    ``IfcCircleProfileDef`` still carries an exact radius, and that is the
+    number a diameter threshold should be tested against.
+
+    Args:
+        entity: The IFC entity to measure.
+        scale_to_mm: Factor converting the model's length unit to mm, from
+            :func:`unit_scale_to_mm`.
+
+    Returns:
+        The largest cross-section declared by any of the element's
+        representation items, in mm, or None where no item declares one.
+    """
+    representation = getattr(entity, "Representation", None)
+    if representation is None:
+        return None
+
+    measured: list[float] = []
+    for shape in getattr(representation, "Representations", []) or []:
+        for item in getattr(shape, "Items", []) or []:
+            diameter = _item_diameter(item)
+            if diameter:
+                measured.append(diameter)
+
+    return max(measured) * scale_to_mm if measured else None
 
 
 # ---------------------------------------------------------------------------

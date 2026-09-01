@@ -85,3 +85,12 @@ test-models
 docs/scraped_standards/*
 !docs/scraped_standards/.gitkeep
 !docs/scraped_standards/README.md
+
+# Generated BCF archives. Only the README is tracked.
+docs/bcf_exports/*
+!docs/bcf_exports/README.md
+
+# Downloaded IFC test models (scripts/fetch_test_model.py). Large binaries;
+# fetched on demand from maicen/bimguard-test-models. Only the README is tracked.
+data/test_models/*
+!data/test_models/README.md
