@@ -6,10 +6,10 @@ from typing import Any, override
 
 import httpx
 from fastlite import database
-from supabase import ClientOptions, create_client
 
 from app.environment import load_env_file
 from app.services.db_adapters import SQLiteTableAdapter, SupabaseTableAdapter
+from supabase import ClientOptions, create_client
 
 load_env_file()
 

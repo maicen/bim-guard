@@ -78,6 +78,7 @@ class ObjectStorage:
         # 2. HTTP/HTTPS URL (e.g. GitHub raw model URLs)
         if reference.startswith("http://") or reference.startswith("https://"):
             import hashlib
+
             import httpx
             url_hash = hashlib.md5(reference.encode("utf-8")).hexdigest()
             filename = Path(reference.split("?")[0]).name or "model.ifc"

@@ -85,9 +85,9 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning:supabase.*:",
     "ignore::DeprecationWarning:postgrest.*:",
-    "ignore::starlette.testclient.StarletteDeprecationWarning",
-    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.testclient.StarletteDeprecationWarning",
-    "ignore:The 'timeout' parameter is deprecated:DeprecationWarning",
-    "ignore:The 'verify' parameter is deprecated:DeprecationWarning",
+    "ignore:.*StarletteDeprecationWarning.*",
+    "ignore:.*Using `httpx` with `starlette.testclient`.*",
+    "ignore:.*The 'timeout' parameter is deprecated.*:DeprecationWarning",
+    "ignore:.*The 'verify' parameter is deprecated.*:DeprecationWarning",
     "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
