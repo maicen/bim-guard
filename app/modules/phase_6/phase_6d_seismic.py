@@ -63,7 +63,7 @@ logger = get_logger(__name__)
 PRIMARY_MODEL_LABEL = "primary model"
 
 #: Jurisdiction config shipped with the Blue Halo work. Phase 2 output.
-DEFAULT_CONFIG_PATH = Path("data/config_en_1998_1_din_4149.json")
+DEFAULT_CONFIG_PATH = Path("data/rulesets/config_en_1998_1_din_4149.json")
 
 #: Ruleset reference recorded on every seismic Issue.
 RULE_ID = "SB-001.01"

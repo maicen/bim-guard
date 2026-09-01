@@ -15,7 +15,7 @@ pair of standards to combine:
   2. If either is missing from hermes_standards_research_summary.json,
      fall back to the Priority 2/3 US pair (ASCE 7-22 + NFPA 13).
   3. Whichever pair is used, write the full CONFIG TEMPLATE OUTPUT FORMAT
-     JSON to data/config_<pair>.json and validate it three ways:
+     JSON to data/rulesets/config_<pair>.json and validate it three ways:
      structural completeness, numeric-not-string field types, and a real
      load through halo_volume_generator.load_clearance_config().
 
@@ -48,7 +48,7 @@ CANDIDATE_PAIRS: tuple[tuple[tuple[str, str], str], ...] = (
     (("ASCE 7-22", "NFPA 13"), "config_asce_7_22_nfpa_13.json"),
 )
 
-OUTPUT_DIR = REPO_ROOT / "data"
+OUTPUT_DIR = REPO_ROOT / "data" / "rulesets"
 
 
 def select_pair(entries: list[dict]) -> tuple[dict, tuple[str, str], str]:

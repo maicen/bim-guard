@@ -41,7 +41,7 @@ TARGET_DIRS: list[str] = [
     "app/engines",     # GC-001, CC-001, MC-001 and ARCH-* compliance kernels
     "app/modules",     # Document parsing, IFC read, rule build, comparator pipeline
     "app/services",    # Rule catalogs, ruleset seeding, analysis runner
-    "data/rulesets",   # Static JSON rule packs (MM-001, XM-001)
+    "data/rulesets",   # Static JSON rule packs (MM-001, XM-001) + jurisdiction configs
     "docs",            # Standards research, validation reports, submissions
 ]
 
@@ -50,7 +50,6 @@ TARGET_DIRS: list[str] = [
 #: up without having to name each one.
 EXTRA_FILES: list[str] = [
     "README.md",
-    "data/config_*.json",   # Generated jurisdiction configs (EN 1998-1 / DIN 4149)
 ]
 
 #: Only files carrying one of these suffixes are included.
@@ -142,7 +141,7 @@ ROUTING_RULES: list[tuple[str, str]] = [
     ("app/modules/phase_6/phase_6c_corrosion_ui.py", CORROSION),
 
     # -- 2. Explicit seismic paths -----------------------------------------
-    ("data/config_*.json", SEISMIC),               # EN 1998-1 / DIN 4149 configs
+    ("data/rulesets/config_*.json", SEISMIC),      # EN 1998-1 / DIN 4149 configs
     ("app/modules/module2_producer/generate_expanded_config.py", SEISMIC),
     ("app/modules/phase_6/phase_6d_seismic.py", SEISMIC),
     ("app/modules/module5_reporter/blue_halo_bcf_exporter.py", SEISMIC),
