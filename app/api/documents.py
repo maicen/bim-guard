@@ -1,10 +1,8 @@
 """FastAPI router for document management and text extraction."""
 
-from __future__ import annotations
-
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile, status
 
 from app.api.dependencies import get_documents_service
 from app.logging_config import get_logger
@@ -27,7 +25,7 @@ router = APIRouter()
 def list_documents(
     service: Annotated[DocumentService, Depends(get_documents_service)],
     response: Response,
-    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
+    if_none_match: str | None = Header(default=None, alias="If-None-Match"),
 ) -> list[DocumentResponse]:
     """Retrieve all specification documents ordered newest first."""
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"

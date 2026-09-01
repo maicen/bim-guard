@@ -6,9 +6,11 @@ import os
 import uuid
 from pathlib import Path
 
+import httpx
+
 from app.environment import load_env_file
 from app.logging_config import get_logger
-from supabase import Client, create_client
+from supabase import Client, ClientOptions, create_client
 
 load_env_file()
 logger = get_logger(__name__)
@@ -185,5 +187,6 @@ class ObjectStorage:
                 "Supabase Storage requires SUPABASE_URL and a server-side API key"
             )
 
-        self._client = create_client(url, key)
+        options = ClientOptions(httpx_client=httpx.Client(timeout=30.0))
+        self._client = create_client(url, key, options=options)
         return self._client

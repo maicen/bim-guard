@@ -4,8 +4,9 @@ import os
 from pathlib import Path
 from typing import Any, override
 
+import httpx
 from fastlite import database
-from supabase import create_client
+from supabase import ClientOptions, create_client
 
 from app.environment import load_env_file
 from app.services.db_adapters import SQLiteTableAdapter, SupabaseTableAdapter
@@ -205,7 +206,8 @@ class PersistenceService:
             cls._db = _MemoryClient()
             return cls._db
 
-        cls._db = create_client(url, key)
+        options = ClientOptions(httpx_client=httpx.Client(timeout=30.0))
+        cls._db = create_client(url, key, options=options)
         return cls._db
 
     @classmethod
