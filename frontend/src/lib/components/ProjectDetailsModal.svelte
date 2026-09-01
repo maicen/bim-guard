@@ -79,6 +79,30 @@
           </div>
         </div>
 
+        <!-- ISO 19650 & CDE Governance -->
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold block">ISO 19650 Container Naming & CDE Governance</span>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <span class="text-[9px] text-slate-500 block font-semibold">Suitability</span>
+              <span class="text-xs font-bold text-amber-400">{project.suitability_code || 'S0'}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <span class="text-[9px] text-slate-500 block font-semibold">Revision</span>
+              <span class="text-xs font-bold text-blue-400">{project.revision_code || 'P01.01'}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <span class="text-[9px] text-slate-500 block font-semibold">CDE State</span>
+              <span class="text-xs font-bold text-emerald-400">{project.cde_state || 'WIP'}</span>
+            </div>
+          </div>
+          {#if project.project_code || project.originator}
+            <div class="text-[11px] font-mono text-slate-300 pt-1">
+              Container Tag: <span class="text-white font-semibold">[{project.project_code || 'PRJ'}]-[{project.originator || 'ORIG'}]-[{project.volume_system || 'ZZ'}]-[{project.level || 'ZZ'}]-[{project.type || 'M3'}]-[{project.role || 'A'}]-[{project.number || '0001'}]</span>
+            </div>
+          {/if}
+        </div>
+
         <!-- IFC Model Section -->
         <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
           <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold block">Attached OpenBIM Model</span>

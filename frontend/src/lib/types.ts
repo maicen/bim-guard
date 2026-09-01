@@ -2,7 +2,22 @@
  * Type contracts corresponding directly to backend Pydantic models in app/modules/contracts.py
  */
 
-export type AnalysisDomain = 'Arch' | 'Piping' | 'seismic';
+export type CDEState = 'WIP' | 'SHARED' | 'PUBLISHED' | 'ARCHIVED';
+
+export interface ISO19650Metadata {
+  project_code: string;
+  originator: string;
+  volume_system: string;
+  level: string;
+  type: string;
+  role: string;
+  number: string;
+  suitability_code: string;
+  revision_code: string;
+  cde_state: CDEState;
+  cde_approved_by?: string;
+  cde_approved_at?: string | null;
+}
 
 export interface Project {
   id: number;
@@ -20,6 +35,18 @@ export interface Project {
   ifc_md5_hash?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+  cde_approved_by?: string;
+  cde_approved_at?: string | null;
 }
 
 /**
@@ -40,6 +67,17 @@ export interface ProjectIfcFile {
   is_primary: boolean;
   role: IfcFileRole | string;
   uploaded_at?: string | null;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+  cde_approved_by?: string;
+  cde_approved_at?: string | null;
 }
 
 /** Outcome of attaching one or more IFC models. Mirrors ProjectIfcUploadResponse. */
@@ -67,6 +105,16 @@ export interface ProjectCreatePayload {
   floors_count?: number | null;
   document_ids?: number[];
   standards_codes?: string[];
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 /** One selectable normative reference offered by the project setup wizard. */
@@ -104,6 +152,16 @@ export interface ProjectUpdatePayload {
   status?: string;
   country?: string;
   analysis_type?: AnalysisDomain | string;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 export interface ProjectBulkDeletePayload {
@@ -144,6 +202,16 @@ export interface DocumentItem {
   upload_date?: string | null;
   extracted_text_preview?: string | null;
   char_count: number;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 export interface DocumentDetail {
@@ -154,12 +222,27 @@ export interface DocumentDetail {
   upload_date?: string | null;
   extracted_text: string;
   char_count: number;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 export interface DocumentUpdatePayload {
   filename?: string;
   doc_type?: string | null;
   extracted_text?: string;
+  project_code?: string;
+  originator?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 export type RulesetCategory = 'Arch' | 'Piping' | 'seismic';

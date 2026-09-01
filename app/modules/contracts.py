@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -115,26 +116,33 @@ class ProjectOptionsResponse(BaseModel):
     building_codes: list[BuildingCodeOption] = Field(default_factory=list)
 
 
+class CDEState(str, Enum):
+    """ISO 19650 Common Data Environment (CDE) Workflow States."""
+
+    WIP = "WIP"
+    SHARED = "SHARED"
+    PUBLISHED = "PUBLISHED"
+    ARCHIVED = "ARCHIVED"
+
+
 class ProjectCreateRequest(BaseModel):
-    """Payload for creating a new project via the API."""
+    """Payload for creating a project."""
 
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
-    description: Optional[str] = Field(default="", description="Project description")
-    status: str = Field(default="Draft", description="Workflow status (e.g. Draft, Active)")
-    country: str = Field(default="US", description="Regulatory jurisdiction or country code")
-    analysis_type: str = Field(default="Arch", description="Target analysis domain")
-    building_code: Optional[str] = Field(
-        default=None,
-        description="Building code ID from app.constants.BUILDING_CODES; optional outside Arch",
-    )
+    description: Optional[str] = Field(default="", description="Optional description")
+    status: str = Field(default="Draft", description="Workflow status")
+    country: str = Field(..., description="Jurisdiction governing code applicability")
+    analysis_type: str = Field(..., description="Analysis domain: Arch, Piping, or seismic")
 
-    # Wizard step 1. Optional so that the plain API stays usable without them,
-    # and so a client that predates these fields keeps working.
+    # Wizard step 3: optional building code ID
+    building_code: Optional[str] = Field(default=None, description="Building code ID")
+
+    # Wizard step 1 building details
     project_type: Optional[str] = Field(
-        default=None, description="Building type, one of app.constants.PROJECT_TYPES"
+        default=None, description="Building type from PROJECT_TYPES"
     )
     project_size_sqm: Optional[float] = Field(
-        default=None, ge=0, description="Gross floor area in square metres"
+        default=None, ge=0.0, description="Gross floor area in square metres"
     )
     buildings_count: Optional[int] = Field(
         default=None, ge=0, description="Number of buildings in the project"
@@ -142,6 +150,18 @@ class ProjectCreateRequest(BaseModel):
     floors_count: Optional[int] = Field(
         default=None, ge=0, description="Number of floors in the project"
     )
+
+    # ISO 19650 Container Naming & CDE Metadata
+    project_code: Optional[str] = Field(default="", description="ISO 19650 Project Code")
+    originator: Optional[str] = Field(default="", description="ISO 19650 Originator Code")
+    volume_system: Optional[str] = Field(default="", description="ISO 19650 Volume/System Breakdown")
+    level: Optional[str] = Field(default="", description="ISO 19650 Level/Location Breakdown")
+    type: Optional[str] = Field(default="", description="ISO 19650 Type Code")
+    role: Optional[str] = Field(default="", description="ISO 19650 Role/Discipline Code")
+    number: Optional[str] = Field(default="", description="ISO 19650 Sequential Number")
+    suitability_code: Optional[str] = Field(default="S0", description="ISO 19650 Suitability Code (S0-S4, A1-A4)")
+    revision_code: Optional[str] = Field(default="P01.01", description="ISO 19650 Revision Code (P01.01, C01)")
+    cde_state: CDEState = Field(default=CDEState.WIP, description="CDE State (WIP, SHARED, PUBLISHED, ARCHIVED)")
 
     # Wizard steps 4 and 5. Linked after the project row exists, so a failure
     # to link does not cost the caller the project.
@@ -162,11 +182,40 @@ class ProjectUpdateRequest(BaseModel):
     country: Optional[str] = None
     analysis_type: Optional[str] = None
 
+    # ISO 19650 Container Naming & CDE Metadata
+    project_code: Optional[str] = None
+    originator: Optional[str] = None
+    volume_system: Optional[str] = None
+    level: Optional[str] = None
+    type: Optional[str] = None
+    role: Optional[str] = None
+    number: Optional[str] = None
+    suitability_code: Optional[str] = None
+    revision_code: Optional[str] = None
+    cde_state: Optional[CDEState] = None
+
 
 class ProjectBulkDeleteRequest(BaseModel):
     """Payload for deleting multiple projects in bulk."""
 
     project_ids: list[int] = Field(..., min_length=1, description="IDs of projects to delete")
+
+
+class ISO19650Metadata(BaseModel):
+    """ISO 19650 UK National Annex container naming & suitability fields."""
+
+    project_code: str = Field(default="", description="Project code string (e.g. PRJ)")
+    originator: str = Field(default="", description="Authoring organization code (e.g. BIMG)")
+    volume_system: str = Field(default="", description="Volume or spatial breakdown code (e.g. ZZ, 01)")
+    level: str = Field(default="", description="Level / location breakdown (e.g. ZZ, 00)")
+    type: str = Field(default="", description="Document / Model type code (e.g. M3, DR)")
+    role: str = Field(default="", description="Discipline role code (e.g. A, S, M)")
+    number: str = Field(default="", description="Sequential document number (e.g. 0001)")
+    suitability_code: str = Field(default="S0", description="ISO 19650 suitability code (S0-S4, A1-A4, B1-B4)")
+    revision_code: str = Field(default="P01.01", description="ISO 19650 revision code (e.g. P01.01, C01)")
+    cde_state: CDEState = Field(default=CDEState.WIP, description="CDE state (WIP, SHARED, PUBLISHED, ARCHIVED)")
+    cde_approved_by: Optional[str] = Field(default="", description="Lead appointed party approver")
+    cde_approved_at: Optional[str] = Field(default=None, description="ISO timestamp of CDE approval")
 
 
 class ProjectBulkUpdateRequest(BaseModel):
@@ -183,7 +232,6 @@ class ProjectBulkActionResponse(BaseModel):
 
     success_count: int = Field(..., description="Number of projects affected")
     affected_ids: list[int] = Field(default_factory=list, description="IDs of affected projects")
-
 
 
 class ProjectResponse(BaseModel):
@@ -205,6 +253,20 @@ class ProjectResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    role: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
+    cde_approved_by: Optional[str] = ""
+    cde_approved_at: Optional[str] = None
+
 
 class ProjectIfcFileResponse(BaseModel):
     """One IFC model attached to a project."""
@@ -225,6 +287,19 @@ class ProjectIfcFileResponse(BaseModel):
         description="Discipline the model carries, e.g. structural; an open vocabulary",
     )
     uploaded_at: Optional[str] = None
+
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
+    cde_approved_by: Optional[str] = ""
+    cde_approved_at: Optional[str] = None
 
 
 class ProjectIfcUploadResponse(BaseModel):
@@ -256,6 +331,13 @@ class DocumentUpdateRequest(BaseModel):
     doc_type: Optional[str] = Field(None, description="Updated document type classification")
     extracted_text: Optional[str] = Field(None, description="Updated extracted text content")
 
+    # ISO 19650 Container Naming & CDE Metadata
+    project_code: Optional[str] = Field(None, description="ISO 19650 Project Code")
+    originator: Optional[str] = Field(None, description="ISO 19650 Originator Code")
+    suitability_code: Optional[str] = Field(None, description="ISO 19650 Suitability Code")
+    revision_code: Optional[str] = Field(None, description="ISO 19650 Revision Code")
+    cde_state: Optional[CDEState] = Field(None, description="CDE State")
+
 
 class DocumentResponse(BaseModel):
     """Summary document item returned in lists."""
@@ -268,6 +350,18 @@ class DocumentResponse(BaseModel):
     extracted_text_preview: Optional[str] = None
     char_count: int = 0
 
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    role: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
+
 
 class DocumentDetailResponse(BaseModel):
     """Complete document record including full extracted text."""
@@ -279,6 +373,18 @@ class DocumentDetailResponse(BaseModel):
     upload_date: Optional[str] = None
     extracted_text: str = ""
     char_count: int = 0
+
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    role: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
 
 
 # ---------------------------------------------------------------------------

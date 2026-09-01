@@ -262,15 +262,23 @@ def to_bcf(result: dict, *, include_data_quality: bool = True) -> bytes:
     return generate_bcf([_bcf_issue(i) for i in issues])
 
 
+def to_ids(result: dict) -> str:
+    """Render rules / compliance requirements as buildingSMART IDS XML deliverable."""
+    from app.modules.module3_rule_builder.ids_exporter import build_ids_document
+    rules = result.get("rules", []) or result.get("audit_rules", []) or []
+    return build_ids_document(rules)
+
+
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 
-#: Export format -> (renderer, media type, file extension).
+#: Export format -> (media type, file extension).
 FORMATS: dict[str, tuple[str, str]] = {
     "csv": ("text/csv", "csv"),
     "json": ("application/json", "json"),
     "bcf": ("application/octet-stream", "bcf"),
+    "ids": ("application/xml", "ids"),
 }
 
 
@@ -283,7 +291,7 @@ def export(result: dict, fmt: str) -> tuple[bytes, str, str]:
 
     Returns:
         ``(content, media_type, extension)``, content always as bytes so a
-        route can return all three formats through one code path.
+        route can return all formats through one code path.
 
     Raises:
         ValueError: If ``fmt`` is not a supported format.
@@ -297,4 +305,7 @@ def export(result: dict, fmt: str) -> tuple[bytes, str, str]:
         return to_csv(result).encode("utf-8"), media_type, extension
     if key == "json":
         return to_json(result).encode("utf-8"), media_type, extension
+    if key == "ids":
+        return to_ids(result).encode("utf-8"), media_type, extension
     return to_bcf(result), media_type, extension
+

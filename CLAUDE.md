@@ -125,6 +125,7 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
 - **Framework**: Svelte 5 using the modern runes syntax (`$state`, `$derived`, `$props`, `$effect`).
 - **Styling**: Tailwind CSS with custom theme variables matching BIM-Guard design tokens.
 - **Contract Parity**: When Pydantic schemas in `app/modules/contracts.py` change, immediately update corresponding TypeScript interfaces in `frontend/src/lib/types.ts`.
+- **ISO 19650 & CDE Governance**: Ensure all project and document entities carry ISO 19650 metadata (`project_code`, `originator`, `volume_system`, `level`, `type`, `role`, `number`, `suitability_code`, `revision_code`, `cde_state`). State transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) must be governed by `CDEStateMachine`.
 - **API Client**: All HTTP calls go through `src/lib/api.ts`. Never use raw `fetch()` directly in components.
 - **Real-Time Streaming**: Consume pipeline stage transitions (Validation → Parsing → Engine Run → Scoring → Reporting) using `subscribeToEvents()` from `src/lib/sse.ts`.
 - **IFC 3D Viewer**: Encapsulated in `src/lib/components/IfcViewer.svelte` using `@thatopen/fragments`, `@thatopen/components`, and `web-ifc`.

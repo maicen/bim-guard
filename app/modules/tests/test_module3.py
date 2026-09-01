@@ -35,8 +35,11 @@ def store():
     s.clear_all_rules()
     yield s
     s.close()
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    try:
+        if os.path.exists(TEST_DB):
+            os.remove(TEST_DB)
+    except OSError:
+        pass
 
 
 @pytest.fixture

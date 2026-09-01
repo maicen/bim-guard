@@ -77,6 +77,15 @@ class BCFExporter:
         priority = self._risk_band_to_bcf_priority(issue.band)
         ET.SubElement(topic, "Priority").text = priority
 
+        labels = [issue.mechanism, issue.band.value]
+        if issue.metadata and isinstance(issue.metadata, dict):
+            if issue.metadata.get("suitability_code"):
+                labels.append(f"Suitability:{issue.metadata['suitability_code']}")
+            if issue.metadata.get("cde_state"):
+                labels.append(f"CDE:{issue.metadata['cde_state']}")
+        for label_val in labels:
+            ET.SubElement(topic, "Labels").text = label_val
+
         references = ET.SubElement(topic, "References")
         ref = ET.SubElement(references, "Reference")
         ref.set("ReferencedSheet", issue.element_id)

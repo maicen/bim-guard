@@ -33,6 +33,16 @@ class DocumentService:
                     "extracted_text": str,
                     "upload_date": str,
                     "doc_type": str,
+                    "project_code": str,
+                    "originator": str,
+                    "volume_system": str,
+                    "level": str,
+                    "type": str,
+                    "role": str,
+                    "number": str,
+                    "suitability_code": str,
+                    "revision_code": str,
+                    "cde_state": str,
                 },
             )
         )
@@ -58,25 +68,45 @@ class DocumentService:
         file_path: str,
         extracted_text: str,
         doc_type: str = "Specification",
+        project_code: str = "",
+        originator: str = "",
+        volume_system: str = "",
+        level: str = "",
+        type: str = "",
+        role: str = "",
+        number: str = "",
+        suitability_code: str = "S0",
+        revision_code: str = "P01.01",
+        cde_state: str = "WIP",
     ):
         """Create and persist a new uploaded document record."""
         clean_doc_type = (doc_type or "").strip() or "Specification"
-        document = self._documents.insert(
-            {
-                "md5_hash": md5_hash,
-                "filename": filename,
-                "file_path": file_path,
-                "extracted_text": extracted_text,
-                "upload_date": now_iso_utc(),
-                "doc_type": clean_doc_type,
-            }
-        )
+        payload = {
+            "md5_hash": md5_hash,
+            "filename": filename,
+            "file_path": file_path,
+            "extracted_text": extracted_text,
+            "upload_date": now_iso_utc(),
+            "doc_type": clean_doc_type,
+            "project_code": project_code,
+            "originator": originator,
+            "volume_system": volume_system,
+            "level": level,
+            "type": type,
+            "role": role,
+            "number": number,
+            "suitability_code": suitability_code or "S0",
+            "revision_code": revision_code or "P01.01",
+            "cde_state": cde_state or "WIP",
+        }
+        document = self._documents.insert(payload)
         invalidate_cache("bimguard:documents:list")
         logger.info(
-            "Document created document_id=%s filename=%s doc_type=%s extracted_chars=%d",
+            "Document created document_id=%s filename=%s doc_type=%s suitability=%s extracted_chars=%d",
             document.get("id"),
             filename,
             clean_doc_type,
+            suitability_code,
             len(extracted_text),
         )
         return document
@@ -93,11 +123,27 @@ class DocumentService:
         filename: str,
         extracted_text: str,
         doc_type: str | None = None,
+        project_code: str | None = None,
+        originator: str | None = None,
+        suitability_code: str | None = None,
+        revision_code: str | None = None,
+        cde_state: str | None = None,
     ):
         """Update mutable document metadata and extracted text."""
         updates: dict = {"filename": filename, "extracted_text": extracted_text}
         if doc_type is not None:
             updates["doc_type"] = doc_type.strip() or "Specification"
+        if project_code is not None:
+            updates["project_code"] = project_code.strip()
+        if originator is not None:
+            updates["originator"] = originator.strip()
+        if suitability_code is not None:
+            updates["suitability_code"] = suitability_code.strip() or "S0"
+        if revision_code is not None:
+            updates["revision_code"] = revision_code.strip() or "P01.01"
+        if cde_state is not None:
+            updates["cde_state"] = cde_state.strip() or "WIP"
+
         self._documents.update(
             updates=updates,
             pk_values=document_id,

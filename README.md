@@ -6,13 +6,20 @@ View the published demo at [https://maicen.github.io/bim-guard/](https://maicen.
 
 ## Overview
 
-BIM-Guard is an OpenBIM compliance platform built on a modern decoupled architecture: a high-performance **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, run multi-engine audits (galvanic corrosion, crevice corrosion, MIC, seismic clearance), and stream live progress via Server-Sent Events (SSE).
+BIM-Guard is an ISO 19650-compliant OpenBIM compliance platform built on a modern decoupled architecture: a high-performance **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, validate ISO 19650 container naming conventions (UK National Annex), enforce CDE state machine transitions (WIP → SHARED → PUBLISHED → ARCHIVED), verify Level of Information Need (LOIN) via buildingSMART Information Delivery Specifications (IDS), run multi-engine audits, and stream live progress via Server-Sent Events (SSE).
+
+## Key Capabilities
+
+- **ISO 19650 Container Naming & Metadata**: Validates container naming fields (`[Project]-[Originator]-[Volume]-[Level]-[Type]-[Role]-[Number]`), suitability codes (`S0`–`S4`, `A1`–`A4`), and revision codes (`P01.01`, `C01`).
+- **CDE State Machine Governance**: Guards project and document workflow state transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) with RLS database triggers restricting mutation of published models.
+- **LOIN & buildingSMART IDS Integration**: Exports and audits models against buildingSMART Information Delivery Specifications XML (IDS v0.9.3) for data requirements verification.
+- **BCF 2.1 Metadata Injection**: Enriches BCF issue reports with ISO 19650 container labels, suitability codes, and revision tags.
 
 ## Stack
 
 - **Backend API**: FastAPI (REST + SSE) with strict Pydantic data contracts
 - **Frontend SPA**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
-- **IFC & BIM Processing**: IfcOpenShell, ThatOpenCompany / Web-IFC viewer
+- **IFC & BIM Processing**: IfcOpenShell, buildingSMART IDS, ThatOpenCompany / Web-IFC viewer
 - **Database & Storage**: Supabase (Postgres) and Supabase Object Storage
 - **LLM Engine**: LiteLLM for rule extraction across multiple providers
 

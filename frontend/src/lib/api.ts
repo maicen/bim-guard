@@ -582,10 +582,18 @@ export const documentsApi = {
     );
   },
 
-  async upload(file: File, docType: string = 'Specification'): Promise<DocumentDetail> {
+  async upload(
+    file: File,
+    docType: string = 'Specification',
+    isoOptions?: { project_code?: string; originator?: string; suitability_code?: string; revision_code?: string },
+  ): Promise<DocumentDetail> {
     const form = new FormData();
     form.append('file', file);
     form.append('doc_type', docType);
+    if (isoOptions?.project_code) form.append('project_code', isoOptions.project_code);
+    if (isoOptions?.originator) form.append('originator', isoOptions.originator);
+    if (isoOptions?.suitability_code) form.append('suitability_code', isoOptions.suitability_code);
+    if (isoOptions?.revision_code) form.append('revision_code', isoOptions.revision_code);
     const res = await fetch(`${API_BASE}/documents`, {
       method: 'POST',
       body: form,
@@ -599,6 +607,11 @@ export const documentsApi = {
       upload_date: created.upload_date,
       extracted_text_preview: created.extracted_text_preview || created.extracted_text?.slice(0, 200) || '',
       char_count: created.char_count ?? created.extracted_text?.length ?? 0,
+      project_code: created.project_code,
+      originator: created.originator,
+      suitability_code: created.suitability_code,
+      revision_code: created.revision_code,
+      cde_state: created.cde_state,
     });
     _documentDetailStore.set(created.id, created);
     return created;

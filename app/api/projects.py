@@ -6,7 +6,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.dependencies import get_phase6_service, get_projects_service
 from app.constants import (
@@ -195,6 +195,16 @@ def create_project(
             project_size_sqm=payload.project_size_sqm,
             buildings_count=payload.buildings_count,
             floors_count=payload.floors_count,
+            project_code=payload.project_code or "",
+            originator=payload.originator or "",
+            volume_system=payload.volume_system or "",
+            level=payload.level or "",
+            type=payload.type or "",
+            role=payload.role or "",
+            number=payload.number or "",
+            suitability_code=payload.suitability_code or "S0",
+            revision_code=payload.revision_code or "P01.01",
+            cde_state=payload.cde_state.value if hasattr(payload.cde_state, "value") else (payload.cde_state or "WIP"),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -233,8 +243,30 @@ async def create_project_with_ifc(
     """Create a project and optionally attach an uploaded IFC model."""
     ifc_file_path = ""
     ifc_md5_hash = ""
+    project_code = ""
+    originator = ""
+    volume_system = ""
+    level = ""
+    type_code = ""
+    role_code = ""
+    number_code = ""
+    suitability_code = "S0"
+    revision_code = "P01.01"
+
     if ifc_file is not None and ifc_file.filename:
         ifc_file_path, ifc_md5_hash = await service.prepare_ifc_upload(ifc_file)
+        from app.modules.module1_doc_parser.iso_validator import ISO19650Validator
+        val = ISO19650Validator.validate_filename(ifc_file.filename)
+        if val.is_valid:
+            project_code = val.fields.get("project_code", "")
+            originator = val.fields.get("originator", "")
+            volume_system = val.fields.get("volume_system", "")
+            level = val.fields.get("level", "")
+            type_code = val.fields.get("type", "")
+            role_code = val.fields.get("role", "")
+            number_code = val.fields.get("number", "")
+            suitability_code = val.fields.get("suitability_code", "S0")
+            revision_code = val.fields.get("revision_code", "P01.01")
 
     try:
         created = service.create_project(
@@ -250,6 +282,15 @@ async def create_project_with_ifc(
             project_size_sqm=project_size_sqm,
             buildings_count=buildings_count,
             floors_count=floors_count,
+            project_code=project_code,
+            originator=originator,
+            volume_system=volume_system,
+            level=level,
+            type=type_code,
+            role=role_code,
+            number=number_code,
+            suitability_code=suitability_code,
+            revision_code=revision_code,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -297,6 +338,16 @@ def update_project(
             status_val,
             country=country,
             analysis_type=analysis_type,
+            project_code=payload.project_code,
+            originator=payload.originator,
+            volume_system=payload.volume_system,
+            level=payload.level,
+            type=payload.type,
+            role=payload.role,
+            number=payload.number,
+            suitability_code=payload.suitability_code,
+            revision_code=payload.revision_code,
+            cde_state=payload.cde_state.value if hasattr(payload.cde_state, "value") else payload.cde_state,
         )
         return ProjectResponse(**(updated or service.get_project(project_id)))
     except ValueError as exc:
@@ -664,3 +715,79 @@ def download_project_ifc_file(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Project {project_id} has no attached model with ID {file_id}.",
     )
+
+
+# ---------------------------------------------------------------------------
+# ISO 19650 CDE State Machine Endpoints
+# ---------------------------------------------------------------------------
+
+
+class CDETransitionRequest(BaseModel):
+    target_state: str = Field(..., description="Target CDE state (WIP, SHARED, PUBLISHED, ARCHIVED)")
+    actor: str = Field(default="Lead Appointed Party", description="Entity initiating state transition")
+    approved_by: str = Field(default="", description="Approver identifier for SHARED -> PUBLISHED transition")
+
+
+class CDEApprovalRequest(BaseModel):
+    approved_by: str = Field(..., description="Lead Appointed Party approver name / title")
+
+
+@router.post("/{project_id}/cde/transition", response_model=ProjectResponse, summary="Execute ISO 19650 CDE state transition")
+def transition_project_cde_state(
+    project_id: int,
+    payload: CDETransitionRequest,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+):
+    """Execute ISO 19650 CDE state transition with gateway verification."""
+    from app.services.cde_state_machine import CDEStateMachine
+
+    sm = CDEStateMachine(projects_service=service)
+    try:
+        updated = sm.transition_project(
+            project_id=project_id,
+            target_state=payload.target_state,
+            actor=payload.actor,
+            approved_by=payload.approved_by,
+        )
+        return ProjectResponse(**updated)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/{project_id}/cde/approve", response_model=ProjectResponse, summary="Approve project for PUBLISHED CDE state")
+def approve_project_cde_state(
+    project_id: int,
+    payload: CDEApprovalRequest,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+):
+    """Grant Lead Appointed Party approval for PUBLISHED state transition."""
+    from app.services.cde_state_machine import CDEStateMachine
+
+    sm = CDEStateMachine(projects_service=service)
+    try:
+        updated = sm.transition_project(
+            project_id=project_id,
+            target_state="PUBLISHED",
+            approved_by=payload.approved_by,
+        )
+        return ProjectResponse(**updated)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.get("/{project_id}/cde/validate-naming", summary="Validate project IFC container ISO 19650 naming")
+def validate_project_iso_naming(
+    project_id: int,
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> dict:
+    """Validate project attached primary model filename against ISO 19650 National Annex."""
+    from app.modules.module1_doc_parser.iso_validator import ISO19650Validator
+
+    project = service.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    filename = project.get("ifc_file_path", "")
+    val = ISO19650Validator.validate_filename(filename)
+    return val.to_dict()
+

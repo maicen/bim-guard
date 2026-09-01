@@ -72,6 +72,18 @@ class ProjectsService:
                     "ifc_md5_hash": str,
                     "created_at": str,
                     "updated_at": str,
+                    "project_code": str,
+                    "originator": str,
+                    "volume_system": str,
+                    "level": str,
+                    "type": str,
+                    "role": str,
+                    "number": str,
+                    "suitability_code": str,
+                    "revision_code": str,
+                    "cde_state": str,
+                    "cde_approved_by": str,
+                    "cde_approved_at": str,
                 },
                 required_columns={"ifc_file_path": str, "ifc_md5_hash": str},
             )
@@ -108,6 +120,17 @@ class ProjectsService:
                     "is_primary": bool,
                     "role": str,
                     "uploaded_at": str,
+                    "project_code": str,
+                    "originator": str,
+                    "volume_system": str,
+                    "level": str,
+                    "type": str,
+                    "number": str,
+                    "suitability_code": str,
+                    "revision_code": str,
+                    "cde_state": str,
+                    "cde_approved_by": str,
+                    "cde_approved_at": str,
                 },
             )
         )
@@ -224,6 +247,16 @@ class ProjectsService:
         project_size_sqm: float | None = None,
         buildings_count: int | None = None,
         floors_count: int | None = None,
+        project_code: str = "",
+        originator: str = "",
+        volume_system: str = "",
+        level: str = "",
+        type: str = "",
+        role: str = "",
+        number: str = "",
+        suitability_code: str = "S0",
+        revision_code: str = "P01.01",
+        cde_state: str = "WIP",
     ):
         """Insert a new project record into the database.
 
@@ -282,6 +315,16 @@ class ProjectsService:
             "ifc_md5_hash": ifc_md5_hash,
             "created_at": now,
             "updated_at": now,
+            "project_code": project_code,
+            "originator": originator,
+            "volume_system": volume_system,
+            "level": level,
+            "type": type,
+            "role": role,
+            "number": number,
+            "suitability_code": suitability_code or "S0",
+            "revision_code": revision_code or "P01.01",
+            "cde_state": cde_state or "WIP",
         }
         # Only send the wizard columns the caller actually filled in, so a
         # project created through the plain API is not written a row full of
@@ -316,9 +359,19 @@ class ProjectsService:
         status: str = "Draft",
         country: str = "",
         analysis_type: str = "",
+        project_code: str | None = None,
+        originator: str | None = None,
+        volume_system: str | None = None,
+        level: str | None = None,
+        type: str | None = None,
+        role: str | None = None,
+        number: str | None = None,
+        suitability_code: str | None = None,
+        revision_code: str | None = None,
+        cde_state: str | None = None,
     ):
         """Update editable fields for an existing project."""
-        updates = {
+        updates: dict = {
             "name": name.strip(),
             "description": description.strip(),
             "status": status,
@@ -326,6 +379,28 @@ class ProjectsService:
         }
         if country:
             updates["country"] = country.strip()
+        if analysis_type:
+            updates["analysis_type"] = normalize_analysis_type(analysis_type.strip())
+        if project_code is not None:
+            updates["project_code"] = project_code.strip()
+        if originator is not None:
+            updates["originator"] = originator.strip()
+        if volume_system is not None:
+            updates["volume_system"] = volume_system.strip()
+        if level is not None:
+            updates["level"] = level.strip()
+        if type is not None:
+            updates["type"] = type.strip()
+        if role is not None:
+            updates["role"] = role.strip()
+        if number is not None:
+            updates["number"] = number.strip()
+        if suitability_code is not None:
+            updates["suitability_code"] = suitability_code.strip() or "S0"
+        if revision_code is not None:
+            updates["revision_code"] = revision_code.strip() or "P01.01"
+        if cde_state is not None:
+            updates["cde_state"] = cde_state.strip() or "WIP"
         if analysis_type:
             analysis_type = normalize_analysis_type(analysis_type.strip())
             if analysis_type not in ANALYSIS_TYPES:

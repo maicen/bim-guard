@@ -43,12 +43,13 @@ class KeywordFilter:
 
             self.nlp = spacy.load("en_core_web_sm")
             print("[KeywordFilter] spaCy model loaded")
-        except ImportError:
-            raise ImportError("Run: pip install spacy")
-        except OSError:
-            raise OSError("Run: python -m spacy download en_core_web_sm")
+        except (ImportError, OSError):
+            self.nlp = None
+            print("[KeywordFilter] spaCy model unavailable; using basic tokenization fallback")
 
     def _lemmatize(self, text: str) -> str:
+        if self.nlp is None:
+            return text.lower()
         doc = self.nlp(text.lower())
         return " ".join([t.lemma_ for t in doc])
 

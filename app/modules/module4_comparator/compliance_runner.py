@@ -267,3 +267,77 @@ def run_compliance_checks(elements: list[Any]) -> list[dict]:
         results.append(result)
 
     return results
+
+
+def run_ids_loin_verification(elements: list[Any], ids_rules: list[dict[str, Any]]) -> dict[str, Any]:
+    """Validate IFC elements against Level of Information Need (LOIN) / buildingSMART IDS rules.
+
+    Checks:
+    - Required Property Sets and Property Names
+    - Material assignments
+    - Classifications (e.g. Uniclass 2015 / OmniClass)
+    """
+    total_checks = 0
+    passed_checks = 0
+    violations = []
+
+    for element in elements:
+        if hasattr(element, "is_a") and callable(getattr(element, "is_a")):
+            element_type = element.is_a()
+        elif isinstance(element, dict) and callable(element.get("is_a")):
+            element_type = element["is_a"]()
+        elif isinstance(element, dict):
+            element_type = str(element.get("element_type") or element.get("is_a") or "")
+        else:
+            element_type = getattr(element, "element_type", "") or ""
+
+        guid = str(getattr(element, "GlobalId", None) or (element.get("GlobalId") if isinstance(element, dict) else None) or getattr(element, "global_id", None) or "")
+        info = element.get_info() if hasattr(element, "get_info") and callable(getattr(element, "get_info")) else (element.get("get_info")() if isinstance(element, dict) and callable(element.get("get_info")) else (element if isinstance(element, dict) else {}))
+
+        for rule in ids_rules:
+            target_class = str(rule.get("target_ifc_class") or "").strip()
+            if target_class and target_class != "*" and target_class.lower() != element_type.lower():
+                continue
+
+            prop_name = str(rule.get("property_name") or "").strip()
+            pset = str(rule.get("property_set") or "").strip()
+            rule_ref = str(rule.get("reference") or f"LOIN-{rule.get('id', '0')}")
+
+            total_checks += 1
+            has_prop = False
+
+            if isinstance(info, dict):
+                has_prop = prop_name in info or (pset and pset in info.get("psets", {}))
+            if not has_prop and hasattr(element, prop_name):
+                has_prop = True
+
+            # Also check material or classification rules
+            if not has_prop and prop_name.lower() == "material":
+                mat = getattr(element, "material", None) or (info.get("material") if isinstance(info, dict) else None)
+                has_prop = bool(mat)
+            elif not has_prop and "classification" in prop_name.lower():
+                cls = getattr(element, "classification", None) or (info.get("classification") if isinstance(info, dict) else None)
+                has_prop = bool(cls)
+
+            if has_prop:
+                passed_checks += 1
+            else:
+                violations.append({
+                    "element_guid": guid,
+                    "element_type": element_type,
+                    "rule_reference": rule_ref,
+                    "property_set": pset,
+                    "property_name": prop_name,
+                    "message": f"Element {guid} ({element_type}) missing required LOIN property '{prop_name}' in pset '{pset or 'Default'}'",
+                })
+
+    compliance_percent = 100.0 if total_checks == 0 else round((passed_checks / total_checks) * 100.0, 2)
+    return {
+        "passed": compliance_percent == 100.0 and len(violations) == 0,
+        "compliance_percent": compliance_percent,
+        "total_checks": total_checks,
+        "passed_checks": passed_checks,
+        "failed_checks": len(violations),
+        "violations": violations,
+    }
+

@@ -45,6 +45,7 @@ The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to back
 
 - **Architecture Direction**: Target all user-facing features to the Svelte 5 frontend (`frontend/`) and FastAPI backend (`app/api/`).
 - **Contract Parity**: When modifying API endpoints in `app/api/**`, always update or create strict Pydantic schemas in `app/modules/contracts.py` and synchronize TypeScript interfaces in `frontend/src/lib/types.ts`.
+- **ISO 19650 & CDE Governance**: Ensure all project and document entities carry ISO 19650 metadata (`project_code`, `originator`, `volume_system`, `level`, `type`, `role`, `number`, `suitability_code`, `revision_code`, `cde_state`). State transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) must be governed by `CDEStateMachine`.
 - **Database-Driven Rules**: Never hardcode engineering cutoffs, scoring weights, or rule classifications in Python engines. Rules must be read dynamically from the database via `RuleService` and `corrosion_rule_catalog.py`.
 - **Real-Time Streaming**: Use Server-Sent Events (`/api/events/{project_id}`) for pipeline progress; avoid polling loops.
 - **Root Directory Protection**: NEVER create or place new files (code, tests, reports, data, JSON manifests, scratch files) in the repository root. Always use the appropriate subdirectories (`app/`, `frontend/`, `tests/`, `scripts/`, `docs/`, `data/`, `supabase/migrations/`).

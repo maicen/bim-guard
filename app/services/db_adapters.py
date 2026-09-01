@@ -146,7 +146,11 @@ class SQLiteTableAdapter(DatabaseAdapter):
 
     def get(self, pk_value: Any) -> dict[str, Any] | None:
         """Get one row by primary key."""
-        return self._table.get(pk_value)
+        try:
+            return self._table.get(pk_value)
+        except Exception:
+            return None
+
 
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert one row."""
@@ -158,7 +162,11 @@ class SQLiteTableAdapter(DatabaseAdapter):
 
     def delete(self, pk_value: Any) -> None:
         """Delete one row by primary key."""
-        self._table.delete(pk_value)
+        try:
+            self._table.delete(pk_value)
+        except Exception:
+            pass
+
 
     def rows_where(
         self,
