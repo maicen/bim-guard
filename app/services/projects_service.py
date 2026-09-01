@@ -342,7 +342,10 @@ class ProjectsService:
         project = self._insert_project_row(row)
         invalidate_cache("bimguard:projects:list")
         if project and project.get("id"):
-            invalidate_cache(f"bimguard:projects:item:project_id={project.get('id')}")
+            pid = project.get("id")
+            invalidate_cache(f"bimguard:projects:item:project_id={pid}")
+            invalidate_cache(f"bimguard:projects:docs:project_id={pid}")
+            invalidate_cache(f"bimguard:projects:inputs:project_id={pid}")
         logger.info(
             "Project created project_id=%s status=%s country=%s analysis_type=%s has_ifc=%s",
             project.get("id"),

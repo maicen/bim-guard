@@ -10,16 +10,21 @@ BIM-Guard is an ISO 19650-compliant OpenBIM compliance platform built on a moder
 
 ## Key Capabilities
 
+- **buildingSMART Ecosystem Integration**:
+  - **bSDD (buildingSMART Data Dictionary)**: Standardizes semantic terminology and validates material definitions, classifications (Uniclass, OmniClass), and property sets against the bSDD REST API with offline resilience.
+  - **openCDE Foundation & Documents APIs**: Provides vendor-neutral discovery (`/api/cde/versions`), user profile context, OAuth2 configuration, OData v4 query filtering, strong ETag HTTP 304 caching, and automated document synchronization.
+  - **IFC Pre-Flight Validation Service**: 3-stage pre-flight quality gateway verifying STEP ISO 10303-21 physical syntax, IFC schema compatibility (IFC2X3, IFC4, IFC4.3), and buildingSMART Gherkin rules (single project root, 22-char GUID integrity, spatial containment, material association).
+  - **IDS (Information Delivery Specification) Expansion**: Generates, imports, and audits buildingSMART IDS 0.9.6 / 1.0 XML specifications with multi-facet requirements (`entity`, `property`, `classification`, `material`, `partOf`) and numerical tolerance checks.
+  - **BCF REST API v2.1 / v3.0**: Bidirectional REST endpoints (`/api/bcf/v2.1/projects`) managing topics, viewpoints, comments, and snapshot binaries with ISO 19650 metadata parity.
 - **ISO 19650 Container Naming & Metadata**: Validates container naming fields (`[Project]-[Originator]-[Volume]-[Level]-[Type]-[Role]-[Number]`), suitability codes (`S0`–`S4`, `A1`–`A4`), and revision codes (`P01.01`, `C01`).
 - **CDE State Machine Governance**: Guards project and document workflow state transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) with RLS database triggers restricting mutation of published models.
-- **LOIN & buildingSMART IDS Integration**: Exports and audits models against buildingSMART Information Delivery Specifications XML (IDS v0.9.3) for data requirements verification.
 - **BCF 2.1 Metadata Injection**: Enriches BCF issue reports with ISO 19650 container labels, suitability codes, and revision tags.
 
 ## Stack
 
 - **Backend API**: FastAPI (REST + SSE) with strict Pydantic data contracts
 - **Frontend SPA**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
-- **IFC & BIM Processing**: IfcOpenShell, buildingSMART IDS, ThatOpenCompany / Web-IFC viewer
+- **IFC & BIM Processing**: IfcOpenShell, buildingSMART IDS, buildingSMART Data Dictionary (bSDD), ThatOpenCompany / Web-IFC viewer
 - **Database & Storage**: Supabase (Postgres) and Supabase Object Storage
 - **LLM Engine**: LiteLLM for rule extraction across multiple providers
 
@@ -162,10 +167,12 @@ The primary modern client runs on `http://localhost:5173`:
 ### FastAPI API Gateway (`/api`)
 The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/docs`:
 - `/api/projects` — Project CRUD, model file uploads, IFC metadata
-- `/api/documents` — Document upload, PDF text extraction
+- `/api/documents` — Document upload, PDF text extraction, ETag caching
 - `/api/rules` — Rule folders, rulesets, and custom rule CRUD
 - `/api/analyze` — Compliance and corrosion analysis execution
 - `/api/events/{project_id}` — Real-time Server-Sent Events (SSE) progress streaming
+- `/api/cde` — buildingSMART openCDE Foundation & Documents REST APIs
+- `/api/bcf/v2.1` — buildingSMART BCF REST API v2.1/v3.0 (topics, viewpoints, comments, snapshots)
 
 ## Deployment
 
