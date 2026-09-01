@@ -129,6 +129,25 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
 - **API Client**: All HTTP calls go through `src/lib/api.ts`. Never use raw `fetch()` directly in components.
 - **Real-Time Streaming**: Consume pipeline stage transitions (Validation → Parsing → Engine Run → Scoring → Reporting) using `subscribeToEvents()` from `src/lib/sse.ts`.
 - **IFC 3D Viewer**: Encapsulated in `src/lib/components/IfcViewer.svelte` using `@thatopen/fragments`, `@thatopen/components`, and `web-ifc`.
+- **Universal Data Table UX Standards**: Every data table in the application (Projects, Documents, Reports & BCF Topics/Deliverables, Rules Catalog, Extracted Rules Review, Audit Findings/Issues, Revit Sync, etc.) MUST provide rich, interactive, and user-friendly features:
+  - Multiple selection with per-row checkboxes, header 'Select All' (with indeterminate state), selection counter badge, and clear selection action.
+  - Full CRUD operations: creation/upload modals, details inspector modals with full properties, edit modals, and delete confirmations.
+  - Floating or embedded `BulkActionBar` active on selection (bulk edit modal, bulk delete modal, bulk export to CSV/JSON/BCF).
+  - Dedicated `TablePagination` with configurable page size selector (10, 25, 50, 100), range indicators, total items count, and page controls.
+  - Reactive search, multi-field dropdown filters, and reset actions.
+  - Interactive column header sorting (ascending/descending indicators).
+  - Rich zero-state placeholders, loading skeletons, responsive horizontal scroll, and keyboard accessibility.
+- **Reusable Frontend Component Architecture**: Always use established shared UI components from `src/lib/components/` instead of duplicating markup:
+  - `<PageHeader>`: Top view header with category breadcrumbs, icon, title, subtitle, and action slots.
+  - `<Modal>`: Standard modal dialog with backdrop blur, keyboard `Escape` closing, header with icon, and slot layout.
+  - `<SortHeader>`: Sortable table column header with automatic sort direction indicators and ARIA attributes.
+  - `<TableCheckbox>`: Accessible checkbox supporting indeterminate master toggle and row selection.
+  - `<TablePagination>`: Dedicated table pagination component with page size selection.
+  - `<BulkActionBar>`: Floating/inline bulk action toolbar when rows are selected.
+  - `<EmptyState>`: Standardized zero-state card with icon, title, description, and primary CTA.
+  - `<LoadingState>`: Spinner loading container with configurable messages.
+  - `<SeverityBadge>`: Unified pill badge for severity levels and verdicts.
+  - `<IsoGovernanceBadges>`: Standard ISO 19650 metadata tags (Suitability, Revision, CDE State).
 
 ### API & Backend Guidelines (`app/api/`)
 

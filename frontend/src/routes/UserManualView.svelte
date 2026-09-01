@@ -8,7 +8,9 @@
     FileText,
     ArrowRight,
     CheckCircle2,
+    GraduationCap,
   } from "lucide-svelte";
+  import PageHeader from "../lib/components/PageHeader.svelte";
 
   export let onNavigate: (view: string) => void;
 
@@ -38,25 +40,20 @@
       title: "Add the compliance reference documents",
       icon: BookOpen,
       description:
-        "Upload the PDF, Markdown, or text specifications that define the technical requirements for the project. BIM Guard stores each specification and parses its textual content for automated rule synthesis.",
+        "Upload specification PDFs, markdown design criteria, or building code standards to the document library. BIM Guard parses text and prepares chunks for rule extraction.",
       result:
-        "Result: Source specifications and extracted clauses are stored in the library.",
-      actions: [
-        { label: "Open Document Library", view: "documents", primary: true },
-      ],
+        "Result: Specifications appear with extracted text previews and character counts.",
+      actions: [{ label: "Manage Documents", view: "documents", primary: true }],
     },
     {
       step: 4,
-      title: "Extract and review compliance rules",
+      title: "Extract compliance rules via LLM",
       icon: ListChecks,
       description:
-        "Use Rule Extraction Studio to turn reference specification clauses into structured, executable checks. Review property sets, operators, target values, and severities, then persist them to the rules library.",
+        "Run AI extraction against documents or pasted specification text. Gemini parses natural language sentences into structured rules (IFC entity, property set, property name, operator, target value, severity).",
       result:
-        "Result: A reviewed rule set is categorized and ready to evaluate against the model.",
-      actions: [
-        { label: "Rule Extraction Studio", view: "extract", primary: true },
-        { label: "Review Rules Catalog", view: "rules", primary: false },
-      ],
+        "Result: Extracted rules can be edited, toggled, and persisted into the live database catalog.",
+      actions: [{ label: "Rule Extraction", view: "extraction", primary: true }],
     },
     {
       step: 5,
@@ -66,10 +63,8 @@
         "Execute multi-domain checks against the IFC geometry. Run architectural compliance for Ontario Building Code egress, daylight, and fire separations, or MEP checks for galvanic (GC-001), crevice (CC-001), and MIC (MC-001) piping corrosion and seismic clearances.",
       result:
         "Result: Non-compliant elements are tagged with risk bands, scores, and mitigations.",
-      actions: [
-        { label: "Run ARCH Audit", view: "arch", primary: true },
-        { label: "Run MEP & Piping", view: "analyze", primary: false },
-      ],
+      actions: [{ label: "Run ARCH Audit", view: "arch", primary: true },
+        { label: "Run MEP & Piping", view: "analyze", primary: false }],
     },
     {
       step: 6,
@@ -86,19 +81,12 @@
 
 <div class="space-y-6 mx-auto">
   <!-- Header -->
-  <div>
-    <div
-      class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
-    >
-      Documentation
-    </div>
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-      User Workflow Manual
-    </h1>
-    <p class="text-xs sm:text-sm text-slate-400">
-      End-to-end guide to the OpenBIM compliance checking workflow in BIM Guard.
-    </p>
-  </div>
+  <PageHeader
+    category="Documentation"
+    title="User Workflow Manual"
+    subtitle="End-to-end guide to the OpenBIM compliance checking workflow in BIM Guard."
+    icon={GraduationCap}
+  />
 
   <!-- Steps List -->
   <div class="space-y-4">

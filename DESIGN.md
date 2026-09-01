@@ -368,3 +368,30 @@ The standalone frontend (`frontend/src/`) translates these design principles int
 - **Real-Time Instrumentation**: The `PipelineProgress` component features animated SSE stream status pings, stage step meters, and dynamic metrics chips reflecting the active physics engines.
 - **3D OpenBIM Viewport**: Enclosed viewport canvas (`IfcViewer.svelte`) featuring dark frame styling and model isolation.
 
+## 11. Universal Data Table UX Specifications
+
+Every data table across the application (Projects, Documents, Reports & BCF, Rules Catalog, Extracted Rules, Findings & Issues, Revit Sync) must follow these strict UX design rules:
+
+- **Multiple Selection**: Per-row checkboxes (`w-4 h-4 rounded bg-slate-950 border-slate-700 text-[#0071e3]`), header master checkbox with indeterminate and selected states, and selected row highlights (`bg-blue-950/20`).
+- **Bulk Action Bar**: Sticky/floating `BulkActionBar.svelte` displaying the selected item count, quick clear button, bulk edit modal launcher, bulk delete launcher, and export buttons.
+- **Table Pagination**: Uniform `TablePagination.svelte` at the footer of every table showing the current page, page size options (10, 25, 50, 100), item range (`Showing 1 to 10 of 42`), and navigation controls.
+- **Search & Multi-Attribute Filters**: Filter toolbar placed above tables with a search input (`Search` icon) and categorized dropdown filters.
+- **Column Sorting**: Interactive header buttons with ascending/descending arrow indicators.
+- **CRUD Modals & Confirmations**: High-polish dark modals for creation, editing, inspecting full details, and deleting with explicit confirmation dialogs.
+
+## 12. Reusable UI Component Building Blocks
+
+To maintain cohesive design patterns and avoid duplicate markup, all UI views must compose with the established core component building blocks from `frontend/src/lib/components/`:
+
+- **`<PageHeader.svelte>`**: Standard page hero header with category breadcrumbs, icon, title, subtitle, and action slots.
+- **`<Modal.svelte>`**: Reusable modal dialog wrapper with backdrop blur (`backdrop-blur-md`), keyboard `Escape` closing, header with icon, scrollable body, and `slot="footer"` button layout.
+- **`<SortHeader.svelte>`**: Interactive sortable table column header with automatic ascending/descending/inactive sort icons and ARIA attributes.
+- **`<TableCheckbox.svelte>`**: Unified checkbox supporting indeterminate master toggle, row-level selection, and accessibility labels.
+- **`<TablePagination.svelte>`**: Dedicated table pagination component with page size selection (10, 25, 50, 100).
+- **`<BulkActionBar.svelte>`**: Floating/inline bulk action toolbar when rows are selected.
+- **`<EmptyState.svelte>`**: Standardized zero-state card with icon, title, description, and primary CTA button.
+- **`<LoadingState.svelte>`**: Spinner loading container with configurable message and sub-message.
+- **`<SeverityBadge.svelte>`**: Universal pill badge for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
+- **`<IsoGovernanceBadges.svelte>`**: Standard ISO 19650 metadata tags (Suitability `S0`–`S7`, Revision `P01.01`, CDE State `WIP`/`SHARED`/`PUBLISHED`/`ARCHIVED`).
+
+

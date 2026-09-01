@@ -33,6 +33,12 @@
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
+  import PageHeader from "../lib/components/PageHeader.svelte";
+  import SortHeader from "../lib/components/SortHeader.svelte";
+  import TableCheckbox from "../lib/components/TableCheckbox.svelte";
+  import EmptyState from "../lib/components/EmptyState.svelte";
+  import LoadingState from "../lib/components/LoadingState.svelte";
+  import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
 
   export let onSelectProjectForAudit: (projectId: number) => void;
   export let onSelectProjectForViewer: (projectId: number) => void;
@@ -109,11 +115,32 @@
     filteredProjects.length > 0 &&
     filteredProjects.every((p) => selectedProjectIds.includes(p.id));
 
+  let sortField: 'id' | 'name' | 'status' | 'analysis_type' | 'jurisdiction' | 'created_at' = 'id';
+  let sortAsc = true;
+
+  function toggleSort(field: 'id' | 'name' | 'status' | 'analysis_type' | 'jurisdiction' | 'created_at') {
+    if (sortField === field) {
+      sortAsc = !sortAsc;
+    } else {
+      sortField = field;
+      sortAsc = true;
+    }
+  }
+
+  $: sortedProjects = [...filteredProjects].sort((a, b) => {
+    let valA: any = (a as any)[sortField] || '';
+    let valB: any = (b as any)[sortField] || '';
+    if (typeof valA === 'string') {
+      return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    }
+    return sortAsc ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+  });
+
   let currentPage = 1;
   let pageSize = 10;
 
-  $: totalItems = filteredProjects.length;
-  $: paginatedProjects = filteredProjects.slice(
+  $: totalItems = sortedProjects.length;
+  $: paginatedProjects = sortedProjects.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
@@ -240,21 +267,14 @@
 
 <div class="space-y-6 mx-auto">
   <!-- Header & Storage Source Control -->
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <div>
-      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
-        Registry
-      </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-        Project Registry
-      </h1>
-      <p class="text-xs sm:text-sm text-slate-400">
-        Manage OpenBIM models, analysis scopes, and project storage sources.
-      </p>
-    </div>
-
-    <!-- Storage Source Dropdown & Repo Manager Button -->
-    <div class="flex flex-wrap items-center gap-2.5 bg-slate-900/90 border border-slate-800 p-2 rounded-2xl">
+  <!-- Header & Storage Source Control -->
+  <PageHeader
+    category="Registry"
+    title="Project Registry"
+    subtitle="Manage OpenBIM models, analysis scopes, and project storage sources."
+    icon={Box}
+  >
+    <div slot="actions" class="flex flex-wrap items-center gap-2.5 bg-slate-900/90 border border-slate-800 p-2 rounded-2xl">
       <div class="flex items-center gap-2 px-2">
         {#if selectedSource === 'supabase'}
           <Database class="w-4 h-4 text-emerald-400" />
@@ -315,7 +335,7 @@
         </button>
       {/if}
     </div>
-  </div>
+  </PageHeader>
 
   {#if error}
     <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
@@ -372,23 +392,19 @@
     <!-- Projects Table -->
     <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
       {#if isLoading}
-        <div class="p-12 text-center text-xs text-slate-400">
-          Loading project registry...
-        </div>
+        <LoadingState message="Loading project registry..." />
       {:else if filteredProjects.length === 0}
-        <div class="p-12 text-center text-xs text-slate-500 space-y-2">
-          <p>No projects match your current filters.</p>
-          <button
-            type="button"
-            on:click={() => {
+        <div class="p-6">
+          <EmptyState
+            title="No projects match your current filters"
+            description="Adjust your search criteria or create a project using the Wizard."
+            actionLabel="Reset filters"
+            onAction={() => {
               searchQuery = "";
               statusFilter = "all";
               domainFilter = "all";
             }}
-            class="text-[#0071e3] hover:underline"
-          >
-            Reset filters
-          </button>
+          />
         </div>
       {:else}
         <div class="overflow-x-auto">
@@ -396,20 +412,28 @@
             <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
               <tr>
                 <th class="py-3 px-4 w-10">
-                  <input
-                    type="checkbox"
+                  <TableCheckbox
                     checked={allFilteredSelected}
                     on:change={toggleSelectAll}
-                    class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
                     title="Select or deselect all visible projects"
                   />
                 </th>
-                <th class="py-3 px-4">Project Name</th>
-                <th class="py-3 px-4">Status</th>
+                <SortHeader column="name" {sortField} {sortAsc} onSort={toggleSort}>
+                  Project Name
+                </SortHeader>
+                <SortHeader column="status" {sortField} {sortAsc} onSort={toggleSort}>
+                  Status
+                </SortHeader>
                 <th class="py-3 px-4">IFC Model</th>
-                <th class="py-3 px-4">Analysis Domain</th>
-                <th class="py-3 px-4">Jurisdiction</th>
-                <th class="py-3 px-4">Created</th>
+                <SortHeader column="analysis_type" {sortField} {sortAsc} onSort={toggleSort}>
+                  Analysis Domain
+                </SortHeader>
+                <SortHeader column="jurisdiction" {sortField} {sortAsc} onSort={toggleSort}>
+                  Jurisdiction
+                </SortHeader>
+                <SortHeader column="created_at" {sortField} {sortAsc} onSort={toggleSort}>
+                  Created
+                </SortHeader>
                 <th class="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -417,11 +441,10 @@
               {#each paginatedProjects as project}
                 <tr class="hover:bg-slate-900/60 transition-colors {selectedProjectIds.includes(project.id) ? 'bg-blue-950/20' : ''}">
                   <td class="py-3 px-4 w-10">
-                    <input
-                      type="checkbox"
+                    <TableCheckbox
                       checked={selectedProjectIds.includes(project.id)}
                       on:change={() => toggleSelectProject(project.id)}
-                      class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      ariaLabel={`Select project ${project.name}`}
                     />
                   </td>
                   <td class="py-3 px-4 font-semibold text-white">

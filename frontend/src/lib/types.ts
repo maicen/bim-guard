@@ -2,7 +2,15 @@
  * Type contracts corresponding directly to backend Pydantic models in app/modules/contracts.py
  */
 
-export type CDEState = 'WIP' | 'SHARED' | 'PUBLISHED' | 'ARCHIVED';
+export const CDE_STATE_CHOICES = ['WIP', 'SHARED', 'PUBLISHED', 'ARCHIVED'] as const;
+export type CDEState = (typeof CDE_STATE_CHOICES)[number];
+
+export const SUITABILITY_CODES = [
+  'S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7',
+  'D1', 'D2', 'D3', 'D4',
+  'A1', 'A2', 'B1', 'CR'
+] as const;
+export type SuitabilityCode = (typeof SUITABILITY_CODES)[number];
 
 export interface ISO19650Metadata {
   project_code: string;

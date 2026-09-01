@@ -196,6 +196,27 @@ def update_topic(
     return updated
 
 
+@router.delete(
+    "/v2.1/projects/{project_id}/topics/{topic_guid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete BCF Topic",
+    tags=["BCF API v2.1"],
+)
+def delete_topic(
+    project_id: str,
+    topic_guid: str,
+    service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
+) -> None:
+    """Delete a BCF topic and all associated viewpoints/comments."""
+    deleted = service.delete_topic(project_id, topic_guid)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"BCF Topic {topic_guid} not found in project {project_id}",
+        )
+
+
+
 # ------------------------------------------------------------------------------
 # 3. Comments Endpoints
 # ------------------------------------------------------------------------------

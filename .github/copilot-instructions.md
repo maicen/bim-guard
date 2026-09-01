@@ -16,6 +16,8 @@ When making code changes:
 - Stream real-time pipeline progress using Server-Sent Events (`/api/events/{project_id}`) via `src/lib/sse.ts`.
 - Keep rules and engine thresholds database-driven via `RuleService` and `corrosion_rule_catalog.py` — never hardcode engineering constants in Python engines.
 - Use PEP 257 docstrings for new public Python APIs.
+- Universal Data Table UX Standards: All data tables (Projects, Documents, Reports & BCF, Rules Catalog, Extracted Rules, Findings/Issues, Revit Sync) must support multiple selection, full CRUD, bulk actions/edits (`BulkActionBar`), pagination (`TablePagination`), column sorting, search/filtering, and rich zero-states.
+- Reusable Component Architecture: Always reuse established UI components from `frontend/src/lib/components/` (`PageHeader`, `Modal`, `SortHeader`, `TableCheckbox`, `TablePagination`, `BulkActionBar`, `EmptyState`, `LoadingState`, `SeverityBadge`, `IsoGovernanceBadges`).
 
 ## Mermaid Diagrams
 

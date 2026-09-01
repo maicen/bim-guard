@@ -27,6 +27,9 @@
     Building2,
     Compass,
     SlidersHorizontal,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
   } from "lucide-svelte";
   import { analyzeApi, projectsApi, rulesApi } from "../lib/api";
   import type {
@@ -37,6 +40,8 @@
     RuleFolder,
   } from "../lib/types";
   import PipelineProgress from "../lib/components/PipelineProgress.svelte";
+  import TablePagination from "../lib/components/TablePagination.svelte";
+  import BulkActionBar from "../lib/components/BulkActionBar.svelte";
 
   export let initialProjectId: number | null = null;
   export let activeCategory: "Piping" | "seismic" = "Piping";
@@ -314,17 +319,99 @@
     },
   );
 
-  // Distinct count for data quality reports
-  $: dataQualityCount =
-    result?.issue_stats?.data_quality ??
-    (result?.audit_issues || []).filter(
-      (i) => i.mechanism === "data_quality" || i.mechanism === "Data Quality",
-    ).length;
-  $: hasFindingsOnlyDataQuality =
-    (result?.audit_issues || []).length > 0 &&
-    (result?.audit_issues || []).every(
-      (i) => i.mechanism === "data_quality" || i.mechanism === "Data Quality",
-    );
+  // Finding table multi-selection, sort, and pagination state
+  let selectedFindingIds: string[] = [];
+  let findingSortField: "band" | "rule_id" | "element_id" | "title" | "score" = "band";
+  let findingSortAsc = false;
+  let findingCurrentPage = 1;
+  let findingPageSize = 10;
+
+  const SEVERITY_WEIGHTS: Record<string, number> = {
+    critical: 4,
+    high: 3,
+    medium: 2,
+    low: 1,
+    data_quality: 0,
+  };
+
+  $: sortedFilteredIssues = [...filteredIssues].sort((a, b) => {
+    let valA: any = a[findingSortField];
+    let valB: any = b[findingSortField];
+    if (findingSortField === "band") {
+      valA = SEVERITY_WEIGHTS[(a.band || "").toLowerCase()] ?? 0;
+      valB = SEVERITY_WEIGHTS[(b.band || "").toLowerCase()] ?? 0;
+    } else {
+      if (valA === undefined || valA === null) valA = "";
+      if (valB === undefined || valB === null) valB = "";
+      if (typeof valA === "string") valA = valA.toLowerCase();
+      if (typeof valB === "string") valB = valB.toLowerCase();
+    }
+    if (valA < valB) return findingSortAsc ? -1 : 1;
+    if (valA > valB) return findingSortAsc ? 1 : -1;
+    return 0;
+  });
+
+  $: findingTotalItems = sortedFilteredIssues.length;
+  $: paginatedIssues = sortedFilteredIssues.slice(
+    (findingCurrentPage - 1) * findingPageSize,
+    findingCurrentPage * findingPageSize,
+  );
+
+  $: allFilteredFindingsSelected =
+    sortedFilteredIssues.length > 0 &&
+    sortedFilteredIssues.every((i) => selectedFindingIds.includes(i.id));
+
+  function toggleSelectAllFindings() {
+    if (allFilteredFindingsSelected) {
+      selectedFindingIds = [];
+    } else {
+      selectedFindingIds = sortedFilteredIssues.map((i) => i.id);
+    }
+  }
+
+  function toggleSelectFinding(id: string) {
+    if (selectedFindingIds.includes(id)) {
+      selectedFindingIds = selectedFindingIds.filter((iId) => iId !== id);
+    } else {
+      selectedFindingIds = [...selectedFindingIds, id];
+    }
+  }
+
+  function toggleFindingSort(field: "band" | "rule_id" | "element_id" | "title" | "score") {
+    if (findingSortField === field) {
+      findingSortAsc = !findingSortAsc;
+    } else {
+      findingSortField = field;
+      findingSortAsc = true;
+    }
+  }
+
+  function exportFindingsToCsv() {
+    const toExport = (result?.audit_issues || []).filter((i) => selectedFindingIds.includes(i.id));
+    const target = toExport.length ? toExport : sortedFilteredIssues;
+    const headers = ["FindingID", "Severity", "Mechanism", "RuleID", "ElementGUID", "Title", "Description", "Score", "IntrusionDepthMM", "Mitigation"];
+    const rows = target.map((i) => [
+      `"${(i.id || "").replace(/"/g, '""')}"`,
+      `"${(i.band || "").replace(/"/g, '""')}"`,
+      `"${(i.mechanism || "").replace(/"/g, '""')}"`,
+      `"${(i.rule_id || "").replace(/"/g, '""')}"`,
+      `"${(i.element_id || "").replace(/"/g, '""')}"`,
+      `"${(i.title || "").replace(/"/g, '""')}"`,
+      `"${(i.description || "").replace(/"/g, '""')}"`,
+      i.score ?? "",
+      i.details?.intrusion_depth_mm ?? "",
+      `"${(i.mitigation || "").replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `compliance_findings_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 </script>
 
 <div class="space-y-6 pb-12">
@@ -937,11 +1024,21 @@
         </span>
       </div>
 
+      <!-- Bulk Actions Bar -->
+      <BulkActionBar
+        selectedCount={selectedFindingIds.length}
+        itemLabel="finding"
+        onClearSelection={() => (selectedFindingIds = [])}
+        onBulkExport={exportFindingsToCsv}
+        onBulkDelete={null}
+        onBulkEdit={null}
+      />
+
       <!-- Tabular Findings Table -->
       <div
         class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/50"
       >
-        {#if filteredIssues.length === 0}
+        {#if sortedFilteredIssues.length === 0}
           <div class="p-12 text-center text-xs text-slate-500">
             No compliance issues match your selected filters.
           </div>
@@ -952,20 +1049,99 @@
                 class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
               >
                 <tr>
-                  <th class="py-3.5 px-4">Severity</th>
-                  <th class="py-3.5 px-4">Rule &amp; Mechanism</th>
-                  <th class="py-3.5 px-4">Element GUID</th>
-                  <th class="py-3.5 px-4">Finding &amp; Citations</th>
-                  <th class="py-3.5 px-4 text-center">Score / Clearance</th>
+                  <th class="py-3.5 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredFindingsSelected}
+                      on:change={toggleSelectAllFindings}
+                      class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      title="Select all findings"
+                    />
+                  </th>
+                  <th
+                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    on:click={() => toggleFindingSort("band")}
+                  >
+                    <div class="flex items-center gap-1">
+                      <span>Severity</span>
+                      {#if findingSortField === "band"}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                      {:else}
+                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
+                      {/if}
+                    </div>
+                  </th>
+                  <th
+                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    on:click={() => toggleFindingSort("rule_id")}
+                  >
+                    <div class="flex items-center gap-1">
+                      <span>Rule &amp; Mechanism</span>
+                      {#if findingSortField === "rule_id"}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                      {:else}
+                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
+                      {/if}
+                    </div>
+                  </th>
+                  <th
+                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    on:click={() => toggleFindingSort("element_id")}
+                  >
+                    <div class="flex items-center gap-1">
+                      <span>Element GUID</span>
+                      {#if findingSortField === "element_id"}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                      {:else}
+                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
+                      {/if}
+                    </div>
+                  </th>
+                  <th
+                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    on:click={() => toggleFindingSort("title")}
+                  >
+                    <div class="flex items-center gap-1">
+                      <span>Finding &amp; Citations</span>
+                      {#if findingSortField === "title"}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                      {:else}
+                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
+                      {/if}
+                    </div>
+                  </th>
+                  <th
+                    class="py-3.5 px-4 text-center cursor-pointer hover:text-white transition-colors select-none"
+                    on:click={() => toggleFindingSort("score")}
+                  >
+                    <div class="flex items-center justify-center gap-1">
+                      <span>Score / Clearance</span>
+                      {#if findingSortField === "score"}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                      {:else}
+                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
+                      {/if}
+                    </div>
+                  </th>
                   <th class="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
-                {#each filteredIssues as issue}
+                {#each paginatedIssues as issue}
                   {@const isDq =
                     issue.mechanism === "data_quality" ||
                     issue.mechanism === "Data Quality"}
-                  <tr class="hover:bg-slate-900/60 transition-colors group">
+                  <tr class="hover:bg-slate-900/60 transition-colors group {selectedFindingIds.includes(issue.id) ? 'bg-blue-950/20' : ''}">
+                    <!-- Row Checkbox -->
+                    <td class="py-3.5 px-4 align-top w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedFindingIds.includes(issue.id)}
+                        on:change={() => toggleSelectFinding(issue.id)}
+                        class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      />
+                    </td>
+
                     <!-- Severity Band Pill -->
                     <td class="py-3.5 px-4 align-top whitespace-nowrap">
                       {#if isDq}
@@ -1120,6 +1296,17 @@
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            currentPage={findingCurrentPage}
+            pageSize={findingPageSize}
+            totalItems={findingTotalItems}
+            onPageChange={(p) => (findingCurrentPage = p)}
+            onPageSizeChange={(s) => {
+              findingPageSize = s;
+              findingCurrentPage = 1;
+            }}
+          />
         {/if}
       </div>
     </div>

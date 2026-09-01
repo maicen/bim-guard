@@ -22,6 +22,12 @@
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
   import OpenCdeSyncModal from "../lib/components/OpenCdeSyncModal.svelte";
+  import DocumentBulkEditModal from "../lib/components/DocumentBulkEditModal.svelte";
+  import PageHeader from "../lib/components/PageHeader.svelte";
+  import SortHeader from "../lib/components/SortHeader.svelte";
+  import TableCheckbox from "../lib/components/TableCheckbox.svelte";
+  import EmptyState from "../lib/components/EmptyState.svelte";
+  import LoadingState from "../lib/components/LoadingState.svelte";
 
   const cachedDocs = documentsApi.getCachedList();
   let documents: DocumentItem[] = cachedDocs || [];
@@ -30,6 +36,7 @@
   let error = "";
   let isDeleteModalOpen = false;
   let isOpenCdeModalOpen = false;
+  let isBulkEditModalOpen = false;
   let docToDelete: { id: number; filename: string } | null = null;
   let unsubscribeDocs: (() => void) | null = null;
 
@@ -55,6 +62,19 @@
 
   let searchQuery = "";
   let selectedDocTypeFilter: string = "ALL";
+
+  // Sorting state
+  let sortField: "id" | "filename" | "doc_type" | "char_count" | "upload_date" = "id";
+  let sortAsc = false;
+
+  function toggleSort(field: "id" | "filename" | "doc_type" | "char_count" | "upload_date") {
+    if (sortField === field) {
+      sortAsc = !sortAsc;
+    } else {
+      sortField = field;
+      sortAsc = true;
+    }
+  }
 
   async function loadDocuments(force = false) {
     if (!documents.length) {
@@ -88,13 +108,27 @@
     }
   });
 
-  $: filteredDocuments = documents.filter((d) => {
-    const matchesSearch = d.filename.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType =
-      selectedDocTypeFilter === "ALL" ||
-      (d.doc_type || "Specification") === selectedDocTypeFilter;
-    return matchesSearch && matchesType;
-  });
+  $: filteredDocuments = documents
+    .filter((d) => {
+      const matchesSearch =
+        d.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (d.extracted_text_preview || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType =
+        selectedDocTypeFilter === "ALL" ||
+        (d.doc_type || "Specification") === selectedDocTypeFilter;
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => {
+      let valA: any = a[sortField];
+      let valB: any = b[sortField];
+      if (valA === undefined || valA === null) valA = "";
+      if (valB === undefined || valB === null) valB = "";
+      if (typeof valA === "string") valA = valA.toLowerCase();
+      if (typeof valB === "string") valB = valB.toLowerCase();
+      if (valA < valB) return sortAsc ? -1 : 1;
+      if (valA > valB) return sortAsc ? 1 : -1;
+      return 0;
+    });
 
   let selectedDocIds: number[] = [];
   let isBulkDeleteModalOpen = false;
@@ -126,6 +160,31 @@
     } else {
       selectedDocIds = [...selectedDocIds, id];
     }
+  }
+
+  function exportSelectedToCsv() {
+    const docsToExport = documents.filter((d) => selectedDocIds.includes(d.id));
+    const targetDocs = docsToExport.length ? docsToExport : filteredDocuments;
+    const headers = ["ID", "Filename", "DocType", "CharCount", "UploadDate"];
+    const rows = targetDocs.map((d) => [
+      d.id,
+      `"${(d.filename || "").replace(/"/g, '""')}"`,
+      `"${(d.doc_type || "Specification").replace(/"/g, '""')}"`,
+      d.char_count || 0,
+      `"${d.upload_date || ""}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `documents_export_${new Date().toISOString().substring(0, 10)}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   async function confirmBulkDelete() {
@@ -246,23 +305,13 @@
 
 <div class="space-y-6 mx-auto">
   <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <div>
-      <div
-        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
-      >
-        Library
-      </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-        Document Specifications
-      </h1>
-      <p class="text-xs sm:text-sm text-slate-400">
-        Upload and manage building code standards, specifications, and project
-        manuals.
-      </p>
-    </div>
-
-    <div class="flex items-center gap-2">
+  <PageHeader
+    category="Library"
+    title="Document Specifications"
+    subtitle="Upload and manage building code standards, specifications, and project manuals."
+    icon={BookOpen}
+  >
+    <div slot="actions" class="flex items-center gap-2">
       <button
         type="button"
         on:click={() => (isOpenCdeModalOpen = true)}
@@ -292,7 +341,7 @@
         <span>Upload Specification</span>
       </button>
     </div>
-  </div>
+  </PageHeader>
 
   {#if error}
     <div
@@ -307,6 +356,8 @@
     selectedCount={selectedDocIds.length}
     itemLabel="document"
     onClearSelection={() => (selectedDocIds = [])}
+    onBulkEdit={() => (isBulkEditModalOpen = true)}
+    onBulkExport={exportSelectedToCsv}
     onBulkDelete={() => (isBulkDeleteModalOpen = true)}
   />
 
@@ -316,7 +367,7 @@
   >
     <DataTableHeader
       bind:searchQuery
-      searchPlaceholder="Filter documents by file name..."
+      searchPlaceholder="Filter documents by file name or text..."
       {isRefreshing}
       onRefresh={() => loadDocuments(true)}
     >
@@ -335,19 +386,15 @@
     </DataTableHeader>
 
     {#if isLoading}
-      <div class="p-12 text-center text-xs text-slate-400">
-        Loading document library...
-      </div>
+      <LoadingState message="Loading document library..." />
     {:else if filteredDocuments.length === 0}
-      <div class="p-12 text-center text-xs text-slate-500 space-y-2">
-        <p>No specification documents found.</p>
-        <button
-          type="button"
-          on:click={() => (isUploadModalOpen = true)}
-          class="text-[#0071e3] hover:underline font-medium"
-        >
-          Upload your first specification (PDF, TXT, MD)
-        </button>
+      <div class="p-6">
+        <EmptyState
+          title="No specification documents found"
+          description="Upload building code specifications or sync with OpenCDE to begin extraction."
+          actionLabel="Upload Specification (PDF, TXT, MD)"
+          onAction={() => (isUploadModalOpen = true)}
+        />
       </div>
     {:else}
       <div class="overflow-x-auto">
@@ -357,20 +404,28 @@
           >
             <tr>
               <th class="py-3 px-4 w-10">
-                <input
-                  type="checkbox"
+                <TableCheckbox
                   checked={allFilteredSelected}
                   on:change={toggleSelectAll}
-                  class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
                   title="Select or deselect all visible documents"
                 />
               </th>
-              <th class="py-3 px-4">ID</th>
-              <th class="py-3 px-4">Document File</th>
-              <th class="py-3 px-4">Type</th>
+              <SortHeader column="id" {sortField} {sortAsc} onSort={toggleSort}>
+                ID
+              </SortHeader>
+              <SortHeader column="filename" {sortField} {sortAsc} onSort={toggleSort}>
+                Document File
+              </SortHeader>
+              <SortHeader column="doc_type" {sortField} {sortAsc} onSort={toggleSort}>
+                Type
+              </SortHeader>
               <th class="py-3 px-4">Extracted Text</th>
-              <th class="py-3 px-4">Characters</th>
-              <th class="py-3 px-4">Uploaded</th>
+              <SortHeader column="char_count" {sortField} {sortAsc} onSort={toggleSort}>
+                Characters
+              </SortHeader>
+              <SortHeader column="upload_date" {sortField} {sortAsc} onSort={toggleSort}>
+                Uploaded
+              </SortHeader>
               <th class="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -378,11 +433,10 @@
             {#each paginatedDocuments as doc}
               <tr class="hover:bg-slate-900/60 transition-colors {selectedDocIds.includes(doc.id) ? 'bg-blue-950/20' : ''}">
                 <td class="py-3 px-4 w-10">
-                  <input
-                    type="checkbox"
+                  <TableCheckbox
                     checked={selectedDocIds.includes(doc.id)}
                     on:change={() => toggleSelectDoc(doc.id)}
-                    class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                    ariaLabel={`Select document ${doc.filename}`}
                   />
                 </td>
                 <td class="py-3 px-4 font-mono text-slate-500">#{doc.id}</td>
@@ -763,3 +817,14 @@
   onClose={() => (isOpenCdeModalOpen = false)}
   onSyncComplete={() => loadDocuments(true)}
 />
+
+<DocumentBulkEditModal
+  isOpen={isBulkEditModalOpen}
+  {selectedDocIds}
+  onClose={() => (isBulkEditModalOpen = false)}
+  onBulkUpdated={() => {
+    loadDocuments(true);
+    selectedDocIds = [];
+  }}
+/>
+

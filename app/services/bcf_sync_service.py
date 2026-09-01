@@ -327,6 +327,38 @@ class BCFSyncService:
         """Fetch snapshot PNG bytes for a viewpoint."""
         return self._snapshots_by_viewpoint.get(str(viewpoint_guid).upper())
 
+    def delete_topic(self, project_id: str, topic_guid: str) -> bool:
+        """Delete a BCF topic and its associated comments and viewpoints."""
+        proj_key = str(project_id)
+        project_store = self._topics_by_project.get(proj_key, {})
+        guid = str(topic_guid).upper()
+        if guid not in project_store and str(topic_guid) in project_store:
+            guid = str(topic_guid)
+
+        if guid not in project_store:
+            return False
+
+        del project_store[guid]
+
+        # Clean up comments and viewpoints
+        self._comments_by_topic.pop(guid, None)
+        viewpoints = self._viewpoints_by_topic.pop(guid, [])
+        for vp in viewpoints:
+            vp_guid = vp.get("guid")
+            if vp_guid:
+                self._snapshots_by_viewpoint.pop(vp_guid, None)
+
+        return True
+
+    def bulk_delete_topics(self, project_id: str, topic_guids: list[str]) -> int:
+        """Bulk delete multiple BCF topics."""
+        deleted_count = 0
+        for guid in topic_guids:
+            if self.delete_topic(project_id, guid):
+                deleted_count += 1
+        return deleted_count
+
 
 # Global Singleton BCF Sync Service
 DEFAULT_BCF_SYNC_SERVICE = BCFSyncService()
+

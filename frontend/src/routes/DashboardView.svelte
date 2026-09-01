@@ -22,6 +22,7 @@
   import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import PageHeader from "../lib/components/PageHeader.svelte";
 
   export let onSelectProjectForAudit: (projectId: number) => void;
   export let onSelectProjectForViewer: (projectId: number) => void;
@@ -127,22 +128,12 @@
 
 <div class="space-y-8 mx-auto">
   <!-- Page Header -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-    <div>
-      <div
-        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
-      >
-        Overview
-      </div>
-      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-        Compliance Dashboard
-      </h1>
-      <p class="text-sm text-slate-400 mt-1">
-        High-level OpenBIM metrics and project compliance readiness.
-      </p>
-    </div>
-
-    <div class="flex items-center gap-3">
+  <PageHeader
+    category="Overview"
+    title="Compliance Dashboard"
+    subtitle="High-level OpenBIM metrics and project compliance readiness."
+  >
+    <div slot="actions" class="flex items-center gap-3">
       <!-- New Project CTA -->
       <button
         type="button"
@@ -153,7 +144,7 @@
         <span>New Project</span>
       </button>
     </div>
-  </div>
+  </PageHeader>
 
   {#if !stats.db_ok}
     <div

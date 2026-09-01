@@ -543,6 +543,13 @@ export const analyzeApi = {
     const res = await fetch(`${API_BASE}/analyze/bcf/list`);
     return handleResponse<BcfArtifact[]>(res);
   },
+
+  async deleteBcfArtifact(artifactId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/analyze/bcf/artifacts/${artifactId}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<void>(res);
+  },
 };
 
 export const dashboardApi = {
@@ -968,6 +975,17 @@ export const bcfApi = {
       body: JSON.stringify(payload),
     });
     return handleResponse<BCFViewpointResponse>(res);
+  },
+
+  async deleteTopic(projectId: string | number, topicGuid: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<void>(res);
+  },
+
+  async bulkDeleteTopics(projectId: string | number, topicGuids: string[]): Promise<void> {
+    await Promise.all(topicGuids.map((guid) => this.deleteTopic(projectId, guid)));
   },
 };
 
