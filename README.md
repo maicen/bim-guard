@@ -36,7 +36,7 @@ To eliminate AI hallucination and ensure strict engineering accuracy, this proje
 utilizes a "Walled Garden" Retrieval-Augmented Generation (RAG) architecture:
 
 1.  **Retrieval (`scripts/fetch_standards.py`):** An LLM-native web scraping script powered by the Firecrawl API dynamically retrieves open-access government building codes and manufacturer material specifications, converting them into clean Markdown.
-2.  **Augmentation (`scripts/compile_for_notebooklm.py`):** A custom compilation pipeline packages the OpenBIM Python logic (`IfcOpenShell`), static JSON rule packs, and scraped standards into targeted, domain-isolated Markdown exports (`bimguard_seismic_rules.md` and `bimguard_corrosion_rules.md`).
+2.  **Augmentation (`scripts/compile_for_notebooklm.py`):** A custom compilation pipeline packages the OpenBIM Python logic (`IfcOpenShell`), static JSON rule packs, and scraped standards into targeted, domain-isolated Markdown exports (`docs/bimguard_seismic_rules.md` and `docs/bimguard_corrosion_rules.md`).
 3.  **Generation (Gemini Notebooks):** The compiled domains are fed into isolated Google Gemini Notebook (NotebookLM) workspaces. The AI reasoning engine evaluates the Python codebase strictly against the ingested facts (and uploaded proprietary, IP-protected PDFs) to identify gaps in the compliance algorithms.
 
 ### Pipeline Components

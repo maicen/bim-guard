@@ -2,8 +2,8 @@
 
 Two Markdown documents are produced, one per NotebookLM workspace:
 
-* ``bimguard_seismic_rules.md``   -> "FMP: BIMGUARD AI - Seismic"
-* ``bimguard_corrosion_rules.md`` -> "FMP: BIMGUARD AI - Corrosion"
+* ``docs/bimguard_seismic_rules.md``   -> "FMP: BIMGUARD AI - Seismic"
+* ``docs/bimguard_corrosion_rules.md`` -> "FMP: BIMGUARD AI - Corrosion"
 
 Every discovered file is routed to exactly one of three categories by
 :data:`ROUTING_RULES`: ``seismic``, ``corrosion``, or ``shared``. Shared files
@@ -203,7 +203,7 @@ DEFAULT_CATEGORY = SHARED
 #: Per-output document configuration.
 OUTPUTS: dict[str, dict[str, str]] = {
     SEISMIC: {
-        "filename": "bimguard_seismic_rules.md",
+        "filename": "docs/bimguard_seismic_rules.md",
         "workspace": "FMP: BIMGUARD AI - Seismic",
         "title": "BIMGUARD AI — Seismic Bracing & Clearance Corpus",
         "preamble": (
@@ -216,7 +216,7 @@ OUTPUTS: dict[str, dict[str, str]] = {
         ),
     },
     CORROSION: {
-        "filename": "bimguard_corrosion_rules.md",
+        "filename": "docs/bimguard_corrosion_rules.md",
         "workspace": "FMP: BIMGUARD AI - Corrosion",
         "title": "BIMGUARD AI — Corrosion & Materials Corpus",
         "preamble": (
@@ -399,7 +399,7 @@ def print_routing_report(routed: list[tuple[Path, str, str]]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Compile both corpora and write them to the repository root."""
+    """Compile both corpora and write them to docs/."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--list",

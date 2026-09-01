@@ -15,14 +15,16 @@ YOU MUST FOLLOW THEM.
 
 **CRITICAL RULE: NEVER CREATE OR PLACE FILES IN THE REPOSITORY ROOT.**
 
-The repository root is strictly reserved for primary configuration files (`pyproject.toml`, `uv.lock`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `DESIGN.md`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, `main.py`, `.gitignore`, `run_server.*`, etc.).
+The repository root is strictly reserved for primary configuration files (`pyproject.toml`, `uv.lock`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `DESIGN.md`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, `main.py`, `.gitignore`, `run_server.*`, etc.), plus community/meta files (`TODO.md`, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`), the `static/` asset dir, tooling state (`skills-lock.json`, `.sesskey`), and agent-tool config dirs (`.agents`, `.Jules`, `.copilot`).
+
+Rule corpus documents (e.g. `bimguard_*_rules.md`) are generated output, not root config — they belong in `docs/` (see `scripts/compile_for_notebooklm.py`), never at the repo root.
 
 All newly generated files (code, tests, scripts, fixtures, data manifests, reports, documentation, temporary files) **MUST ALWAYS** be placed in the appropriate subfolder:
 
 - **`app/`** — Backend application code:
-  - `app/api/` — FastAPI routers, dependency injection, and SSE streaming
+  - `app/api/` — FastAPI routers (`analyze`, `bcf_routes`, `cde_integration`, `dashboard`, `documents`, `events`, `naming_config`, `projects`, `repositories`, `rules`, `settings`), dependency injection, and SSE streaming
   - `app/modules/contracts.py` — Pydantic request/response schemas
-  - `app/engines/` — Pure Python computation and compliance engines (GC-001, CC-001, MC-001, ARCH-*, etc.)
+  - `app/engines/` — Pure Python computation and compliance engines (GC-001 galvanic, CC-001 crevice, MC-001 microbiological, ARCH-*, etc.)
   - `app/services/` — Business logic, persistence, and pipeline runner services
   - `app/modules/` — Orchestration and parsing modules
 - **`frontend/`** — Svelte 5 frontend client:
@@ -41,6 +43,7 @@ All newly generated files (code, tests, scripts, fixtures, data manifests, repor
   - `docs/validation/data/` — Validation output datasets and JSON machine records (e.g. `docs/validation/data/test-results.json`)
   - `docs/benchmarks/` — Benchmark results, charts, and summaries
   - `docs/architecture/` — System architecture design documents
+  - Also holds general reference docs and reports not covered above (e.g. `docs/architecture.md`, `docs/CONVENTIONS.md`, `docs/planning/`, `docs/thesis/`, `docs/submissions/`, `docs/client-qa/`, `docs/bimguard_*_rules.md` NotebookLM corpora)
 - **`data/`** — Seed data, static rulesets (`data/rulesets/`), schema configs, and sample IFC files.
 - **`supabase/migrations/`** — Database migration SQL scripts.
 
@@ -109,7 +112,7 @@ Primary Frontend (frontend/)       → Vite + Svelte 5 SPA, TypeScript, Tailwind
 API Gateway (app/api/)             → FastAPI routers (/projects, /rules, /analyze, /events)
 Data Contracts (app/modules/contracts.py) → Pydantic request/response schemas (mirrored in frontend/src/lib/types.ts)
 Services (app/services/)           → Business logic, pipeline runner, tracker, Supabase persistence
-Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernels (GC-001, CC-001, MC-001, Blue Halo)
+Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernels (GC-001 galvanic, CC-001 crevice, MC-001 microbiological, Blue Halo)
 ```
 
 ### Data Flow
@@ -148,6 +151,7 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
   - `<LoadingState>`: Spinner loading container with configurable messages.
   - `<SeverityBadge>`: Unified pill badge for severity levels and verdicts.
   - `<IsoGovernanceBadges>`: Standard ISO 19650 metadata tags (Suitability, Revision, CDE State).
+  - Other established shared components also live here (e.g. `Navbar`, `Sidebar`, `TopHeader`, `PipelineProgress`, `ConfirmModal`, `Alert`, `Badge`, `TableActions`, `ThemeToggle`, `ExportActions`, `IssueTable`) — reuse them the same way rather than duplicating markup.
 
 ### API & Backend Guidelines (`app/api/`)
 
