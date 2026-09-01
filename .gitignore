@@ -71,3 +71,17 @@ validation_sweep_retry.log
 # No trailing slash: the dataset is often a symlink to a clone kept outside
 # the working tree, and "test-models/" matches only a real directory.
 test-models
+
+# --- Master's submission hygiene -------------------------------------------
+
+# Log files anywhere. The curated validation logs under docs/validation/logs/
+# are evidentiary (thesis Appendix B) and stay tracked via the negation below.
+*.log
+!docs/validation/logs/*.log
+
+# Firecrawl scrape output: transient RAG retrieval artifacts, regenerable with
+# `python scripts/fetch_standards.py`. The folder itself stays tracked via
+# .gitkeep, and README.md documents the naming/routing contract.
+docs/scraped_standards/*
+!docs/scraped_standards/.gitkeep
+!docs/scraped_standards/README.md

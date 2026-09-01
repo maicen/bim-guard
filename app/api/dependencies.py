@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.bootstrap import get_container
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.documents_service import DocumentService
+from app.services.naming_config_service import NamingConfigService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
 from app.services.projects_service import ProjectsService
@@ -47,3 +48,6 @@ def get_arch_analysis_service() -> ArchAnalysisService:
     return get_container().arch_analysis_service
 
 
+def get_naming_config_service() -> NamingConfigService:
+    """Return the configured NamingConfigService instance."""
+    return get_container().naming_config_service

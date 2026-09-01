@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { X, Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from 'lucide-svelte';
-  import { projectsApi, documentsApi } from '../api';
+  import { projectsApi, documentsApi, namingConfigApi } from '../api';
   import { IFC_FILE_ROLES } from '../types';
-  import type { Project, DocumentItem, ProjectOptions } from '../types';
+  import type { Project, DocumentItem, ProjectOptions, NamingConfigPayload } from '../types';
+  import NamingConfigStep from './NamingConfigStep.svelte';
 
   export let isOpen: boolean = false;
   export let onClose: () => void;
@@ -49,7 +50,34 @@
   let buildingsCount = '';
   let floorsCount = '';
 
-  // Available Documents and standards for Step 4
+  // ISO 19650 naming, edited on step 3. The project row does not exist until
+  // the final step, so this is held here and written once it does -- there is
+  // no project to PUT it against while the step is on screen.
+  const NAMING_DEFAULTS: NamingConfigPayload = {
+    project_code: '',
+    originator_code: '',
+    type_code: 'CO',
+    suitability: 'S1',
+    revision: '01',
+    separator: '_',
+    date_format: 'YYMMDD',
+    class_a: '',
+    class_b: '',
+    active_convention: 'iso19650_date',
+    level_codes: [],
+    type_codes: [],
+    discipline_codes: [],
+    volume_codes: [],
+    custom_conventions: [],
+  };
+  let namingConfig: NamingConfigPayload = { ...NAMING_DEFAULTS };
+  // A project is only given a naming row if the user actually filled the step
+  // in. Writing the untouched defaults would make every project claim a naming
+  // setup it never chose, and is_configured would stop meaning anything.
+  $: namingConfigTouched =
+    JSON.stringify(namingConfig) !== JSON.stringify(NAMING_DEFAULTS);
+
+  // Available Documents and standards for Step 5
   let documents: DocumentItem[] = [];
   let selectedDocIds: Set<number> = new Set();
   let selectedStandardIds: Set<string> = new Set();
@@ -88,10 +116,12 @@
   const STEPS = [
     { num: 1, title: 'Details' },
     { num: 2, title: 'IFC Model' },
-    { num: 3, title: 'Scope' },
-    { num: 4, title: 'Inputs' },
-    { num: 5, title: 'Confirm' },
+    { num: 3, title: 'Naming' },
+    { num: 4, title: 'Scope' },
+    { num: 5, title: 'Inputs' },
+    { num: 6, title: 'Confirm' },
   ];
+  const LAST_STEP = STEPS.length;
 
   onMount(async () => {
     try {
@@ -303,6 +333,17 @@
         createdProject = await projectsApi.get(createdProject.id, { forceRefresh: true });
       }
 
+      if (namingConfigTouched) {
+        try {
+          await namingConfigApi.save(createdProject.id, namingConfig);
+        } catch (namingErr: any) {
+          // Non-fatal on purpose. The project and its models are saved; a
+          // naming setup that failed to write is recoverable from the project's
+          // own settings, and failing here would strand work already done.
+          console.warn('Naming configuration was not saved:', namingErr);
+        }
+      }
+
       onProjectCreated(createdProject);
       handleClose();
     } catch (err: any) {
@@ -328,6 +369,7 @@
     primaryIndex = 0;
     isDraggingIfc = false;
     ifcNotice = '';
+    namingConfig = { ...NAMING_DEFAULTS };
     createdProjectId = null;
     projectType = '';
     projectSizeSqm = '';
@@ -627,7 +669,11 @@
           </div>
 
         {:else if currentStep === 3}
-          <!-- Step 3: Scope -->
+          <!-- Step 3: ISO 19650 Naming -->
+          <NamingConfigStep bind:config={namingConfig} />
+
+        {:else if currentStep === 4}
+          <!-- Step 4: Scope -->
           <div class="space-y-4">
             <div>
               <label for="wizard-type" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -703,8 +749,8 @@
             </div>
           </div>
 
-        {:else if currentStep === 4}
-          <!-- Step 4: Reference Specifications -->
+        {:else if currentStep === 5}
+          <!-- Step 5: Reference Specifications -->
           <div class="space-y-3">
             <p class="text-xs text-slate-400 mb-2">
               Select specification documents and standards from the library to link with this project:
@@ -783,8 +829,8 @@
             </div>
           </div>
 
-        {:else if currentStep === 5}
-          <!-- Step 5: Summary & Confirm -->
+        {:else if currentStep === 6}
+          <!-- Step 6: Summary & Confirm -->
           <div class="space-y-3 text-xs">
             <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
               <div class="flex justify-between py-1 border-b border-slate-800">
@@ -861,7 +907,7 @@
           <div></div>
         {/if}
 
-        {#if currentStep < 5}
+        {#if currentStep < LAST_STEP}
           <button
             type="button"
             on:click={() => {

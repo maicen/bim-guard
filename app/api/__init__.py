@@ -10,7 +10,16 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analyze, dashboard, documents, events, projects, rules, settings
+from app.api import (
+    analyze,
+    dashboard,
+    documents,
+    events,
+    naming_config,
+    projects,
+    rules,
+    settings,
+)
 
 api_app = FastAPI(
     title="BIM Guard API",
@@ -49,6 +58,9 @@ api_app.include_router(rules.router, prefix="/rules", tags=["Rules"])
 api_app.include_router(analyze.router, prefix="/analyze", tags=["Analysis"])
 api_app.include_router(documents.router, prefix="/documents", tags=["Documents"])
 api_app.include_router(settings.router, prefix="/settings", tags=["Settings"])
+api_app.include_router(
+    naming_config.router, prefix="/naming-config", tags=["ISO 19650 Naming"]
+)
 api_app.include_router(events.router, prefix="", tags=["Events"])
 
 

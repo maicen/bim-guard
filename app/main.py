@@ -26,6 +26,9 @@ from app.api import (
     events as api_events,
 )
 from app.api import (
+    naming_config as api_naming_config,
+)
+from app.api import (
     projects as api_projects,
 )
 from app.api import (
@@ -194,6 +197,9 @@ app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(api_documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(api_settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(
+    api_naming_config.router, prefix="/api/naming-config", tags=["ISO 19650 Naming"]
+)
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 
 
