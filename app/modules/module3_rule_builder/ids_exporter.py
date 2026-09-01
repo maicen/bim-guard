@@ -156,38 +156,49 @@ def build_ids_document(
         ET.SubElement(entity, f"{{{ns['ids']}}}name").text = str(row.get("target_ifc_class"))
 
         requirements = ET.SubElement(spec, f"{{{ns['ids']}}}requirements")
-        requirement = ET.SubElement(requirements, f"{{{ns['ids']}}}property")
-        requirement.set("dataType", "IFCLABEL")
+        
+        # 1. Property Requirement Facet
+        if str(row.get("rule_category") or "").strip() == "property_check":
+            requirement = ET.SubElement(requirements, f"{{{ns['ids']}}}property")
+            requirement.set("dataType", str(row.get("data_type") or "IFCLABEL"))
+            
+            tolerance = row.get("tolerance")
+            if tolerance is not None and str(tolerance).strip() != "":
+                requirement.set("tolerance", str(tolerance))
 
-        pset = str(row.get("property_set") or "").strip()
-        if pset:
-            requirement.set("uri", pset)
-            property_set = ET.SubElement(requirement, f"{{{ns['ids']}}}propertySet")
-            property_set.text = pset
+            cardinality = row.get("cardinality")
+            if cardinality and str(cardinality).strip() in {"required", "optional", "prohibited"}:
+                requirement.set("cardinality", str(cardinality).strip())
 
-        prop_name = ET.SubElement(requirement, f"{{{ns['ids']}}}name")
-        prop_name.text = str(row.get("property_name"))
+            pset = str(row.get("property_set") or "").strip()
+            if pset:
+                requirement.set("uri", pset)
+                property_set = ET.SubElement(requirement, f"{{{ns['ids']}}}propertySet")
+                property_set.text = pset
 
-        value = ET.SubElement(requirement, f"{{{ns['ids']}}}value")
-        simple = ET.SubElement(value, f"{{{ns['ids']}}}simpleValue")
+            prop_name = ET.SubElement(requirement, f"{{{ns['ids']}}}name")
+            prop_name.text = str(row.get("property_name"))
 
-        operator = str(row.get("operator") or "").strip()
-        if operator.lower() in {"between", "range"}:
-            range_values = _range_values(row)
-            if range_values:
-                min_value, max_value = range_values
-                lower = ET.SubElement(requirement, f"{{{ns['ids']}}}minValue")
-                lower.text = min_value
-                upper = ET.SubElement(requirement, f"{{{ns['ids']}}}maxValue")
-                upper.text = max_value
-                continue
+            value = ET.SubElement(requirement, f"{{{ns['ids']}}}value")
+            simple = ET.SubElement(value, f"{{{ns['ids']}}}simpleValue")
 
-        simple.text = _value_text(row.get("check_value"))
+            operator = str(row.get("operator") or "").strip()
+            if operator.lower() in {"between", "range"}:
+                range_values = _range_values(row)
+                if range_values:
+                    min_value, max_value = range_values
+                    lower = ET.SubElement(requirement, f"{{{ns['ids']}}}minValue")
+                    lower.text = min_value
+                    upper = ET.SubElement(requirement, f"{{{ns['ids']}}}maxValue")
+                    upper.text = max_value
+                    continue
 
-        if operator:
-            restriction = ET.SubElement(requirement, f"{{{ns['ids']}}}restriction")
-            restriction.set("type", _operator_tag(operator))
-            restriction.text = _value_text(row.get("check_value") or row.get("value_min") or row.get("value_max"))
+            simple.text = _value_text(row.get("check_value"))
+
+            if operator:
+                restriction = ET.SubElement(requirement, f"{{{ns['ids']}}}restriction")
+                restriction.set("type", _operator_tag(operator))
+                restriction.text = _value_text(row.get("check_value") or row.get("value_min") or row.get("value_max"))
 
     xml_bytes = ET.tostring(ids_root, encoding="utf-8")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_bytes.decode("utf-8")
@@ -248,10 +259,8 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
         if entity_el is not None and entity_el.text:
             entity_name = entity_el.text.strip()
 
+        # 1. Properties
         requirements = spec.findall("ids:requirements/ids:property", ns)
-        if not requirements:
-            continue
-
         for requirement in requirements:
             property_set = ""
             property_set_el = requirement.find("ids:propertySet", ns)
@@ -265,6 +274,9 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
 
             if not entity_name or not prop_name:
                 continue
+
+            tolerance_attr = requirement.attrib.get("tolerance")
+            tolerance = _coerce_ids_scalar(tolerance_attr) if tolerance_attr else None
 
             value_el = requirement.find("ids:value", ns)
             min_el = requirement.find("ids:minValue", ns)
@@ -305,11 +317,60 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
                     "check_value": check_value,
                     "value_min": value_min,
                     "value_max": value_max,
+                    "tolerance": tolerance,
                     "rule_category": "property_check",
                     "ruleset_id": base_ruleset_id,
                     "mechanism": "CODE",
                     "severity": "mandatory",
                     "source_text": f"Imported from IDS specification {spec_name}",
+                }
+            )
+
+        # 2. Classifications
+        classifications = spec.findall("ids:requirements/ids:classification", ns)
+        for req_cls in classifications:
+            system_el = req_cls.find("ids:system", ns)
+            val_el = req_cls.find("ids:value", ns)
+            system_name = system_el.text.strip() if system_el is not None and system_el.text else "Classification"
+            cls_value = val_el.text.strip() if val_el is not None and val_el.text else None
+            rows.append(
+                {
+                    "reference": f"{spec_name}-CLS",
+                    "rule_type": "classification_check",
+                    "description": f"Imported classification from IDS: {spec_name}",
+                    "target_ifc_class": entity_name,
+                    "property_set": system_name,
+                    "property_name": "Classification",
+                    "operator": "=",
+                    "check_value": cls_value,
+                    "rule_category": "property_check",
+                    "ruleset_id": base_ruleset_id,
+                    "mechanism": "CODE",
+                    "severity": "mandatory",
+                    "source_text": f"Imported classification {system_name}",
+                }
+            )
+
+        # 3. Materials
+        materials = spec.findall("ids:requirements/ids:material", ns)
+        for req_mat in materials:
+            val_el = req_mat.find("ids:value", ns)
+            mat_value = val_el.text.strip() if val_el is not None and val_el.text else None
+            rows.append(
+                {
+                    "reference": f"{spec_name}-MAT",
+                    "rule_type": "material_check",
+                    "description": f"Imported material from IDS: {spec_name}",
+                    "target_ifc_class": entity_name,
+                    "property_set": "Material",
+                    "property_name": "Material",
+                    "operator": "=",
+                    "check_value": mat_value,
+                    "rule_category": "property_check",
+                    "ruleset_id": base_ruleset_id,
+                    "mechanism": "CODE",
+                    "severity": "mandatory",
+                    "source_text": f"Imported material requirement for {entity_name}",
                 }
             )
 
@@ -322,3 +383,4 @@ __all__ = [
     "filter_exportable_rules",
     "import_ids_ruleset",
 ]
+

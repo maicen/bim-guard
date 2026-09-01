@@ -64,6 +64,25 @@ run_server.bat          # Windows
 5. **Styling**: Use Tailwind CSS utility classes following the design tokens in `DESIGN.md`.
 6. **3D Viewport**: Reuse or extend `src/lib/components/IfcViewer.svelte` for IFC 3D visualization and BCF camera viewpoints.
 7. **Views & Routing**: All UI views (projects, dashboards, analysis, rule editors) live in `frontend/src/routes/` or `frontend/src/lib/components/`.
+8. **Universal Data Table UX Standards**: Every data table in the repository (Projects, Documents, Reports & BCF Topics/Artifacts, Rules Catalog, Extracted Rules, Audit Findings/Issues, Revit Sync, etc.) MUST provide rich, interactive, user-friendly features:
+   - **Multiple Selection**: Checkboxes per row, 'Select All' header toggle with indeterminate/checked states, selection count badges, and clear selection action.
+   - **Full CRUD Support**: Create/Upload dialogs/wizards, Read/Inspect Details modal with rich properties, Update/Edit modal, and Delete with explicit confirmation dialog.
+   - **Bulk Actions**: Contextual `BulkActionBar` toolbar active when 1+ items are selected (supporting Bulk Edit modal, Bulk Delete with confirmation, and Bulk Export to CSV/JSON/BCF).
+   - **Pagination**: Dedicated `TablePagination` component supporting dynamic page size selection (10, 25, 50, 100), current item range indicator, total counts, and quick navigation.
+   - **Search & Multi-Criteria Filtering**: Real-time client/server multi-attribute search and dropdown filters with zero-state reset actions.
+   - **Column Sorting**: Interactive column headers with ascending/descending direction indicators.
+   - **Empty States & Accessibility**: High-polish zero-state placeholders with actionable reset buttons, loading skeletons/spinners, responsive horizontal scroll, and keyboard accessibility.
+9. **Reusable Component Architecture**: Always use established shared UI building blocks from `frontend/src/lib/components/`:
+   - `<PageHeader>`: Standard top view header with category breadcrumbs, icon, title, subtitle, and action slots.
+   - `<Modal>`: Standard modal dialog with backdrop blur, keyboard `Escape` closing, header with icon, and slot layout.
+   - `<SortHeader>`: Sortable table column header with automatic sort direction indicators and ARIA attributes.
+   - `<TableCheckbox>`: Accessible checkbox supporting indeterminate master toggle and row selection.
+   - `<TablePagination>`: Dedicated table pagination component with page size selection.
+   - `<BulkActionBar>`: Floating/inline bulk action toolbar when rows are selected.
+   - `<EmptyState>`: Standardized zero-state card with icon, title, description, and primary CTA.
+   - `<LoadingState>`: Spinner loading container with configurable messages.
+   - `<SeverityBadge>`: Unified pill badge for severity levels and verdicts.
+   - `<IsoGovernanceBadges>`: Standard ISO 19650 metadata tags (Suitability, Revision, CDE State).
 
 ---
 

@@ -70,13 +70,14 @@ def test_project_enhance_endpoint_requires_no_token(client: TestClient) -> None:
 
 
 def test_document_update_endpoint(client: TestClient) -> None:
-    """PUT /api/documents/{id} updates document filename and extracted text."""
+    """PUT /api/documents/{id} updates document filename, doc_type, and extracted text."""
     doc_service = DocumentService()
     created = doc_service.create_document(
         md5_hash="dummy-md5-for-test",
         filename="original_spec.txt",
         file_path="uploads/test.txt",
         extracted_text="Original extracted text content",
+        doc_type="Specification",
     )
     doc_id = created["id"]
 
@@ -85,13 +86,49 @@ def test_document_update_endpoint(client: TestClient) -> None:
             f"/api/documents/{doc_id}",
             json={
                 "filename": "updated_spec.txt",
+                "doc_type": "Code",
                 "extracted_text": "Updated parsed rules text content",
             },
         )
         assert response.status_code == 200
         data = response.json()
         assert data["filename"] == "updated_spec.txt"
+        assert data["doc_type"] == "Code"
         assert data["extracted_text"] == "Updated parsed rules text content"
         assert data["char_count"] == len("Updated parsed rules text content")
     finally:
         doc_service.delete_document(doc_id)
+
+
+def test_document_create_and_link_with_doc_type() -> None:
+    """DocumentService preserves doc_type and ProjectsService propagates it to client_documents."""
+    doc_service = DocumentService()
+    proj_service = ProjectsService()
+
+    doc = doc_service.create_document(
+        md5_hash="dummy-md5-manual-test",
+        filename="equipment_manual.pdf",
+        file_path="uploads/equipment_manual.pdf",
+        extracted_text="Operating and maintenance procedures",
+        doc_type="Manual",
+    )
+    doc_id = doc["id"]
+
+    project = proj_service.create_project(
+        name="Doc Link Test Project",
+        country="Canada",
+        analysis_type="Arch",
+    )
+    project_id = project["id"]
+
+    try:
+        linked_count = proj_service.link_library_documents(project_id, [doc_id])
+        assert linked_count == 1
+        client_docs = proj_service.get_client_documents_by_project(project_id)
+        assert len(client_docs) == 1
+        assert client_docs[0]["category"] == "Manual"
+        assert client_docs[0]["filename"] == "equipment_manual.pdf"
+    finally:
+        proj_service.delete_project(project_id)
+        doc_service.delete_document(doc_id)
+

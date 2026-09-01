@@ -1,22 +1,52 @@
 import type {
   AnalysisResult,
   BcfArtifact,
+  BCFCommentCreatePayload,
+  BCFCommentResponse,
+  BCFProjectResponse,
+  BCFTopicCreatePayload,
+  BCFTopicResponse,
+  BCFTopicUpdatePayload,
+  BCFViewpointCreatePayload,
+  BCFViewpointResponse,
+  BSDDClassItem,
+  BSDDClassSearchResponse,
+  BSDDDictionaryItem,
+  BSDDValidationResult,
+  CDEDocumentItem,
+  CDESyncRequest,
+  CDESyncResponse,
+  CDEUserResponse,
+  CDEVersionsResponse,
   DocumentDetail,
   DocumentItem,
   DocumentUpdatePayload,
+  GitHubRepo,
+  GitHubRepoCreatePayload,
+  GitHubRepoStructure,
+  GitHubRepoUpdatePayload,
+  IFCValidationReport,
   NamingCatalog,
   NamingConfig,
   NamingConfigPayload,
   NamingPreview,
   Project,
+  ProjectBulkActionResponse,
+  ProjectBulkDeletePayload,
+  ProjectBulkUpdatePayload,
   ProjectCreatePayload,
   ProjectIfcFile,
   ProjectIfcUploadResponse,
+  ProjectImportPayload,
   ProjectOptions,
   ProjectListResponse,
   ProjectUpdatePayload,
   Rule,
+  RuleBulkActionResponse,
+  RuleBulkUpdatePayload,
   RuleFolder,
+  RuleFolderBulkActionResponse,
+  RuleFolderBulkUpdatePayload,
   RuleFolderCreatePayload,
   RuleFolderUpdatePayload,
   RulesetCategory,
@@ -174,6 +204,28 @@ export const projectsApi = {
     _projectsStore.remove(id);
   },
 
+  async bulkDelete(ids: number[]): Promise<ProjectBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/projects/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_ids: ids }),
+    });
+    const result = await handleResponse<ProjectBulkActionResponse>(res);
+    ids.forEach((id) => _projectsStore.remove(id));
+    return result;
+  },
+
+  async bulkUpdate(payload: ProjectBulkUpdatePayload): Promise<ProjectBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/projects/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await handleResponse<ProjectBulkActionResponse>(res);
+    _projectsStore.clear();
+    return result;
+  },
+
   invalidateCache() {
     _projectsStore.clear();
     _projectOptionsStore.clear();
@@ -309,6 +361,45 @@ export const rulesApi = {
     return updated;
   },
 
+  async deleteFolder(rulesetId: string): Promise<{ success: boolean; ruleset_id: string; deleted_rules: number }> {
+    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
+      method: 'DELETE',
+    });
+    const result = await handleResponse<{ success: boolean; ruleset_id: string; deleted_rules: number }>(res);
+    _ruleFoldersStore.clear();
+    _rulesStore.clear();
+    return result;
+  },
+
+  async bulkUpdateFolders(payload: RuleFolderBulkUpdatePayload): Promise<RuleFolderBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/folders/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await handleResponse<RuleFolderBulkActionResponse>(res);
+    _ruleFoldersStore.clear();
+    _rulesStore.clear();
+    return result;
+  },
+
+  async bulkDeleteFolders(rulesetIds: string[]): Promise<RuleFolderBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/folders/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ruleset_ids: rulesetIds }),
+    });
+    const result = await handleResponse<RuleFolderBulkActionResponse>(res);
+    _ruleFoldersStore.clear();
+    _rulesStore.clear();
+    return result;
+  },
+
+  async getFolder(rulesetId: string): Promise<RuleFolder> {
+    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`);
+    return handleResponse<RuleFolder>(res);
+  },
+
   async get(id: number, options: SWROptions = {}): Promise<Rule> {
     return _rulesStore.fetchItem(
       id,
@@ -353,9 +444,40 @@ export const rulesApi = {
     _ruleFoldersStore.clear();
   },
 
+  async bulkUpdate(payload: RuleBulkUpdatePayload): Promise<RuleBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await handleResponse<RuleBulkActionResponse>(res);
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
+    return result;
+  },
+
+  async bulkDelete(ruleIds: number[]): Promise<RuleBulkActionResponse> {
+    const res = await fetch(`${API_BASE}/rules/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rule_ids: ruleIds }),
+    });
+    const result = await handleResponse<RuleBulkActionResponse>(res);
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
+    return result;
+  },
+
   invalidateCache() {
     _rulesStore.clear();
     _ruleFoldersStore.clear();
+  },
+
+  getIdsExportUrl(rulesetId?: string): string {
+    if (rulesetId) {
+      return `${API_BASE}/rules/export-ids/${encodeURIComponent(rulesetId)}`;
+    }
+    return `${API_BASE}/rules/export-ids`;
   },
 };
 
@@ -425,6 +547,13 @@ export const analyzeApi = {
     const res = await fetch(`${API_BASE}/analyze/bcf/list`);
     return handleResponse<BcfArtifact[]>(res);
   },
+
+  async deleteBcfArtifact(artifactId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/analyze/bcf/artifacts/${artifactId}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<void>(res);
+  },
 };
 
 export const dashboardApi = {
@@ -489,9 +618,18 @@ export const documentsApi = {
     );
   },
 
-  async upload(file: File): Promise<DocumentDetail> {
+  async upload(
+    file: File,
+    docType: string = 'Specification',
+    isoOptions?: { project_code?: string; originator?: string; suitability_code?: string; revision_code?: string },
+  ): Promise<DocumentDetail> {
     const form = new FormData();
     form.append('file', file);
+    form.append('doc_type', docType);
+    if (isoOptions?.project_code) form.append('project_code', isoOptions.project_code);
+    if (isoOptions?.originator) form.append('originator', isoOptions.originator);
+    if (isoOptions?.suitability_code) form.append('suitability_code', isoOptions.suitability_code);
+    if (isoOptions?.revision_code) form.append('revision_code', isoOptions.revision_code);
     const res = await fetch(`${API_BASE}/documents`, {
       method: 'POST',
       body: form,
@@ -500,10 +638,16 @@ export const documentsApi = {
     _documentsStore.addOrUpdate({
       id: created.id,
       filename: created.filename,
+      doc_type: created.doc_type || docType,
       file_path: created.file_path,
       upload_date: created.upload_date,
       extracted_text_preview: created.extracted_text_preview || created.extracted_text?.slice(0, 200) || '',
       char_count: created.char_count ?? created.extracted_text?.length ?? 0,
+      project_code: created.project_code,
+      originator: created.originator,
+      suitability_code: created.suitability_code,
+      revision_code: created.revision_code,
+      cde_state: created.cde_state,
     });
     _documentDetailStore.set(created.id, created);
     return created;
@@ -519,6 +663,7 @@ export const documentsApi = {
     _documentsStore.addOrUpdate({
       id: updated.id,
       filename: updated.filename,
+      doc_type: updated.doc_type || payload.doc_type,
       file_path: updated.file_path,
       upload_date: updated.upload_date,
       extracted_text_preview: updated.extracted_text_preview || updated.extracted_text?.slice(0, 200) || '',
@@ -617,6 +762,234 @@ export const revitSyncApi = {
       body: JSON.stringify(payload),
     });
     return handleResponse<any>(res);
+  },
+};
+
+let _cachedReposList: GitHubRepo[] | null = null;
+const _cachedStructureMap: Record<number, GitHubRepoStructure> = {};
+
+export const githubReposApi = {
+  async list(forceRefresh = false): Promise<GitHubRepo[]> {
+    if (_cachedReposList && !forceRefresh) {
+      fetch(`${API_BASE}/repositories`)
+        .then((res) => handleResponse<GitHubRepo[]>(res))
+        .then((data) => {
+          _cachedReposList = data;
+        })
+        .catch(() => {});
+      return _cachedReposList;
+    }
+    const res = await fetch(`${API_BASE}/repositories`);
+    const data = await handleResponse<GitHubRepo[]>(res);
+    _cachedReposList = data;
+    return data;
+  },
+
+  async get(id: number): Promise<GitHubRepo> {
+    const res = await fetch(`${API_BASE}/repositories/${id}`);
+    return handleResponse<GitHubRepo>(res);
+  },
+
+  async create(payload: GitHubRepoCreatePayload): Promise<GitHubRepo> {
+    const res = await fetch(`${API_BASE}/repositories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const created = await handleResponse<GitHubRepo>(res);
+    _cachedReposList = null;
+    return created;
+  },
+
+  async update(id: number, payload: GitHubRepoUpdatePayload): Promise<GitHubRepo> {
+    const res = await fetch(`${API_BASE}/repositories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const updated = await handleResponse<GitHubRepo>(res);
+    _cachedReposList = null;
+    return updated;
+  },
+
+  async delete(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/repositories/${id}`, {
+      method: 'DELETE',
+    });
+    await handleResponse<void>(res);
+    _cachedReposList = null;
+    delete _cachedStructureMap[id];
+  },
+
+  async getStructure(id: number, forceRefresh = false): Promise<GitHubRepoStructure> {
+    if (_cachedStructureMap[id] && !forceRefresh) {
+      fetch(`${API_BASE}/repositories/${id}/structure`)
+        .then((res) => handleResponse<GitHubRepoStructure>(res))
+        .then((data) => {
+          _cachedStructureMap[id] = data;
+        })
+        .catch(() => {});
+      return _cachedStructureMap[id];
+    }
+    const res = await fetch(`${API_BASE}/repositories/${id}/structure`);
+    const data = await handleResponse<GitHubRepoStructure>(res);
+    _cachedStructureMap[id] = data;
+    return data;
+  },
+
+  async importProject(repoId: number, payload: ProjectImportPayload): Promise<Project> {
+    const res = await fetch(`${API_BASE}/repositories/${repoId}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const created = await handleResponse<Project>(res);
+    _projectsStore.addOrUpdate(created);
+    return created;
+  },
+};
+
+// =============================================================================
+// buildingSMART OpenCDE API Client
+// =============================================================================
+
+export const cdeApi = {
+  async getVersions(): Promise<CDEVersionsResponse> {
+    const res = await fetch(`${API_BASE}/cde/versions`);
+    return handleResponse<CDEVersionsResponse>(res);
+  },
+
+  async getUser(): Promise<CDEUserResponse> {
+    const res = await fetch(`${API_BASE}/cde/v1/user`);
+    return handleResponse<CDEUserResponse>(res);
+  },
+
+  async listDocuments(
+    projectId: number,
+    params?: { filter?: string; top?: number; skip?: number; orderby?: string },
+  ): Promise<CDEDocumentItem[]> {
+    const query = new URLSearchParams();
+    if (params?.filter) query.set('$filter', params.filter);
+    if (params?.top) query.set('$top', String(params.top));
+    if (params?.skip) query.set('$skip', String(params.skip));
+    if (params?.orderby) query.set('$orderby', params.orderby);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const res = await fetch(`${API_BASE}/cde/v1/projects/${projectId}/documents${qs}`);
+    return handleResponse<CDEDocumentItem[]>(res);
+  },
+
+  async syncDocuments(payload: CDESyncRequest): Promise<CDESyncResponse> {
+    const res = await fetch(`${API_BASE}/cde/v1/projects/${payload.project_id}/documents/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<CDESyncResponse>(res);
+  },
+};
+
+// =============================================================================
+// buildingSMART BCF REST API Client (v2.1)
+// =============================================================================
+
+export const bcfApi = {
+  async listProjects(): Promise<BCFProjectResponse[]> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects`);
+    return handleResponse<BCFProjectResponse[]>(res);
+  },
+
+  async getProject(projectId: string | number): Promise<BCFProjectResponse> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}`);
+    return handleResponse<BCFProjectResponse>(res);
+  },
+
+  async listTopics(
+    projectId: string | number,
+    filters?: { topic_status?: string; topic_type?: string; priority?: string; assigned_to?: string; cde_state?: string },
+  ): Promise<BCFTopicResponse[]> {
+    const query = new URLSearchParams();
+    if (filters?.topic_status) query.set('topic_status', filters.topic_status);
+    if (filters?.topic_type) query.set('topic_type', filters.topic_type);
+    if (filters?.priority) query.set('priority', filters.priority);
+    if (filters?.assigned_to) query.set('assigned_to', filters.assigned_to);
+    if (filters?.cde_state) query.set('cde_state', filters.cde_state);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics${qs}`);
+    return handleResponse<BCFTopicResponse[]>(res);
+  },
+
+  async getTopic(projectId: string | number, topicGuid: string): Promise<BCFTopicResponse> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`);
+    return handleResponse<BCFTopicResponse>(res);
+  },
+
+  async createTopic(projectId: string | number, payload: BCFTopicCreatePayload): Promise<BCFTopicResponse> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<BCFTopicResponse>(res);
+  },
+
+  async updateTopic(
+    projectId: string | number,
+    topicGuid: string,
+    payload: BCFTopicUpdatePayload,
+  ): Promise<BCFTopicResponse> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<BCFTopicResponse>(res);
+  },
+
+  async listComments(projectId: string | number, topicGuid: string): Promise<BCFCommentResponse[]> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`);
+    return handleResponse<BCFCommentResponse[]>(res);
+  },
+
+  async createComment(
+    projectId: string | number,
+    topicGuid: string,
+    payload: BCFCommentCreatePayload,
+  ): Promise<BCFCommentResponse> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<BCFCommentResponse>(res);
+  },
+
+  async listViewpoints(projectId: string | number, topicGuid: string): Promise<BCFViewpointResponse[]> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`);
+    return handleResponse<BCFViewpointResponse[]>(res);
+  },
+
+  async createViewpoint(
+    projectId: string | number,
+    topicGuid: string,
+    payload: BCFViewpointCreatePayload,
+  ): Promise<BCFViewpointResponse> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<BCFViewpointResponse>(res);
+  },
+
+  async deleteTopic(projectId: string | number, topicGuid: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<void>(res);
+  },
+
+  async bulkDeleteTopics(projectId: string | number, topicGuids: string[]): Promise<void> {
+    await Promise.all(topicGuids.map((guid) => this.deleteTopic(projectId, guid)));
   },
 };
 

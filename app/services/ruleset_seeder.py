@@ -189,6 +189,47 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
         },
     ]
 
+    # Window data-completeness checks: presence-only, not code-mandated
+    # thresholds. Life-safety window properties (fire/acoustic/security
+    # rating, thermal transmittance, egress/fire-exit flags, ...) live in
+    # Pset_WindowCommon but are almost never populated by default in
+    # authoring tools — Module4_Comparator already treats a missing
+    # property as MISSING_DATA (or PARTIAL if some elements have it), never
+    # PASS, so these rules surface "this window has no documented X" rather
+    # than asserting compliance against a threshold nobody has verified.
+    # Kept in a separate ruleset_id / mechanism from the OBC "CODE" rows
+    # above so they're never mistaken for real regulatory citations.
+    window_pset_common_fields = [
+        "FireRating",
+        "AcousticRating",
+        "SecurityRating",
+        "ThermalTransmittance",
+        "Infiltration",
+        "IsExternal",
+        "HandicapAccessible",
+        "FireExit",
+        "SelfClosing",
+        "SmokeStop",
+    ]
+    for field_name in window_pset_common_fields:
+        rules_to_seed.append({
+            "reference": f"BIMGUARD-WIN.{field_name}",
+            "rule_type": "property_presence",
+            "rule_category": "window_documentation",
+            "description": (
+                f"Pset_WindowCommon.{field_name} should be documented on every "
+                f"window (BIM-Guard data-completeness check — flags undocumented "
+                f"data as MISSING_DATA, not a jurisdiction-specific threshold)"
+            ),
+            "target_ifc_class": "IfcWindow",
+            "property_name": field_name,
+            "operator": "documented",
+            "ruleset_id": "BIMGUARD-WINDOW-DATA",
+            "mechanism": "DATA_QC",
+            "category": "Arch",
+            "severity": "recommended",
+        })
+
     existing_refs = {
         str(r.get("reference") or "")
         for r in svc.list_rules()

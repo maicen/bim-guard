@@ -743,8 +743,21 @@ export async function initViewer(containerOrId) {
         }
     }
 
+    // The host page's project/file selection can update twice in one user
+    // action (e.g. a reactive prop settling in two steps), which fires two
+    // concurrent loadIfc calls for the same model. Racing clearModels() and
+    // fragmentIfcLoader.load() against each other silently ends with nothing
+    // in the scene — no error, since both individual loads succeed, they just
+    // stomp on each other. Serializing here means the second call always
+    // starts clean after the first one has actually finished attaching its
+    // model, regardless of what triggered the double call upstream.
+    let activeLoad = Promise.resolve();
     async function loadIfc(urlOrFile) {
+        const previous = activeLoad;
+        let release;
+        activeLoad = new Promise((resolve) => { release = resolve; });
         try {
+            await previous;
             await clearModels();
             const file = typeof urlOrFile === "string"
                 ? await fetch(urlOrFile).then(async (response) => {
@@ -758,6 +771,8 @@ export async function initViewer(containerOrId) {
         } catch (error) {
             console.error("Error loading IFC file", error);
             throw error;
+        } finally {
+            release();
         }
     }
 

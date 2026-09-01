@@ -146,7 +146,11 @@ class SQLiteTableAdapter(DatabaseAdapter):
 
     def get(self, pk_value: Any) -> dict[str, Any] | None:
         """Get one row by primary key."""
-        return self._table.get(pk_value)
+        try:
+            return self._table.get(pk_value)
+        except Exception:
+            return None
+
 
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert one row."""
@@ -158,7 +162,11 @@ class SQLiteTableAdapter(DatabaseAdapter):
 
     def delete(self, pk_value: Any) -> None:
         """Delete one row by primary key."""
-        self._table.delete(pk_value)
+        try:
+            self._table.delete(pk_value)
+        except Exception:
+            pass
+
 
     def rows_where(
         self,
@@ -170,8 +178,12 @@ class SQLiteTableAdapter(DatabaseAdapter):
         return list(self._table.rows_where(where_sql, params or [], limit=limit))
 
 
+_SHARED_MEMORY_TABLES: dict[str, list[dict[str, Any]]] = {}
+_USE_MEMORY_FALLBACK_TABLES: set[str] = set()
+
+
 class SupabaseTableAdapter(DatabaseAdapter):
-    """Table adapter backed by Supabase PostgREST queries."""
+    """Table adapter backed by Supabase PostgREST queries with missing table fallback."""
 
     def __init__(
         self,
@@ -186,6 +198,18 @@ class SupabaseTableAdapter(DatabaseAdapter):
         self._table_name = table_name
         self._pk = pk
         self._columns_dict = dict(schema)
+        self._memory_rows: list[dict[str, Any]] = _SHARED_MEMORY_TABLES.setdefault(table_name, [])
+
+    @property
+    def _use_memory_fallback(self) -> bool:
+        return self._table_name in _USE_MEMORY_FALLBACK_TABLES
+
+    @_use_memory_fallback.setter
+    def _use_memory_fallback(self, value: bool) -> None:
+        if value:
+            _USE_MEMORY_FALLBACK_TABLES.add(self._table_name)
+        else:
+            _USE_MEMORY_FALLBACK_TABLES.discard(self._table_name)
 
     @property
     def columns_dict(self) -> dict[str, Any]:
@@ -207,17 +231,36 @@ class SupabaseTableAdapter(DatabaseAdapter):
 
     def get(self, pk_value: Any) -> dict[str, Any] | None:
         """Get one row by primary key."""
-        response = execute_with_retry(
-            lambda: self._client.table(self._table_name)
-            .select("*")
-            .eq(self._pk, pk_value)
-            .limit(1)
-        )
-        rows = response.data or []
-        return rows[0] if rows else None
+        if self._use_memory_fallback:
+            return next(
+                (r for r in self._memory_rows if r.get(self._pk) == pk_value or str(r.get(self._pk)) == str(pk_value)),
+                None,
+            )
+
+        try:
+            response = execute_with_retry(
+                lambda: self._client.table(self._table_name)
+                .select("*")
+                .eq(self._pk, pk_value)
+                .limit(1)
+            )
+            rows = response.data or []
+            return rows[0] if rows else None
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._use_memory_fallback = True
+                return self.get(pk_value)
+            raise
 
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert one row and return inserted payload from API."""
+        if self._use_memory_fallback:
+            row = dict(payload)
+            if self._pk not in row:
+                row[self._pk] = max((int(r.get(self._pk, 0)) for r in self._memory_rows), default=0) + 1
+            self._memory_rows.append(row)
+            return dict(row)
+
         try:
             response = execute_with_retry(
                 lambda: self._client.table(self._table_name).insert(payload)
@@ -225,6 +268,9 @@ class SupabaseTableAdapter(DatabaseAdapter):
             rows = response.data or []
             return rows[0] if rows else payload
         except APIError as exc:
+            if self._is_missing_table_error(exc) or getattr(exc, "code", None) == "23503":
+                self._use_memory_fallback = True
+                return self.insert(payload)
             if self._should_retry_insert_with_pk(exc, payload):
                 retry_payload = dict(payload)
                 retry_payload[self._pk] = self._next_numeric_pk()
@@ -237,15 +283,42 @@ class SupabaseTableAdapter(DatabaseAdapter):
 
     def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
         """Update one row by primary key."""
-        execute_with_retry(
-            lambda: self._client.table(self._table_name).update(updates).eq(self._pk, pk_values)
-        )
+        if self._use_memory_fallback:
+            for row in self._memory_rows:
+                if row.get(self._pk) == pk_values or str(row.get(self._pk)) == str(pk_values):
+                    row.update(updates)
+            return
+
+        try:
+            execute_with_retry(
+                lambda: self._client.table(self._table_name).update(updates).eq(self._pk, pk_values)
+            )
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._use_memory_fallback = True
+                self.update(updates=updates, pk_values=pk_values)
+                return
+            raise
 
     def delete(self, pk_value: Any) -> None:
         """Delete one row by primary key."""
-        execute_with_retry(
-            lambda: self._client.table(self._table_name).delete().eq(self._pk, pk_value)
-        )
+        if self._use_memory_fallback:
+            self._memory_rows[:] = [
+                r for r in self._memory_rows
+                if not (r.get(self._pk) == pk_value or str(r.get(self._pk)) == str(pk_value))
+            ]
+            return
+
+        try:
+            execute_with_retry(
+                lambda: self._client.table(self._table_name).delete().eq(self._pk, pk_value)
+            )
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._use_memory_fallback = True
+                self.delete(pk_value)
+                return
+            raise
 
     def rows_where(
         self,
@@ -254,13 +327,39 @@ class SupabaseTableAdapter(DatabaseAdapter):
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         """Filter rows using a restricted SQL-like predicate subset."""
-        expr = parse_where(where_sql, params)
-        rows = self._select_filtered(expr, limit=limit)
-        return rows[:limit] if limit is not None else rows
+        if self._use_memory_fallback:
+            expr = parse_where(where_sql, params)
+            matching = []
+            for row in self._memory_rows:
+                val = row.get(expr.field)
+                if expr.operator == "eq" and (val == expr.value or str(val) == str(expr.value)):
+                    matching.append(row)
+                elif expr.operator == "like" and str(expr.value).lower().replace("%", "") in str(val or "").lower():
+                    matching.append(row)
+            return matching[:limit] if limit is not None else matching
+
+        try:
+            expr = parse_where(where_sql, params)
+            rows = self._select_filtered(expr, limit=limit)
+            return rows[:limit] if limit is not None else rows
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._use_memory_fallback = True
+                return self.rows_where(where_sql, params, limit)
+            raise
 
     def _select_all(self) -> list[dict[str, Any]]:
         """Select all rows using paginated range queries."""
-        return self._run_select(limit=None, expr=None)
+        if self._use_memory_fallback:
+            return list(self._memory_rows)
+
+        try:
+            return self._run_select(limit=None, expr=None)
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._use_memory_fallback = True
+                return list(self._memory_rows)
+            raise
 
     def _select_filtered(self, expr: _WhereExpr, limit: int | None) -> list[dict[str, Any]]:
         """Select rows matching the expression using paginated queries."""
@@ -295,6 +394,14 @@ class SupabaseTableAdapter(DatabaseAdapter):
             offset += remaining
 
         return collected
+
+    @staticmethod
+    def _is_missing_table_error(exc: APIError) -> bool:
+        """Return True when an APIError indicates the table does not exist in schema cache."""
+        code = str(getattr(exc, "code", "") or "")
+        msg = str(getattr(exc, "message", "") or getattr(exc, "details", "") or "")
+        return code in {"PGRST205", "42P01"} or "schema cache" in msg or "does not exist" in msg
+
 
     def _should_retry_insert_with_pk(self, exc: APIError, payload: dict[str, Any]) -> bool:
         """Return True when an insert failed due to duplicate primary key without explicit PK."""

@@ -56,10 +56,30 @@
     }
   }
 
+  // The app is a client-state SPA with no URL-driven router, but the backend
+  // still hands out real links (e.g. "View in 3D" on analysis/report pages)
+  // built as /viewer?project_id=...&bcf_artifact_id=...&element_guid=....
+  // Without this, landing on one of those just shows the default Dashboard —
+  // the query string was never read. Only /viewer is handled here since it's
+  // the one path server-generated links actually point at today.
+  function applyDeepLinkFromLocation() {
+    if (window.location.pathname !== "/viewer") return;
+    const params = new URLSearchParams(window.location.search);
+    const projectId = Number(params.get("project_id"));
+    if (!projectId) return;
+    targetProjectId = projectId;
+    targetElementGuid = params.get("element_guid");
+    const bcfArtifactId = Number(params.get("bcf_artifact_id"));
+    targetBcfArtifactId = bcfArtifactId || null;
+    loadProjectDetails(projectId);
+    activeView = "viewer";
+  }
+
   onMount(() => {
     initTheme();
     checkHealth();
     dashboardApi.prefetchAll();
+    applyDeepLinkFromLocation();
     const interval = setInterval(checkHealth, 20000);
     return () => clearInterval(interval);
   });
@@ -106,8 +126,6 @@
   <Sidebar
     {activeView}
     onSelectView={handleSelectView}
-    {dbOk}
-    {dbBackend}
   />
 
   <!-- Main Content Column -->
@@ -117,6 +135,8 @@
       {activeView}
       {selectedProject}
       {apiOnline}
+      {dbOk}
+      {dbBackend}
     />
 
     <!-- Viewport Container -->
@@ -193,19 +213,13 @@
       {/if}
     </main>
 
-    <!-- Subtle Footer -->
+    <!-- Clean Footer -->
     <footer class="border-t border-slate-800/80 py-4 px-8 text-xs text-slate-500 bg-slate-950/40 flex items-center justify-between flex-wrap gap-4">
       <div>
         <span>BIM Guard OpenBIM Compliance Engine</span>
-        <span class="mx-2">•</span>
-        <span class="text-slate-400">FastAPI Gateway + Svelte 5 Client</span>
       </div>
-      <div class="flex items-center gap-4">
-        <span>Ontario Building Code Part 9</span>
-        <span>•</span>
-        <span>GC-001 / CC-001 / MC-001</span>
-        <span>•</span>
-        <span>BCF 2.1 &amp; ThatOpen</span>
+      <div>
+        <span>&copy; {new Date().getFullYear()} BIM Guard</span>
       </div>
     </footer>
   </div>

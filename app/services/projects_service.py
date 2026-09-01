@@ -72,6 +72,18 @@ class ProjectsService:
                     "ifc_md5_hash": str,
                     "created_at": str,
                     "updated_at": str,
+                    "project_code": str,
+                    "originator": str,
+                    "volume_system": str,
+                    "level": str,
+                    "type": str,
+                    "role": str,
+                    "number": str,
+                    "suitability_code": str,
+                    "revision_code": str,
+                    "cde_state": str,
+                    "cde_approved_by": str,
+                    "cde_approved_at": str,
                 },
                 required_columns={"ifc_file_path": str, "ifc_md5_hash": str},
             )
@@ -108,6 +120,17 @@ class ProjectsService:
                     "is_primary": bool,
                     "role": str,
                     "uploaded_at": str,
+                    "project_code": str,
+                    "originator": str,
+                    "volume_system": str,
+                    "level": str,
+                    "type": str,
+                    "number": str,
+                    "suitability_code": str,
+                    "revision_code": str,
+                    "cde_state": str,
+                    "cde_approved_by": str,
+                    "cde_approved_at": str,
                 },
             )
         )
@@ -224,6 +247,16 @@ class ProjectsService:
         project_size_sqm: float | None = None,
         buildings_count: int | None = None,
         floors_count: int | None = None,
+        project_code: str = "",
+        originator: str = "",
+        volume_system: str = "",
+        level: str = "",
+        type: str = "",
+        role: str = "",
+        number: str = "",
+        suitability_code: str = "S0",
+        revision_code: str = "P01.01",
+        cde_state: str = "WIP",
     ):
         """Insert a new project record into the database.
 
@@ -282,6 +315,16 @@ class ProjectsService:
             "ifc_md5_hash": ifc_md5_hash,
             "created_at": now,
             "updated_at": now,
+            "project_code": project_code,
+            "originator": originator,
+            "volume_system": volume_system,
+            "level": level,
+            "type": type,
+            "role": role,
+            "number": number,
+            "suitability_code": suitability_code or "S0",
+            "revision_code": revision_code or "P01.01",
+            "cde_state": cde_state or "WIP",
         }
         # Only send the wizard columns the caller actually filled in, so a
         # project created through the plain API is not written a row full of
@@ -298,6 +341,11 @@ class ProjectsService:
 
         project = self._insert_project_row(row)
         invalidate_cache("bimguard:projects:list")
+        if project and project.get("id"):
+            pid = project.get("id")
+            invalidate_cache(f"bimguard:projects:item:project_id={pid}")
+            invalidate_cache(f"bimguard:projects:docs:project_id={pid}")
+            invalidate_cache(f"bimguard:projects:inputs:project_id={pid}")
         logger.info(
             "Project created project_id=%s status=%s country=%s analysis_type=%s has_ifc=%s",
             project.get("id"),
@@ -316,9 +364,19 @@ class ProjectsService:
         status: str = "Draft",
         country: str = "",
         analysis_type: str = "",
+        project_code: str | None = None,
+        originator: str | None = None,
+        volume_system: str | None = None,
+        level: str | None = None,
+        type: str | None = None,
+        role: str | None = None,
+        number: str | None = None,
+        suitability_code: str | None = None,
+        revision_code: str | None = None,
+        cde_state: str | None = None,
     ):
         """Update editable fields for an existing project."""
-        updates = {
+        updates: dict = {
             "name": name.strip(),
             "description": description.strip(),
             "status": status,
@@ -326,6 +384,28 @@ class ProjectsService:
         }
         if country:
             updates["country"] = country.strip()
+        if analysis_type:
+            updates["analysis_type"] = normalize_analysis_type(analysis_type.strip())
+        if project_code is not None:
+            updates["project_code"] = project_code.strip()
+        if originator is not None:
+            updates["originator"] = originator.strip()
+        if volume_system is not None:
+            updates["volume_system"] = volume_system.strip()
+        if level is not None:
+            updates["level"] = level.strip()
+        if type is not None:
+            updates["type"] = type.strip()
+        if role is not None:
+            updates["role"] = role.strip()
+        if number is not None:
+            updates["number"] = number.strip()
+        if suitability_code is not None:
+            updates["suitability_code"] = suitability_code.strip() or "S0"
+        if revision_code is not None:
+            updates["revision_code"] = revision_code.strip() or "P01.01"
+        if cde_state is not None:
+            updates["cde_state"] = cde_state.strip() or "WIP"
         if analysis_type:
             analysis_type = normalize_analysis_type(analysis_type.strip())
             if analysis_type not in ANALYSIS_TYPES:
@@ -369,6 +449,12 @@ class ProjectsService:
         project = self.get_project(project_id)
         if project is not None:
             self._storage.delete(project.get("ifc_file_path") or "")
+        try:
+            for cd in self.get_client_documents_by_project(project_id):
+                if cd.get("id"):
+                    self._client_documents.delete(cd["id"])
+        except Exception:
+            pass
         self._projects.delete(project_id)
         invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
         invalidate_cache("bimguard:projects:list")
@@ -376,6 +462,68 @@ class ProjectsService:
         invalidate_cache(f"bimguard:projects:docs:project_id={project_id}")
         invalidate_cache(f"bimguard:projects:inputs:project_id={project_id}")
         logger.info("Project deleted project_id=%d existed=%s", project_id, project is not None)
+
+    def bulk_update_projects(
+        self,
+        project_ids: list[int],
+        *,
+        status: str | None = None,
+        country: str | None = None,
+        analysis_type: str | None = None,
+    ) -> list[int]:
+        """Update specified fields for multiple existing projects in bulk."""
+        if not project_ids:
+            return []
+
+        updates: dict[str, str] = {"updated_at": now_iso_utc()}
+        if status is not None and status.strip():
+            updates["status"] = status.strip()
+        if country is not None and country.strip():
+            updates["country"] = country.strip()
+        if analysis_type is not None and analysis_type.strip():
+            norm_analysis = normalize_analysis_type(analysis_type.strip())
+            if norm_analysis not in ANALYSIS_TYPES:
+                raise ValueError(
+                    f"analysis_type must be one of {ANALYSIS_TYPES!r}, got {norm_analysis!r}"
+                )
+            updates["analysis_type"] = norm_analysis
+
+        if len(updates) <= 1:
+            return []
+
+        updated_ids: list[int] = []
+        for pid in project_ids:
+            existing = self.get_project(pid)
+            if existing is not None:
+                self._projects.update(updates=updates, pk_values=pid)
+                invalidate_cache(f"bimguard:projects:item:project_id={pid}")
+                updated_ids.append(pid)
+
+        if updated_ids:
+            invalidate_cache("bimguard:projects:list")
+            logger.info("Bulk updated %d projects fields=%s", len(updated_ids), list(updates.keys()))
+
+        return updated_ids
+
+    def bulk_delete_projects(self, project_ids: list[int]) -> list[int]:
+        """Delete multiple projects by primary keys."""
+        deleted_ids: list[int] = []
+        for pid in project_ids:
+            project = self.get_project(pid)
+            if project is not None:
+                self._storage.delete(project.get("ifc_file_path") or "")
+                self._projects.delete(pid)
+                invalidate_cache(f"bimguard:projects:item:project_id={pid}")
+                invalidate_cache(f"bimguard:projects:standards:project_id={pid}")
+                invalidate_cache(f"bimguard:projects:docs:project_id={pid}")
+                invalidate_cache(f"bimguard:projects:inputs:project_id={pid}")
+                deleted_ids.append(pid)
+
+        if deleted_ids:
+            invalidate_cache("bimguard:projects:list")
+            logger.info("Bulk deleted %d projects", len(deleted_ids))
+
+        return deleted_ids
 
 
     def resolve_ifc_file(self, project_id: int) -> Path | None:
@@ -900,21 +1048,21 @@ class ProjectsService:
                 continue
 
             file_path = str(document.get("file_path") or "")
-            if file_path and file_path in already_linked:
+            if file_path and file_path in already_linked and file_path != "":
                 continue
 
             filename = str(document.get("filename") or f"document-{document_id}")
             extension = Path(filename).suffix.lstrip(".").lower()
+            doc_category = str(document.get("doc_type") or "Specification")
+            if doc_category not in DOCUMENT_CATEGORIES:
+                doc_category = "Specification"
             self._client_documents.insert(
                 {
                     "project_id": project_id,
                     "filename": filename,
                     "file_path": file_path,
                     "file_type": extension,
-                    # The check constraint only accepts the DOCUMENT_CATEGORIES
-                    # values; library documents are specifications by default,
-                    # and can be recategorised from the document library later.
-                    "category": "Specification",
+                    "category": doc_category,
                     "description": f"Linked from document library (id {document_id})",
                     "tags": "",
                     "upload_date": now,

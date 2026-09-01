@@ -77,9 +77,18 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["app/modules/tests"]
+testpaths = ["tests", "app/modules/tests"]
 markers = [
     "slow: marks tests that need real PDFs and are slow",
     "llm: marks tests that call the LLM (slow, costs tokens)",
     "integration: marks end-to-end pipeline tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:supabase.*:",
+    "ignore::DeprecationWarning:postgrest.*:",
+    "ignore:.*StarletteDeprecationWarning.*",
+    "ignore:.*Using `httpx` with `starlette.testclient`.*",
+    "ignore:.*The 'timeout' parameter is deprecated.*:DeprecationWarning",
+    "ignore:.*The 'verify' parameter is deprecated.*:DeprecationWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]

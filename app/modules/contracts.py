@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -115,26 +116,33 @@ class ProjectOptionsResponse(BaseModel):
     building_codes: list[BuildingCodeOption] = Field(default_factory=list)
 
 
+class CDEState(str, Enum):
+    """ISO 19650 Common Data Environment (CDE) Workflow States."""
+
+    WIP = "WIP"
+    SHARED = "SHARED"
+    PUBLISHED = "PUBLISHED"
+    ARCHIVED = "ARCHIVED"
+
+
 class ProjectCreateRequest(BaseModel):
-    """Payload for creating a new project via the API."""
+    """Payload for creating a project."""
 
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
-    description: Optional[str] = Field(default="", description="Project description")
-    status: str = Field(default="Draft", description="Workflow status (e.g. Draft, Active)")
-    country: str = Field(default="US", description="Regulatory jurisdiction or country code")
-    analysis_type: str = Field(default="Arch", description="Target analysis domain")
-    building_code: Optional[str] = Field(
-        default=None,
-        description="Building code ID from app.constants.BUILDING_CODES; optional outside Arch",
-    )
+    description: Optional[str] = Field(default="", description="Optional description")
+    status: str = Field(default="Draft", description="Workflow status")
+    country: str = Field(..., description="Jurisdiction governing code applicability")
+    analysis_type: str = Field(..., description="Analysis domain: Arch, Piping, or seismic")
 
-    # Wizard step 1. Optional so that the plain API stays usable without them,
-    # and so a client that predates these fields keeps working.
+    # Wizard step 3: optional building code ID
+    building_code: Optional[str] = Field(default=None, description="Building code ID")
+
+    # Wizard step 1 building details
     project_type: Optional[str] = Field(
-        default=None, description="Building type, one of app.constants.PROJECT_TYPES"
+        default=None, description="Building type from PROJECT_TYPES"
     )
     project_size_sqm: Optional[float] = Field(
-        default=None, ge=0, description="Gross floor area in square metres"
+        default=None, ge=0.0, description="Gross floor area in square metres"
     )
     buildings_count: Optional[int] = Field(
         default=None, ge=0, description="Number of buildings in the project"
@@ -142,6 +150,18 @@ class ProjectCreateRequest(BaseModel):
     floors_count: Optional[int] = Field(
         default=None, ge=0, description="Number of floors in the project"
     )
+
+    # ISO 19650 Container Naming & CDE Metadata
+    project_code: Optional[str] = Field(default="", description="ISO 19650 Project Code")
+    originator: Optional[str] = Field(default="", description="ISO 19650 Originator Code")
+    volume_system: Optional[str] = Field(default="", description="ISO 19650 Volume/System Breakdown")
+    level: Optional[str] = Field(default="", description="ISO 19650 Level/Location Breakdown")
+    type: Optional[str] = Field(default="", description="ISO 19650 Type Code")
+    role: Optional[str] = Field(default="", description="ISO 19650 Role/Discipline Code")
+    number: Optional[str] = Field(default="", description="ISO 19650 Sequential Number")
+    suitability_code: Optional[str] = Field(default="S0", description="ISO 19650 Suitability Code (S0-S4, A1-A4)")
+    revision_code: Optional[str] = Field(default="P01.01", description="ISO 19650 Revision Code (P01.01, C01)")
+    cde_state: CDEState = Field(default=CDEState.WIP, description="CDE State (WIP, SHARED, PUBLISHED, ARCHIVED)")
 
     # Wizard steps 4 and 5. Linked after the project row exists, so a failure
     # to link does not cost the caller the project.
@@ -161,6 +181,57 @@ class ProjectUpdateRequest(BaseModel):
     status: Optional[str] = None
     country: Optional[str] = None
     analysis_type: Optional[str] = None
+
+    # ISO 19650 Container Naming & CDE Metadata
+    project_code: Optional[str] = None
+    originator: Optional[str] = None
+    volume_system: Optional[str] = None
+    level: Optional[str] = None
+    type: Optional[str] = None
+    role: Optional[str] = None
+    number: Optional[str] = None
+    suitability_code: Optional[str] = None
+    revision_code: Optional[str] = None
+    cde_state: Optional[CDEState] = None
+
+
+class ProjectBulkDeleteRequest(BaseModel):
+    """Payload for deleting multiple projects in bulk."""
+
+    project_ids: list[int] = Field(..., min_length=1, description="IDs of projects to delete")
+
+
+class ISO19650Metadata(BaseModel):
+    """ISO 19650 UK National Annex container naming & suitability fields."""
+
+    project_code: str = Field(default="", description="Project code string (e.g. PRJ)")
+    originator: str = Field(default="", description="Authoring organization code (e.g. BIMG)")
+    volume_system: str = Field(default="", description="Volume or spatial breakdown code (e.g. ZZ, 01)")
+    level: str = Field(default="", description="Level / location breakdown (e.g. ZZ, 00)")
+    type: str = Field(default="", description="Document / Model type code (e.g. M3, DR)")
+    role: str = Field(default="", description="Discipline role code (e.g. A, S, M)")
+    number: str = Field(default="", description="Sequential document number (e.g. 0001)")
+    suitability_code: str = Field(default="S0", description="ISO 19650 suitability code (S0-S4, A1-A4, B1-B4)")
+    revision_code: str = Field(default="P01.01", description="ISO 19650 revision code (e.g. P01.01, C01)")
+    cde_state: CDEState = Field(default=CDEState.WIP, description="CDE state (WIP, SHARED, PUBLISHED, ARCHIVED)")
+    cde_approved_by: Optional[str] = Field(default="", description="Lead appointed party approver")
+    cde_approved_at: Optional[str] = Field(default=None, description="ISO timestamp of CDE approval")
+
+
+class ProjectBulkUpdateRequest(BaseModel):
+    """Payload for updating metadata on multiple projects in bulk."""
+
+    project_ids: list[int] = Field(..., min_length=1, description="IDs of projects to update")
+    status: Optional[str] = Field(None, description="Optional new status (Active, Draft, Archived)")
+    country: Optional[str] = Field(None, description="Optional new country/jurisdiction")
+    analysis_type: Optional[str] = Field(None, description="Optional new analysis domain")
+
+
+class ProjectBulkActionResponse(BaseModel):
+    """Response returned after executing a bulk project operation."""
+
+    success_count: int = Field(..., description="Number of projects affected")
+    affected_ids: list[int] = Field(default_factory=list, description="IDs of affected projects")
 
 
 class ProjectResponse(BaseModel):
@@ -182,6 +253,20 @@ class ProjectResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    role: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
+    cde_approved_by: Optional[str] = ""
+    cde_approved_at: Optional[str] = None
+
 
 class ProjectIfcFileResponse(BaseModel):
     """One IFC model attached to a project."""
@@ -202,6 +287,19 @@ class ProjectIfcFileResponse(BaseModel):
         description="Discipline the model carries, e.g. structural; an open vocabulary",
     )
     uploaded_at: Optional[str] = None
+
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
+    cde_approved_by: Optional[str] = ""
+    cde_approved_at: Optional[str] = None
 
 
 class ProjectIfcUploadResponse(BaseModel):
@@ -230,7 +328,15 @@ class DocumentUpdateRequest(BaseModel):
     """Payload for updating document metadata or extracted text."""
 
     filename: Optional[str] = Field(None, min_length=1, description="Updated document filename")
+    doc_type: Optional[str] = Field(None, description="Updated document type classification")
     extracted_text: Optional[str] = Field(None, description="Updated extracted text content")
+
+    # ISO 19650 Container Naming & CDE Metadata
+    project_code: Optional[str] = Field(None, description="ISO 19650 Project Code")
+    originator: Optional[str] = Field(None, description="ISO 19650 Originator Code")
+    suitability_code: Optional[str] = Field(None, description="ISO 19650 Suitability Code")
+    revision_code: Optional[str] = Field(None, description="ISO 19650 Revision Code")
+    cde_state: Optional[CDEState] = Field(None, description="CDE State")
 
 
 class DocumentResponse(BaseModel):
@@ -238,10 +344,23 @@ class DocumentResponse(BaseModel):
 
     id: int
     filename: str
+    doc_type: str = Field(default="Specification", description="Document classification type")
     file_path: Optional[str] = None
     upload_date: Optional[str] = None
     extracted_text_preview: Optional[str] = None
     char_count: int = 0
+
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    role: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
 
 
 class DocumentDetailResponse(BaseModel):
@@ -249,10 +368,23 @@ class DocumentDetailResponse(BaseModel):
 
     id: int
     filename: str
+    doc_type: str = Field(default="Specification", description="Document classification type")
     file_path: Optional[str] = None
     upload_date: Optional[str] = None
     extracted_text: str = ""
     char_count: int = 0
+
+    # ISO 19650 & CDE fields
+    project_code: Optional[str] = ""
+    originator: Optional[str] = ""
+    volume_system: Optional[str] = ""
+    level: Optional[str] = ""
+    type: Optional[str] = ""
+    role: Optional[str] = ""
+    number: Optional[str] = ""
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: CDEState = CDEState.WIP
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +506,53 @@ class RuleFolderUpdateRequest(BaseModel):
     description: Optional[str] = None
     mechanism_scope: Optional[str] = None
     category: Optional[str] = None
+
+
+class RuleBulkUpdateRequest(BaseModel):
+    """Payload for updating multiple rules in bulk."""
+
+    rule_ids: list[int] = Field(..., min_length=1, description="Rule IDs to update")
+    ruleset_id: Optional[str] = Field(default=None, description="Assign to ruleset folder")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    mechanism: Optional[str] = Field(default=None, description="Mechanism: CODE, GC-001, CC-001, MC-001, SEISMIC")
+    severity: Optional[str] = Field(default=None, description="Severity: Critical, High, Medium, Low")
+    needs_review: Optional[int] = Field(default=None, description="Needs review flag: 0 or 1")
+    property_set: Optional[str] = Field(default=None, description="Property set name")
+
+
+class RuleBulkDeleteRequest(BaseModel):
+    """Payload for deleting multiple rules in bulk."""
+
+    rule_ids: list[int] = Field(..., min_length=1, description="Rule IDs to delete")
+
+
+class RuleBulkActionResponse(BaseModel):
+    """Response returned after executing a bulk rule operation."""
+
+    success_count: int
+    affected_ids: list[int] = Field(default_factory=list)
+
+
+class RuleFolderBulkUpdateRequest(BaseModel):
+    """Payload for updating multiple ruleset folders in bulk."""
+
+    ruleset_ids: list[str] = Field(..., min_length=1, description="Ruleset IDs to update")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    mechanism_scope: Optional[str] = Field(default=None, description="Mechanism scope")
+
+
+class RuleFolderBulkDeleteRequest(BaseModel):
+    """Payload for deleting multiple ruleset folders in bulk."""
+
+    ruleset_ids: list[str] = Field(..., min_length=1, description="Ruleset IDs to delete")
+
+
+class RuleFolderBulkActionResponse(BaseModel):
+    """Response returned after executing a bulk ruleset folder operation."""
+
+    success_count: int
+    affected_ruleset_ids: list[str] = Field(default_factory=list)
+    deleted_rules_count: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -696,6 +875,460 @@ class RuleEvaluationResult(BaseModel):
     def to_dict(self) -> dict[str, Any]:
         """Serialize result to a standard dictionary."""
         return self.model_dump()
+
+
+# ---------------------------------------------------------------------------
+# GitHub Repository Contracts
+# ---------------------------------------------------------------------------
+
+
+class GitHubRepoCreateRequest(BaseModel):
+    """Payload for creating or adding a GitHub repository project storage source."""
+
+    url: str = Field(..., min_length=5, description="Full GitHub repository URL (e.g. https://github.com/owner/repo)")
+    name: Optional[str] = Field(None, description="Display name for repository")
+    branch: Optional[str] = Field("main", description="Git branch to inspect")
+    description: Optional[str] = Field("", description="Optional repository description")
+
+
+class GitHubRepoUpdateRequest(BaseModel):
+    """Payload for updating GitHub repository storage configuration."""
+
+    name: Optional[str] = Field(None, description="Updated display name")
+    branch: Optional[str] = Field(None, description="Updated default git branch")
+    description: Optional[str] = Field(None, description="Updated description")
+    is_active: Optional[bool] = Field(None, description="Toggle active state")
+
+
+class GitHubRepoResponse(BaseModel):
+    """Response contract for a registered GitHub repository."""
+
+    id: int
+    name: str
+    owner: str
+    url: str
+    branch: str = "main"
+    description: str = ""
+    is_active: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class GitHubRepoItem(BaseModel):
+    """File item inside a GitHub repository tree."""
+
+    path: str
+    name: str
+    type: str = "file"  # file or folder
+    size: int = 0
+    extension: str = ""
+    category: str = "general"
+    download_url: str = ""
+
+
+class GitHubRepoStructureResponse(BaseModel):
+    """Complete structure response listing models in a GitHub repository."""
+
+    repo_id: int
+    owner: str
+    name: str
+    url: str
+    branch: str = "main"
+    total_files: int = 0
+    models_count: int = 0
+    categories: list[str] = []
+    items: list[GitHubRepoItem] = []
+
+
+class ProjectImportFromRepoRequest(BaseModel):
+    """Payload for importing an IFC model file from a GitHub repository into projects."""
+
+    file_path: str = Field(..., min_length=1, description="Relative file path in repository (e.g. models/hospital/Clinic_Architectural.ifc)")
+    name: Optional[str] = Field(None, description="Custom project name (defaults to file basename)")
+    country: Optional[str] = Field(None, description="Jurisdiction / country code")
+    analysis_type: Optional[str] = Field(None, description="Domain analysis type (Arch, Piping, seismic)")
+
+
+# ==============================================================================
+# buildingSMART Ecosystem Contracts
+# ==============================================================================
+
+
+# ------------------------------------------------------------------------------
+# 1. bSDD (buildingSMART Data Dictionary) Contracts
+# ------------------------------------------------------------------------------
+
+
+class BSDDPropertyItem(BaseModel):
+    """bSDD property definition contract."""
+
+    uri: str = Field(..., description="Unique bSDD URI for the property")
+    name: str = Field(..., description="Property name (e.g. FireRating, Material)")
+    property_set: Optional[str] = Field(None, description="Standard property set name (e.g. Pset_PipeSegmentCommon)")
+    data_type: Optional[str] = Field(None, description="IFC or XSD data type (e.g. IfcLabel, IfcReal, IfcBoolean)")
+    units: Optional[str] = Field(None, description="Physical units (e.g. mm, m/s, degC)")
+    allowed_values: list[str] = Field(default_factory=list, description="List of allowed enumeration values if restricted")
+    description: Optional[str] = Field(None, description="Property description from bSDD")
+
+
+class BSDDClassItem(BaseModel):
+    """bSDD class / classification definition contract."""
+
+    uri: str = Field(..., description="Unique bSDD URI for the class")
+    code: str = Field(..., description="Class code (e.g. Pr_65_52_63 or IfcPipeSegment)")
+    name: str = Field(..., description="Human-readable class name")
+    dictionary_uri: str = Field(..., description="URI of the parent dictionary")
+    parent_class_code: Optional[str] = Field(None, description="Parent class code if hierarchical")
+    related_ifc_entities: list[str] = Field(default_factory=list, description="Associated IFC entity types")
+    properties: list[BSDDPropertyItem] = Field(default_factory=list, description="Properties defined on this class")
+    description: Optional[str] = Field(None, description="Class description")
+
+
+class BSDDDictionaryItem(BaseModel):
+    """bSDD dictionary catalog contract."""
+
+    uri: str = Field(..., description="Unique URI identifying the dictionary")
+    code: str = Field(..., description="Short dictionary identifier (e.g. uniclass_2015, omniclass_23)")
+    name: str = Field(..., description="Full dictionary name")
+    version: str = Field("1.0", description="Dictionary version")
+    organization_code_owner: str = Field("buildingSMART", description="Owner organization code")
+    language_iso_code: str = Field("en-GB", description="Language code")
+    classes_count: int = Field(0, description="Number of classes in dictionary")
+
+
+class BSDDValidationViolation(BaseModel):
+    """Single semantic validation violation detected by bSDD checks."""
+
+    element_guid: str = Field(..., description="IFC GUID of failing element")
+    element_type: str = Field(..., description="IFC entity type")
+    field_checked: str = Field(..., description="Property, classification, or material checked")
+    expected_constraint: str = Field(..., description="Constraint specified by bSDD")
+    actual_value: Optional[Any] = Field(None, description="Value extracted from element")
+    severity: str = Field("warning", description="Severity (error, warning, info)")
+    message: str = Field(..., description="Human-readable violation message")
+    dictionary_uri: Optional[str] = Field(None, description="bSDD dictionary reference URI")
+
+
+class BSDDValidationResult(BaseModel):
+    """Aggregated outcome of bSDD semantic validation on model elements."""
+
+    passed: bool = Field(..., description="True if no blocking semantic errors occurred")
+    dictionary_uri: str = Field(..., description="bSDD dictionary URI used for verification")
+    total_elements_checked: int = Field(0, description="Total elements inspected")
+    total_properties_checked: int = Field(0, description="Total property assertions checked")
+    passed_count: int = Field(0, description="Count of compliant assertions")
+    violations_count: int = Field(0, description="Count of violations found")
+    compliance_score_pct: float = Field(100.0, description="Semantic compliance percentage")
+    violations: list[BSDDValidationViolation] = Field(default_factory=list, description="List of semantic violations")
+
+
+class BSDDClassSearchResponse(BaseModel):
+    """Response payload for bSDD class text searches."""
+
+    query: str
+    total: int = 0
+    classes: list[BSDDClassItem] = []
+
+
+# ------------------------------------------------------------------------------
+# 2. openCDE APIs Contracts
+# ------------------------------------------------------------------------------
+
+
+class CDEVersionItem(BaseModel):
+    """OpenCDE API version descriptor entry."""
+
+    version: str = Field(..., description="API version (e.g. 1.0, 2.1)")
+    api_type: str = Field(..., description="API family: foundation, documents, or bcf")
+    detailed_version: Optional[str] = Field(None, description="Detailed semantic version")
+
+
+class CDEVersionsResponse(BaseModel):
+    """Response returned by GET /api/cde/versions per OpenCDE Foundation API."""
+
+    versions: list[CDEVersionItem] = Field(default_factory=list)
+
+
+class CDEUserResponse(BaseModel):
+    """OpenCDE user profile representation."""
+
+    id: str = Field(..., description="User unique identifier")
+    name: str = Field(..., description="Full user or service name")
+    email: Optional[str] = Field(None, description="User email address")
+    role: Optional[str] = Field("Engineer", description="User role in CDE")
+
+
+class CDEDocumentItem(BaseModel):
+    """OpenCDE Documents API standard document item."""
+
+    id: str = Field(..., description="Document identifier in CDE")
+    name: str = Field(..., description="Document filename or title")
+    document_type: str = Field("IFC", description="Type: IFC, Specification, Drawing, Report")
+    size_bytes: int = Field(0, description="File size in bytes")
+    etag: str = Field(..., description="HTTP ETag hash for caching")
+    url: Optional[str] = Field(None, description="Direct download URL or storage URI")
+    created_at: Optional[str] = Field(None, description="Creation timestamp")
+    updated_at: Optional[str] = Field(None, description="Last modification timestamp")
+    # ISO 19650 metadata attributes
+    project_code: str = Field("", description="ISO 19650 Project Code")
+    originator: str = Field("", description="ISO 19650 Originator")
+    volume_system: str = Field("", description="ISO 19650 Volume/System")
+    level: str = Field("", description="ISO 19650 Level")
+    type: str = Field("", description="ISO 19650 Type")
+    role: str = Field("", description="ISO 19650 Role")
+    number: str = Field("", description="ISO 19650 Number")
+    suitability_code: str = Field("S0", description="ISO 19650 Suitability Code")
+    revision_code: str = Field("P01.01", description="ISO 19650 Revision Code")
+    cde_state: CDEState = Field(CDEState.WIP, description="ISO 19650 CDE Workflow State")
+
+
+class CDESyncRequest(BaseModel):
+    """Payload for synchronizing models/documents from an external CDE."""
+
+    cde_server_url: str = Field(..., description="Base URL of external CDE")
+    project_id: int = Field(..., description="Target BIMGuard project ID")
+    external_project_id: str = Field(..., description="Project ID in external CDE")
+    document_ids: list[str] = Field(default_factory=list, description="Specific external document IDs to pull")
+    auto_analyze: bool = Field(False, description="Automatically trigger compliance analysis upon sync")
+
+
+class CDESyncResponse(BaseModel):
+    """Outcome of an external CDE synchronization request."""
+
+    success: bool
+    synced_documents_count: int = 0
+    synced_files: list[str] = []
+    message: str = ""
+
+
+class CDEWebhookPayload(BaseModel):
+    """Incoming OpenCDE webhook event payload."""
+
+    event_type: str = Field(..., description="Event type: document.created, document.updated, model.published")
+    external_project_id: str = Field(..., description="External CDE project ID")
+    document_id: str = Field(..., description="External document identifier")
+    document_name: str = Field(..., description="Document file name")
+    download_url: Optional[str] = Field(None, description="Direct pre-authenticated download URL")
+    etag: Optional[str] = Field(None, description="File ETag digest")
+    timestamp: Optional[str] = Field(None, description="Event timestamp")
+
+
+# ------------------------------------------------------------------------------
+# 3. IFC Validation Service Pre-Flight Checks Contracts
+# ------------------------------------------------------------------------------
+
+
+class IFCValidationIssue(BaseModel):
+    """Single diagnostic issue identified during IFC pre-flight validation."""
+
+    rule_code: str = Field(..., description="Validation rule code (e.g. IFC-SYN-001, IFC-VAL-002)")
+    stage: str = Field(..., description="Validation stage: syntax, schema, or gherkin_rules")
+    severity: str = Field("error", description="Severity: fatal, error, warning, info")
+    message: str = Field(..., description="Diagnostic description")
+    line_number: Optional[int] = Field(None, description="Line number in IFC STEP physical file if applicable")
+    entity_id: Optional[str] = Field(None, description="IFC Step entity ID (#123) or GlobalId")
+
+
+class IFCValidationStageResult(BaseModel):
+    """Result for one specific validation stage."""
+
+    stage_name: str
+    passed: bool
+    issues_count: int = 0
+    details: list[IFCValidationIssue] = []
+
+
+class IFCValidationReport(BaseModel):
+    """Comprehensive diagnostic report from the IFC Pre-Flight Validation Service."""
+
+    valid: bool = Field(..., description="True if model is safe for heavy compute pipelines")
+    schema_version: Optional[str] = Field(None, description="Detected IFC schema (e.g. IFC4, IFC2X3)")
+    file_size_bytes: int = Field(0, description="Size of validated file")
+    syntax_stage: IFCValidationStageResult
+    schema_stage: IFCValidationStageResult
+    rules_stage: IFCValidationStageResult
+    total_issues: int = 0
+    fatal_errors: int = 0
+    warnings: int = 0
+    summary_message: str = ""
+
+
+# ------------------------------------------------------------------------------
+# 4. IDS (Information Delivery Specification) Contracts
+# ------------------------------------------------------------------------------
+
+
+class IDSRequirementFacet(BaseModel):
+    """Specification of a single requirement facet in an IDS specification."""
+
+    facet_type: str = Field("property", description="Facet type: entity, property, classification, material, partOf")
+    property_set: Optional[str] = Field(None, description="Property set name (for property facet)")
+    name: Optional[str] = Field(None, description="Property name, entity name, or classification system")
+    data_type: Optional[str] = Field("IFCLABEL", description="IFC data type")
+    expected_value: Optional[Any] = Field(None, description="Target value or pattern")
+    operator: str = Field("=", description="Comparison operator: =, !=, >, <, >=, <=, between, exists")
+    min_value: Optional[float] = Field(None, description="Lower range bound")
+    max_value: Optional[float] = Field(None, description="Upper range bound")
+    tolerance: Optional[float] = Field(None, description="Numerical tolerance threshold")
+    cardinality: str = Field("required", description="Cardinality: required, optional, prohibited")
+    uri: Optional[str] = Field(None, description="Standard URI or bSDD reference")
+
+
+class IDSFacetViolation(BaseModel):
+    """Violation of an individual IDS specification facet."""
+
+    element_guid: str
+    element_type: str
+    spec_name: str
+    facet_type: str
+    details: str
+    expected: str
+    actual: Optional[str] = None
+
+
+class IDSValidationReport(BaseModel):
+    """Report detailing evaluation of IFC elements against IDS requirements."""
+
+    passed: bool
+    specifications_count: int = 0
+    total_checks: int = 0
+    passed_checks: int = 0
+    failed_checks: int = 0
+    compliance_percent: float = 100.0
+    violations: list[IDSFacetViolation] = []
+
+
+class IDSExportRequest(BaseModel):
+    """Payload for requesting an IDS XML export for a ruleset."""
+
+    ruleset_id: str
+    ifc_version: str = "IFC4"
+    include_tolerances: bool = True
+
+
+# ------------------------------------------------------------------------------
+# 5. BCF REST API (v2.1 / v3.0) Contracts
+# ------------------------------------------------------------------------------
+
+
+class BCFProjectResponse(BaseModel):
+    """BCF Project information contract."""
+
+    project_id: str
+    name: str
+    authorization: dict[str, list[str]] = Field(
+        default_factory=lambda: {"project_actions": ["update"], "topic_actions": ["create", "update", "delete"]}
+    )
+
+
+class BCFCommentResponse(BaseModel):
+    """BCF Topic comment contract."""
+
+    guid: str
+    date: str
+    author: str
+    comment: str
+    topic_guid: str
+    modified_date: Optional[str] = None
+    modified_author: Optional[str] = None
+    viewpoint_guid: Optional[str] = None
+
+
+class BCFCommentCreatePayload(BaseModel):
+    """Payload for adding a new comment to a BCF topic."""
+
+    comment: str = Field(..., min_length=1, description="Comment text content")
+    viewpoint_guid: Optional[str] = Field(None, description="Optional associated viewpoint GUID")
+
+
+class BCFViewpointResponse(BaseModel):
+    """BCF Topic viewpoint contract."""
+
+    guid: str
+    topic_guid: str
+    index: int = 0
+    perspective_camera: Optional[dict[str, Any]] = None
+    orthogonal_camera: Optional[dict[str, Any]] = None
+    lines: list[dict[str, Any]] = Field(default_factory=list)
+    clipping_planes: list[dict[str, Any]] = Field(default_factory=list)
+    components: dict[str, Any] = Field(default_factory=dict)
+    snapshot_url: Optional[str] = None
+
+
+class BCFViewpointCreatePayload(BaseModel):
+    """Payload for creating a viewpoint on a BCF topic."""
+
+    perspective_camera: Optional[dict[str, Any]] = None
+    orthogonal_camera: Optional[dict[str, Any]] = None
+    components: Optional[dict[str, Any]] = None
+    snapshot_base64: Optional[str] = None
+
+
+class BCFTopicResponse(BaseModel):
+    """BCF Topic entity contract."""
+
+    guid: str
+    topic_type: str = "Issue"
+    topic_status: str = "Open"
+    title: str
+    priority: str = "Normal"
+    index: int = 1
+    creation_date: str
+    creation_author: str
+    modified_date: Optional[str] = None
+    modified_author: Optional[str] = None
+    assigned_to: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    labels: list[str] = Field(default_factory=list)
+    stage: Optional[str] = None
+    # Component references
+    component_guids: list[str] = Field(default_factory=list)
+    # ISO 19650 governance metadata
+    project_code: Optional[str] = None
+    originator: Optional[str] = None
+    suitability_code: Optional[str] = None
+    revision_code: Optional[str] = None
+    cde_state: Optional[CDEState] = None
+    comments_count: int = 0
+    viewpoints_count: int = 0
+
+
+class BCFTopicCreatePayload(BaseModel):
+    """Payload for creating a BCF topic via REST API."""
+
+    title: str = Field(..., min_length=1, description="Topic title")
+    topic_type: str = Field("Issue", description="Type (Issue, Request, Clashes, Remark)")
+    topic_status: str = Field("Open", description="Status (Open, InProgress, Closed, Resolved)")
+    priority: str = Field("Normal", description="Priority (Critical, Major, Normal, Minor)")
+    description: Optional[str] = None
+    assigned_to: Optional[str] = None
+    due_date: Optional[str] = None
+    labels: list[str] = Field(default_factory=list)
+    component_guids: list[str] = Field(default_factory=list)
+    # ISO 19650 metadata
+    suitability_code: Optional[str] = "S0"
+    revision_code: Optional[str] = "P01.01"
+    cde_state: Optional[CDEState] = CDEState.WIP
+
+
+class BCFTopicUpdatePayload(BaseModel):
+    """Payload for updating an existing BCF topic."""
+
+    title: Optional[str] = None
+    topic_type: Optional[str] = None
+    topic_status: Optional[str] = None
+    priority: Optional[str] = None
+    description: Optional[str] = None
+    assigned_to: Optional[str] = None
+    due_date: Optional[str] = None
+    labels: Optional[list[str]] = None
+    component_guids: Optional[list[str]] = None
+    suitability_code: Optional[str] = None
+    revision_code: Optional[str] = None
+    cde_state: Optional[CDEState] = None
+
+
 
 
 

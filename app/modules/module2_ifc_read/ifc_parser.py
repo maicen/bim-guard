@@ -647,3 +647,35 @@ def generate_synthetic_elements(n: int = 25) -> list[ServiceElement]:
             )
         )
     return elements
+
+
+def extract_ifc_header_iso_metadata(ifc_model) -> dict:
+    """Extract IfcProject and IfcDocumentInformation header attributes from an opened IFC model or file path."""
+    from pathlib import Path
+    if isinstance(ifc_model, (str, Path)):
+        try:
+            ifc_model = ifcopenshell.open(str(ifc_model))
+        except Exception:
+            return {}
+
+    header = {}
+    try:
+        projects = ifc_model.by_type("IfcProject")
+        if projects:
+            p = projects[0]
+            header["project_name"] = getattr(p, "Name", "") or ""
+            header["project_description"] = getattr(p, "Description", "") or ""
+            header["project_long_name"] = getattr(p, "LongName", "") or ""
+
+        doc_infos = ifc_model.by_type("IfcDocumentInformation")
+        if doc_infos:
+            d = doc_infos[0]
+            header["document_id"] = getattr(d, "Identification", "") or getattr(d, "DocumentId", "") or ""
+            header["document_name"] = getattr(d, "Name", "") or ""
+            header["document_revision"] = getattr(d, "Revision", "") or ""
+            header["document_status"] = getattr(d, "Status", "") or ""
+    except Exception:
+        pass
+
+    return header
+

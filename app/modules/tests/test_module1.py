@@ -281,8 +281,11 @@ def store_and_gen():
     gen = RuleGenerator(store)
     yield store, gen
     store.close()
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    try:
+        if os.path.exists(TEST_DB):
+            os.remove(TEST_DB)
+    except OSError:
+        pass
 
 
 def test_table_builder_extracts_range_rules(store_and_gen):

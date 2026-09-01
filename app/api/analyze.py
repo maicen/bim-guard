@@ -450,6 +450,20 @@ def list_bcf_artifacts() -> list[dict]:
     return ReportArtifactService().list_bcf()
 
 
+@router.delete("/bcf/artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete BCF artifact by ID")
+def delete_bcf_artifact(artifact_id: int) -> None:
+    """Delete a persisted BCF report artifact."""
+    from app.services.report_artifacts import ReportArtifactService
+
+    deleted = ReportArtifactService().delete_bcf(artifact_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"BCF artifact {artifact_id} not found.",
+        )
+
+
+
 # ---------------------------------------------------------------------------
 # Revit Direct Sync Endpoint
 # ---------------------------------------------------------------------------

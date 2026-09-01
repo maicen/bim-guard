@@ -72,13 +72,23 @@ def test_seed_architectural_code_rules():
     rules_svc = RuleService(rules_repo=mock_rules, folders_repo=mock_folders)
 
     count = seed_architectural_code_rules(rules_svc)
-    assert count == 4
+    assert count == 14
 
     refs = {r["reference"] for r in rules_svc.list_rules()}
     assert "CODE 9.9.10.1" in refs
     assert "CODE 9.9.4.1" in refs
     assert "CODE 9.7.2.3" in refs
     assert "CODE 9.10.9.14.PW" in refs
+    assert "BIMGUARD-WIN.FireRating" in refs
+    assert "BIMGUARD-WIN.AcousticRating" in refs
+    assert "BIMGUARD-WIN.SecurityRating" in refs
+    assert "BIMGUARD-WIN.ThermalTransmittance" in refs
+    assert "BIMGUARD-WIN.Infiltration" in refs
+    assert "BIMGUARD-WIN.IsExternal" in refs
+    assert "BIMGUARD-WIN.HandicapAccessible" in refs
+    assert "BIMGUARD-WIN.FireExit" in refs
+    assert "BIMGUARD-WIN.SelfClosing" in refs
+    assert "BIMGUARD-WIN.SmokeStop" in refs
 
     # Verify idempotency
     count_second_run = seed_architectural_code_rules(rules_svc)

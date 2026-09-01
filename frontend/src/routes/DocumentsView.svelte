@@ -12,10 +12,22 @@
     CheckCircle2,
     Search,
     RotateCw,
+    FolderSync,
   } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
-  import type { DocumentItem, DocumentDetail } from "../lib/types";
+  import { DOCUMENT_TYPES } from "../lib/types";
+  import type { DocumentItem, DocumentDetail, DocumentType } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import TablePagination from "../lib/components/TablePagination.svelte";
+  import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import DataTableHeader from "../lib/components/DataTableHeader.svelte";
+  import OpenCdeSyncModal from "../lib/components/OpenCdeSyncModal.svelte";
+  import DocumentBulkEditModal from "../lib/components/DocumentBulkEditModal.svelte";
+  import PageHeader from "../lib/components/PageHeader.svelte";
+  import SortHeader from "../lib/components/SortHeader.svelte";
+  import TableCheckbox from "../lib/components/TableCheckbox.svelte";
+  import EmptyState from "../lib/components/EmptyState.svelte";
+  import LoadingState from "../lib/components/LoadingState.svelte";
 
   const cachedDocs = documentsApi.getCachedList();
   let documents: DocumentItem[] = cachedDocs || [];
@@ -23,6 +35,8 @@
   let isRefreshing = false;
   let error = "";
   let isDeleteModalOpen = false;
+  let isOpenCdeModalOpen = false;
+  let isBulkEditModalOpen = false;
   let docToDelete: { id: number; filename: string } | null = null;
   let unsubscribeDocs: (() => void) | null = null;
 
@@ -30,6 +44,7 @@
   let isEditModalOpen = false;
   let docToEdit: DocumentItem | null = null;
   let editFilename = "";
+  let editDocType = "Specification";
   let editExtractedText = "";
   let isSavingEdit = false;
   let editError = "";
@@ -37,6 +52,7 @@
   // Upload modal state
   let isUploadModalOpen = false;
   let uploadFile: File | null = null;
+  let uploadDocType = "Specification";
   let isUploading = false;
   let uploadError = "";
 
@@ -45,6 +61,20 @@
   let isLoadingDocDetail = false;
 
   let searchQuery = "";
+  let selectedDocTypeFilter: string = "ALL";
+
+  // Sorting state
+  let sortField: "id" | "filename" | "doc_type" | "char_count" | "upload_date" = "id";
+  let sortAsc = false;
+
+  function toggleSort(field: "id" | "filename" | "doc_type" | "char_count" | "upload_date") {
+    if (sortField === field) {
+      sortAsc = !sortAsc;
+    } else {
+      sortField = field;
+      sortAsc = true;
+    }
+  }
 
   async function loadDocuments(force = false) {
     if (!documents.length) {
@@ -78,19 +108,115 @@
     }
   });
 
-  $: filteredDocuments = documents.filter((d) =>
-    d.filename.toLowerCase().includes(searchQuery.toLowerCase()),
+  $: filteredDocuments = documents
+    .filter((d) => {
+      const matchesSearch =
+        d.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (d.extracted_text_preview || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType =
+        selectedDocTypeFilter === "ALL" ||
+        (d.doc_type || "Specification") === selectedDocTypeFilter;
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => {
+      let valA: any = a[sortField];
+      let valB: any = b[sortField];
+      if (valA === undefined || valA === null) valA = "";
+      if (valB === undefined || valB === null) valB = "";
+      if (typeof valA === "string") valA = valA.toLowerCase();
+      if (typeof valB === "string") valB = valB.toLowerCase();
+      if (valA < valB) return sortAsc ? -1 : 1;
+      if (valA > valB) return sortAsc ? 1 : -1;
+      return 0;
+    });
+
+  let selectedDocIds: number[] = [];
+  let isBulkDeleteModalOpen = false;
+
+  let currentPage = 1;
+  let pageSize = 10;
+
+  $: totalItems = filteredDocuments.length;
+  $: paginatedDocuments = filteredDocuments.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   );
+
+  $: allFilteredSelected =
+    filteredDocuments.length > 0 &&
+    filteredDocuments.every((d) => selectedDocIds.includes(d.id));
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      selectedDocIds = [];
+    } else {
+      selectedDocIds = filteredDocuments.map((d) => d.id);
+    }
+  }
+
+  function toggleSelectDoc(id: number) {
+    if (selectedDocIds.includes(id)) {
+      selectedDocIds = selectedDocIds.filter((dId) => dId !== id);
+    } else {
+      selectedDocIds = [...selectedDocIds, id];
+    }
+  }
+
+  function exportSelectedToCsv() {
+    const docsToExport = documents.filter((d) => selectedDocIds.includes(d.id));
+    const targetDocs = docsToExport.length ? docsToExport : filteredDocuments;
+    const headers = ["ID", "Filename", "DocType", "CharCount", "UploadDate"];
+    const rows = targetDocs.map((d) => [
+      d.id,
+      `"${(d.filename || "").replace(/"/g, '""')}"`,
+      `"${(d.doc_type || "Specification").replace(/"/g, '""')}"`,
+      d.char_count || 0,
+      `"${d.upload_date || ""}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `documents_export_${new Date().toISOString().substring(0, 10)}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  async function confirmBulkDelete() {
+    if (!selectedDocIds.length) return;
+    try {
+      for (const id of selectedDocIds) {
+        await documentsApi.delete(id);
+      }
+      documents = documents.filter((d) => !selectedDocIds.includes(d.id));
+      selectedDocIds = [];
+      isBulkDeleteModalOpen = false;
+    } catch (err: any) {
+      error = `Could not delete selected documents: ${err.message}`;
+    }
+  }
+
+  $: {
+    searchQuery;
+    selectedDocTypeFilter;
+    currentPage = 1;
+  }
 
   async function handleUpload() {
     if (!uploadFile) return;
     isUploading = true;
     uploadError = "";
     try {
-      const created = await documentsApi.upload(uploadFile);
+      const created = await documentsApi.upload(uploadFile, uploadDocType);
       documents = [created, ...documents];
       isUploadModalOpen = false;
       uploadFile = null;
+      uploadDocType = "Specification";
     } catch (err: any) {
       uploadError = err.message || "Failed to upload document.";
     } finally {
@@ -112,6 +238,7 @@
   async function openEdit(doc: DocumentItem) {
     docToEdit = doc;
     editFilename = doc.filename;
+    editDocType = doc.doc_type || "Specification";
     editExtractedText = "";
     editError = "";
     isEditModalOpen = true;
@@ -134,6 +261,7 @@
     try {
       const updated = await documentsApi.update(docToEdit.id, {
         filename: editFilename.trim(),
+        doc_type: editDocType,
         extracted_text: editExtractedText,
       });
       documents = documents.map((d) =>
@@ -141,6 +269,7 @@
           ? {
               ...d,
               filename: updated.filename,
+              doc_type: updated.doc_type,
               extracted_text_preview:
                 updated.extracted_text.slice(0, 200) +
                 (updated.extracted_text.length > 200 ? "..." : ""),
@@ -176,23 +305,23 @@
 
 <div class="space-y-6 mx-auto">
   <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <div>
-      <div
-        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
+  <PageHeader
+    category="Library"
+    title="Document Specifications"
+    subtitle="Upload and manage building code standards, specifications, and project manuals."
+    icon={BookOpen}
+  >
+    <div slot="actions" class="flex items-center gap-2">
+      <button
+        type="button"
+        on:click={() => (isOpenCdeModalOpen = true)}
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 border border-blue-800/50 transition-colors"
+        title="Sync documents via buildingSMART OpenCDE API"
       >
-        Library
-      </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-        Document Specifications
-      </h1>
-      <p class="text-xs sm:text-sm text-slate-400">
-        Upload and manage building code standards, specifications, and project
-        manuals.
-      </p>
-    </div>
+        <FolderSync class="w-3.5 h-3.5" />
+        <span>OpenCDE Sync</span>
+      </button>
 
-    <div class="flex items-center gap-2">
       <button
         type="button"
         on:click={() => loadDocuments(true)}
@@ -212,7 +341,7 @@
         <span>Upload Specification</span>
       </button>
     </div>
-  </div>
+  </PageHeader>
 
   {#if error}
     <div
@@ -222,41 +351,50 @@
     </div>
   {/if}
 
-  <!-- Search Filter -->
-  <div
-    class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center gap-3"
-  >
-    <div class="relative flex-1">
-      <Search
-        class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
-      />
-      <input
-        type="text"
-        bind:value={searchQuery}
-        placeholder="Filter documents by file name..."
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
-      />
-    </div>
-  </div>
+  <!-- Bulk Actions Bar -->
+  <BulkActionBar
+    selectedCount={selectedDocIds.length}
+    itemLabel="document"
+    onClearSelection={() => (selectedDocIds = [])}
+    onBulkEdit={() => (isBulkEditModalOpen = true)}
+    onBulkExport={exportSelectedToCsv}
+    onBulkDelete={() => (isBulkDeleteModalOpen = true)}
+  />
 
-  <!-- Documents Table -->
+  <!-- Documents Table Container -->
   <div
     class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40"
   >
-    {#if isLoading}
-      <div class="p-12 text-center text-xs text-slate-400">
-        Loading document library...
-      </div>
-    {:else if filteredDocuments.length === 0}
-      <div class="p-12 text-center text-xs text-slate-500 space-y-2">
-        <p>No specification documents found.</p>
-        <button
-          type="button"
-          on:click={() => (isUploadModalOpen = true)}
-          class="text-[#0071e3] hover:underline font-medium"
+    <DataTableHeader
+      bind:searchQuery
+      searchPlaceholder="Filter documents by file name or text..."
+      {isRefreshing}
+      onRefresh={() => loadDocuments(true)}
+    >
+      <div slot="filters" class="flex items-center gap-1.5">
+        <select
+          bind:value={selectedDocTypeFilter}
+          aria-label="Filter by document type"
+          class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none focus:border-[#0071e3]"
         >
-          Upload your first specification (PDF, TXT, MD)
-        </button>
+          <option value="ALL">All Types</option>
+          {#each DOCUMENT_TYPES as type}
+            <option value={type}>{type}</option>
+          {/each}
+        </select>
+      </div>
+    </DataTableHeader>
+
+    {#if isLoading}
+      <LoadingState message="Loading document library..." />
+    {:else if filteredDocuments.length === 0}
+      <div class="p-6">
+        <EmptyState
+          title="No specification documents found"
+          description="Upload building code specifications or sync with OpenCDE to begin extraction."
+          actionLabel="Upload Specification (PDF, TXT, MD)"
+          onAction={() => (isUploadModalOpen = true)}
+        />
       </div>
     {:else}
       <div class="overflow-x-auto">
@@ -265,17 +403,42 @@
             class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
           >
             <tr>
-              <th class="py-3 px-4">ID</th>
-              <th class="py-3 px-4">Document File</th>
+              <th class="py-3 px-4 w-10">
+                <TableCheckbox
+                  checked={allFilteredSelected}
+                  on:change={toggleSelectAll}
+                  title="Select or deselect all visible documents"
+                />
+              </th>
+              <SortHeader column="id" {sortField} {sortAsc} onSort={toggleSort}>
+                ID
+              </SortHeader>
+              <SortHeader column="filename" {sortField} {sortAsc} onSort={toggleSort}>
+                Document File
+              </SortHeader>
+              <SortHeader column="doc_type" {sortField} {sortAsc} onSort={toggleSort}>
+                Type
+              </SortHeader>
               <th class="py-3 px-4">Extracted Text</th>
-              <th class="py-3 px-4">Characters</th>
-              <th class="py-3 px-4">Uploaded</th>
+              <SortHeader column="char_count" {sortField} {sortAsc} onSort={toggleSort}>
+                Characters
+              </SortHeader>
+              <SortHeader column="upload_date" {sortField} {sortAsc} onSort={toggleSort}>
+                Uploaded
+              </SortHeader>
               <th class="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
-            {#each filteredDocuments as doc}
-              <tr class="hover:bg-slate-900/60 transition-colors">
+            {#each paginatedDocuments as doc}
+              <tr class="hover:bg-slate-900/60 transition-colors {selectedDocIds.includes(doc.id) ? 'bg-blue-950/20' : ''}">
+                <td class="py-3 px-4 w-10">
+                  <TableCheckbox
+                    checked={selectedDocIds.includes(doc.id)}
+                    on:change={() => toggleSelectDoc(doc.id)}
+                    ariaLabel={`Select document ${doc.filename}`}
+                  />
+                </td>
                 <td class="py-3 px-4 font-mono text-slate-500">#{doc.id}</td>
                 <td class="py-3 px-4">
                   <div class="flex items-center gap-2">
@@ -284,6 +447,11 @@
                       >{doc.filename}</span
                     >
                   </div>
+                </td>
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+                    {doc.doc_type || 'Specification'}
+                  </span>
                 </td>
                 <td
                   class="py-3 px-4 text-slate-400 text-[11px] max-w-sm truncate"
@@ -329,6 +497,17 @@
           </tbody>
         </table>
       </div>
+
+      <TablePagination
+        {currentPage}
+        {pageSize}
+        totalItems={totalItems}
+        onPageChange={(p) => (currentPage = p)}
+        onPageSizeChange={(s) => {
+          pageSize = s;
+          currentPage = 1;
+        }}
+      />
     {/if}
   </div>
 </div>
@@ -363,6 +542,21 @@
           {uploadError}
         </div>
       {/if}
+
+      <div class="space-y-1.5">
+        <label for="upload-doc-type" class="block text-xs font-semibold text-slate-300">
+          Document Type
+        </label>
+        <select
+          id="upload-doc-type"
+          bind:value={uploadDocType}
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        >
+          {#each DOCUMENT_TYPES as type}
+            <option value={type}>{type}</option>
+          {/each}
+        </select>
+      </div>
 
       <div
         class="border-2 border-dashed border-slate-700 hover:border-[#0071e3] transition-colors rounded-xl p-6 text-center bg-slate-950/40"
@@ -431,10 +625,17 @@
         class="px-6 py-4 border-b border-slate-800 flex items-center justify-between"
       >
         <div>
-          <h2 class="text-base font-bold text-white tracking-tight">
-            {selectedDoc.filename}
-          </h2>
-          <p class="text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-bold text-white tracking-tight">
+              {selectedDoc.filename}
+            </h2>
+            {#if selectedDoc.doc_type}
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+                {selectedDoc.doc_type}
+              </span>
+            {/if}
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
             {selectedDoc.char_count.toLocaleString()} extracted characters
           </p>
         </div>
@@ -538,6 +739,21 @@
           />
         </div>
 
+        <div class="space-y-1.5">
+          <label for="edit-doc-type" class="block text-xs font-semibold text-slate-300">
+            Document Type
+          </label>
+          <select
+            id="edit-doc-type"
+            bind:value={editDocType}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            {#each DOCUMENT_TYPES as type}
+              <option value={type}>{type}</option>
+            {/each}
+          </select>
+        </div>
+
         <div class="space-y-1.5 flex-1 flex flex-col">
           <label for="edit-doc-text" class="block text-xs font-semibold text-slate-300">
             Extracted Specification Text
@@ -585,3 +801,30 @@
   onConfirm={confirmDelete}
   onCancel={() => (docToDelete = null)}
 />
+
+<ConfirmModal
+  bind:isOpen={isBulkDeleteModalOpen}
+  title="Delete Selected Documents"
+  message={`Are you sure you want to delete ${selectedDocIds.length} selected document specification(s)? This action cannot be undone.`}
+  confirmText="Delete Selected Documents"
+  danger={true}
+  onConfirm={confirmBulkDelete}
+  onCancel={() => (selectedDocIds = [])}
+/>
+
+<OpenCdeSyncModal
+  isOpen={isOpenCdeModalOpen}
+  onClose={() => (isOpenCdeModalOpen = false)}
+  onSyncComplete={() => loadDocuments(true)}
+/>
+
+<DocumentBulkEditModal
+  isOpen={isBulkEditModalOpen}
+  {selectedDocIds}
+  onClose={() => (isBulkEditModalOpen = false)}
+  onBulkUpdated={() => {
+    loadDocuments(true);
+    selectedDocIds = [];
+  }}
+/>
+

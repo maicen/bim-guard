@@ -1,6 +1,30 @@
 <script lang="ts">
   import { Box, Layers, ShieldCheck, CheckCircle2 } from "lucide-svelte";
 
+  const CHECKLISTS = [
+    {
+      domain: "Doors",
+      items: [
+        {
+          title: "True door family, not a generic model",
+          why: "A generic model dressed up to look like a door doesn't export as IfcDoor — it drops out of every door check, with no error or warning.",
+        },
+        {
+          title: "Hosted in a wall, not freestanding",
+          why: "An unhosted door doesn't get modeled as a real opening, which breaks space-boundary and fire-separation checks that depend on it sitting inside a wall.",
+        },
+        {
+          title: "Assigned to the correct building storey",
+          why: "A door with no level assigned, or the wrong level, fails the storey-assignment check even if every other property is correct.",
+        },
+        {
+          title: "Connects two room-bounding spaces",
+          why: "The most common false failure: if the Rooms/Spaces on either side of the door aren't placed or set to room-bounding, the space-connection check fails even though the door itself is modeled correctly.",
+        },
+      ],
+    },
+  ];
+
   const GUIDES = [
     {
       domain: "Architecture & Egress",
@@ -60,6 +84,36 @@
       OpenBIM modeling conventions to ensure IFC models pass automated
       compliance rules.
     </p>
+  </div>
+
+  <!-- Architectural 3D Model Checklist -->
+  <div class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+    <h2 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
+      <CheckCircle2 class="w-4 h-4 text-[#0071e3]" />
+      <span>Architectural 3D Model Checklist</span>
+    </h2>
+    <p class="text-[11px] text-slate-400 -mt-2">
+      Modeling mistakes that make an element invisible to checking entirely, or fail
+      a rule that has nothing to do with a real code issue &mdash; regardless of
+      whether its properties are filled in correctly. Check these before export.
+    </p>
+
+    {#each CHECKLISTS as group}
+      <div class="space-y-2">
+        <div class="font-semibold text-xs text-white">{group.domain}</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {#each group.items as item}
+            <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex gap-3">
+              <CheckCircle2 class="w-4 h-4 text-[#0071e3] shrink-0 mt-0.5" />
+              <div class="space-y-1">
+                <div class="font-semibold text-xs text-white">{item.title}</div>
+                <p class="text-[11px] text-slate-400 leading-relaxed">{item.why}</p>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/each}
   </div>
 
   <div class="space-y-6">

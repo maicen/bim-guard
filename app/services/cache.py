@@ -100,7 +100,7 @@ class InMemoryTTLCacheBackend(ABC):
 
             for key in list(self._store.keys()):
                 key_str = str(key)
-                if key_str == normalized or key_str.startswith(prefix_with_colon):
+                if key_str == normalized or key_str.startswith(normalized) or key_str.startswith(prefix_with_colon):
                     to_remove.add(key)
 
             for key in to_remove:

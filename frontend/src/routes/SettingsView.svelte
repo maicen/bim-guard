@@ -13,6 +13,7 @@
   import { settingsApi } from "../lib/api";
   import { themeMode, setTheme, type ThemeMode } from "../lib/theme";
   import type { SettingItem } from "../lib/types";
+  import PageHeader from "../lib/components/PageHeader.svelte";
 
   let settings: SettingItem[] = [];
   let activeLogLevel = "INFO";
@@ -60,32 +61,24 @@
 
 <div class="space-y-6 mx-auto">
   <!-- Header -->
-  <div class="flex items-center justify-between">
-    <div>
-      <div
-        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
+  <PageHeader
+    category="Configuration"
+    title="Runtime Settings"
+    subtitle="Manage application runtime parameters and logging levels persisted in database."
+    icon={Settings}
+  >
+    <div slot="actions">
+      <button
+        type="button"
+        disabled={isSaving}
+        on:click={handleSave}
+        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
       >
-        Configuration
-      </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-        Runtime Settings
-      </h1>
-      <p class="text-xs sm:text-sm text-slate-400">
-        Manage application runtime parameters and logging levels persisted in
-        database.
-      </p>
+        <Save class="w-3.5 h-3.5" />
+        <span>{isSaving ? "Saving..." : "Save Settings"}</span>
+      </button>
     </div>
-
-    <button
-      type="button"
-      disabled={isSaving}
-      on:click={handleSave}
-      class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
-    >
-      <Save class="w-3.5 h-3.5" />
-      <span>{isSaving ? "Saving..." : "Save Settings"}</span>
-    </button>
-  </div>
+  </PageHeader>
 
   {#if error}
     <div

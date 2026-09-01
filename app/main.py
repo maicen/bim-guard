@@ -17,6 +17,12 @@ from app.api import (
     analyze as api_analyze,
 )
 from app.api import (
+    bcf_routes as api_bcf,
+)
+from app.api import (
+    cde_integration as api_cde,
+)
+from app.api import (
     dashboard as api_dashboard,
 )
 from app.api import (
@@ -30,6 +36,9 @@ from app.api import (
 )
 from app.api import (
     projects as api_projects,
+)
+from app.api import (
+    repositories as api_repositories,
 )
 from app.api import (
     rules as api_rules,
@@ -48,6 +57,7 @@ except ImportError:  # pragma: no cover - non-POSIX platforms
 load_env_file()
 configure_logging()
 logger = get_logger(__name__)
+
 
 
 def _apply_persisted_log_level() -> None:
@@ -193,14 +203,18 @@ app.add_middleware(RequestLoggingMiddleware)
 # Register API Gateway routers directly under /api prefix
 app.include_router(api_dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(api_projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(api_repositories.router, prefix="/api/repositories", tags=["Repositories"])
 app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(api_documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(api_cde.router, prefix="/api/cde", tags=["OpenCDE"])
+app.include_router(api_bcf.router, prefix="/api/bcf", tags=["BCF API"])
 app.include_router(api_settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(
     api_naming_config.router, prefix="/api/naming-config", tags=["ISO 19650 Naming"]
 )
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
+
 
 
 @app.get("/api/health", tags=["Health"], summary="API Gateway Health Check")

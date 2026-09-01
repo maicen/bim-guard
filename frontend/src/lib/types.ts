@@ -2,7 +2,30 @@
  * Type contracts corresponding directly to backend Pydantic models in app/modules/contracts.py
  */
 
-export type AnalysisDomain = 'Arch' | 'Piping' | 'seismic';
+export const CDE_STATE_CHOICES = ['WIP', 'SHARED', 'PUBLISHED', 'ARCHIVED'] as const;
+export type CDEState = (typeof CDE_STATE_CHOICES)[number];
+
+export const SUITABILITY_CODES = [
+  'S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7',
+  'D1', 'D2', 'D3', 'D4',
+  'A1', 'A2', 'B1', 'CR'
+] as const;
+export type SuitabilityCode = (typeof SUITABILITY_CODES)[number];
+
+export interface ISO19650Metadata {
+  project_code: string;
+  originator: string;
+  volume_system: string;
+  level: string;
+  type: string;
+  role: string;
+  number: string;
+  suitability_code: string;
+  revision_code: string;
+  cde_state: CDEState;
+  cde_approved_by?: string;
+  cde_approved_at?: string | null;
+}
 
 export interface Project {
   id: number;
@@ -20,14 +43,25 @@ export interface Project {
   ifc_md5_hash?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+  cde_approved_by?: string;
+  cde_approved_at?: string | null;
 }
 
 /**
- * Discipline an attached IFC model carries. The backend column has no CHECK
- * constraint -- the vocabulary is open -- so this is the set the wizard offers,
- * not the set the API accepts.
+ * Discipline/role an attached IFC model carries.
+ * Restriced to primary or context in the project setup wizard.
  */
-export const IFC_FILE_ROLES = ['primary', 'architectural', 'structural', 'context'] as const;
+export const IFC_FILE_ROLES = ['primary', 'context'] as const;
 
 export type IfcFileRole = (typeof IFC_FILE_ROLES)[number];
 
@@ -41,6 +75,17 @@ export interface ProjectIfcFile {
   is_primary: boolean;
   role: IfcFileRole | string;
   uploaded_at?: string | null;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+  cde_approved_by?: string;
+  cde_approved_at?: string | null;
 }
 
 /** Outcome of attaching one or more IFC models. Mirrors ProjectIfcUploadResponse. */
@@ -68,6 +113,16 @@ export interface ProjectCreatePayload {
   floors_count?: number | null;
   document_ids?: number[];
   standards_codes?: string[];
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 /** One selectable normative reference offered by the project setup wizard. */
@@ -105,29 +160,97 @@ export interface ProjectUpdatePayload {
   status?: string;
   country?: string;
   analysis_type?: AnalysisDomain | string;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
+
+export interface ProjectBulkDeletePayload {
+  project_ids: number[];
+}
+
+export interface ProjectBulkUpdatePayload {
+  project_ids: number[];
+  status?: string;
+  country?: string;
+  analysis_type?: string;
+}
+
+export interface ProjectBulkActionResponse {
+  success_count: number;
+  affected_ids: number[];
+}
+
+export const DOCUMENT_TYPES = [
+  'Specification',
+  'Code',
+  'Manual',
+  'Standard',
+  'Drawing',
+  'Schedule',
+  'Assessment',
+  'Report',
+  'Other',
+] as const;
+
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 export interface DocumentItem {
   id: number;
   filename: string;
+  doc_type?: string | null;
   file_path?: string | null;
   upload_date?: string | null;
   extracted_text_preview?: string | null;
   char_count: number;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 export interface DocumentDetail {
   id: number;
   filename: string;
+  doc_type?: string | null;
   file_path?: string | null;
   upload_date?: string | null;
   extracted_text: string;
   char_count: number;
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 export interface DocumentUpdatePayload {
   filename?: string;
+  doc_type?: string | null;
   extracted_text?: string;
+  project_code?: string;
+  originator?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
 }
 
 export type RulesetCategory = 'Arch' | 'Piping' | 'seismic';
@@ -187,6 +310,33 @@ export interface RuleFolderUpdatePayload {
   description?: string;
   mechanism_scope?: string;
   category?: RulesetCategory | string;
+}
+
+export interface RuleBulkUpdatePayload {
+  rule_ids: number[];
+  ruleset_id?: string;
+  category?: RulesetCategory | string;
+  mechanism?: string;
+  severity?: string;
+  needs_review?: number;
+  property_set?: string;
+}
+
+export interface RuleBulkActionResponse {
+  success_count: number;
+  affected_ids: number[];
+}
+
+export interface RuleFolderBulkUpdatePayload {
+  ruleset_ids: string[];
+  category?: RulesetCategory | string;
+  mechanism_scope?: string;
+}
+
+export interface RuleFolderBulkActionResponse {
+  success_count: number;
+  affected_ruleset_ids: string[];
+  deleted_rules_count: number;
 }
 
 export interface Citation {
@@ -505,6 +655,330 @@ export interface RevitSyncResponse {
   results: RevitRuleResult[];
 }
 
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  owner: string;
+  url: string;
+  branch: string;
+  description: string;
+  is_active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface GitHubRepoItem {
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+  extension: string;
+  category: string;
+  download_url: string;
+}
+
+export interface GitHubRepoStructure {
+  repo_id: number;
+  owner: string;
+  name: string;
+  url: string;
+  branch: string;
+  total_files: number;
+  models_count: number;
+  categories: string[];
+  items: GitHubRepoItem[];
+}
+
+export interface GitHubRepoCreatePayload {
+  url: string;
+  name?: string;
+  branch?: string;
+  description?: string;
+}
+
+export interface GitHubRepoUpdatePayload {
+  name?: string;
+  branch?: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface ProjectImportPayload {
+  file_path: string;
+  name?: string;
+  country?: string;
+  analysis_type?: string;
+}
+
+// =============================================================================
+// buildingSMART Ecosystem Frontend Types
+// =============================================================================
+
+// 1. bSDD Types
+export interface BSDDPropertyItem {
+  uri: string;
+  name: string;
+  property_set?: string | null;
+  data_type?: string | null;
+  units?: string | null;
+  allowed_values: string[];
+  description?: string | null;
+}
+
+export interface BSDDClassItem {
+  uri: string;
+  code: string;
+  name: string;
+  dictionary_uri: string;
+  parent_class_code?: string | null;
+  related_ifc_entities: string[];
+  properties: BSDDPropertyItem[];
+  description?: string | null;
+}
+
+export interface BSDDDictionaryItem {
+  uri: string;
+  code: string;
+  name: string;
+  version: string;
+  organization_code_owner: string;
+  language_iso_code: string;
+  classes_count: number;
+}
+
+export interface BSDDValidationViolation {
+  element_guid: string;
+  element_type: string;
+  field_checked: string;
+  expected_constraint: string;
+  actual_value?: any;
+  severity: 'error' | 'warning' | 'info' | string;
+  message: string;
+  dictionary_uri?: string | null;
+}
+
+export interface BSDDValidationResult {
+  passed: boolean;
+  dictionary_uri: string;
+  total_elements_checked: number;
+  total_properties_checked: number;
+  passed_count: number;
+  violations_count: number;
+  compliance_score_pct: number;
+  violations: BSDDValidationViolation[];
+}
+
+export interface BSDDClassSearchResponse {
+  query: string;
+  total: number;
+  classes: BSDDClassItem[];
+}
+
+// 2. OpenCDE Types
+export interface CDEVersionItem {
+  version: string;
+  api_type: 'foundation' | 'documents' | 'bcf' | string;
+  detailed_version?: string | null;
+}
+
+export interface CDEVersionsResponse {
+  versions: CDEVersionItem[];
+}
+
+export interface CDEUserResponse {
+  id: string;
+  name: string;
+  email?: string | null;
+  role?: string | null;
+}
+
+export interface CDEDocumentItem {
+  id: string;
+  name: string;
+  document_type: string;
+  size_bytes: number;
+  etag: string;
+  url?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  project_code: string;
+  originator: string;
+  volume_system: string;
+  level: string;
+  type: string;
+  role: string;
+  number: string;
+  suitability_code: string;
+  revision_code: string;
+  cde_state: CDEState;
+}
+
+export interface CDESyncRequest {
+  cde_server_url: string;
+  project_id: number;
+  external_project_id: string;
+  document_ids?: string[];
+  auto_analyze?: boolean;
+}
+
+export interface CDESyncResponse {
+  success: boolean;
+  synced_documents_count: number;
+  synced_files: string[];
+  message: string;
+}
+
+// 3. IFC Pre-Flight Validation Types
+export interface IFCValidationIssue {
+  rule_code: string;
+  stage: 'syntax' | 'schema' | 'gherkin_rules' | string;
+  severity: 'fatal' | 'error' | 'warning' | 'info' | string;
+  message: string;
+  line_number?: number | null;
+  entity_id?: string | null;
+}
+
+export interface IFCValidationStageResult {
+  stage_name: string;
+  passed: boolean;
+  issues_count: number;
+  details: IFCValidationIssue[];
+}
+
+export interface IFCValidationReport {
+  valid: boolean;
+  schema_version?: string | null;
+  file_size_bytes: number;
+  syntax_stage: IFCValidationStageResult;
+  schema_stage: IFCValidationStageResult;
+  rules_stage: IFCValidationStageResult;
+  total_issues: number;
+  fatal_errors: number;
+  warnings: number;
+  summary_message: string;
+}
+
+// 4. IDS Types
+export interface IDSFacetViolation {
+  element_guid: string;
+  element_type: string;
+  spec_name: string;
+  facet_type: string;
+  details: string;
+  expected: string;
+  actual?: string | null;
+}
+
+export interface IDSValidationReport {
+  passed: boolean;
+  specifications_count: number;
+  total_checks: number;
+  passed_checks: number;
+  failed_checks: number;
+  compliance_percent: number;
+  violations: IDSFacetViolation[];
+}
+
+// 5. BCF REST API Types
+export interface BCFProjectResponse {
+  project_id: string;
+  name: string;
+  authorization?: {
+    project_actions: string[];
+    topic_actions: string[];
+  };
+}
+
+export interface BCFCommentResponse {
+  guid: string;
+  date: string;
+  author: string;
+  comment: string;
+  topic_guid: string;
+  modified_date?: string | null;
+  modified_author?: string | null;
+  viewpoint_guid?: string | null;
+}
+
+export interface BCFCommentCreatePayload {
+  comment: string;
+  viewpoint_guid?: string | null;
+}
+
+export interface BCFViewpointResponse {
+  guid: string;
+  topic_guid: string;
+  index: number;
+  perspective_camera?: Record<string, any> | null;
+  orthogonal_camera?: Record<string, any> | null;
+  lines?: Record<string, any>[];
+  clipping_planes?: Record<string, any>[];
+  components?: Record<string, any>;
+  snapshot_url?: string | null;
+}
+
+export interface BCFViewpointCreatePayload {
+  perspective_camera?: Record<string, any> | null;
+  orthogonal_camera?: Record<string, any> | null;
+  components?: Record<string, any> | null;
+  snapshot_base64?: string | null;
+}
+
+export interface BCFTopicResponse {
+  guid: string;
+  topic_type: string;
+  topic_status: string;
+  title: string;
+  priority: string;
+  index: number;
+  creation_date: string;
+  creation_author: string;
+  modified_date?: string | null;
+  modified_author?: string | null;
+  assigned_to?: string | null;
+  description?: string | null;
+  due_date?: string | null;
+  labels: string[];
+  stage?: string | null;
+  component_guids: string[];
+  project_code?: string | null;
+  originator?: string | null;
+  suitability_code?: string | null;
+  revision_code?: string | null;
+  cde_state?: CDEState | null;
+  comments_count: number;
+  viewpoints_count: number;
+}
+
+export interface BCFTopicCreatePayload {
+  title: string;
+  topic_type?: string;
+  topic_status?: string;
+  priority?: string;
+  description?: string;
+  assigned_to?: string;
+  due_date?: string;
+  labels?: string[];
+  component_guids?: string[];
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+}
+
+export interface BCFTopicUpdatePayload {
+  title?: string;
+  topic_type?: string;
+  topic_status?: string;
+  priority?: string;
+  description?: string;
+  assigned_to?: string;
+  due_date?: string;
+  labels?: string[];
+  component_guids?: string[];
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+}
 
 // ── ISO 19650 naming configuration ───────────────────────────────────────────
 

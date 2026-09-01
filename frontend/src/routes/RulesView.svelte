@@ -10,9 +10,12 @@
     Folder,
     FolderOpen,
     CheckCircle2,
+    CheckSquare,
     AlertCircle,
     SlidersHorizontal,
     Edit3,
+    Pencil,
+    GripVertical,
     Eye,
     X,
     RotateCw,
@@ -20,6 +23,9 @@
   import { rulesApi, ruleExtractionApi } from "../lib/api";
   import type { Rule, RuleFolder, RulesetCategory } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import TablePagination from "../lib/components/TablePagination.svelte";
+  import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import DataTableHeader from "../lib/components/DataTableHeader.svelte";
 
   const cachedRules = rulesApi.getCachedList();
   const cachedFolders = rulesApi.getCachedFolders();
@@ -47,6 +53,49 @@
   let isModalOpen = false;
   let isEditing = false;
   let editRuleId: number | null = null;
+
+  // Folder Create/Edit Modal State
+  let isFolderModalOpen = false;
+  let isEditingFolder = false;
+  let folderRulesetId = "";
+  let folderDisplayName = "";
+  let folderDescription = "";
+  let folderMechanismScope = "";
+  let folderCategory: RulesetCategory = "Arch";
+  let folderModalError = "";
+  let isSavingFolder = false;
+
+  // Folder Delete Modal State
+  let isDeleteFolderModalOpen = false;
+  let folderToDelete: RuleFolder | null = null;
+  let isDeletingFolder = false;
+
+  // Bulk Rule Modification State
+  let isBulkEditRulesModalOpen = false;
+  let bulkRuleRulesetId = "__keep__";
+  let bulkRuleCategory: RulesetCategory | "__keep__" = "__keep__";
+  let bulkRuleMechanism = "__keep__";
+  let bulkRuleSeverity = "__keep__";
+  let bulkRuleNeedsReview: "0" | "1" | "__keep__" = "__keep__";
+  let isBulkUpdatingRules = false;
+  let bulkRulesModalError = "";
+
+  // Bulk Folder Selection & Modification State
+  let selectedFolderRulesetIds: string[] = [];
+  let isFolderSelectionMode = false;
+  let isBulkEditFoldersModalOpen = false;
+  let bulkFolderCategory: RulesetCategory | "__keep__" = "__keep__";
+  let bulkFolderMechanismScope = "__keep__";
+  let isBulkUpdatingFolders = false;
+  let bulkFoldersModalError = "";
+  let isBulkDeleteFoldersModalOpen = false;
+  let isBulkDeletingFolders = false;
+
+  // Resizable Sidebar Splitter State
+  let sidebarWidth = 280;
+  let isDraggingDivider = false;
+  let dragStartX = 0;
+  let dragStartWidth = 280;
 
   // Form fields
   let formRuleId = "";
@@ -97,6 +146,16 @@
   }
 
   onMount(() => {
+    try {
+      const savedWidth = localStorage.getItem("bimguard_rules_sidebar_width");
+      if (savedWidth) {
+        const parsed = parseInt(savedWidth, 10);
+        if (!isNaN(parsed) && parsed >= 180 && parsed <= 600) {
+          sidebarWidth = parsed;
+        }
+      }
+    } catch {}
+
     unsubscribeRules = rulesApi.subscribe((updatedRules) => {
       rules = updatedRules;
     });
@@ -144,6 +203,168 @@
 
     return matchesSearch && matchesFolder && matchesMechanism && matchesCategory && matchesReview;
   });
+
+  let selectedRuleIds: number[] = [];
+  let isBulkDeleteModalOpen = false;
+
+  let currentPage = 1;
+  let pageSize = 10;
+
+  $: totalItems = filteredRules.length;
+  $: paginatedRules = filteredRules.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  $: allFilteredSelected =
+    filteredRules.length > 0 &&
+    filteredRules.every((r) => selectedRuleIds.includes(r.id));
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      selectedRuleIds = [];
+    } else {
+      selectedRuleIds = filteredRules.map((r) => r.id);
+    }
+  }
+
+  function toggleSelectRule(id: number) {
+    if (selectedRuleIds.includes(id)) {
+      selectedRuleIds = selectedRuleIds.filter((rId) => rId !== id);
+    } else {
+      selectedRuleIds = [...selectedRuleIds, id];
+    }
+  }
+
+  // ── Bulk Rules Handlers ───────────────────────────────────────────────────
+
+  function openBulkEditRulesModal() {
+    if (!selectedRuleIds.length) return;
+    bulkRuleRulesetId = "__keep__";
+    bulkRuleCategory = "__keep__";
+    bulkRuleMechanism = "__keep__";
+    bulkRuleSeverity = "__keep__";
+    bulkRuleNeedsReview = "__keep__";
+    bulkRulesModalError = "";
+    isBulkEditRulesModalOpen = true;
+  }
+
+  async function handleBulkUpdateRules() {
+    if (!selectedRuleIds.length) return;
+    isBulkUpdatingRules = true;
+    bulkRulesModalError = "";
+    try {
+      const payload: any = { rule_ids: selectedRuleIds };
+      if (bulkRuleRulesetId !== "__keep__") payload.ruleset_id = bulkRuleRulesetId;
+      if (bulkRuleCategory !== "__keep__") payload.category = bulkRuleCategory;
+      if (bulkRuleMechanism !== "__keep__") payload.mechanism = bulkRuleMechanism;
+      if (bulkRuleSeverity !== "__keep__") payload.severity = bulkRuleSeverity;
+      if (bulkRuleNeedsReview !== "__keep__") payload.needs_review = parseInt(bulkRuleNeedsReview, 10);
+
+      const res = await rulesApi.bulkUpdate(payload);
+      successMessage = `Successfully updated ${res.success_count} rule(s).`;
+      isBulkEditRulesModalOpen = false;
+      selectedRuleIds = [];
+      await loadData(true);
+      setTimeout(() => (successMessage = ""), 4000);
+    } catch (err: any) {
+      bulkRulesModalError = err.message || "Failed to update rules in bulk.";
+    } finally {
+      isBulkUpdatingRules = false;
+    }
+  }
+
+  async function confirmBulkDelete() {
+    if (!selectedRuleIds.length) return;
+    try {
+      const res = await rulesApi.bulkDelete(selectedRuleIds);
+      rules = rules.filter((r) => !selectedRuleIds.includes(r.id));
+      selectedRuleIds = [];
+      isBulkDeleteModalOpen = false;
+      successMessage = `Successfully deleted ${res.success_count} rule(s).`;
+      await loadData(true);
+      setTimeout(() => (successMessage = ""), 4000);
+    } catch (err: any) {
+      error = `Could not delete selected rules: ${err.message}`;
+    }
+  }
+
+  // ── Bulk Folder Handlers ──────────────────────────────────────────────────
+
+  function toggleFolderSelectionMode() {
+    isFolderSelectionMode = !isFolderSelectionMode;
+    if (!isFolderSelectionMode) {
+      selectedFolderRulesetIds = [];
+    }
+  }
+
+  function toggleSelectFolder(rulesetId: string, event?: Event) {
+    if (event) event.stopPropagation();
+    if (selectedFolderRulesetIds.includes(rulesetId)) {
+      selectedFolderRulesetIds = selectedFolderRulesetIds.filter((id) => id !== rulesetId);
+    } else {
+      selectedFolderRulesetIds = [...selectedFolderRulesetIds, rulesetId];
+    }
+  }
+
+  function openBulkEditFoldersModal() {
+    if (!selectedFolderRulesetIds.length) return;
+    bulkFolderCategory = "__keep__";
+    bulkFolderMechanismScope = "__keep__";
+    bulkFoldersModalError = "";
+    isBulkEditFoldersModalOpen = true;
+  }
+
+  async function handleBulkUpdateFolders() {
+    if (!selectedFolderRulesetIds.length) return;
+    isBulkUpdatingFolders = true;
+    bulkFoldersModalError = "";
+    try {
+      const payload: any = { ruleset_ids: selectedFolderRulesetIds };
+      if (bulkFolderCategory !== "__keep__") payload.category = bulkFolderCategory;
+      if (bulkFolderMechanismScope !== "__keep__") payload.mechanism_scope = bulkFolderMechanismScope;
+
+      const res = await rulesApi.bulkUpdateFolders(payload);
+      successMessage = `Successfully updated ${res.success_count} ruleset folder(s).`;
+      isBulkEditFoldersModalOpen = false;
+      selectedFolderRulesetIds = [];
+      await loadData(true);
+      setTimeout(() => (successMessage = ""), 4000);
+    } catch (err: any) {
+      bulkFoldersModalError = err.message || "Failed to update folders in bulk.";
+    } finally {
+      isBulkUpdatingFolders = false;
+    }
+  }
+
+  async function confirmBulkDeleteFolders() {
+    if (!selectedFolderRulesetIds.length) return;
+    isBulkDeletingFolders = true;
+    try {
+      const res = await rulesApi.bulkDeleteFolders(selectedFolderRulesetIds);
+      if (selectedFolderId && selectedFolderRulesetIds.includes(selectedFolderId)) {
+        selectedFolderId = null;
+      }
+      successMessage = `Successfully deleted ${res.success_count} folder(s) and ${res.deleted_rules_count} member rule(s).`;
+      selectedFolderRulesetIds = [];
+      isBulkDeleteFoldersModalOpen = false;
+      await loadData(true);
+      setTimeout(() => (successMessage = ""), 4000);
+    } catch (err: any) {
+      error = `Could not delete selected folders: ${err.message}`;
+    } finally {
+      isBulkDeletingFolders = false;
+    }
+  }
+
+  $: {
+    searchQuery;
+    selectedFolderId;
+    selectedMechanism;
+    selectedCategory;
+    filterNeedsReview;
+    currentPage = 1;
+  }
 
   async function handleSeedRules() {
     try {
@@ -289,6 +510,133 @@
       error = `Delete failed: ${err.message}`;
     }
   }
+
+  // ── Folder CRUD & Resizer Handlers ──────────────────────────────────────────
+
+  function openCreateFolderModal() {
+    isEditingFolder = false;
+    folderRulesetId = "";
+    folderDisplayName = "";
+    folderDescription = "";
+    folderMechanismScope =
+      selectedCategory === "Piping"
+        ? "GC-001"
+        : selectedCategory === "seismic"
+        ? "SEISMIC"
+        : "CODE";
+    folderCategory = selectedCategory !== "all" ? selectedCategory : "Arch";
+    folderModalError = "";
+    isFolderModalOpen = true;
+  }
+
+  function openEditFolderModal(folder: RuleFolder, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    isEditingFolder = true;
+    folderRulesetId = folder.ruleset_id;
+    folderDisplayName = folder.display_name || folder.ruleset_id;
+    folderDescription = folder.description || "";
+    folderMechanismScope = folder.mechanism_scope || "CODE";
+    folderCategory = (folder.category as RulesetCategory) || "Arch";
+    folderModalError = "";
+    isFolderModalOpen = true;
+  }
+
+  async function handleSaveFolder() {
+    if (!folderRulesetId.trim()) {
+      folderModalError = "Ruleset ID is required.";
+      return;
+    }
+    isSavingFolder = true;
+    folderModalError = "";
+    try {
+      if (isEditingFolder) {
+        await rulesApi.updateFolder(folderRulesetId, {
+          display_name: folderDisplayName.trim() || folderRulesetId.trim(),
+          description: folderDescription.trim(),
+          mechanism_scope: folderMechanismScope.trim(),
+          category: folderCategory,
+        });
+        successMessage = `Updated ruleset folder "${folderDisplayName || folderRulesetId}"`;
+      } else {
+        await rulesApi.createFolder({
+          ruleset_id: folderRulesetId.trim(),
+          display_name: folderDisplayName.trim() || folderRulesetId.trim(),
+          description: folderDescription.trim(),
+          mechanism_scope: folderMechanismScope.trim(),
+          category: folderCategory,
+        });
+        selectedFolderId = folderRulesetId.trim();
+        successMessage = `Created ruleset folder "${folderDisplayName || folderRulesetId}"`;
+      }
+      isFolderModalOpen = false;
+      await loadData(true);
+      setTimeout(() => (successMessage = ""), 4000);
+    } catch (err: any) {
+      folderModalError = err.message || "Failed to save ruleset folder.";
+    } finally {
+      isSavingFolder = false;
+    }
+  }
+
+  function promptDeleteFolder(folder: RuleFolder, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    folderToDelete = folder;
+    isDeleteFolderModalOpen = true;
+  }
+
+  async function confirmDeleteFolder() {
+    if (!folderToDelete) return;
+    isDeletingFolder = true;
+    try {
+      await rulesApi.deleteFolder(folderToDelete.ruleset_id);
+      if (selectedFolderId === folderToDelete.ruleset_id) {
+        selectedFolderId = null;
+      }
+      successMessage = `Deleted folder "${folderToDelete.display_name || folderToDelete.ruleset_id}"`;
+      isDeleteFolderModalOpen = false;
+      folderToDelete = null;
+      await loadData(true);
+      setTimeout(() => (successMessage = ""), 4000);
+    } catch (err: any) {
+      error = `Failed to delete folder: ${err.message}`;
+    } finally {
+      isDeletingFolder = false;
+    }
+  }
+
+  function handleDividerPointerDown(event: PointerEvent) {
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture(event.pointerId);
+    isDraggingDivider = true;
+    dragStartX = event.clientX;
+    dragStartWidth = sidebarWidth;
+  }
+
+  function handleDividerPointerMove(event: PointerEvent) {
+    if (!isDraggingDivider) return;
+    const delta = event.clientX - dragStartX;
+    const newWidth = Math.min(Math.max(dragStartWidth + delta, 180), 550);
+    sidebarWidth = newWidth;
+  }
+
+  function handleDividerPointerUp(event: PointerEvent) {
+    if (isDraggingDivider) {
+      isDraggingDivider = false;
+      try {
+        localStorage.setItem("bimguard_rules_sidebar_width", String(sidebarWidth));
+      } catch {}
+    }
+  }
+
+  function handleDividerKeyDown(event: KeyboardEvent) {
+    if (event.key === "ArrowLeft") {
+      sidebarWidth = Math.max(sidebarWidth - 16, 180);
+      try { localStorage.setItem("bimguard_rules_sidebar_width", String(sidebarWidth)); } catch {}
+    } else if (event.key === "ArrowRight") {
+      sidebarWidth = Math.min(sidebarWidth + 16, 550);
+      try { localStorage.setItem("bimguard_rules_sidebar_width", String(sidebarWidth)); } catch {}
+    }
+  }
 </script>
 
 <div class="space-y-6 mx-auto">
@@ -427,23 +775,89 @@
     </button>
   </div>
 
-  <!-- Main Grid: Folders Sidebar + Rules Table -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+  <!-- Main Layout: Resizable Split View (Folders Sidebar + Draggable Divider + Rules Table) -->
+  <div class="flex flex-col md:flex-row gap-0 items-stretch relative">
     <!-- Folder tree sidebar -->
     <div
-      class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3"
+      class="p-4 rounded-2xl md:rounded-r-none bg-slate-900/60 border border-slate-800 space-y-3 shrink-0 flex flex-col w-full md:w-auto"
+      style="width: 100%; max-width: 100%;"
+      style:width={typeof window !== 'undefined' && window.innerWidth >= 768 ? `${sidebarWidth}px` : '100%'}
     >
-      <div
-        class="text-xs font-bold uppercase tracking-wider text-slate-400 px-1"
-      >
-        Ruleset Folders
+      <div class="flex items-center justify-between px-1">
+        <div class="flex items-center gap-1.5">
+          <div
+            class="text-xs font-bold uppercase tracking-wider text-slate-400"
+          >
+            Ruleset Folders
+          </div>
+          {#if folders.length > 0}
+            <button
+              type="button"
+              on:click={toggleFolderSelectionMode}
+              class="p-1 rounded-md transition-colors {isFolderSelectionMode || selectedFolderRulesetIds.length > 0
+                ? 'text-blue-400 bg-blue-500/10'
+                : 'text-slate-500 hover:text-white hover:bg-slate-800'}"
+              title={isFolderSelectionMode ? 'Exit folder select mode' : 'Select multiple folders'}
+            >
+              <CheckSquare class="w-3.5 h-3.5" />
+            </button>
+          {/if}
+        </div>
+        <button
+          type="button"
+          on:click={openCreateFolderModal}
+          class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-blue-600 transition-colors border border-slate-700/60"
+          title="Create New Ruleset Folder"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          <span>Folder</span>
+        </button>
       </div>
-      <div class="space-y-1">
+
+      <!-- Folder Bulk Action Bar when folders are selected -->
+      {#if selectedFolderRulesetIds.length > 0}
+        <div
+          class="p-2 rounded-xl bg-blue-950/90 border border-blue-800 text-xs text-blue-200 flex items-center justify-between gap-1 shadow-md animate-in fade-in duration-150"
+        >
+          <div class="flex items-center gap-1 font-medium text-[11px] truncate">
+            <span class="font-bold text-white">{selectedFolderRulesetIds.length}</span>
+            <span class="truncate">selected</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              on:click={openBulkEditFoldersModal}
+              class="px-2 py-1 rounded-md bg-blue-600/40 hover:bg-blue-600 text-white font-medium text-[10px] transition-colors"
+              title="Bulk edit selected folders"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              on:click={() => (isBulkDeleteFoldersModalOpen = true)}
+              class="px-2 py-1 rounded-md bg-rose-600/40 hover:bg-rose-600 text-white font-medium text-[10px] transition-colors"
+              title="Bulk delete selected folders"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              on:click={() => (selectedFolderRulesetIds = [])}
+              class="p-1 rounded-md hover:bg-blue-900/60 text-blue-300 hover:text-white"
+              title="Clear selection"
+            >
+              <X class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      {/if}
+
+      <div class="space-y-1 overflow-y-auto max-h-[70vh] flex-1 pr-1">
         <button
           type="button"
           on:click={() => (selectedFolderId = null)}
           class="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors {!selectedFolderId
-            ? 'bg-[#0071e3] text-white'
+            ? 'bg-[#0071e3] text-white shadow-sm'
             : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
         >
           <div class="flex items-center gap-2">
@@ -454,22 +868,44 @@
         </button>
 
         {#each filteredFolders as folder}
-          <button
-            type="button"
-            on:click={() => (selectedFolderId = folder.ruleset_id)}
-            class="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors {selectedFolderId ===
+          <div
+            class="group/folder relative flex items-center justify-between rounded-xl text-xs font-medium transition-colors {selectedFolderId ===
             folder.ruleset_id
-              ? 'bg-[#0071e3] text-white'
+              ? 'bg-[#0071e3] text-white shadow-sm'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
           >
-            <div class="flex items-center gap-2 truncate flex-1">
+            {#if isFolderSelectionMode || selectedFolderRulesetIds.length > 0}
+              <button
+                type="button"
+                class="pl-2.5 py-2 cursor-pointer flex items-center shrink-0 bg-transparent border-0"
+                on:click|stopPropagation={(e) => toggleSelectFolder(folder.ruleset_id, e)}
+                title="Select folder"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedFolderRulesetIds.includes(folder.ruleset_id)}
+                  tabindex="-1"
+                  class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-3.5 h-3.5 pointer-events-none"
+                />
+              </button>
+            {/if}
+
+            <button
+              type="button"
+              on:click={() => (selectedFolderId = folder.ruleset_id)}
+              class="flex items-center gap-2 truncate flex-1 min-w-0 {isFolderSelectionMode || selectedFolderRulesetIds.length > 0 ? 'px-1.5' : 'px-2.5'} py-2 text-left"
+              title="{folder.display_name} ({folder.ruleset_id})"
+            >
               <Folder class="w-3.5 h-3.5 shrink-0" />
               <span class="truncate">{folder.display_name}</span>
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0 ml-2">
+            </button>
+
+            <div class="flex items-center gap-1 shrink-0 pr-2">
               {#if folder.category}
                 <span
-                  class="text-[9px] px-1.5 py-0.5 rounded font-mono font-medium {folder.category === 'Piping'
+                  class="text-[9px] px-1.5 py-0.5 rounded font-mono font-medium {selectedFolderId === folder.ruleset_id
+                    ? 'bg-white/20 text-white'
+                    : folder.category === 'Piping'
                     ? 'bg-amber-500/20 text-amber-300'
                     : folder.category === 'seismic'
                     ? 'bg-purple-500/20 text-purple-300'
@@ -478,15 +914,71 @@
                   {folder.category}
                 </span>
               {/if}
-              <span class="text-[10px] opacity-75">{folder.rules.length}</span>
+
+              <!-- Action buttons on hover -->
+              <div class="hidden group-hover/folder:flex items-center gap-0.5 ml-1">
+                <button
+                  type="button"
+                  on:click={(e) => openEditFolderModal(folder, e)}
+                  class="p-1 rounded hover:bg-black/30 text-white/80 hover:text-white transition-colors"
+                  title="Edit Folder"
+                >
+                  <Pencil class="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  on:click={(e) => promptDeleteFolder(folder, e)}
+                  class="p-1 rounded hover:bg-rose-500/30 text-rose-300 hover:text-rose-200 transition-colors"
+                  title="Delete Folder"
+                >
+                  <Trash2 class="w-3 h-3" />
+                </button>
+              </div>
+
+              <span class="text-[10px] opacity-75 group-hover/folder:hidden ml-1">
+                {folder.rules.length}
+              </span>
             </div>
-          </button>
+          </div>
         {/each}
       </div>
     </div>
 
+    <!-- Draggable vertical resizer divider (Desktop only) -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuenow={sidebarWidth}
+      aria-valuemin={180}
+      aria-valuemax={550}
+      tabindex="0"
+      on:pointerdown={handleDividerPointerDown}
+      on:pointermove={handleDividerPointerMove}
+      on:pointerup={handleDividerPointerUp}
+      on:pointercancel={handleDividerPointerUp}
+      on:keydown={handleDividerKeyDown}
+      class="hidden md:flex items-center justify-center w-3 -mx-1.5 cursor-col-resize z-20 group relative focus:outline-none transition-colors select-none"
+      title="Drag to resize Ruleset Folders sidebar (or use Left/Right Arrow keys)"
+    >
+      <div
+        class="w-1 h-full rounded-full transition-all duration-150 {isDraggingDivider
+          ? 'bg-[#0071e3] shadow-[0_0_10px_rgba(0,113,227,0.9)] w-1.5'
+          : 'bg-slate-800 group-hover:bg-[#0071e3]/80'}"
+      ></div>
+      <!-- Grip handle indicator in the middle -->
+      <div
+        class="absolute top-1/2 -translate-y-1/2 w-4 h-7 rounded-md border border-slate-700 bg-slate-900 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity shadow-lg {isDraggingDivider
+          ? '!opacity-100 border-[#0071e3] bg-[#0071e3]'
+          : ''}"
+      >
+        <GripVertical class="w-3 h-3 text-slate-400 {isDraggingDivider ? 'text-white' : ''}" />
+      </div>
+    </div>
+
     <!-- Rules Table Area -->
-    <div class="md:col-span-3 space-y-4">
+    <div class="flex-1 min-w-0 md:pl-4 space-y-4 pt-4 md:pt-0">
       <!-- Search & Filters -->
       <div
         class="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row items-center gap-3"
@@ -527,7 +1019,16 @@
         </label>
       </div>
 
-      <!-- Table -->
+      <!-- Bulk Operations Bar -->
+      <BulkActionBar
+        selectedCount={selectedRuleIds.length}
+        itemLabel="rule"
+        onClearSelection={() => (selectedRuleIds = [])}
+        onBulkEdit={openBulkEditRulesModal}
+        onBulkDelete={() => (isBulkDeleteModalOpen = true)}
+      />
+
+      <!-- Table Container -->
       <div
         class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40"
       >
@@ -546,6 +1047,15 @@
                 class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
               >
                 <tr>
+                  <th class="py-3 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      on:change={toggleSelectAll}
+                      class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      title="Select or deselect all visible rules"
+                    />
+                  </th>
                   <th class="py-3 px-4">Rule Ref</th>
                   <th class="py-3 px-4">Category</th>
                   <th class="py-3 px-4">Mechanism</th>
@@ -556,8 +1066,16 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
-                {#each filteredRules as rule}
-                  <tr class="hover:bg-slate-900/60 transition-colors">
+                {#each paginatedRules as rule}
+                  <tr class="hover:bg-slate-900/60 transition-colors {selectedRuleIds.includes(rule.id) ? 'bg-blue-950/20' : ''}">
+                    <td class="py-3 px-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedRuleIds.includes(rule.id)}
+                        on:change={() => toggleSelectRule(rule.id)}
+                        class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      />
+                    </td>
                     <td class="py-3 px-4">
                       <div class="font-mono font-bold text-white">
                         {rule.rule_id || `Rule #${rule.id}`}
@@ -677,6 +1195,17 @@
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            {currentPage}
+            {pageSize}
+            totalItems={totalItems}
+            onPageChange={(p) => (currentPage = p)}
+            onPageSizeChange={(s) => {
+              pageSize = s;
+              currentPage = 1;
+            }}
+          />
         {/if}
       </div>
     </div>
@@ -1187,3 +1716,405 @@
     </div>
   </div>
 {/if}
+
+<ConfirmModal
+  bind:isOpen={isBulkDeleteModalOpen}
+  title="Delete Selected Compliance Rules"
+  message={`Are you sure you want to delete ${selectedRuleIds.length} selected compliance rule(s)? This action cannot be undone.`}
+  confirmText="Delete Selected Rules"
+  danger={true}
+  onConfirm={confirmBulkDelete}
+  onCancel={() => (selectedRuleIds = [])}
+/>
+
+<!-- Create / Edit Ruleset Folder Modal -->
+{#if isFolderModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            {#if isEditingFolder}
+              <Pencil class="w-5 h-5" />
+            {:else}
+              <Folder class="w-5 h-5" />
+            {/if}
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white tracking-tight">
+              {isEditingFolder ? `Edit Folder: ${folderRulesetId}` : "Create Ruleset Folder"}
+            </h2>
+            <p class="text-xs text-slate-400">
+              {isEditingFolder ? "Update folder name, category, and scope" : "Organize compliance rules under a new domain ruleset"}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          on:click={() => (isFolderModalOpen = false)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Body Form -->
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        {#if folderModalError}
+          <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300">
+            {folderModalError}
+          </div>
+        {/if}
+
+        <div class="space-y-1.5">
+          <label for="folder-ruleset-id" class="block font-semibold text-slate-300">
+            Ruleset Identifier (ID) <span class="text-rose-400">*</span>
+          </label>
+          <input
+            id="folder-ruleset-id"
+            type="text"
+            bind:value={folderRulesetId}
+            disabled={isEditingFolder}
+            placeholder="e.g. BUILDING-CODE-PART3 or GC-001"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3] font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+          {#if !isEditingFolder}
+            <p class="text-[11px] text-slate-500">
+              Unique ID used to link member rules (e.g. OBC-2024-STAIRS, GC-001, SEISMIC-CLEARANCE).
+            </p>
+          {/if}
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="folder-display-name" class="block font-semibold text-slate-300">
+            Display Name
+          </label>
+          <input
+            id="folder-display-name"
+            type="text"
+            bind:value={folderDisplayName}
+            placeholder="e.g. OBC Part 3 - Fire Protection & Safety"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label for="folder-category" class="block font-semibold text-slate-300">
+              Domain Category
+            </label>
+            <select
+              id="folder-category"
+              bind:value={folderCategory}
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            >
+              <option value="Arch">Arch (Architectural)</option>
+              <option value="Piping">Piping (Corrosion)</option>
+              <option value="seismic">seismic (Clearance)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="folder-mechanism-scope" class="block font-semibold text-slate-300">
+              Mechanism Scope
+            </label>
+            <select
+              id="folder-mechanism-scope"
+              bind:value={folderMechanismScope}
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            >
+              <option value="CODE">CODE (Building Code)</option>
+              <option value="GC-001">GC-001 (Galvanic)</option>
+              <option value="CC-001">CC-001 (Crevice)</option>
+              <option value="MC-001">MC-001 (Microbiological)</option>
+              <option value="SEISMIC">SEISMIC (Clearance Detection)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="folder-desc" class="block font-semibold text-slate-300">
+            Description
+          </label>
+          <textarea
+            id="folder-desc"
+            rows="3"
+            bind:value={folderDescription}
+            placeholder="Regulatory standard, scope notes, or compliance criteria..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3] resize-y"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          on:click={() => (isFolderModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={isSavingFolder || !folderRulesetId.trim()}
+          on:click={handleSaveFolder}
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+        >
+          <span>{isSavingFolder ? "Saving..." : isEditingFolder ? "Update Folder" : "Create Folder"}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Delete Folder Confirmation Modal -->
+<ConfirmModal
+  bind:isOpen={isDeleteFolderModalOpen}
+  title="Delete Ruleset Folder"
+  message={`Are you sure you want to delete folder "${folderToDelete?.display_name || folderToDelete?.ruleset_id || ""}"? This will delete the folder and all of its ${folderToDelete?.rules?.length ?? 0} member rules.`}
+  confirmText="Delete Folder & Rules"
+  danger={true}
+  onConfirm={confirmDeleteFolder}
+  onCancel={() => (folderToDelete = null)}
+/>
+
+<!-- Bulk Edit Rules Modal -->
+{#if isBulkEditRulesModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <Pencil class="w-5 h-5" />
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white tracking-tight">
+              Bulk Edit {selectedRuleIds.length} Rules
+            </h2>
+            <p class="text-xs text-slate-400">Apply batch changes to selected compliance rules</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          on:click={() => (isBulkEditRulesModalOpen = false)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        {#if bulkRulesModalError}
+          <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300">
+            {bulkRulesModalError}
+          </div>
+        {/if}
+
+        <div class="space-y-1.5">
+          <label for="bulk-rule-ruleset" class="block font-semibold text-slate-300">
+            Move to Ruleset Folder
+          </label>
+          <select
+            id="bulk-rule-ruleset"
+            bind:value={bulkRuleRulesetId}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            <option value="__keep__">— Keep current folder —</option>
+            {#each folders as f}
+              <option value={f.ruleset_id}>{f.display_name} ({f.ruleset_id})</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label for="bulk-rule-category" class="block font-semibold text-slate-300">
+              Domain Category
+            </label>
+            <select
+              id="bulk-rule-category"
+              bind:value={bulkRuleCategory}
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            >
+              <option value="__keep__">— Keep current —</option>
+              <option value="Arch">Arch (Architectural)</option>
+              <option value="Piping">Piping (Corrosion)</option>
+              <option value="seismic">seismic (Clearance)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="bulk-rule-mechanism" class="block font-semibold text-slate-300">
+              Mechanism
+            </label>
+            <select
+              id="bulk-rule-mechanism"
+              bind:value={bulkRuleMechanism}
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            >
+              <option value="__keep__">— Keep current —</option>
+              <option value="CODE">CODE (Building Code)</option>
+              <option value="GC-001">GC-001 (Galvanic)</option>
+              <option value="CC-001">CC-001 (Crevice)</option>
+              <option value="MC-001">MC-001 (Microbiological)</option>
+              <option value="SEISMIC">SEISMIC (Clearance)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label for="bulk-rule-severity" class="block font-semibold text-slate-300">
+              Severity
+            </label>
+            <select
+              id="bulk-rule-severity"
+              bind:value={bulkRuleSeverity}
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            >
+              <option value="__keep__">— Keep current —</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="bulk-rule-review" class="block font-semibold text-slate-300">
+              Review Status
+            </label>
+            <select
+              id="bulk-rule-review"
+              bind:value={bulkRuleNeedsReview}
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            >
+              <option value="__keep__">— Keep current —</option>
+              <option value="0">Mark as Approved (0)</option>
+              <option value="1">Mark as Needs Review (1)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          on:click={() => (isBulkEditRulesModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={isBulkUpdatingRules}
+          on:click={handleBulkUpdateRules}
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+        >
+          <span>{isBulkUpdatingRules ? "Updating..." : `Update ${selectedRuleIds.length} Rules`}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Bulk Edit Ruleset Folders Modal -->
+{#if isBulkEditFoldersModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <Pencil class="w-5 h-5" />
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white tracking-tight">
+              Bulk Edit {selectedFolderRulesetIds.length} Folders
+            </h2>
+            <p class="text-xs text-slate-400">Apply batch changes to selected ruleset folders</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          on:click={() => (isBulkEditFoldersModalOpen = false)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        {#if bulkFoldersModalError}
+          <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300">
+            {bulkFoldersModalError}
+          </div>
+        {/if}
+
+        <div class="space-y-1.5">
+          <label for="bulk-folder-category" class="block font-semibold text-slate-300">
+            Domain Category
+          </label>
+          <select
+            id="bulk-folder-category"
+            bind:value={bulkFolderCategory}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            <option value="__keep__">— Keep current —</option>
+            <option value="Arch">Arch (Architectural)</option>
+            <option value="Piping">Piping (Corrosion)</option>
+            <option value="seismic">seismic (Clearance)</option>
+          </select>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="bulk-folder-mechanism-scope" class="block font-semibold text-slate-300">
+            Mechanism Scope
+          </label>
+          <select
+            id="bulk-folder-mechanism-scope"
+            bind:value={bulkFolderMechanismScope}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            <option value="__keep__">— Keep current —</option>
+            <option value="CODE">CODE (Building Code)</option>
+            <option value="GC-001">GC-001 (Galvanic)</option>
+            <option value="CC-001">CC-001 (Crevice)</option>
+            <option value="MC-001">MC-001 (Microbiological)</option>
+            <option value="SEISMIC">SEISMIC (Clearance Detection)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          on:click={() => (isBulkEditFoldersModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={isBulkUpdatingFolders}
+          on:click={handleBulkUpdateFolders}
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+        >
+          <span>{isBulkUpdatingFolders ? "Updating..." : `Update ${selectedFolderRulesetIds.length} Folders`}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Bulk Delete Folders Confirmation Modal -->
+<ConfirmModal
+  bind:isOpen={isBulkDeleteFoldersModalOpen}
+  title="Delete Selected Ruleset Folders"
+  message={`Are you sure you want to delete ${selectedFolderRulesetIds.length} selected ruleset folder(s) and all of their member rules? This action cannot be undone.`}
+  confirmText="Delete Folders & Rules"
+  danger={true}
+  onConfirm={confirmBulkDeleteFolders}
+  onCancel={() => (isBulkDeleteFoldersModalOpen = false)}
+/>

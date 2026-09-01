@@ -1,25 +1,55 @@
-# BIMGUARD AI: Agentic RAG Pipeline for OpenBIM Compliance
+# BIM-Guard
 
-BIMGUARD AI is an Automated Code Compliance Checking (ACCC) platform that bridges OpenBIM standards (IFC, BCF, IDS) with large language models. This repository contains the Python-based compliance engines and the data ingestion pipeline used to evaluate structural and material integrity against international building codes.
+## Live Demo
 
-## Project Scope
-This project focuses on two primary compliance modules:
+View the published demo at [https://maicen.github.io/bim-guard/](https://maicen.github.io/bim-guard/).
+
+## Overview
+
+BIM-Guard is an ISO 19650-compliant OpenBIM compliance platform built on a modern decoupled architecture: a high-performance **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, validate ISO 19650 container naming conventions (UK National Annex), enforce CDE state machine transitions (WIP → SHARED → PUBLISHED → ARCHIVED), verify Level of Information Need (LOIN) via buildingSMART Information Delivery Specifications (IDS), run multi-engine audits, and stream live progress via Server-Sent Events (SSE).
+
+## Key Capabilities
+
+- **buildingSMART Ecosystem Integration**:
+  - **bSDD (buildingSMART Data Dictionary)**: Standardizes semantic terminology and validates material definitions, classifications (Uniclass, OmniClass), and property sets against the bSDD REST API with offline resilience.
+  - **openCDE Foundation & Documents APIs**: Provides vendor-neutral discovery (`/api/cde/versions`), user profile context, OAuth2 configuration, OData v4 query filtering, strong ETag HTTP 304 caching, and automated document synchronization.
+  - **IFC Pre-Flight Validation Service**: 3-stage pre-flight quality gateway verifying STEP ISO 10303-21 physical syntax, IFC schema compatibility (IFC2X3, IFC4, IFC4.3), and buildingSMART Gherkin rules (single project root, 22-char GUID integrity, spatial containment, material association).
+  - **IDS (Information Delivery Specification) Expansion**: Generates, imports, and audits buildingSMART IDS 0.9.6 / 1.0 XML specifications with multi-facet requirements (`entity`, `property`, `classification`, `material`, `partOf`) and numerical tolerance checks.
+  - **BCF REST API v2.1 / v3.0**: Bidirectional REST endpoints (`/api/bcf/v2.1/projects`) managing topics, viewpoints, comments, and snapshot binaries with ISO 19650 metadata parity.
+- **ISO 19650 Container Naming & Metadata**: Validates container naming fields (`[Project]-[Originator]-[Volume]-[Level]-[Type]-[Role]-[Number]`), suitability codes (`S0`–`S4`, `A1`–`A4`), and revision codes (`P01.01`, `C01`).
+- **CDE State Machine Governance**: Guards project and document workflow state transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) with RLS database triggers restricting mutation of published models.
+- **BCF 2.1 Metadata Injection**: Enriches BCF issue reports with ISO 19650 container labels, suitability codes, and revision tags.
+
+## Compliance Module Scope
+
+BIMGUARD AI is an Automated Code Compliance Checking (ACCC) platform that bridges
+OpenBIM standards (IFC, BCF, IDS) with large language models. Its compliance
+engines and data ingestion pipeline evaluate structural and material integrity
+against international building codes through two primary modules:
+
 *   **GC-001 (Seismic):** Evaluates nonstructural component clearance volumes and clash detection against seismic bracing standards (e.g., FEMA E-74, ASCE 7-22).
 *   **CC-001 (Piping & Corrosion):** Evaluates material degradation, galvanic mismatch, and environmental exposure against atmospheric standards (e.g., ISO 9223, MBIE B2).
 
 ## The Agentic RAG Methodology
-To eliminate AI hallucination and ensure strict engineering accuracy, this project utilizes a "Walled Garden" Retrieval-Augmented Generation (RAG) architecture:
-1.  **Retrieval (`fetch_standards.py`):** An LLM-native web scraping script powered by the Firecrawl API dynamically retrieves open-access government building codes and manufacturer material specifications, converting them into clean Markdown.
-2.  **Augmentation (`compile_for_notebooklm.py`):** A custom compilation pipeline packages the OpenBIM Python logic (`IfcOpenShell`), static JSON rule packs, and scraped standards into targeted, domain-isolated Markdown exports (`bimguard_seismic_rules.md` and `bimguard_corrosion_rules.md`).
+
+To eliminate AI hallucination and ensure strict engineering accuracy, this project
+utilizes a "Walled Garden" Retrieval-Augmented Generation (RAG) architecture:
+
+1.  **Retrieval (`scripts/fetch_standards.py`):** An LLM-native web scraping script powered by the Firecrawl API dynamically retrieves open-access government building codes and manufacturer material specifications, converting them into clean Markdown.
+2.  **Augmentation (`scripts/compile_for_notebooklm.py`):** A custom compilation pipeline packages the OpenBIM Python logic (`IfcOpenShell`), static JSON rule packs, and scraped standards into targeted, domain-isolated Markdown exports (`bimguard_seismic_rules.md` and `bimguard_corrosion_rules.md`).
 3.  **Generation (Gemini Notebooks):** The compiled domains are fed into isolated Google Gemini Notebook (NotebookLM) workspaces. The AI reasoning engine evaluates the Python codebase strictly against the ingested facts (and uploaded proprietary, IP-protected PDFs) to identify gaps in the compliance algorithms.
 
-## Repository Structure
-*   `/app/engines/` - Core Python kernels for galvanic, crevice, and seismic clearance analysis.
-*   `/data/rulesets/` - Static JSON configurations defining fallback rules for material mismatch (MM-001) and cross-material (XM-001) interactions.
-*   `/scripts/` - The AI data ingestion and Markdown compilation pipeline.
+### Pipeline Components
 
-## Usage
+*   `app/engines/` — Core Python kernels for galvanic, crevice, and seismic clearance analysis.
+*   `data/rulesets/` — Static JSON configurations defining fallback rules for material mismatch (MM-001), cross-material (XM-001) interactions, and the EN 1998-1 / DIN 4149 seismic jurisdiction config.
+*   `scripts/` — The AI data ingestion and Markdown compilation pipeline.
+*   `docs/scraped_standards/` — Retrieved standards, regenerable and excluded from version control.
+
+### Regenerating the AI Workspace
+
 To pull a new open-access standard and recompile the AI workspace:
+
 ```bash
 # 1. Search and extract an online standard via Firecrawl
 python scripts/fetch_standards.py "MBIE B2 durability for metal components" mbie_durability --corrosion --search
@@ -28,27 +58,15 @@ python scripts/fetch_standards.py "MBIE B2 durability for metal components" mbie
 python scripts/compile_for_notebooklm.py
 ```
 
-## Extended Documentation & Application Stack
-
-## BIM-Guard
-
-### Live Demo
-
-View the published demo at [https://maicen.github.io/bim-guard/](https://maicen.github.io/bim-guard/).
-
-### Overview
-
-BIM-Guard is an OpenBIM compliance platform built on a modern decoupled architecture: a high-performance **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, run multi-engine audits (galvanic corrosion, crevice corrosion, MIC, seismic clearance), and stream live progress via Server-Sent Events (SSE).
-
-### Stack
+## Stack
 
 - **Backend API**: FastAPI (REST + SSE) with strict Pydantic data contracts
 - **Frontend SPA**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
-- **IFC & BIM Processing**: IfcOpenShell, ThatOpenCompany / Web-IFC viewer
+- **IFC & BIM Processing**: IfcOpenShell, buildingSMART IDS, buildingSMART Data Dictionary (bSDD), ThatOpenCompany / Web-IFC viewer
 - **Database & Storage**: Supabase (Postgres) and Supabase Object Storage
 - **LLM Engine**: LiteLLM for rule extraction across multiple providers
 
-### Repository Layout
+## Repository Layout
 
 ```
 bim-guard/
@@ -74,9 +92,9 @@ bim-guard/
 └── example.env          # Environment template for local development
 ```
 
-### Getting Started
+## Getting Started
 
-#### 1. Install dependencies
+### 1. Install dependencies
 
 ```bash
 uv sync
@@ -88,7 +106,7 @@ Python 3.12 or later (tested with 3.12.13) is required. If you need the optional
 uv sync --group ml-pipeline
 ```
 
-#### 2. Configure environment variables
+### 2. Configure environment variables
 
 Create your local `.env` file from the template:
 
@@ -126,7 +144,7 @@ Pin the default app model with `BIM_GUARD_LLM_MODEL`; it defaults to
 
 Supabase schema changes are now tracked in-repo under `supabase/migrations/`. For a fresh Supabase environment, apply the migrations in that folder instead of relying on runtime table creation.
 
-#### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
+### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
 
 You can launch both the backend and frontend concurrently using the cross-platform launcher:
 
@@ -150,14 +168,14 @@ npm run dev
 ```
 The Svelte frontend is available at [http://localhost:5173](http://localhost:5173). Requests to `/api/*` are automatically proxied to the backend at port 8000.
 
-#### 4. Run Production Server
+### 4. Run Production Server
 
 To build the frontend and serve the compiled single-page application with multi-worker Uvicorn:
 
 - **macOS / Linux / WSL**: `./run_production_server.sh` (or `./run_production_server.bat`)
 - **Windows**: `run_production_server.bat`
 
-#### 5. Run the Python agent
+### 5. Run the Python agent
 
 The terminal agent uses OpenRouter, repository-local coding tools, bounded tool
 turns and cost, server-side web search, and append-only JSONL sessions:
@@ -171,9 +189,9 @@ the environment for one run. Inside the agent, `/model` fetches the current
 OpenRouter catalogue, `/new` starts a fresh session, and `/help` lists commands.
 Session logs are written under `data/agent-sessions/` and ignored by Git.
 
-### Application Architecture & Routes
+## Application Architecture & Routes
 
-#### Svelte 5 SPA Client (`frontend/`)
+### Svelte 5 SPA Client (`frontend/`)
 The primary modern client runs on `http://localhost:5173`:
 - **Dashboard**: System overview, recent runs, and status
 - **Projects**: Project creation, IFC upload, and metadata inspection
@@ -184,17 +202,19 @@ The primary modern client runs on `http://localhost:5173`:
 - **3D Viewer**: Interactive OpenBIM viewport and BCF clash inspection
 - **Reports**: BCF issue export, Excel/PDF compliance reports
 
-#### FastAPI API Gateway (`/api`)
+### FastAPI API Gateway (`/api`)
 The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/docs`:
 - `/api/projects` — Project CRUD, model file uploads, IFC metadata
-- `/api/documents` — Document upload, PDF text extraction
+- `/api/documents` — Document upload, PDF text extraction, ETag caching
 - `/api/rules` — Rule folders, rulesets, and custom rule CRUD
 - `/api/analyze` — Compliance and corrosion analysis execution
 - `/api/events/{project_id}` — Real-time Server-Sent Events (SSE) progress streaming
+- `/api/cde` — buildingSMART openCDE Foundation & Documents REST APIs
+- `/api/bcf/v2.1` — buildingSMART BCF REST API v2.1/v3.0 (topics, viewpoints, comments, snapshots)
 
-### Deployment
+## Deployment
 
-#### Docker Compose
+### Docker Compose
 
 ```bash
 docker compose up --build
@@ -202,11 +222,11 @@ docker compose up --build
 
 `docker-compose.yml` wires the Supabase environment variables from your shell or `.env` file and mounts a cache volume for downloaded artifacts.
 
-#### Render
+### Render
 
 The repository includes `render.yaml` for Docker-based deployment on Render. Set the Supabase variables and any AI provider keys you intend to use.
 
-### Notes
+## Notes
 
 - `app/main.py` is the application bootstrap used by the root `main.py` entrypoint.
 - `README.md`, `AGENTS.md`, `CLAUDE.md`, and `.github/instructions/project-specific.instructions.md` are the main source files for project guidance.
@@ -215,11 +235,11 @@ The repository includes `render.yaml` for Docker-based deployment on Render. Set
 1. Results are de-duplicated and displayed for review.
 2. Accepted rules can be saved directly to the Rule Library.
 
-### Documentation Map
+## Documentation Map
 
 Use [docs/README.md](docs/README.md) as the authoritative index for repository documentation. It groups markdown files by purpose and marks which docs are current vs. archival/reference.
 
-### Next Development Steps
+## Next Development Steps
 
 - Verify the reported issues.
 - Verify the BCF exported.
@@ -230,12 +250,12 @@ Output rule fields:
 - `desc`
 - `target`
 
-### Notes
+## Notes
 
 - If `.env` is not loaded (for custom scripts/tests), call `load_env_file()` from `app.utils` before creating AI extraction services.
 - Document upload validation includes extension, MIME type, and content checks.
 
-### Python Docstrings and API Docs
+## Python Docstrings and API Docs
 
 This repository follows [PEP 257](https://peps.python.org/pep-0257/) docstring conventions and uses Python's built-in [pydoc](https://docs.python.org/3/library/pydoc.html) for API documentation.
 

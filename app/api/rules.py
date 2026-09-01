@@ -20,7 +20,13 @@ from fastapi.responses import PlainTextResponse
 from app.api.dependencies import get_rules_service
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    RuleBulkActionResponse,
+    RuleBulkDeleteRequest,
+    RuleBulkUpdateRequest,
     RuleCreateRequest,
+    RuleFolderBulkActionResponse,
+    RuleFolderBulkDeleteRequest,
+    RuleFolderBulkUpdateRequest,
     RuleFolderCreateRequest,
     RuleFolderResponse,
     RuleFolderUpdateRequest,
@@ -149,6 +155,78 @@ def create_rule_folder(
     )
 
 
+@router.post(
+    "/folders/bulk-update",
+    response_model=RuleFolderBulkActionResponse,
+    summary="Update metadata for multiple ruleset folders in bulk",
+)
+def bulk_update_rule_folders(
+    payload: RuleFolderBulkUpdateRequest,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleFolderBulkActionResponse:
+    """Update category and/or mechanism scope for multiple ruleset folders."""
+    updates = {}
+    if payload.category is not None:
+        updates["category"] = payload.category
+    if payload.mechanism_scope is not None:
+        updates["mechanism_scope"] = payload.mechanism_scope
+
+    updated_ids = service.bulk_update_folders(payload.ruleset_ids, updates)
+    return RuleFolderBulkActionResponse(
+        success_count=len(updated_ids),
+        affected_ruleset_ids=updated_ids,
+        deleted_rules_count=0,
+    )
+
+
+@router.post(
+    "/folders/bulk-delete",
+    response_model=RuleFolderBulkActionResponse,
+    summary="Delete multiple ruleset folders and member rules in bulk",
+)
+def bulk_delete_rule_folders(
+    payload: RuleFolderBulkDeleteRequest,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleFolderBulkActionResponse:
+    """Delete multiple ruleset folders along with all member rules."""
+    deleted_ids, deleted_rules = service.bulk_delete_folders(payload.ruleset_ids)
+    return RuleFolderBulkActionResponse(
+        success_count=len(deleted_ids),
+        affected_ruleset_ids=deleted_ids,
+        deleted_rules_count=deleted_rules,
+    )
+
+
+@router.get(
+    "/folders/{ruleset_id}",
+    response_model=RuleFolderResponse,
+    summary="Get a ruleset folder by ID",
+)
+def get_rule_folder(
+    ruleset_id: str,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+    response: Response,
+) -> RuleFolderResponse:
+    """Retrieve details and member rules for a single ruleset folder."""
+    response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
+    folder = service.get_folder(ruleset_id)
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ruleset folder '{ruleset_id}' not found.",
+        )
+    rules_list = [RuleResponse(**r) for r in folder.get("rules", [])]
+    return RuleFolderResponse(
+        id=folder.get("id"),
+        ruleset_id=folder.get("ruleset_id", ""),
+        display_name=folder.get("display_name", ""),
+        description=folder.get("description", ""),
+        mechanism_scope=folder.get("mechanism_scope", ""),
+        category=folder.get("category", "Arch"),
+        rules=rules_list,
+    )
+
+
 @router.put(
     "/folders/{ruleset_id}",
     response_model=RuleFolderResponse,
@@ -186,6 +264,77 @@ def update_rule_folder(
                 rules=rules_list,
             )
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found after update")
+
+
+@router.delete(
+    "/folders/{ruleset_id}",
+    summary="Delete a ruleset folder",
+)
+def delete_rule_folder(
+    ruleset_id: str,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> dict:
+    """Delete a ruleset folder and all of its associated member rules."""
+    folder = service.get_folder(ruleset_id)
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ruleset folder '{ruleset_id}' not found.",
+        )
+    deleted_rules = service.delete_folder(ruleset_id)
+    return {
+        "success": True,
+        "ruleset_id": ruleset_id,
+        "deleted_rules": deleted_rules,
+    }
+
+
+@router.post(
+    "/bulk-update",
+    response_model=RuleBulkActionResponse,
+    summary="Update fields on multiple compliance rules in bulk",
+)
+def bulk_update_rules(
+    payload: RuleBulkUpdateRequest,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleBulkActionResponse:
+    """Update ruleset folder, category, mechanism, severity, property set, or review status across multiple rules."""
+    updates = {}
+    if payload.ruleset_id is not None:
+        updates["ruleset_id"] = payload.ruleset_id
+    if payload.category is not None:
+        updates["category"] = payload.category
+    if payload.mechanism is not None:
+        updates["mechanism"] = payload.mechanism
+    if payload.severity is not None:
+        updates["severity"] = payload.severity
+    if payload.needs_review is not None:
+        updates["needs_review"] = payload.needs_review
+    if payload.property_set is not None:
+        updates["property_set"] = payload.property_set
+
+    updated_ids = service.bulk_update_rules(payload.rule_ids, updates)
+    return RuleBulkActionResponse(
+        success_count=len(updated_ids),
+        affected_ids=updated_ids,
+    )
+
+
+@router.post(
+    "/bulk-delete",
+    response_model=RuleBulkActionResponse,
+    summary="Delete multiple compliance rules in bulk",
+)
+def bulk_delete_rules(
+    payload: RuleBulkDeleteRequest,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleBulkActionResponse:
+    """Delete multiple compliance rules by integer primary key IDs."""
+    deleted_count = service.delete_rules(payload.rule_ids)
+    return RuleBulkActionResponse(
+        success_count=deleted_count,
+        affected_ids=payload.rule_ids,
+    )
 
 
 @router.get("/{rule_id}", response_model=RuleResponse, summary="Get rule by ID")
@@ -282,6 +431,30 @@ def delete_rule(
             detail=f"Rule with ID {rule_id} not found.",
         )
     service.delete_rule(rule_id)
+
+
+@router.get("/export-ids", summary="Export active rules as buildingSMART IDS XML")
+def export_all_ids_xml(
+    service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_id: str | None = None,
+):
+    """Export active rules or specific ruleset into buildingSMART IDS XML format."""
+    if ruleset_id:
+        rules = service.list_by_ruleset(ruleset_id)
+    else:
+        rules = service.list_rules()
+    if not rules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No rules found for IDS XML export.",
+        )
+    filename = f"{ruleset_id}.ids" if ruleset_id else "bimguard_rules.ids"
+    xml_content = RuleService.export_ids_xml(ruleset_id or "BIMGUARD_EXPORT", rules)
+    return PlainTextResponse(
+        xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/export-ids/{ruleset_id}", summary="Export ruleset as IDS XML")

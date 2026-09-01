@@ -88,3 +88,33 @@ class SupabaseModelLineageRepository:
     def get(self, lineage_id: int) -> dict[str, Any] | None:
         """Return one lineage record by primary key."""
         return self._lineage.get(lineage_id)
+
+    def record_cde_transition(
+        self,
+        *,
+        project_id: int,
+        from_state: str,
+        to_state: str,
+        actor: str,
+        metrics: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Record an immutable CDE state transition log entry for audit compliance."""
+        summary = {
+            "event_type": "CDE_STATE_TRANSITION",
+            "from_state": from_state,
+            "to_state": to_state,
+            "actor": actor,
+            "metrics": metrics or {},
+        }
+        return self._lineage.insert(
+            {
+                "project_id": project_id,
+                "source_reference": f"CDE:{from_state}",
+                "source_sha256": "cde_transition_audit",
+                "source_version": 0,
+                "output_reference": f"CDE:{to_state}",
+                "version": 0,
+                "summary": summary,
+                "created_at": now_iso_utc(),
+            }
+        )

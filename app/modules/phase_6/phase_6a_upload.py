@@ -90,12 +90,14 @@ class UploadResponse:
         recorded: Whether the metadata row was written. ``False`` with
             ``success`` ``True`` means the file is safely stored but its row is
             not — the upload is not rolled back for a bookkeeping failure.
+        validation_report: Pre-flight validation diagnostics for IFC models.
     """
 
     success: bool
     ref: StoredFileRef | None = None
     error: str | None = None
     recorded: bool = False
+    validation_report: Any = None
 
 
 def sha256_of(content: bytes) -> str:
@@ -178,6 +180,7 @@ class FileUploadService:
         *,
         project_id: int | None = None,
         kind: str = "ifc",
+        run_preflight: bool = True,
     ) -> UploadResponse:
         """Store ``content`` and return where it went.
 
@@ -187,6 +190,7 @@ class FileUploadService:
             project_id: Project the file belongs to. Recorded when present.
             kind: One of :data:`SUBDIR_BY_KIND`; selects the storage
                 subdirectory and the accepted extensions.
+            run_preflight: Whether to run IFC pre-flight syntax and schema checks.
 
         Returns:
             An :class:`UploadResponse`. Never raises — a rejected or failed
@@ -200,6 +204,29 @@ class FileUploadService:
             return UploadResponse(success=False, error=rejection)
 
         safe_name = Path(filename.replace("\\", "/")).name
+        validation_report = None
+
+        if kind == "ifc" and run_preflight:
+            try:
+                from app.services.ifc_validation_service import DEFAULT_IFC_VALIDATION_SERVICE
+
+                validation_report = DEFAULT_IFC_VALIDATION_SERVICE.validate_bytes(
+                    content, filename=safe_name
+                )
+                if not validation_report.valid and validation_report.fatal_errors > 0:
+                    logger.warning(
+                        "Upload pre-flight validation failed filename=%s errors=%d",
+                        safe_name,
+                        validation_report.fatal_errors,
+                    )
+                    return UploadResponse(
+                        success=False,
+                        error=f"IFC Validation Failed: {validation_report.summary_message}",
+                        validation_report=validation_report,
+                    )
+            except Exception as exc:
+                logger.debug("IFC pre-flight check exception (non-fatal): %s", exc)
+
         file_hash = sha256_of(content)
 
         try:
@@ -226,7 +253,9 @@ class FileUploadService:
             storage_ref,
             recorded,
         )
-        return UploadResponse(success=True, ref=ref, recorded=recorded)
+        return UploadResponse(
+            success=True, ref=ref, recorded=recorded, validation_report=validation_report
+        )
 
     def _record(self, ref: StoredFileRef, project_id: int | None) -> bool:
         """Write the metadata row.

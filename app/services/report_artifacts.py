@@ -96,6 +96,20 @@ class ReportArtifactService:
             return None
         return artifact
 
+    def delete_bcf(self, artifact_id: int) -> bool:
+        """Delete a persisted BCF export and clean up storage."""
+        artifact = self.get_bcf(artifact_id)
+        if not artifact:
+            return False
+        storage_ref = artifact.get("storage_ref")
+        if storage_ref:
+            try:
+                self._storage.delete(storage_ref)
+            except Exception:
+                logger.warning("Failed to delete storage object %s", storage_ref, exc_info=True)
+        self._artifacts.delete(artifact_id)
+        return True
+
     def materialize(self, artifact: dict[str, Any]):
         """Return a local cache path for a persisted report artifact."""
         return self._storage.materialize_local_path(str(artifact.get("storage_ref") or ""))
