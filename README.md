@@ -30,17 +30,17 @@ python scripts/compile_for_notebooklm.py
 
 ## Extended Documentation & Application Stack
 
-# BIM-Guard
+## BIM-Guard
 
-## Live Demo
+### Live Demo
 
 View the published demo at [https://maicen.github.io/bim-guard/](https://maicen.github.io/bim-guard/).
 
-## Overview
+### Overview
 
 BIM-Guard is an OpenBIM compliance platform built on a modern decoupled architecture: a high-performance **FastAPI API Gateway** and a **decoupled Vite + Svelte 5 SPA Frontend**, backed by framework-agnostic Python physics engines and compliance pipelines. Users can upload IFC models and regulatory specifications, extract compliance rules, manage rule libraries, run multi-engine audits (galvanic corrosion, crevice corrosion, MIC, seismic clearance), and stream live progress via Server-Sent Events (SSE).
 
-## Stack
+### Stack
 
 - **Backend API**: FastAPI (REST + SSE) with strict Pydantic data contracts
 - **Frontend SPA**: Svelte 5, Vite, TypeScript, Tailwind CSS (under `frontend/`)
@@ -48,7 +48,7 @@ BIM-Guard is an OpenBIM compliance platform built on a modern decoupled architec
 - **Database & Storage**: Supabase (Postgres) and Supabase Object Storage
 - **LLM Engine**: LiteLLM for rule extraction across multiple providers
 
-## Repository Layout
+### Repository Layout
 
 ```
 bim-guard/
@@ -74,9 +74,9 @@ bim-guard/
 └── example.env          # Environment template for local development
 ```
 
-## Getting Started
+### Getting Started
 
-### 1. Install dependencies
+#### 1. Install dependencies
 
 ```bash
 uv sync
@@ -88,7 +88,7 @@ Python 3.12 or later (tested with 3.12.13) is required. If you need the optional
 uv sync --group ml-pipeline
 ```
 
-### 2. Configure environment variables
+#### 2. Configure environment variables
 
 Create your local `.env` file from the template:
 
@@ -126,7 +126,7 @@ Pin the default app model with `BIM_GUARD_LLM_MODEL`; it defaults to
 
 Supabase schema changes are now tracked in-repo under `supabase/migrations/`. For a fresh Supabase environment, apply the migrations in that folder instead of relying on runtime table creation.
 
-### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
+#### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
 
 You can launch both the backend and frontend concurrently using the cross-platform launcher:
 
@@ -150,14 +150,14 @@ npm run dev
 ```
 The Svelte frontend is available at [http://localhost:5173](http://localhost:5173). Requests to `/api/*` are automatically proxied to the backend at port 8000.
 
-### 4. Run Production Server
+#### 4. Run Production Server
 
 To build the frontend and serve the compiled single-page application with multi-worker Uvicorn:
 
 - **macOS / Linux / WSL**: `./run_production_server.sh` (or `./run_production_server.bat`)
 - **Windows**: `run_production_server.bat`
 
-### 5. Run the Python agent
+#### 5. Run the Python agent
 
 The terminal agent uses OpenRouter, repository-local coding tools, bounded tool
 turns and cost, server-side web search, and append-only JSONL sessions:
@@ -171,9 +171,9 @@ the environment for one run. Inside the agent, `/model` fetches the current
 OpenRouter catalogue, `/new` starts a fresh session, and `/help` lists commands.
 Session logs are written under `data/agent-sessions/` and ignored by Git.
 
-## Application Architecture & Routes
+### Application Architecture & Routes
 
-### Svelte 5 SPA Client (`frontend/`)
+#### Svelte 5 SPA Client (`frontend/`)
 The primary modern client runs on `http://localhost:5173`:
 - **Dashboard**: System overview, recent runs, and status
 - **Projects**: Project creation, IFC upload, and metadata inspection
@@ -184,7 +184,7 @@ The primary modern client runs on `http://localhost:5173`:
 - **3D Viewer**: Interactive OpenBIM viewport and BCF clash inspection
 - **Reports**: BCF issue export, Excel/PDF compliance reports
 
-### FastAPI API Gateway (`/api`)
+#### FastAPI API Gateway (`/api`)
 The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/docs`:
 - `/api/projects` — Project CRUD, model file uploads, IFC metadata
 - `/api/documents` — Document upload, PDF text extraction
@@ -192,9 +192,9 @@ The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/
 - `/api/analyze` — Compliance and corrosion analysis execution
 - `/api/events/{project_id}` — Real-time Server-Sent Events (SSE) progress streaming
 
-## Deployment
+### Deployment
 
-### Docker Compose
+#### Docker Compose
 
 ```bash
 docker compose up --build
@@ -202,11 +202,11 @@ docker compose up --build
 
 `docker-compose.yml` wires the Supabase environment variables from your shell or `.env` file and mounts a cache volume for downloaded artifacts.
 
-### Render
+#### Render
 
 The repository includes `render.yaml` for Docker-based deployment on Render. Set the Supabase variables and any AI provider keys you intend to use.
 
-## Notes
+### Notes
 
 - `app/main.py` is the application bootstrap used by the root `main.py` entrypoint.
 - `README.md`, `AGENTS.md`, `CLAUDE.md`, and `.github/instructions/project-specific.instructions.md` are the main source files for project guidance.
@@ -215,11 +215,11 @@ The repository includes `render.yaml` for Docker-based deployment on Render. Set
 1. Results are de-duplicated and displayed for review.
 2. Accepted rules can be saved directly to the Rule Library.
 
-## Documentation Map
+### Documentation Map
 
 Use [docs/README.md](docs/README.md) as the authoritative index for repository documentation. It groups markdown files by purpose and marks which docs are current vs. archival/reference.
 
-## Next Development Steps
+### Next Development Steps
 
 - Verify the reported issues.
 - Verify the BCF exported.
@@ -230,12 +230,12 @@ Output rule fields:
 - `desc`
 - `target`
 
-## Notes
+### Notes
 
 - If `.env` is not loaded (for custom scripts/tests), call `load_env_file()` from `app.utils` before creating AI extraction services.
 - Document upload validation includes extension, MIME type, and content checks.
 
-## Python Docstrings and API Docs
+### Python Docstrings and API Docs
 
 This repository follows [PEP 257](https://peps.python.org/pep-0257/) docstring conventions and uses Python's built-in [pydoc](https://docs.python.org/3/library/pydoc.html) for API documentation.
 
