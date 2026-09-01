@@ -207,6 +207,10 @@ def test_verify_script_runs_and_reports_the_expected_convention() -> None:
         cwd=repo_root,
         capture_output=True,
         text=True,
+        # The script prints the payload's provenance note, whose smart
+        # punctuation is non-ASCII. Without this, text=True decodes with the
+        # locale codec and Windows (cp1252) raises on the UTF-8 bytes.
+        encoding="utf-8",
         timeout=60,
         check=False,
     )
