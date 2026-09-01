@@ -179,6 +179,7 @@ class SQLiteTableAdapter(DatabaseAdapter):
 
 
 _SHARED_MEMORY_TABLES: dict[str, list[dict[str, Any]]] = {}
+_USE_MEMORY_FALLBACK_TABLES: set[str] = set()
 
 
 class SupabaseTableAdapter(DatabaseAdapter):
@@ -197,8 +198,18 @@ class SupabaseTableAdapter(DatabaseAdapter):
         self._table_name = table_name
         self._pk = pk
         self._columns_dict = dict(schema)
-        self._use_memory_fallback = False
         self._memory_rows: list[dict[str, Any]] = _SHARED_MEMORY_TABLES.setdefault(table_name, [])
+
+    @property
+    def _use_memory_fallback(self) -> bool:
+        return self._table_name in _USE_MEMORY_FALLBACK_TABLES
+
+    @_use_memory_fallback.setter
+    def _use_memory_fallback(self, value: bool) -> None:
+        if value:
+            _USE_MEMORY_FALLBACK_TABLES.add(self._table_name)
+        else:
+            _USE_MEMORY_FALLBACK_TABLES.discard(self._table_name)
 
     @property
     def columns_dict(self) -> dict[str, Any]:
@@ -257,7 +268,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             rows = response.data or []
             return rows[0] if rows else payload
         except APIError as exc:
-            if self._is_missing_table_error(exc):
+            if self._is_missing_table_error(exc) or getattr(exc, "code", None) == "23503":
                 self._use_memory_fallback = True
                 return self.insert(payload)
             if self._should_retry_insert_with_pk(exc, payload):
