@@ -449,6 +449,12 @@ class ProjectsService:
         project = self.get_project(project_id)
         if project is not None:
             self._storage.delete(project.get("ifc_file_path") or "")
+        try:
+            for cd in self.get_client_documents_by_project(project_id):
+                if cd.get("id"):
+                    self._client_documents.delete(cd["id"])
+        except Exception:
+            pass
         self._projects.delete(project_id)
         invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
         invalidate_cache("bimguard:projects:list")
