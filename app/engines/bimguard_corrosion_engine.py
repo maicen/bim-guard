@@ -26,6 +26,7 @@ Risk bands:
 
 import csv
 import os
+import re
 import uuid
 import zipfile
 from dataclasses import dataclass
@@ -116,6 +117,28 @@ MATERIAL_ALIASES = {
     "titanium": "titanium",
     "ti": "titanium",
     "titanium grade 2": "titanium",
+    # Noble metals with no catalog entry of their own. Without these the
+    # default below treats them as carbon steel (0.55 V), which is not the
+    # conservative choice it is for an unknown ferrous alloy: it makes a noble
+    # metal read as strongly anodic and can invert the anode/cathode
+    # assignment of the couple. Each is mapped to its nearest catalog
+    # neighbour, with the reasoning recorded per line.
+    # Nickel-base alloys -> hastelloy_c (0.14 V), the catalog's only nickel
+    # alloy. Agrees with MIL-STD-889B Table II, which ranks Nickel (35) and
+    # Monel 400 (64) nobler than copper (0.28 V).
+    "nickel": "hastelloy_c",
+    "nickel alloy": "hastelloy_c",
+    "monel": "hastelloy_c",
+    "monel 400": "hastelloy_c",
+    "cupronickel": "hastelloy_c",
+    # Valve metal with a stable passive oxide film, as titanium is. Note that
+    # Table II ranks tantalum at 37, mid-series, against the wider literature
+    # placing it among the most noble metals; the titanium mapping follows the
+    # latter and is flagged in docs/validation/ as approximate.
+    "tantalum": "titanium",
+    # Table II ranks tungsten at 45, coincident with the median rank of the
+    # catalog's copper entries, so copper is the nearest ordinal neighbour.
+    "tungsten": "copper",
     # Non-metallic (no galvanic risk)
     "pvc": None,
     "cpvc": None,
@@ -125,6 +148,38 @@ MATERIAL_ALIASES = {
     "pp": None,
     "pvdf": None,
 }
+
+# Database-sourced aliases (MIL-STD-889B Table II designations, written by
+# scripts/map_mil_std_synonyms.py) are appended *after* the built-ins above.
+# setdefault keeps the built-in table authoritative on any shared key, and the
+# append order means the substring fallback in resolve_material() still tries
+# every built-in before any database alias. Existing resolutions are therefore
+# unchanged; only previously unrecognised strings gain a match.
+for _alias, _target in (_GC_CATALOG.get("material_aliases") or {}).items():
+    MATERIAL_ALIASES.setdefault(_alias, _target)
+
+
+#: Aliases no longer than this are matched on word boundaries rather than as
+#: bare substrings. The short chemical symbols are substrings of unrelated
+#: words -- "tantalum" contains "al", "active" contains "ti", "erwin" contains
+#: "erw" -- so a plain containment test resolves them to the wrong material
+#: outright. Longer aliases ("copper", "stainless steel 316") are specific
+#: enough that containment carries no such risk.
+_SHORT_ALIAS_MAX_LEN = 3
+
+#: Compiled word-boundary patterns for the short aliases, built on first use.
+_SHORT_ALIAS_PATTERNS: dict[str, re.Pattern[str]] = {}
+
+
+def _alias_matches(alias: str, key: str) -> bool:
+    """Return True when ``alias`` occurs in ``key`` as a legitimate match."""
+    if len(alias) > _SHORT_ALIAS_MAX_LEN:
+        return alias in key
+    pattern = _SHORT_ALIAS_PATTERNS.get(alias)
+    if pattern is None:
+        pattern = re.compile(rf"\b{re.escape(alias)}\b")
+        _SHORT_ALIAS_PATTERNS[alias] = pattern
+    return pattern.search(key) is not None
 
 
 def resolve_material(material_name: str) -> Optional[str]:
@@ -138,9 +193,10 @@ def resolve_material(material_name: str) -> Optional[str]:
     key = material_name.lower().strip()
     if key in MATERIAL_ALIASES:
         return MATERIAL_ALIASES[key]
-    # Substring matching for unrecognised variants
+    # Substring matching for unrecognised variants. Short aliases require a
+    # word boundary; see _alias_matches.
     for alias, resolved in MATERIAL_ALIASES.items():
-        if alias in key:
+        if _alias_matches(alias, key):
             return resolved
     # Default: treat as carbon steel (conservative)
     return "carbon_steel"

@@ -379,6 +379,7 @@ def load_gc_catalog() -> dict[str, Any]:
     pren_values: dict[str, float] = {}
     environment_classes: dict[str, dict[str, Any]] = {}
     pren_thresholds: dict[str, float] = {}
+    material_aliases: dict[str, str] = {}
 
     for row in rows:
         params = _decode_json(row.get("parameters"))
@@ -412,12 +413,27 @@ def load_gc_catalog() -> dict[str, Any]:
             ).strip()
             if env_key:
                 pren_thresholds[env_key] = _coerce_float(row.get("check_value"), 18.0) or 18.0
+        elif rule_type == "material_alias":
+            alias = str(params.get("alias") or row.get("keyword") or "").strip().lower()
+            target = str(params.get("material_key") or "").strip()
+            if alias and target:
+                material_aliases[alias] = target
+
+    # An alias is only useful if its target carries a potential; dropping the
+    # orphans here keeps a stale alias row from resolving a material to a key
+    # the series no longer holds, which would score the couple as non-metallic.
+    material_aliases = {
+        alias: target
+        for alias, target in material_aliases.items()
+        if target in galvanic_series
+    }
 
     return {
         "ruleset_id": json_data["ruleset_id"],
         "ruleset_version": json_data.get("ruleset_version", "1.0.0"),
         "description": json_data.get("description", ""),
         "galvanic_series": galvanic_series,
+        "material_aliases": material_aliases,
         "environment_classes": environment_classes,
         "zone_to_env": (
             next(

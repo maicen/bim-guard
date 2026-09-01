@@ -1,0 +1,663 @@
+{
+  "source_standard": "MIL-STD-889B (USAF), Notices 1-3",
+  "source_table": "TABLE II. Galvanic series of selected metals in seawater",
+  "source_attribution": "Army Missile Command Report RS-TR-67-11, Practical Galvanic Series",
+  "source_file": "docs/scraped_standards/corrosion_mil_std_889_galvanic.md",
+  "ordering": "index 0 = most active (anodic); last = most noble (cathodic)",
+  "potentials_published": false,
+  "potential_note": "Table II is ordinal only. MIL-STD-889B section 30.4 states that standard electrode potentials are 'of little value in establishing galvanic corrosion relationships in actual environments'. No voltages are synthesised here.",
+  "entry_count": 93,
+  "entries": [
+    {
+      "rank": 1,
+      "name": "Magnesium (Mg)",
+      "material_key": "magnesium_mg",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 2,
+      "name": "Mg Alloy AZ-31B",
+      "material_key": "mg_alloy_az_31b",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 3,
+      "name": "MG Alloy HK-31A",
+      "material_key": "mg_alloy_hk_31a",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 4,
+      "name": "Zinc (hot-dip, die cast or plated)",
+      "material_key": "zinc_hot_dip_die_cast_or_plated",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 5,
+      "name": "Beryllium (hot pressed)",
+      "material_key": "beryllium_hot_pressed",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 6,
+      "name": "Aluminum (Al) 7072 el. on 7075",
+      "material_key": "aluminum_al_7072_el_on_7075",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 7,
+      "name": "Al alloy 2014-T3",
+      "material_key": "al_alloy_2014_t3",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 8,
+      "name": "Al alloy 1160-H14",
+      "material_key": "al_alloy_1160_h14",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 9,
+      "name": "Al alloy 7079-T6",
+      "material_key": "al_alloy_7079_t6",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 10,
+      "name": "Cadmium (plated)",
+      "material_key": "cadmium_plated",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 11,
+      "name": "Uranium",
+      "material_key": "uranium",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 12,
+      "name": "Al alloy 218 (die cast)",
+      "material_key": "al_alloy_218_die_cast",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 13,
+      "name": "Al alloy 5052-0",
+      "material_key": "al_alloy_5052_0",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 14,
+      "name": "Al alloy 5052-H12",
+      "material_key": "al_alloy_5052_h12",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 15,
+      "name": "Al alloy 5456-0, H353",
+      "material_key": "al_alloy_5456_0_h353",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 16,
+      "name": "Al alloy 5052-H32",
+      "material_key": "al_alloy_5052_h32",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 17,
+      "name": "Al alloy 1100-0",
+      "material_key": "al_alloy_1100_0",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 18,
+      "name": "Al alloy 3003-H25",
+      "material_key": "al_alloy_3003_h25",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 19,
+      "name": "Al alloy 6061-T6",
+      "material_key": "al_alloy_6061_t6",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 20,
+      "name": "Al alloy A360 (die cast)",
+      "material_key": "al_alloy_a360_die_cast",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 21,
+      "name": "Al alloy 7075-T6",
+      "material_key": "al_alloy_7075_t6",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 22,
+      "name": "Al alloy 1160-H14",
+      "material_key": "al_alloy_1160_h14",
+      "state": null,
+      "duplicate_of_rank": 8
+    },
+    {
+      "rank": 23,
+      "name": "Al alloy 6061-0",
+      "material_key": "al_alloy_6061_0",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 24,
+      "name": "Indium",
+      "material_key": "indium",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 25,
+      "name": "Al alloy 2014-0",
+      "material_key": "al_alloy_2014_0",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 26,
+      "name": "Al alloy 2024-T4",
+      "material_key": "al_alloy_2024_t4",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 27,
+      "name": "Al alloy 5052-H16",
+      "material_key": "al_alloy_5052_h16",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 28,
+      "name": "Tin (plated)",
+      "material_key": "tin_plated",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 29,
+      "name": "Stainless steel 430 (active)",
+      "material_key": "stainless_steel_430_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 30,
+      "name": "Lead",
+      "material_key": "lead",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 31,
+      "name": "Steel 1010",
+      "material_key": "steel_1010",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 32,
+      "name": "Iron, cast",
+      "material_key": "iron_cast",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 33,
+      "name": "Stainless steel 410 (active)",
+      "material_key": "stainless_steel_410_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 34,
+      "name": "Copper (plated, cast or wrought)",
+      "material_key": "copper_plated_cast_or_wrought",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 35,
+      "name": "Nickel (plated)",
+      "material_key": "nickel_plated",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 36,
+      "name": "Chromium (plated)",
+      "material_key": "chromium_plated",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 37,
+      "name": "Tantalum",
+      "material_key": "tantalum",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 38,
+      "name": "AM350 (active)",
+      "material_key": "am350_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 39,
+      "name": "Stainless steel 310 (active)",
+      "material_key": "stainless_steel_310_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 40,
+      "name": "Stainless steel 301 (active)",
+      "material_key": "stainless_steel_301_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 41,
+      "name": "Stainless steel 304 (active)",
+      "material_key": "stainless_steel_304_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 42,
+      "name": "Stainless steel 430 (passive)",
+      "material_key": "stainless_steel_430_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 43,
+      "name": "Stainless steel 410 (passive)",
+      "material_key": "stainless_steel_410_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 44,
+      "name": "Stainless steel 17-7 PH (active)",
+      "material_key": "stainless_steel_17_7_ph_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 45,
+      "name": "Tungsten",
+      "material_key": "tungsten",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 46,
+      "name": "Niobium (Columbium) 1% Zr",
+      "material_key": "niobium_columbium_1_zr",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 47,
+      "name": "Brass, yellow, 268",
+      "material_key": "brass_yellow_268",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 48,
+      "name": "Uranium 8% Mo.",
+      "material_key": "uranium_8_mo",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 49,
+      "name": "Brass, Naval, 464",
+      "material_key": "brass_naval_464",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 50,
+      "name": "Yellow brass",
+      "material_key": "yellow_brass",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 51,
+      "name": "Muntz metal 280",
+      "material_key": "muntz_metal_280",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 52,
+      "name": "Brass (plated)",
+      "material_key": "brass_plated",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 53,
+      "name": "Nickel-silver (18% Ni)",
+      "material_key": "nickel_silver_18_ni",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 54,
+      "name": "Stainless steel 316L (active)",
+      "material_key": "stainless_steel_316l_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 55,
+      "name": "Bronze 220",
+      "material_key": "bronze_220",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 56,
+      "name": "Copper 110",
+      "material_key": "copper_110",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 57,
+      "name": "Red brass",
+      "material_key": "red_brass",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 58,
+      "name": "Stainless steel 347 (active)",
+      "material_key": "stainless_steel_347_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 59,
+      "name": "Molybdenum, Comm pure",
+      "material_key": "molybdenum_comm_pure",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 60,
+      "name": "Copper-Nickel 715",
+      "material_key": "copper_nickel_715",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 61,
+      "name": "Admiralty brass",
+      "material_key": "admiralty_brass",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 62,
+      "name": "Stainless steel 202 (active)",
+      "material_key": "stainless_steel_202_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 63,
+      "name": "Bronze, Phosphor 534 (B-1)",
+      "material_key": "bronze_phosphor_534_b_1",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 64,
+      "name": "Monel 400",
+      "material_key": "monel_400",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 65,
+      "name": "Stainless steel 201 (active)",
+      "material_key": "stainless_steel_201_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 66,
+      "name": "Carpenter 20 (active)",
+      "material_key": "carpenter_20_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 67,
+      "name": "Stainless steel 321 (active)",
+      "material_key": "stainless_steel_321_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 68,
+      "name": "Stainless steel 316 (active)",
+      "material_key": "stainless_steel_316_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 69,
+      "name": "Stainless steel 309 (passive)",
+      "material_key": "stainless_steel_309_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 70,
+      "name": "Stainless steel 17-7 PH (passive)",
+      "material_key": "stainless_steel_17_7_ph_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 71,
+      "name": "Silicone Bronze 655",
+      "material_key": "silicone_bronze_655",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 72,
+      "name": "Stainless steel 304 (passive)",
+      "material_key": "stainless_steel_304_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 73,
+      "name": "Stainless steel 301 (passive)",
+      "material_key": "stainless_steel_301_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 74,
+      "name": "Stainless steel 321 (passive)",
+      "material_key": "stainless_steel_321_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 75,
+      "name": "Stainless steel 201 (passive)",
+      "material_key": "stainless_steel_201_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 76,
+      "name": "Stainless steel 286 (active)",
+      "material_key": "stainless_steel_286_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 77,
+      "name": "Stainless steel 316L (passive)",
+      "material_key": "stainless_steel_316l_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 78,
+      "name": "AM355 (active)",
+      "material_key": "am355_active",
+      "state": "active",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 79,
+      "name": "Stainless steel 202 (passive)",
+      "material_key": "stainless_steel_202_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 80,
+      "name": "Carpenter 20 (passive)",
+      "material_key": "carpenter_20_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 81,
+      "name": "AM355 (passive)",
+      "material_key": "am355_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 82,
+      "name": "A286 (passive)",
+      "material_key": "a286_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 83,
+      "name": "Titanium 5Al, 2.5 Sn.",
+      "material_key": "titanium_5al_2_5_sn",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 84,
+      "name": "Titanium 13V, 11Cr, 3Al. (annealed)",
+      "material_key": "titanium_13v_11cr_3al_annealed",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 85,
+      "name": "Titanium 6Al, 4V (solution treated and aged)",
+      "material_key": "titanium_6al_4v_solution_treated_and_aged",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 86,
+      "name": "Titanium 6Al, 4V (annealed)",
+      "material_key": "titanium_6al_4v_annealed",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 87,
+      "name": "Titanium 8 Mn",
+      "material_key": "titanium_8_mn",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 88,
+      "name": "Titanium 13V, 11Cr 3Al (solution treated and aged)",
+      "material_key": "titanium_13v_11cr_3al_solution_treated_and_aged",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 89,
+      "name": "Titanum 75A",
+      "material_key": "titanum_75a",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 90,
+      "name": "AM350 (passive)",
+      "material_key": "am350_passive",
+      "state": "passive",
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 91,
+      "name": "Silver",
+      "material_key": "silver",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 92,
+      "name": "Gold",
+      "material_key": "gold",
+      "state": null,
+      "duplicate_of_rank": null
+    },
+    {
+      "rank": 93,
+      "name": "Graphite",
+      "material_key": "graphite",
+      "state": null,
+      "duplicate_of_rank": null
+    }
+  ]
+}
