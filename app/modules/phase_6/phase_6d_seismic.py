@@ -48,6 +48,7 @@ from app.modules.module2_producer.halo_volume_generator import (
     HaloVolume,
     detect_halo_clash_against_geometry,
     element_bbox_mm,
+    element_diameter_mm,
     generate_halo_volume_from_geometry,
     load_clearance_config,
     unit_scale_to_mm,
@@ -91,6 +92,13 @@ BRACED_CLASSES: tuple[str, ...] = (
     "IfcCableCarrierSegment",
     "IfcFlowSegment",
 )
+
+#: The subset of BRACED_CLASSES that ``thresholds.pipe_diameter_mm`` governs.
+#: Ducts and cable carriers are sized by area, not diameter, and the config's
+#: ``thresholds.duct_area_sqm`` is null (a documented data gap), so they stay in
+#: scope unconditionally rather than being filtered by a threshold that does not
+#: describe them.
+PIPE_CLASSES: tuple[str, ...] = ("IfcPipeSegment", "IfcFlowSegment")
 
 
 def _severity_band(severity: str, *, element: str) -> RiskBand:
@@ -227,6 +235,60 @@ def _clash_issue(
     )
 
 
+def _cross_section_mm(geometry: ElementGeometry) -> float:
+    """Estimate an element's outside diameter from its bounding box, mm.
+
+    A pipe run's axis-aligned box is ``length x d x d``, so the median of the
+    three extents is the cross-section: the longest is the run, and the two
+    shorter ones are the diameter.
+
+    This is a proxy, not a property read. It is used because the seismic path
+    works from raw geometry -- ``ElementGeometry`` carries a bounding box and
+    nothing else -- and because the models this runs against carry almost no
+    ``NominalDiameter`` properties to read instead. The approximation errs
+    high: a pipe running diagonally inflates its own box, so the estimate
+    overstates the diameter and keeps the element in scope. That direction is
+    deliberate -- over-inclusion costs review time, under-inclusion drops a
+    brace that a standard requires.
+
+    Reading ``NominalDiameter`` off the IFC entity where it exists, and falling
+    back to this only when it does not, would be strictly better and is the
+    obvious next refinement.
+    """
+    return sorted(geometry.bbox_mm.size)[1]
+
+
+def _bracing_scope(geometry: ElementGeometry, threshold_mm: float | None) -> str:
+    """Classify *geometry* against the config's bracing threshold.
+
+    Returns one of:
+        ``"braced"``
+            In scope: a braced class, and either no threshold applies to it or
+            its estimated diameter meets the threshold.
+        ``"below_threshold"``
+            A pipe the standard does not require braced. Skipped silently,
+            because that is a correct result and not a gap.
+        ``"unmeasurable"``
+            A pipe whose bounding box has no thickness, so no diameter can be
+            estimated from it. Reported as a data-quality finding rather than
+            skipped: an element that cannot be measured is unknown, not small,
+            and dropping it would hide a brace the standard may require.
+        ``"out_of_class"``
+            Not a braced class at all.
+    """
+    if geometry.ifc_class not in BRACED_CLASSES:
+        return "out_of_class"
+    if threshold_mm is None or geometry.ifc_class not in PIPE_CLASSES:
+        return "braced"
+
+    # The declared profile is the real diameter; the bounding box is only a
+    # fallback for elements whose geometry is a mesh rather than a sweep.
+    diameter = geometry.nominal_diameter_mm or _cross_section_mm(geometry)
+    if diameter <= 0.0:
+        return "unmeasurable"
+    return "braced" if diameter >= threshold_mm else "below_threshold"
+
+
 def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[str, str, str]]]:
     """Extract a bounding box for every element in the model.
 
@@ -257,7 +319,18 @@ def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[
         if bbox is None:
             failures.append((element_id, ifc_class, "no readable geometry"))
             continue
-        geometries.append(ElementGeometry(element_id=element_id, ifc_class=ifc_class, bbox_mm=bbox))
+        try:
+            diameter = element_diameter_mm(entity, scale)
+        except Exception:  # pragma: no cover - malformed representation
+            diameter = None
+        geometries.append(
+            ElementGeometry(
+                element_id=element_id,
+                ifc_class=ifc_class,
+                bbox_mm=bbox,
+                nominal_diameter_mm=diameter,
+            )
+        )
 
     return geometries, failures
 
@@ -375,7 +448,41 @@ def run_seismic_analysis(
                 )
             )
 
-    braced = [g for g in geometries if g.ifc_class in BRACED_CLASSES]
+    # Scope bracing to what the standard actually requires braced. The config
+    # declares thresholds.pipe_diameter_mm and the loader parses it, but until
+    # now nothing applied it: every pipe got a halo regardless of size, so a
+    # dense model reported a clash for every small-bore run in it.
+    #
+    # The diameter is estimated from the bounding box, and on models whose pipe
+    # geometry does not resolve to a solid that estimate is unavailable rather
+    # than small. Those elements are reported, not dropped -- see _bracing_scope.
+    threshold_mm = config.pipe_diameter_threshold_mm
+    in_class = [g for g in geometries if g.ifc_class in BRACED_CLASSES]
+    scoped: dict[str, list[ElementGeometry]] = {
+        "braced": [],
+        "below_threshold": [],
+        "unmeasurable": [],
+    }
+    for geometry in in_class:
+        scoped[_bracing_scope(geometry, threshold_mm)].append(geometry)
+
+    braced = scoped["braced"]
+    for geometry in scoped["unmeasurable"]:
+        issues.append(
+            _data_quality_issue(
+                geometry.element_id,
+                geometry.ifc_class,
+                (
+                    "Bounding box has no thickness, so no diameter could be "
+                    f"estimated to test against the {threshold_mm}mm bracing "
+                    "threshold. The element's geometry may be a centreline or "
+                    "a swept solid whose profile the reader does not resolve."
+                ),
+                allocator,
+                source_of.get(geometry.element_id, ""),
+            )
+        )
+
     for geometry in braced:
         halo = generate_halo_volume_from_geometry(
             geometry,
@@ -389,15 +496,23 @@ def run_seismic_analysis(
             issues.append(_clash_issue(clash, halo, config, allocator, source_of))
 
     logger.info(
-        "Seismic analysis complete models=%d elements=%d braced=%d clashes=%d "
+        "Seismic analysis complete models=%d elements=%d in_class=%d braced=%d "
+        "below_threshold=%d unmeasurable=%d threshold_mm=%s clashes=%d "
         "data_quality=%d federated_duplicates=%d",
         1 + len(extra_models),
         len(geometries),
+        len(in_class),
         len(braced),
+        len(scoped["below_threshold"]),
+        len(scoped["unmeasurable"]),
+        threshold_mm,
         sum(1 for i in issues if i.mechanism != DATA_QUALITY),
         sum(1 for i in issues if i.mechanism == DATA_QUALITY),
         duplicates,
     )
+    # Bracing scope stays in the log rather than the result: a seismic result
+    # and a corrosion result must carry identical keys to be interchangeable
+    # downstream, which tests/test_phase_6d_seismic.py pins.
     return _result(issues)
 
 
