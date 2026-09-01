@@ -42,7 +42,7 @@ Phase 4 addendum:
   This is the only place this script imports module5_reporter.
 
 Usage:
-    uv run python validate_blue_halo.py
+    uv run python scripts/validate_blue_halo.py
 """
 
 import json
@@ -73,7 +73,7 @@ from app.modules.module5_reporter.blue_halo_bcf_exporter import (  # noqa: E402
     generate_pset_halo_reservation,
 )
 
-OUTPUT_PATH = "validate_blue_halo_output_REAL_CONFIG.txt"
+OUTPUT_PATH = "docs/validation/validate_blue_halo_output_REAL_CONFIG.txt"
 
 # A tee-like sink: every print() in this script goes through _out() so the
 # same text lands on stdout and in OUTPUT_PATH, keeping the two in sync
@@ -92,7 +92,7 @@ def _out(line: str = "") -> None:
 # CONFIG TEMPLATE OUTPUT FORMAT.
 # ═══════════════════════════════════════════════════════════════════════════
 
-REAL_CONFIG_PATH = "hermes_case_study_and_config.json"
+REAL_CONFIG_PATH = "data/rulesets/hermes_case_study_and_config.json"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

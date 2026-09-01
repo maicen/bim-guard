@@ -52,7 +52,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SOURCE_PATH = REPO_ROOT / "hermes_standards_research_summary.json"
-OUTPUT_PATH = REPO_ROOT / "hermes_case_study_and_config.json"
+OUTPUT_PATH = REPO_ROOT / "data" / "rulesets" / "hermes_case_study_and_config.json"
 
 TARGET_STANDARDS = ("EN 1998-1", "DIN 4149")
 
