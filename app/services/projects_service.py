@@ -341,6 +341,8 @@ class ProjectsService:
 
         project = self._insert_project_row(row)
         invalidate_cache("bimguard:projects:list")
+        if project and project.get("id"):
+            invalidate_cache(f"bimguard:projects:item:project_id={project.get('id')}")
         logger.info(
             "Project created project_id=%s status=%s country=%s analysis_type=%s has_ifc=%s",
             project.get("id"),
@@ -1037,7 +1039,7 @@ class ProjectsService:
                 continue
 
             file_path = str(document.get("file_path") or "")
-            if file_path and file_path in already_linked:
+            if file_path and file_path in already_linked and file_path != "":
                 continue
 
             filename = str(document.get("filename") or f"document-{document_id}")

@@ -18,6 +18,8 @@ from app.utils import md5_hex, safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
 
+import hashlib
+
 router = APIRouter()
 
 
@@ -25,10 +27,16 @@ router = APIRouter()
 def list_documents(
     service: Annotated[DocumentService, Depends(get_documents_service)],
     response: Response,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
 ) -> list[DocumentResponse]:
     """Retrieve all specification documents ordered newest first."""
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"
     rows = service.list_documents()
+    etag = f'"{hashlib.sha256(str(len(rows)).encode() + (rows[0]["created_at"].encode() if rows and "created_at" in rows[0] else b"")).hexdigest()[:16]}"'
+    response.headers["ETag"] = etag
+    if if_none_match and if_none_match.strip() == etag:
+        response.status_code = status.HTTP_304_NOT_MODIFIED
+        return []
     res = []
     for r in rows:
         text = r.get("extracted_text") or ""

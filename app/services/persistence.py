@@ -64,7 +64,7 @@ class _MemoryQuery:
             filtered = []
             for row in rows:
                 current = row.get(field)
-                if op == "eq" and current == value:
+                if op == "eq" and (current == value or str(current) == str(value)):
                     filtered.append(row)
                 elif op == "ilike":
                     pattern = str(value).lower().replace("%", "")
@@ -155,7 +155,7 @@ class _MemoryQueryWithMutation(_MemoryQuery):
             filtered = []
             for row in rows:
                 current = row.get(field)
-                if op == "eq" and current == value:
+                if op == "eq" and (current == value or str(current) == str(value)):
                     filtered.append(row)
                 elif op == "ilike":
                     if str(value).lower().replace("%", "") in str(current or "").lower():

@@ -702,4 +702,275 @@ export interface ProjectImportPayload {
   analysis_type?: string;
 }
 
+// =============================================================================
+// buildingSMART Ecosystem Frontend Types
+// =============================================================================
+
+// 1. bSDD Types
+export interface BSDDPropertyItem {
+  uri: string;
+  name: string;
+  property_set?: string | null;
+  data_type?: string | null;
+  units?: string | null;
+  allowed_values: string[];
+  description?: string | null;
+}
+
+export interface BSDDClassItem {
+  uri: string;
+  code: string;
+  name: string;
+  dictionary_uri: string;
+  parent_class_code?: string | null;
+  related_ifc_entities: string[];
+  properties: BSDDPropertyItem[];
+  description?: string | null;
+}
+
+export interface BSDDDictionaryItem {
+  uri: string;
+  code: string;
+  name: string;
+  version: string;
+  organization_code_owner: string;
+  language_iso_code: string;
+  classes_count: number;
+}
+
+export interface BSDDValidationViolation {
+  element_guid: string;
+  element_type: string;
+  field_checked: string;
+  expected_constraint: string;
+  actual_value?: any;
+  severity: 'error' | 'warning' | 'info' | string;
+  message: string;
+  dictionary_uri?: string | null;
+}
+
+export interface BSDDValidationResult {
+  passed: boolean;
+  dictionary_uri: string;
+  total_elements_checked: number;
+  total_properties_checked: number;
+  passed_count: number;
+  violations_count: number;
+  compliance_score_pct: number;
+  violations: BSDDValidationViolation[];
+}
+
+export interface BSDDClassSearchResponse {
+  query: string;
+  total: number;
+  classes: BSDDClassItem[];
+}
+
+// 2. OpenCDE Types
+export interface CDEVersionItem {
+  version: string;
+  api_type: 'foundation' | 'documents' | 'bcf' | string;
+  detailed_version?: string | null;
+}
+
+export interface CDEVersionsResponse {
+  versions: CDEVersionItem[];
+}
+
+export interface CDEUserResponse {
+  id: string;
+  name: string;
+  email?: string | null;
+  role?: string | null;
+}
+
+export interface CDEDocumentItem {
+  id: string;
+  name: string;
+  document_type: string;
+  size_bytes: number;
+  etag: string;
+  url?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  project_code: string;
+  originator: string;
+  volume_system: string;
+  level: string;
+  type: string;
+  role: string;
+  number: string;
+  suitability_code: string;
+  revision_code: string;
+  cde_state: CDEState;
+}
+
+export interface CDESyncRequest {
+  cde_server_url: string;
+  project_id: number;
+  external_project_id: string;
+  document_ids?: string[];
+  auto_analyze?: boolean;
+}
+
+export interface CDESyncResponse {
+  success: boolean;
+  synced_documents_count: number;
+  synced_files: string[];
+  message: string;
+}
+
+// 3. IFC Pre-Flight Validation Types
+export interface IFCValidationIssue {
+  rule_code: string;
+  stage: 'syntax' | 'schema' | 'gherkin_rules' | string;
+  severity: 'fatal' | 'error' | 'warning' | 'info' | string;
+  message: string;
+  line_number?: number | null;
+  entity_id?: string | null;
+}
+
+export interface IFCValidationStageResult {
+  stage_name: string;
+  passed: boolean;
+  issues_count: number;
+  details: IFCValidationIssue[];
+}
+
+export interface IFCValidationReport {
+  valid: boolean;
+  schema_version?: string | null;
+  file_size_bytes: number;
+  syntax_stage: IFCValidationStageResult;
+  schema_stage: IFCValidationStageResult;
+  rules_stage: IFCValidationStageResult;
+  total_issues: number;
+  fatal_errors: number;
+  warnings: number;
+  summary_message: string;
+}
+
+// 4. IDS Types
+export interface IDSFacetViolation {
+  element_guid: string;
+  element_type: string;
+  spec_name: string;
+  facet_type: string;
+  details: string;
+  expected: string;
+  actual?: string | null;
+}
+
+export interface IDSValidationReport {
+  passed: boolean;
+  specifications_count: number;
+  total_checks: number;
+  passed_checks: number;
+  failed_checks: number;
+  compliance_percent: number;
+  violations: IDSFacetViolation[];
+}
+
+// 5. BCF REST API Types
+export interface BCFProjectResponse {
+  project_id: string;
+  name: string;
+  authorization?: {
+    project_actions: string[];
+    topic_actions: string[];
+  };
+}
+
+export interface BCFCommentResponse {
+  guid: string;
+  date: string;
+  author: string;
+  comment: string;
+  topic_guid: string;
+  modified_date?: string | null;
+  modified_author?: string | null;
+  viewpoint_guid?: string | null;
+}
+
+export interface BCFCommentCreatePayload {
+  comment: string;
+  viewpoint_guid?: string | null;
+}
+
+export interface BCFViewpointResponse {
+  guid: string;
+  topic_guid: string;
+  index: number;
+  perspective_camera?: Record<string, any> | null;
+  orthogonal_camera?: Record<string, any> | null;
+  lines?: Record<string, any>[];
+  clipping_planes?: Record<string, any>[];
+  components?: Record<string, any>;
+  snapshot_url?: string | null;
+}
+
+export interface BCFViewpointCreatePayload {
+  perspective_camera?: Record<string, any> | null;
+  orthogonal_camera?: Record<string, any> | null;
+  components?: Record<string, any> | null;
+  snapshot_base64?: string | null;
+}
+
+export interface BCFTopicResponse {
+  guid: string;
+  topic_type: string;
+  topic_status: string;
+  title: string;
+  priority: string;
+  index: number;
+  creation_date: string;
+  creation_author: string;
+  modified_date?: string | null;
+  modified_author?: string | null;
+  assigned_to?: string | null;
+  description?: string | null;
+  due_date?: string | null;
+  labels: string[];
+  stage?: string | null;
+  component_guids: string[];
+  project_code?: string | null;
+  originator?: string | null;
+  suitability_code?: string | null;
+  revision_code?: string | null;
+  cde_state?: CDEState | null;
+  comments_count: number;
+  viewpoints_count: number;
+}
+
+export interface BCFTopicCreatePayload {
+  title: string;
+  topic_type?: string;
+  topic_status?: string;
+  priority?: string;
+  description?: string;
+  assigned_to?: string;
+  due_date?: string;
+  labels?: string[];
+  component_guids?: string[];
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+}
+
+export interface BCFTopicUpdatePayload {
+  title?: string;
+  topic_type?: string;
+  topic_status?: string;
+  priority?: string;
+  description?: string;
+  assigned_to?: string;
+  due_date?: string;
+  labels?: string[];
+  component_guids?: string[];
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+}
+
+
 

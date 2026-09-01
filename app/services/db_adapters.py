@@ -178,6 +178,9 @@ class SQLiteTableAdapter(DatabaseAdapter):
         return list(self._table.rows_where(where_sql, params or [], limit=limit))
 
 
+_SHARED_MEMORY_TABLES: dict[str, list[dict[str, Any]]] = {}
+
+
 class SupabaseTableAdapter(DatabaseAdapter):
     """Table adapter backed by Supabase PostgREST queries with missing table fallback."""
 
@@ -195,7 +198,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
         self._pk = pk
         self._columns_dict = dict(schema)
         self._use_memory_fallback = False
-        self._memory_rows: list[dict[str, Any]] = []
+        self._memory_rows: list[dict[str, Any]] = _SHARED_MEMORY_TABLES.setdefault(table_name, [])
 
     @property
     def columns_dict(self) -> dict[str, Any]:
@@ -218,7 +221,10 @@ class SupabaseTableAdapter(DatabaseAdapter):
     def get(self, pk_value: Any) -> dict[str, Any] | None:
         """Get one row by primary key."""
         if self._use_memory_fallback:
-            return next((r for r in self._memory_rows if r.get(self._pk) == pk_value), None)
+            return next(
+                (r for r in self._memory_rows if r.get(self._pk) == pk_value or str(r.get(self._pk)) == str(pk_value)),
+                None,
+            )
 
         try:
             response = execute_with_retry(
@@ -268,7 +274,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
         """Update one row by primary key."""
         if self._use_memory_fallback:
             for row in self._memory_rows:
-                if row.get(self._pk) == pk_values:
+                if row.get(self._pk) == pk_values or str(row.get(self._pk)) == str(pk_values):
                     row.update(updates)
             return
 
@@ -286,7 +292,10 @@ class SupabaseTableAdapter(DatabaseAdapter):
     def delete(self, pk_value: Any) -> None:
         """Delete one row by primary key."""
         if self._use_memory_fallback:
-            self._memory_rows = [r for r in self._memory_rows if r.get(self._pk) != pk_value]
+            self._memory_rows[:] = [
+                r for r in self._memory_rows
+                if not (r.get(self._pk) == pk_value or str(r.get(self._pk)) == str(pk_value))
+            ]
             return
 
         try:
@@ -312,7 +321,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             matching = []
             for row in self._memory_rows:
                 val = row.get(expr.field)
-                if expr.operator == "eq" and val == expr.value:
+                if expr.operator == "eq" and (val == expr.value or str(val) == str(expr.value)):
                     matching.append(row)
                 elif expr.operator == "like" and str(expr.value).lower().replace("%", "") in str(val or "").lower():
                     matching.append(row)

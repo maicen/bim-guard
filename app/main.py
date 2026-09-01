@@ -17,6 +17,12 @@ from app.api import (
     analyze as api_analyze,
 )
 from app.api import (
+    bcf_routes as api_bcf,
+)
+from app.api import (
+    cde_integration as api_cde,
+)
+from app.api import (
     dashboard as api_dashboard,
 )
 from app.api import (
@@ -198,6 +204,8 @@ app.include_router(api_repositories.router, prefix="/api/repositories", tags=["R
 app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(api_documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(api_cde.router, prefix="/api/cde", tags=["OpenCDE"])
+app.include_router(api_bcf.router, prefix="/api/bcf", tags=["BCF API"])
 app.include_router(api_settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 
