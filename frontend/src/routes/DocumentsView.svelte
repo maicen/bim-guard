@@ -12,6 +12,7 @@
     CheckCircle2,
     Search,
     RotateCw,
+    FolderSync,
   } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
   import { DOCUMENT_TYPES } from "../lib/types";
@@ -20,6 +21,7 @@
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
+  import OpenCdeSyncModal from "../lib/components/OpenCdeSyncModal.svelte";
 
   const cachedDocs = documentsApi.getCachedList();
   let documents: DocumentItem[] = cachedDocs || [];
@@ -27,6 +29,7 @@
   let isRefreshing = false;
   let error = "";
   let isDeleteModalOpen = false;
+  let isOpenCdeModalOpen = false;
   let docToDelete: { id: number; filename: string } | null = null;
   let unsubscribeDocs: (() => void) | null = null;
 
@@ -260,6 +263,16 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <button
+        type="button"
+        on:click={() => (isOpenCdeModalOpen = true)}
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 border border-blue-800/50 transition-colors"
+        title="Sync documents via buildingSMART OpenCDE API"
+      >
+        <FolderSync class="w-3.5 h-3.5" />
+        <span>OpenCDE Sync</span>
+      </button>
+
       <button
         type="button"
         on:click={() => loadDocuments(true)}
@@ -743,4 +756,10 @@
   danger={true}
   onConfirm={confirmBulkDelete}
   onCancel={() => (selectedDocIds = [])}
+/>
+
+<OpenCdeSyncModal
+  isOpen={isOpenCdeModalOpen}
+  onClose={() => (isOpenCdeModalOpen = false)}
+  onSyncComplete={() => loadDocuments(true)}
 />

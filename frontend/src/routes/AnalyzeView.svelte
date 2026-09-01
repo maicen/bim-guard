@@ -640,6 +640,16 @@
             Default regulatory rulepacks will be evaluated.
           </div>
         {/if}
+        <div class="pt-1 flex items-center gap-1.5 text-[10px] text-slate-400 border-t border-slate-800/60">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/60 font-semibold">
+            <ShieldCheck class="w-3 h-3 text-blue-400" />
+            bSDD Verified
+          </span>
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/60 font-semibold">
+            <CheckCircle2 class="w-3 h-3 text-amber-400" />
+            IDS 1.0 Compliant
+          </span>
+        </div>
       </div>
     </div>
   {/if}

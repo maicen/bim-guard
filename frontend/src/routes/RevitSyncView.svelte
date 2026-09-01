@@ -11,6 +11,7 @@
     Boxes,
     Terminal,
     ArrowRight,
+    Shield,
   } from "lucide-svelte";
   import { revitSyncApi } from "../lib/api";
   import type {
@@ -253,6 +254,19 @@ print(response.read())
         </div>
         <div class="font-mono text-xs text-blue-400 break-all select-all">
           {endpointUrl}
+        </div>
+      </div>
+
+      <!-- OpenBIM & buildingSMART BCF REST Integration Card -->
+      <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2 text-xs">
+        <div class="text-[11px] font-bold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+          <Shield class="w-3.5 h-3.5" />
+          <span>buildingSMART OpenBIM Standards</span>
+        </div>
+        <div class="space-y-1 text-slate-400 text-[11px]">
+          <div>• BCF REST API v2.1: <span class="font-mono text-blue-400">/api/bcf/v2.1/projects</span></div>
+          <div>• OpenCDE Discovery: <span class="font-mono text-blue-400">/api/cde/versions</span></div>
+          <div>• OpenCDE Documents: <span class="font-mono text-blue-400">/api/cde/v1/projects/&#123;id&#125;/documents</span></div>
         </div>
       </div>
     </div>

@@ -468,6 +468,13 @@ export const rulesApi = {
     _rulesStore.clear();
     _ruleFoldersStore.clear();
   },
+
+  getIdsExportUrl(rulesetId?: string): string {
+    if (rulesetId) {
+      return `${API_BASE}/rules/export-ids/${encodeURIComponent(rulesetId)}`;
+    }
+    return `${API_BASE}/rules/export-ids`;
+  },
 };
 
 function engineQuery(engines?: string[]): string {

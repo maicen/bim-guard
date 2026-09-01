@@ -433,6 +433,30 @@ def delete_rule(
     service.delete_rule(rule_id)
 
 
+@router.get("/export-ids", summary="Export active rules as buildingSMART IDS XML")
+def export_all_ids_xml(
+    service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_id: str | None = None,
+):
+    """Export active rules or specific ruleset into buildingSMART IDS XML format."""
+    if ruleset_id:
+        rules = service.list_by_ruleset(ruleset_id)
+    else:
+        rules = service.list_rules()
+    if not rules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No rules found for IDS XML export.",
+        )
+    filename = f"{ruleset_id}.ids" if ruleset_id else "bimguard_rules.ids"
+    xml_content = RuleService.export_ids_xml(ruleset_id or "BIMGUARD_EXPORT", rules)
+    return PlainTextResponse(
+        xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/export-ids/{ruleset_id}", summary="Export ruleset as IDS XML")
 def export_ids_xml(
     ruleset_id: str,
