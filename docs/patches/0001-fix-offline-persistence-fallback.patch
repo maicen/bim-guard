@@ -1,0 +1,67 @@
+From 23946272902917d088aa9065b31b4acc4b0221a5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 21 Aug 2026 21:38:22 +0000
+Subject: [PATCH] Fix offline persistence fallback breaking app.modules.config
+ import
+
+_MemoryTable.insert() returned the raw payload dict, but SupabaseTableAdapter
+routes every insert through execute_with_retry(), which calls .execute() on
+the built query. Without Supabase credentials the fallback client is used and
+importing app.modules.config raised
+AttributeError: 'dict' object has no attribute 'execute'.
+
+Add _MemoryInsert, a deferred insert exposing execute(). The row is appended
+on execute() rather than at build time so execute_with_retry's per-attempt
+query rebuild cannot duplicate it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Ya1Zj5RKVrj5phQams6yQe
+---
+ app/services/persistence.py | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/app/services/persistence.py b/app/services/persistence.py
+index 4bb8516..762466a 100644
+--- a/app/services/persistence.py
++++ b/app/services/persistence.py
+@@ -97,9 +97,7 @@ class _MemoryTable:
+         return _MemoryQuery(self._client, self._table_name).select(*cols)
+ 
+     def insert(self, payload: dict[str, Any]):
+-        rows = self._client._tables.setdefault(self._table_name, [])
+-        rows.append(dict(payload))
+-        return payload
++        return _MemoryInsert(self._client, self._table_name, payload)
+ 
+     def update(self, updates: dict[str, Any]):
+         return _MemoryQueryWithMutation(self._client, self._table_name, updates=updates)
+@@ -116,6 +114,26 @@ class _MemoryTable:
+         raise AttributeError(f"{self.__class__.__name__} has no attribute {name}")
+ 
+ 
++class _MemoryInsert:
++    """Deferred insert compatible with ``execute_with_retry``.
++
++    The row is appended on ``execute()`` rather than at build time so that
++    rebuilding the query — which ``execute_with_retry`` does on every retry —
++    never duplicates the row.
++    """
++
++    def __init__(self, client: "_MemoryClient", table_name: str, payload: dict[str, Any]):
++        self._client = client
++        self._table_name = table_name
++        self._payload = dict(payload)
++
++    def execute(self):
++        rows = self._client._tables.setdefault(self._table_name, [])
++        row = dict(self._payload)
++        rows.append(row)
++        return _MemoryResult([row])
++
++
+ class _MemoryQueryWithMutation(_MemoryQuery):
+     """Query object that can apply updates and deletes."""
+ 
+-- 
+2.43.0
+
