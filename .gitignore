@@ -32,6 +32,11 @@ data/BIMGuard_IFC4_Export.json
 data/cache/supabase-storage/
 data/agent-sessions/
 
+# Source PDFs cached by fetch_standards.py --local-pdf. Tens of megabytes each
+# (FEMA E-74 alone is 67 MiB) and re-downloadable from the URL recorded in the
+# provenance header of the extracted Markdown.
+data/cache/standards-pdf/
+
 # Validation sweep inputs/outputs: ~1.8 GB, fully regenerable.
 # Models re-download from the URLs in the validation dataset doc; BCF
 # archives re-export from the cached per-model results. The evidentiary
