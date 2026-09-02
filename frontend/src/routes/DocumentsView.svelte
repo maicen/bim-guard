@@ -13,10 +13,11 @@
     Search,
     RotateCw,
     FolderSync,
+    ExternalLink,
   } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
   import { DOCUMENT_TYPES } from "../lib/types";
-  import type { DocumentItem, DocumentDetail, DocumentType, Rule, IdsImportResult } from "../lib/types";
+  import type { DocumentItem, DocumentDetail, DocumentType, IdsImportResult } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
@@ -28,8 +29,12 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
-  import RuleForm from "../lib/components/RuleForm.svelte";
   import IdsImportForm from "../lib/components/IdsImportForm.svelte";
+
+  // Called when the "Manual" source tab is chosen — hand-typing a rule needs
+  // the full per-element-category editor, which lives on its own page rather
+  // than cramped inside this modal.
+  export let onNavigateToManualRuleEditor: () => void = () => {};
 
   const cachedDocs = documentsApi.getCachedList();
   let documents: DocumentItem[] = cachedDocs || [];
@@ -53,12 +58,13 @@
 
   // Upload modal state — three ways a rule source can enter the system,
   // sharing one modal: an uploaded document (parsed later in Rule Extraction
-  // Studio), a buildingSMART IDS file, or a hand-typed rule.
+  // Studio), a buildingSMART IDS file, or a hand-typed rule (which routes to
+  // the dedicated Manual Rule Editor page instead of rendering here).
   let isUploadModalOpen = false;
-  let uploadTab: "document" | "ids" | "manual" = "document";
+  let uploadTab: "document" | "ids" = "document";
 
   // Called by the sidebar's "New Rule Document Upload" action once this view is mounted.
-  export function openUploadModal(tab: "document" | "ids" | "manual" = "document") {
+  export function openUploadModal(tab: "document" | "ids" = "document") {
     uploadTab = tab;
     isUploadModalOpen = true;
   }
@@ -77,9 +83,9 @@
     }, 6000);
   }
 
-  function handleRuleCreatedFromUpload(rule: Rule) {
+  function goToManualRuleEditor() {
     isUploadModalOpen = false;
-    flashSuccess(`Rule "${rule.rule_id}" created — view it in Rules Catalog.`);
+    onNavigateToManualRuleEditor();
   }
 
   function handleIdsImportedFromUpload(res: IdsImportResult) {
@@ -598,12 +604,12 @@
         </button>
         <button
           type="button"
-          on:click={() => (uploadTab = "manual")}
-          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'manual'
-            ? 'bg-[#0071e3] text-white shadow-sm'
-            : 'text-slate-400 hover:text-white hover:bg-slate-900'}"
+          on:click={goToManualRuleEditor}
+          title="Opens the Manual Rule Editor page, organized by building element category"
+          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-colors inline-flex items-center justify-center gap-1"
         >
-          Manual
+          <span>Manual</span>
+          <ExternalLink class="w-3 h-3 opacity-60" />
         </button>
       </div>
 
@@ -697,16 +703,11 @@
               </button>
             </div>
           </div>
-        {:else if uploadTab === "ids"}
+        {:else}
           <IdsImportForm
             defaultRulesetId=""
             onCancel={() => (isUploadModalOpen = false)}
             onImported={handleIdsImportedFromUpload}
-          />
-        {:else}
-          <RuleForm
-            onCancel={() => (isUploadModalOpen = false)}
-            onSaved={handleRuleCreatedFromUpload}
           />
         {/if}
       </div>

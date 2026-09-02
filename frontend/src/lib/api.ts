@@ -70,7 +70,19 @@ async function handleResponse<T>(res: Response): Promise<T> {
     let errorDetail = res.statusText;
     try {
       const errJson = await res.json();
-      errorDetail = errJson.detail || errJson.error || errorDetail;
+      const detail = errJson.detail ?? errJson.error;
+      if (Array.isArray(detail)) {
+        // FastAPI's default 422 validation shape: a list of {loc, msg, ...}.
+        errorDetail =
+          detail
+            .map((d: any) => {
+              const field = Array.isArray(d?.loc) ? d.loc.slice(1).join('.') : '';
+              return field ? `${field}: ${d.msg}` : d?.msg || JSON.stringify(d);
+            })
+            .join('; ') || errorDetail;
+      } else if (detail) {
+        errorDetail = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      }
     } catch {
       // not json
     }

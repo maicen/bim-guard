@@ -47,6 +47,19 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def _rule_response(row: dict) -> RuleResponse:
+    """Build a RuleResponse from a raw rules-table row.
+
+    The persistence layer stores the human-readable rule identifier under
+    the "reference" column (see RuleService._rules schema); RuleResponse
+    exposes it as "rule_id" for a clearer public contract, so it needs
+    bridging here rather than relying on Pydantic to find a same-named key.
+    """
+    if not row.get("rule_id"):
+        row = {**row, "rule_id": row.get("reference")}
+    return RuleResponse(**row)
+
+
 @router.get("", response_model=list[RuleResponse], summary="List rules with optional filters")
 def list_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
@@ -553,6 +566,7 @@ def create_rule(
             rule_id=payload.rule_id,
             description=payload.description or "",
             source_text="",
+            target_ifc_class=payload.target_ifc_class or "",
             property_set=payload.property_set or "",
             property_name=payload.property_name or "",
             operator=payload.operator or "==",

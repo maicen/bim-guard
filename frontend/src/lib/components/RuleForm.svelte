@@ -2,14 +2,25 @@
   import { SlidersHorizontal } from "lucide-svelte";
   import { rulesApi } from "../api";
   import type { Rule, RulesetCategory } from "../types";
+  import type { IfcPropertySuggestion } from "../archDomains";
 
   export let editingRule: Rule | null = null;
   export let defaultRulesetId = "BUILDING-CODE-PART9";
   export let defaultCategory: RulesetCategory = "Arch";
+  // When set, the rule's target IFC class is fixed (shown read-only) instead
+  // of a free-text field — used when this form is opened from a specific
+  // element-category page (e.g. Doors) so every rule created there is
+  // correctly scoped without the user having to know the IFC class name.
+  export let lockedTargetIfcClass: string | null = null;
+  // Suggested property_name/property_set pairs for the locked target class,
+  // offered as autocomplete — the field stays free text so any property can
+  // still be typed.
+  export let propertySuggestions: IfcPropertySuggestion[] = [];
   export let onCancel: () => void;
   export let onSaved: (rule: Rule) => void;
 
   const isEditing = !!editingRule;
+  const formInstanceId = Math.random().toString(36).slice(2, 8);
 
   let formRuleId = editingRule?.rule_id || "";
   let formDescription = editingRule?.description || "";
@@ -18,8 +29,15 @@
   let formCategory = editingRule?.rule_category || "property_check";
   let formDomainCategory: RulesetCategory =
     (editingRule?.category as RulesetCategory) || defaultCategory;
+  let formTargetIfcClass =
+    editingRule?.target_ifc_class || lockedTargetIfcClass || "";
   let formPropertySet = editingRule?.property_set || "Pset_Compliance";
   let formPropertyName = editingRule?.property_name || "";
+
+  function applyPropertySuggestion() {
+    const match = propertySuggestions.find((p) => p.name === formPropertyName);
+    if (match) formPropertySet = match.propertySet;
+  }
   let formOperator = editingRule?.operator || "==";
   let formCheckValue = editingRule?.check_value || "";
   let formValueMin = editingRule?.value_min || "";
@@ -61,6 +79,7 @@
         ruleset_id: formRulesetId,
         rule_category: formCategory,
         category: formDomainCategory,
+        target_ifc_class: formTargetIfcClass || null,
         property_set: formPropertySet,
         property_name: formPropertyName,
         operator: formOperator,
@@ -69,8 +88,8 @@
         value_max: formValueMax || null,
         value_min_property: formValueMinProperty || "",
         value_max_property: formValueMaxProperty || "",
-        value_min_offset: formValueMinOffset || 0,
-        value_max_offset: formValueMaxOffset || 0,
+        value_min_offset: formValueMinOffset || "0",
+        value_max_offset: formValueMaxOffset || "0",
         compare_property: formCompareProperty || "",
         name_pattern: formNamePattern || "",
         uniqueness_scope: formUniquenessScope || "building",
@@ -151,6 +170,28 @@
   </div>
 
   <div>
+    <span class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+      Target IFC Class
+    </span>
+    {#if lockedTargetIfcClass}
+      <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300">
+        {lockedTargetIfcClass}
+      </div>
+      <p class="text-[11px] text-slate-500 mt-1">
+        Every rule added here targets this element type.
+      </p>
+    {:else}
+      <input
+        id="rule-target-ifc-class"
+        type="text"
+        bind:value={formTargetIfcClass}
+        placeholder="e.g. IfcDoor, IfcWindow (leave blank to apply to any element)"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-[#0071e3]"
+      />
+    {/if}
+  </div>
+
+  <div>
     <label
       for="rule-desc"
       class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
@@ -180,16 +221,26 @@
     </div>
     <div>
       <label
-        for="rule-pname"
+        for="rule-pname-{formInstanceId}"
         class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
         >Property Name *</label
       >
       <input
-        id="rule-pname"
+        id="rule-pname-{formInstanceId}"
         type="text"
+        list={propertySuggestions.length ? `rule-pname-options-${formInstanceId}` : undefined}
         bind:value={formPropertyName}
+        on:change={applyPropertySuggestion}
+        placeholder={propertySuggestions.length ? "Choose or type a property…" : undefined}
         class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
       />
+      {#if propertySuggestions.length}
+        <datalist id="rule-pname-options-{formInstanceId}">
+          {#each propertySuggestions as prop}
+            <option value={prop.name}>{prop.label}</option>
+          {/each}
+        </datalist>
+      {/if}
     </div>
     <div>
       <label

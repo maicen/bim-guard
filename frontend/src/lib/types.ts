@@ -254,6 +254,7 @@ export interface Rule {
   ruleset_id?: string;
   rule_category?: string;
   category?: RulesetCategory | string;
+  target_ifc_class?: string | null;
   property_set?: string;
   property_name?: string;
   operator?: string;

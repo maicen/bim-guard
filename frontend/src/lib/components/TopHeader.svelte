@@ -16,6 +16,7 @@
     documents: { section: "Library", title: "Document Specifications" },
     extract: { section: "Library", title: "Rule Extraction Studio" },
     rules: { section: "Library", title: "Rules Catalog" },
+    "manual-rule-editor": { section: "Library", title: "Manual Rule Editor" },
     arch: { section: "Analysis", title: "Architectural Compliance Audit" },
     piping: { section: "Analysis", title: "Piping Corrosion Audit" },
     seismic: { section: "Analysis", title: "Seismic Clearance Audit" },

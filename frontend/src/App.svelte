@@ -11,6 +11,7 @@
   import DocumentsView from './routes/DocumentsView.svelte';
   import RuleExtractionView from './routes/RuleExtractionView.svelte';
   import RulesView from './routes/RulesView.svelte';
+  import ManualRuleEditorView from './routes/ManualRuleEditorView.svelte';
   import ArchAnalyzeView from './routes/ArchAnalyzeView.svelte';
   import AnalyzeView from './routes/AnalyzeView.svelte';
   import WorkflowView from './routes/WorkflowView.svelte';
@@ -169,11 +170,16 @@
           initialBcfArtifactId={targetBcfArtifactId}
         />
       {:else if activeView === 'documents'}
-        <DocumentsView bind:this={documentsViewRef} />
+        <DocumentsView
+          bind:this={documentsViewRef}
+          onNavigateToManualRuleEditor={() => (activeView = 'manual-rule-editor')}
+        />
       {:else if activeView === 'extract'}
         <RuleExtractionView />
       {:else if activeView === 'rules'}
         <RulesView />
+      {:else if activeView === 'manual-rule-editor'}
+        <ManualRuleEditorView onBack={() => (activeView = 'rules')} />
       {:else if activeView === 'arch'}
         <ArchAnalyzeView
           initialProjectId={targetProjectId}

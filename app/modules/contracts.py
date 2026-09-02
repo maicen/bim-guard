@@ -443,6 +443,7 @@ class RuleCreateRequest(BaseModel):
     ruleset_id: Optional[str] = Field(default=None, description="Group or folder ruleset identifier")
     rule_category: Optional[str] = Field(default="property_check", description="Rule classification")
     category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    target_ifc_class: Optional[str] = Field(default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow)")
     property_set: Optional[str] = None
     property_name: Optional[str] = None
     operator: Optional[str] = Field(default="==", description="Evaluation operator")
@@ -467,6 +468,7 @@ class RuleUpdateRequest(BaseModel):
     """Payload for updating an existing rule."""
 
     description: Optional[str] = None
+    target_ifc_class: Optional[str] = None
     property_set: Optional[str] = None
     property_name: Optional[str] = None
     operator: Optional[str] = None
@@ -497,6 +499,7 @@ class RuleResponse(BaseModel):
     ruleset_id: Optional[str] = None
     rule_category: Optional[str] = None
     category: Optional[str] = Field(default="Arch", description="Domain category: Arch, Piping, or seismic")
+    target_ifc_class: Optional[str] = Field(default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow)")
     property_set: Optional[str] = None
     property_name: Optional[str] = None
     operator: Optional[str] = None
