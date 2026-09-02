@@ -52,6 +52,7 @@ Editor/agent tooling (Claude Code, Antigravity, VS Code) starts the same two dev
 1. **Sync as soon as possible**: `git fetch origin` and `git pull` (or `git pull --rebase` with local unpushed commits) at the start of every session and again as soon as possible before further edits if time has passed — never defer this.
 2. **Auto-commit as soon as possible**: Once a coherent, working unit of change is done (a fix, a completed feature slice, a passing test, a doc update), stage and commit it immediately — do not wait for the end of the session or for the user to ask. Push to the remote as soon as possible after committing. Don't batch unrelated changes into one commit.
 3. **Still follow standard hygiene**: review `git status`/`git diff` before staging, write clear commit messages, and never force-push, rewrite shared history, or bypass hooks/signing without explicit user instruction.
+4. **No AI attribution in commits**: Do not append `Co-Authored-By: Claude ...` (or any other AI-attribution trailer) to commit messages or PR descriptions. This project prohibits AI co-author signatures in its git history — commit messages must contain only the human-readable summary of the change.
 
 ---
 

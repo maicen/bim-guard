@@ -61,6 +61,8 @@ Run `git fetch origin` and `git pull` (or `git pull --rebase` if the branch has 
 
 As soon as a coherent, working unit of change is done (a bug fix, a completed feature slice, a passing test, a doc update), stage and commit it immediately rather than letting it accumulate uncommitted. Do not batch unrelated changes into one commit and do not hold commits back "to see if more changes come." After committing, push to the current branch's remote as soon as possible as well, so work is never left stranded locally. Still follow standard git hygiene: review `git status`/`git diff` before staging, use clear commit messages, and never force-push or rewrite shared history without explicit user instruction. This auto-commit policy applies only within this repository's normal working rules — it does not authorize destructive operations (`reset --hard`, force-push, history rewrites) or bypassing hooks/signing.
 
+**No AI attribution in commit messages (STRICT):** Do **not** append `Co-Authored-By: Claude ...` (Sonnet, Opus, or any other model) or any other AI-attribution trailer to commit messages or PR descriptions in this repository. This project prohibits AI co-author signatures in its git history — commit messages must contain only the human-readable summary of the change, with no attribution line.
+
 ## Commands
 
 ```bash
