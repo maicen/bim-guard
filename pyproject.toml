@@ -74,13 +74,15 @@ dev = [
     "pytest-json-report>=1.5.0",
     # Validates generated BCF archives against the vendored buildingSMART
     # 2.1 XSDs in tests/schemas/bcf21/ (tests/test_bcf_generator.py).
+    "pytest-xdist>=3.8.0",
     "xmlschema>=3.0.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "app/modules/tests"]
+addopts = "-n auto -m 'not slow'"
 markers = [
-    "slow: marks tests that need real PDFs and are slow",
+    "slow: marks tests that need real PDFs/full engine runs and are slow",
     "llm: marks tests that call the LLM (slow, costs tokens)",
     "integration: marks end-to-end pipeline tests",
 ]

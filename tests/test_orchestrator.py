@@ -27,6 +27,8 @@ import pytest
 
 from tests.conftest import FLAG_COMBO_IDS, FLAG_COMBOS, REPO_ROOT
 
+pytestmark = pytest.mark.slow
+
 ORCHESTRATOR_PATH = (
     REPO_ROOT / "app" / "modules" / "module4_comparator" / "compliance_orchestrator.py"
 )

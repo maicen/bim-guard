@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from app.bootstrap import get_container, reset_container
 from app.engines.bimguard_arch_engine import EgressAnalysisEngine, SpatialDaylightEngine
 from app.modules.contracts import RuleEvaluationResult
@@ -20,6 +22,8 @@ from app.modules.module4_comparator.engine_registry import (
     RuleEvaluator,
     register_default_engines,
 )
+
+pytestmark = pytest.mark.slow
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.db_adapters import DatabaseAdapter
 from app.services.rules_service import RuleService

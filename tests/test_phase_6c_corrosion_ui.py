@@ -41,6 +41,8 @@ from app.modules.phase_6.phase_6c_corrosion_ui import (
     worst_band,
 )
 
+pytestmark = pytest.mark.slow
+
 
 def service_element(
     guid: str = "GUID-01",

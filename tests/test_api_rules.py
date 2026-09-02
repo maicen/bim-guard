@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from starlette.testclient import TestClient
 
 from app.main import app
@@ -32,6 +33,7 @@ def test_get_rule_not_found():
     assert response.status_code == 404
 
 
+@pytest.mark.slow
 def test_rule_folder_crud():
     """Verify complete CRUD lifecycle for ruleset folders via REST API."""
     test_ruleset_id = "TEST-CRUD-FOLDER-01"
@@ -153,6 +155,7 @@ def test_rules_bulk_operations():
         assert client.get(f"/api/rules/{r2['id']}").status_code == 404
 
 
+@pytest.mark.slow
 def test_folders_bulk_operations():
     """Verify bulk update and bulk delete for ruleset folders."""
     f1_id = "BULK-FOLDER-01"

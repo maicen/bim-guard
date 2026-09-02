@@ -2,8 +2,12 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from app.services.pipeline_services import AnalysisService
 from app.services.projects_service import is_enhancement_authorized
+
+pytestmark = pytest.mark.slow
 
 
 def test_audit_service_returns_immutable_findings_and_bcf_topics():

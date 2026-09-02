@@ -82,6 +82,14 @@ run_production_server.bat   # Windows
 # Run automated tests and lint
 uv run ruff check .
 uv run pytest tests/ -v
+
+# Test suite is grouped by pytest markers (slow, llm, integration) and runs
+# in parallel by default (pytest-xdist, addopts = "-n auto -m 'not slow'").
+# Default `pytest` already excludes slow tests — no extra flags needed for
+# everyday runs.
+uv run pytest -m slow          # only the slow tests (full engine/pipeline runs)
+uv run pytest -m ""             # everything, including slow tests
+uv run pytest -m "not llm"      # skip tests that call an LLM
 ```
 
 ## Dev Server Launch Configs (STRICT — keep generated, never hand-edit)

@@ -30,6 +30,8 @@ PROJECT_WITH_MODEL = 3
 #: A project with no IFC model, used for the 409 path.
 NONEXISTENT_PROJECT = 999_999_999
 
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
