@@ -1,7 +1,8 @@
 <script lang="ts">
   import { SlidersHorizontal } from "lucide-svelte";
   import { rulesApi } from "../api";
-  import type { Rule, RulesetCategory } from "../types";
+  import type { BSDDClassItem, BSDDPropertyItem, Rule, RulesetCategory } from "../types";
+  import BsddAutocomplete from "./BsddAutocomplete.svelte";
 
   export let editingRule: Rule | null = null;
   export let defaultRulesetId = "BUILDING-CODE-PART9";
@@ -18,6 +19,7 @@
   let formCategory = editingRule?.rule_category || "property_check";
   let formDomainCategory: RulesetCategory =
     (editingRule?.category as RulesetCategory) || defaultCategory;
+  let formTargetIfcClass = editingRule?.target_ifc_class || "";
   let formPropertySet = editingRule?.property_set || "Pset_Compliance";
   let formPropertyName = editingRule?.property_name || "";
   let formOperator = editingRule?.operator || "==";
@@ -61,6 +63,7 @@
         ruleset_id: formRulesetId,
         rule_category: formCategory,
         category: formDomainCategory,
+        target_ifc_class: formTargetIfcClass,
         property_set: formPropertySet,
         property_name: formPropertyName,
         operator: formOperator,
@@ -89,6 +92,17 @@
     } finally {
       isSaving = false;
     }
+  }
+
+  function handleTargetClassPick(item: BSDDClassItem | BSDDPropertyItem) {
+    if ("code" in item) formTargetIfcClass = item.code;
+  }
+
+  function handlePropertyNamePick(item: BSDDClassItem | BSDDPropertyItem) {
+    if ("code" in item) return;
+    formPropertyName = item.name;
+    if (item.property_set) formPropertySet = item.property_set;
+    if (item.units) formUnit = item.units;
   }
 </script>
 
@@ -164,6 +178,21 @@
     ></textarea>
   </div>
 
+  <div>
+    <label
+      for="rule-target-class"
+      class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
+      >Target IFC Class (Element)</label
+    >
+    <BsddAutocomplete
+      id="rule-target-class"
+      mode="class"
+      bind:value={formTargetIfcClass}
+      placeholder="e.g. IfcPipeSegment -- search bSDD as you type"
+      onSelect={handleTargetClassPick}
+    />
+  </div>
+
   <div class="grid grid-cols-3 gap-3">
     <div>
       <label
@@ -184,11 +213,12 @@
         class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
         >Property Name *</label
       >
-      <input
+      <BsddAutocomplete
         id="rule-pname"
-        type="text"
+        mode="property"
         bind:value={formPropertyName}
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        placeholder="search bSDD as you type"
+        onSelect={handlePropertyNamePick}
       />
     </div>
     <div>

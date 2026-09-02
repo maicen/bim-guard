@@ -82,6 +82,130 @@ def test_bsdd_validate_element_missing_properties():
     assert any(v.severity == "warning" for v in result.violations)
 
 
+def test_bsdd_list_dictionaries_parses_live_v1_response_shape():
+    """Verify a wrapped, real-schema Dictionary/v1 response parses correctly.
+
+    GET /api/Dictionary/v1 wraps the list in {"dictionaries": [...]} with
+    dictionaryCode/dictionaryName/dictionaryVersion/classCount fields -- not
+    the bare-array, code/name/version/classesCount shape this client used to
+    assume. See DictionaryResponseContract.v1 in buildingSMART/bSDD's OpenAPI spec.
+    """
+    client = BSDDClient(enable_network=False)
+    client._http_get = lambda *a, **k: {
+        "totalCount": 1,
+        "offset": 0,
+        "count": 1,
+        "dictionaries": [
+            {
+                "uri": "https://identifier.buildingsmart.org/uri/bs-ag/uniclass-2015",
+                "organizationCodeOwner": "NBS",
+                "dictionaryCode": "uniclass_2015",
+                "dictionaryVersion": "2024.1",
+                "dictionaryName": "Uniclass 2015 Classification System",
+                "languageIsoCode": "en-GB",
+                "classCount": 5,
+            }
+        ],
+    }
+    dicts = client.list_dictionaries()
+    assert len(dicts) == 1
+    assert dicts[0].code == "uniclass_2015"
+    assert dicts[0].name == "Uniclass 2015 Classification System"
+    assert dicts[0].version == "2024.1"
+    assert dicts[0].classes_count == 5
+
+
+def test_bsdd_get_class_parses_live_v1_response_shape():
+    """Verify a real-schema Class/v1 response parses correctly.
+
+    GET /api/Class/v1 takes a full `Uri`, and nests properties under
+    `classProperties` (ClassPropertyContract.v1: propertyUri/name/propertySet/
+    dataType/units[]/allowedValues[{value}]) -- not the flat `properties`
+    shape with a bare uri/units string this client used to assume.
+    """
+    client = BSDDClient(enable_network=False)
+    calls = []
+
+    def fake_get(endpoint, params=None):
+        calls.append((endpoint, params))
+        return {
+            "uri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3/class/IfcPipeSegment",
+            "code": "IfcPipeSegment",
+            "name": "Pipe Segment",
+            "dictionaryUri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3",
+            "classProperties": [
+                {
+                    "propertyUri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3/prop/Material",
+                    "name": "Material",
+                    "propertySet": "Pset_PipeSegmentCommon",
+                    "dataType": "IfcLabel",
+                    "units": ["mm"],
+                    "allowedValues": [{"value": "Copper"}, {"value": "PVC"}],
+                    "description": "Material classification.",
+                }
+            ],
+        }
+
+    client._http_get = fake_get
+    result = client.get_class(
+        "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3", "IfcPipeSegment"
+    )
+    assert result is not None
+    assert result.code == "IfcPipeSegment"
+    assert len(result.properties) == 1
+    prop = result.properties[0]
+    assert prop.name == "Material"
+    assert prop.property_set == "Pset_PipeSegmentCommon"
+    assert prop.units == "mm"
+    assert prop.allowed_values == ["Copper", "PVC"]
+
+    # Looked up by full Uri (there is no separate dictionaryUri+code param).
+    endpoint, params = calls[0]
+    assert endpoint == "/api/Class/v1"
+    assert params["Uri"].endswith("/class/IfcPipeSegment")
+
+
+def test_bsdd_search_classes_parses_live_v2_response_shape():
+    """GET /api/TextSearch/v2 (v1 is retired) takes SearchText/DictionaryUris."""
+    client = BSDDClient(enable_network=False)
+    calls = []
+
+    def fake_get(endpoint, params=None):
+        calls.append((endpoint, params))
+        return {
+            "classes": [
+                {
+                    "uri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3/class/IfcPipeSegment",
+                    "code": "IfcPipeSegment",
+                    "name": "Pipe Segment",
+                    "dictionaryUri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3",
+                }
+            ],
+            "properties": [],
+        }
+
+    client._http_get = fake_get
+    result = client.search_classes("pipe")
+    assert result.total == 1
+    assert result.classes[0].code == "IfcPipeSegment"
+
+    endpoint, params = calls[0]
+    assert endpoint == "/api/TextSearch/v2"
+    assert params["SearchText"] == "pipe"
+
+
+def test_bsdd_search_properties():
+    client = BSDDClient(enable_network=False)
+    props = client.search_properties("Material")
+    assert len(props) >= 1
+    assert all("material" in p.name.lower() or "material" in (p.description or "").lower() for p in props)
+
+
+def test_bsdd_search_properties_empty_query_returns_nothing():
+    client = BSDDClient(enable_network=False)
+    assert client.search_properties("   ") == []
+
+
 def test_run_bsdd_semantic_verification_runner():
     elements = [
         {

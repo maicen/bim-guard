@@ -260,15 +260,34 @@ Owner: unassigned.
       `ElementTree`, so exported IDS is schema-correct; import tries the same
       strict parser first and falls back to the original lenient parser for
       XML this module produced before the refactor.
-- [ ] Connect project scope terminology directly to the central buildingSMART
+- [x] Connect project scope terminology directly to the central buildingSMART
       Data Dictionary (bSDD) API so standardized terms and codes are available
-      throughout the project.
-- [ ] Let users select a project classification standard, such as Uniclass or
-      CCI, directly from project settings.
-- [ ] Add bSDD-powered autocomplete suggestions in the scope module for
+      throughout the project. `app/api/bsdd.py` exposes `BSDDClient`
+      (dictionaries, class search, class lookup, property search) at
+      `/api/bsdd/*`; the client's live-network paths were corrected against
+      buildingSMART/bSDD's own OpenAPI spec (Dictionary v1 response is
+      `{"dictionaries": [...]}` not a bare array; Class v1 takes a full `Uri`,
+      not `dictionaryUri`+`code`; TextSearch is v2, not v1) so real bSDD
+      calls parse correctly instead of always silently falling back offline.
+- [x] Let users select a project classification standard, such as Uniclass or
+      CCI, directly from project settings. `projects.classification_standard`
+      (migration `20260902160000_add_classification_standard_to_projects.sql`)
+      stores a bSDD dictionary code, editable from `ProjectEditModal.svelte`
+      and the wizard's Scope step, both populated from `GET /api/bsdd/dictionaries`.
+- [x] Add bSDD-powered autocomplete suggestions in the scope module for
       correctly coded element and property names as users type.
-- [ ] Translate human-readable information requirements into machine-readable
-      IDS XML files that software can test and verify.
+      `BsddAutocomplete.svelte` backs the rule builder's new Target IFC Class
+      field and Property Name field (`RuleForm.svelte`), debounced against
+      `/api/bsdd/classes/search` and `/api/bsdd/properties/search`; picking a
+      property suggestion also fills its property set and unit.
+      `target_ifc_class` is now a first-class field on the rule create/update
+      API and response contracts (it already existed on the `rules` table and
+      in `RuleService`, but was not reachable from the REST layer or UI).
+- [x] Translate human-readable information requirements into machine-readable
+      IDS XML files that software can test and verify. Already covered by the
+      `ids_exporter.py` work above (`build_ids_document` / `import_ids_ruleset`,
+      wired to `POST /api/rules/import-ids`, `GET /api/rules/export-ids`, and
+      the drafts `ids-preview` endpoint).
 
 ### Agent & CDE Orchestration (`app/agent`, Module 4 & Services) (LangGraph)
 

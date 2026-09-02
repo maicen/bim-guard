@@ -126,6 +126,44 @@ def test_create_project_without_building_code_is_allowed():
         ProjectsService().delete_project(created["id"])
 
 
+def test_create_project_persists_classification_standard():
+    """Verify a bSDD classification standard choice round-trips onto the created project."""
+    from app.services.projects_service import ProjectsService
+
+    response = client.post(
+        "/api/projects",
+        json={
+            "name": "Classification standard round-trip",
+            "country": "Canada",
+            "analysis_type": "Arch",
+            "classification_standard": "uniclass_2015",
+        },
+    )
+    assert response.status_code == 201
+    created = response.json()
+    try:
+        assert created["classification_standard"] == "uniclass_2015"
+    finally:
+        ProjectsService().delete_project(created["id"])
+
+
+def test_update_project_classification_standard():
+    """Verify PUT /api/projects/{id} can change the classification standard."""
+    from app.services.projects_service import ProjectsService
+
+    svc = ProjectsService()
+    created = svc.create_project(name="Classification update target", country="US", analysis_type="Arch")
+    try:
+        response = client.put(
+            f"/api/projects/{created['id']}",
+            json={"classification_standard": "omniclass_2020"},
+        )
+        assert response.status_code == 200
+        assert response.json()["classification_standard"] == "omniclass_2020"
+    finally:
+        svc.delete_project(created["id"])
+
+
 def test_bulk_update_projects():
     """Verify POST /api/projects/bulk-update updates multiple projects in batch."""
     from app.services.projects_service import ProjectsService

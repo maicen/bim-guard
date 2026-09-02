@@ -12,6 +12,7 @@ import type {
   BSDDClassItem,
   BSDDClassSearchResponse,
   BSDDDictionaryItem,
+  BSDDPropertySearchResponse,
   BSDDValidationResult,
   CDEDocumentItem,
   CDESyncRequest,
@@ -1091,5 +1092,45 @@ export const namingConfigApi = {
       body: JSON.stringify({ config, overrides }),
     });
     return handleResponse<NamingPreview>(res);
+  },
+};
+
+/**
+ * buildingSMART Data Dictionary (bSDD) client.
+ *
+ * Backs project-settings classification-standard selection and the rule
+ * builder's element/property autocomplete. Search results are inherently
+ * transient (typed by the user, one query at a time), so unlike the other
+ * clients in this file this one does no caching -- each call is a plain
+ * round trip.
+ */
+export const bsddApi = {
+  /** Classification standards a project can be coded against (Uniclass, OmniClass, IFC, ...). */
+  async listDictionaries(): Promise<BSDDDictionaryItem[]> {
+    const res = await fetch(`${API_BASE}/bsdd/dictionaries`);
+    return handleResponse<BSDDDictionaryItem[]>(res);
+  },
+
+  /** Search bSDD classes (element/classification codes) matching free text. */
+  async searchClasses(query: string, dictionaryUri?: string): Promise<BSDDClassSearchResponse> {
+    const params = new URLSearchParams({ q: query });
+    if (dictionaryUri) params.set('dictionary_uri', dictionaryUri);
+    const res = await fetch(`${API_BASE}/bsdd/classes/search?${params.toString()}`);
+    return handleResponse<BSDDClassSearchResponse>(res);
+  },
+
+  /** Search bSDD properties (property set + name pairs) matching free text. */
+  async searchProperties(query: string, dictionaryUri?: string): Promise<BSDDPropertySearchResponse> {
+    const params = new URLSearchParams({ q: query });
+    if (dictionaryUri) params.set('dictionary_uri', dictionaryUri);
+    const res = await fetch(`${API_BASE}/bsdd/properties/search?${params.toString()}`);
+    return handleResponse<BSDDPropertySearchResponse>(res);
+  },
+
+  /** Fetch one bSDD class definition with its standardized properties. */
+  async getClass(classCode: string, dictionaryUri?: string): Promise<BSDDClassItem> {
+    const params = dictionaryUri ? `?dictionary_uri=${encodeURIComponent(dictionaryUri)}` : '';
+    const res = await fetch(`${API_BASE}/bsdd/classes/${encodeURIComponent(classCode)}${params}`);
+    return handleResponse<BSDDClassItem>(res);
   },
 };

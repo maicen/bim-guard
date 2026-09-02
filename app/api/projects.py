@@ -205,6 +205,7 @@ def create_project(
             suitability_code=payload.suitability_code or "S0",
             revision_code=payload.revision_code or "P01.01",
             cde_state=payload.cde_state.value if hasattr(payload.cde_state, "value") else (payload.cde_state or "WIP"),
+            classification_standard=payload.classification_standard or None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -238,6 +239,7 @@ async def create_project_with_ifc(
     floors_count: Annotated[Optional[int], Form()] = None,
     document_ids: Annotated[list[int], Form()] = [],
     standards_codes: Annotated[list[str], Form()] = [],
+    classification_standard: Annotated[Optional[str], Form()] = None,
     ifc_file: Optional[UploadFile] = File(None),
 ) -> ProjectResponse:
     """Create a project and optionally attach an uploaded IFC model."""
@@ -291,6 +293,7 @@ async def create_project_with_ifc(
             number=number_code,
             suitability_code=suitability_code,
             revision_code=revision_code,
+            classification_standard=classification_standard,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -348,6 +351,7 @@ def update_project(
             suitability_code=payload.suitability_code,
             revision_code=payload.revision_code,
             cde_state=payload.cde_state.value if hasattr(payload.cde_state, "value") else payload.cde_state,
+            classification_standard=payload.classification_standard,
         )
         return ProjectResponse(**(updated or service.get_project(project_id)))
     except ValueError as exc:

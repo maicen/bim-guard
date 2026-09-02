@@ -1,7 +1,7 @@
 <script lang="ts">
   import { X, Check, Pencil, AlertTriangle } from 'lucide-svelte';
-  import { projectsApi } from '../api';
-  import type { Project } from '../types';
+  import { bsddApi, projectsApi } from '../api';
+  import type { BSDDDictionaryItem, Project } from '../types';
 
   export let isOpen: boolean = false;
   export let project: Project | null = null;
@@ -13,8 +13,15 @@
   let status = 'Active';
   let country = 'Canada';
   let analysisType = 'Architecture';
+  let classificationStandard = '';
   let isSaving = false;
   let errorMessage = '';
+
+  let classificationStandards: BSDDDictionaryItem[] = [];
+  bsddApi
+    .listDictionaries()
+    .then((dicts) => (classificationStandards = dicts))
+    .catch(() => (classificationStandards = []));
 
   $: if (isOpen && project) {
     name = project.name || '';
@@ -22,6 +29,7 @@
     status = project.status || 'Active';
     country = project.country || 'Canada';
     analysisType = project.analysis_type || 'Arch';
+    classificationStandard = project.classification_standard || '';
     errorMessage = '';
   }
 
@@ -41,6 +49,7 @@
         status,
         country,
         analysis_type: analysisType,
+        classification_standard: classificationStandard,
       });
       onProjectUpdated(updated);
       onClose();
@@ -156,6 +165,25 @@
             <option value="Piping">Piping</option>
             <option value="seismic">seismic</option>
           </select>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="edit-proj-classification" class="block text-xs font-semibold text-slate-300">
+            Classification Standard
+          </label>
+          <select
+            id="edit-proj-classification"
+            bind:value={classificationStandard}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            <option value="">Not set</option>
+            {#each classificationStandards as std}
+              <option value={std.code}>{std.name}</option>
+            {/each}
+          </select>
+          <p class="text-[11px] text-slate-500">
+            Element and property codes are resolved against this bSDD dictionary throughout the project.
+          </p>
         </div>
       </div>
 
