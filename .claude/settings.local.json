@@ -13,7 +13,12 @@
       "Bash(powershell -ExecutionPolicy Bypass -Command \"irm https://astral.sh/uv/install.ps1 | iex\")",
       "Bash(\"/c/Users/Malak/.local/bin/uv\" --version)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(claude mcp *)",
+      "WebFetch(domain:docs.unstructured.io)",
+      "Bash(uv add *)",
+      "Bash(uv run python -c ' *)",
+      "Bash(mkdir -p .claude .vscode .antigravity)"
     ]
   },
   "enabledMcpjsonServers": [
