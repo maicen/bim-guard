@@ -26,7 +26,9 @@
       "Bash(time uv run pytest tests/ -q --durations=30 -p no:cacheprovider)",
       "Bash(tail -80 /tmp_pytest_run.log)",
       "Bash(wc -l /tmp_pytest_run.log)",
-      "Bash(tail -100 /tmp_pytest_run.log)"
+      "Bash(tail -100 /tmp_pytest_run.log)",
+      "mcp__supabase__list_migrations",
+      "PowerShell(git fetch origin 2>&1)"
     ]
   },
   "enableAllProjectMcpServers": true,
