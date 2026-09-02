@@ -198,12 +198,18 @@ def test_bcf_markup_iso_metadata_injection():
         cde_state="WIP",
     )
 
-    markup = _markup_xml(issue, 1, "VIEW-001")
+    markup = _markup_xml(issue, 1, "7A0E74E1-3CC3-46E8-B94E-516D2A12AD47")
     assert "<Labels>Suitability:S1</Labels>" in markup
     assert "<Labels>Originator:BIMG</Labels>" in markup
     assert "<Labels>CDE:WIP</Labels>" in markup
-    assert 'IfcProject="PRJ1"' in markup
+    # Header/File/@IfcProject is typed IfcGuid (22-char GlobalId) in BCF 2.1,
+    # so a project *code* must not be written there; it travels in the comment.
+    assert "IfcProject=" not in markup
     assert "ISO 19650 Container: PRJ1-BIMG" in markup
+
+    issue.project_code = "0YvctVUKr0kugbFTf53O9L"  # a real IfcProject GlobalId
+    markup = _markup_xml(issue, 1, "7A0E74E1-3CC3-46E8-B94E-516D2A12AD47")
+    assert 'IfcProject="0YvctVUKr0kugbFTf53O9L"' in markup
 
 
 def test_phase_6_ids_export_format():

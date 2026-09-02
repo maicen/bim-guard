@@ -41,6 +41,7 @@ import ifcopenshell
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
 
+from app.logging_config import get_logger
 from app.modules.module2_ifc_read.piping_schema import (
     CANONICAL_MATERIALS,
     BoundingBox,
@@ -63,6 +64,8 @@ try:
 except ImportError:  # pragma: no cover - exercised only on partial installs
     _GEOMETRY_EXTRACTOR_AVAILABLE = False
 
+logger = get_logger(__name__)
+
 # Exact text appended to extraction_warnings when neither IFC ports nor
 # centerline geometry could establish connectivity (Tier 3). XM-001 keys off
 # this constant to decide which elements to skip, so it must not be reworded
@@ -77,6 +80,29 @@ CONNECTIVITY_SOURCE_KEY = "_connectivity_source"
 # could not tessellate one or more of its bbox-near neighbours. The element is
 # assessed on the neighbours that did measure; this records the blind spot so
 # an auditor can see the adjacency is partial rather than complete.
+# Recorded in PipingElement.properties so a reader can tell a material that was
+# READ from the file apart from one this module INFERRED. MM-001 and XM-001 score
+# both the same way, so without this a galvanic couple built on an assumption is
+# indistinguishable from one built on the model's own data.
+MATERIAL_SOURCE_KEY = "_material_source"
+
+#: The element carried a usable material through IfcRelAssociatesMaterial or a
+#: Material/MaterialName property.
+MATERIAL_SOURCE_IFC = "ifc_metadata"
+
+#: The material was deduced from the element's piping system. A design
+#: convention, not a fact about this model. Prefixes the system that drove it,
+#: e.g. "system_inference:fire_sprinkler".
+MATERIAL_SOURCE_INFERENCE = "system_inference"
+
+# Appended to extraction_warnings whenever a material is inferred, so the
+# assumption travels with the element into any report built from it.
+MATERIAL_INFERRED_TEMPLATE = (
+    "Material {material} assumed from system '{system}' ({confidence} convention) "
+    "- not read from the IFC; verify against the specification before relying on "
+    "any corrosion finding derived from it"
+)
+
 GEOMETRY_PARTIAL_TEMPLATE = (
     "Geometric adjacency partial - {count} nearby element(s) could not be "
     "tessellated, so contact with them is unmeasured"
@@ -297,6 +323,111 @@ def normalise_material(raw: Optional[str]) -> str:
             return canonical
 
     return "Unknown"
+
+
+# ---------------------------------------------------------------------------
+# Material inference from system type
+# ---------------------------------------------------------------------------
+# Real models mostly do not carry material. Measured across the 21 MEP models in
+# test-models/, only 1.9% of piping elements resolve a material from IFC
+# metadata; the rest carry no association at all, or a placeholder like
+# "Material", "<Unnamed>" or "N/A". With no material there is no galvanic couple
+# to score, so MM-001 and XM-001 have nothing to say about almost any real file.
+#
+# This table closes part of that gap by deducing the material from the piping
+# system, which models DO classify. It is a statement about ordinary design
+# practice, NOT a measurement of this model, and every element it fills is
+# tagged MATERIAL_SOURCE_INFERENCE and carries a warning saying so.
+#
+# Confidence is recorded per entry, mirroring the `conf` field the rule packs
+# use:
+#   established  one material dominates the system in practice
+#   provisional  the convention holds but a common alternative exists
+#
+# Systems deliberately ABSENT, because no single material dominates and a wrong
+# guess scores as a real couple:
+#   RAINWATER        PVC, cast iron and aluminium are all ordinary choices
+#   COMPRESSED_AIR   carbon steel, copper and aluminium all standard
+#   MEDICAL_GAS_VACUUM  copper is usual but plastics are permitted in some codes
+#   UNKNOWN          nothing to infer from
+
+_SYSTEM_MATERIAL_INFERENCE: dict[PipingSystem, tuple[str, str]] = {
+    # Copper tube is the long-standing default for domestic water services
+    # (ASTM B88 / EN 1057). Cold water is provisional: PE and MDPE are common
+    # for buried and modern runs, where copper would be the wrong call.
+    PipingSystem.DOMESTIC_HOT_WATER: ("Copper_C12200", "established"),
+    PipingSystem.DOMESTIC_HOT_WATER_RETURN: ("Copper_C12200", "established"),
+    PipingSystem.DOMESTIC_COLD_WATER: ("Copper_C12200", "provisional"),
+    # Medical gas pipeline is degreased copper by code (EN 13348, ASTM B819).
+    PipingSystem.MEDICAL_GAS_OXYGEN: ("Copper_C12200", "established"),
+    PipingSystem.MEDICAL_GAS_NITROUS: ("Copper_C12200", "established"),
+    PipingSystem.MEDICAL_GAS_COMPRESSED_AIR: ("Copper_C12200", "established"),
+    # Closed heating and chilled circuits run in black/carbon steel; the closed
+    # loop is what makes plain steel acceptable.
+    PipingSystem.CHILLED_WATER_FLOW: ("CarbonSteel", "established"),
+    PipingSystem.CHILLED_WATER_RETURN: ("CarbonSteel", "established"),
+    PipingSystem.HEATING_FLOW: ("CarbonSteel", "established"),
+    PipingSystem.HEATING_RETURN: ("CarbonSteel", "established"),
+    PipingSystem.CONDENSER_WATER: ("CarbonSteel", "provisional"),
+    PipingSystem.STEAM_LP: ("CarbonSteel", "established"),
+    PipingSystem.STEAM_HP: ("CarbonSteel", "established"),
+    PipingSystem.CONDENSATE_RETURN: ("CarbonSteel", "established"),
+    PipingSystem.NATURAL_GAS: ("CarbonSteel", "established"),
+    # Sprinkler and wet riser pipework is galvanised or black steel; galvanised
+    # is the conventional specification, hence provisional rather than settled.
+    PipingSystem.FIRE_SPRINKLER: ("GalvanisedSteel", "provisional"),
+    PipingSystem.FIRE_WET_RISER: ("GalvanisedSteel", "provisional"),
+    # Above-ground foul drainage is traditionally cast iron; PVC and HDPE are
+    # equally ordinary in current work, so this is provisional.
+    PipingSystem.FOUL_DRAINAGE: ("CastIron", "provisional"),
+    # Pool water is chlorinated, which rules out plain steel and copper alloys;
+    # 316 is the usual specification for wetted metalwork.
+    PipingSystem.POOL_CIRCULATION: ("SS316", "established"),
+    PipingSystem.POOL_CHEMICAL_DOSING: ("SS316", "established"),
+}
+
+# Same guard as _MATERIAL_RULES: a key the rule packs cannot score would fail
+# silently at runtime as a data-quality issue on every inferred element.
+_UNCANONICAL_INFERENCE = {
+    material for material, _ in _SYSTEM_MATERIAL_INFERENCE.values()
+} - CANONICAL_MATERIALS
+if _UNCANONICAL_INFERENCE:
+    raise ValueError(
+        f"_SYSTEM_MATERIAL_INFERENCE emits non-canonical material keys: "
+        f"{sorted(_UNCANONICAL_INFERENCE)}"
+    )
+
+
+def infer_material_from_system(system: Any) -> Optional[str]:
+    """Infer a piping material from the element's system classification.
+
+    A design convention, not a reading of the model. Use it only where the
+    caller records the provenance — see resolve_material, which tags every
+    inferred value MATERIAL_SOURCE_INFERENCE and warns on the element.
+
+    Args:
+        system: A PipingSystem, or its string value. Anything unrecognised,
+            including None and PipingSystem.UNKNOWN, yields None.
+
+    Returns:
+        A CANONICAL_MATERIALS key, or None when no single material is the
+        ordinary choice for that system. None means "no convention to apply",
+        and must not be turned into a default by the caller.
+    """
+    entry = _system_inference_entry(system)
+    return entry[0] if entry else None
+
+
+def _system_inference_entry(system: Any) -> Optional[tuple[str, str]]:
+    """Return (material, confidence) for a system, or None."""
+    if system is None:
+        return None
+    if not isinstance(system, PipingSystem):
+        try:
+            system = PipingSystem(str(getattr(system, "value", system)).strip().lower())
+        except ValueError:
+            return None
+    return _SYSTEM_MATERIAL_INFERENCE.get(system)
 
 
 # ---------------------------------------------------------------------------
@@ -717,6 +848,70 @@ def extract_normalized_material(element: Any) -> Optional[str]:
     if canonical == "Unknown":
         return None
     return canonical
+
+
+def resolve_material(
+    element: Any,
+    system: Any = None,
+    *,
+    properties: Optional[dict] = None,
+    allow_inference: bool = True,
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Resolve an element's material, saying where the answer came from.
+
+    Two kinds of source, tried in order and never blended:
+
+      1. The IFC file itself. First the material association, via
+         extract_normalized_material; then, when *properties* is supplied, a
+         "Material" or "MaterialName" property. Both are readings of the
+         model, so both report MATERIAL_SOURCE_IFC. The property fallback
+         matters: on the models measured here it is the ONLY source that
+         resolves anything on Clinic_Plumbing and Clinic_HVAC, where the
+         material sits in a Pset and no IfcRelAssociatesMaterial exists.
+      2. The element's piping system, via infer_material_from_system. A design
+         convention applied to this model, not a reading of it.
+
+    Args:
+        element: An IFC element (ifcopenshell entity_instance), or None.
+        system: The element's PipingSystem, used only for step 2.
+        properties: Flattened property values for the element, enabling the
+            Material/MaterialName fallback within step 1.
+        allow_inference: Set False to get step 1 alone — the honest read, with
+            no assumption filled in.
+
+    Returns:
+        (material, source, confidence).
+
+        material is a CANONICAL_MATERIALS key, or None when neither source
+        resolves one. source is MATERIAL_SOURCE_IFC, or
+        "system_inference:<system>", or None alongside a None material.
+        confidence is "established"/"provisional" for an inference and None
+        otherwise.
+
+        A None material is Undetermined and must stay that way: filling it
+        with a default would let a fabricated galvanic couple score exactly
+        like a real one.
+    """
+    from_ifc = extract_normalized_material(element)
+    if from_ifc is None and properties:
+        from_property = normalise_material(
+            _first_text(properties, "Material", "MaterialName")
+        )
+        if from_property != "Unknown":
+            from_ifc = from_property
+    if from_ifc is not None:
+        return from_ifc, MATERIAL_SOURCE_IFC, None
+
+    if not allow_inference:
+        return None, None, None
+
+    entry = _system_inference_entry(system)
+    if entry is None:
+        return None, None, None
+
+    material, confidence = entry
+    system_value = getattr(system, "value", system)
+    return material, f"{MATERIAL_SOURCE_INFERENCE}:{system_value}", confidence
 
 
 def _unit_scale_to_metres(model: Any) -> float:
@@ -1286,13 +1481,20 @@ def _build_adjacency(
 # ---------------------------------------------------------------------------
 
 
-def _build_element(model: Any, entity: Any, unit_scale: float) -> Optional[PipingElement]:
+def _build_element(
+    model: Any,
+    entity: Any,
+    unit_scale: float,
+    material_inference: bool = True,
+) -> Optional[PipingElement]:
     """Convert one IFC entity to a PipingElement, or None if unusable.
 
     Args:
         model: The open IFC model, for inverse lookups.
         entity: The entity to convert.
         unit_scale: Factor converting model length units to metres.
+        material_inference: Allow the system-type material fallback. Set
+            False for a reading of the file alone.
     """
     global_id = _safe_str(getattr(entity, "GlobalId", None))
     if not global_id:
@@ -1304,20 +1506,44 @@ def _build_element(model: Any, entity: Any, unit_scale: float) -> Optional[Pipin
     ifc_class = entity.is_a()
     properties = _all_property_values(entity)
 
-    material_raw = _material_name(entity) or _first_text(properties, "Material", "MaterialName")
-    material = normalise_material(material_raw)
-    if material == "Unknown":
-        warnings.append(
-            f"material not identified from {material_raw!r}"
-            if material_raw
-            else "no material associated with element"
-        )
-
     system_name, zone_ids = _groups(model, entity)
     predefined = _safe_str(getattr(entity, "PredefinedType", None))
     system = classify_system(system_name, name, description, predefined)
     if system is PipingSystem.UNKNOWN:
         warnings.append("piping system could not be classified")
+
+    # Material is resolved AFTER the system, because the system is the fallback
+    # source when the file carries no material of its own.
+    material_raw = _material_name(entity) or _first_text(properties, "Material", "MaterialName")
+    material, material_source, confidence = resolve_material(
+        entity, system, properties=properties, allow_inference=material_inference
+    )
+    if material is None:
+        # PipingElement.material is a str whose sentinel is "Unknown"; the
+        # None from resolve_material is the tri-state signal, and this is where
+        # it becomes the schema's way of saying the same thing. XM-001 raises
+        # material_not_in_series for it rather than scoring a couple.
+        material = "Unknown"
+        warnings.append(
+            f"material not identified from {material_raw!r}"
+            if material_raw
+            else "no material associated with element"
+        )
+        logger.debug("material unresolved: %s (system=%s)", global_id, system.value)
+    else:
+        properties[MATERIAL_SOURCE_KEY] = material_source
+        if material_source != MATERIAL_SOURCE_IFC:
+            warnings.append(
+                MATERIAL_INFERRED_TEMPLATE.format(
+                    material=material, system=system.value, confidence=confidence
+                )
+            )
+            logger.debug(
+                "material inferred: %s (system=%s) -> %s [%s]",
+                global_id, system.value, material, confidence,
+            )
+        else:
+            logger.debug("material from IFC: %s -> %s", global_id, material)
 
     level_id, level_name = _storey(entity)
     space_id, space_name = _space(entity)
@@ -1377,6 +1603,7 @@ def produce_piping_elements_from_model(
     source_path: Optional[str] = None,
     adjacency_tolerance_m: float = 0.05,
     geometric_adjacency: bool = False,
+    material_inference: bool = True,
 ) -> list[PipingElement]:
     """Emit the canonical PipingElement list from an already-open IFC model.
 
@@ -1396,6 +1623,10 @@ def produce_piping_elements_from_model(
             elements Tiers 1 and 2 leave unresolved, which XM-001 would
             otherwise skip as indeterminable. Costs a bounded tessellation
             pass; defaults False.
+        material_inference: Fall back to the element's piping system when the
+            file carries no material. Defaults True; inferred values are
+            tagged MATERIAL_SOURCE_KEY and warned on. Set False for a
+            reading of the file alone.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1422,14 +1653,54 @@ def produce_piping_elements_from_model(
                 # by_type returns subtypes too, so the same entity can be
                 # yielded under both its own class and a supertype.
                 continue
-            element = _build_element(model, entity, unit_scale)
+            element = _build_element(model, entity, unit_scale, material_inference)
             if element is None:
                 continue
             seen.add(global_id)
             elements.append(element)
 
     _build_adjacency(model, elements, adjacency_tolerance_m, geometric_adjacency)
+    _log_material_coverage(elements)
     return elements
+
+
+def material_coverage(elements: list[PipingElement]) -> dict[str, int]:
+    """Count how each element's material was resolved.
+
+    Returns:
+        Counts keyed "total", "from_ifc", "inferred", "unknown".
+    """
+    counts = {"total": 0, "from_ifc": 0, "inferred": 0, "unknown": 0}
+    for element in elements:
+        counts["total"] += 1
+        source = (element.properties or {}).get(MATERIAL_SOURCE_KEY)
+        if source == MATERIAL_SOURCE_IFC:
+            counts["from_ifc"] += 1
+        elif source:
+            counts["inferred"] += 1
+        else:
+            counts["unknown"] += 1
+    return counts
+
+
+def _log_material_coverage(elements: list[PipingElement]) -> None:
+    """Emit one coverage line per model.
+
+    Deliberately a summary, not a line per element: a single hospital model
+    here carries 18,000 piping elements, and an INFO record for each buries
+    the run and slows it measurably. Per-element detail is at DEBUG.
+    """
+    if not elements:
+        return
+    counts = material_coverage(elements)
+    total = counts["total"]
+    resolved = counts["from_ifc"] + counts["inferred"]
+    logger.info(
+        "Material coverage: %d/%d (%.1f%%) - %d from IFC, %d inferred from system, "
+        "%d unknown",
+        resolved, total, 100.0 * resolved / total,
+        counts["from_ifc"], counts["inferred"], counts["unknown"],
+    )
 
 
 def produce_piping_elements(
@@ -1437,6 +1708,7 @@ def produce_piping_elements(
     *,
     adjacency_tolerance_m: float = 0.05,
     geometric_adjacency: bool = False,
+    material_inference: bool = True,
 ) -> list[PipingElement]:
     """Read an IFC file and emit the canonical PipingElement list.
 
@@ -1453,6 +1725,10 @@ def produce_piping_elements(
             elements Tiers 1 and 2 leave unresolved, which XM-001 would
             otherwise skip as indeterminable. Costs a bounded tessellation
             pass; defaults False.
+        material_inference: Fall back to the element's piping system when the
+            file carries no material. Defaults True; inferred values are
+            tagged MATERIAL_SOURCE_KEY and warned on. Set False for a
+            reading of the file alone.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1467,6 +1743,7 @@ def produce_piping_elements(
         source_path=ifc_path,
         adjacency_tolerance_m=adjacency_tolerance_m,
         geometric_adjacency=geometric_adjacency,
+        material_inference=material_inference,
     )
 
 
