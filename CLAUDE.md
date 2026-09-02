@@ -216,6 +216,21 @@ Supabase Postgres stores application data. The primary tables are:
 - `documents` — Uploaded PDFs with extracted text
 - `rules` — Unified compliance rules table with typed fields and JSON `parameters`
 
+#### Schema Migrations (STRICT)
+
+**Every schema or rule-data change starts as a file in `supabase/migrations/`, and the filename is the version of record.**
+
+Write `supabase/migrations/<UTCYYYYMMDDHHMMSS>_<snake_case_name>.sql` first, then apply it. Never change the remote project by any route that does not leave that file behind:
+
+- **`execute_sql` (MCP) records nothing** in `supabase_migrations.schema_migrations`. Use it for reads and inspection only — never for `CREATE`/`ALTER`/`DROP`, and never for rule-data edits such as `UPDATE public.rules`.
+- **`apply_migration` (MCP) and the dashboard SQL editor stamp their own apply-time version**, which will not match your filename. If you use them, give the migration exactly the local file's name and confirm the recorded version afterwards with `list_migrations`.
+
+Version numbers must be unique — two files sharing a timestamp are rejected as a duplicate. Mind the ordering when picking one: migrations run in filename order on a fresh preview branch, so a file must sort after everything it depends on.
+
+Before pushing, confirm local and remote agree — `list_migrations` (MCP) or `supabase migration list` should show the same set as `ls supabase/migrations/`. A mismatch fails the "Supabase Preview" check with *Remote migration versions not found in local migrations directory*, and leaves already-applied migrations queued to re-run against production, where the non-idempotent ones (bare `CREATE TABLE`, `CREATE POLICY`) break the deploy.
+
+To reconcile drift, never delete history rows or rewrite applied SQL. Rename the local file to the version the remote recorded, recover remote-only migrations back into local files, and stamp already-applied local migrations with `supabase migration repair --status applied <version>` — verifying first that each one's effect is genuinely present in the database.
+
 #### Database-Driven Analysis Engine Architecture
 
 All compliance and corrosion analysis workflows are strictly database-driven:
