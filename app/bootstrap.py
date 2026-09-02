@@ -17,6 +17,7 @@ from app.modules.module4_comparator.engine_registry import (
 )
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.db_adapters import DatabaseAdapter
+from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.model_lineage import SupabaseModelLineageRepository
@@ -74,6 +75,7 @@ class ApplicationContainer:
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
+    digital_inspector_service: DigitalInspectorService
     engine_registry: RuleEngineRegistry = field(default_factory=RuleEngineRegistry)
 
 
@@ -278,6 +280,8 @@ def build_default_container() -> ApplicationContainer:
         engine_registry=registry,
     )
 
+    digital_inspector_service = DigitalInspectorService()
+
     return ApplicationContainer(
         storage=storage,
         projects_repo=projects_repo,
@@ -302,6 +306,7 @@ def build_default_container() -> ApplicationContainer:
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,
+        digital_inspector_service=digital_inspector_service,
         engine_registry=registry,
     )
 

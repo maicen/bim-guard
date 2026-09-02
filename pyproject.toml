@@ -31,6 +31,7 @@ dependencies = [
     "llama-index-llms-litellm>=0.3.0",
     "langgraph>=0.2.0",
     "langchain-core>=0.3.0",
+    "langchain-litellm>=0.2.0",
     "ifctester>=0.8.5",
 ]
 

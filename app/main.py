@@ -26,6 +26,9 @@ from app.api import (
     dashboard as api_dashboard,
 )
 from app.api import (
+    digital_inspector as api_digital_inspector,
+)
+from app.api import (
     documents as api_documents,
 )
 from app.api import (
@@ -203,6 +206,9 @@ app.add_middleware(RequestLoggingMiddleware)
 # Register API Gateway routers directly under /api prefix
 app.include_router(api_dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(api_projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(
+    api_digital_inspector.router, prefix="/api/projects", tags=["Digital Inspector"]
+)
 app.include_router(api_repositories.router, prefix="/api/repositories", tags=["Repositories"])
 app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])

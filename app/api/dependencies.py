@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.bootstrap import get_container
 from app.services.arch_analysis_service import ArchAnalysisService
+from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.naming_config_service import NamingConfigService
@@ -58,3 +59,8 @@ def get_github_repo_service() -> GitHubRepoService:
 def get_naming_config_service() -> NamingConfigService:
     """Return the configured NamingConfigService instance."""
     return get_container().naming_config_service
+
+
+def get_digital_inspector_service() -> DigitalInspectorService:
+    """Return the configured DigitalInspectorService instance."""
+    return get_container().digital_inspector_service

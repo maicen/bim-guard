@@ -319,6 +319,7 @@ dependencies = [
     { name = "ifcopenshell" },
     { name = "ifctester" },
     { name = "langchain-core" },
+    { name = "langchain-litellm" },
     { name = "langgraph" },
     { name = "litellm" },
     { name = "llama-index-core" },
@@ -363,6 +364,7 @@ requires-dist = [
     { name = "ifcopenshell", specifier = ">=0.8.4.post1" },
     { name = "ifctester", specifier = ">=0.8.5" },
     { name = "langchain-core", specifier = ">=0.3.0" },
+    { name = "langchain-litellm", specifier = ">=0.2.0" },
     { name = "langgraph", specifier = ">=0.2.0" },
     { name = "litellm", specifier = ">=1.0.0" },
     { name = "llama-index-core", specifier = ">=0.12.0" },
@@ -1969,6 +1971,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/90/12/aff76ca89c219ebe6f9dd3c5dbc4e3b1cf5450e9fc7037dccad23d45cd7a/langchain_core-1.6.1.tar.gz", hash = "sha256:1b156cb395aac4f009a8a1b38a574c7d948fe2d5f74c96e0d8a5017b4149e04f", size = 1003359, upload-time = "2026-08-27T19:31:14.956Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/25/f50dd65673c819aa33d3c34df58c115dbb6ec627d19f93e6e401dd0fc8d7/langchain_core-1.6.1-py3-none-any.whl", hash = "sha256:954a84132a5cb0435d27b910e336347b6744ecc18fbeef1e2de7029a0959841a", size = 571478, upload-time = "2026-08-27T19:31:13.34Z" },
+]
+
+[[package]]
+name = "langchain-litellm"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "httpx" },
+    { name = "langchain-core" },
+    { name = "litellm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/2f/3602ea4c111740b021316b0458c9b5eb4da291aed780a1bd2191a880b1ee/langchain_litellm-0.7.1.tar.gz", hash = "sha256:15c7e8b7ef72993e13860a2be87706a50769a9c778c580a6208c2139d4eea776", size = 355108, upload-time = "2026-08-31T17:20:02.925Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/4d/4d5d1428695d12c0c31db8bedfab131775c1aa14b6150f40d5b19b4e459d/langchain_litellm-0.7.1-py3-none-any.whl", hash = "sha256:fd6a2c683d32c7d7d15300abd7c787ef99b881552b579f63c980611d0345a38b", size = 25463, upload-time = "2026-08-31T17:20:01.736Z" },
 ]
 
 [[package]]
