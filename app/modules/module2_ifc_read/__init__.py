@@ -180,7 +180,7 @@ _LENGTH_DIRECT_ATTRS: frozenset[str] = frozenset([
     "overallwidth", "overallheight", "width", "height",
     "treadlength", "treaddepth", "going", "riserheight",
     "handrailheight", "sillheight", "headroomclearance",
-    "requireheadroom", "clearwidth", "nominalwidth", "nominalheight",
+    "requiredheadroom", "clearwidth", "nominalwidth", "nominalheight",
     "clearheight", "elevationwithflooring",
     "grosswidth", "grossheight", "netwidth", "netheight",
     "thickness", "length", "depth",
@@ -1041,14 +1041,24 @@ class Module2_IFCRead:
         if (
             unit_scale_mm != 1.0
             and actual_value is not None
-            and isinstance(actual_value, (int, float))
             and found_pset != "geometry"
         ):
-            measure_type = rich_detail.get("measure_type", "")
-            prop_lower = prop_name.lower()
-            if (measure_type in _LENGTH_MEASURE_TYPES
-                    or prop_lower in _LENGTH_DIRECT_ATTRS):
-                actual_value = round(actual_value * unit_scale_mm, 4)
+            # A quantity can arrive as a numeric string -- e.g. an
+            # IfcLabel('1.2') where the authoring tool typed the Pset value
+            # as text instead of a proper IfcLengthMeasure. Coerce it before
+            # the numeric check below, otherwise it silently skips scaling
+            # and gets compared raw (1.2 m evaluated as 1.2 mm).
+            if isinstance(actual_value, str):
+                try:
+                    actual_value = float(actual_value)
+                except ValueError:
+                    pass
+            if isinstance(actual_value, (int, float)) and not isinstance(actual_value, bool):
+                measure_type = rich_detail.get("measure_type", "")
+                prop_lower = prop_name.lower()
+                if (measure_type in _LENGTH_MEASURE_TYPES
+                        or prop_lower in _LENGTH_DIRECT_ATTRS):
+                    actual_value = round(actual_value * unit_scale_mm, 4)
 
         return actual_value, found_pset, rich_detail
 
