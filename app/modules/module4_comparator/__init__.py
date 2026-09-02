@@ -25,6 +25,50 @@ import re
 # IFC property (IsExternal, SelfClosing, SmokeStop, HandicapAccessible, …).
 _BOOL_ALIASES = {"true": True, "false": False, "yes": True, "no": False}
 
+# ── Scope and waiver predicates ───────────────────────────────────────────────
+# A rule may carry `applies_when` (narrowing which elements it governs) and
+# `exceptions` (conditions that waive a failure). Both are dicts of predicate
+# key -> expected value, evaluated per element against the element record
+# Module 2 built.
+#
+# Every predicate resolves to one of three outcomes, and the third is the
+# reason this is not a plain boolean: a predicate whose data Module 2 does not
+# supply is UNDETERMINED, not False. The two gates then fail in opposite
+# directions, both toward reporting rather than silence:
+#
+#   scope  — UNDETERMINED keeps the element IN scope, so an unevaluable
+#            narrowing can never silently suppress a check.
+#   waiver — UNDETERMINED does NOT waive, so an unevaluable exemption can
+#            never silently suppress a finding.
+#
+# Anything undetermined is counted and surfaced on the result rather than
+# discarded, so a ruleset that depends on data the extractor cannot yet
+# provide is visible instead of quietly inert.
+MATCH = "MATCH"
+NO_MATCH = "NO_MATCH"
+UNDETERMINED = "UNDETERMINED"
+
+#: Predicate key -> IFC property whose per-element value Module 2 resolves into
+#: `scope_values`. Keys carry their unit so a rule reads as the standard writes
+#: it; the value is compared in that unit.
+_SCOPE_NUMERIC_PROPERTIES = {
+    "nominal_diameter_mm": "NominalDiameter",
+    "nominal_diameter_below_mm": "NominalDiameter",
+}
+
+#: Predicate keys matched against a list-valued field of the element record.
+_SCOPE_LIST_FIELDS = {
+    "element_type_any_of": "element_type",
+    "storey_any_of": "storey",
+    "space_any_of": "space",
+    "material_any_of": "materials",
+}
+
+#: Predicate keys that are structurally meaningful but carry no per-element
+#: test: the extraction already guarantees them, so they are satisfied by
+#: construction rather than evaluated.
+_SCOPE_TRIVIAL_KEYS = {"target_ifc_class"}
+
 
 class Module4_Comparator:
     """Validates IFC model data against the BIMGuard rule library."""
@@ -82,6 +126,18 @@ class Module4_Comparator:
         if not elements:
             return self._result(item, "NO_ELEMENTS", 0, 0, 0, 0, [], [], [])
 
+        # Scope narrowing and waivers. A rule carrying neither -- which is
+        # every rule seeded before BIMGUARD-PC-001 -- takes the original path
+        # untouched: `scope` stays empty, `_evaluate_predicate` returns MATCH
+        # for it without inspecting the element, and no waiver is consulted
+        # because failures only look at `exceptions` when it is non-empty.
+        scope = item.get("applies_when") or {}
+        exceptions = item.get("exceptions") or []
+
+        not_applicable_count = waived_count = 0
+        undetermined_notes: list[str] = []
+        waivers: list[dict] = []
+
         pass_count = fail_count = missing_count = 0
         failures: list[dict] = []
         missing_elements: list[dict] = []
@@ -92,6 +148,21 @@ class Module4_Comparator:
 
         for el in elements:
             actual = el.get("actual_value")
+
+            # Scope gate. Runs before the operator so an out-of-scope element
+            # is never measured against a threshold that does not govern it.
+            if scope:
+                outcome, details = self._evaluate_predicate(scope, el)
+                if outcome == NO_MATCH:
+                    not_applicable_count += 1
+                    all_elements.append(
+                        self._entry(el, actual, "NOT_APPLICABLE", "outside rule scope")
+                    )
+                    continue
+                if outcome == UNDETERMINED:
+                    # Kept in scope deliberately: an unevaluable narrowing must
+                    # not suppress the check.
+                    undetermined_notes.extend(details)
 
             if operator in ("exists", "not_exists"):
                 present = actual is not None
@@ -172,22 +243,180 @@ class Module4_Comparator:
                 pass_count += 1
                 all_elements.append(self._entry(el, actual, "PASS", ""))
             else:
-                fail_count += 1
-                failures.append(self._failure(el, actual, reason))
-                all_elements.append(self._entry(el, actual, "FAIL", reason))
+                # Waiver gate. Only a failing element is worth testing against
+                # the exemptions, and only this comparison path carries them
+                # today -- the exists/not_exists and field_consistency paths
+                # above are reached only by rules with no `exceptions`, so
+                # routing them through the same gate would be dead code.
+                waiver, notes = self._waiver_for(exceptions, el)
+                undetermined_notes.extend(notes)
+                if waiver is not None:
+                    ref = waiver.get("reference") or "exemption"
+                    label = waiver.get("label") or ref
+                    waived_count += 1
+                    waivers.append(
+                        {
+                            "element_name": el.get("name"),
+                            "guid": el.get("guid"),
+                            "exemption_ref": ref,
+                            "exemption_label": label,
+                            "waived_reason": reason,
+                        }
+                    )
+                    all_elements.append(
+                        self._entry(el, actual, "WAIVED", f"{reason} — waived by {ref} ({label})")
+                    )
+                else:
+                    fail_count += 1
+                    failures.append(self._failure(el, actual, reason))
+                    all_elements.append(self._entry(el, actual, "FAIL", reason))
 
+        # Status roll-up. The first four branches are the original ladder,
+        # still reached first and in the same order, so a rule carrying
+        # neither scope nor waivers resolves exactly as it did before. The two
+        # new terminal states are reachable only once every element has been
+        # gated away.
         if fail_count > 0:
             status = "FAIL"
         elif missing_count > 0 and pass_count == 0:
             status = "MISSING_DATA"
         elif missing_count > 0:
             status = "PARTIAL"
+        elif pass_count > 0:
+            status = "PASS"
+        elif waived_count > 0:
+            # Every failure was waived and nothing passed: a real outcome,
+            # distinct from PASS, that a reviewer must be able to see.
+            status = "WAIVED"
+        elif not_applicable_count > 0:
+            status = "NOT_APPLICABLE"
         else:
             status = "PASS"
 
-        return self._result(item, status, pass_count, fail_count,
-                            missing_count, len(elements), failures, missing_elements,
-                            all_elements)
+        result = self._result(item, status, pass_count, fail_count,
+                              missing_count, len(elements), failures, missing_elements,
+                              all_elements)
+        result["not_applicable_count"] = not_applicable_count
+        result["waived_count"] = waived_count
+        result["waivers"] = waivers
+        # Deduplicated so one unsupported predicate is reported once, not once
+        # per element.
+        result["undetermined_predicates"] = sorted(set(undetermined_notes))
+        return result
+
+    # ── Scope / waiver predicate evaluation ───────────────────────────────────
+
+    @staticmethod
+    def _predicate_key(key: str, expected, el: dict) -> tuple[str, str]:
+        """Evaluate one predicate key against one element.
+
+        Returns (outcome, detail) where outcome is MATCH, NO_MATCH or
+        UNDETERMINED and detail names the reason when it is not a clean match.
+        """
+        if key in _SCOPE_TRIVIAL_KEYS:
+            return MATCH, ""
+
+        scope_values = el.get("scope_values") or {}
+
+        if key in _SCOPE_NUMERIC_PROPERTIES:
+            prop = _SCOPE_NUMERIC_PROPERTIES[key]
+            raw = scope_values.get(prop)
+            if raw is None:
+                return UNDETERMINED, f"{prop} not resolved on element"
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                return UNDETERMINED, f"{prop}={raw!r} is not numeric"
+
+            # "<key>_below_mm": a bare numeric ceiling, exclusive.
+            if key.endswith("_below_mm"):
+                try:
+                    limit = float(expected)
+                except (TypeError, ValueError):
+                    return UNDETERMINED, f"{key} bound {expected!r} is not numeric"
+                return (MATCH if value < limit else NO_MATCH), ""
+
+            # Otherwise a {"min": , "max": } band, both bounds inclusive and
+            # both optional.
+            if not isinstance(expected, dict):
+                return UNDETERMINED, f"{key} expects a min/max object"
+            low = expected.get("min")
+            high = expected.get("max")
+            try:
+                if low is not None and value < float(low):
+                    return NO_MATCH, ""
+                if high is not None and value > float(high):
+                    return NO_MATCH, ""
+            except (TypeError, ValueError):
+                return UNDETERMINED, f"{key} bounds are not numeric"
+            return MATCH, ""
+
+        if key in _SCOPE_LIST_FIELDS:
+            field = _SCOPE_LIST_FIELDS[key]
+            actual = el.get(field)
+            if actual is None:
+                return UNDETERMINED, f"{field} not resolved on element"
+            haystack = actual if isinstance(actual, list) else [actual]
+            wanted = expected if isinstance(expected, list) else [expected]
+            wanted_cf = {str(w).strip().casefold() for w in wanted}
+            for candidate in haystack:
+                text = str(candidate).strip().casefold()
+                if text in wanted_cf or any(w in text for w in wanted_cf):
+                    return MATCH, ""
+            return NO_MATCH, ""
+
+        # An unrecognised key is data the extractor does not supply -- a
+        # relational predicate such as the host element's material or the
+        # proximity of a flexible coupling. Undetermined, never assumed.
+        return UNDETERMINED, f"predicate {key!r} is not supported by the extractor"
+
+    @classmethod
+    def _evaluate_predicate(cls, predicate: dict, el: dict) -> tuple[str, list[str]]:
+        """Evaluate a whole predicate dict (AND across its keys) for one element.
+
+        NO_MATCH on any key settles the predicate immediately. Otherwise an
+        undetermined key leaves the whole predicate undetermined, because a
+        condition that cannot be tested cannot be asserted.
+        """
+        if not predicate:
+            return MATCH, []
+        undetermined: list[str] = []
+        for key, expected in predicate.items():
+            outcome, detail = cls._predicate_key(key, expected, el)
+            if outcome == NO_MATCH:
+                return NO_MATCH, []
+            if outcome == UNDETERMINED:
+                undetermined.append(detail)
+        if undetermined:
+            return UNDETERMINED, undetermined
+        return MATCH, []
+
+    @classmethod
+    def _waiver_for(cls, exceptions: list[dict], el: dict) -> tuple[dict | None, list[str]]:
+        """Return the first exception waiving this element, plus undetermined notes.
+
+        Exceptions arrive already resolved by Module 2 from the references on
+        the rule, each carrying its own predicate.
+        """
+        notes: list[str] = []
+        for exception in exceptions or []:
+            ref = exception.get("reference") or "exception"
+            predicate = exception.get("predicate") or {}
+            # An empty predicate is the asymmetry between the two gates. For
+            # scope, "no condition" means the rule governs everything; for a
+            # waiver it would mean "waives everything", which is how an
+            # exemption reference that resolved to nothing would silently
+            # erase real findings. An exemption must state a condition to
+            # suppress anything.
+            if not predicate:
+                notes.append(f"{ref}: no predicate to evaluate, cannot waive")
+                continue
+            outcome, details = cls._evaluate_predicate(predicate, el)
+            if outcome == MATCH:
+                return exception, notes
+            if outcome == UNDETERMINED:
+                notes.extend(f"{ref}: {d}" for d in details)
+        return None, notes
 
     @staticmethod
     def _apply_name_pattern(value, pattern: str):

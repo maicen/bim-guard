@@ -1048,8 +1048,26 @@ class Module2_IFCRead:
             total_rules,
             _unit_scale_mm,
         )
+        # Index of this batch's rules by reference, so a rule listing waivers
+        # in `exceptions` can have them resolved to the predicates they stand
+        # for here, where the whole rule set is in hand. Module 4 then gates
+        # on plain data and never needs database access of its own.
+        rules_by_reference = {
+            str(r.get("reference") or "").strip(): r
+            for r in rules
+            if str(r.get("reference") or "").strip()
+        }
+
         for rule_index, rule in enumerate(rules, start=1):
             rule_started_at = time.monotonic()
+            scope_predicate = self._decode_json_obj(rule.get("applies_when"))
+            resolved_exceptions = self._resolve_exceptions(rule, rules_by_reference)
+            # Properties named only by the scope or waiver predicates still
+            # have to be read off each element, or the gates have nothing to
+            # test against.
+            scope_property_names = self._scope_property_names(
+                scope_predicate, resolved_exceptions
+            )
             target = str(rule.get("target_ifc_class") or "").strip()
             prop_name = str(rule.get("property_name") or "").strip()
             prop_set = str(rule.get("property_set") or "").strip()
@@ -1172,6 +1190,20 @@ class Module2_IFCRead:
                         el, compare_property, spatial=spatial, unit_scale_mm=_unit_scale_mm
                     )
 
+                # Scope/waiver predicate inputs, through the same cascade. The
+                # loop body is skipped entirely for the rules that declare no
+                # predicates, which is every rule but BIMGUARD-PC-001's, so
+                # extraction cost is unchanged for them.
+                scope_values: dict = {}
+                for scope_prop in scope_property_names:
+                    try:
+                        scope_value, _, _ = self._resolve_element_property(
+                            el, scope_prop, spatial=spatial, unit_scale_mm=_unit_scale_mm
+                        )
+                    except Exception:
+                        scope_value = None
+                    scope_values[scope_prop] = scope_value
+
                 # ── Type context ────────────────────────────────
                 try:
                     type_inf = self.get_type_info(el)
@@ -1224,6 +1256,10 @@ class Module2_IFCRead:
                         # Gap 3: material
                         "materials": mat_info.get("materials", []),
                         "material_layers": mat_info.get("layers", []),
+                        # Properties needed only by this rule's scope/waiver
+                        # predicates, resolved through the same cascade as the
+                        # main property. Empty for rules that declare neither.
+                        "scope_values": scope_values,
                     }
                 )
 
@@ -1249,6 +1285,13 @@ class Module2_IFCRead:
                     "unit": str(rule.get("unit") or ""),
                     "severity": str(rule.get("severity") or "mandatory"),
                     "egress_direction": egress_direction,
+                    # Scope narrowing and waivers, carried through for Module 4
+                    # to gate on. Both are empty for every rule that does not
+                    # declare them, which keeps the comparator on its original
+                    # path. Exceptions arrive resolved from references to the
+                    # predicates they stand for, so Module 4 needs no database.
+                    "applies_when": scope_predicate,
+                    "exceptions": resolved_exceptions,
                     "elements": element_results,
                 }
             )
@@ -1950,6 +1993,84 @@ class Module2_IFCRead:
             return len(self.ifc_file.by_type(ifc_type))
         except Exception:
             return 0
+
+    #: Scope predicate key -> IFC property to resolve per element. Mirrors
+    #: ``module4_comparator._SCOPE_NUMERIC_PROPERTIES``; the comparator does
+    #: the comparing, this side only has to know what to fetch.
+    _SCOPE_PROPERTY_SOURCES = {
+        "nominal_diameter_mm": "NominalDiameter",
+        "nominal_diameter_below_mm": "NominalDiameter",
+    }
+
+    @staticmethod
+    def _decode_json_obj(value):
+        """Decode a JSON object column (applies_when) into a dict."""
+        if isinstance(value, dict):
+            return value
+        if not value:
+            return {}
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
+
+    @staticmethod
+    def _decode_json_list(value):
+        """Decode a JSON array column (exceptions) into a list."""
+        if isinstance(value, list):
+            return value
+        if not value:
+            return []
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return []
+        return decoded if isinstance(decoded, list) else []
+
+    @classmethod
+    def _resolve_exceptions(cls, rule: dict, rules_by_reference: dict) -> list[dict]:
+        """Turn a rule's `exceptions` references into predicates to evaluate.
+
+        A reference that names no rule in this batch is kept with an empty
+        predicate and marked unresolved, rather than dropped: the comparator
+        treats an empty predicate as undetermined and so declines to waive,
+        which is the safe direction. Silently discarding it would instead make
+        the exemption look considered and rejected.
+        """
+        resolved: list[dict] = []
+        for entry in cls._decode_json_list(rule.get("exceptions")):
+            if isinstance(entry, dict):
+                # An inline predicate, already in the shape Module 4 wants.
+                resolved.append(entry)
+                continue
+            ref = str(entry).strip()
+            if not ref:
+                continue
+            source = rules_by_reference.get(ref)
+            if source is None:
+                resolved.append({"reference": ref, "predicate": {}, "unresolved": True})
+                continue
+            resolved.append(
+                {
+                    "reference": ref,
+                    "label": str(source.get("description") or ref),
+                    "predicate": cls._decode_json_obj(source.get("applies_when")),
+                }
+            )
+        return resolved
+
+    @classmethod
+    def _scope_property_names(cls, scope: dict, exceptions: list[dict]) -> set:
+        """Return the IFC properties the scope and waiver predicates need."""
+        wanted = set()
+        predicates = [scope] + [e.get("predicate") or {} for e in exceptions]
+        for predicate in predicates:
+            for key in predicate or {}:
+                prop = cls._SCOPE_PROPERTY_SOURCES.get(key)
+                if prop:
+                    wanted.add(prop)
+        return wanted
 
     @staticmethod
     def _decode_json_val(v):
