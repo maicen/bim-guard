@@ -1,0 +1,65 @@
+{
+  "notebook": "NZ seismic clearances (IMPORTER TEST FIXTURE)",
+  "standard": "NZS 0000:2026 — FICTITIOUS. This designation does not exist. Every dimension below is invented to exercise scripts/import_notebooklm_json.py and must never be cited or enforced.",
+  "exported_at": "2026-09-02T00:00:00Z",
+  "ruleset_id": "NOTEBOOKLM-TEST-NZ",
+  "mechanism": "SEISMIC",
+  "category": "seismic",
+  "compliance_type": "prescriptive",
+  "rules": [
+    {
+      "reference": "NZ-TEST.01",
+      "rule_type": "spatial_clearance",
+      "description": "FIXTURE — annular clearance around sprinkler pipe passing through a wall or floor, nominal 25-90 mm pipe",
+      "target_ifc_class": "IfcPipeSegment",
+      "annular_clearance_mm": 40,
+      "applies_when": {
+        "nominal_diameter_mm": { "min": 25.0, "max": 90.0 }
+      },
+      "exceptions": [
+        {
+          "ref": "NZ-TEST.01.a",
+          "label": "Penetration through breakaway plasterboard",
+          "when": { "material_any_of": ["gypsum", "plasterboard"] }
+        },
+        {
+          "ref": "NZ-TEST.01.b",
+          "label": "Pipe below the smallest banded size",
+          "when": { "nominal_diameter_below_mm": 25.0 }
+        }
+      ],
+      "keyword": "annular clearance",
+      "confidence": 0.35,
+      "source_text": "FIXTURE — synthetic text, not quoted from any published standard.",
+      "seismic_zone": "Zone 3 (fixture)",
+      "installation_note": "fixture key with no catalog column, expected to land in parameters"
+    },
+    {
+      "ref": "NZ-TEST.02",
+      "type": "numeric_comparison",
+      "desc": "FIXTURE — clearance between a seismically braced duct and adjacent structure, measured at the closest face",
+      "target": "IfcDuctSegment",
+      "property": "StructuralClearance",
+      "op": ">=",
+      "value": 75,
+      "units": "millimetres",
+      "priority": "recommended",
+      "scope": {
+        "storey_any_of": ["Level 1", "Level 2"],
+        "braced": true
+      },
+      "exemptions": [
+        {
+          "ref": "NZ-TEST.02.a",
+          "label": "Duct enclosed within a seismic joint housing",
+          "when": { "element_type_any_of": ["seismic joint housing"] }
+        }
+      ],
+      "see_also": ["NZ-TEST.01"],
+      "citation": "FIXTURE — synthetic text, not quoted from any published standard.",
+      "confidence": 0.3,
+      "review_required": true,
+      "install_tolerance_mm": 10
+    }
+  ]
+}
