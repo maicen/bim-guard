@@ -4,6 +4,19 @@ This module intentionally exports only a strict subset of rules that are
 compatible with buildingSMART IDS. Proprietary logic such as scoring models,
 threshold bands, material-property catalogs, and mitigation catalogues remain in
 BIMGuard's internal schema and are not forced into the IDS representation.
+
+Export (`build_ids_document`) is built via `ifctester.ids` (buildingSMART's
+own IDS 1.0 implementation, installed alongside `ifcopenshell`) rather than
+hand-built `xml.etree.ElementTree`, so the output is schema-correct for free
+instead of an approximation of the IDS 1.0 XSD.
+
+Import (`import_ids_ruleset`) tries the same strict library first — so a
+real, schema-correct IDS document (from another tool, or from this module's
+own export) parses correctly — and falls back to the original hand-rolled
+`xml.etree.ElementTree` parser when strict parsing fails, since it also has
+to accept the older, more lenient XML shape this module itself produced
+before this refactor (and that existing fixtures/tests are still written
+against).
 """
 
 from __future__ import annotations
@@ -11,6 +24,12 @@ from __future__ import annotations
 import json
 from typing import Any
 from xml.etree import ElementTree as ET
+
+import ifctester.ids as ifctester_ids
+
+from app.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 _SUPPORTED_OPERATORS = {
@@ -113,95 +132,107 @@ def export_ids_for_ruleset(
     )
 
 
+def _is_numeric(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _restriction_for_row(row: dict[str, Any]) -> ifctester_ids.Restriction | None:
+    """Build an XSD restriction facet from a row's operator + bound(s), if any.
+
+    Range operators (between) set both minInclusive/maxInclusive. Single-sided
+    comparisons set the corresponding one-sided bound. Equality/exists need
+    no restriction — the plain `value=` on the Property facet already pins
+    the exact value. `!=` has no direct XSD-restriction equivalent and is
+    left unrestricted, matching the prior exporter's best-effort behaviour.
+    """
+    operator = str(row.get("operator") or "").strip().lower()
+    base = "double" if _is_numeric(_parse_scalar(row.get("check_value"))) else "string"
+
+    if operator in {"between", "range"}:
+        range_values = _range_values(row)
+        if not range_values:
+            return None
+        min_value, max_value = range_values
+        options: dict[str, Any] = {}
+        if min_value:
+            options["minInclusive"] = min_value
+        if max_value:
+            options["maxInclusive"] = max_value
+        return ifctester_ids.Restriction(options=options, base=base) if options else None
+
+    bound_tag = {">=": "minInclusive", ">": "minExclusive", "<=": "maxInclusive", "<": "maxExclusive"}.get(
+        operator
+    )
+    if bound_tag is None:
+        return None
+    bound_value = _value_text(row.get("check_value"))
+    if not bound_value:
+        return None
+    return ifctester_ids.Restriction(options={bound_tag: bound_value}, base=base)
+
+
 def build_ids_document(
     rows: list[dict[str, Any]],
     *,
     ifc_schema_version: str = "IFC4",
     export_identifier: str | None = None,
 ) -> str:
-    """Build an IDS XML document for the subset of rules that are exportable."""
-    exportable_rows = filter_exportable_rules(rows)
+    """Build a schema-correct IDS 1.0 XML document via `ifctester.ids`.
 
-    ns = {
-        "ids": "http://standards.buildingsmart.org/IDS",
-        "xsi": "http://www.w3.org/2001/XMLSchema-instance",
-    }
+    Raises:
+        ValueError: If no row has both a target IFC class and property name —
+            the IDS 1.0 schema requires at least one `<specification>`, so
+            there is no valid empty document to return.
+    """
+    exportable_rows = [
+        row for row in filter_exportable_rules(rows) if row.get("target_ifc_class")
+    ]
+    if not exportable_rows:
+        raise ValueError(
+            "No rows contain both a target IFC class and property name — "
+            "IDS 1.0 requires at least one specification."
+        )
 
-    ET.register_namespace("ids", ns["ids"])
-    ET.register_namespace("xsi", ns["xsi"])
+    document = ifctester_ids.Ids(
+        title=(export_identifier or "bim-guard-export").strip() or "bim-guard-export",
+        description="Generated from BIMGuard internal property_check rules.",
+    )
 
-    ids_root = ET.Element(f"{{{ns['ids']}}}ids")
-    ids_root.set("xmlns", ns["ids"])
-    ids_root.set("xmlns:xsi", ns["xsi"])
-    ids_root.set("xsi:schemaLocation", f"{ns['ids']} https://standards.buildingsmart.org/IDS/1.0/ids.xsd")
-    ids_root.set("version", "1.0")
-    ids_root.set("identifier", (export_identifier or "bim-guard-export").strip() or "bim-guard-export")
-
-    info = ET.SubElement(ids_root, f"{{{ns['ids']}}}info")
-    ET.SubElement(info, f"{{{ns['ids']}}}title").text = "BIMGuard IDS export"
-    ET.SubElement(info, f"{{{ns['ids']}}}version").text = ifc_schema_version
-    ET.SubElement(info, f"{{{ns['ids']}}}description").text = "Generated from BIMGuard internal property_check rules."
-
-    specifications = ET.SubElement(ids_root, f"{{{ns['ids']}}}specifications")
     for index, row in enumerate(exportable_rows, start=1):
-        if row.get("target_ifc_class") is None:
+        target = row.get("target_ifc_class")
+        if not target:
             continue
 
-        spec = ET.SubElement(specifications, f"{{{ns['ids']}}}specification")
-        spec.set("ifcVersion", ifc_schema_version)
-        spec.set("name", str(row.get("reference") or f"rule-{index}"))
+        spec = ifctester_ids.Specification(
+            name=str(row.get("reference") or f"rule-{index}"),
+            ifcVersion=[ifc_schema_version],
+        )
+        spec.applicability.append(ifctester_ids.Entity(name=str(target)))
 
-        applicability = ET.SubElement(spec, f"{{{ns['ids']}}}applicability")
-        entity = ET.SubElement(applicability, f"{{{ns['ids']}}}entity")
-        ET.SubElement(entity, f"{{{ns['ids']}}}name").text = str(row.get("target_ifc_class"))
+        cardinality = str(row.get("cardinality") or "required").strip()
+        if cardinality not in {"required", "optional", "prohibited"}:
+            cardinality = "required"
 
-        requirements = ET.SubElement(spec, f"{{{ns['ids']}}}requirements")
-        
-        # 1. Property Requirement Facet
-        if str(row.get("rule_category") or "").strip() == "property_check":
-            requirement = ET.SubElement(requirements, f"{{{ns['ids']}}}property")
-            requirement.set("dataType", str(row.get("data_type") or "IFCLABEL"))
-            
-            tolerance = row.get("tolerance")
-            if tolerance is not None and str(tolerance).strip() != "":
-                requirement.set("tolerance", str(tolerance))
+        operator = str(row.get("operator") or "").strip().lower()
+        restriction = _restriction_for_row(row)
+        if restriction is not None:
+            value: Any = restriction
+        elif operator not in {"exists", "not_exists", ""}:
+            value = _value_text(row.get("check_value")) or None
+        else:
+            value = None
 
-            cardinality = row.get("cardinality")
-            if cardinality and str(cardinality).strip() in {"required", "optional", "prohibited"}:
-                requirement.set("cardinality", str(cardinality).strip())
+        spec.requirements.append(
+            ifctester_ids.Property(
+                propertySet=str(row.get("property_set") or "").strip() or "Property_Set",
+                baseName=str(row.get("property_name") or "").strip() or "PropertyName",
+                value=value,
+                cardinality="prohibited" if operator == "not_exists" else cardinality,
+            )
+        )
+        document.specifications.append(spec)
 
-            pset = str(row.get("property_set") or "").strip()
-            if pset:
-                requirement.set("uri", pset)
-                property_set = ET.SubElement(requirement, f"{{{ns['ids']}}}propertySet")
-                property_set.text = pset
-
-            prop_name = ET.SubElement(requirement, f"{{{ns['ids']}}}name")
-            prop_name.text = str(row.get("property_name"))
-
-            value = ET.SubElement(requirement, f"{{{ns['ids']}}}value")
-            simple = ET.SubElement(value, f"{{{ns['ids']}}}simpleValue")
-
-            operator = str(row.get("operator") or "").strip()
-            if operator.lower() in {"between", "range"}:
-                range_values = _range_values(row)
-                if range_values:
-                    min_value, max_value = range_values
-                    lower = ET.SubElement(requirement, f"{{{ns['ids']}}}minValue")
-                    lower.text = min_value
-                    upper = ET.SubElement(requirement, f"{{{ns['ids']}}}maxValue")
-                    upper.text = max_value
-                    continue
-
-            simple.text = _value_text(row.get("check_value"))
-
-            if operator:
-                restriction = ET.SubElement(requirement, f"{{{ns['ids']}}}restriction")
-                restriction.set("type", _operator_tag(operator))
-                restriction.text = _value_text(row.get("check_value") or row.get("value_min") or row.get("value_max"))
-
-    xml_bytes = ET.tostring(ids_root, encoding="utf-8")
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_bytes.decode("utf-8")
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + document.to_string()
 
 
 def _coerce_ids_scalar(raw: str | None) -> Any:
@@ -224,8 +255,156 @@ def _coerce_ids_scalar(raw: str | None) -> Any:
         return text
 
 
+def _operator_from_restriction(restriction: "ifctester_ids.Restriction") -> tuple[str, Any, Any, Any]:
+    """Map a parsed Restriction facet to (operator, check_value, value_min, value_max)."""
+    options = restriction.options or {}
+    has_min = "minInclusive" in options or "minExclusive" in options
+    has_max = "maxInclusive" in options or "maxExclusive" in options
+
+    if has_min and has_max:
+        min_value = options.get("minInclusive", options.get("minExclusive"))
+        max_value = options.get("maxInclusive", options.get("maxExclusive"))
+        return "between", None, _coerce_ids_scalar(str(min_value)), _coerce_ids_scalar(str(max_value))
+    if "minInclusive" in options:
+        return ">=", _coerce_ids_scalar(str(options["minInclusive"])), None, None
+    if "minExclusive" in options:
+        return ">", _coerce_ids_scalar(str(options["minExclusive"])), None, None
+    if "maxInclusive" in options:
+        return "<=", _coerce_ids_scalar(str(options["maxInclusive"])), None, None
+    if "maxExclusive" in options:
+        return "<", _coerce_ids_scalar(str(options["maxExclusive"])), None, None
+    if "enumeration" in options:
+        values = options["enumeration"]
+        first = values[0] if isinstance(values, list) and values else values
+        return "=", _coerce_ids_scalar(str(first)), None, None
+    if "pattern" in options:
+        pattern = options["pattern"]
+        first = pattern[0] if isinstance(pattern, list) and pattern else pattern
+        return "matches", first, None, None
+    return "=", None, None, None
+
+
+def _import_ids_ruleset_strict(xml_text: str, ruleset_id: str | None = None) -> list[dict[str, Any]]:
+    """Parse a schema-correct IDS 1.0 document via `ifctester.ids`.
+
+    Raises on anything that isn't valid per the real IDS 1.0 XSD — callers
+    should fall back to `_import_ids_ruleset_legacy` for older/lenient XML.
+    """
+    import tempfile
+    from pathlib import Path
+
+    if not xml_text or not xml_text.strip():
+        return []
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ids", encoding="utf-8", delete=False
+        ) as tmp_file:
+            tmp_file.write(xml_text)
+            tmp_path = tmp_file.name
+        document = ifctester_ids.open(tmp_path, validate=False)
+    except Exception as exc:  # noqa: BLE001 - surfaced at the calling API layer
+        raise ValueError(f"Invalid IDS XML: {exc}") from exc
+    finally:
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    base_ruleset_id = (ruleset_id or document.info.get("title") or "IMPORTED-IDS").strip()
+    rows: list[dict[str, Any]] = []
+
+    for index, spec in enumerate(document.specifications, start=1):
+        spec_name = (spec.name or f"IDS-{index}").strip()
+        entity_name = ""
+        for facet in spec.applicability:
+            if isinstance(facet, ifctester_ids.Entity):
+                entity_name = str(facet.name or "").strip()
+                break
+
+        for requirement in spec.requirements:
+            if isinstance(requirement, ifctester_ids.Property):
+                prop_name = str(requirement.baseName or "").strip()
+                if not entity_name or not prop_name:
+                    continue
+
+                operator, check_value, value_min, value_max = "=", None, None, None
+                if isinstance(requirement.value, ifctester_ids.Restriction):
+                    operator, check_value, value_min, value_max = _operator_from_restriction(
+                        requirement.value
+                    )
+                elif requirement.value is not None:
+                    check_value = _coerce_ids_scalar(str(requirement.value))
+                elif requirement.cardinality == "prohibited":
+                    operator = "not_exists"
+                else:
+                    operator = "exists"
+
+                rows.append(
+                    {
+                        "reference": spec_name,
+                        "rule_type": "numeric_comparison",
+                        "description": f"Imported from IDS: {spec_name}",
+                        "target_ifc_class": entity_name,
+                        "property_set": str(requirement.propertySet or "").strip(),
+                        "property_name": prop_name,
+                        "operator": operator,
+                        "check_value": check_value,
+                        "value_min": value_min,
+                        "value_max": value_max,
+                        "rule_category": "property_check",
+                        "ruleset_id": base_ruleset_id,
+                        "mechanism": "CODE",
+                        "severity": "mandatory",
+                        "source_text": f"Imported from IDS specification {spec_name}",
+                    }
+                )
+
+            elif isinstance(requirement, ifctester_ids.Classification):
+                system_name = str(requirement.system or "Classification").strip()
+                cls_value = str(requirement.value).strip() if requirement.value is not None else None
+                rows.append(
+                    {
+                        "reference": f"{spec_name}-CLS",
+                        "rule_type": "classification_check",
+                        "description": f"Imported classification from IDS: {spec_name}",
+                        "target_ifc_class": entity_name,
+                        "property_set": system_name,
+                        "property_name": "Classification",
+                        "operator": "=",
+                        "check_value": cls_value,
+                        "rule_category": "property_check",
+                        "ruleset_id": base_ruleset_id,
+                        "mechanism": "CODE",
+                        "severity": "mandatory",
+                        "source_text": f"Imported classification {system_name}",
+                    }
+                )
+
+            elif isinstance(requirement, ifctester_ids.Material):
+                mat_value = str(requirement.value).strip() if requirement.value is not None else None
+                rows.append(
+                    {
+                        "reference": f"{spec_name}-MAT",
+                        "rule_type": "material_check",
+                        "description": f"Imported material from IDS: {spec_name}",
+                        "target_ifc_class": entity_name,
+                        "property_set": "Material",
+                        "property_name": "Material",
+                        "operator": "=",
+                        "check_value": mat_value,
+                        "rule_category": "property_check",
+                        "ruleset_id": base_ruleset_id,
+                        "mechanism": "CODE",
+                        "severity": "mandatory",
+                        "source_text": f"Imported material requirement for {entity_name}",
+                    }
+                )
+
+    return rows
+
+
 def _operator_from_ids_type(value: str | None) -> str:
-    """Map IDS restriction types to BIMGuard operator strings."""
+    """Map IDS restriction types to BIMGuard operator strings (legacy parser)."""
     normalized = (value or "").strip().lower()
     mapping = {
         "ge": ">=",
@@ -238,14 +417,17 @@ def _operator_from_ids_type(value: str | None) -> str:
     return mapping.get(normalized, "=")
 
 
-def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dict[str, Any]]:
-    """Parse an IDS XML document and return BIMGuard-compatible rule rows."""
-    if not xml_text or not xml_text.strip():
-        return []
+def _import_ids_ruleset_legacy(xml_text: str, ruleset_id: str | None = None) -> list[dict[str, Any]]:
+    """Hand-rolled ElementTree parser for the module's pre-refactor XML shape.
 
+    Kept for XML this module produced before the `ifctester.ids`-based
+    export existed (plain text nodes rather than `<simpleValue>`-wrapped
+    ones, and an invented `<minValue>`/`<maxValue>` range shape that isn't
+    part of the real IDS 1.0 schema).
+    """
     try:
         root = ET.fromstring(xml_text.encode("utf-8"))
-    except ET.ParseError as exc:  # pragma: no cover - surfaced at the calling API layer
+    except ET.ParseError as exc:
         raise ValueError(f"Invalid IDS XML: {exc}") from exc
 
     ns = {"ids": "http://standards.buildingsmart.org/IDS"}
@@ -259,7 +441,6 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
         if entity_el is not None and entity_el.text:
             entity_name = entity_el.text.strip()
 
-        # 1. Properties
         requirements = spec.findall("ids:requirements/ids:property", ns)
         for requirement in requirements:
             property_set = ""
@@ -282,7 +463,6 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
             min_el = requirement.find("ids:minValue", ns)
             max_el = requirement.find("ids:maxValue", ns)
             restriction_el = requirement.find("ids:restriction", ns)
-            simple_value = None
             operator = "="
             check_value = None
             value_min = None
@@ -291,8 +471,7 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
             if value_el is not None:
                 simple_el = value_el.find("ids:simpleValue", ns)
                 if simple_el is not None and simple_el.text is not None:
-                    simple_value = simple_el.text.strip()
-                    check_value = _coerce_ids_scalar(simple_value)
+                    check_value = _coerce_ids_scalar(simple_el.text.strip())
                     operator = "="
             elif min_el is not None or max_el is not None:
                 if min_el is not None and min_el.text is not None:
@@ -326,9 +505,7 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
                 }
             )
 
-        # 2. Classifications
-        classifications = spec.findall("ids:requirements/ids:classification", ns)
-        for req_cls in classifications:
+        for req_cls in spec.findall("ids:requirements/ids:classification", ns):
             system_el = req_cls.find("ids:system", ns)
             val_el = req_cls.find("ids:value", ns)
             system_name = system_el.text.strip() if system_el is not None and system_el.text else "Classification"
@@ -351,9 +528,7 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
                 }
             )
 
-        # 3. Materials
-        materials = spec.findall("ids:requirements/ids:material", ns)
-        for req_mat in materials:
+        for req_mat in spec.findall("ids:requirements/ids:material", ns):
             val_el = req_mat.find("ids:value", ns)
             mat_value = val_el.text.strip() if val_el is not None and val_el.text else None
             rows.append(
@@ -377,10 +552,67 @@ def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dic
     return rows
 
 
+def import_ids_ruleset(xml_text: str, ruleset_id: str | None = None) -> list[dict[str, Any]]:
+    """Parse an IDS XML document into BIMGuard-compatible rule rows.
+
+    Tries the strict `ifctester.ids` parser first (correct for real,
+    schema-valid IDS 1.0 documents); falls back to a lenient hand-rolled
+    parser for the older, non-schema-strict shape this module itself
+    produced before its export was refactored onto `ifctester.ids`.
+    """
+    if not xml_text or not xml_text.strip():
+        return []
+
+    try:
+        return _import_ids_ruleset_strict(xml_text, ruleset_id)
+    except ValueError:
+        logger.debug("Strict IDS parse failed; falling back to legacy parser", exc_info=True)
+        return _import_ids_ruleset_legacy(xml_text, ruleset_id)
+
+
+def translate_rule_drafts_to_ids(
+    drafts: list[Any], *, ifc_schema_version: str = "IFC4", export_identifier: str | None = None
+) -> str:
+    """Build an IDS XML preview directly from extraction drafts, before promotion.
+
+    Accepts `RuleExtractionDraft` objects (see app.modules.contracts) — each
+    draft's `proposed_rule` is projected into the same row shape
+    `build_ids_document` expects from canonical `rules` table rows, so a
+    reviewer can preview the IDS a draft would produce without first
+    promoting it into `public.rules`.
+
+    `RuleCreateRequest` carries no target-IFC-class field (a pre-existing
+    contract gap — the canonical `rules` table's `target_ifc_class` column
+    is never populated by the extraction/bulk-save path today either), so
+    drafts without one are filtered out by `filter_exportable_rules` just as
+    canonical rule rows without a target are.
+    """
+    rows = [
+        {
+            "reference": draft.proposed_rule.rule_id,
+            "rule_category": draft.proposed_rule.rule_category or "property_check",
+            "target_ifc_class": "",
+            "property_set": draft.proposed_rule.property_set or "",
+            "property_name": draft.proposed_rule.property_name or "",
+            "operator": draft.proposed_rule.operator or "==",
+            "check_value": draft.proposed_rule.check_value,
+            "value_min": draft.proposed_rule.value_min,
+            "value_max": draft.proposed_rule.value_max,
+            "value_min_property": draft.proposed_rule.value_min_property,
+            "value_max_property": draft.proposed_rule.value_max_property,
+        }
+        for draft in drafts
+    ]
+    return build_ids_document(
+        rows, ifc_schema_version=ifc_schema_version, export_identifier=export_identifier
+    )
+
+
 __all__ = [
     "build_ids_document",
     "export_ids_for_ruleset",
     "filter_exportable_rules",
     "import_ids_ruleset",
+    "translate_rule_drafts_to_ids",
 ]
 

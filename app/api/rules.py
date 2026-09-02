@@ -24,6 +24,8 @@ from app.modules.contracts import (
     RuleBulkDeleteRequest,
     RuleBulkUpdateRequest,
     RuleCreateRequest,
+    RuleDraftReviewRequest,
+    RuleExtractionDraft,
     RuleFolderBulkActionResponse,
     RuleFolderBulkDeleteRequest,
     RuleFolderBulkUpdateRequest,
@@ -449,7 +451,10 @@ def export_all_ids_xml(
             detail="No rules found for IDS XML export.",
         )
     filename = f"{ruleset_id}.ids" if ruleset_id else "bimguard_rules.ids"
-    xml_content = RuleService.export_ids_xml(ruleset_id or "BIMGUARD_EXPORT", rules)
+    try:
+        xml_content = RuleService.export_ids_xml(ruleset_id or "BIMGUARD_EXPORT", rules)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return PlainTextResponse(
         xml_content,
         media_type="application/xml",
@@ -469,7 +474,10 @@ def export_ids_xml(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No rules found for ruleset {ruleset_id}.",
         )
-    xml_content = RuleService.export_ids_xml(ruleset_id, rules)
+    try:
+        xml_content = RuleService.export_ids_xml(ruleset_id, rules)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return PlainTextResponse(
         xml_content,
         media_type="application/xml",
@@ -508,6 +516,38 @@ async def extract_rules(
         "warnings": result.warnings,
         "count": len(result.rules),
     }
+
+
+@router.patch(
+    "/drafts/{draft_id}",
+    response_model=RuleExtractionDraft,
+    summary="Review (accept/reject/edit) one rule extraction draft",
+)
+def review_rule_draft(draft_id: int, payload: RuleDraftReviewRequest) -> RuleExtractionDraft:
+    """Record a review decision on one extraction draft."""
+    from app.services.rule_draft_service import RuleDraftService
+
+    try:
+        row = RuleDraftService().review_draft(draft_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return RuleExtractionDraft.model_validate(row)
+
+
+@router.post(
+    "/drafts/{draft_id}/promote",
+    response_model=RuleResponse,
+    summary="Promote an accepted/edited rule extraction draft into the rule library",
+)
+def promote_rule_draft(draft_id: int) -> dict:
+    """Insert an accepted/edited draft's proposed rule into `public.rules`."""
+    from app.services.rule_draft_service import RuleDraftService
+
+    try:
+        created = RuleDraftService().promote_draft(draft_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return created
 
 
 @router.post("/seed", summary="Seed rule library with engine rulesets")

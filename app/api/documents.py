@@ -2,17 +2,31 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.concurrency import run_in_threadpool
 
 from app.api.dependencies import get_documents_service
 from app.logging_config import get_logger
 from app.modules.contracts import (
     DocumentDetailResponse,
+    DocumentIngestResponse,
     DocumentResponse,
     DocumentUpdateRequest,
+    RuleExtractionDraft,
+    RuleExtractionDraftListResponse,
 )
 from app.services.documents_service import DocumentService
+from app.services.rule_extraction_service import RuleExtractionService
 from app.utils import md5_hex, safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
@@ -264,6 +278,115 @@ def update_document(
         revision_code=updated.get("revision_code", "P01.01"),
         cde_state=updated.get("cde_state") or "WIP",
     )
+
+
+@router.post(
+    "/{document_id}/ingest",
+    response_model=DocumentIngestResponse,
+    summary="Run LlamaIndex ingestion (clause metadata + deontic extraction) over a document",
+)
+async def ingest_document(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> DocumentIngestResponse:
+    """Ingest an already-uploaded document's extracted text via LlamaIndexIngestor.
+
+    Splits the document into clause-annotated nodes and extracts typed
+    deontic ("shall"/"must"/"should"/"may") statements. Progress streams on
+    the existing `GET /api/events/{document_id}` SSE channel.
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    text = doc.get("extracted_text") or ""
+    if not text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document has no extracted text to ingest.",
+        )
+
+    extraction_service = RuleExtractionService()
+    nodes = await extraction_service.ingest_with_llamaindex(document_id, text)
+    deontic_count = sum(len(node.deontic_statements) for node in nodes)
+
+    return DocumentIngestResponse(
+        document_id=document_id,
+        nodes=nodes,
+        deontic_statement_count=deontic_count,
+    )
+
+
+@router.post(
+    "/{document_id}/rules/extract-drafts",
+    response_model=RuleExtractionDraftListResponse,
+    summary="Extract reviewable rule drafts from a document via LlamaIndex",
+)
+async def extract_rule_drafts(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> RuleExtractionDraftListResponse:
+    """Ingest a document and generate LlamaIndex rule drafts awaiting review.
+
+    Unlike `POST /api/rules/extract`, results are persisted as
+    `pending_review` drafts (see `rule_extraction_drafts`) rather than
+    returned for immediate bulk-insert — review via
+    `GET /api/documents/{id}/rules/drafts` and
+    `PATCH /api/rules/drafts/{draft_id}`.
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    text = doc.get("extracted_text") or ""
+    if not text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document has no extracted text to extract rules from.",
+        )
+
+    extraction_service = RuleExtractionService()
+    drafts = await extraction_service.extract_rule_drafts(document_id, text)
+    return RuleExtractionDraftListResponse(drafts=drafts)
+
+
+@router.get(
+    "/{document_id}/rules/drafts",
+    response_model=RuleExtractionDraftListResponse,
+    summary="List rule extraction drafts for a document",
+)
+def list_rule_drafts(document_id: int) -> RuleExtractionDraftListResponse:
+    """Return all extraction drafts for one document, newest first."""
+    from app.services.rule_draft_service import RuleDraftService
+
+    rows = RuleDraftService().list_drafts(document_id)
+    return RuleExtractionDraftListResponse(
+        drafts=[RuleExtractionDraft.model_validate(row) for row in rows]
+    )
+
+
+@router.get(
+    "/{document_id}/rules/drafts/ids-preview",
+    summary="Preview the IDS XML that would be produced by a document's rule drafts",
+)
+def preview_rule_drafts_ids(document_id: int) -> Response:
+    """Render an IDS preview from a document's extraction drafts, before promotion."""
+    from app.modules.contracts import RuleExtractionDraft as _RuleExtractionDraft
+    from app.modules.module3_rule_builder.ids_exporter import translate_rule_drafts_to_ids
+    from app.services.rule_draft_service import RuleDraftService
+
+    rows = RuleDraftService().list_drafts(document_id)
+    drafts = [_RuleExtractionDraft.model_validate(row) for row in rows]
+    try:
+        xml_content = translate_rule_drafts_to_ids(drafts)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return Response(content=xml_content, media_type="application/xml")
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete document")

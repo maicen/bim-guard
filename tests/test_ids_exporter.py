@@ -68,7 +68,10 @@ def test_build_ids_document_bundles_exportable_checks_into_valid_xml():
     xml = build_ids_document(rows, ifc_schema_version="IFC4")
 
     assert xml.startswith("<?xml")
-    assert "<ids:ids" in xml
+    # ifctester.ids emits the IDS namespace as the default namespace
+    # (<ids xmlns="...">) rather than a bound "ids:" prefix; both are
+    # equally valid per XML namespaces, so assert on the namespace URI.
+    assert "http://standards.buildingsmart.org/IDS" in xml
     assert "IfcPipeSegment" in xml
     assert "CorrosionAllowance" in xml
     assert "Pset_PipeSegmentCommon" in xml
@@ -127,7 +130,9 @@ def test_build_ids_document_handles_missing_property_set_and_range_checks():
     assert "RiserHeight" in xml
     assert "125" in xml
     assert "200" in xml
-    assert "<ids:name>RiserHeight</ids:name>" in xml
+    # Real IDS 1.0 names a property requirement's element <baseName>, not the
+    # prior hand-rolled exporter's non-standard <name>.
+    assert "<baseName>" in xml
 
 
 def test_export_ids_for_ruleset_uses_ruleset_identifier_and_filters_scope():

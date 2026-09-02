@@ -82,4 +82,10 @@ def test_settings_service_exposes_only_database_managed_values(monkeypatch):
 
     settings = SettingsService().list_settings()
 
-    assert [row["key"] for row in settings] == ["BIM_GUARD_LOG_LEVEL"]
+    assert sorted(row["key"] for row in settings) == sorted(
+        [
+            "BIM_GUARD_LOG_LEVEL",
+            "BIM_GUARD_USE_LLAMAINDEX_INGESTION",
+            "BIM_GUARD_RULE_EXTRACTION_PROVIDER",
+        ]
+    )

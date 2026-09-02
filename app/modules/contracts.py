@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -388,6 +388,48 @@ class DocumentDetailResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# LlamaIndex Document Ingestion Contracts
+# ---------------------------------------------------------------------------
+
+
+class ClauseMetadata(BaseModel):
+    """Provenance for a single extracted document node (clause/table/section)."""
+
+    clause_id: Optional[str] = Field(default=None, description="Clause/article reference, e.g. '9.8.2.1.(1)'")
+    page_number: Optional[int] = Field(default=None, description="1-based source page number, when known")
+    parent_section: Optional[str] = Field(default=None, description="Nearest enclosing section heading")
+    section_path: list[str] = Field(default_factory=list, description="Breadcrumb of headings, e.g. ['5', '5.3', '5.3.2']")
+    node_type: Literal["paragraph", "table", "list", "heading"] = "paragraph"
+    source_document_id: int = Field(..., description="FK to documents.id")
+
+
+class DeonticStatement(BaseModel):
+    """A single 'shall/must/should/may' obligation extracted from a clause."""
+
+    text: str = Field(..., description="The extracted obligation sentence")
+    modality: Literal["shall", "must", "should", "may"]
+    subject: Optional[str] = Field(default=None, description="IFC entity/discipline the obligation refers to")
+    clause: ClauseMetadata
+
+
+class DocumentNodeContract(BaseModel):
+    """A LlamaIndex node persisted for BCF/rule traceability."""
+
+    node_id: str
+    text: str
+    metadata: ClauseMetadata
+    deontic_statements: list[DeonticStatement] = Field(default_factory=list)
+
+
+class DocumentIngestResponse(BaseModel):
+    """Result of running LlamaIndex ingestion over one document."""
+
+    document_id: int
+    nodes: list[DocumentNodeContract]
+    deontic_statement_count: int = 0
+
+
+# ---------------------------------------------------------------------------
 # Rule & Ruleset Contracts
 # ---------------------------------------------------------------------------
 
@@ -475,6 +517,49 @@ class RuleResponse(BaseModel):
     needs_review: Optional[int] = 0
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+class RuleDraftStatus(str, Enum):
+    """Review lifecycle state for a LlamaIndex-extracted rule candidate."""
+
+    pending_review = "pending_review"
+    accepted = "accepted"
+    rejected = "rejected"
+    edited = "edited"
+
+
+class RuleExtractionDraft(BaseModel):
+    """A single extracted rule candidate awaiting human review before promotion."""
+
+    id: Optional[int] = None
+    source_document_id: int
+    source_node_id: Optional[str] = Field(default=None, description="Links back to DocumentNodeContract.node_id")
+    clause: Optional[ClauseMetadata] = None
+    proposed_rule: RuleCreateRequest
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    extraction_method: Literal["llamaindex_pydantic", "litellm_legacy"] = "litellm_legacy"
+    status: RuleDraftStatus = RuleDraftStatus.pending_review
+    reviewer_email: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    review_notes: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class RuleExtractionDraftListResponse(BaseModel):
+    """List of extraction drafts for a document."""
+
+    drafts: list[RuleExtractionDraft]
+
+
+class RuleDraftReviewRequest(BaseModel):
+    """Payload for reviewing (accepting/rejecting/editing) one extraction draft."""
+
+    status: RuleDraftStatus
+    review_notes: Optional[str] = None
+    reviewer_email: Optional[str] = None
+    edited_rule: Optional[RuleCreateRequest] = Field(
+        default=None, description="Required when status == edited"
+    )
 
 
 class RuleFolderResponse(BaseModel):
@@ -1470,3 +1555,31 @@ class NamingPreviewResponseContract(BaseModel):
         default_factory=list,
         description="Tokens left literal because nothing supplied a value for them",
     )
+
+
+# ---------------------------------------------------------------------------
+# Digital Inspector (LangGraph agent) Contracts
+# ---------------------------------------------------------------------------
+
+
+class InspectorQueryRequest(BaseModel):
+    """A natural-language query for the Digital Inspector agent."""
+
+    query: str = Field(..., min_length=1, description="Free-text question about the project")
+
+
+class InspectorToolCallContract(BaseModel):
+    """One tool invocation recorded during an inspector run."""
+
+    tool_name: str
+    input: dict[str, Any] = Field(default_factory=dict)
+    output: Optional[dict[str, Any]] = None
+    status: Literal["running", "success", "error"] = "running"
+
+
+class InspectorResponse(BaseModel):
+    """Final answer and tool-call trace from a Digital Inspector run."""
+
+    project_id: int
+    answer: str
+    tool_calls: list[InspectorToolCallContract] = Field(default_factory=list)
