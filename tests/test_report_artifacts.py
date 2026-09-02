@@ -1,8 +1,10 @@
 """Tests for persistent generated report artifacts."""
 
+import xml.etree.ElementTree as ET
 import zipfile
 from io import BytesIO
 
+from app.modules.module5_reporter.bcf_generator import bcf_topic_guid
 from app.services.report_artifacts import ReportArtifactService
 
 
@@ -73,4 +75,11 @@ def test_persist_bcf_uploads_zip_and_records_metadata() -> None:
     assert service.get_bcf(999) is None
     with zipfile.ZipFile(BytesIO(storage.content)) as archive:
         assert "bcf.version" in archive.namelist()
-        assert "topic-guid/markup.bcf" in archive.namelist()
+        # "topic-guid" is not a BCF 2.1 Guid (hyphenated UUID), so the
+        # generator files the topic under the deterministic UUID5 it derives
+        # from that id and records the original in the comment body.
+        folder = bcf_topic_guid("topic-guid")
+        assert f"{folder}/markup.bcf" in archive.namelist()
+        markup = ET.fromstring(archive.read(f"{folder}/markup.bcf").decode())
+        assert markup.find("Topic").get("Guid") == folder
+        assert "Source finding id: topic-guid" in markup.find("./Comment/Comment").text

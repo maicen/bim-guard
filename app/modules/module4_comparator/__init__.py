@@ -63,6 +63,29 @@ _SCOPE_NUMERIC_PROPERTIES = {
     "hanger_rod_length_mm": "HangerRodLength",
     "lateral_brace_spacing_mm": "LateralBraceSpacing",
     "longitudinal_brace_spacing_mm": "LongitudinalBraceSpacing",
+    # Seismic-derived, resolved by module2_ifc_read.ifc_seismic into
+    # `scope_values` alongside the rest. FlexibleCouplingWithin is the distance
+    # from the brace FURTHEST from a coupling: "flexible couplings within
+    # 300 mm" is earned only when every brace has one, so the worst brace
+    # decides, exactly as the longest rod does above.
+    "mass_kg": "MassKg",
+    "mass_below_kg": "MassKg",
+    "seismic_force_coefficient_c": "SeismicForceCoefficientC",
+    "flexible_coupling_within_mm": "FlexibleCouplingWithin",
+    "spacing_extension_multiplier": "SpacingExtensionMultiplier",
+}
+
+#: Numeric predicate suffixes that state a bare ceiling rather than a band,
+#: mapped to whether the limit itself satisfies the predicate.
+#:
+#: "_below_" is exclusive and "_within_" inclusive because that is how the
+#: standards word them: "rods shorter than 150 mm" excludes 150, "couplings
+#: within 300 mm" includes 300. The difference decides borderline elements, so
+#: it is encoded rather than rounded away.
+_SCOPE_CEILING_SUFFIXES = {
+    "_below_mm": False,
+    "_below_kg": False,
+    "_within_mm": True,
 }
 
 #: Predicate keys matched against a list-valued field of the element record.
@@ -96,6 +119,14 @@ _SCOPE_BOOL_FIELDS = {
     # that writes no relationships looks exactly like a genuinely unsupported
     # run.
     "is_suspended": "is_suspended",
+    # Seismic detailing flags, resolved by module2_ifc_read.ifc_seismic. Both
+    # RELAX a rule when true, which is precisely why neither may default to
+    # False: a fabricated False fails compliant work, a fabricated True passes
+    # work that is not, and None -- UNDETERMINED -- is the only honest reading
+    # of a model that never authored the property. True requires EVERY support
+    # on the run to say so; one silent hanger leaves the run undetermined.
+    "details_prevent_rod_bending": "details_prevent_rod_bending",
+    "has_dual_structural_supports": "has_dual_structural_supports",
 }
 
 #: Predicate keys that are structurally meaningful but carry no per-element
@@ -397,13 +428,17 @@ class Module4_Comparator:
             except (TypeError, ValueError):
                 return UNDETERMINED, f"{prop}={raw!r} is not numeric"
 
-            # "<key>_below_mm": a bare numeric ceiling, exclusive.
-            if key.endswith("_below_mm"):
+            # A bare numeric ceiling -- "_below_" exclusive, "_within_"
+            # inclusive -- rather than a min/max band.
+            for suffix, inclusive in _SCOPE_CEILING_SUFFIXES.items():
+                if not key.endswith(suffix):
+                    continue
                 try:
                     limit = float(expected)
                 except (TypeError, ValueError):
                     return UNDETERMINED, f"{key} bound {expected!r} is not numeric"
-                return (MATCH if value < limit else NO_MATCH), ""
+                within = value <= limit if inclusive else value < limit
+                return (MATCH if within else NO_MATCH), ""
 
             # A bare number is a single nominated size -- "NB50", "DN65" --
             # rather than a band. Standards tabulate rules that way (NZS 4219

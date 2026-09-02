@@ -61,6 +61,7 @@
 
   let extractedRules: ExtractedRule[] = [];
   let extractionWarnings: string[] = [];
+  let formRulesetId = "EXTRACTED-STANDARDS";
 
   // Search, Filter, Sort & Pagination for Draft Rules
   let draftSearchQuery = "";
@@ -254,7 +255,7 @@
         unit: r.unit || "",
         severity: r.severity || "Medium",
         mechanism: "CODE",
-        ruleset_id: "EXTRACTED-STANDARDS",
+        ruleset_id: formRulesetId || "EXTRACTED-STANDARDS",
         rule_category: "property_check",
         confidence: r.confidence || "0.9",
         extraction_method: "ai_extracted",
@@ -392,6 +393,20 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex flex-col">
+            <label
+              for="extraction-ruleset"
+              class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5"
+              >Rule Folder</label
+            >
+            <input
+              id="extraction-ruleset"
+              type="text"
+              bind:value={formRulesetId}
+              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3] w-44"
+            />
+          </div>
+
           <button
             type="button"
             on:click={addManualDraftRule}

@@ -162,6 +162,7 @@ class RuleService:
             else PersistenceService.get_table(
                 "rule_folders",
                 _FOLDER_COLUMNS,
+                db=db,
             )
         )
         self._folders_enabled = True
@@ -626,6 +627,61 @@ class RuleService:
         )
         invalidate_cache("bimguard:rules")
 
+    def remove_rule_parameter(self, rule_id: int, key: str) -> None:
+        """Drop one key from a rule's `parameters` JSON blob.
+
+        The inverse of `set_rule_parameter`, so a patch that stamped its own
+        provenance into `parameters` can take it back out again and leave the
+        row exactly as it found it. A key that is not there is not an error.
+        """
+        rule = self.get_rule(rule_id)
+        if rule is None:
+            return
+        try:
+            params = json.loads(rule.get("parameters") or "{}")
+            if not isinstance(params, dict):
+                params = {}
+        except json.JSONDecodeError:
+            params = {}
+        if key not in params:
+            return
+        params.pop(key)
+        self._rules.update(
+            updates={"parameters": json.dumps(params), "updated_at": now_iso_utc()},
+            pk_values=rule_id,
+        )
+        invalidate_cache("bimguard:rules")
+
+    def set_rule_scope(
+        self,
+        rule_id: int,
+        applies_when: dict,
+        target_ifc_class: str | None = None,
+        description: str | None = None,
+    ) -> bool:
+        """Rewrite a rule's `applies_when` predicate, optionally with its target.
+
+        `update_rule` has no `applies_when` parameter and `bulk_update_rules`
+        whitelists a handful of classification columns, so narrowing a rule's
+        scope -- pointing NZS-4219-5.13 at IfcPipeSegment and banding it by
+        nominal bore, say -- had no writer of its own. This is that writer, in
+        the same shape as `set_rule_parameter` above: the named fields are
+        replaced, everything else is left untouched. Returns False when the
+        rule does not exist.
+        """
+        if self.get_rule(rule_id) is None:
+            return False
+        updates: dict[str, Any] = {
+            "applies_when": json.dumps(applies_when or {}),
+            "updated_at": now_iso_utc(),
+        }
+        if target_ifc_class is not None:
+            updates["target_ifc_class"] = target_ifc_class.strip()
+        if description is not None:
+            updates["description"] = description.strip()
+        self._rules.update(updates=updates, pk_values=rule_id)
+        invalidate_cache("bimguard:rules")
+        return True
 
     # ── Classification queries ────────────────────────────────────────────────
 
@@ -1175,11 +1231,11 @@ class RuleService:
         return export_ids_for_ruleset(ruleset_id, rules)
 
     @staticmethod
-    def import_ids_xml(xml_text: str) -> list[dict]:
+    def import_ids_xml(xml_text: str, ruleset_id: str | None = None) -> list[dict]:
         """Import rules from an IDS XML payload."""
         from app.modules.module3_rule_builder.ids_exporter import import_ids_ruleset
 
-        return import_ids_ruleset(xml_text)
+        return import_ids_ruleset(xml_text, ruleset_id)
 
 
 RulesService = RuleService

@@ -428,7 +428,7 @@
         <span class="text-slate-400">
           {activeCategory === "seismic"
             ? "Seismic Clearance (SB-001)"
-            : "MEP Piping Corrosion (GC/CC/MC)"}
+            : "MEP Piping Corrosion (GC/CC/MC/MM/XM)"}
         </span>
       </div>
       <h1
@@ -461,8 +461,9 @@
           Execute verified Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN
           4149) buffer volume and bracing audits.
         {:else}
-          Execute verified Galvanic (GC-001), Crevice (CC-001), and
-          Microbiological (MC-001) piping compliance audits.
+          Execute verified Galvanic (GC-001), Crevice (CC-001),
+          Microbiological (MC-001), Material-media (MM-001), and
+          Cross-material (XM-001) piping compliance audits.
         {/if}
       </p>
 

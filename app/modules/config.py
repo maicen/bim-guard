@@ -72,6 +72,20 @@ UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
 FEATURE_PATH_B_MM = os.environ.get("FEATURE_PATH_B_MM", "0") == "1"
 FEATURE_PATH_B_XM = os.environ.get("FEATURE_PATH_B_XM", "0") == "1"
 
+# Tier 3 geometric adjacency in the piping producer (piping_producer.
+# _geometric_adjacency). Feeds XM-001: elements Tiers 1 and 2 cannot resolve
+# are skipped as connectivity-indeterminable today, and this tier measures
+# real tessellated surface distance to recover them.
+#
+# A third flag rather than a rider on FEATURE_PATH_B_XM, because the cost
+# profile is different in kind: the other two gate which comparators run,
+# this one gates a tessellation pass during extraction. A site may want
+# XM-001 on and this off on large models.
+# Set to the string "1" to enable; any other value reads as off.
+FEATURE_XM_GEOMETRIC_ADJACENCY = (
+    os.environ.get("FEATURE_XM_GEOMETRIC_ADJACENCY", "0") == "1"
+)
+
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "BuildingCode_PDF"
 SOURCE_DOC_SEED = "BuildingCode_Seed"

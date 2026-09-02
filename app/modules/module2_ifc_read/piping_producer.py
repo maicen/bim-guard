@@ -41,6 +41,7 @@ import ifcopenshell
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
 
+from app.logging_config import get_logger
 from app.modules.module2_ifc_read.piping_schema import (
     CANONICAL_MATERIALS,
     BoundingBox,
@@ -53,6 +54,18 @@ from app.modules.module2_ifc_read.piping_schema import (
     Point3D,
 )
 
+try:
+    # Tier 3 only. Guarded because ifc_geometry itself degrades when
+    # ifcopenshell.geom or scipy are absent, and the producer must keep
+    # working (Tiers 1, 2 and 4) when the geometry stack is unavailable.
+    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+
+    _GEOMETRY_EXTRACTOR_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only on partial installs
+    _GEOMETRY_EXTRACTOR_AVAILABLE = False
+
+logger = get_logger(__name__)
+
 # Exact text appended to extraction_warnings when neither IFC ports nor
 # centerline geometry could establish connectivity (Tier 3). XM-001 keys off
 # this constant to decide which elements to skip, so it must not be reworded
@@ -62,6 +75,38 @@ CONNECTIVITY_INDETERMINABLE = "Connectivity indeterminable - XM-001 skipped for 
 # Recorded in PipingElement.properties so downstream comparators and audits
 # can tell which tier produced joined_to.
 CONNECTIVITY_SOURCE_KEY = "_connectivity_source"
+
+# Appended to extraction_warnings when Tier 3 resolved an element itself but
+# could not tessellate one or more of its bbox-near neighbours. The element is
+# assessed on the neighbours that did measure; this records the blind spot so
+# an auditor can see the adjacency is partial rather than complete.
+# Recorded in PipingElement.properties so a reader can tell a material that was
+# READ from the file apart from one this module INFERRED. MM-001 and XM-001 score
+# both the same way, so without this a galvanic couple built on an assumption is
+# indistinguishable from one built on the model's own data.
+MATERIAL_SOURCE_KEY = "_material_source"
+
+#: The element carried a usable material through IfcRelAssociatesMaterial or a
+#: Material/MaterialName property.
+MATERIAL_SOURCE_IFC = "ifc_metadata"
+
+#: The material was deduced from the element's piping system. A design
+#: convention, not a fact about this model. Prefixes the system that drove it,
+#: e.g. "system_inference:fire_sprinkler".
+MATERIAL_SOURCE_INFERENCE = "system_inference"
+
+# Appended to extraction_warnings whenever a material is inferred, so the
+# assumption travels with the element into any report built from it.
+MATERIAL_INFERRED_TEMPLATE = (
+    "Material {material} assumed from system '{system}' ({confidence} convention) "
+    "- not read from the IFC; verify against the specification before relying on "
+    "any corrosion finding derived from it"
+)
+
+GEOMETRY_PARTIAL_TEMPLATE = (
+    "Geometric adjacency partial - {count} nearby element(s) could not be "
+    "tessellated, so contact with them is unmeasured"
+)
 
 # ---------------------------------------------------------------------------
 # Extraction scope
@@ -166,6 +211,80 @@ if _UNCANONICAL:
     )
 
 
+# ---------------------------------------------------------------------------
+# Designation aliases (fallback only)
+# ---------------------------------------------------------------------------
+# Real models label pipework by element symbol ("Cu") or by the product
+# standard the spec cites ("ASTM B88") rather than by material name, and none
+# of those hit a substring rule above. They are matched only AFTER the
+# substring rules fail, so every result _MATERIAL_RULES produces today is
+# unchanged and these can only rescue what currently returns "Unknown".
+#
+# Matching is on normalised text (lowercased, punctuation collapsed to single
+# spaces), which is why "ASTM B88", "astm-b88" and "ASTM  B88" all key the
+# same entry.
+#
+# Deliberately EXCLUDED as ambiguous — a wrong material is worse than an
+# honest "Unknown" here, because it scores as a real galvanic couple:
+#   ASTM A53  — covers both black AND hot-dipped galvanised steel pipe
+#   ASTM A312 — austenitic stainless pipe, grade-agnostic (304 vs 316)
+
+# Matched as a whole PHRASE inside the normalised text, so "ASTM B88 Type L"
+# and "Copper tube to EN 1057" both resolve, while "PE1000" does not collide
+# with "PE100".
+_MATERIAL_DESIGNATIONS: dict[str, str] = {
+    # Copper tube — ASTM B88 is seamless copper water tube, EN 1057 its
+    # European counterpart; C11000 is ETP and C12200 DHP copper.
+    "astm b88": "Copper_C12200",
+    "en 1057": "Copper_C12200",
+    "c11000": "Copper_C12200",
+    # Copper-nickel alloy designations
+    "c70600": "CuNi_9010",
+    "c71500": "CuNi_7030",
+    # Carbon steel line and pressure pipe
+    "astm a106": "CarbonSteel",
+    "api 5l": "CarbonSteel",
+    # Irons
+    "astm a536": "DuctileIron",
+    "en 545": "DuctileIron",
+    "astm a48": "CastIron",
+    # Plastics
+    "astm d1785": "PVC",
+    "astm f876": "PEX",
+    "pe100": "HDPE",
+    "pe80": "HDPE",
+}
+
+# Element symbols, matched only as a standalone WORD in the normalised text.
+# A substring test would be actively harmful here: "cu" is inside
+# "cupronickel" and "vacuum", "al" inside "alkathene" and "galvanised".
+_MATERIAL_SYMBOLS: dict[str, str] = {
+    "cu": "Copper_C12200",
+    "ti": "Titanium",
+    "al": "Aluminium",
+}
+
+_UNCANONICAL_ALIASES = (
+    set(_MATERIAL_DESIGNATIONS.values()) | set(_MATERIAL_SYMBOLS.values())
+) - CANONICAL_MATERIALS
+if _UNCANONICAL_ALIASES:
+    raise ValueError(
+        f"material aliases emit non-canonical keys: {sorted(_UNCANONICAL_ALIASES)}"
+    )
+
+
+def _normalise_material_text(raw: str) -> str:
+    """Lowercase *raw* and collapse every non-alphanumeric run to one space."""
+    return " ".join("".join(c if c.isalnum() else " " for c in raw.lower()).split())
+
+
+# Longest designation first, so a future short entry can never shadow a longer
+# one that contains it.
+_DESIGNATIONS_BY_LENGTH: tuple[str, ...] = tuple(
+    sorted(_MATERIAL_DESIGNATIONS, key=len, reverse=True)
+)
+
+
 def normalise_material(raw: Optional[str]) -> str:
     """Map a free-text IFC material name to a CANONICAL_MATERIALS key.
 
@@ -190,7 +309,125 @@ def normalise_material(raw: Optional[str]) -> str:
         if all(needle in text for needle in needles):
             return canonical
 
+    # Fallback: product-standard designations and element symbols. Reached only
+    # when no substring rule matched, so this never overrides existing results.
+    normalised = _normalise_material_text(text)
+    padded = f" {normalised} "
+    for designation in _DESIGNATIONS_BY_LENGTH:
+        if f" {designation} " in padded:
+            return _MATERIAL_DESIGNATIONS[designation]
+
+    words = set(normalised.split())
+    for symbol, canonical in _MATERIAL_SYMBOLS.items():
+        if symbol in words:
+            return canonical
+
     return "Unknown"
+
+
+# ---------------------------------------------------------------------------
+# Material inference from system type
+# ---------------------------------------------------------------------------
+# Real models mostly do not carry material. Measured across the 21 MEP models in
+# test-models/, only 1.9% of piping elements resolve a material from IFC
+# metadata; the rest carry no association at all, or a placeholder like
+# "Material", "<Unnamed>" or "N/A". With no material there is no galvanic couple
+# to score, so MM-001 and XM-001 have nothing to say about almost any real file.
+#
+# This table closes part of that gap by deducing the material from the piping
+# system, which models DO classify. It is a statement about ordinary design
+# practice, NOT a measurement of this model, and every element it fills is
+# tagged MATERIAL_SOURCE_INFERENCE and carries a warning saying so.
+#
+# Confidence is recorded per entry, mirroring the `conf` field the rule packs
+# use:
+#   established  one material dominates the system in practice
+#   provisional  the convention holds but a common alternative exists
+#
+# Systems deliberately ABSENT, because no single material dominates and a wrong
+# guess scores as a real couple:
+#   RAINWATER        PVC, cast iron and aluminium are all ordinary choices
+#   COMPRESSED_AIR   carbon steel, copper and aluminium all standard
+#   MEDICAL_GAS_VACUUM  copper is usual but plastics are permitted in some codes
+#   UNKNOWN          nothing to infer from
+
+_SYSTEM_MATERIAL_INFERENCE: dict[PipingSystem, tuple[str, str]] = {
+    # Copper tube is the long-standing default for domestic water services
+    # (ASTM B88 / EN 1057). Cold water is provisional: PE and MDPE are common
+    # for buried and modern runs, where copper would be the wrong call.
+    PipingSystem.DOMESTIC_HOT_WATER: ("Copper_C12200", "established"),
+    PipingSystem.DOMESTIC_HOT_WATER_RETURN: ("Copper_C12200", "established"),
+    PipingSystem.DOMESTIC_COLD_WATER: ("Copper_C12200", "provisional"),
+    # Medical gas pipeline is degreased copper by code (EN 13348, ASTM B819).
+    PipingSystem.MEDICAL_GAS_OXYGEN: ("Copper_C12200", "established"),
+    PipingSystem.MEDICAL_GAS_NITROUS: ("Copper_C12200", "established"),
+    PipingSystem.MEDICAL_GAS_COMPRESSED_AIR: ("Copper_C12200", "established"),
+    # Closed heating and chilled circuits run in black/carbon steel; the closed
+    # loop is what makes plain steel acceptable.
+    PipingSystem.CHILLED_WATER_FLOW: ("CarbonSteel", "established"),
+    PipingSystem.CHILLED_WATER_RETURN: ("CarbonSteel", "established"),
+    PipingSystem.HEATING_FLOW: ("CarbonSteel", "established"),
+    PipingSystem.HEATING_RETURN: ("CarbonSteel", "established"),
+    PipingSystem.CONDENSER_WATER: ("CarbonSteel", "provisional"),
+    PipingSystem.STEAM_LP: ("CarbonSteel", "established"),
+    PipingSystem.STEAM_HP: ("CarbonSteel", "established"),
+    PipingSystem.CONDENSATE_RETURN: ("CarbonSteel", "established"),
+    PipingSystem.NATURAL_GAS: ("CarbonSteel", "established"),
+    # Sprinkler and wet riser pipework is galvanised or black steel; galvanised
+    # is the conventional specification, hence provisional rather than settled.
+    PipingSystem.FIRE_SPRINKLER: ("GalvanisedSteel", "provisional"),
+    PipingSystem.FIRE_WET_RISER: ("GalvanisedSteel", "provisional"),
+    # Above-ground foul drainage is traditionally cast iron; PVC and HDPE are
+    # equally ordinary in current work, so this is provisional.
+    PipingSystem.FOUL_DRAINAGE: ("CastIron", "provisional"),
+    # Pool water is chlorinated, which rules out plain steel and copper alloys;
+    # 316 is the usual specification for wetted metalwork.
+    PipingSystem.POOL_CIRCULATION: ("SS316", "established"),
+    PipingSystem.POOL_CHEMICAL_DOSING: ("SS316", "established"),
+}
+
+# Same guard as _MATERIAL_RULES: a key the rule packs cannot score would fail
+# silently at runtime as a data-quality issue on every inferred element.
+_UNCANONICAL_INFERENCE = {
+    material for material, _ in _SYSTEM_MATERIAL_INFERENCE.values()
+} - CANONICAL_MATERIALS
+if _UNCANONICAL_INFERENCE:
+    raise ValueError(
+        f"_SYSTEM_MATERIAL_INFERENCE emits non-canonical material keys: "
+        f"{sorted(_UNCANONICAL_INFERENCE)}"
+    )
+
+
+def infer_material_from_system(system: Any) -> Optional[str]:
+    """Infer a piping material from the element's system classification.
+
+    A design convention, not a reading of the model. Use it only where the
+    caller records the provenance — see resolve_material, which tags every
+    inferred value MATERIAL_SOURCE_INFERENCE and warns on the element.
+
+    Args:
+        system: A PipingSystem, or its string value. Anything unrecognised,
+            including None and PipingSystem.UNKNOWN, yields None.
+
+    Returns:
+        A CANONICAL_MATERIALS key, or None when no single material is the
+        ordinary choice for that system. None means "no convention to apply",
+        and must not be turned into a default by the caller.
+    """
+    entry = _system_inference_entry(system)
+    return entry[0] if entry else None
+
+
+def _system_inference_entry(system: Any) -> Optional[tuple[str, str]]:
+    """Return (material, confidence) for a system, or None."""
+    if system is None:
+        return None
+    if not isinstance(system, PipingSystem):
+        try:
+            system = PipingSystem(str(getattr(system, "value", system)).strip().lower())
+        except ValueError:
+            return None
+    return _SYSTEM_MATERIAL_INFERENCE.get(system)
 
 
 # ---------------------------------------------------------------------------
@@ -561,6 +798,122 @@ def _material_name(entity: Any) -> Optional[str]:
     return None
 
 
+def extract_normalized_material(element: Any) -> Optional[str]:
+    """Return the element's material as a CANONICAL_MATERIALS key, or None.
+
+    Resolves the material by IfcRelAssociatesMaterial — via
+    ifcopenshell.util.element.get_materials, which follows the association to
+    IfcMaterial, IfcMaterialLayerSet(Usage), IfcMaterialConstituentSet and
+    IfcMaterialProfileSet alike, and inherits from the element's type (a pipe
+    routinely carries its material on IfcPipeSegmentType, not on the
+    occurrence) — then normalises the free text with normalise_material.
+
+    TRI-STATE FAIL-SAFE
+        Returns None, never a guess and never a falsy sentinel a caller could
+        score, in all three unresolvable cases:
+
+          * the element carries no material association at all;
+          * the association exists but yields no usable name;
+          * a name exists but matches no rule (normalise_material said
+            "Unknown"), e.g. "TBC", "Default" or a vendor part code.
+
+        None means Undetermined. A caller must surface it as a data-quality
+        finding — XM-001 already does this via its "material_not_in_series"
+        path — and must not fall through to a default material, because a
+        defaulted material scores as a real galvanic couple and would turn a
+        missing input into a fabricated Pass or Fail.
+
+    VOCABULARY
+        Emits CANONICAL_MATERIALS keys ("Copper_C12200", "GalvanisedSteel",
+        "CarbonSteel"), which is the vocabulary the Path B rule packs key off
+        case-sensitively. This is deliberately NOT the Path A vocabulary of
+        ifc_parser.normalise_material_name ("Copper", "Galvanized_steel"); see
+        this module's header note on the two not being interchangeable.
+
+    Args:
+        element: An IFC element (ifcopenshell entity_instance), or None.
+
+    Returns:
+        A member of CANONICAL_MATERIALS other than "Unknown", or None when
+        the material cannot be determined.
+    """
+    if element is None:
+        return None
+
+    raw = _material_name(element)
+    if not raw:
+        return None
+
+    canonical = normalise_material(raw)
+    if canonical == "Unknown":
+        return None
+    return canonical
+
+
+def resolve_material(
+    element: Any,
+    system: Any = None,
+    *,
+    properties: Optional[dict] = None,
+    allow_inference: bool = True,
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Resolve an element's material, saying where the answer came from.
+
+    Two kinds of source, tried in order and never blended:
+
+      1. The IFC file itself. First the material association, via
+         extract_normalized_material; then, when *properties* is supplied, a
+         "Material" or "MaterialName" property. Both are readings of the
+         model, so both report MATERIAL_SOURCE_IFC. The property fallback
+         matters: on the models measured here it is the ONLY source that
+         resolves anything on Clinic_Plumbing and Clinic_HVAC, where the
+         material sits in a Pset and no IfcRelAssociatesMaterial exists.
+      2. The element's piping system, via infer_material_from_system. A design
+         convention applied to this model, not a reading of it.
+
+    Args:
+        element: An IFC element (ifcopenshell entity_instance), or None.
+        system: The element's PipingSystem, used only for step 2.
+        properties: Flattened property values for the element, enabling the
+            Material/MaterialName fallback within step 1.
+        allow_inference: Set False to get step 1 alone — the honest read, with
+            no assumption filled in.
+
+    Returns:
+        (material, source, confidence).
+
+        material is a CANONICAL_MATERIALS key, or None when neither source
+        resolves one. source is MATERIAL_SOURCE_IFC, or
+        "system_inference:<system>", or None alongside a None material.
+        confidence is "established"/"provisional" for an inference and None
+        otherwise.
+
+        A None material is Undetermined and must stay that way: filling it
+        with a default would let a fabricated galvanic couple score exactly
+        like a real one.
+    """
+    from_ifc = extract_normalized_material(element)
+    if from_ifc is None and properties:
+        from_property = normalise_material(
+            _first_text(properties, "Material", "MaterialName")
+        )
+        if from_property != "Unknown":
+            from_ifc = from_property
+    if from_ifc is not None:
+        return from_ifc, MATERIAL_SOURCE_IFC, None
+
+    if not allow_inference:
+        return None, None, None
+
+    entry = _system_inference_entry(system)
+    if entry is None:
+        return None, None, None
+
+    material, confidence = entry
+    system_value = getattr(system, "value", system)
+    return material, f"{MATERIAL_SOURCE_INFERENCE}:{system_value}", confidence
+
+
 def _unit_scale_to_metres(model: Any) -> float:
     """Return the factor converting model length units to metres.
 
@@ -852,19 +1205,184 @@ def _endpoints(element: PipingElement) -> list[Point3D]:
     return []
 
 
+def _bbox_gap_m(a: Optional[BoundingBox], b: Optional[BoundingBox]) -> Optional[float]:
+    """Return the axis-aligned gap between two bounding boxes in metres.
+
+    This is a true LOWER bound on the surface-to-surface distance, so a pair
+    whose bbox gap already exceeds the tolerance cannot be touching and can be
+    pruned without tessellating anything. That pruning is what keeps Tier 3
+    affordable: bboxes come from _geometry(), which reads local vertices and
+    the placement matrix without invoking the mesher at all.
+
+    Returns None when either box is missing, meaning "cannot prune" — the
+    caller must then measure rather than assume distance.
+    """
+    if a is None or b is None:
+        return None
+    gap_sq = 0.0
+    for lo_a, hi_a, lo_b, hi_b in (
+        (a.min.x, a.max.x, b.min.x, b.max.x),
+        (a.min.y, a.max.y, b.min.y, b.max.y),
+        (a.min.z, a.max.z, b.min.z, b.max.z),
+    ):
+        axis_gap = max(0.0, lo_b - hi_a, lo_a - hi_b)
+        gap_sq += axis_gap * axis_gap
+    return math.sqrt(gap_sq)
+
+
+def _geometric_adjacency(
+    model: Any,
+    elements: list[PipingElement],
+    candidates: list[PipingElement],
+    tolerance_m: float,
+    link: Any,
+) -> int:
+    """Link isolated *candidates* to any element they touch, by real geometry.
+
+    Runs on the elements Tiers 1 and 2 left with an empty joined_to — the two
+    cases where a missed contact silently suppresses an XM-001 finding:
+
+      * no connectivity source at all (no placement, no centerline), which
+        XM-001 skips outright as indeterminable; and
+      * a Tier 2 element whose joined_to came back empty. Tier 2 tests
+        centerline endpoints, falling back to the placement centroid, so a
+        valve or fitting whose centroid sits far from a pipe's endpoints
+        reads as isolated even when their surfaces meet. That "isolation" is
+        an artifact of the proxy, not a fact about the model.
+
+    Because it only ever adds links to elements that had none, this tier
+    cannot overturn a positive adjacency Tier 1 or Tier 2 established.
+
+    Port-resolved elements are never candidates: IfcRelConnectsPorts is
+    authoritative, so this tier does not measure outward from one to look for
+    connectivity the authoring tool did not record. They can still be linked
+    when a candidate measures contact with them, and that link is kept — the
+    two facts do not conflict. Ports describe flow connectivity; geometry
+    describes physical contact, and it is contact that forms a galvanic cell.
+
+    Each candidate is measured against every element whose bounding box is
+    within tolerance (the mesher-free lower-bound prune above), using
+    IFCGeometryExtractor.calculate_shortest_distance — a tessellated
+    point-to-surface distance in millimetres.
+
+    TRI-STATE
+        A candidate is credited to this tier only when its OWN tessellation
+        succeeded, i.e. when a real measurement was possible. A distance of
+        None is "not measured", never "far apart": reading it as a large
+        distance would turn missing geometry into an assertion of isolation,
+        and an element with no neighbours is one XM-001 finds nothing to
+        couple. Candidates that cannot be tessellated keep the status they
+        arrived with, so a previously indeterminable element stays
+        indeterminable and is skipped — the honest answer.
+
+    Provenance is recorded so an auditor can tell the tiers apart: a
+    recovered element reads "geometry", and a Tier 2 element this tier
+    augmented reads "centerline+geometry".
+
+    Tolerance note: the measurement is point-to-triangle, so a contact
+    landing mid-face — a branch tee meeting a riser between its vertices —
+    reads as the 0 mm it is, not as the corner-to-corner distance a
+    vertex-only read returned. It remains an upper bound in the general case
+    (see calculate_shortest_distance), and the shared 50 mm default tolerance
+    absorbs that residual slack. The residual risk is a missed contact, not a
+    fabricated one — and a missed direct contact between connected elements
+    still surfaces through XM-001's same_loop path.
+
+    Args:
+        model: The open IFC model, for GlobalId -> entity lookups.
+        elements: Every element in the network — candidate partners.
+        candidates: Elements eligible for geometric resolution.
+        tolerance_m: Surface separation counting as joined, in metres.
+        link: Closure joining two elements, from _build_adjacency.
+
+    Returns:
+        The number of candidates this tier measured.
+    """
+    if not candidates or not _GEOMETRY_EXTRACTOR_AVAILABLE or model is None:
+        return 0
+
+    try:
+        extractor = IFCGeometryExtractor(model)
+    except Exception:
+        return 0
+
+    tolerance_mm = tolerance_m * 1000.0
+    entities: dict[str, Any] = {}
+
+    def entity_for(element: PipingElement) -> Optional[Any]:
+        if element.id not in entities:
+            try:
+                entities[element.id] = model.by_guid(element.id)
+            except Exception:
+                entities[element.id] = None
+        return entities[element.id]
+
+    measured = 0
+    for element in candidates:
+        entity = entity_for(element)
+        if entity is None:
+            continue
+
+        # A self-distance of 0.0 proves the element tessellates. None means no
+        # measurement is possible, so it must keep the status it arrived with.
+        if extractor.calculate_shortest_distance(entity, entity) is None:
+            continue
+
+        previous = element.properties.get(CONNECTIVITY_SOURCE_KEY)
+        element.properties[CONNECTIVITY_SOURCE_KEY] = (
+            "geometry" if previous is None else f"{previous}+geometry"
+        )
+        measured += 1
+        unmeasured = 0
+
+        for other in elements:
+            if other.id == element.id:
+                continue
+            gap = _bbox_gap_m(element.bbox, other.bbox)
+            if gap is not None and gap > tolerance_m:
+                continue  # Lower bound already exceeds tolerance — cannot touch.
+
+            other_entity = entity_for(other)
+            if other_entity is None:
+                unmeasured += 1
+                continue
+
+            distance_mm = extractor.calculate_shortest_distance(entity, other_entity)
+            if distance_mm is None:
+                unmeasured += 1
+                continue
+            if distance_mm <= tolerance_mm:
+                link(element, other)
+
+        if unmeasured:
+            element.extraction_warnings.append(
+                GEOMETRY_PARTIAL_TEMPLATE.format(count=unmeasured)
+            )
+
+    return measured
+
+
 def _build_adjacency(
     model: Any,
     elements: list[PipingElement],
     tolerance_m: float,
+    geometric_adjacency: bool = False,
 ) -> dict[str, int]:
-    """Populate joined_to in place using the three-tier resolution.
+    """Populate joined_to in place using the four-tier resolution.
 
     Tier 1  IFC ports (IfcRelConnectsPorts) — authoritative, used whenever
             the model carries any port connectivity at all.
     Tier 2  Centerline endpoint proximity within tolerance_m — endpoints,
             not placement origins, so pipes joined end to end register even
             when their origins are a full pipe-length apart.
-    Tier 3  Neither available — joined_to stays empty and
+    Tier 3  Tessellated surface proximity within tolerance_m, via
+            IFCGeometryExtractor.calculate_shortest_distance. OPT-IN, off by
+            default. Applies only to elements Tiers 1 and 2 left with an
+            empty joined_to, and so can only add links, never remove them.
+            Catches what endpoint proximity structurally cannot: a valve or
+            fitting whose centroid sits far from the pipe endpoint its
+            surface actually meets. See _geometric_adjacency.
+    Tier 4  None of the above — joined_to stays empty and
             CONNECTIVITY_INDETERMINABLE is appended to extraction_warnings
             so XM-001 skips the element rather than reading the empty list
             as "isolated".
@@ -872,17 +1390,26 @@ def _build_adjacency(
     Tiers are resolved per element, not per model: an element with ports
     uses Tier 1 even when its neighbours fall back to Tier 2.
 
+    Tier 3 defaults OFF because it tessellates, and this module's _centroid
+    docstring records the standing decision that a whole-model tessellation
+    pass is too slow for routine reads. It stays affordable when enabled by
+    running only on elements Tiers 1 and 2 left unresolved, and by pruning
+    candidate partners on their (mesher-free) bounding boxes first.
+
     Args:
         model: The open IFC model, for port lookups.
         elements: Elements to link, mutated in place.
-        tolerance_m: Endpoint separation counting as joined, in metres.
+        tolerance_m: Separation counting as joined, in metres. Applies to
+            Tier 2 endpoints and Tier 3 surfaces alike.
+        geometric_adjacency: Enable Tier 3. Defaults False.
 
     Returns:
-        Counts keyed "ports", "centerline", "indeterminable", "pairs".
+        Counts keyed "ports", "centerline", "geometry", "indeterminable",
+        "pairs".
     """
     ports = _port_adjacency(model)
     by_id = {e.id: e for e in elements}
-    counts = {"ports": 0, "centerline": 0, "indeterminable": 0, "pairs": 0}
+    counts = {"ports": 0, "centerline": 0, "geometry": 0, "indeterminable": 0, "pairs": 0}
     linked: set[tuple[str, str]] = set()
 
     def link(a: PipingElement, b: PipingElement) -> None:
@@ -924,6 +1451,21 @@ def _build_adjacency(
                 link(element, other)
 
     # ── Tier 3 ────────────────────────────────────────────────────────────
+    if geometric_adjacency:
+        counts["geometry"] = _geometric_adjacency(
+            model,
+            elements,
+            [
+                e
+                for e in elements
+                if not e.joined_to
+                and e.properties.get(CONNECTIVITY_SOURCE_KEY) != "ports"
+            ],
+            tolerance_m,
+            link,
+        )
+
+    # ── Tier 4 ────────────────────────────────────────────────────────────
     for element in elements:
         if CONNECTIVITY_SOURCE_KEY in element.properties:
             continue
@@ -939,13 +1481,20 @@ def _build_adjacency(
 # ---------------------------------------------------------------------------
 
 
-def _build_element(model: Any, entity: Any, unit_scale: float) -> Optional[PipingElement]:
+def _build_element(
+    model: Any,
+    entity: Any,
+    unit_scale: float,
+    material_inference: bool = True,
+) -> Optional[PipingElement]:
     """Convert one IFC entity to a PipingElement, or None if unusable.
 
     Args:
         model: The open IFC model, for inverse lookups.
         entity: The entity to convert.
         unit_scale: Factor converting model length units to metres.
+        material_inference: Allow the system-type material fallback. Set
+            False for a reading of the file alone.
     """
     global_id = _safe_str(getattr(entity, "GlobalId", None))
     if not global_id:
@@ -957,20 +1506,44 @@ def _build_element(model: Any, entity: Any, unit_scale: float) -> Optional[Pipin
     ifc_class = entity.is_a()
     properties = _all_property_values(entity)
 
-    material_raw = _material_name(entity) or _first_text(properties, "Material", "MaterialName")
-    material = normalise_material(material_raw)
-    if material == "Unknown":
-        warnings.append(
-            f"material not identified from {material_raw!r}"
-            if material_raw
-            else "no material associated with element"
-        )
-
     system_name, zone_ids = _groups(model, entity)
     predefined = _safe_str(getattr(entity, "PredefinedType", None))
     system = classify_system(system_name, name, description, predefined)
     if system is PipingSystem.UNKNOWN:
         warnings.append("piping system could not be classified")
+
+    # Material is resolved AFTER the system, because the system is the fallback
+    # source when the file carries no material of its own.
+    material_raw = _material_name(entity) or _first_text(properties, "Material", "MaterialName")
+    material, material_source, confidence = resolve_material(
+        entity, system, properties=properties, allow_inference=material_inference
+    )
+    if material is None:
+        # PipingElement.material is a str whose sentinel is "Unknown"; the
+        # None from resolve_material is the tri-state signal, and this is where
+        # it becomes the schema's way of saying the same thing. XM-001 raises
+        # material_not_in_series for it rather than scoring a couple.
+        material = "Unknown"
+        warnings.append(
+            f"material not identified from {material_raw!r}"
+            if material_raw
+            else "no material associated with element"
+        )
+        logger.debug("material unresolved: %s (system=%s)", global_id, system.value)
+    else:
+        properties[MATERIAL_SOURCE_KEY] = material_source
+        if material_source != MATERIAL_SOURCE_IFC:
+            warnings.append(
+                MATERIAL_INFERRED_TEMPLATE.format(
+                    material=material, system=system.value, confidence=confidence
+                )
+            )
+            logger.debug(
+                "material inferred: %s (system=%s) -> %s [%s]",
+                global_id, system.value, material, confidence,
+            )
+        else:
+            logger.debug("material from IFC: %s -> %s", global_id, material)
 
     level_id, level_name = _storey(entity)
     space_id, space_name = _space(entity)
@@ -1029,6 +1602,8 @@ def produce_piping_elements_from_model(
     *,
     source_path: Optional[str] = None,
     adjacency_tolerance_m: float = 0.05,
+    geometric_adjacency: bool = False,
+    material_inference: bool = True,
 ) -> list[PipingElement]:
     """Emit the canonical PipingElement list from an already-open IFC model.
 
@@ -1041,9 +1616,17 @@ def produce_piping_elements_from_model(
         source_path: Originating file path, carried for logging and
             diagnostics only. Never read from — the model is the sole
             source of data.
-        adjacency_tolerance_m: Tier 2 endpoint separation counting as
-            joined, in metres. Ignored for elements resolved by Tier 1
-            ports. Defaults to 50 mm.
+        adjacency_tolerance_m: Separation counting as joined, in metres,
+            for Tier 2 endpoints and Tier 3 surfaces. Ignored for elements
+            resolved by Tier 1 ports. Defaults to 50 mm.
+        geometric_adjacency: Enable Tier 3 tessellated surface proximity for
+            elements Tiers 1 and 2 leave unresolved, which XM-001 would
+            otherwise skip as indeterminable. Costs a bounded tessellation
+            pass; defaults False.
+        material_inference: Fall back to the element's piping system when the
+            file carries no material. Defaults True; inferred values are
+            tagged MATERIAL_SOURCE_KEY and warned on. Set False for a
+            reading of the file alone.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1070,20 +1653,62 @@ def produce_piping_elements_from_model(
                 # by_type returns subtypes too, so the same entity can be
                 # yielded under both its own class and a supertype.
                 continue
-            element = _build_element(model, entity, unit_scale)
+            element = _build_element(model, entity, unit_scale, material_inference)
             if element is None:
                 continue
             seen.add(global_id)
             elements.append(element)
 
-    _build_adjacency(model, elements, adjacency_tolerance_m)
+    _build_adjacency(model, elements, adjacency_tolerance_m, geometric_adjacency)
+    _log_material_coverage(elements)
     return elements
+
+
+def material_coverage(elements: list[PipingElement]) -> dict[str, int]:
+    """Count how each element's material was resolved.
+
+    Returns:
+        Counts keyed "total", "from_ifc", "inferred", "unknown".
+    """
+    counts = {"total": 0, "from_ifc": 0, "inferred": 0, "unknown": 0}
+    for element in elements:
+        counts["total"] += 1
+        source = (element.properties or {}).get(MATERIAL_SOURCE_KEY)
+        if source == MATERIAL_SOURCE_IFC:
+            counts["from_ifc"] += 1
+        elif source:
+            counts["inferred"] += 1
+        else:
+            counts["unknown"] += 1
+    return counts
+
+
+def _log_material_coverage(elements: list[PipingElement]) -> None:
+    """Emit one coverage line per model.
+
+    Deliberately a summary, not a line per element: a single hospital model
+    here carries 18,000 piping elements, and an INFO record for each buries
+    the run and slows it measurably. Per-element detail is at DEBUG.
+    """
+    if not elements:
+        return
+    counts = material_coverage(elements)
+    total = counts["total"]
+    resolved = counts["from_ifc"] + counts["inferred"]
+    logger.info(
+        "Material coverage: %d/%d (%.1f%%) - %d from IFC, %d inferred from system, "
+        "%d unknown",
+        resolved, total, 100.0 * resolved / total,
+        counts["from_ifc"], counts["inferred"], counts["unknown"],
+    )
 
 
 def produce_piping_elements(
     ifc_path: str,
     *,
     adjacency_tolerance_m: float = 0.05,
+    geometric_adjacency: bool = False,
+    material_inference: bool = True,
 ) -> list[PipingElement]:
     """Read an IFC file and emit the canonical PipingElement list.
 
@@ -1093,9 +1718,17 @@ def produce_piping_elements(
 
     Args:
         ifc_path: Path to the IFC file.
-        adjacency_tolerance_m: Tier 2 endpoint separation counting as
-            joined, in metres. Ignored for elements resolved by Tier 1
-            ports. Defaults to 50 mm.
+        adjacency_tolerance_m: Separation counting as joined, in metres,
+            for Tier 2 endpoints and Tier 3 surfaces. Ignored for elements
+            resolved by Tier 1 ports. Defaults to 50 mm.
+        geometric_adjacency: Enable Tier 3 tessellated surface proximity for
+            elements Tiers 1 and 2 leave unresolved, which XM-001 would
+            otherwise skip as indeterminable. Costs a bounded tessellation
+            pass; defaults False.
+        material_inference: Fall back to the element's piping system when the
+            file carries no material. Defaults True; inferred values are
+            tagged MATERIAL_SOURCE_KEY and warned on. Set False for a
+            reading of the file alone.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1109,6 +1742,8 @@ def produce_piping_elements(
         model,
         source_path=ifc_path,
         adjacency_tolerance_m=adjacency_tolerance_m,
+        geometric_adjacency=geometric_adjacency,
+        material_inference=material_inference,
     )
 
 

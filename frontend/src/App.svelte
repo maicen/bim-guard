@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Sidebar from './lib/components/Sidebar.svelte';
   import TopHeader from './lib/components/TopHeader.svelte';
   import ProjectWizardModal from './lib/components/ProjectWizardModal.svelte';
@@ -31,6 +31,7 @@
   let targetBcfArtifactId: number | null = null;
   let selectedProject: Project | null = null;
   let isGlobalWizardOpen = false;
+  let documentsViewRef: DocumentsView;
 
   let dbOk = true;
   let dbBackend = 'SUPABASE';
@@ -84,12 +85,20 @@
     return () => clearInterval(interval);
   });
 
-  function handleSelectView(view: string) {
+  async function handleSelectView(view: string) {
     // "New Project" is an action, not a destination: it opens the wizard over
     // whatever is on screen. Changing activeView would leave the sidebar
     // highlighting a view that renders nothing once the modal is dismissed.
     if (view === 'newproject') {
       isGlobalWizardOpen = true;
+      return;
+    }
+    // "New Rule Document Upload" mirrors that: land on the Documents view,
+    // then open its upload modal once it's actually mounted.
+    if (view === 'newdocument') {
+      activeView = 'documents';
+      await tick();
+      documentsViewRef?.openUploadModal();
       return;
     }
     activeView = view;
@@ -160,7 +169,7 @@
           initialBcfArtifactId={targetBcfArtifactId}
         />
       {:else if activeView === 'documents'}
-        <DocumentsView />
+        <DocumentsView bind:this={documentsViewRef} />
       {:else if activeView === 'extract'}
         <RuleExtractionView />
       {:else if activeView === 'rules'}

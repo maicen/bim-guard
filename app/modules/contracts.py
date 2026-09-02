@@ -640,6 +640,41 @@ class RuleFolderBulkActionResponse(BaseModel):
     deleted_rules_count: int = 0
 
 
+class RuleSnapshotCreateRequest(BaseModel):
+    """Payload for freezing a ruleset's current rules into a named snapshot."""
+
+    ruleset_id: str = Field(..., description="Ruleset/folder to snapshot")
+    name: Optional[str] = Field(default=None, description="Display name; defaults to ruleset_id")
+    source_mode: Optional[Literal["pdf", "ids", "manual", "mixed"]] = Field(
+        default="manual", description="How the snapshotted rules originated"
+    )
+    notes: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+class RuleSnapshotResponse(BaseModel):
+    """A persisted, frozen rule-configuration snapshot (configuration only, no analysis results)."""
+
+    id: int
+    name: str
+    source_ruleset_id: str
+    source_mode: str
+    category: str
+    rule_count: int
+    notes: Optional[str] = ""
+    created_at: Optional[str] = None
+    created_by: Optional[str] = ""
+
+
+class IdsImportResponse(BaseModel):
+    """Result of importing rules from an uploaded buildingSMART IDS file."""
+
+    success: bool
+    created_count: int
+    total_parsed: int
+    ruleset_id: str
+
+
 # ---------------------------------------------------------------------------
 # Analysis & Finding Contracts
 # ---------------------------------------------------------------------------
@@ -760,6 +795,7 @@ class ArchAnalysisResponse(BaseModel):
     building_summary: dict[str, Any] = Field(default_factory=dict)
     spatial_checks: dict[str, Any] = Field(default_factory=dict)
     egress_checks: dict[str, Any] = Field(default_factory=dict)
+    iso_checks: dict[str, Any] = Field(default_factory=dict)
     rule_compliance: list[dict[str, Any]] = Field(default_factory=list)
     rule_folder: Optional[str] = None
     ifc_element_count: Optional[int] = 0

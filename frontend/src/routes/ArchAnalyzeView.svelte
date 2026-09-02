@@ -337,98 +337,96 @@
 
 <div class="space-y-5 max-w-7xl mx-auto">
   <!-- ═══ Header ═══ -->
-  <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-    <div>
-      <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Analysis</div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-        {#if result}
-          {result.project_name} — ARCH Analysis{folderNote}
-        {:else}
-          Architectural Compliance Audit
-        {/if}
-      </h1>
-      <p class="text-xs sm:text-sm text-slate-400 mt-1">
-        Domain-based compliance check against Ontario Building Code Part 9.
-      </p>
-
-      <!-- Pass rate pill + coverage evidence -->
-      {#if result && totalRules > 0}
-        <div class="flex flex-wrap items-center gap-3 mt-3">
-          {#if passRate !== null}
-            <span
-              class="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wide border {passRate >= 80
-                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
-                : passRate >= 50
-                  ? 'bg-amber-950/80 text-amber-300 border-amber-800'
-                  : 'bg-rose-950/80 text-rose-300 border-rose-800'}"
-            >
-              {passRate.toFixed(0)}% pass rate
-            </span>
-          {/if}
-          {#if durationSeconds !== undefined && durationSeconds !== null}
-            <span class="inline-flex items-center gap-1 text-xs text-slate-400 font-mono">
-              <Timer class="w-3.5 h-3.5 text-blue-400" />
-              ⏱ {formatDuration(durationSeconds)}
-            </span>
-          {/if}
-          {#if uniqueElements > 0}
-            <span class="text-xs text-slate-400">
-              🔍 <strong class="text-slate-300">{uniqueElements}</strong> element(s) checked across
-              <strong class="text-slate-300">{rulesWithElements}</strong> applicable rule(s) — every match evaluated, no sampling
-            </span>
-          {/if}
-        </div>
+  <div>
+    <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Analysis</div>
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+      {#if result}
+        {result.project_name} — ARCH Analysis{folderNote}
+      {:else}
+        Architectural Compliance Audit
       {/if}
-    </div>
+    </h1>
+    <p class="text-xs sm:text-sm text-slate-400 mt-1">
+      Domain-based compliance check against Ontario Building Code Part 9.
+    </p>
 
-    <!-- Project selector & Run button -->
-    <div class="flex items-center gap-2.5 flex-wrap shrink-0">
-      <select
-        bind:value={selectedProjectId}
-        on:change={handleProjectChange}
-        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-      >
-        {#if relevantProjects.length === 0}
-          <option value={null}>No Arch projects found</option>
-        {:else}
-          {#each relevantProjects as project}
-            <option value={project.id}>{project.name}</option>
-          {/each}
-        {/if}
-      </select>
-
-      {#if result && selectedProjectId}
-        <button
-          type="button"
-          on:click={() => selectedProjectId && onSelectProjectForViewer(selectedProjectId, undefined, result?.bcf_artifact_id || undefined)}
-          class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-800/80 hover:bg-emerald-700 text-white border border-emerald-700 transition-colors"
-          title="Open in 3D ThatOpen Viewer with error viewpoints"
-        >
-          <ScanEye class="w-3.5 h-3.5" />
-          View in 3D / BCF
-        </button>
-        {#if result.bcf_artifact_id}
-          <a
-            href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
-            download
-            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+    <!-- Pass rate pill + coverage evidence -->
+    {#if result && totalRules > 0}
+      <div class="flex flex-wrap items-center gap-3 mt-3">
+        {#if passRate !== null}
+          <span
+            class="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wide border {passRate >= 80
+              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+              : passRate >= 50
+                ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                : 'bg-rose-950/80 text-rose-300 border-rose-800'}"
           >
-            <Download class="w-3.5 h-3.5" />
-            BCF
-          </a>
+            {passRate.toFixed(0)}% pass rate
+          </span>
         {/if}
-      {/if}
+        {#if durationSeconds !== undefined && durationSeconds !== null}
+          <span class="inline-flex items-center gap-1 text-xs text-slate-400 font-mono">
+            <Timer class="w-3.5 h-3.5 text-blue-400" />
+            ⏱ {formatDuration(durationSeconds)}
+          </span>
+        {/if}
+        {#if uniqueElements > 0}
+          <span class="text-xs text-slate-400">
+            🔍 <strong class="text-slate-300">{uniqueElements}</strong> element(s) checked across
+            <strong class="text-slate-300">{rulesWithElements}</strong> applicable rule(s) — every match evaluated, no sampling
+          </span>
+        {/if}
+      </div>
+    {/if}
+  </div>
 
+  <!-- ═══ Run Analysis Bar ═══ -->
+  <div class="flex items-center gap-2.5 flex-wrap">
+    <select
+      bind:value={selectedProjectId}
+      on:change={handleProjectChange}
+      class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+    >
+      {#if relevantProjects.length === 0}
+        <option value={null}>No Arch projects found</option>
+      {:else}
+        {#each relevantProjects as project}
+          <option value={project.id}>{project.name}</option>
+        {/each}
+      {/if}
+    </select>
+
+    {#if result && selectedProjectId}
       <button
         type="button"
-        disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
-        on:click={handleRunClick}
-        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+        on:click={() => selectedProjectId && onSelectProjectForViewer(selectedProjectId, undefined, result?.bcf_artifact_id || undefined)}
+        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-800/80 hover:bg-emerald-700 text-white border border-emerald-700 transition-colors"
+        title="Open in 3D ThatOpen Viewer with error viewpoints"
       >
-        <Play class="w-3.5 h-3.5" />
-        {isRunning ? 'Auditing…' : isCheckingEnhancement ? 'Checking model…' : 'Run ARCH Audit'}
+        <ScanEye class="w-3.5 h-3.5" />
+        View in 3D / BCF
       </button>
-    </div>
+      {#if result.bcf_artifact_id}
+        <a
+          href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
+          download
+          class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+        >
+          <Download class="w-3.5 h-3.5" />
+          BCF
+        </a>
+      {/if}
+    {/if}
+
+    <button
+      type="button"
+      disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
+      on:click={handleRunClick}
+      class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+    >
+      <Play class="w-3.5 h-3.5" />
+      {isRunning ? 'Auditing…' : isCheckingEnhancement ? 'Checking model…' : 'Run ARCH Audit'}
+    </button>
   </div>
 
   {#if error}
@@ -462,35 +460,18 @@
         <FolderOpen class="w-4 h-4 text-blue-400" />
         <span class="text-xs font-semibold text-slate-300">Ruleset</span>
       </div>
-      <div class="flex flex-wrap gap-2 flex-1">
-        <!-- "All" option -->
-        <button
-          type="button"
-          on:click={() => (selectedFolder = '')}
-          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all border
-            {selectedFolder === ''
-              ? 'bg-[#0071e3] border-blue-500 text-white shadow-sm shadow-blue-500/20'
-              : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'}"
+      <div class="relative flex-1 sm:max-w-xs">
+        <select
+          bind:value={selectedFolder}
+          disabled={isFoldersLoading}
+          class="w-full bg-slate-800/60 border border-slate-700 rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium text-white focus:outline-none focus:border-[#0071e3] appearance-none disabled:opacity-60"
         >
-          All Rules
-        </button>
-        {#if isFoldersLoading}
-          <span class="text-xs text-slate-500 italic px-2 py-1.5">Loading folders…</span>
-        {:else}
+          <option value="">{isFoldersLoading ? 'Loading folders…' : 'All Rules'}</option>
           {#each ruleFolders as folder}
-            <button
-              type="button"
-              on:click={() => (selectedFolder = folder.ruleset_id)}
-              class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all border
-                {selectedFolder === folder.ruleset_id
-                  ? 'bg-[#0071e3] border-blue-500 text-white shadow-sm shadow-blue-500/20'
-                  : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'}"
-              title={folder.description || folder.display_name}
-            >
-              {folder.display_name}
-            </button>
+            <option value={folder.ruleset_id}>{folder.display_name}</option>
           {/each}
-        {/if}
+        </select>
+        <ChevronDown class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       </div>
       {#if selectedFolder}
         <span class="text-[10px] text-slate-500 shrink-0">Selected: <span class="text-slate-300 font-mono">{selectedFolder}</span> (scopes audit to this ruleset only)</span>

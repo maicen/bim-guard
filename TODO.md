@@ -289,6 +289,15 @@ Owner: unassigned.
       `ElementTree`, so exported IDS is schema-correct; import tries the same
       strict parser first and falls back to the original lenient parser for
       XML this module produced before the refactor.
+- [ ] Connect project scope terminology directly to the central buildingSMART
+      Data Dictionary (bSDD) API so standardized terms and codes are available
+      throughout the project.
+- [ ] Let users select a project classification standard, such as Uniclass or
+      CCI, directly from project settings.
+- [ ] Add bSDD-powered autocomplete suggestions in the scope module for
+      correctly coded element and property names as users type.
+- [ ] Translate human-readable information requirements into machine-readable
+      IDS XML files that software can test and verify.
 
 ### Agent & CDE Orchestration (`app/agent`, Module 4 & Services) (LangGraph)
 

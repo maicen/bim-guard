@@ -20,6 +20,7 @@ from fastapi.responses import PlainTextResponse
 from app.api.dependencies import get_rules_service
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    IdsImportResponse,
     RuleBulkActionResponse,
     RuleBulkDeleteRequest,
     RuleBulkUpdateRequest,
@@ -33,9 +34,12 @@ from app.modules.contracts import (
     RuleFolderResponse,
     RuleFolderUpdateRequest,
     RuleResponse,
+    RuleSnapshotCreateRequest,
+    RuleSnapshotResponse,
     RuleUpdateRequest,
 )
 from app.services.rule_extraction_service import RuleExtractionService
+from app.services.rule_snapshot_service import RuleSnapshotService
 from app.services.rules_service import RuleService
 
 logger = get_logger(__name__)
@@ -109,6 +113,183 @@ def list_rule_folders(
             )
         )
     return result
+
+
+# NOTE: every route below that has a literal single-path-segment name (like
+# "/export-ids" or "/snapshots") MUST stay declared before the generic
+# GET/PUT/DELETE "/{rule_id}" routes further down this file. FastAPI/
+# Starlette match routes in declaration order and "/{rule_id}" has no type
+# converter in the path itself (int coercion happens after routing), so it
+# matches ANY single path segment at the routing level — a literal route
+# declared after it gets shadowed and 422s on "invalid int" instead of ever
+# running. (This previously broke GET /rules/export-ids in production; keep
+# this comment so nobody reintroduces the same bug.)
+
+
+@router.get("/export-ids", summary="Export active rules as buildingSMART IDS XML")
+def export_all_ids_xml(
+    service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_id: str | None = None,
+):
+    """Export active rules or specific ruleset into buildingSMART IDS XML format."""
+    if ruleset_id:
+        rules = service.list_by_ruleset(ruleset_id)
+    else:
+        rules = service.list_rules()
+    if not rules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No rules found for IDS XML export.",
+        )
+    filename = f"{ruleset_id}.ids" if ruleset_id else "bimguard_rules.ids"
+    try:
+        xml_content = RuleService.export_ids_xml(ruleset_id or "BIMGUARD_EXPORT", rules)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return PlainTextResponse(
+        xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export-ids/{ruleset_id}", summary="Export ruleset as IDS XML")
+def export_ids_xml(
+    ruleset_id: str,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+):
+    """Export a ruleset into buildingSMART IDS XML format."""
+    rules = service.list_by_ruleset(ruleset_id)
+    if not rules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No rules found for ruleset {ruleset_id}.",
+        )
+    try:
+        xml_content = RuleService.export_ids_xml(ruleset_id, rules)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return PlainTextResponse(
+        xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{ruleset_id}.ids"'},
+    )
+
+
+@router.post("/import-ids", response_model=IdsImportResponse, summary="Import rules from a buildingSMART IDS XML file")
+async def import_ids_rules(
+    service: Annotated[RuleService, Depends(get_rules_service)],
+    file: UploadFile = File(...),
+    ruleset_id: str = Form(...),
+) -> IdsImportResponse:
+    """Parse an uploaded IDS (.ids/XML) file and save its rules under ruleset_id."""
+    content_bytes = await file.read()
+    xml_text = content_bytes.decode("utf-8", errors="replace")
+    try:
+        rows = service.import_ids_xml(xml_text, ruleset_id=ruleset_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No importable rules found in IDS file.",
+        )
+
+    created_count = 0
+    for row in rows:
+        try:
+            service.create_rule(
+                reference=row.get("reference", ""),
+                rule_type=row.get("rule_type", "numeric_comparison"),
+                description=row.get("description", ""),
+                target_ifc_class=row.get("target_ifc_class", ""),
+                source_text=row.get("source_text", ""),
+                property_set=row.get("property_set", ""),
+                property_name=row.get("property_name", ""),
+                operator=row.get("operator", "="),
+                check_value=row.get("check_value"),
+                value_min=row.get("value_min"),
+                value_max=row.get("value_max"),
+                mechanism=row.get("mechanism", "CODE"),
+                ruleset_id=ruleset_id,
+                rule_category=row.get("rule_category", "property_check"),
+                severity=row.get("severity", "mandatory"),
+                extraction_method="ids_import",
+                needs_review=True,
+            )
+            created_count += 1
+        except Exception as exc:
+            logger.warning("Could not import IDS rule %s: %s", row.get("reference"), exc)
+
+    return IdsImportResponse(
+        success=True,
+        created_count=created_count,
+        total_parsed=len(rows),
+        ruleset_id=ruleset_id,
+    )
+
+
+@router.post(
+    "/snapshots",
+    response_model=RuleSnapshotResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Save a named, timestamped snapshot of a ruleset's current rules",
+)
+def create_rule_snapshot(payload: RuleSnapshotCreateRequest) -> RuleSnapshotResponse:
+    """Freeze the current rules of a ruleset into a persisted, reusable snapshot."""
+    try:
+        row = RuleSnapshotService().create_snapshot(
+            ruleset_id=payload.ruleset_id,
+            name=payload.name or payload.ruleset_id,
+            source_mode=payload.source_mode or "manual",
+            notes=payload.notes or "",
+            created_by=payload.created_by or "",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return RuleSnapshotResponse(**row)
+
+
+@router.get("/snapshots", response_model=list[RuleSnapshotResponse], summary="List rule configuration snapshots")
+def list_rule_snapshots() -> list[RuleSnapshotResponse]:
+    """Return all saved rule-configuration snapshots, newest first."""
+    return [RuleSnapshotResponse(**r) for r in RuleSnapshotService().list_snapshots()]
+
+
+@router.get("/snapshots/{snapshot_id}", response_model=RuleSnapshotResponse, summary="Get one rule snapshot")
+def get_rule_snapshot(snapshot_id: int) -> RuleSnapshotResponse:
+    """Retrieve one saved rule-configuration snapshot by ID."""
+    row = RuleSnapshotService().get_snapshot(snapshot_id)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Snapshot {snapshot_id} not found.")
+    return RuleSnapshotResponse(**row)
+
+
+@router.delete("/snapshots/{snapshot_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a rule snapshot")
+def delete_rule_snapshot(snapshot_id: int) -> None:
+    """Delete a saved rule-configuration snapshot."""
+    if not RuleSnapshotService().delete_snapshot(snapshot_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Snapshot {snapshot_id} not found.")
+
+
+@router.get("/snapshots/{snapshot_id}/pdf", summary="Download a rule snapshot as a structured PDF")
+def download_rule_snapshot_pdf(snapshot_id: int):
+    """Render and return a snapshot's frozen rule configuration as a PDF spec sheet."""
+    svc = RuleSnapshotService()
+    snapshot = svc.get_snapshot(snapshot_id)
+    if not snapshot:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Snapshot {snapshot_id} not found.")
+    rules = svc.get_snapshot_rules(snapshot_id)
+
+    from app.services.pdf_report_service import render_snapshot_pdf
+
+    pdf_bytes = render_snapshot_pdf(snapshot, rules)
+    filename = f"{(snapshot.get('name') or 'rule_configuration').replace(' ', '_')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post(
@@ -433,56 +614,6 @@ def delete_rule(
             detail=f"Rule with ID {rule_id} not found.",
         )
     service.delete_rule(rule_id)
-
-
-@router.get("/export-ids", summary="Export active rules as buildingSMART IDS XML")
-def export_all_ids_xml(
-    service: Annotated[RuleService, Depends(get_rules_service)],
-    ruleset_id: str | None = None,
-):
-    """Export active rules or specific ruleset into buildingSMART IDS XML format."""
-    if ruleset_id:
-        rules = service.list_by_ruleset(ruleset_id)
-    else:
-        rules = service.list_rules()
-    if not rules:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No rules found for IDS XML export.",
-        )
-    filename = f"{ruleset_id}.ids" if ruleset_id else "bimguard_rules.ids"
-    try:
-        xml_content = RuleService.export_ids_xml(ruleset_id or "BIMGUARD_EXPORT", rules)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return PlainTextResponse(
-        xml_content,
-        media_type="application/xml",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
-@router.get("/export-ids/{ruleset_id}", summary="Export ruleset as IDS XML")
-def export_ids_xml(
-    ruleset_id: str,
-    service: Annotated[RuleService, Depends(get_rules_service)],
-):
-    """Export a ruleset into buildingSMART IDS XML format."""
-    rules = service.list_by_ruleset(ruleset_id)
-    if not rules:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No rules found for ruleset {ruleset_id}.",
-        )
-    try:
-        xml_content = RuleService.export_ids_xml(ruleset_id, rules)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return PlainTextResponse(
-        xml_content,
-        media_type="application/xml",
-        headers={"Content-Disposition": f'attachment; filename="{ruleset_id}.ids"'},
-    )
 
 
 @router.post("/extract", summary="Extract rules from document text or file")

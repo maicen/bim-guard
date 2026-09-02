@@ -417,6 +417,7 @@ class BIMGuard_App:
         building_summary: dict = {}
         spatial_checks: dict = {}
         egress_checks: dict = {}
+        iso_checks: dict = {}
 
         if ifc_path:
             try:
@@ -528,9 +529,31 @@ class BIMGuard_App:
                     )
                 log_progress(
                     45,
+                    "iso19650-compliance-started",
+                    checks="filename,suitability,revision,duplicate-guid,cde-state,provenance",
+                )
+                try:
+                    iso_checks = m2_reader.extract_iso19650_checks(project=project)
+                    log_progress(
+                        46,
+                        "iso19650-compliance-complete",
+                        checks_run=len(iso_checks.get("results", [])),
+                        fail_count=iso_checks.get("fail_count", 0),
+                    )
+                except Exception as exc:
+                    iso_checks = {}
+                    logger.warning(
+                        "ISO 19650 compliance extraction failed project_id=%d error=%s",
+                        project_id,
+                        exc,
+                        exc_info=True,
+                    )
+                log_progress(
+                    47,
                     "ifc-domain-data-extracted",
                     spatial_checks=len(spatial_checks),
                     egress_checks=len(egress_checks),
+                    iso_checks=len(iso_checks),
                 )
                 if selected_theme == "MEP":
                     elements = parse_ifc_model(m2_reader.ifc_file)
@@ -807,6 +830,7 @@ class BIMGuard_App:
             "building_summary": building_summary,
             "spatial_checks": spatial_checks,
             "egress_checks": egress_checks,
+            "iso_checks": iso_checks,
         }
 
 

@@ -45,6 +45,7 @@ from app.modules.module5_reporter.bcf_generator import (
     _markup_xml,
     _placeholder_png,
     _viewpoint_xml,
+    bcf_topic_guid,
 )
 
 PSET_HALO_RESERVATION = "Pset_HaloReservation"
@@ -150,9 +151,14 @@ def generate_bcf_zip_from_halo_clashes(
 
         for index, clash in enumerate(clashes):
             issue = _bcf_issue_from_clash(clash, halo=halos.get(clash.halo_id))
-            folder = issue.guid + "/"
+            # Folder name is the schema-legal topic GUID, same as generate_bcf().
+            topic_guid = bcf_topic_guid(issue.guid)
+            folder = topic_guid + "/"
             viewpoint_guid = str(uuid.uuid4()).upper()
-            zf.writestr(folder + "markup.bcf", _markup_xml(issue, index, viewpoint_guid))
+            zf.writestr(
+                folder + "markup.bcf",
+                _markup_xml(issue, index, viewpoint_guid, topic_guid=topic_guid),
+            )
             zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue, viewpoint_guid))
             zf.writestr(folder + "snapshot.png", _placeholder_png())
 

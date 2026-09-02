@@ -32,7 +32,18 @@ Relationship to ``module5_reporter.bcf_generator``
 archive from its own ``BCFIssue`` dataclass on the Blue Halo path, but its
 viewpoint selects a single component. This module is the services-layer
 entry point, works directly off the Module 4 ``Issue`` contract, and supports
-multi-component selection. The two are candidates for consolidation.
+multi-component selection. The two are candidates for consolidation; the
+GUID rules they share (``bcf_topic_guid``, ``is_ifc_guid``) already live in
+``bcf_generator`` and are imported here rather than duplicated.
+
+GUID hygiene
+------------
+BCF 2.1 types ``Topic/@Guid`` as a hyphenated UUID and ``Component/@IfcGuid``
+and ``File/@IfcProject`` as a 22-character IFC GlobalId. Module 4 finding ids
+(``BGR-0007``) are neither, and a project code is not an IfcProject GUID, so
+the archive path derives a deterministic UUID5 topic GUID from the finding id
+(recorded as ``Finding ID`` in the description) and only writes ``IfcGuid`` /
+``IfcProject`` for values that really are IFC GlobalIds.
 """
 
 from __future__ import annotations
@@ -48,6 +59,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
 from app.modules.module4_comparator.issue_schema import Issue, RiskBand
+from app.modules.module5_reporter.bcf_generator import bcf_topic_guid, is_ifc_guid
 
 #: Repository root, resolved from this file so exports work from any cwd.
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -231,6 +243,7 @@ class BCFExporter:
     def _describe(self, issue: Issue, elements: Sequence[ElementRef]) -> str:
         """Build the topic description body for *issue*."""
         lines = [
+            f"Finding ID: {issue.id}",
             f"Mechanism: {issue.mechanism}",
             f"Score: {issue.score:.2f} ({issue.band.value})",
             f"Element ID: {issue.element_id}",
@@ -290,15 +303,22 @@ class BCFExporter:
     # Spec-valid archive
     # ------------------------------------------------------------------
 
-    def _topic_markup_xml(self, issue: Issue, viewpoint_guid: str) -> str:
+    def _topic_markup_xml(
+        self, issue: Issue, viewpoint_guid: str, topic_guid: Optional[str] = None
+    ) -> str:
         """Render one topic's ``markup.bcf`` document.
 
         Element order follows the BCF 2.1 schema, which is a strict sequence:
         ``Header, Topic, Comment*, Viewpoints*``. Within ``Topic``, ``Title``
         precedes ``Priority``, which precedes ``Labels`` and the audit dates.
+
+        ``topic_guid`` is the schema-legal ``Topic/@Guid``; it defaults to
+        :func:`bcf_topic_guid` of ``issue.id`` and is passed explicitly by
+        :meth:`build_archive` so the folder name and attribute always agree.
         """
         elements = self.collect_elements(issue)
         created_at = issue.created_at or self._timestamp()
+        topic_guid = topic_guid or bcf_topic_guid(issue.id)
 
         # BCF 2.1's markup.xsd declares no targetNamespace, so Markup and its
         # children are unqualified. Only the xsi prefix is bound, matching the
@@ -309,14 +329,19 @@ class BCFExporter:
 
         header = ET.SubElement(root, "Header")
         file_elem = ET.SubElement(header, "File")
-        file_elem.set("IfcProject", str(issue.metadata.get("project_code", "") or "BIMGuard"))
+        # File/@IfcProject is typed IfcGuid; a project code ("ZIG-001") or a
+        # product name fails its 22-character facet, so only a real GlobalId
+        # is written. The code still reaches reviewers through the labels.
+        project_code = str(issue.metadata.get("project_code", "") or "")
+        if is_ifc_guid(project_code):
+            file_elem.set("IfcProject", project_code)
         ET.SubElement(file_elem, "Filename").text = str(
             issue.metadata.get("source_filename", "") or "model.ifc"
         )
         ET.SubElement(file_elem, "Date").text = created_at
 
         topic = ET.SubElement(root, "Topic")
-        topic.set("Guid", issue.id)
+        topic.set("Guid", topic_guid)
         topic.set("TopicType", "Issue")
         topic.set("TopicStatus", issue.status)
 
@@ -362,12 +387,17 @@ class BCFExporter:
         hints.set("SpaceBoundariesVisible", "false")
         hints.set("OpeningsVisible", "false")
 
+        # Component/@IfcGuid is optional in visinfo.xsd but, when present,
+        # must be a 22-character IFC GlobalId. Anything else (an empty id, a
+        # UUID, a label) is left off the attribute and kept in AuthoringToolId
+        # so the reader still sees what the finding pointed at.
         selection = ET.SubElement(components, "Selection")
         for element in elements:
             component = ET.SubElement(selection, "Component")
-            component.set("IfcGuid", element.ifc_guid)
+            if is_ifc_guid(element.ifc_guid):
+                component.set("IfcGuid", element.ifc_guid)
             ET.SubElement(component, "OriginatingSystem").text = "BIMGUARD AI"
-            ET.SubElement(component, "AuthoringToolId").text = element.role
+            ET.SubElement(component, "AuthoringToolId").text = f"{element.role}:{element.ifc_guid}"
 
         visibility = ET.SubElement(components, "Visibility")
         visibility.set("DefaultVisibility", "true")
@@ -376,7 +406,9 @@ class BCFExporter:
         colour_elem = ET.SubElement(coloring, "Color")
         colour_elem.set("Color", colour)
         for element in elements:
-            ET.SubElement(colour_elem, "Component").set("IfcGuid", element.ifc_guid)
+            coloured = ET.SubElement(colour_elem, "Component")
+            if is_ifc_guid(element.ifc_guid):
+                coloured.set("IfcGuid", element.ifc_guid)
 
         self._append_camera(root, issue)
         return self._serialise(root)
@@ -419,10 +451,16 @@ class BCFExporter:
             archive.writestr("bcf.version", self._version_xml())
             archive.writestr("project.bcfp", self._project_xml(project_name))
 
+            # Folder name is the topic GUID (BCF 2.1 convention), derived from
+            # the finding id when that is not already a UUID.
             for issue in issue_list:
-                folder = f"{issue.id}/"
+                topic_guid = bcf_topic_guid(issue.id)
+                folder = f"{topic_guid}/"
                 viewpoint_guid = str(uuid.uuid4()).upper()
-                archive.writestr(folder + "markup.bcf", self._topic_markup_xml(issue, viewpoint_guid))
+                archive.writestr(
+                    folder + "markup.bcf",
+                    self._topic_markup_xml(issue, viewpoint_guid, topic_guid=topic_guid),
+                )
                 archive.writestr(folder + "viewpoint.bcfv", self._viewpoint_xml(issue, viewpoint_guid))
                 archive.writestr(folder + "snapshot.png", _PLACEHOLDER_PNG)
 

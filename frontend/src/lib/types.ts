@@ -188,17 +188,7 @@ export interface ProjectBulkActionResponse {
   affected_ids: number[];
 }
 
-export const DOCUMENT_TYPES = [
-  'Specification',
-  'Code',
-  'Manual',
-  'Standard',
-  'Drawing',
-  'Schedule',
-  'Assessment',
-  'Report',
-  'Other',
-] as const;
+export const DOCUMENT_TYPES = ['Code', 'Specification', 'Manual'] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
@@ -337,6 +327,35 @@ export interface RuleFolderBulkActionResponse {
   success_count: number;
   affected_ruleset_ids: string[];
   deleted_rules_count: number;
+}
+
+export type RuleSnapshotSourceMode = 'pdf' | 'ids' | 'manual' | 'mixed';
+
+export interface RuleSnapshot {
+  id: number;
+  name: string;
+  source_ruleset_id: string;
+  source_mode: RuleSnapshotSourceMode | string;
+  category: string;
+  rule_count: number;
+  notes?: string;
+  created_at?: string | null;
+  created_by?: string;
+}
+
+export interface RuleSnapshotCreatePayload {
+  ruleset_id: string;
+  name?: string;
+  source_mode?: RuleSnapshotSourceMode;
+  notes?: string;
+  created_by?: string;
+}
+
+export interface IdsImportResult {
+  success: boolean;
+  created_count: number;
+  total_parsed: number;
+  ruleset_id: string;
 }
 
 export interface Citation {

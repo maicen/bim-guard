@@ -360,3 +360,164 @@ class TestTier3Indeterminable:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestMaterialInferenceFromSystem:
+    """infer_material_from_system deduces a material from the piping system.
+
+    The table is a statement about ordinary design practice, not a reading of
+    any model, so these tests pin two things equally: that the conventions it
+    does encode are the right ones, and that the systems it deliberately
+    leaves out stay out.
+    """
+
+    @pytest.mark.parametrize(
+        "system,expected",
+        [
+            (PipingSystem.DOMESTIC_HOT_WATER, "Copper_C12200"),
+            (PipingSystem.DOMESTIC_HOT_WATER_RETURN, "Copper_C12200"),
+            (PipingSystem.DOMESTIC_COLD_WATER, "Copper_C12200"),
+            (PipingSystem.MEDICAL_GAS_OXYGEN, "Copper_C12200"),
+            (PipingSystem.CHILLED_WATER_FLOW, "CarbonSteel"),
+            (PipingSystem.HEATING_RETURN, "CarbonSteel"),
+            (PipingSystem.STEAM_HP, "CarbonSteel"),
+            (PipingSystem.CONDENSATE_RETURN, "CarbonSteel"),
+            (PipingSystem.NATURAL_GAS, "CarbonSteel"),
+            (PipingSystem.FIRE_SPRINKLER, "GalvanisedSteel"),
+            (PipingSystem.FIRE_WET_RISER, "GalvanisedSteel"),
+            (PipingSystem.FOUL_DRAINAGE, "CastIron"),
+            (PipingSystem.POOL_CIRCULATION, "SS316"),
+            (PipingSystem.POOL_CHEMICAL_DOSING, "SS316"),
+        ],
+    )
+    def test_conventional_systems_infer(self, system, expected):
+        assert pp.infer_material_from_system(system) == expected
+
+    @pytest.mark.parametrize(
+        "system",
+        [
+            PipingSystem.UNKNOWN,
+            PipingSystem.RAINWATER,          # PVC, cast iron and aluminium all ordinary
+            PipingSystem.COMPRESSED_AIR,     # steel, copper and aluminium all standard
+            PipingSystem.MEDICAL_GAS_VACUUM, # plastics permitted in some codes
+        ],
+    )
+    def test_ambiguous_systems_infer_nothing(self, system):
+        """No single ordinary material means no guess. None is the answer."""
+        assert pp.infer_material_from_system(system) is None
+
+    @pytest.mark.parametrize("system", [None, "", "not_a_system", 42])
+    def test_unusable_input_infers_nothing(self, system):
+        assert pp.infer_material_from_system(system) is None
+
+    def test_accepts_the_enum_value_as_a_string(self):
+        """Callers holding the serialised form get the same answer."""
+        assert pp.infer_material_from_system("fire_sprinkler") == "GalvanisedSteel"
+        assert pp.infer_material_from_system("DOMESTIC_HOT_WATER".lower()) == "Copper_C12200"
+
+    def test_every_inference_is_canonical(self):
+        """An off-vocabulary key would fail silently as a data-quality issue."""
+        emitted = {material for material, _ in pp._SYSTEM_MATERIAL_INFERENCE.values()}
+        assert emitted <= CANONICAL_MATERIALS
+        assert "Unknown" not in emitted
+
+    def test_confidence_is_declared_for_every_entry(self):
+        levels = {conf for _, conf in pp._SYSTEM_MATERIAL_INFERENCE.values()}
+        assert levels <= {"established", "provisional"}
+
+
+class TestResolveMaterialProvenance:
+    """resolve_material must say where each answer came from."""
+
+    def test_ifc_metadata_wins_over_inference(self, monkeypatch):
+        """A material in the file is never overridden by a convention."""
+        monkeypatch.setattr(pp, "extract_normalized_material", lambda _: "SS316")
+        material, source, confidence = pp.resolve_material(
+            object(), PipingSystem.FIRE_SPRINKLER
+        )
+        assert material == "SS316"
+        assert source == pp.MATERIAL_SOURCE_IFC
+        assert confidence is None
+
+    def test_property_fallback_still_counts_as_read_from_ifc(self, monkeypatch):
+        """Material in a Pset is a reading of the model, not an assumption.
+
+        This is the only source that resolves anything on the Clinic models,
+        where the material sits in a property and no association exists.
+        """
+        monkeypatch.setattr(pp, "extract_normalized_material", lambda _: None)
+        material, source, _ = pp.resolve_material(
+            object(), PipingSystem.FIRE_SPRINKLER, properties={"Material": "Copper"}
+        )
+        assert material == "Copper_C12200"
+        assert source == pp.MATERIAL_SOURCE_IFC
+
+    def test_inference_is_tagged_with_the_system_that_drove_it(self, monkeypatch):
+        monkeypatch.setattr(pp, "extract_normalized_material", lambda _: None)
+        material, source, confidence = pp.resolve_material(
+            object(), PipingSystem.FIRE_SPRINKLER
+        )
+        assert material == "GalvanisedSteel"
+        assert source == f"{pp.MATERIAL_SOURCE_INFERENCE}:fire_sprinkler"
+        assert confidence == "provisional"
+
+    def test_unresolvable_stays_none(self, monkeypatch):
+        """Neither source resolving is Undetermined, not a default material."""
+        monkeypatch.setattr(pp, "extract_normalized_material", lambda _: None)
+        material, source, confidence = pp.resolve_material(object(), PipingSystem.UNKNOWN)
+        assert material is None
+        assert source is None
+        assert confidence is None
+
+    def test_inference_can_be_switched_off(self, monkeypatch):
+        """allow_inference=False gives the reading of the file alone."""
+        monkeypatch.setattr(pp, "extract_normalized_material", lambda _: None)
+        material, source, _ = pp.resolve_material(
+            object(), PipingSystem.FIRE_SPRINKLER, allow_inference=False
+        )
+        assert material is None
+        assert source is None
+
+    def test_never_returns_a_falsy_non_none_material(self, monkeypatch):
+        """Missing data must be None - never False, "" or "Unknown"."""
+        monkeypatch.setattr(pp, "extract_normalized_material", lambda _: None)
+        material, _, _ = pp.resolve_material(object(), PipingSystem.RAINWATER)
+        assert material is None
+        assert material is not False
+        assert material != "Unknown"
+
+
+class TestMaterialCoverage:
+    """material_coverage counts the two sources separately."""
+
+    def _element(self, element_id, source):
+        properties = {pp.MATERIAL_SOURCE_KEY: source} if source else {}
+        return PipingElement(
+            id=element_id,
+            ifc_class="IfcPipeSegment",
+            subtype="pipe_segment",
+            properties=properties,
+        )
+
+    def test_counts_each_source(self):
+        elements = [
+            self._element("a", pp.MATERIAL_SOURCE_IFC),
+            self._element("b", f"{pp.MATERIAL_SOURCE_INFERENCE}:fire_sprinkler"),
+            self._element("c", f"{pp.MATERIAL_SOURCE_INFERENCE}:domestic_hot_water"),
+            self._element("d", None),
+        ]
+        assert pp.material_coverage(elements) == {
+            "total": 4, "from_ifc": 1, "inferred": 2, "unknown": 1,
+        }
+
+    def test_inferred_is_never_folded_into_from_ifc(self):
+        """The headline number must not let an assumption pass for a reading."""
+        elements = [self._element("a", f"{pp.MATERIAL_SOURCE_INFERENCE}:fire_sprinkler")]
+        counts = pp.material_coverage(elements)
+        assert counts["from_ifc"] == 0
+        assert counts["inferred"] == 1
+
+    def test_empty_network(self):
+        assert pp.material_coverage([]) == {
+            "total": 0, "from_ifc": 0, "inferred": 0, "unknown": 0,
+        }
