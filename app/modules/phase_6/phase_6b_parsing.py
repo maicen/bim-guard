@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from app.logging_config import get_logger
+from app.modules.config import FEATURE_XM_GEOMETRIC_ADJACENCY
 from app.modules.module2_ifc_read.ifc_parser import (
     ServiceElement,
     get_schema_compatibility_note,
@@ -291,7 +292,14 @@ def parse_ifc_bytes(
     piping_warning: str | None = None
     if with_piping:
         try:
-            piping_elements = produce_piping_elements_from_model(model, source_path=source_ref)
+            # Tier 3 geometric adjacency is opt-in: it recovers elements that
+            # Tiers 1 and 2 leave connectivity-indeterminable, which XM-001
+            # skips outright, at the cost of a bounded tessellation pass.
+            piping_elements = produce_piping_elements_from_model(
+                model,
+                source_path=source_ref,
+                geometric_adjacency=FEATURE_XM_GEOMETRIC_ADJACENCY,
+            )
         except Exception as exc:
             piping_warning = (
                 "The piping network could not be extracted, so the material-media "

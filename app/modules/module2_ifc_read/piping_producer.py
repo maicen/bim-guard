@@ -53,6 +53,16 @@ from app.modules.module2_ifc_read.piping_schema import (
     Point3D,
 )
 
+try:
+    # Tier 3 only. Guarded because ifc_geometry itself degrades when
+    # ifcopenshell.geom or scipy are absent, and the producer must keep
+    # working (Tiers 1, 2 and 4) when the geometry stack is unavailable.
+    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+
+    _GEOMETRY_EXTRACTOR_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only on partial installs
+    _GEOMETRY_EXTRACTOR_AVAILABLE = False
+
 # Exact text appended to extraction_warnings when neither IFC ports nor
 # centerline geometry could establish connectivity (Tier 3). XM-001 keys off
 # this constant to decide which elements to skip, so it must not be reworded
@@ -62,6 +72,15 @@ CONNECTIVITY_INDETERMINABLE = "Connectivity indeterminable - XM-001 skipped for 
 # Recorded in PipingElement.properties so downstream comparators and audits
 # can tell which tier produced joined_to.
 CONNECTIVITY_SOURCE_KEY = "_connectivity_source"
+
+# Appended to extraction_warnings when Tier 3 resolved an element itself but
+# could not tessellate one or more of its bbox-near neighbours. The element is
+# assessed on the neighbours that did measure; this records the blind spot so
+# an auditor can see the adjacency is partial rather than complete.
+GEOMETRY_PARTIAL_TEMPLATE = (
+    "Geometric adjacency partial - {count} nearby element(s) could not be "
+    "tessellated, so contact with them is unmeasured"
+)
 
 # ---------------------------------------------------------------------------
 # Extraction scope
@@ -991,19 +1010,182 @@ def _endpoints(element: PipingElement) -> list[Point3D]:
     return []
 
 
+def _bbox_gap_m(a: Optional[BoundingBox], b: Optional[BoundingBox]) -> Optional[float]:
+    """Return the axis-aligned gap between two bounding boxes in metres.
+
+    This is a true LOWER bound on the surface-to-surface distance, so a pair
+    whose bbox gap already exceeds the tolerance cannot be touching and can be
+    pruned without tessellating anything. That pruning is what keeps Tier 3
+    affordable: bboxes come from _geometry(), which reads local vertices and
+    the placement matrix without invoking the mesher at all.
+
+    Returns None when either box is missing, meaning "cannot prune" — the
+    caller must then measure rather than assume distance.
+    """
+    if a is None or b is None:
+        return None
+    gap_sq = 0.0
+    for lo_a, hi_a, lo_b, hi_b in (
+        (a.min.x, a.max.x, b.min.x, b.max.x),
+        (a.min.y, a.max.y, b.min.y, b.max.y),
+        (a.min.z, a.max.z, b.min.z, b.max.z),
+    ):
+        axis_gap = max(0.0, lo_b - hi_a, lo_a - hi_b)
+        gap_sq += axis_gap * axis_gap
+    return math.sqrt(gap_sq)
+
+
+def _geometric_adjacency(
+    model: Any,
+    elements: list[PipingElement],
+    candidates: list[PipingElement],
+    tolerance_m: float,
+    link: Any,
+) -> int:
+    """Link isolated *candidates* to any element they touch, by real geometry.
+
+    Runs on the elements Tiers 1 and 2 left with an empty joined_to — the two
+    cases where a missed contact silently suppresses an XM-001 finding:
+
+      * no connectivity source at all (no placement, no centerline), which
+        XM-001 skips outright as indeterminable; and
+      * a Tier 2 element whose joined_to came back empty. Tier 2 tests
+        centerline endpoints, falling back to the placement centroid, so a
+        valve or fitting whose centroid sits far from a pipe's endpoints
+        reads as isolated even when their surfaces meet. That "isolation" is
+        an artifact of the proxy, not a fact about the model.
+
+    Because it only ever adds links to elements that had none, this tier
+    cannot overturn a positive adjacency Tier 1 or Tier 2 established.
+
+    Port-resolved elements are never candidates: IfcRelConnectsPorts is
+    authoritative, so this tier does not measure outward from one to look for
+    connectivity the authoring tool did not record. They can still be linked
+    when a candidate measures contact with them, and that link is kept — the
+    two facts do not conflict. Ports describe flow connectivity; geometry
+    describes physical contact, and it is contact that forms a galvanic cell.
+
+    Each candidate is measured against every element whose bounding box is
+    within tolerance (the mesher-free lower-bound prune above), using
+    IFCGeometryExtractor.calculate_shortest_distance — a tessellated
+    vertex-to-vertex distance in millimetres.
+
+    TRI-STATE
+        A candidate is credited to this tier only when its OWN tessellation
+        succeeded, i.e. when a real measurement was possible. A distance of
+        None is "not measured", never "far apart": reading it as a large
+        distance would turn missing geometry into an assertion of isolation,
+        and an element with no neighbours is one XM-001 finds nothing to
+        couple. Candidates that cannot be tessellated keep the status they
+        arrived with, so a previously indeterminable element stays
+        indeterminable and is skipped — the honest answer.
+
+    Provenance is recorded so an auditor can tell the tiers apart: a
+    recovered element reads "geometry", and a Tier 2 element this tier
+    augmented reads "centerline+geometry".
+
+    Tolerance note: the vertex distance is an UPPER bound on true surface
+    separation (see calculate_shortest_distance), so a coarsely tessellated
+    pipe can read as separated when its surfaces actually meet. The shared
+    50 mm default tolerance absorbs that slack. The residual risk is a missed
+    contact, not a fabricated one — and a missed direct contact between
+    connected elements still surfaces through XM-001's same_loop path.
+
+    Args:
+        model: The open IFC model, for GlobalId -> entity lookups.
+        elements: Every element in the network — candidate partners.
+        candidates: Elements eligible for geometric resolution.
+        tolerance_m: Surface separation counting as joined, in metres.
+        link: Closure joining two elements, from _build_adjacency.
+
+    Returns:
+        The number of candidates this tier measured.
+    """
+    if not candidates or not _GEOMETRY_EXTRACTOR_AVAILABLE or model is None:
+        return 0
+
+    try:
+        extractor = IFCGeometryExtractor(model)
+    except Exception:
+        return 0
+
+    tolerance_mm = tolerance_m * 1000.0
+    entities: dict[str, Any] = {}
+
+    def entity_for(element: PipingElement) -> Optional[Any]:
+        if element.id not in entities:
+            try:
+                entities[element.id] = model.by_guid(element.id)
+            except Exception:
+                entities[element.id] = None
+        return entities[element.id]
+
+    measured = 0
+    for element in candidates:
+        entity = entity_for(element)
+        if entity is None:
+            continue
+
+        # A self-distance of 0.0 proves the element tessellates. None means no
+        # measurement is possible, so it must keep the status it arrived with.
+        if extractor.calculate_shortest_distance(entity, entity) is None:
+            continue
+
+        previous = element.properties.get(CONNECTIVITY_SOURCE_KEY)
+        element.properties[CONNECTIVITY_SOURCE_KEY] = (
+            "geometry" if previous is None else f"{previous}+geometry"
+        )
+        measured += 1
+        unmeasured = 0
+
+        for other in elements:
+            if other.id == element.id:
+                continue
+            gap = _bbox_gap_m(element.bbox, other.bbox)
+            if gap is not None and gap > tolerance_m:
+                continue  # Lower bound already exceeds tolerance — cannot touch.
+
+            other_entity = entity_for(other)
+            if other_entity is None:
+                unmeasured += 1
+                continue
+
+            distance_mm = extractor.calculate_shortest_distance(entity, other_entity)
+            if distance_mm is None:
+                unmeasured += 1
+                continue
+            if distance_mm <= tolerance_mm:
+                link(element, other)
+
+        if unmeasured:
+            element.extraction_warnings.append(
+                GEOMETRY_PARTIAL_TEMPLATE.format(count=unmeasured)
+            )
+
+    return measured
+
+
 def _build_adjacency(
     model: Any,
     elements: list[PipingElement],
     tolerance_m: float,
+    geometric_adjacency: bool = False,
 ) -> dict[str, int]:
-    """Populate joined_to in place using the three-tier resolution.
+    """Populate joined_to in place using the four-tier resolution.
 
     Tier 1  IFC ports (IfcRelConnectsPorts) — authoritative, used whenever
             the model carries any port connectivity at all.
     Tier 2  Centerline endpoint proximity within tolerance_m — endpoints,
             not placement origins, so pipes joined end to end register even
             when their origins are a full pipe-length apart.
-    Tier 3  Neither available — joined_to stays empty and
+    Tier 3  Tessellated surface proximity within tolerance_m, via
+            IFCGeometryExtractor.calculate_shortest_distance. OPT-IN, off by
+            default. Applies only to elements Tiers 1 and 2 left with an
+            empty joined_to, and so can only add links, never remove them.
+            Catches what endpoint proximity structurally cannot: a valve or
+            fitting whose centroid sits far from the pipe endpoint its
+            surface actually meets. See _geometric_adjacency.
+    Tier 4  None of the above — joined_to stays empty and
             CONNECTIVITY_INDETERMINABLE is appended to extraction_warnings
             so XM-001 skips the element rather than reading the empty list
             as "isolated".
@@ -1011,17 +1193,26 @@ def _build_adjacency(
     Tiers are resolved per element, not per model: an element with ports
     uses Tier 1 even when its neighbours fall back to Tier 2.
 
+    Tier 3 defaults OFF because it tessellates, and this module's _centroid
+    docstring records the standing decision that a whole-model tessellation
+    pass is too slow for routine reads. It stays affordable when enabled by
+    running only on elements Tiers 1 and 2 left unresolved, and by pruning
+    candidate partners on their (mesher-free) bounding boxes first.
+
     Args:
         model: The open IFC model, for port lookups.
         elements: Elements to link, mutated in place.
-        tolerance_m: Endpoint separation counting as joined, in metres.
+        tolerance_m: Separation counting as joined, in metres. Applies to
+            Tier 2 endpoints and Tier 3 surfaces alike.
+        geometric_adjacency: Enable Tier 3. Defaults False.
 
     Returns:
-        Counts keyed "ports", "centerline", "indeterminable", "pairs".
+        Counts keyed "ports", "centerline", "geometry", "indeterminable",
+        "pairs".
     """
     ports = _port_adjacency(model)
     by_id = {e.id: e for e in elements}
-    counts = {"ports": 0, "centerline": 0, "indeterminable": 0, "pairs": 0}
+    counts = {"ports": 0, "centerline": 0, "geometry": 0, "indeterminable": 0, "pairs": 0}
     linked: set[tuple[str, str]] = set()
 
     def link(a: PipingElement, b: PipingElement) -> None:
@@ -1063,6 +1254,21 @@ def _build_adjacency(
                 link(element, other)
 
     # ── Tier 3 ────────────────────────────────────────────────────────────
+    if geometric_adjacency:
+        counts["geometry"] = _geometric_adjacency(
+            model,
+            elements,
+            [
+                e
+                for e in elements
+                if not e.joined_to
+                and e.properties.get(CONNECTIVITY_SOURCE_KEY) != "ports"
+            ],
+            tolerance_m,
+            link,
+        )
+
+    # ── Tier 4 ────────────────────────────────────────────────────────────
     for element in elements:
         if CONNECTIVITY_SOURCE_KEY in element.properties:
             continue
@@ -1168,6 +1374,7 @@ def produce_piping_elements_from_model(
     *,
     source_path: Optional[str] = None,
     adjacency_tolerance_m: float = 0.05,
+    geometric_adjacency: bool = False,
 ) -> list[PipingElement]:
     """Emit the canonical PipingElement list from an already-open IFC model.
 
@@ -1180,9 +1387,13 @@ def produce_piping_elements_from_model(
         source_path: Originating file path, carried for logging and
             diagnostics only. Never read from — the model is the sole
             source of data.
-        adjacency_tolerance_m: Tier 2 endpoint separation counting as
-            joined, in metres. Ignored for elements resolved by Tier 1
-            ports. Defaults to 50 mm.
+        adjacency_tolerance_m: Separation counting as joined, in metres,
+            for Tier 2 endpoints and Tier 3 surfaces. Ignored for elements
+            resolved by Tier 1 ports. Defaults to 50 mm.
+        geometric_adjacency: Enable Tier 3 tessellated surface proximity for
+            elements Tiers 1 and 2 leave unresolved, which XM-001 would
+            otherwise skip as indeterminable. Costs a bounded tessellation
+            pass; defaults False.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1215,7 +1426,7 @@ def produce_piping_elements_from_model(
             seen.add(global_id)
             elements.append(element)
 
-    _build_adjacency(model, elements, adjacency_tolerance_m)
+    _build_adjacency(model, elements, adjacency_tolerance_m, geometric_adjacency)
     return elements
 
 
@@ -1223,6 +1434,7 @@ def produce_piping_elements(
     ifc_path: str,
     *,
     adjacency_tolerance_m: float = 0.05,
+    geometric_adjacency: bool = False,
 ) -> list[PipingElement]:
     """Read an IFC file and emit the canonical PipingElement list.
 
@@ -1232,9 +1444,13 @@ def produce_piping_elements(
 
     Args:
         ifc_path: Path to the IFC file.
-        adjacency_tolerance_m: Tier 2 endpoint separation counting as
-            joined, in metres. Ignored for elements resolved by Tier 1
-            ports. Defaults to 50 mm.
+        adjacency_tolerance_m: Separation counting as joined, in metres,
+            for Tier 2 endpoints and Tier 3 surfaces. Ignored for elements
+            resolved by Tier 1 ports. Defaults to 50 mm.
+        geometric_adjacency: Enable Tier 3 tessellated surface proximity for
+            elements Tiers 1 and 2 leave unresolved, which XM-001 would
+            otherwise skip as indeterminable. Costs a bounded tessellation
+            pass; defaults False.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1248,6 +1464,7 @@ def produce_piping_elements(
         model,
         source_path=ifc_path,
         adjacency_tolerance_m=adjacency_tolerance_m,
+        geometric_adjacency=geometric_adjacency,
     )
 
 
