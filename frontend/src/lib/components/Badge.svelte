@@ -1,5 +1,7 @@
 <script lang="ts">
-  export let variant:
+  import type { Snippet } from 'svelte';
+
+  type Variant =
     | 'critical'
     | 'high'
     | 'medium'
@@ -9,8 +11,17 @@
     | 'running'
     | 'pending'
     | 'failed'
-    | 'neutral' = 'neutral';
-  export let size: 'sm' | 'md' = 'sm';
+    | 'neutral';
+
+  let {
+    variant = 'neutral',
+    size = 'sm',
+    children,
+  }: {
+    variant?: Variant;
+    size?: 'sm' | 'md';
+    children?: Snippet;
+  } = $props();
 
   const STYLES: Record<string, string> = {
     critical: 'bg-rose-950/80 border-rose-800 text-rose-300',
@@ -25,8 +36,8 @@
     neutral: 'bg-slate-800/80 border-slate-700 text-slate-300',
   };
 
-  $: normalizedKey = (variant || '').toLowerCase().replace('-', '_');
-  $: cls = STYLES[normalizedKey] || STYLES.neutral;
+  let normalizedKey = $derived((variant || '').toLowerCase().replace('-', '_'));
+  let cls = $derived(STYLES[normalizedKey] || STYLES.neutral);
 </script>
 
 <span
@@ -34,5 +45,5 @@
     ? 'text-[10px] px-2 py-0.5'
     : 'text-xs px-2.5 py-1'} {cls}"
 >
-  <slot />
+  {@render children?.()}
 </span>
