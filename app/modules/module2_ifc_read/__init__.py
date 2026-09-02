@@ -73,6 +73,12 @@ except ImportError:
     _EGRESS_AVAILABLE = False
 
 try:
+    from .ifc_penetrations import build_interference_index, penetration_context
+    _PENETRATIONS_AVAILABLE = True
+except ImportError:
+    _PENETRATIONS_AVAILABLE = False
+
+try:
     from .ifc_quality.validator import IFCValidator
 
     _QUALITY_TOOLS_AVAILABLE = True
@@ -778,6 +784,7 @@ class Module2_IFCRead:
         spatial: dict | None = None,
         material_info: dict | None = None,
         door_space_connection: dict | None = None,
+        penetration: dict | None = None,
         unit_scale_mm: float = 1.0,
     ) -> tuple[object, "str | None", dict]:
         """
@@ -834,6 +841,20 @@ class Module2_IFCRead:
                     "spatial:door_space_connection",
                     dsc_rich,
                 )
+        elif prop_lower_name in ("annularclearance", "annular_clearance"):
+            # The radial gap between an element and the opening it passes
+            # through. Like Storey and Material above, this is a relationship
+            # (IfcRelFillsElement -> IfcRelVoidsElement) plus geometry, never a
+            # Pset key, so no amount of Pset searching below could find it.
+            #
+            # Falls through when the traversal produced nothing, so a model
+            # that *does* author AnnularClearance as a real property still has
+            # it read from the Pset by Pass 1. Authored data beats derived.
+            clearance = (penetration or {}).get("annular_clearance_mm")
+            if clearance is not None:
+                detail = dict((penetration or {}).get("annular_clearance_detail") or {})
+                detail["unit"] = "mm"
+                return clearance, "geometry:penetration", detail
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -1058,6 +1079,19 @@ class Module2_IFCRead:
             if str(r.get("reference") or "").strip()
         }
 
+        # IfcRelInterferesElements has no inverse attribute, so answering
+        # "what does this pipe clash with?" means scanning the whole file.
+        # Done once per run and shared across every rule and element; empty
+        # for models that declare no interferences, which is most of them.
+        # None until a rule needs it, so a model with no interferences is
+        # scanned once rather than once per penetration rule.
+        _interference_index: dict | None = None
+        # Host / opening traversal per unique element, keyed by element id like
+        # _position_cache above and for the same reason: the same pipe is
+        # re-examined by every rule targeting IfcPipeSegment, and the traversal
+        # reads geometry.
+        _penetration_cache: dict[int, dict] = {}
+
         for rule_index, rule in enumerate(rules, start=1):
             rule_started_at = time.monotonic()
             scope_predicate = self._decode_json_obj(rule.get("applies_when"))
@@ -1073,6 +1107,31 @@ class Module2_IFCRead:
             prop_set = str(rule.get("property_set") or "").strip()
             operator = str(rule.get("operator") or "").strip()
             fallback_prop = str(rule.get("fallback_property") or "").strip()
+
+            # A waiver definition states the condition under which another rule
+            # is excused. It makes no claim about the model on its own, so
+            # evaluating it standalone would report a verdict on a requirement
+            # that does not exist -- which is exactly what PC-001.03/.04/.05
+            # did, surfacing as MISSING_DATA and NOT_APPLICABLE rows beside the
+            # requirement they belong to. It still stays in rules_by_reference
+            # above, so the rules that cite it can resolve its predicate.
+            if self._is_waiver_only(operator):
+                logger.info(
+                    "Rule extraction rule=%d/%d reference=%s skipped=waiver_definition operator=%s",
+                    rule_index,
+                    total_rules,
+                    rule.get("reference") or rule.get("id") or "unknown",
+                    operator,
+                )
+                continue
+
+            # Host and opening traversal is only worth its cost for rules that
+            # actually ask about a penetration.
+            needs_penetration = _PENETRATIONS_AVAILABLE and self._needs_penetration_context(
+                prop_name, scope_predicate, resolved_exceptions
+            )
+            if needs_penetration and _interference_index is None:
+                _interference_index = build_interference_index(self.ifc_file)
             logger.info(
                 "Rule extraction rule=%d/%d reference=%s target=%s property=%s pset=%s operator=%s fallback=%s",
                 rule_index,
@@ -1151,6 +1210,31 @@ class Module2_IFCRead:
                     mat_info = {}
                 door_space = door_space_lookup.get(getattr(el, "GlobalId", None))
 
+                # Host / opening traversal: what this element passes through
+                # and how much gap surrounds it. Resolved before the property
+                # cascade because AnnularClearance is derived from it, the way
+                # Storey and Material are derived from their relationships.
+                # Cached per element -- every rule targeting the class would
+                # otherwise repeat a geometry read.
+                penetration: dict = {}
+                if needs_penetration:
+                    pen_id = el.id()
+                    if pen_id in _penetration_cache:
+                        penetration = _penetration_cache[pen_id]
+                    else:
+                        try:
+                            penetration = penetration_context(
+                                el,
+                                geometry_extractor=self.geometry_extractor,
+                                unit_scale_mm=_unit_scale_mm,
+                                interference_index=_interference_index,
+                                material_resolver=self.get_material_info,
+                            )
+                        except Exception as exc:
+                            logger.debug("Penetration context failed for %s: %s", el, exc)
+                            penetration = {}
+                        _penetration_cache[pen_id] = penetration
+
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
                     prop_name,
@@ -1159,6 +1243,7 @@ class Module2_IFCRead:
                     spatial=spatial,
                     material_info=mat_info,
                     door_space_connection=door_space,
+                    penetration=penetration,
                     unit_scale_mm=_unit_scale_mm,
                 )
 
@@ -1203,6 +1288,7 @@ class Module2_IFCRead:
                     except Exception:
                         scope_value = None
                     scope_values[scope_prop] = scope_value
+
 
                 # ── Type context ────────────────────────────────
                 try:
@@ -1260,6 +1346,25 @@ class Module2_IFCRead:
                         # predicates, resolved through the same cascade as the
                         # main property. Empty for rules that declare neither.
                         "scope_values": scope_values,
+                        # What this element passes through. Present only for
+                        # rules that ask about a penetration; the comparator
+                        # reads a missing key as UNDETERMINED, which keeps an
+                        # element in scope and refuses to waive it.
+                        #
+                        # `or None` collapses an empty list to undetermined on
+                        # purpose. "The traversal found no host" is not the
+                        # same claim as "this element penetrates nothing" --
+                        # an exporter that omits IfcRelVoidsElement produces
+                        # the first and means neither. Reporting it as a
+                        # determinate empty set would put every pipe in such a
+                        # model quietly out of scope.
+                        "host_classes": penetration.get("host_classes") or None,
+                        "host_names": penetration.get("host_names") or None,
+                        "host_materials": penetration.get("host_materials") or None,
+                        "host_is_breakaway": penetration.get("host_is_breakaway"),
+                        "annular_clearance_detail": penetration.get(
+                            "annular_clearance_detail"
+                        ),
                     }
                 )
 
@@ -2001,6 +2106,55 @@ class Module2_IFCRead:
         "nominal_diameter_mm": "NominalDiameter",
         "nominal_diameter_below_mm": "NominalDiameter",
     }
+
+    #: Predicate keys answered by the penetration traversal (``ifc_penetrations``)
+    #: rather than by reading a property off the element itself. They describe
+    #: the element's *host* -- what it passes through -- which no Pset holds.
+    _PENETRATION_PREDICATE_KEYS = frozenset(
+        {
+            "penetrates",
+            "host_class_any_of",
+            "host_material_any_of",
+            "host_is_breakaway",
+        }
+    )
+
+    #: Property names that only the penetration traversal can produce, matched
+    #: case- and separator-insensitively against a rule's ``property_name``.
+    _PENETRATION_PROPERTIES = frozenset({"annularclearance"})
+
+    #: Operators marking a rule as a waiver *definition* rather than a
+    #: requirement. Such a row states the condition under which some other rule
+    #: is excused; on its own it asserts nothing about the model and has no
+    #: verdict to give, so it is never extracted or evaluated standalone. It
+    #: reaches the comparator only through the `exceptions` of the rule it
+    #: waives, as a resolved predicate.
+    _WAIVER_ONLY_OPERATORS = frozenset({"exempt", "exemption", "waiver"})
+
+    @classmethod
+    def _is_waiver_only(cls, operator: str) -> bool:
+        """Return True when a rule defines a waiver, not a requirement."""
+        return str(operator or "").strip().lower() in cls._WAIVER_ONLY_OPERATORS
+
+    @classmethod
+    def _needs_penetration_context(
+        cls, prop_name: str, scope: dict, exceptions: list[dict]
+    ) -> bool:
+        """Whether this rule needs the host/opening traversal for its elements.
+
+        The traversal walks relationships and reads geometry, so it is worth
+        far more than a Pset lookup and must not run for the ~1,878 rules that
+        have no use for it. Gated on the rule asking for a penetration-derived
+        property, or naming a host predicate in its scope or any of its
+        waivers.
+        """
+        normalized = str(prop_name or "").replace("_", "").replace(" ", "").lower()
+        if normalized in cls._PENETRATION_PROPERTIES:
+            return True
+        for predicate in [scope] + [e.get("predicate") or {} for e in exceptions]:
+            if cls._PENETRATION_PREDICATE_KEYS & set(predicate or {}):
+                return True
+        return False
 
     @staticmethod
     def _decode_json_obj(value):

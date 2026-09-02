@@ -57,17 +57,49 @@ _SCOPE_NUMERIC_PROPERTIES = {
 }
 
 #: Predicate keys matched against a list-valued field of the element record.
+#: Matching is case-insensitive and accepts a substring, so "IfcWall" in a
+#: `penetrates` list also matches a host typed IfcWallStandardCase, and
+#: "gypsum" matches a material named "5/8in Type X Gypsum Board".
 _SCOPE_LIST_FIELDS = {
     "element_type_any_of": "element_type",
     "storey_any_of": "storey",
     "space_any_of": "space",
     "material_any_of": "materials",
+    # Host predicates. `host_*` describes what the element passes THROUGH, as
+    # resolved by module2_ifc_read.ifc_penetrations, and is a different
+    # question from `material_any_of`, which is the element's own material.
+    # Confusing the two is how a steel pipe in a gypsum wall looks like a
+    # gypsum pipe.
+    "penetrates": "host_classes",
+    "host_class_any_of": "host_classes",
+    "host_material_any_of": "host_materials",
+    "host_name_any_of": "host_names",
+}
+
+#: Predicate keys matched against a tri-state boolean field of the element
+#: record. None means the model did not say, which is UNDETERMINED -- never
+#: False. Treating "unknown" as "not breakaway" would be safe here by luck,
+#: but the same shortcut on an inverted predicate would waive silently.
+_SCOPE_BOOL_FIELDS = {
+    "host_is_breakaway": "host_is_breakaway",
 }
 
 #: Predicate keys that are structurally meaningful but carry no per-element
 #: test: the extraction already guarantees them, so they are satisfied by
 #: construction rather than evaluated.
 _SCOPE_TRIVIAL_KEYS = {"target_ifc_class"}
+
+#: Predicate keys that annotate the rule rather than test the element -- prose
+#: recording how a measurement is defined, not a condition to evaluate. They
+#: are neutral: they neither narrow scope nor grant a waiver, and reporting
+#: them as "unsupported by the extractor" would be misleading, since they were
+#: never a predicate to support.
+_SCOPE_ANNOTATION_KEYS = {"measured_from", "note", "notes", "source", "citation"}
+
+#: Operators marking a rule as a waiver definition rather than a requirement.
+#: Mirrors ``module2_ifc_read._WAIVER_ONLY_OPERATORS``; Module 2 skips
+#: extracting them, this side skips evaluating whatever still arrives.
+_WAIVER_ONLY_OPERATORS = {"exempt", "exemption", "waiver"}
 
 
 class Module4_Comparator:
@@ -80,13 +112,30 @@ class Module4_Comparator:
         Main entry point. Takes Module2_IFCRead.extract_for_compliance() output
         and returns one compliance record per rule.
 
+        Waiver definitions are dropped rather than evaluated. A rule whose
+        operator marks it a waiver states the condition under which some other
+        rule is excused; standing alone it asserts nothing about the model, so
+        there is no verdict to return and any status it were given would be
+        read as one. Module 2 already declines to extract them, so this is the
+        second of two gates -- it catches extraction produced elsewhere, such
+        as a fixture or a cached run predating the skip.
+
         Args:
             extraction_results: list[dict] from Module 2
 
         Returns:
             list[dict] with status, counts, and per-element failures
         """
-        return [self._evaluate_rule(item) for item in extraction_results]
+        return [
+            self._evaluate_rule(item)
+            for item in extraction_results
+            if not self._is_waiver_only(item.get("operator"))
+        ]
+
+    @staticmethod
+    def _is_waiver_only(operator) -> bool:
+        """Return True when a rule defines a waiver, not a requirement."""
+        return str(operator or "").strip().lower() in _WAIVER_ONLY_OPERATORS
 
     def check_naming_conventions(self, elements: list, patterns: list[str]) -> list[dict]:
         """Check element names against regex naming patterns."""
@@ -313,8 +362,14 @@ class Module4_Comparator:
         Returns (outcome, detail) where outcome is MATCH, NO_MATCH or
         UNDETERMINED and detail names the reason when it is not a clean match.
         """
-        if key in _SCOPE_TRIVIAL_KEYS:
+        if key in _SCOPE_TRIVIAL_KEYS or key in _SCOPE_ANNOTATION_KEYS:
             return MATCH, ""
+
+        if key in _SCOPE_BOOL_FIELDS:
+            actual = el.get(_SCOPE_BOOL_FIELDS[key])
+            if actual is None:
+                return UNDETERMINED, f"{key} not resolved on element"
+            return (MATCH if bool(actual) == bool(expected) else NO_MATCH), ""
 
         scope_values = el.get("scope_values") or {}
 
@@ -391,6 +446,15 @@ class Module4_Comparator:
             return UNDETERMINED, undetermined
         return MATCH, []
 
+    @staticmethod
+    def _testable_keys(predicate: dict) -> set:
+        """Return the predicate keys that actually test the element.
+
+        Annotation and trivially-true keys are excluded: both always match, so
+        a predicate consisting only of them asserts nothing.
+        """
+        return set(predicate or {}) - _SCOPE_ANNOTATION_KEYS - _SCOPE_TRIVIAL_KEYS
+
     @classmethod
     def _waiver_for(cls, exceptions: list[dict], el: dict) -> tuple[dict | None, list[str]]:
         """Return the first exception waiving this element, plus undetermined notes.
@@ -408,8 +472,15 @@ class Module4_Comparator:
             # exemption reference that resolved to nothing would silently
             # erase real findings. An exemption must state a condition to
             # suppress anything.
-            if not predicate:
-                notes.append(f"{ref}: no predicate to evaluate, cannot waive")
+            #
+            # "Empty" means empty of anything TESTABLE, not merely of keys. An
+            # annotation ("measured_from: each face...") and a key the
+            # extraction already guarantees ("target_ifc_class") both evaluate
+            # to MATCH for every element by design, so a predicate made only
+            # of them would waive the entire model while looking like a
+            # considered condition.
+            if not cls._testable_keys(predicate):
+                notes.append(f"{ref}: no testable predicate, cannot waive")
                 continue
             outcome, details = cls._evaluate_predicate(predicate, el)
             if outcome == MATCH:
