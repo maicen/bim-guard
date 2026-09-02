@@ -231,40 +231,88 @@ Owner: unassigned.
 
 ### Module 1 & 1b: Document Ingestion & NLP Annotation (LlamaIndex Core)
 
-- [ ] Integrate LlamaIndex as the primary ingestion engine for BEP PDFs, ISO 19650
-      guidelines, and regulatory codes (e.g., DIN 4149, NZ Seismic).
-- [ ] Implement table- and layout-aware document chunking to prevent fragmentation
-      of complex engineering tables, schedules, and nested matrices.
-- [ ] Attach granular clause metadata (clause ID, page numbers, parent section
+- [x] Integrate LlamaIndex as the primary ingestion engine for BEP PDFs, ISO 19650
+      guidelines, and regulatory codes (e.g., DIN 4149, NZ Seismic). Layered on top
+      of the existing `UnstructuredExtractor`/`LightExtractor`, gated behind
+      `BIM_GUARD_USE_LLAMAINDEX_INGESTION`.
+- [x] Implement table- and layout-aware document chunking to prevent fragmentation
+      of complex engineering tables, schedules, and nested matrices
+      (`LlamaIndexIngestor`, `app/modules/module1_doc_parser/llamaindex_ingestor.py`).
+- [x] Attach granular clause metadata (clause ID, page numbers, parent section
       headers) to all extracted nodes to maintain traceability in generated BCF
-      issue reports.
-- [ ] Implement deontic entity extraction via LlamaIndex Pydantic extractors to
+      issue reports (`ClauseMetadata`, `DocumentNodeContract`; `document_nodes` table).
+- [x] Implement deontic entity extraction via LlamaIndex Pydantic extractors to
       isolate normative requirements ("shall", "must", "should") into typed
-      intermediate schemas.
+      intermediate schemas (`DeonticStatement`, `llamaindex_program.py`).
 
 ### Module 3: Deterministic Rule Generation & IDS Export (LlamaIndex)
 
-- [ ] Use LlamaIndex structured data extraction to translate unstructured clause
-      chunks into machine-readable rule definitions (`RuleCatalog`, clearance
-      tolerances, and material compatibility matrices).
-- [ ] Build an automated translation pipeline from extracted rule schemas into
+- [x] Use LlamaIndex structured data extraction to translate unstructured clause
+      chunks into machine-readable rule definitions (`LlamaIndexRuleGenerator`,
+      implements the existing `RuleExtractionProvider` protocol as a drop-in
+      alternative to `LiteLLMRuleExtractor`). Extracted rules persist as
+      `pending_review` drafts (`rule_extraction_drafts` table, `RuleDraftService`)
+      with an approve/reject/edit workflow before promotion into `public.rules`.
+- [x] Build an automated translation pipeline from extracted rule schemas into
       buildingSMART IDS (Information Delivery Specification) XML schemas.
+      `ids_exporter.py`'s export path now builds through `ifctester.ids`
+      (buildingSMART's own IDS 1.0 implementation) instead of hand-built
+      `ElementTree`, so exported IDS is schema-correct; import tries the same
+      strict parser first and falls back to the original lenient parser for
+      XML this module produced before the refactor.
 
 ### Agent & CDE Orchestration (`app/agent`, Module 4 & Services) (LangGraph)
 
-- [ ] Implement a LangGraph state machine for the Digital Inspector agent
-      (`app/agent`) to coordinate cyclical multi-tool execution (querying IFC
+- [x] Implement a LangGraph state machine for the Digital Inspector agent
+      to coordinate cyclical multi-tool execution (querying IFC
       models, checking database cache, dispatching bSDD lookups, running
-      validation engines).
-- [ ] Expose LlamaIndex retrieval and rule-extraction modules as callable tools
-      inside the LangGraph supervisor agent.
-- [ ] Model ISO 19650 Common Data Environment (CDE) state transitions
+      validation engines). New `app/digital_inspector/` package (separate from
+      the generic `app/agent/` OpenRouter coding assistant), built on LangGraph's
+      `create_react_agent`, exposed via `POST /api/projects/{id}/inspect`.
+- [x] Expose LlamaIndex retrieval and rule-extraction modules as callable tools
+      inside the LangGraph supervisor agent (`extract_rules_from_document` tool
+      wraps `RuleExtractionService.extract_rule_drafts`).
+- [x] Model ISO 19650 Common Data Environment (CDE) state transitions
       (`WIP` → `Shared` → `Published` → `Archived`) as a LangGraph state graph
-      with automated compliance gates.
+      with automated compliance gates. `app/digital_inspector/cde_graph.py` is a
+      thin wrapper whose nodes call the existing, already-tested
+      `CDEStateMachine.evaluate_transition()` for every gate decision — the real
+      transactional `transition_project()` write path is untouched; exposed as
+      the `check_cde_transition` agent tool.
 - [ ] Implement LangChain-compatible webhook handlers for asynchronous
       notifications to external issue-tracking platforms (e.g., ACC, BIM Track).
+      Deferred: no existing integration point, credentials, or chosen platform
+      (ACC vs BIM Track) exists yet; needs its own scoping conversation.
 
 Owner: unassigned.
+
+Completion evidence (2026-09-02):
+
+- Added `llama-index-core`, `llama-index-llms-litellm`, `langgraph`,
+  `langchain-core`, `langchain-litellm`, and `ifctester` as required
+  dependencies (`pyproject.toml`).
+- New migrations: `20260902120000_create_document_nodes.sql`,
+  `20260902130000_create_rule_extraction_drafts.sql`.
+- New contracts in `app/modules/contracts.py`: `ClauseMetadata`,
+  `DeonticStatement`, `DocumentNodeContract`, `DocumentIngestResponse`,
+  `RuleDraftStatus`, `RuleExtractionDraft`, `RuleExtractionDraftListResponse`,
+  `RuleDraftReviewRequest`, `InspectorQueryRequest`, `InspectorToolCallContract`,
+  `InspectorResponse`.
+- New endpoints: `POST /api/documents/{id}/ingest`,
+  `POST /api/documents/{id}/rules/extract-drafts`,
+  `GET /api/documents/{id}/rules/drafts`,
+  `GET /api/documents/{id}/rules/drafts/ids-preview`,
+  `PATCH /api/rules/drafts/{draft_id}`, `POST /api/rules/drafts/{draft_id}/promote`,
+  `POST /api/projects/{id}/inspect`. Existing `POST /api/rules/extract` and
+  `POST /api/rules/bulk` are unchanged.
+- Both new extraction paths are flag-gated (`BIM_GUARD_USE_LLAMAINDEX_INGESTION`,
+  `BIM_GUARD_RULE_EXTRACTION_PROVIDER`) so `LiteLLMRuleExtractor` keeps running
+  as the default until a precision/recall comparison justifies flipping the
+  default provider.
+- 984 tests pass (+26 new: `test_llamaindex_ingestion.py`,
+  `test_rule_draft_workflow.py`, `test_ids_export.py`, `test_digital_inspector.py`,
+  `test_cde_graph.py`; 2 pre-existing IDS tests and 1 settings test updated for
+  the corrected schema-valid XML shape and the two new settings keys).
 
 ## Validation Gates
 
