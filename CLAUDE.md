@@ -49,6 +49,11 @@ All newly generated files (code, tests, scripts, fixtures, data manifests, repor
 
 **NEVER output test results, machine logs, JSON dumps, markdown summaries, or scratch scripts to the root directory `./`. Always direct outputs to the designated subdirectories above.**
 
+## Git Sync Requirement (STRICT)
+
+**ALWAYS sync with the remote repository before writing or modifying any line of code.**
+
+Before starting any coding task in this repository, run `git fetch origin` and `git pull` (or `git pull --rebase` if the branch has local unpushed commits) on the current branch to ensure the working tree is up to date with the remote. Do this at the start of every session and before any subsequent edit if time has passed or the remote may have changed. If the pull reveals conflicts or uncommitted local changes would be overwritten, stop and resolve them (stash/commit as appropriate) before proceeding — never discard local work to force a pull.
 
 ## Commands
 
