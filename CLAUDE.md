@@ -51,9 +51,15 @@ All newly generated files (code, tests, scripts, fixtures, data manifests, repor
 
 ## Git Sync Requirement (STRICT)
 
-**ALWAYS sync with the remote repository before writing or modifying any line of code.**
+**ALWAYS sync with the remote repository as soon as possible — do not wait.**
 
-Before starting any coding task in this repository, run `git fetch origin` and `git pull` (or `git pull --rebase` if the branch has local unpushed commits) on the current branch to ensure the working tree is up to date with the remote. Do this at the start of every session and before any subsequent edit if time has passed or the remote may have changed. If the pull reveals conflicts or uncommitted local changes would be overwritten, stop and resolve them (stash/commit as appropriate) before proceeding — never discard local work to force a pull.
+Run `git fetch origin` and `git pull` (or `git pull --rebase` if the branch has local unpushed commits) on the current branch immediately at the start of every session, and again as soon as possible before any subsequent edit if time has passed or the remote may have changed — don't batch this up or defer it. This ensures the working tree is up to date with the remote before writing or modifying any line of code. If the pull reveals conflicts or uncommitted local changes would be overwritten, stop and resolve them (stash/commit as appropriate) before proceeding — never discard local work to force a pull.
+
+## Git Auto-Commit Requirement (STRICT)
+
+**Commit finished work as soon as possible — do not wait for the end of the session or for the user to ask.**
+
+As soon as a coherent, working unit of change is done (a bug fix, a completed feature slice, a passing test, a doc update), stage and commit it immediately rather than letting it accumulate uncommitted. Do not batch unrelated changes into one commit and do not hold commits back "to see if more changes come." After committing, push to the current branch's remote as soon as possible as well, so work is never left stranded locally. Still follow standard git hygiene: review `git status`/`git diff` before staging, use clear commit messages, and never force-push or rewrite shared history without explicit user instruction. This auto-commit policy applies only within this repository's normal working rules — it does not authorize destructive operations (`reset --hard`, force-push, history rewrites) or bypassing hooks/signing.
 
 ## Commands
 

@@ -45,6 +45,11 @@ The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to back
 - `data/cache/supabase-storage/` — Disposable cache for downloaded Supabase Storage objects
 - `static/` — CSS, JS, and viewer assets
 
+## Git workflow (STRICT)
+
+- **Sync ASAP**: Run `git fetch origin` and `git pull` (or `git pull --rebase` if there are local unpushed commits) at the start of every session and again as soon as possible before further edits if time has passed — never defer this.
+- **Auto-commit ASAP**: As soon as a coherent, working unit of change is done (a fix, a completed feature slice, a passing test, a doc update), stage and commit it immediately — do not wait for the end of the session or for the user to ask. Push to the remote as soon as possible after committing. Don't batch unrelated changes into one commit. Standard hygiene still applies: review `git status`/`git diff` before staging, write clear messages, and never force-push, rewrite shared history, or bypass hooks/signing without explicit user instruction.
+
 ## Working rules
 
 - **Architecture Direction**: Target all user-facing features to the Svelte 5 frontend (`frontend/`) and FastAPI backend (`app/api/`).
