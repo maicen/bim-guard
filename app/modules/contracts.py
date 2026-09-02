@@ -760,6 +760,7 @@ class ArchAnalysisResponse(BaseModel):
     building_summary: dict[str, Any] = Field(default_factory=dict)
     spatial_checks: dict[str, Any] = Field(default_factory=dict)
     egress_checks: dict[str, Any] = Field(default_factory=dict)
+    iso_checks: dict[str, Any] = Field(default_factory=dict)
     rule_compliance: list[dict[str, Any]] = Field(default_factory=list)
     rule_folder: Optional[str] = None
     ifc_element_count: Optional[int] = 0

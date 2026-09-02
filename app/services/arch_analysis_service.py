@@ -90,6 +90,7 @@ class ArchAnalysisService:
             building_summary=result.get("building_summary", {}),
             spatial_checks=result.get("spatial_checks", {}),
             egress_checks=result.get("egress_checks", {}) or {},
+            iso_checks=result.get("iso_checks", {}) or {},
             rule_compliance=result.get("rule_compliance", []),
             rule_folder=result.get("rule_folder", ""),
             ifc_element_count=result.get("ifc_element_count", 0),

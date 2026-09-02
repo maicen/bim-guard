@@ -73,6 +73,12 @@ except ImportError:
     _EGRESS_AVAILABLE = False
 
 try:
+    from .iso19650_check import check_iso19650_compliance
+    _ISO19650_AVAILABLE = True
+except ImportError:
+    _ISO19650_AVAILABLE = False
+
+try:
     from .ifc_penetrations import build_interference_index, penetration_context
     _PENETRATIONS_AVAILABLE = True
 except ImportError:
@@ -2102,6 +2108,50 @@ class Module2_IFCRead:
             "exit_count": exit_count,
             "travel_distance": travel_distance,
             "has_graph": has_graph,
+            "warnings": warnings,
+        }
+
+    # ── ISO 19650 whole-model checks ────────────────────────────────────────────
+
+    def extract_iso19650_checks(self, project: dict | None = None) -> dict:
+        """
+        Run whole-model ISO 19650 information-management checks (container
+        naming, suitability/revision codes, GUID uniqueness, CDE-state
+        consistency, export provenance). Separate concern from the building-
+        code/life-safety checks above — see iso19650_check.py.
+
+        Returns:
+            {
+              "results": [list of per-check result dicts],
+              "fail_count": int,
+              "warnings": [str],
+            }
+        """
+        if not _ISO19650_AVAILABLE:
+            return {
+                "results": [],
+                "fail_count": 0,
+                "warnings": ["ISO 19650 check module not available."],
+            }
+
+        project = project or {}
+        filename = str(project.get("ifc_file_path") or (self.file_path.name if self.file_path else ""))
+        cde_state = str(project.get("cde_state") or "WIP")
+        suitability_code = str(project.get("suitability_code") or "")
+
+        results = check_iso19650_compliance(
+            self.ifc_file,
+            filename=filename,
+            cde_state=cde_state,
+            suitability_code=suitability_code,
+        )
+
+        fail_count = sum(1 for r in results if not r.get("passes"))
+        warnings = [r["message"] for r in results if not r.get("passes")]
+
+        return {
+            "results": results,
+            "fail_count": fail_count,
             "warnings": warnings,
         }
 
