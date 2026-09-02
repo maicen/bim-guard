@@ -23,6 +23,10 @@ BIM-Guard uses a modern, decoupled architecture:
 The backend is available at `http://127.0.0.1:8000` (OpenAPI interactive docs at `/api/docs`).
 The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to backend).
 
+### Dev server launch configs
+
+`.claude/launch.json`, `.antigravity/launch.json`, and `.vscode/launch.json` register the same two dev servers for editor/agent preview and debugging. They are generated — never hand-edit them. Update `scripts/generate_launch_configs.py` (the source of truth) and rerun `uv run python scripts/generate_launch_configs.py` if the run commands, host, or ports change.
+
 ## Repo structure
 
 - `app/api/` — FastAPI routers, dependency injection, and SSE event streaming

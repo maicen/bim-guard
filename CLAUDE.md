@@ -84,6 +84,20 @@ uv run ruff check .
 uv run pytest tests/ -v
 ```
 
+## Dev Server Launch Configs (STRICT — keep generated, never hand-edit)
+
+BIM-Guard's two dev servers (FastAPI backend on `:8000`, Vite/Svelte frontend on `:5173`, per `run_server.sh`/`run_server.bat`) are also registered as launch configs for editors/agents that preview or debug the app directly instead of shelling out to the run scripts:
+
+- `.claude/launch.json` — read by Claude Code's `preview_start` tool
+- `.antigravity/launch.json` — same shape, for Antigravity
+- `.vscode/launch.json` — VS Code debug configs (`debugpy` for the backend, `node-terminal` for the frontend) plus a "Full Stack" compound
+
+**[scripts/generate_launch_configs.py](scripts/generate_launch_configs.py) is the single source of truth for all three files.** If the backend/frontend command, host, or port ever changes (i.e. `run_server.sh`/`run_server.bat` changes), update the `BACKEND`/`FRONTEND` dicts in that script and rerun it — never hand-edit the generated `launch.json` files directly:
+
+```bash
+uv run python scripts/generate_launch_configs.py
+```
+
 ## Dependency Management Rule
 
 All Python dependencies must be managed via uv and declared in pyproject.toml (including optional dependency groups). Do not add or maintain separate requirements.txt files.
