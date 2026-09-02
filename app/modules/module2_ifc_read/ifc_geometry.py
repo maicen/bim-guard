@@ -117,6 +117,96 @@ _GEOMETRY_PROPERTY_MAP: dict[str, str] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Point-to-triangle distance (narrow phase for calculate_shortest_distance)
+# ---------------------------------------------------------------------------
+
+
+def _point_to_triangle_distance(p, a, b, c):
+    """Return the orthogonal distance from point *p* to each triangle (a, b, c).
+
+    Vectorised over a batch of triangles: *p* is a single (3,) point while
+    *a*, *b* and *c* are (M, 3) arrays of the triangles' corners. Returns an
+    (M,) array of distances in the same units as the inputs.
+
+    This is Ericson's closest-point-on-triangle (Real-Time Collision
+    Detection, 5.1.5) evaluated in barycentric coordinates, with every region
+    test written as a mask so the whole batch resolves in one pass. The seven
+    Voronoi regions of a triangle -- its three corners, its three edges and
+    its interior -- are each handled explicitly, so a point whose projection
+    falls outside the triangle gets the distance to the nearest edge or
+    corner rather than to the unbounded plane.
+
+    Degenerate triangles (zero area, or a repeated corner) would divide by
+    zero; their denominators are clamped and the corresponding results fall
+    back to a corner distance, which is correct for a collapsed triangle.
+
+    Args:
+        p: The query point, shape (3,).
+        a: First corner of each triangle, shape (M, 3).
+        b: Second corner of each triangle, shape (M, 3).
+        c: Third corner of each triangle, shape (M, 3).
+
+    Returns:
+        (M,) array of point-to-triangle distances.
+    """
+    p = np.asarray(p, dtype=float).reshape(3)
+    a = np.atleast_2d(np.asarray(a, dtype=float))
+    b = np.atleast_2d(np.asarray(b, dtype=float))
+    c = np.atleast_2d(np.asarray(c, dtype=float))
+
+    ab = b - a
+    ac = c - a
+    ap = p - a
+
+    d1 = np.einsum("ij,ij->i", ab, ap)
+    d2 = np.einsum("ij,ij->i", ac, ap)
+
+    bp = p - b
+    d3 = np.einsum("ij,ij->i", ab, bp)
+    d4 = np.einsum("ij,ij->i", ac, bp)
+
+    cp = p - c
+    d5 = np.einsum("ij,ij->i", ab, cp)
+    d6 = np.einsum("ij,ij->i", ac, cp)
+
+    va = d3 * d6 - d5 * d4
+    vb = d5 * d2 - d1 * d6
+    vc = d1 * d4 - d3 * d2
+
+    def _safe(denominator):
+        """Avoid 0/0 on degenerate triangles; masked-out lanes are discarded."""
+        return np.where(np.abs(denominator) < 1e-20, 1.0, denominator)
+
+    # Interior (the general case) -- barycentric weights from the sub-areas.
+    denom = _safe(va + vb + vc)
+    v = vb / denom
+    w = vc / denom
+    closest = a + ab * v[:, None] + ac * w[:, None]
+
+    # Edge BC.
+    on_bc = (va <= 0.0) & ((d4 - d3) >= 0.0) & ((d5 - d6) >= 0.0)
+    w_bc = (d4 - d3) / _safe((d4 - d3) + (d5 - d6))
+    closest = np.where(on_bc[:, None], b + (c - b) * w_bc[:, None], closest)
+
+    # Edge AC.
+    on_ac = (vb <= 0.0) & (d2 >= 0.0) & (d6 <= 0.0)
+    w_ac = d2 / _safe(d2 - d6)
+    closest = np.where(on_ac[:, None], a + ac * w_ac[:, None], closest)
+
+    # Edge AB.
+    on_ab = (vc <= 0.0) & (d1 >= 0.0) & (d3 <= 0.0)
+    v_ab = d1 / _safe(d1 - d3)
+    closest = np.where(on_ab[:, None], a + ab * v_ab[:, None], closest)
+
+    # Corners last, so they win over the edge regions they border.
+    closest = np.where(((d6 >= 0.0) & (d5 <= d6))[:, None], c, closest)
+    closest = np.where(((d3 >= 0.0) & (d4 <= d3))[:, None], b, closest)
+    closest = np.where(((d1 <= 0.0) & (d2 <= 0.0))[:, None], a, closest)
+
+    return np.linalg.norm(closest - p, axis=1)
+
+
 class IFCGeometryExtractor:
     """
     Extracts geometric properties from IFC elements via ifcopenshell.geom tessellation.
@@ -152,11 +242,15 @@ class IFCGeometryExtractor:
         # Keyed on the STEP entity instance id, never on id(element): see
         # _get_shape for why the Python object address is not an identity.
         self._shape_cache: dict[int, object] = {}  # STEP #id → shape
-        # Vertex clouds and their KD-trees, keyed the same way and for the same
-        # reason. XM-001 sweeps every dissimilar-material pair in a network, so
-        # an element is queried once per candidate partner; rebuilding its tree
-        # each time turns an O(n) extraction into O(n^2) tessellations.
-        self._vertex_cache: dict[int, object] = {}   # STEP #id → (N, 3) mm array
+        # Triangle meshes and their KD-trees, keyed the same way and for the
+        # same reason. XM-001 sweeps every dissimilar-material pair in a
+        # network, so an element is queried once per candidate partner;
+        # rebuilding its tree each time turns an O(n) extraction into O(n^2)
+        # tessellations. The mesh caches the FACES alongside the vertices
+        # because calculate_shortest_distance's narrow phase measures to
+        # triangles, not to the vertex cloud alone.
+        # STEP #id → ((N, 3) mm vertices, (M, 3) triangle indices) or None
+        self._mesh_cache: dict[int, object] = {}
         self._kdtree_cache: dict[int, object] = {}   # STEP #id → cKDTree
 
         if IFCOS_AVAILABLE and ifc_model is not None:
@@ -548,25 +642,37 @@ class IFCGeometryExtractor:
 
     # ── PROXIMITY / SEPARATION ────────────────────────────────────────────────
 
-    def _get_vertices_mm(self, element):
-        """Return the element's world-coordinate vertices as an (N, 3) mm array.
+    def _get_mesh_mm(self, element):
+        """Return the element's world-coordinate triangle mesh, in millimetres.
 
-        Returns None when the element has no resolvable tessellation, when
-        numpy is unavailable, or when the mesh is empty. Cached on the STEP
-        entity id for the same identity reason as _get_shape.
+        Returns ``(vertices, faces)`` where *vertices* is an (N, 3) float
+        array of mm coordinates and *faces* is an (M, 3) integer array of
+        indices into it — the triangles the narrow phase of
+        calculate_shortest_distance measures against. Both are returned
+        together, and cached together, because a vertex cloud on its own
+        cannot answer "how far is this point from that surface?": a contact
+        landing mid-face carries no vertex anywhere near it.
+
+        Returns ``(None, None)`` when the element has no resolvable
+        tessellation, when numpy is unavailable, or when the mesh is empty.
+        *faces* alone may be None for a mesh whose vertices resolved but whose
+        connectivity did not; callers must then fall back to the vertex cloud.
+        Cached on the STEP entity id for the same identity reason as
+        _get_shape.
         """
         if not _NP_AVAILABLE:
-            return None
+            return None, None
 
         eid = None
         try:
             eid = element.id()
         except Exception:
             eid = None
-        if eid is not None and eid in self._vertex_cache:
-            return self._vertex_cache[eid]
+        if eid is not None and eid in self._mesh_cache:
+            return self._mesh_cache[eid]
 
         verts = None
+        faces = None
         shape = self._get_shape(element)
         if shape is not None:
             try:
@@ -585,9 +691,32 @@ class IFCGeometryExtractor:
                 logger.debug(f"vertex extraction failed for {element}: {exc}")
                 verts = None
 
+            if verts is not None:
+                try:
+                    if IFCOS_AVAILABLE:
+                        faces = np.asarray(
+                            _ifcos_shape.get_faces(shape.geometry), dtype=np.intp
+                        )
+                    else:
+                        faces = np.asarray(
+                            shape.geometry.faces, dtype=np.intp
+                        ).reshape(-1, 3)
+                    if faces.size == 0:
+                        faces = None
+                    else:
+                        faces = faces.reshape(-1, 3)
+                except Exception as exc:
+                    logger.debug(f"face extraction failed for {element}: {exc}")
+                    faces = None
+
+        mesh = (verts, faces)
         if eid is not None:
-            self._vertex_cache[eid] = verts
-        return verts
+            self._mesh_cache[eid] = mesh
+        return mesh
+
+    def _get_vertices_mm(self, element):
+        """Return just the (N, 3) mm vertex cloud from _get_mesh_mm, or None."""
+        return self._get_mesh_mm(element)[0]
 
     def _get_kdtree(self, element):
         """Return a cKDTree over the element's world vertices, or None."""
@@ -615,13 +744,55 @@ class IFCGeometryExtractor:
             self._kdtree_cache[eid] = tree
         return tree
 
+    @staticmethod
+    def _surface_distance_from(point, verts, faces, vertex_index):
+        """Distance from *point* to the faces of a mesh incident on one vertex.
+
+        The narrow phase of calculate_shortest_distance. *vertex_index* is the
+        broad phase's answer — the mesh vertex nearest *point* — and the
+        triangles that share it are the only ones that can carry a closer
+        surface point, so only those are measured.
+
+        Returns None when the mesh has no connectivity or no triangle touches
+        that vertex, which the caller reads as "no narrow-phase improvement"
+        rather than as a measurement.
+        """
+        if faces is None or verts is None:
+            return None
+        incident = faces[np.any(faces == vertex_index, axis=1)]
+        if incident.size == 0:
+            return None
+        distances = _point_to_triangle_distance(
+            point,
+            verts[incident[:, 0]],
+            verts[incident[:, 1]],
+            verts[incident[:, 2]],
+        )
+        if distances.size == 0:
+            return None
+        return float(np.min(distances))
+
     def calculate_shortest_distance(self, element_a, element_b) -> float | None:
         """Return the shortest distance between two elements in millimetres.
 
-        Both elements are tessellated in world coordinates and the minimum
-        vertex-to-vertex separation is found with a scipy cKDTree over one
-        cloud queried by the other. The result is symmetric: the minimum over
-        all cross pairs does not depend on which cloud builds the tree.
+        Both elements are tessellated in world coordinates and measured in two
+        phases:
+
+          * Broad phase — a scipy cKDTree over one vertex cloud, queried by
+            the other, finds the closest vertex PAIR in O(log N) per query.
+          * Narrow phase — the triangles incident on each of those two
+            vertices are measured against the opposite vertex with
+            _point_to_triangle_distance, giving a true point-to-surface
+            distance rather than a point-to-point one.
+
+        The narrow phase is what closes the mid-span blind spot: two coarse
+        boxes meeting along a face interior — a branch tee landing mid-span on
+        a riser — carry no vertices near the contact patch, so a
+        vertex-to-vertex read put them hundreds of millimetres apart while
+        their surfaces were touching. Measuring to the face reads 0 mm.
+
+        Both directions are measured and the minimum taken, so the result
+        stays symmetric: it does not depend on which cloud builds the tree.
 
         Tri-state contract — this returns None (Undetermined), never a
         distance the caller could mistake for a measurement, whenever the
@@ -634,20 +805,23 @@ class IFCGeometryExtractor:
         A caller must therefore treat None as "not assessed" and must not
         compare it against a clearance threshold.
 
-        Accuracy note: this is a *vertex*-to-vertex distance, so it is an
-        upper bound on true surface-to-surface separation — a coarsely
-        tessellated face can carry its nearest surface point well away from
-        any vertex. It is exact for coincident vertices (0.0) and tightens as
-        mesh density rises, which makes it sound for the "are these two
-        elements touching or near-touching?" question XM-001 asks, and
-        unsuitable for certifying a precise clearance.
+        Accuracy note: the narrow phase searches only the triangles incident
+        on the broad phase's closest vertex pair, which is exact whenever the
+        true closest surface point lies on one of them — the case for the
+        contact and near-contact geometry XM-001 asks about. It remains an
+        upper bound in the general case (a long sliver face whose nearest
+        point sits far from every vertex of the closest pair), so the result
+        is sound for "are these two elements touching or near-touching?" and
+        still unsuitable for certifying a precise clearance. A mesh whose
+        connectivity the mesher did not supply falls back to the
+        vertex-to-vertex distance.
 
         Args:
             element_a: First IFC element.
             element_b: Second IFC element.
 
         Returns:
-            Shortest vertex-to-vertex distance in mm, or None if undetermined.
+            Shortest surface distance in mm, or None if undetermined.
         """
         if element_a is None or element_b is None:
             return None
@@ -655,7 +829,10 @@ class IFCGeometryExtractor:
             logger.debug("shortest distance undetermined — scipy/numpy unavailable")
             return None
 
-        verts_b = self._get_vertices_mm(element_b)
+        verts_a, faces_a = self._get_mesh_mm(element_a)
+        if verts_a is None:
+            return None
+        verts_b, faces_b = self._get_mesh_mm(element_b)
         if verts_b is None:
             return None
 
@@ -664,8 +841,23 @@ class IFCGeometryExtractor:
             return None
 
         try:
-            distances, _ = tree_a.query(verts_b, k=1)
-            return round(float(np.min(distances)), 4)
+            # Broad phase: the closest vertex pair, and the vertex distance
+            # that is the upper bound the narrow phase refines downward.
+            distances, a_indices = tree_a.query(verts_b, k=1)
+            b_index = int(np.argmin(distances))
+            a_index = int(a_indices[b_index])
+            best = float(distances[b_index])
+
+            # Narrow phase, once per direction so the result stays symmetric.
+            for point, verts, faces, index in (
+                (verts_a[a_index], verts_b, faces_b, b_index),
+                (verts_b[b_index], verts_a, faces_a, a_index),
+            ):
+                surface = self._surface_distance_from(point, verts, faces, index)
+                if surface is not None and surface < best:
+                    best = surface
+
+            return round(best, 4)
         except Exception as exc:
             logger.debug(f"shortest distance failed for {element_a}/{element_b}: {exc}")
             return None

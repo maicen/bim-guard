@@ -1068,7 +1068,7 @@ def _geometric_adjacency(
     Each candidate is measured against every element whose bounding box is
     within tolerance (the mesher-free lower-bound prune above), using
     IFCGeometryExtractor.calculate_shortest_distance — a tessellated
-    vertex-to-vertex distance in millimetres.
+    point-to-surface distance in millimetres.
 
     TRI-STATE
         A candidate is credited to this tier only when its OWN tessellation
@@ -1084,12 +1084,14 @@ def _geometric_adjacency(
     recovered element reads "geometry", and a Tier 2 element this tier
     augmented reads "centerline+geometry".
 
-    Tolerance note: the vertex distance is an UPPER bound on true surface
-    separation (see calculate_shortest_distance), so a coarsely tessellated
-    pipe can read as separated when its surfaces actually meet. The shared
-    50 mm default tolerance absorbs that slack. The residual risk is a missed
-    contact, not a fabricated one — and a missed direct contact between
-    connected elements still surfaces through XM-001's same_loop path.
+    Tolerance note: the measurement is point-to-triangle, so a contact
+    landing mid-face — a branch tee meeting a riser between its vertices —
+    reads as the 0 mm it is, not as the corner-to-corner distance a
+    vertex-only read returned. It remains an upper bound in the general case
+    (see calculate_shortest_distance), and the shared 50 mm default tolerance
+    absorbs that residual slack. The residual risk is a missed contact, not a
+    fabricated one — and a missed direct contact between connected elements
+    still surfaces through XM-001's same_loop path.
 
     Args:
         model: The open IFC model, for GlobalId -> entity lookups.

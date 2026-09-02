@@ -3,7 +3,7 @@ XM-001 cross-material extraction primitives.
 
 Covers the two Module 2 reads the cross-material comparator depends on:
 
-  * IFCGeometryExtractor.calculate_shortest_distance — vertex-to-vertex
+  * IFCGeometryExtractor.calculate_shortest_distance — point-to-surface
     separation between two elements, in millimetres, via scipy cKDTree.
   * piping_producer.extract_normalized_material — IfcRelAssociatesMaterial
     traversal normalised to a CANONICAL_MATERIALS key.

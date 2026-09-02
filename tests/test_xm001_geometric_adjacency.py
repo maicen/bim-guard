@@ -397,23 +397,17 @@ def test_missing_bbox_cannot_prune():
 
 
 # ---------------------------------------------------------------------------
-# Known limitation, pinned
+# Mid-span contact (narrow-phase point-to-triangle measurement)
 # ---------------------------------------------------------------------------
 
 
-def test_mid_span_contact_is_not_detected_by_vertex_distance():
-    """A documented blind spot, pinned so it is known rather than discovered.
+def test_mid_span_contact_is_detected_by_surface_distance():
+    """A branch landing mid-span on a riser reads 0 mm, not the corner gap.
 
-    calculate_shortest_distance measures vertex to vertex, so it only sees a
-    contact where both meshes carry vertices. Two coarse boxes meeting along
-    a face interior - a branch tee landing mid-span on a pipe - have no
-    vertices near the contact patch, and the nearest pair sits at the far
-    corners instead.
-
-    The error direction is safe: the tier under-reports contact rather than
-    inventing it, and a connected pair still reaches XM-001 through its
-    same_loop path. Closing it needs point-to-triangle distance over the
-    mesh faces, not a denser vertex cloud.
+    The two coarse boxes touch along a face interior, so neither mesh carries
+    a vertex anywhere near the contact patch and the closest vertex pair sits
+    900 mm apart. Only the narrow phase - point to triangle, over the faces
+    incident on that pair - sees the contact.
     """
     from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
 
@@ -424,8 +418,76 @@ def test_mid_span_contact_is_not_detected_by_vertex_distance():
     measured = IFCGeometryExtractor(f).calculate_shortest_distance(riser, branch)
 
     assert measured is not None
-    assert measured > 50.0, (
-        "If this now reads ~0, the distance function gained face-aware "
-        "measurement - delete this test and drop the caveat from "
-        "calculate_shortest_distance and _geometric_adjacency."
+    assert measured == pytest.approx(0.0, abs=1e-6)
+
+
+def test_mid_span_measurement_is_symmetric():
+    """Both directions are measured, so argument order cannot change the answer."""
+    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+
+    f, body = _new_model()
+    riser = _add(f, body, "IfcPipeSegment", "P1", "Copper", (100, 100, 2000), (0, 0, 0))
+    branch = _add(f, body, "IfcPipeFitting", "T1", "Galvanised Steel", (500, 100, 100), (120, 0, 900))
+
+    extractor = IFCGeometryExtractor(f)
+    assert extractor.calculate_shortest_distance(riser, branch) == pytest.approx(
+        extractor.calculate_shortest_distance(branch, riser)
     )
+
+
+def test_mid_span_gap_is_measured_not_rounded_to_contact():
+    """A branch stopped 20 mm short of the riser face measures 20 mm, not 0."""
+    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+
+    f, body = _new_model()
+    riser = _add(f, body, "IfcPipeSegment", "P1", "Copper", (100, 100, 2000), (0, 0, 0))
+    branch = _add(f, body, "IfcPipeFitting", "T1", "Galvanised Steel", (500, 100, 100), (120, 0, 900))
+
+    measured = IFCGeometryExtractor(f).calculate_shortest_distance(riser, branch)
+
+    assert measured == pytest.approx(20.0, abs=0.01)
+
+
+# ---------------------------------------------------------------------------
+# _point_to_triangle_distance
+# ---------------------------------------------------------------------------
+
+
+def test_point_to_triangle_measures_to_the_face_interior():
+    """A point above the middle of a triangle measures its perpendicular height."""
+    from app.modules.module2_ifc_read.ifc_geometry import _point_to_triangle_distance
+
+    a = np.array([[0.0, 0.0, 0.0]])
+    b = np.array([[10.0, 0.0, 0.0]])
+    c = np.array([[0.0, 10.0, 0.0]])
+
+    assert _point_to_triangle_distance(np.array([2.0, 2.0, 5.0]), a, b, c)[0] == pytest.approx(5.0)
+
+
+def test_point_to_triangle_falls_back_to_edge_and_corner():
+    """Outside the face, the nearest point is on an edge or at a corner."""
+    from app.modules.module2_ifc_read.ifc_geometry import _point_to_triangle_distance
+
+    a = np.array([[0.0, 0.0, 0.0]])
+    b = np.array([[10.0, 0.0, 0.0]])
+    c = np.array([[0.0, 10.0, 0.0]])
+
+    # Beyond edge AB in -Y: nearest point is on the edge itself.
+    assert _point_to_triangle_distance(np.array([5.0, -3.0, 0.0]), a, b, c)[0] == pytest.approx(3.0)
+    # Beyond corner B in +X: nearest point is the corner.
+    assert _point_to_triangle_distance(np.array([14.0, 0.0, 0.0]), a, b, c)[0] == pytest.approx(4.0)
+
+
+def test_point_to_triangle_is_vectorised_over_a_batch():
+    """One point against many triangles returns one distance per triangle."""
+    from app.modules.module2_ifc_read.ifc_geometry import _point_to_triangle_distance
+
+    a = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 100.0]])
+    b = np.array([[10.0, 0.0, 0.0], [10.0, 0.0, 100.0]])
+    c = np.array([[0.0, 10.0, 0.0], [0.0, 10.0, 100.0]])
+
+    distances = _point_to_triangle_distance(np.array([1.0, 1.0, 40.0]), a, b, c)
+
+    assert distances.shape == (2,)
+    assert distances[0] == pytest.approx(40.0)
+    assert distances[1] == pytest.approx(60.0)
