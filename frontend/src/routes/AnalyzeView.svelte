@@ -32,6 +32,8 @@
     ArrowDown,
   } from "lucide-svelte";
   import { analyzeApi, projectsApi, rulesApi } from "../lib/api";
+  import HoverCard from "../lib/components/HoverCard.svelte";
+  import { describeMechanism } from "../lib/glossary";
   import type {
     AnalysisResult,
     Project,
@@ -545,25 +547,45 @@
             >Engines</span
           >
           {#each PIPING_ENGINES as engine}
-            <label
-              title={engine.title}
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border cursor-pointer select-none transition-colors {selectedEngines.includes(
-                engine.id,
-              )
-                ? 'bg-amber-950/60 text-amber-300 border-amber-800/80'
-                : 'bg-slate-900/60 text-slate-500 border-slate-800 hover:text-slate-300'}"
+            {@const info = describeMechanism(engine.label)}
+            <!-- Deciding which engines to run is a real choice, and the
+                 five codes alone do not support it. The card says what each
+                 kernel actually scores and which standard it answers to. -->
+            <HoverCard
+              side="bottom"
+              align="center"
+              width="w-80"
+              focusable={false}
+              title="{engine.label} — {engine.title}"
+              subtitle={selectedEngines.includes(engine.id)
+                ? "Included in this run"
+                : "Excluded from this run"}
+              showFooter={!!info?.reference}
             >
-              <input
-                type="checkbox"
-                class="sr-only"
-                checked={selectedEngines.includes(engine.id)}
-                on:change={() => toggleEngine(engine.id)}
-              />
-              {#if selectedEngines.includes(engine.id)}
-                <Check class="w-3 h-3" />
-              {/if}
-              <span>{engine.label}</span>
-            </label>
+              <label
+                slot="trigger"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border cursor-pointer select-none transition-colors {selectedEngines.includes(
+                  engine.id,
+                )
+                  ? 'bg-amber-950/60 text-amber-300 border-amber-800/80'
+                  : 'bg-slate-900/60 text-slate-500 border-slate-800 hover:text-slate-300'}"
+              >
+                <input
+                  type="checkbox"
+                  class="sr-only"
+                  checked={selectedEngines.includes(engine.id)}
+                  on:change={() => toggleEngine(engine.id)}
+                />
+                {#if selectedEngines.includes(engine.id)}
+                  <Check class="w-3 h-3" />
+                {/if}
+                <span>{engine.label}</span>
+              </label>
+
+              {info?.description || engine.title}
+
+              <span slot="footer" class="font-mono">{info?.reference}</span>
+            </HoverCard>
           {/each}
         </div>
       {/if}

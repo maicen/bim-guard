@@ -22,8 +22,11 @@ pytest.importorskip("ifcopenshell.api")  # attaches ifcopenshell.api submodule
 from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor  # noqa: E402
 
 
-def _build_model(unit: dict | None, length: float, width: float, height: float):
-    """Return (ifc_file, wall) with a box authored in raw model units.
+def _build_model(
+    unit: dict | None, length: float, width: float, height: float,
+    ifc_class: str = "IfcWall",
+):
+    """Return (ifc_file, element) with a box authored in raw model units.
 
     The profile is written directly as IfcCartesianPoints so the numbers in
     the file are exactly *length*, *width*, *height* -- no API-side unit
@@ -39,8 +42,8 @@ def _build_model(unit: dict | None, length: float, width: float, height: float):
         context_type="Model", context_identifier="Body",
         target_view="MODEL_VIEW", parent=ctx,
     )
-    wall = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWall")
-    ifcopenshell.api.run("geometry.edit_object_placement", f, product=wall)
+    element = ifcopenshell.api.run("root.create_entity", f, ifc_class=ifc_class)
+    ifcopenshell.api.run("geometry.edit_object_placement", f, product=element)
 
     pts = [(0.0, 0.0), (length, 0.0), (length, width), (0.0, width), (0.0, 0.0)]
     poly = f.createIfcPolyline([f.createIfcCartesianPoint(p) for p in pts])
@@ -52,8 +55,8 @@ def _build_model(unit: dict | None, length: float, width: float, height: float):
         height,
     )
     rep = f.createIfcShapeRepresentation(body, "Body", "SweptSolid", [solid])
-    ifcopenshell.api.run("geometry.assign_representation", f, product=wall, representation=rep)
-    return f, wall
+    ifcopenshell.api.run("geometry.assign_representation", f, product=element, representation=rep)
+    return f, element
 
 
 def _extent(bbox: dict, axis: str) -> float:
@@ -188,3 +191,34 @@ def test_extractor_without_model_is_inert():
     assert ex._unit_scale == 1.0
     assert ex._mesher_scale == 1.0
     assert ex.get_bounding_box(None) is None
+
+
+# ── ClearWidth on a door/window leaf ─────────────────────────────────────────
+
+def test_clear_width_on_door_uses_overall_width_not_leaf_thickness():
+    """A door leaf is a thin panel, not a room footprint.
+
+    get_corridor_width_mm() returns the SHORTEST side of the element's own
+    bounding footprint -- correct for a room/corridor (its narrow passable
+    dimension), but wrong for a door: the shortest side of a 950mm-wide,
+    50mm-thick leaf is the 50mm leaf thickness, not the openable width.
+    ClearWidth on an IfcDoor/IfcWindow should resolve like OverallWidth
+    (the larger horizontal span) instead.
+    """
+    unit = {"is_metric": True, "raw": "MILLIMETERS"}
+    f, door = _build_model(unit, 950.0, 50.0, 2125.0, ifc_class="IfcDoor")
+    ex = IFCGeometryExtractor(f)
+
+    assert ex.get_width_mm(door) == pytest.approx(950.0)
+    assert ex.get_corridor_width_mm(door) == pytest.approx(50.0)  # leaf thickness
+    assert ex.get_geometry_value(door, "ClearWidth") == pytest.approx(950.0)
+    assert ex.get_geometry_value(door, "OverallWidth") == pytest.approx(950.0)
+
+
+def test_corridor_width_still_used_for_rooms():
+    """Non-door/window elements keep the room/corridor narrow-passage algorithm."""
+    unit = {"is_metric": True, "raw": "MILLIMETERS"}
+    f, wall = _build_model(unit, 5000.0, 1200.0, 2500.0, ifc_class="IfcWall")
+    ex = IFCGeometryExtractor(f)
+
+    assert ex.get_geometry_value(wall, "ClearWidth") == pytest.approx(1200.0)

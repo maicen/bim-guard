@@ -77,7 +77,7 @@ _GEOMETRY_PROPERTY_MAP: dict[str, str] = {
     "nominalheight":       "height",
     "grossheight":         "height",
     "headroomclearance":   "height",
-    "requireheadroom":     "height",
+    "requiredheadroom":    "height",
     "headroom":            "height",
     # Horizontal extent — axis-aligned max span
     "width":               "width",
@@ -891,6 +891,18 @@ class IFCGeometryExtractor:
             return self.get_height_mm(element)
 
         if method == "width":
+            return self.get_width_mm(element)
+
+        if method == "corridor_width" and element is not None and element.is_a() in (
+            "IfcDoor", "IfcDoorStandardCase", "IfcWindow", "IfcWindowStandardCase",
+        ):
+            # get_corridor_width_mm() returns the SHORTER side of the element's
+            # own footprint -- correct for a room/corridor (its narrow passable
+            # dimension) but not for a door/window leaf, whose own footprint is
+            # a thin panel: the shorter side there is the frame/leaf thickness,
+            # not the openable width. OverallWidth (the larger horizontal span)
+            # is the closest available proxy for clear/passage width on these
+            # elements -- see docs/ifc-property-mapping.md's ClearWidth row.
             return self.get_width_mm(element)
 
         if method == "corridor_width":
