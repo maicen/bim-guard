@@ -2,7 +2,7 @@
 tests/test_module1.py
 ----------------------
 Unit tests for Module 1 — SectionChunker, KeywordFilter, TableRuleBuilder,
-DoclingExtractor (PDF parsing), and regression snapshots.
+UnstructuredExtractor (PDF parsing), and regression snapshots.
 
 Run with: pytest tests/test_module1.py -v
 
@@ -361,11 +361,12 @@ def test_table_builder_multiple_tables(store_and_gen):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DoclingExtractor tests (PDF parsing — the critical gap)
+# UnstructuredExtractor tests (PDF parsing — the critical gap)
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# These require real PDFs in tests/fixtures/.  Mark them so they only run
-# when fixtures are present (won't break CI if PDFs aren't committed).
+# These require real PDFs in tests/fixtures/ AND a configured
+# UNSTRUCTURED_API_KEY.  Mark them so they only run when both are present
+# (won't break CI if PDFs aren't committed or no key is configured).
 
 
 def _skip_if_missing_pdf(name):
@@ -379,39 +380,37 @@ SAMPLE_PDF_PATH = os.path.join(FIXTURES_DIR, SAMPLE_PDF)
 
 
 @pytest.fixture
-def docling_extractor():
-    """Import lazily — Docling may not be installed in all environments."""
+def unstructured_extractor():
+    """Import lazily — requires unstructured-client and UNSTRUCTURED_API_KEY."""
     try:
-        from module1_doc_parser.docling_extractor import DoclingExtractor
+        from module1_doc_parser.unstructured_extractor import UnstructuredExtractor
 
-        return DoclingExtractor()
-    except ImportError:
-        pytest.skip("DoclingExtractor not available (Docling not installed)")
+        return UnstructuredExtractor()
+    except (ImportError, RuntimeError) as exc:
+        pytest.skip(f"UnstructuredExtractor not available: {exc}")
 
 
 @pytest.mark.slow
-class TestDoclingExtractor:
+class TestUnstructuredExtractor:
     """
-    Tests that run against real PDFs.
+    Tests that run against real PDFs via the Unstructured hosted API.
     Run with:  pytest tests/test_module1.py -m slow -v
     Skip with: pytest tests/test_module1.py -m "not slow"
     """
 
     @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_returns_text(self, docling_extractor):
+    def test_extraction_returns_text(self, unstructured_extractor):
         """PDF extraction must return non-empty text."""
-        result = docling_extractor.extract(SAMPLE_PDF_PATH)
-        text = result if isinstance(result, str) else result.get("text", "")
+        text, _tables = unstructured_extractor.extract(SAMPLE_PDF_PATH)
         assert len(text) > 100, "Extracted text is suspiciously short"
 
     @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_contains_expected_terms(self, docling_extractor):
+    def test_extraction_contains_expected_terms(self, unstructured_extractor):
         """
         Extracted text should contain known terms from the fixture PDF.
         ── CUSTOMIZE these expected terms for your actual fixture PDF ──
         """
-        result = docling_extractor.extract(SAMPLE_PDF_PATH)
-        text = result if isinstance(result, str) else result.get("text", "")
+        text, _tables = unstructured_extractor.extract(SAMPLE_PDF_PATH)
         text_lower = text.lower()
 
         expected_terms = ["stair", "shall", "mm"]  # adjust to your PDF
@@ -419,20 +418,19 @@ class TestDoclingExtractor:
             assert term in text_lower, f"Expected term '{term}' not found in extracted text"
 
     @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_finds_tables(self, docling_extractor):
+    def test_extraction_finds_tables(self, unstructured_extractor):
         """If the PDF has tables, extraction should return table data."""
-        result = docling_extractor.extract(SAMPLE_PDF_PATH)
-        tables = result.get("tables", []) if isinstance(result, dict) else []
+        _text, tables = unstructured_extractor.extract(SAMPLE_PDF_PATH)
         # This is a soft check — skip if your fixture has no tables
         if tables:
             assert len(tables) >= 1
             assert tables[0].get("row_count", 0) > 0
 
     @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_handles_corrupt_pdf(self, docling_extractor):
+    def test_extraction_handles_corrupt_pdf(self, unstructured_extractor):
         """Corrupt or missing files should raise cleanly, not crash."""
         with pytest.raises(Exception):
-            docling_extractor.extract("/tmp/does_not_exist.pdf")
+            unstructured_extractor.extract("/tmp/does_not_exist.pdf")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

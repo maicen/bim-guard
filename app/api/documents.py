@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.api.dependencies import get_documents_service
 from app.logging_config import get_logger
@@ -107,21 +108,30 @@ async def upload_document(
     originator: Annotated[str, Form()] = "",
     suitability_code: Annotated[str, Form()] = "S0",
     revision_code: Annotated[str, Form()] = "P01.01",
+    parser: Annotated[str, Form()] = "auto",
     service: Annotated[DocumentService, Depends(get_documents_service)] = None,
 ) -> DocumentDetailResponse:
-    """Upload a specification document (PDF, TXT, MD) and extract text."""
+    """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and extract text.
+
+    `parser` selects the extraction engine: "auto" (Unstructured's Workflow/
+    Jobs API, falling back to a light local extractor), "unstructured"
+    (force the hosted API — an async job, several to tens of seconds per
+    document), or "light" (force the local extractor — pypdf/python-docx/
+    openpyxl/csv, no upload, no API key, effectively instant).
+    """
     if service is None:
         service = DocumentService()
-
-    valid, error_msg = validate_document_upload(file)
-    if not valid:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
 
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
 
     clean_filename = safe_upload_name(file.filename)
+
+    error_msg = validate_document_upload(clean_filename, file.content_type, content)
+    if error_msg:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
+
     clean_doc_type = (doc_type or "").strip() or "Specification"
     file_md5 = md5_hex(content)
 
@@ -157,17 +167,19 @@ async def upload_document(
             cde_state=existing.get("cde_state") or "WIP",
         )
 
-    # Extract text based on file extension
-    extracted_text = ""
-    lower_name = clean_filename.lower()
-    if lower_name.endswith(".pdf"):
-        try:
-            extracted_text = service.parse_pdf_content(content)
-        except Exception as exc:
-            logger.warning("PDF extraction failed: %s", exc)
-            extracted_text = f"[Text extraction error: {exc}]"
-    else:
-        extracted_text = content.decode("utf-8", errors="replace")
+    clean_parser = (parser or "auto").strip().lower()
+    try:
+        # The Unstructured path runs an async job under the hood (several to
+        # tens of seconds) — offload to a worker thread so it doesn't block
+        # the event loop for every other in-flight request.
+        extracted_text = await run_in_threadpool(
+            service.extract_document_text, clean_filename, content, parser=clean_parser
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.warning("Document extraction failed filename=%s parser=%s error=%s", clean_filename, clean_parser, exc)
+        extracted_text = f"[Text extraction error: {exc}]"
 
     file_path = service.store_document_file(clean_filename, content)
     created = service.create_document(

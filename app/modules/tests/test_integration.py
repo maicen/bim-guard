@@ -99,13 +99,13 @@ def pipeline():
 
 
 @pytest.fixture
-def docling_extractor():
+def unstructured_extractor():
     try:
-        from module1_doc_parser.docling_extractor import DoclingExtractor
+        from module1_doc_parser.unstructured_extractor import UnstructuredExtractor
 
-        return DoclingExtractor()
-    except ImportError:
-        pytest.skip("DoclingExtractor not available")
+        return UnstructuredExtractor()
+    except (ImportError, RuntimeError) as exc:
+        pytest.skip(f"UnstructuredExtractor not available: {exc}")
 
 
 def _has_fixture(pdf_name):
@@ -121,7 +121,7 @@ def _has_fixture(pdf_name):
 @pytest.mark.llm
 class TestFullPipeline:
     @pytest.mark.parametrize("case", INTEGRATION_CASES, ids=[c["id"] for c in INTEGRATION_CASES])
-    def test_pipeline_end_to_end(self, case, pipeline, docling_extractor):
+    def test_pipeline_end_to_end(self, case, pipeline, unstructured_extractor):
         """
         Full pipeline: PDF → extract → chunk → filter → generate rules → validate.
         """
@@ -129,10 +129,8 @@ class TestFullPipeline:
         if not os.path.exists(pdf_path):
             pytest.skip(f"Fixture not found: {case['pdf']}")
 
-        # ── Step 1: Extract text from PDF (Module 1 — DoclingExtractor) ──
-        result = docling_extractor.extract(pdf_path)
-        text = result if isinstance(result, str) else result.get("text", "")
-        tables = result.get("tables", []) if isinstance(result, dict) else []
+        # ── Step 1: Extract text from PDF (Module 1 — UnstructuredExtractor) ──
+        text, tables = unstructured_extractor.extract(pdf_path)
 
         assert len(text) > 50, "Extraction returned too little text"
 

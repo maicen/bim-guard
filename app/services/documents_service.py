@@ -178,9 +178,14 @@ class DocumentService:
         self.delete_document(document_id)
 
     @staticmethod
-    def parse_pdf_content(content: bytes) -> str:
-        """Parse raw PDF content bytes via doc parser module."""
-        from app.modules.module1_doc_parser import Module1_DocReader
+    def extract_document_text(filename: str, content: bytes, parser: str = "auto") -> str:
+        """Extract text from raw uploaded file bytes via the document parser module.
 
-        reader = Module1_DocReader()
-        return reader.parse_pdf(content)
+        parser: "auto" (Unstructured hosted API, falling back to the light
+        local extractor), "unstructured" (force the hosted API), or "light"
+        (force the local extractor). See module1_doc_parser/document_extractor.py.
+        """
+        from app.modules.module1_doc_parser.document_extractor import extract_document_text
+
+        text, _tables = extract_document_text(filename, content, parser=parser)
+        return text

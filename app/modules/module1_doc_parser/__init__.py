@@ -6,42 +6,32 @@ Public interface for Module 1 — PDF → structured text pipeline.
 Exports
 -------
 Module1_DocReader
-    Basic pypdf-based reader. Used as a fallback in the web pipeline
-    and for plain text / markdown uploads.
+    Thin wrapper around LightExtractor's pypdf reader. Used as a fallback
+    in the web pipeline and for plain text / markdown uploads.
 
 run_module1_pipeline(pdf_path, **kwargs) -> dict
-    Full enhanced pipeline (Docling + TF-IDF + optional BERT).
+    Full enhanced pipeline (Unstructured/LightExtractor + TF-IDF + optional BERT).
     Works both from the web app and as a CLI call.
     Returns the same summary dict as the CLI would print.
 """
 
 import re
-from io import BytesIO
-
-from pypdf import PdfReader
 
 
 class Module1_DocReader:
     """
-    Basic PDF reader (pypdf).
-    Used as the pypdf fallback when Docling is unavailable or fails.
+    Basic PDF reader (pypdf, via LightExtractor).
+    Used as the light fallback when the Unstructured hosted API is
+    unavailable, unconfigured, or fails.
     """
 
     def parse_pdf(self, file_content: bytes) -> str:
         """Parse PDF document bytes and return extracted text."""
         if not file_content:
             return ""
-        try:
-            reader = PdfReader(BytesIO(file_content))
-        except Exception:
-            return ""
+        from app.modules.module1_doc_parser.light_extractor import LightExtractor
 
-        parts = []
-        for page in reader.pages:
-            page_text = (page.extract_text() or "").strip()
-            if page_text:
-                parts.append(page_text)
-        return "\n\n".join(parts)
+        return LightExtractor().extract("document.pdf", file_content)
 
     def extract_text_sections(self, raw_text: str) -> list[str]:
         """Extract normalized, size-bounded text chunks from parsed document text."""

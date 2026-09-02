@@ -5,11 +5,20 @@ from pathlib import Path
 
 from starlette.responses import RedirectResponse
 
-ALLOWED_DOCUMENT_SUFFIXES = {".pdf", ".md", ".txt"}
+ALLOWED_DOCUMENT_SUFFIXES = {".pdf", ".md", ".txt", ".docx", ".csv", ".xlsx"}
 ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {
     ".pdf": {"application/pdf"},
     ".md": {"text/markdown", "text/x-markdown", "text/plain"},
     ".txt": {"text/plain"},
+    ".docx": {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/octet-stream",
+    },
+    ".csv": {"text/csv", "application/vnd.ms-excel", "text/plain"},
+    ".xlsx": {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/octet-stream",
+    },
 }
 
 
@@ -50,7 +59,7 @@ def validate_document_upload(
 ) -> str | None:
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_DOCUMENT_SUFFIXES:
-        return "Only PDF, Markdown (.md), and text (.txt) files are supported."
+        return "Only PDF, Word (.docx), Excel (.xlsx), CSV, Markdown (.md), and text (.txt) files are supported."
 
     normalized_content_type = (content_type or "").split(";", 1)[0].strip().lower()
     allowed_mime_types = ALLOWED_DOCUMENT_MIME_BY_SUFFIX.get(suffix, set())
@@ -63,8 +72,11 @@ def validate_document_upload(
     if suffix == ".pdf" and not file_content.startswith(b"%PDF-"):
         return "Uploaded file content does not match a valid PDF signature."
 
-    if suffix in {".md", ".txt"} and not is_likely_text_content(file_content):
-        return "Uploaded text/markdown file appears to be binary content."
+    if suffix in {".docx", ".xlsx"} and not file_content.startswith(b"PK"):
+        return f"Uploaded file content does not match a valid {suffix} (zip) signature."
+
+    if suffix in {".md", ".txt", ".csv"} and not is_likely_text_content(file_content):
+        return f"Uploaded {suffix} file appears to be binary content."
 
     return None
 

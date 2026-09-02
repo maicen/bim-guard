@@ -1,7 +1,7 @@
 """
 module1_doc_parser/section_chunker.py
 ---------------------------------------
-Step 3 — Splits Docling markdown text into section chunks.
+Step 3 — Splits extracted markdown/plain text into section chunks.
 
 Recognises headings in this priority order:
   1. The original 13-topic code taxonomy ("# 4 Stairs", "4 Stairs...")
@@ -11,8 +11,8 @@ Recognises headings in this priority order:
      markdown and independent of the 13-topic taxonomy above. This is what
       pypdf's plain-text extraction of a real code PDF looks like, so it's the
      pattern the live document-upload -> extract-rules flow actually needs.
-  3. Any markdown heading, any level ("## SECTION 8.14 ...") — Docling's own
-     structural markers, independent of numbering scheme.
+  3. Any markdown heading, any level ("## SECTION 8.14 ...") — the extractor's
+     own structural markers, independent of numbering scheme.
   4. "SECTION 8.14 ...", "CHAPTER 3 ...", "PART II ..." style plain-text
      headings, for documents whose PDF backend didn't preserve markdown "#".
 
@@ -25,7 +25,7 @@ downstream.
 Usage:
     from module1_doc_parser.section_chunker import SectionChunker
     chunker = SectionChunker()
-    chunks  = chunker.chunk(docling_text)
+    chunks  = chunker.chunk(extracted_text)
 """
 
 import re

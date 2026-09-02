@@ -621,7 +621,13 @@ export const documentsApi = {
   async upload(
     file: File,
     docType: string = 'Specification',
-    isoOptions?: { project_code?: string; originator?: string; suitability_code?: string; revision_code?: string },
+    isoOptions?: {
+      project_code?: string;
+      originator?: string;
+      suitability_code?: string;
+      revision_code?: string;
+      parser?: 'auto' | 'unstructured' | 'light';
+    },
   ): Promise<DocumentDetail> {
     const form = new FormData();
     form.append('file', file);
@@ -630,6 +636,7 @@ export const documentsApi = {
     if (isoOptions?.originator) form.append('originator', isoOptions.originator);
     if (isoOptions?.suitability_code) form.append('suitability_code', isoOptions.suitability_code);
     if (isoOptions?.revision_code) form.append('revision_code', isoOptions.revision_code);
+    if (isoOptions?.parser) form.append('parser', isoOptions.parser);
     const res = await fetch(`${API_BASE}/documents`, {
       method: 'POST',
       body: form,

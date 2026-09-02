@@ -7,7 +7,9 @@ This is the single entry point — call run_pipeline() with a PDF path.
 Pipeline flow:
     PDF file
         ↓  Module 1 — Step 1
-    DoclingExtractor          → prose text + table DataFrames
+    Document Extractor        → prose text + table DataFrames
+                                 (Unstructured hosted API, or LightExtractor
+                                 fallback — see module1_doc_parser/document_extractor.py)
         ↓  Module 1 — Step 2
     TableRuleBuilder          → tables → rules.db directly (no LLM)
         ↓  Module 1 — Step 3
@@ -68,7 +70,7 @@ USE_GPT4O = False
 
 try:
     from .module1_doc_parser import Module1_DocReader
-    from .module1_doc_parser.docling_extractor import DoclingExtractor
+    from .module1_doc_parser.document_extractor import extract_document_text
     from .module1_doc_parser.keyword_filter import KeywordFilter
     from .module1_doc_parser.section_chunker import SectionChunker
     from .module1_doc_parser.table_rule_builder import TableRuleBuilder
@@ -154,11 +156,10 @@ def run_pipeline(
         seed_rules(store, generator)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # MODULE 1 — STEP 1: Docling extraction
+    # MODULE 1 — STEP 1: Document extraction (Unstructured / LightExtractor)
     # ─────────────────────────────────────────────────────────────────────────
-    print("\n── MODULE 1 / STEP 1: DOCLING EXTRACTION ──")
-    extractor = DoclingExtractor()
-    text, tables = extractor.extract(pdf_path)
+    print("\n── MODULE 1 / STEP 1: DOCUMENT EXTRACTION ──")
+    text, tables = extract_document_text(pdf_path.name, pdf_path.read_bytes())
     logger.info("Document extraction complete chars=%d tables=%d", len(text), len(tables))
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -178,8 +179,8 @@ def run_pipeline(
 
     if not chunks:
         # No headings this chunker recognises (or the source PDF collapsed to
-        # one undifferentiated block with no line breaks at all — Docling
-        # does this on some documents). Fall back to the same generic,
+        # one undifferentiated block with no line breaks at all — this happens
+        # with some documents/extractors). Fall back to the same generic,
         # size-bounded chunker the AI extraction path already uses instead
         # of giving up and sending nothing downstream.
         print("  [SectionChunker] 0 sections — falling back to generic chunking")

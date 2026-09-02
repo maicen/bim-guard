@@ -62,7 +62,7 @@ import app.services.rule_extraction_service
 legacy = [
     name for name in sys.modules
     if name.endswith((
-        "docling_extractor",
+        "unstructured_extractor",
         "table_rule_builder",
         "keyword_filter",
         "dependency_parser",

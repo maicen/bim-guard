@@ -53,6 +53,7 @@
   let isUploadModalOpen = false;
   let uploadFile: File | null = null;
   let uploadDocType = "Specification";
+  let uploadParser: "auto" | "unstructured" | "light" = "auto";
   let isUploading = false;
   let uploadError = "";
 
@@ -212,11 +213,12 @@
     isUploading = true;
     uploadError = "";
     try {
-      const created = await documentsApi.upload(uploadFile, uploadDocType);
+      const created = await documentsApi.upload(uploadFile, uploadDocType, { parser: uploadParser });
       documents = [created, ...documents];
       isUploadModalOpen = false;
       uploadFile = null;
       uploadDocType = "Specification";
+      uploadParser = "auto";
     } catch (err: any) {
       uploadError = err.message || "Failed to upload document.";
     } finally {
@@ -558,12 +560,27 @@
         </select>
       </div>
 
+      <div class="space-y-1.5">
+        <label for="upload-parser" class="block text-xs font-semibold text-slate-300">
+          Parsing Engine
+        </label>
+        <select
+          id="upload-parser"
+          bind:value={uploadParser}
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        >
+          <option value="auto">Auto (Unstructured API, falls back to local)</option>
+          <option value="unstructured">Unstructured API only (best quality, slower, uploads file)</option>
+          <option value="light">Light local extraction only (instant, no upload)</option>
+        </select>
+      </div>
+
       <div
         class="border-2 border-dashed border-slate-700 hover:border-[#0071e3] transition-colors rounded-xl p-6 text-center bg-slate-950/40"
       >
         <FileText class="w-8 h-8 text-slate-400 mx-auto mb-2" />
         <p class="text-xs text-slate-400 mb-3">
-          Upload PDF, TXT, or Markdown building specifications
+          Upload PDF, Word, Excel, CSV, TXT, or Markdown specifications
         </p>
         <label
           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer transition-colors"
@@ -571,7 +588,7 @@
           <span>Choose File</span>
           <input
             type="file"
-            accept=".pdf,.txt,.md,.markdown"
+            accept=".pdf,.txt,.md,.markdown,.docx,.csv,.xlsx"
             on:change={(e) => {
               const target = e.target as HTMLInputElement;
               if (target.files) uploadFile = target.files[0];

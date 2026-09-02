@@ -53,6 +53,15 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_INITIAL_DELAY_SECONDS = 1.0
 RETRY_BACKOFF_MULTIPLIER = 2.0  # Exponential backoff: 1s, 2s, 4s
 
+# ── Document parsing (Unstructured Workflow/Jobs API) ─────────────────────────
+# Primary document-text extraction engine (async job per document, several to
+# tens of seconds). When UNSTRUCTURED_API_KEY is unset, the pipeline falls
+# back to LightExtractor (pypdf/python-docx/openpyxl/csv — no upload, no ML
+# models, effectively instant). See module1_doc_parser/document_extractor.py.
+UNSTRUCTURED_API_KEY = os.environ.get("UNSTRUCTURED_API_KEY", "")
+UNSTRUCTURED_API_URL = os.environ.get("UNSTRUCTURED_API_URL", "")
+UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
+
 # ── Path B feature flags ─────────────────────────────────────────────────
 # Gate the MM-001 and XM-001 comparators independently. Both default OFF.
 #

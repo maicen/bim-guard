@@ -332,7 +332,7 @@ class TFIDFAnalyzer:
 if __name__ == "__main__":
     """
     To use this script directly:
-    1. Run your CODE PDF through DoclingExtractor + SectionChunker + KeywordFilter first
+    1. Run your CODE PDF through extract_document_text + SectionChunker + KeywordFilter first
     2. Pass the filtered_chunks output to TFIDFAnalyzer.discover()
 
     Quick test with sample text:

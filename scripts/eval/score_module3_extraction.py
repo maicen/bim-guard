@@ -13,14 +13,14 @@ stand-in — so results reflect what actually happens today, not a best case.
   PART A - structural diagnostics (free, no API key, always runs):
     A1. Heading detection   - does SectionChunker recognise CODE numbering in
                                the text the live document-upload flow actually
-                               stores (pypdf), vs. the Docling markdown path?
+                               stores (pypdf), vs. the Unstructured markdown path?
     A2. sendable-chunk prep - replicate rule_extraction_service.py's chunk
                                pipeline (SectionChunker -> generic fallback ->
                                KeywordFilter -> DependencyParser ->
                                ConfidenceScorer) on the REAL live-path text.
     A3. SKIP leakage        - does the confidence scorer drop gold-bearing
                                text before the LLM ever sees it?
-    A4. Table pipeline      - does TableRuleBuilder work on Docling's tables,
+    A4. Table pipeline      - does TableRuleBuilder work on Unstructured's tables,
                                and does the live route ever call it?
     A5. Regex baseline      - free-extractor recall/precision vs gold, on the
                                real sendable chunks from A2.
@@ -51,7 +51,7 @@ from eval_gold_code_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
 sys.path.insert(0, "app/modules")
 
 from module1_doc_parser import Module1_DocReader  # noqa: E402
-from module1_doc_parser.docling_extractor import DoclingExtractor  # noqa: E402
+from module1_doc_parser.unstructured_extractor import UnstructuredExtractor  # noqa: E402
 from module1_doc_parser.section_chunker import SectionChunker  # noqa: E402
 from module1_doc_parser.keyword_filter import KeywordFilter  # noqa: E402
 from module1_doc_parser.dependency_parser import DependencyParser  # noqa: E402
@@ -166,17 +166,17 @@ def part_a():
 
     pdf_bytes = open(PDF_PATH, "rb").read()
     pypdf_text = Module1_DocReader().parse_pdf(pdf_bytes)
-    docling_text, docling_tables = DoclingExtractor().extract(PDF_PATH)
+    unstructured_text, unstructured_tables = UnstructuredExtractor().extract(PDF_PATH)
 
     # ── A1: heading detection gap ────────────────────────────────────────
-    print("\n[A1] SectionChunker heading detection — live path (pypdf) vs Docling path")
+    print("\n[A1] SectionChunker heading detection — live path (pypdf) vs Unstructured path")
     chunks_pypdf = SectionChunker().chunk(pypdf_text)
-    chunks_docling = SectionChunker().chunk(docling_text)
+    chunks_unstructured = SectionChunker().chunk(unstructured_text)
     print(f"     pypdf-extracted text   (what document-upload stores as extracted_text): "
           f"{len(chunks_pypdf)} sections detected")
-    print(f"     Docling-extracted text (only used by the parallel-race extract_rules(bytes) path): "
-          f"{len(chunks_docling)} sections detected")
-    if len(chunks_pypdf) == 0 and len(chunks_docling) > 0:
+    print(f"     Unstructured-extracted text (only used by the parallel-race extract_rules(bytes) path): "
+          f"{len(chunks_unstructured)} sections detected")
+    if len(chunks_pypdf) == 0 and len(chunks_unstructured) > 0:
         print("     -> CONFIRMED: the live document-upload -> extract-rules flow stores pypdf text,")
         print("        whose CODE headings ('9.8.2.  Stair Dimensions') match none of SectionChunker's")
         print("        3 heading patterns (needs markdown '#', a bare top-level digit+space, or the")
@@ -218,12 +218,12 @@ def part_a():
     # ── A4: table pipeline ────────────────────────────────────────────────
     print("\n[A4] Table pipeline — TableRuleBuilder vs live route")
     table_gold = [g for g in GOLD_RULES if g["ref"].startswith("Table ")]
-    print(f"     Docling found {len(docling_tables)} table(s) in the source PDF")
-    table_rules = TableRuleBuilder().extract_all_as_dicts(docling_tables)
+    print(f"     Unstructured found {len(unstructured_tables)} table(s) in the source PDF")
+    table_rules = TableRuleBuilder().extract_all_as_dicts(unstructured_tables)
     print(f"     TableRuleBuilder produced {len(table_rules)} rule(s) from those tables")
     found = sum(1 for g in table_gold if match_gold_to_extracted(g, table_rules))
     print(f"     matched {found}/{len(table_gold)} Table 9.8.4.1 gold rules "
-          f"when TableRuleBuilder IS invoked directly on Docling's tables")
+          f"when TableRuleBuilder IS invoked directly on Unstructured's tables")
     print("\n     BUT app/services/rule_extraction_service.py's extract_rules_from_text() —")
     print("     the method app/routes/library.py:786 calls for the document-upload -> extract")
     print("     UI flow — always passes table_rules=[] and never invokes TableRuleBuilder.")

@@ -1,7 +1,7 @@
 """
 module1_doc_parser/table_rule_builder.py
 ------------------------------------------
-Step 2 — Converts Docling table DataFrames directly into rules.db entries.
+Step 2 — Converts extracted table DataFrames directly into rules.db entries.
 No LLM required for tables — Min/Max columns map directly to numeric_range rules.
 
 Usage:

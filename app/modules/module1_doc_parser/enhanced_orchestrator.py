@@ -5,7 +5,9 @@ Module 1 pipeline with all 4 improvements active.
 
 Pipeline flow:
     PDF
-      ↓ Docling Extractor         → prose text + table DataFrames
+      ↓ Document Extractor        → prose text + table DataFrames
+                                    (Unstructured hosted API, or LightExtractor
+                                    fallback — see document_extractor.py)
       ↓ Table Rule Builder        → tables → rules.db (no LLM)
     ↓ Section Chunker           → 13 code section chunks
       ↓ Keyword Filter            → scored paragraphs (existing)
@@ -39,7 +41,7 @@ from pathlib import Path
 # and when imported by the web app (from app.modules.module1_doc_parser...).
 try:
     from config import OPENAI_API_KEY
-    from module1_doc_parser.docling_extractor import DoclingExtractor
+    from module1_doc_parser.document_extractor import extract_document_text
     from module1_doc_parser.table_rule_builder import TableRuleBuilder
     from module1_doc_parser.section_chunker import SectionChunker
     from module1_doc_parser.keyword_filter import KeywordFilter
@@ -51,7 +53,7 @@ try:
     from module3_rule_builder.rule_converter import RuleConverter
 except ImportError:
     from app.modules.config import OPENAI_API_KEY
-    from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
+    from app.modules.module1_doc_parser.document_extractor import extract_document_text
     from app.modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
     from app.modules.module1_doc_parser.section_chunker import SectionChunker
     from app.modules.module1_doc_parser.keyword_filter import KeywordFilter
@@ -110,11 +112,11 @@ def run_enhanced_pipeline(
         seed_rules(store, generator)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # STEP 1 — Docling extraction
+    # STEP 1 — Document extraction (Unstructured, with LightExtractor fallback)
     # ─────────────────────────────────────────────────────────────────────────
-    print("\n── STEP 1: DOCLING EXTRACTION ──")
-    extractor = DoclingExtractor()
-    text, tables = extractor.extract(pdf_path)
+    print("\n── STEP 1: DOCUMENT EXTRACTION ──")
+    pdf_path = Path(pdf_path)
+    text, tables = extract_document_text(pdf_path.name, pdf_path.read_bytes())
 
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 2 — Tables → direct rules
