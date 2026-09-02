@@ -91,6 +91,17 @@ except ImportError:
     _SUPPORTS_AVAILABLE = False
 
 try:
+    from .ifc_seismic import (
+        build_flexible_coupling_index,
+        mass_unit_scale_kg,
+        project_seismic_coefficient,
+        seismic_context,
+    )
+    _SEISMIC_AVAILABLE = True
+except ImportError:
+    _SEISMIC_AVAILABLE = False
+
+try:
     from .ifc_quality.validator import IFCValidator
 
     _QUALITY_TOOLS_AVAILABLE = True
@@ -228,6 +239,43 @@ _SUPPORT_DERIVED_PROPERTIES = {
     "hangerspacing": ("hanger_spacing", "max_gap_mm"),
     "supportspacing": ("support_spacing", "max_gap_mm"),
     "hangerrodlength": ("rod_lengths", "max"),
+}
+
+#: Property name (lower-cased, separators stripped) -> the key holding it in
+#: ``ifc_seismic.seismic_context``. Unlike the support spacings above, several
+#: of these CAN also be authored as ordinary Pset properties, and the seismic
+#: traversal already reads the Psets itself on the way to deriving them -- so a
+#: model that authors ``Qto_PipeSegmentBaseQuantities.NetWeight`` gets that
+#: number back through this route with its provenance attached, rather than
+#: through the anonymous Pass 1 lookup. When the traversal cannot answer, the
+#: cascade falls through to the Pset passes exactly as it does for
+#: AnnularClearance, so nothing that used to resolve stops resolving.
+_SEISMIC_DERIVED_PROPERTIES = {
+    "masskg": "mass_kg",
+    "mass": "mass_kg",
+    "seismicweight": "mass_kg",
+    "seismicforcecoefficientc": "seismic_force_coefficient_c",
+    "seismicforcecoefficient": "seismic_force_coefficient_c",
+    "seismiccoefficient": "seismic_force_coefficient_c",
+    "flexiblecouplingwithinmm": "flexible_coupling_within_mm",
+    "flexiblecouplingwithin": "flexible_coupling_within_mm",
+    "flexiblecouplingdistance": "flexible_coupling_within_mm",
+    "detailspreventrodbending": "details_prevent_rod_bending",
+    "spacingextensionmultiplier": "spacing_extension_multiplier",
+    "hasdualstructuralsupports": "has_dual_structural_supports",
+    "dualstructuralsupports": "has_dual_structural_supports",
+}
+
+#: The detail dict that accompanies each seismic property, so a finding can
+#: show WHERE the number came from -- an authored quantity, a density times a
+#: volume, or the particular coupling that turned out to be nearest.
+_SEISMIC_DETAIL_KEYS = {
+    "mass_kg": "mass_detail",
+    "seismic_force_coefficient_c": "seismic_force_coefficient_detail",
+    "flexible_coupling_within_mm": "flexible_coupling_detail",
+    "details_prevent_rod_bending": "restraint_detail",
+    "spacing_extension_multiplier": "restraint_detail",
+    "has_dual_structural_supports": "restraint_detail",
 }
 
 
@@ -819,6 +867,7 @@ class Module2_IFCRead:
         door_space_connection: dict | None = None,
         penetration: dict | None = None,
         support: dict | None = None,
+        seismic: dict | None = None,
         unit_scale_mm: float = 1.0,
     ) -> tuple[object, "str | None", dict]:
         """
@@ -850,6 +899,11 @@ class Module2_IFCRead:
         # elsewhere in extract_for_compliance(); short-circuit to that data
         # instead of falling through to passes that can never succeed.
         prop_lower_name = prop_name.strip().lower()
+        # Separators stripped as well, for the two derived-property maps below.
+        # `_needs_support_context` / `_needs_seismic_context` already gate on
+        # this form, so without it a rule written as `mass_kg` rather than
+        # `MassKg` would pay for the traversal and then fail to read it.
+        prop_key_name = prop_lower_name.replace("_", "").replace(" ", "").replace("-", "")
         if prop_lower_name in ("storey", "level", "buildingstorey", "floor"):
             storey_name = spatial.get("storey_name")
             if storey_name:
@@ -889,14 +943,31 @@ class Module2_IFCRead:
                 detail = dict((penetration or {}).get("annular_clearance_detail") or {})
                 detail["unit"] = "mm"
                 return clearance, "geometry:penetration", detail
-        elif prop_lower_name in _SUPPORT_DERIVED_PROPERTIES:
+        elif prop_key_name in _SUPPORT_DERIVED_PROPERTIES:
             # Support spacings and rod lengths: relationships plus geometry,
             # resolved by ifc_supports, never a Pset key. Falls through to the
             # Pset passes when the traversal produced nothing, so a model that
             # authors e.g. HangerSpacing as a real property still has it read.
-            value, detail = self._support_derived_value(prop_lower_name, support)
+            value, detail = self._support_derived_value(prop_key_name, support)
             if value is not None:
                 return value, "geometry:supports", detail
+        elif prop_key_name in _SEISMIC_DERIVED_PROPERTIES:
+            # Seismic restraint inputs: mass, the design coefficient, the
+            # distance to the nearest flexible coupling, and the three
+            # detailing flags. Each is a Pset read, a relationship walk, or a
+            # geometry measurement that ifc_seismic has already done for this
+            # element, with a provenance and a plausibility check the anonymous
+            # Pset passes below cannot apply.
+            #
+            # Falls through when the traversal produced nothing, so nothing
+            # that resolved before this route existed stops resolving now.
+            #
+            # `is not None` and not a truth test: False is a real answer for
+            # both booleans here, and 0.0 -- which these functions never return
+            # in place of "unknown" -- would be one for the numbers.
+            value, detail = self._seismic_derived_value(prop_key_name, seismic)
+            if value is not None:
+                return value, "derived:seismic", detail
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -1137,6 +1208,17 @@ class Module2_IFCRead:
         # traversal are both worth caching across rules.
         _support_index: list | None = None
         _support_cache: dict[int, dict] = {}
+        # And again for the seismic inputs. The coupling index is a whole-file
+        # scan; the per-element context can mesh a solid to get a volume, which
+        # is the most expensive thing in this loop and must never run twice for
+        # the same element.
+        _coupling_index: list | None = None
+        _seismic_cache: dict[int, dict] = {}
+        # Two model-wide facts the seismic context needs. Neither varies
+        # between elements, so both are resolved once and handed down rather
+        # than re-read from the file for every pipe in it.
+        _project_coefficient: tuple | None = None
+        _mass_scale_kg: float | None = None
 
         for rule_index, rule in enumerate(rules, start=1):
             rule_started_at = time.monotonic()
@@ -1183,6 +1265,19 @@ class Module2_IFCRead:
                 prop_name, scope_predicate, resolved_exceptions
             )
             if needs_support and _support_index is None:
+                _support_index = build_support_index(self.ifc_file)
+
+            needs_seismic = _SEISMIC_AVAILABLE and self._needs_seismic_context(
+                prop_name, scope_predicate, resolved_exceptions
+            )
+            if needs_seismic and _coupling_index is None:
+                _coupling_index = build_flexible_coupling_index(self.ifc_file)
+                _project_coefficient = project_seismic_coefficient(self.ifc_file)
+                _mass_scale_kg = mass_unit_scale_kg(self.ifc_file)
+            if needs_seismic and _support_index is None:
+                # The seismic context measures flexible-coupling distances from
+                # the braces and reads the detailing flags off them, so it needs
+                # the same candidate scan even when no spacing rule asked for it.
                 _support_index = build_support_index(self.ifc_file)
             logger.info(
                 "Rule extraction rule=%d/%d reference=%s target=%s property=%s pset=%s operator=%s fallback=%s",
@@ -1308,6 +1403,34 @@ class Module2_IFCRead:
                             support = {}
                         _support_cache[sup_id] = support
 
+                # Seismic restraint inputs: how heavy this component is, what
+                # coefficient governs it, how near the braces a flexible
+                # coupling gets, and what the hanger details say. Cached per
+                # element like the two traversals above -- this one can mesh a
+                # solid to get a volume, so repeating it per rule would be the
+                # most expensive mistake in the loop.
+                seismic = {}
+                if needs_seismic:
+                    seis_id = el.id()
+                    if seis_id in _seismic_cache:
+                        seismic = _seismic_cache[seis_id]
+                    else:
+                        try:
+                            seismic = seismic_context(
+                                el,
+                                ifc_file=self.ifc_file,
+                                geometry_extractor=self.geometry_extractor,
+                                unit_scale_mm=_unit_scale_mm,
+                                coupling_index=_coupling_index,
+                                support_index=_support_index,
+                                project_coefficient=_project_coefficient,
+                                mass_scale_kg=_mass_scale_kg,
+                            )
+                        except Exception as exc:
+                            logger.debug("Seismic context failed for %s: %s", el, exc)
+                            seismic = {}
+                        _seismic_cache[seis_id] = seismic
+
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
                     prop_name,
@@ -1318,6 +1441,7 @@ class Module2_IFCRead:
                     door_space_connection=door_space,
                     penetration=penetration,
                     support=support,
+                    seismic=seismic,
                     unit_scale_mm=_unit_scale_mm,
                 )
 
@@ -1362,6 +1486,7 @@ class Module2_IFCRead:
                             spatial=spatial,
                             penetration=penetration,
                             support=support,
+                            seismic=seismic,
                             unit_scale_mm=_unit_scale_mm,
                         )
                     except Exception:
@@ -1454,6 +1579,34 @@ class Module2_IFCRead:
                         "support_spacing": support.get("support_spacing"),
                         "rod_lengths": support.get("rod_lengths"),
                         "is_suspended": support.get("is_suspended"),
+                        # Seismic restraint inputs. Empty for rules that ask
+                        # about none of them. The two detailing booleans travel
+                        # as their own fields rather than inside scope_values
+                        # because they are tri-state: the comparator reads a
+                        # missing or None field as UNDETERMINED, which keeps the
+                        # element in scope and refuses to waive it, and that is
+                        # the whole point of not defaulting them to False.
+                        "mass_kg": seismic.get("mass_kg"),
+                        "mass_detail": seismic.get("mass_detail"),
+                        "seismic_force_coefficient_c": seismic.get(
+                            "seismic_force_coefficient_c"
+                        ),
+                        "flexible_coupling_within_mm": seismic.get(
+                            "flexible_coupling_within_mm"
+                        ),
+                        "flexible_coupling_detail": seismic.get(
+                            "flexible_coupling_detail"
+                        ),
+                        "details_prevent_rod_bending": seismic.get(
+                            "details_prevent_rod_bending"
+                        ),
+                        "has_dual_structural_supports": seismic.get(
+                            "has_dual_structural_supports"
+                        ),
+                        "spacing_extension_multiplier": seismic.get(
+                            "spacing_extension_multiplier"
+                        ),
+                        "restraint_detail": seismic.get("restraint_detail"),
                     }
                 )
 
@@ -2245,6 +2398,15 @@ class Module2_IFCRead:
         "hanger_rod_length_mm": "HangerRodLength",
         "lateral_brace_spacing_mm": "LateralBraceSpacing",
         "longitudinal_brace_spacing_mm": "LongitudinalBraceSpacing",
+        # Resolved by the seismic traversal (``ifc_seismic``). Numeric only --
+        # the two booleans travel on the element record itself, the way
+        # `host_is_breakaway` and `is_suspended` do, because the comparator
+        # reads tri-state booleans from a field rather than from scope_values.
+        "mass_kg": "MassKg",
+        "mass_below_kg": "MassKg",
+        "seismic_force_coefficient_c": "SeismicForceCoefficientC",
+        "flexible_coupling_within_mm": "FlexibleCouplingWithin",
+        "spacing_extension_multiplier": "SpacingExtensionMultiplier",
     }
 
     #: Predicate keys answered by the penetration traversal (``ifc_penetrations``)
@@ -2296,6 +2458,23 @@ class Module2_IFCRead:
             "lateral_brace_spacing_mm",
             "longitudinal_brace_spacing_mm",
             "support_count_min",
+        }
+    )
+
+    #: Property names produced by the seismic traversal (``ifc_seismic``),
+    #: matched case- and separator-insensitively like the two sets above.
+    _SEISMIC_PROPERTIES = frozenset(_SEISMIC_DERIVED_PROPERTIES)
+
+    #: Predicate keys answered by the seismic traversal.
+    _SEISMIC_PREDICATE_KEYS = frozenset(
+        {
+            "mass_kg",
+            "mass_below_kg",
+            "seismic_force_coefficient_c",
+            "flexible_coupling_within_mm",
+            "spacing_extension_multiplier",
+            "details_prevent_rod_bending",
+            "has_dual_structural_supports",
         }
     )
 
@@ -2387,6 +2566,43 @@ class Module2_IFCRead:
             return True
         for predicate in [scope] + [e.get("predicate") or {} for e in exceptions]:
             if cls._SUPPORT_PREDICATE_KEYS & set(predicate or {}):
+                return True
+        return False
+
+    @staticmethod
+    def _seismic_derived_value(prop_lower_name: str, seismic: dict | None):
+        """Return (value, detail) for a seismic property, or (None, {}).
+
+        None means the traversal could not answer: no mass could be found or
+        computed, no coefficient was authored anywhere in the model, no
+        flexible coupling exists to measure to, or the supports are silent on a
+        detailing flag. It is never False and never 0.0 -- both would be read
+        as determinate answers by a rule that was in fact never evaluated, and
+        for the two detailing booleans a fabricated False fails compliant work
+        while a fabricated True passes work that is not.
+        """
+        key = _SEISMIC_DERIVED_PROPERTIES[prop_lower_name]
+        value = (seismic or {}).get(key)
+        if value is None:
+            return None, {}
+        detail = dict((seismic or {}).get(_SEISMIC_DETAIL_KEYS[key]) or {})
+        return value, detail
+
+    @classmethod
+    def _needs_seismic_context(
+        cls, prop_name: str, scope: dict, exceptions: list[dict]
+    ) -> bool:
+        """Whether this rule needs the seismic traversal for its elements.
+
+        Gated exactly like the penetration and support traversals, and for the
+        same reason: mass alone can mesh a solid per element, which is far too
+        expensive to run for the rules that never ask about a seismic restraint.
+        """
+        normalized = str(prop_name or "").replace("_", "").replace(" ", "").lower()
+        if normalized in cls._SEISMIC_PROPERTIES:
+            return True
+        for predicate in [scope] + [e.get("predicate") or {} for e in exceptions]:
+            if cls._SEISMIC_PREDICATE_KEYS & set(predicate or {}):
                 return True
         return False
 

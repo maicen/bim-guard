@@ -128,10 +128,33 @@ class TestScopeGating:
 
     def test_unsupported_predicate_keeps_element_in_scope(self):
         pipe = _element("pipe-a", 10.0)
-        scope = {"flexible_coupling_within_mm": 300.0}
+        scope = {"pipe_colour_any_of": ["red"]}
         result = _evaluate(_rule([pipe], applies_when=scope))
         assert result["status"] == "FAIL"
         assert any("not supported" in n for n in result["undetermined_predicates"])
+
+    def test_flexible_coupling_is_evaluated_not_unsupported(self):
+        # ifc_seismic resolves this one now. It is still UNDETERMINED for an
+        # element that carries no value -- which is the safe direction -- but
+        # for the different and more informative reason that the model did not
+        # answer, rather than that nothing could ask.
+        pipe = _element("pipe-a", 10.0)
+        scope = {"flexible_coupling_within_mm": 300.0}
+        result = _evaluate(_rule([pipe], applies_when=scope))
+        assert result["status"] == "FAIL"
+        notes = result["undetermined_predicates"]
+        assert any("FlexibleCouplingWithin" in n for n in notes)
+        assert not any("not supported" in n for n in notes)
+
+    def test_flexible_coupling_within_limit_is_in_scope(self):
+        # "within 300 mm" is INCLUSIVE, unlike the exclusive "_below_mm"
+        # ceilings: a coupling at exactly 300 satisfies the standard's wording.
+        at_limit = _element("pipe-at", 10.0, scope_values={"FlexibleCouplingWithin": 300.0})
+        beyond = _element("pipe-far", 10.0, scope_values={"FlexibleCouplingWithin": 300.1})
+        scope = {"flexible_coupling_within_mm": 300.0}
+        result = _evaluate(_rule([at_limit, beyond], applies_when=scope))
+        assert result["fail_count"] == 1
+        assert result["not_applicable_count"] == 1
 
 
 class TestWaiverGating:
@@ -362,3 +385,76 @@ class TestWaiverDefinitionsAreNotEvaluated:
         results = Module4_Comparator().validate_metadata([requirement, exemption])
         assert len(results) == 1
         assert results[0]["status"] == "FAIL"
+
+
+class TestNzs4219_513PatchedScope:
+    """The narrowed NZS-4219-5.13 scope, as written by scripts/patch_nzs4219_513_scope.py.
+
+    The clause's own gate is `mass_kg >= 10`, which the extractor cannot
+    resolve. The patch pairs it with a nominal-bore band that the extractor
+    can, and relies on the asymmetry between NO_MATCH and UNDETERMINED rather
+    than on a disjunction the predicate language does not have: the diameter
+    settles the scope when it fails, and the unevaluable mass key never
+    suppresses a check on its own.
+    """
+
+    #: Mirrors NEW_APPLIES_WHEN in scripts/patch_nzs4219_513_scope.py.
+    SCOPE = {
+        "target_ifc_class": "IfcPipeSegment",
+        "nominal_diameter_mm": {"min": 50.0},
+        "location": "ceiling_void",
+        "mass_kg": {"min": 10.0},
+        "note": "nominal bore proxies for the unextractable mass threshold",
+    }
+
+    def _pipe(self, name, actual, diameter):
+        return _element(name, actual, scope_values={"NominalDiameter": diameter})
+
+    def test_below_the_band_is_out_of_scope(self):
+        # The whole point of the patch: a 25 mm run no longer gets a verdict.
+        # NO_MATCH settles the predicate before the undetermined keys are
+        # reached, which is why the inert mass_kg key does not rescue it.
+        pipe = self._pipe("pipe-dn25", 10.0, 25.0)
+        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
+        assert result["not_applicable_count"] == 1
+        assert result["fail_count"] == 0
+        assert result["status"] == "NOT_APPLICABLE"
+
+    def test_at_the_band_floor_stays_in_scope_and_fails(self):
+        # 50.0 is inclusive, so NB50 itself is governed.
+        pipe = self._pipe("pipe-dn50", 10.0, 50.0)
+        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
+        assert result["fail_count"] == 1
+        assert result["not_applicable_count"] == 0
+
+    def test_above_the_band_passes_on_adequate_clearance(self):
+        pipe = self._pipe("pipe-dn100", 80.0, 100.0)
+        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
+        assert result["status"] == "PASS"
+
+    def test_unextractable_keys_are_reported_not_silently_dropped(self):
+        # mass_kg and location leave the predicate UNDETERMINED for an
+        # in-band pipe. The element stays in scope and the gap is surfaced,
+        # so the rule is visibly incomplete rather than quietly inert.
+        #
+        # mass_kg is extractable now -- ifc_seismic resolves it into
+        # scope_values as MassKg -- so the note names the property that this
+        # synthetic element does not carry, rather than an unsupported key.
+        # location remains genuinely unsupported by the comparator.
+        pipe = self._pipe("pipe-dn100", 10.0, 100.0)
+        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
+        assert result["fail_count"] == 1
+        notes = result["undetermined_predicates"]
+        assert any("MassKg" in n for n in notes)
+        assert any("location" in n for n in notes)
+        # `note` is an annotation key and must not be reported as unsupported.
+        assert not any("'note'" in n for n in notes)
+
+    def test_unresolved_diameter_keeps_the_element_in_scope(self):
+        # A model that does not author NominalDiameter must not have the
+        # check silently suppressed by the proxy.
+        pipe = _element("pipe-unknown-dn", 10.0)
+        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
+        assert result["fail_count"] == 1
+        assert result["not_applicable_count"] == 0
+        assert any("NominalDiameter" in n for n in result["undetermined_predicates"])
