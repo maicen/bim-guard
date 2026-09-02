@@ -12,7 +12,6 @@
     CheckCircle2,
     CheckSquare,
     AlertCircle,
-    SlidersHorizontal,
     Edit3,
     Pencil,
     GripVertical,
@@ -24,7 +23,7 @@
     FileText,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
-  import type { Rule, RuleFolder, RulesetCategory, RuleSnapshot, RuleSnapshotSourceMode } from "../lib/types";
+  import type { Rule, RuleFolder, RulesetCategory, RuleSnapshot, RuleSnapshotSourceMode, IdsImportResult } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
@@ -33,6 +32,8 @@
   import SortHeader from "../lib/components/SortHeader.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import RuleForm from "../lib/components/RuleForm.svelte";
+  import IdsImportForm from "../lib/components/IdsImportForm.svelte";
 
   // Top-level tab: Rules catalog vs saved Rule Configuration Snapshots
   let activeMainTab: "rules" | "snapshots" = "rules";
@@ -52,10 +53,6 @@
 
   // Import IDS modal state
   let isImportIdsModalOpen = false;
-  let importIdsFile: File | null = null;
-  let importIdsRulesetId = "";
-  let isImportingIds = false;
-  let importIdsError = "";
 
   // Save Snapshot modal state
   let isSaveSnapshotModalOpen = false;
@@ -89,8 +86,25 @@
 
   // Rule edit/create modal state
   let isModalOpen = false;
-  let isEditing = false;
-  let editRuleId: number | null = null;
+  let editingRule: Rule | null = null;
+
+  // Sensible defaults for a brand-new rule, based on whatever the catalog is
+  // currently filtered to — mirrors what the create button implied before.
+  let newRuleDefaultRulesetId = "BUILDING-CODE-PART9";
+  let newRuleDefaultCategory: RulesetCategory = "Arch";
+  $: newRuleDefaultRulesetId =
+    selectedFolderId ||
+    (selectedCategory !== "all"
+      ? folders.find((f) => f.category === selectedCategory)?.ruleset_id
+      : undefined) ||
+    "BUILDING-CODE-PART9";
+  $: newRuleDefaultCategory =
+    selectedCategory !== "all"
+      ? selectedCategory
+      : selectedFolderId
+        ? ((folders.find((f) => f.ruleset_id === selectedFolderId)
+            ?.category as RulesetCategory) || "Arch")
+        : "Arch";
 
   // Folder Create/Edit Modal State
   let isFolderModalOpen = false;
@@ -134,30 +148,6 @@
   let isDraggingDivider = false;
   let dragStartX = 0;
   let dragStartWidth = 280;
-
-  // Form fields
-  let formRuleId = "";
-  let formDescription = "";
-  let formMechanism = "CODE";
-  let formRulesetId = "BUILDING-CODE-PART9";
-  let formCategory = "property_check";
-  let formDomainCategory: RulesetCategory = "Arch";
-  let formPropertySet = "Pset_Compliance";
-  let formPropertyName = "";
-  let formOperator = "==";
-  let formCheckValue = "";
-  let formValueMin = "";
-  let formValueMax = "";
-  let formValueMinProperty = "";
-  let formValueMaxProperty = "";
-  let formValueMinOffset = "";
-  let formValueMaxOffset = "";
-  let formCompareProperty = "";
-  let formNamePattern = "";
-  let formUniquenessScope = "building";
-  let formUnit = "";
-  let formSeverity = "Medium";
-  let formNeedsReview = 0;
 
   async function loadData(force = false) {
     if (!rules.length) {
@@ -436,29 +426,13 @@
   }
 
   function openImportIdsModal() {
-    importIdsFile = null;
-    importIdsRulesetId = selectedFolderId || "";
-    importIdsError = "";
     isImportIdsModalOpen = true;
   }
 
-  async function handleImportIds() {
-    if (!importIdsFile || !importIdsRulesetId.trim()) {
-      importIdsError = "Please choose an IDS file and a Rule Folder name.";
-      return;
-    }
-    isImportingIds = true;
-    importIdsError = "";
-    try {
-      const res = await rulesApi.importIds(importIdsFile, importIdsRulesetId.trim());
-      successMessage = `Imported ${res.created_count} of ${res.total_parsed} rules from IDS file into "${res.ruleset_id}".`;
-      isImportIdsModalOpen = false;
-      await loadData(true);
-    } catch (err: any) {
-      importIdsError = err.message || "Failed to import IDS file.";
-    } finally {
-      isImportingIds = false;
-    }
+  async function handleIdsImported(res: IdsImportResult) {
+    successMessage = `Imported ${res.created_count} of ${res.total_parsed} rules from IDS file into "${res.ruleset_id}".`;
+    isImportIdsModalOpen = false;
+    await loadData(true);
   }
 
   function openSaveSnapshotModal() {
@@ -580,37 +554,7 @@
   );
 
   function openCreateModal() {
-    isEditing = false;
-    editRuleId = null;
-    formRuleId = "";
-    formDescription = "";
-    formMechanism = "CODE";
-    formRulesetId = selectedFolderId || "BUILDING-CODE-PART9";
-    formCategory = "property_check";
-    if (selectedCategory !== "all") {
-      formDomainCategory = selectedCategory;
-    } else if (selectedFolderId) {
-      const folder = folders.find((f) => f.ruleset_id === selectedFolderId);
-      formDomainCategory = (folder?.category as RulesetCategory) || "Arch";
-    } else {
-      formDomainCategory = "Arch";
-    }
-    formPropertySet = "Pset_Compliance";
-    formPropertyName = "";
-    formOperator = "==";
-    formCheckValue = "";
-    formValueMin = "";
-    formValueMax = "";
-    formValueMinProperty = "";
-    formValueMaxProperty = "";
-    formValueMinOffset = "";
-    formValueMaxOffset = "";
-    formCompareProperty = "";
-    formNamePattern = "";
-    formUniquenessScope = "building";
-    formUnit = "";
-    formSeverity = "Medium";
-    formNeedsReview = 0;
+    editingRule = null;
     isModalOpen = true;
   }
 
@@ -620,82 +564,14 @@
   }
 
   function openEditModal(rule: Rule) {
-    isEditing = true;
-    editRuleId = rule.id;
-    formRuleId = rule.rule_id || "";
-    formDescription = rule.description || "";
-    formMechanism = rule.mechanism || "CODE";
-    formRulesetId = rule.ruleset_id || "BUILDING-CODE-PART9";
-    formCategory = rule.rule_category || "property_check";
-    formDomainCategory = (rule.category as RulesetCategory) || "Arch";
-    formPropertySet = rule.property_set || "Pset_Compliance";
-    formPropertyName = rule.property_name || "";
-    formOperator = rule.operator || "==";
-    formCheckValue = rule.check_value || "";
-    formValueMin = rule.value_min || "";
-    formValueMax = rule.value_max || "";
-    formValueMinProperty = rule.value_min_property || "";
-    formValueMaxProperty = rule.value_max_property || "";
-    formValueMinOffset =
-      rule.value_min_offset !== undefined && rule.value_min_offset !== null
-        ? String(rule.value_min_offset)
-        : "";
-    formValueMaxOffset =
-      rule.value_max_offset !== undefined && rule.value_max_offset !== null
-        ? String(rule.value_max_offset)
-        : "";
-    formCompareProperty = rule.compare_property || "";
-    formNamePattern = rule.name_pattern || "";
-    formUniquenessScope = rule.uniqueness_scope || "building";
-    formUnit = rule.unit || "";
-    formSeverity = rule.severity || "Medium";
-    formNeedsReview = rule.needs_review || 0;
+    editingRule = rule;
     isModalOpen = true;
   }
 
-  async function handleSaveRule() {
-    if (!formRuleId.trim() || !formPropertyName.trim()) {
-      alert("Rule ID and Property Name are required.");
-      return;
-    }
-
-    try {
-      const payload: Partial<Rule> = {
-        rule_id: formRuleId,
-        description: formDescription,
-        mechanism: formMechanism,
-        ruleset_id: formRulesetId,
-        rule_category: formCategory,
-        category: formDomainCategory,
-        property_set: formPropertySet,
-        property_name: formPropertyName,
-        operator: formOperator,
-        check_value: formCheckValue,
-        value_min: formValueMin || null,
-        value_max: formValueMax || null,
-        value_min_property: formValueMinProperty || "",
-        value_max_property: formValueMaxProperty || "",
-        value_min_offset: formValueMinOffset || 0,
-        value_max_offset: formValueMaxOffset || 0,
-        compare_property: formCompareProperty || "",
-        name_pattern: formNamePattern || "",
-        uniqueness_scope: formUniquenessScope || "building",
-        unit: formUnit || "",
-        severity: formSeverity,
-        needs_review: formNeedsReview,
-      };
-
-      if (isEditing && editRuleId) {
-        await rulesApi.update(editRuleId, payload);
-      } else {
-        await rulesApi.create(payload);
-      }
-
-      isModalOpen = false;
-      await loadData();
-    } catch (err: any) {
-      alert(`Save failed: ${err.message}`);
-    }
+  async function handleRuleSaved() {
+    isModalOpen = false;
+    editingRule = null;
+    await loadData();
   }
 
   function promptDelete(id: number, ruleId: string) {
@@ -1593,7 +1469,7 @@
         class="flex items-center justify-between border-b border-slate-800 pb-3"
       >
         <h2 class="text-base font-bold text-white">
-          {isEditing ? "Edit Rule" : "Create New Rule"}
+          {editingRule ? "Edit Rule" : "Create New Rule"}
         </h2>
         <button
           type="button"
@@ -1604,370 +1480,14 @@
         </button>
       </div>
 
-      <div class="space-y-4 overflow-y-auto pr-1 flex-1">
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label
-              for="rule-id"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Rule ID *</label
-            >
-            <input
-              id="rule-id"
-              type="text"
-              bind:value={formRuleId}
-              placeholder="e.g. OBC-9.9.4.2"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-          <div>
-            <label
-              for="rule-domain-category"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Category *</label
-            >
-            <select
-              id="rule-domain-category"
-              bind:value={formDomainCategory}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            >
-              <option value="Arch">Arch</option>
-              <option value="Piping">Piping</option>
-              <option value="seismic">seismic</option>
-            </select>
-          </div>
-          <div>
-            <label
-              for="rule-mechanism"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Mechanism</label
-            >
-            <select
-              id="rule-mechanism"
-              bind:value={formMechanism}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            >
-              <option value="CODE">CODE</option>
-              <option value="GC-001">GC-001</option>
-              <option value="CC-001">CC-001</option>
-              <option value="MC-001">MC-001</option>
-              <option value="SEISMIC">SEISMIC</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label
-            for="rule-desc"
-            class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-            >Description</label
-          >
-          <textarea
-            id="rule-desc"
-            bind:value={formDescription}
-            rows="2"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-          ></textarea>
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label
-              for="rule-pset"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Property Set</label
-            >
-            <input
-              id="rule-pset"
-              type="text"
-              bind:value={formPropertySet}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-          <div>
-            <label
-              for="rule-pname"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Property Name *</label
-            >
-            <input
-              id="rule-pname"
-              type="text"
-              bind:value={formPropertyName}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-          <div>
-            <label
-              for="rule-unit"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Unit</label
-            >
-            <input
-              id="rule-unit"
-              type="text"
-              bind:value={formUnit}
-              placeholder="e.g. mm, min, m²"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              for="rule-op"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Operator</label
-            >
-            <select
-              id="rule-op"
-              bind:value={formOperator}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            >
-              <option value="==">== (Exact match)</option>
-              <option value="!=">!= (Not equal)</option>
-              <option value=">">&gt; (Greater than)</option>
-              <option value=">=">&gt;= (Greater than or equal)</option>
-              <option value="<">&lt; (Less than)</option>
-              <option value="<=">&lt;= (Less than or equal)</option>
-              <option value="exists">exists</option>
-              <option value="not_exists">not_exists</option>
-              <option value="matches">matches (Regex)</option>
-              <option value="field_consistency"
-                >field_consistency (Element match)</option
-              >
-              <option value="unique_within_scope"
-                >unique_within_scope (Uniqueness)</option
-              >
-            </select>
-          </div>
-          <div>
-            <label
-              for="rule-val"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Expected / Target Value</label
-            >
-            <input
-              id="rule-val"
-              type="text"
-              bind:value={formCheckValue}
-              placeholder="Literal value or threshold"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-        </div>
-
-        <!-- Field Consistency section -->
-        {#if formOperator === "field_consistency"}
-          <div
-            class="p-3 rounded-xl bg-slate-950 border border-amber-900/40 space-y-2.5"
-          >
-            <div
-              class="text-[11px] font-bold text-amber-400 uppercase tracking-wider"
-            >
-              Field Consistency (Element-to-Element Property Match)
-            </div>
-            <p class="text-[11px] text-slate-400">
-              Validates that Property Name's value matches another property on
-              the SAME element (e.g. wall Name matches Cod_Object).
-            </p>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label
-                  for="rule-compare-prop"
-                  class="block text-[11px] font-semibold text-slate-300 mb-1"
-                  >Compare Property</label
-                >
-                <input
-                  id="rule-compare-prop"
-                  type="text"
-                  bind:value={formCompareProperty}
-                  placeholder="e.g. Cod_Object"
-                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-                />
-              </div>
-              <div>
-                <label
-                  for="rule-name-pattern"
-                  class="block text-[11px] font-semibold text-slate-300 mb-1"
-                  >Name Pattern (Regex extraction)</label
-                >
-                <input
-                  id="rule-name-pattern"
-                  type="text"
-                  bind:value={formNamePattern}
-                  placeholder="e.g. ([A-Z]+)_.*_(\\d+)$"
-                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-                />
-              </div>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Uniqueness Scope section -->
-        {#if formOperator === "unique_within_scope"}
-          <div
-            class="p-3 rounded-xl bg-slate-950 border border-purple-900/40 space-y-2.5"
-          >
-            <div
-              class="text-[11px] font-bold text-purple-400 uppercase tracking-wider"
-            >
-              Scope Uniqueness Verification
-            </div>
-            <p class="text-[11px] text-slate-400">
-              Ensures Property Name's value is unique across elements within the
-              selected building hierarchy scope.
-            </p>
-            <div>
-              <label
-                for="rule-unique-scope"
-                class="block text-[11px] font-semibold text-slate-300 mb-1"
-                >Uniqueness Scope</label
-              >
-              <select
-                id="rule-unique-scope"
-                bind:value={formUniquenessScope}
-                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-              >
-                <option value="building">building (entire model)</option>
-                <option value="storey">storey (same floor)</option>
-                <option value="space">storey + space (same room)</option>
-              </select>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Dynamic relative threshold section -->
-        <div
-          class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5"
-        >
-          <div
-            class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5"
-          >
-            <SlidersHorizontal class="w-3.5 h-3.5 text-blue-400" />
-            <span>Dynamic Property-Relative Range (Optional)</span>
-          </div>
-          <p class="text-[11px] text-slate-400">
-            Compare target property dynamically against other properties on the
-            same element with optional offsets (e.g. RiserHeight &lt;= 0.5 *
-            StairHeight + 25mm).
-          </p>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label
-                for="rule-min-prop"
-                class="block text-[11px] font-semibold text-slate-300 mb-1"
-                >Min Dynamic Property / Offset</label
-              >
-              <div class="grid grid-cols-2 gap-2">
-                <input
-                  id="rule-min-prop"
-                  type="text"
-                  bind:value={formValueMinProperty}
-                  placeholder="e.g. TreadWidth"
-                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-                />
-                <input
-                  type="number"
-                  bind:value={formValueMinOffset}
-                  placeholder="Offset (0)"
-                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-                />
-              </div>
-            </div>
-            <div>
-              <label
-                for="rule-max-prop"
-                class="block text-[11px] font-semibold text-slate-300 mb-1"
-                >Max Dynamic Property / Offset</label
-              >
-              <div class="grid grid-cols-2 gap-2">
-                <input
-                  id="rule-max-prop"
-                  type="text"
-                  bind:value={formValueMaxProperty}
-                  placeholder="e.g. TreadWidth"
-                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-                />
-                <input
-                  type="number"
-                  bind:value={formValueMaxOffset}
-                  placeholder="Offset (+25)"
-                  class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              for="rule-sev"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Severity</label
-            >
-            <select
-              id="rule-sev"
-              bind:value={formSeverity}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            >
-              <option value="mandatory">Mandatory</option>
-              <option value="recommended">Recommended</option>
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-          </div>
-          <div>
-            <label
-              for="rule-ruleset"
-              class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1"
-              >Ruleset ID</label
-            >
-            <input
-              id="rule-ruleset"
-              type="text"
-              bind:value={formRulesetId}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label
-            class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"
-          >
-            <input
-              type="checkbox"
-              checked={formNeedsReview === 1}
-              on:change={(e) =>
-                (formNeedsReview = e.currentTarget.checked ? 1 : 0)}
-              class="rounded border-slate-700 bg-slate-950 text-[#0071e3]"
-            />
-            <span>Flag for engineering review (Needs Review)</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-        <button
-          type="button"
-          on:click={() => (isModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          on:click={handleSaveRule}
-          class="px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white"
-        >
-          Save Rule
-        </button>
+      <div class="overflow-y-auto pr-1 flex-1">
+        <RuleForm
+          {editingRule}
+          defaultRulesetId={newRuleDefaultRulesetId}
+          defaultCategory={newRuleDefaultCategory}
+          onCancel={() => (isModalOpen = false)}
+          onSaved={handleRuleSaved}
+        />
       </div>
     </div>
   </div>
@@ -2511,59 +2031,12 @@
         </button>
       </div>
 
-      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
-        {#if importIdsError}
-          <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300">
-            {importIdsError}
-          </div>
-        {/if}
-
-        <div class="space-y-1.5">
-          <label for="import-ids-file" class="block font-semibold text-slate-300">
-            IDS File <span class="text-rose-400">*</span>
-          </label>
-          <input
-            id="import-ids-file"
-            type="file"
-            accept=".ids,.xml"
-            on:change={(e) => (importIdsFile = (e.target as HTMLInputElement).files?.[0] || null)}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-white file:text-xs focus:outline-none focus:border-[#0071e3]"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="import-ids-ruleset" class="block font-semibold text-slate-300">
-            Rule Folder <span class="text-rose-400">*</span>
-          </label>
-          <input
-            id="import-ids-ruleset"
-            type="text"
-            bind:value={importIdsRulesetId}
-            placeholder="e.g. IMPORTED-IDS or an existing folder name"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3] font-mono"
-          />
-          <p class="text-[11px] text-slate-500">
-            Imported rules are saved under this folder and flagged for review (needs_review).
-          </p>
-        </div>
-      </div>
-
-      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          on:click={() => (isImportIdsModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={isImportingIds || !importIdsFile || !importIdsRulesetId.trim()}
-          on:click={handleImportIds}
-          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
-        >
-          <span>{isImportingIds ? "Importing..." : "Import Rules"}</span>
-        </button>
+      <div class="p-6 overflow-y-auto flex-1 text-xs">
+        <IdsImportForm
+          defaultRulesetId={selectedFolderId || ""}
+          onCancel={() => (isImportIdsModalOpen = false)}
+          onImported={handleIdsImported}
+        />
       </div>
     </div>
   </div>

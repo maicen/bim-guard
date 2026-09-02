@@ -188,17 +188,7 @@ export interface ProjectBulkActionResponse {
   affected_ids: number[];
 }
 
-export const DOCUMENT_TYPES = [
-  'Specification',
-  'Code',
-  'Manual',
-  'Standard',
-  'Drawing',
-  'Schedule',
-  'Assessment',
-  'Report',
-  'Other',
-] as const;
+export const DOCUMENT_TYPES = ['Code', 'Specification', 'Manual'] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

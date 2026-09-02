@@ -27,20 +27,21 @@
 
   const NAV_SECTIONS = [
     {
-      title: "Platform",
+      title: "Project Uploads",
       items: [
-        { id: "newproject", label: "New Project", icon: Plus },
+        { id: "newproject", label: "New Project Upload", icon: Plus },
+        { id: "projects", label: "Existing Projects", icon: FolderOpen },
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { id: "projects", label: "Projects", icon: FolderOpen },
         { id: "viewer", label: "3D Viewer", icon: ScanEye },
       ],
     },
     {
-      title: "Library",
+      title: "Rule Document Uploads",
       items: [
-        { id: "documents", label: "Documents", icon: BookOpen },
+        { id: "newdocument", label: "New Rule Document Upload", icon: Plus },
+        { id: "documents", label: "Existing Rule Documents", icon: BookOpen },
         { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
-        { id: "rules", label: "Rules Catalog", icon: ListChecks },
+        { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
       ],
     },
     {

@@ -16,7 +16,7 @@
   } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
   import { DOCUMENT_TYPES } from "../lib/types";
-  import type { DocumentItem, DocumentDetail, DocumentType } from "../lib/types";
+  import type { DocumentItem, DocumentDetail, DocumentType, Rule, IdsImportResult } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
@@ -28,6 +28,8 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import RuleForm from "../lib/components/RuleForm.svelte";
+  import IdsImportForm from "../lib/components/IdsImportForm.svelte";
 
   const cachedDocs = documentsApi.getCachedList();
   let documents: DocumentItem[] = cachedDocs || [];
@@ -49,13 +51,43 @@
   let isSavingEdit = false;
   let editError = "";
 
-  // Upload modal state
+  // Upload modal state — three ways a rule source can enter the system,
+  // sharing one modal: an uploaded document (parsed later in Rule Extraction
+  // Studio), a buildingSMART IDS file, or a hand-typed rule.
   let isUploadModalOpen = false;
+  let uploadTab: "document" | "ids" | "manual" = "document";
+
+  // Called by the sidebar's "New Rule Document Upload" action once this view is mounted.
+  export function openUploadModal(tab: "document" | "ids" | "manual" = "document") {
+    uploadTab = tab;
+    isUploadModalOpen = true;
+  }
   let uploadFile: File | null = null;
   let uploadDocType = "Specification";
   let uploadParser: "auto" | "unstructured" | "light" = "auto";
   let isUploading = false;
   let uploadError = "";
+
+  let successMessage = "";
+
+  function flashSuccess(message: string) {
+    successMessage = message;
+    setTimeout(() => {
+      if (successMessage === message) successMessage = "";
+    }, 6000);
+  }
+
+  function handleRuleCreatedFromUpload(rule: Rule) {
+    isUploadModalOpen = false;
+    flashSuccess(`Rule "${rule.rule_id}" created — view it in Rules Catalog.`);
+  }
+
+  function handleIdsImportedFromUpload(res: IdsImportResult) {
+    isUploadModalOpen = false;
+    flashSuccess(
+      `Imported ${res.created_count} of ${res.total_parsed} rules from IDS file into "${res.ruleset_id}" — view them in Rules Catalog.`,
+    );
+  }
 
   // Text reader modal state
   let selectedDoc: DocumentDetail | null = null;
@@ -336,7 +368,7 @@
 
       <button
         type="button"
-        on:click={() => (isUploadModalOpen = true)}
+        on:click={() => openUploadModal()}
         class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
       >
         <Upload class="w-3.5 h-3.5" />
@@ -350,6 +382,15 @@
       class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs"
     >
       {error}
+    </div>
+  {/if}
+
+  {#if successMessage}
+    <div
+      class="p-4 rounded-xl bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2.5"
+    >
+      <CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0" />
+      <span>{successMessage}</span>
     </div>
   {/if}
 
@@ -395,7 +436,7 @@
           title="No specification documents found"
           description="Upload building code specifications or sync with OpenCDE to begin extraction."
           actionLabel="Upload Specification (PDF, TXT, MD)"
-          onAction={() => (isUploadModalOpen = true)}
+          onAction={() => openUploadModal()}
         />
       </div>
     {:else}
@@ -514,20 +555,18 @@
   </div>
 </div>
 
-<!-- Upload Modal -->
+<!-- Add Rule Source Modal: a document upload, an IDS import, or a hand-typed rule -->
 {#if isUploadModalOpen}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
   >
     <div
-      class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4"
+      class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] flex flex-col"
     >
       <div
         class="flex items-center justify-between border-b border-slate-800 pb-3"
       >
-        <h2 class="text-base font-bold text-white">
-          Upload Specification Document
-        </h2>
+        <h2 class="text-base font-bold text-white">Add Rule Source</h2>
         <button
           type="button"
           on:click={() => (isUploadModalOpen = false)}
@@ -537,94 +576,139 @@
         </button>
       </div>
 
-      {#if uploadError}
-        <div
-          class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs"
+      <!-- Source Tabs -->
+      <div class="flex items-center gap-1 p-1 rounded-xl bg-slate-950/60 border border-slate-800">
+        <button
+          type="button"
+          on:click={() => (uploadTab = "document")}
+          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'document'
+            ? 'bg-[#0071e3] text-white shadow-sm'
+            : 'text-slate-400 hover:text-white hover:bg-slate-900'}"
         >
-          {uploadError}
-        </div>
-      {/if}
-
-      <div class="space-y-1.5">
-        <label for="upload-doc-type" class="block text-xs font-semibold text-slate-300">
-          Document Type
-        </label>
-        <select
-          id="upload-doc-type"
-          bind:value={uploadDocType}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          PDF / Word / Excel / TXT
+        </button>
+        <button
+          type="button"
+          on:click={() => (uploadTab = "ids")}
+          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'ids'
+            ? 'bg-[#0071e3] text-white shadow-sm'
+            : 'text-slate-400 hover:text-white hover:bg-slate-900'}"
         >
-          {#each DOCUMENT_TYPES as type}
-            <option value={type}>{type}</option>
-          {/each}
-        </select>
+          IDS XML File
+        </button>
+        <button
+          type="button"
+          on:click={() => (uploadTab = "manual")}
+          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'manual'
+            ? 'bg-[#0071e3] text-white shadow-sm'
+            : 'text-slate-400 hover:text-white hover:bg-slate-900'}"
+        >
+          Manual
+        </button>
       </div>
 
-      <div class="space-y-1.5">
-        <label for="upload-parser" class="block text-xs font-semibold text-slate-300">
-          Parsing Engine
-        </label>
-        <select
-          id="upload-parser"
-          bind:value={uploadParser}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
-        >
-          <option value="auto">Auto (Unstructured API, falls back to local)</option>
-          <option value="unstructured">Unstructured API only (best quality, slower, uploads file)</option>
-          <option value="light">Light local extraction only (instant, no upload)</option>
-        </select>
-      </div>
+      <div class="overflow-y-auto pr-1 flex-1">
+        {#if uploadTab === "document"}
+          <div class="space-y-4">
+            {#if uploadError}
+              <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+                {uploadError}
+              </div>
+            {/if}
 
-      <div
-        class="border-2 border-dashed border-slate-700 hover:border-[#0071e3] transition-colors rounded-xl p-6 text-center bg-slate-950/40"
-      >
-        <FileText class="w-8 h-8 text-slate-400 mx-auto mb-2" />
-        <p class="text-xs text-slate-400 mb-3">
-          Upload PDF, Word, Excel, CSV, TXT, or Markdown specifications
-        </p>
-        <label
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer transition-colors"
-        >
-          <span>Choose File</span>
-          <input
-            type="file"
-            accept=".pdf,.txt,.md,.markdown,.docx,.csv,.xlsx"
-            on:change={(e) => {
-              const target = e.target as HTMLInputElement;
-              if (target.files) uploadFile = target.files[0];
-            }}
-            class="hidden"
+            <div class="space-y-1.5">
+              <label for="upload-doc-type" class="block text-xs font-semibold text-slate-300">
+                Document Type
+              </label>
+              <select
+                id="upload-doc-type"
+                bind:value={uploadDocType}
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              >
+                {#each DOCUMENT_TYPES as type}
+                  <option value={type}>{type}</option>
+                {/each}
+              </select>
+              <p class="text-[11px] text-slate-500">
+                Classifies the document for filtering — used later in Rule Extraction Studio.
+              </p>
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="upload-parser" class="block text-xs font-semibold text-slate-300">
+                Parsing Engine
+              </label>
+              <select
+                id="upload-parser"
+                bind:value={uploadParser}
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              >
+                <option value="auto">Auto (Unstructured API, falls back to local)</option>
+                <option value="unstructured">Unstructured API only (best quality, slower, uploads file)</option>
+                <option value="light">Light local extraction only (instant, no upload)</option>
+              </select>
+            </div>
+
+            <div
+              class="border-2 border-dashed border-slate-700 hover:border-[#0071e3] transition-colors rounded-xl p-6 text-center bg-slate-950/40"
+            >
+              <FileText class="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p class="text-xs text-slate-400 mb-3">
+                Upload PDF, Word, Excel, CSV, TXT, or Markdown specifications
+              </p>
+              <label
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer transition-colors"
+              >
+                <span>Choose File</span>
+                <input
+                  type="file"
+                  accept=".pdf,.txt,.md,.markdown,.docx,.csv,.xlsx"
+                  on:change={(e) => {
+                    const target = e.target as HTMLInputElement;
+                    if (target.files) uploadFile = target.files[0];
+                  }}
+                  class="hidden"
+                />
+              </label>
+            </div>
+
+            {#if uploadFile}
+              <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+                <span class="text-white font-medium truncate">{uploadFile.name}</span>
+                <span class="text-slate-500">{(uploadFile.size / 1024).toFixed(1)} KB</span>
+              </div>
+            {/if}
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                on:click={() => (isUploadModalOpen = false)}
+                class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!uploadFile || isUploading}
+                on:click={handleUpload}
+                class="px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white disabled:opacity-50"
+              >
+                {isUploading ? "Extracting Text..." : "Upload & Extract"}
+              </button>
+            </div>
+          </div>
+        {:else if uploadTab === "ids"}
+          <IdsImportForm
+            defaultRulesetId=""
+            onCancel={() => (isUploadModalOpen = false)}
+            onImported={handleIdsImportedFromUpload}
           />
-        </label>
-      </div>
-
-      {#if uploadFile}
-        <div
-          class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
-        >
-          <span class="text-white font-medium truncate">{uploadFile.name}</span>
-          <span class="text-slate-500"
-            >{(uploadFile.size / 1024).toFixed(1)} KB</span
-          >
-        </div>
-      {/if}
-
-      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-        <button
-          type="button"
-          on:click={() => (isUploadModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={!uploadFile || isUploading}
-          on:click={handleUpload}
-          class="px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white disabled:opacity-50"
-        >
-          {isUploading ? "Extracting Text..." : "Upload & Extract"}
-        </button>
+        {:else}
+          <RuleForm
+            onCancel={() => (isUploadModalOpen = false)}
+            onSaved={handleRuleCreatedFromUpload}
+          />
+        {/if}
       </div>
     </div>
   </div>
