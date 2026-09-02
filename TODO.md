@@ -147,6 +147,7 @@ Owner: Osama.
 - [x] Remove artificial max-width constraints on route view containers for fluid high-density layouts.
 - [x] Implement native `@thatopen/components` Svelte wrapper in `IfcViewer.svelte` to retire iframe embedding.
 - [ ] Add user authentication (Supabase Auth / JWT) across FastAPI endpoints and Svelte client.
+      See Priority 9 for OAuth and RBAC, planned as a later-stage follow-on.
 
 ## Priority 5: 3D OpenBIM Viewer Integration
 
@@ -206,6 +207,23 @@ Owner: Osama.
 - [ ] Add `requiredheadroom` to `_LENGTH_DIRECT_ATTRS`; the list contains
       `requireheadroom`, so `Pset_StairCommon.RequiredHeadroom` only converts when it
       carries an explicit measure type.
+
+Owner: unassigned.
+
+## Priority 9: OAuth and RBAC (Later Stage)
+
+Deferred until core pipeline, rules, and background-processing priorities stabilize.
+Builds on the base Supabase Auth / JWT work in Priority 4.1.
+
+- [ ] Add OAuth login (e.g. Supabase Auth third-party providers) for FastAPI endpoints
+      and the Svelte 5 SPA.
+- [ ] Define roles (e.g. admin, reviewer, viewer) and map permissions to project,
+      rule, analysis, enhancement, and reporting endpoints.
+- [ ] Enforce Role-Based Access Control (RBAC) via FastAPI dependency injection
+      (`app/api/dependencies.py`) and Supabase Row Level Security policies.
+- [ ] Reflect role-gated actions and views in the Svelte client (e.g. hide/disable
+      enhancement, rule editing, and admin views for unauthorized roles).
+- [ ] Add tests proving unauthorized roles cannot invoke restricted API operations.
 
 Owner: unassigned.
 
