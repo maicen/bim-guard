@@ -154,9 +154,13 @@ class EngineSpec:
 #: ``GC-001`` / ``CC-001``
 #:     Implemented and instrumented. ``pending`` means "no run yet".
 #: ``MM-001`` / ``XM-001``
-#:     Path B comparators, gated behind ``FEATURE_PATH_B_MM`` /
-#:     ``FEATURE_PATH_B_XM`` in :mod:`app.modules.config` and off by default, so
-#:     ``pending`` is accurate for a default deployment.
+#:     Path B comparators. ``FEATURE_PATH_B_MM`` / ``FEATURE_PATH_B_XM`` in
+#:     :mod:`app.modules.config` gate them only in
+#:     ``module4_comparator.compliance_orchestrator``, which no API route calls.
+#:     On the live path they are ``NETWORK_MECHANISMS`` in
+#:     ``phase_6c_corrosion_ui`` and run whenever selected -- which the analyse
+#:     page now does by default. ``pending`` here means "not instrumented",
+#:     exactly as it does for MC-001 below, not "not running".
 #: ``MC-001``
 #:     Declared ``not_implemented`` because the frontend contract for this
 #:     endpoint specifies it. **Note that this repository does ship an MC-001

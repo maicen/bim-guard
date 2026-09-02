@@ -50,16 +50,37 @@ router = APIRouter()
 #: ``MechanismSpec.code`` values in ``phase_6c_corrosion_ui``. Issues carry rule
 #: ids like "GC-001.01" and "GC-001.DATA", so a prefix match selects an engine's
 #: verdicts and its data-quality notes together.
-SELECTABLE_ENGINES: tuple[str, ...] = ("GC-001", "CC-001", "MC-001")
+#:
+#: All five engines are here, and the list must stay in step with
+#: ``phase_6c_corrosion_ui.MECHANISMS``. A code missing from this tuple is not
+#: merely unselectable: it is dropped from ``wanted`` in
+#: :func:`_filter_issues_by_engine`, so a caller naming it alongside a listed
+#: engine ran it and then had its findings filtered away. MM-001 and XM-001
+#: were absent while the network mechanisms that produce them were running,
+#: which is exactly that silent loss.
+SELECTABLE_ENGINES: tuple[str, ...] = (
+    "GC-001",
+    "CC-001",
+    "MC-001",
+    "MM-001",
+    "XM-001",
+)
 
 
 def _filter_issues_by_engine(result: dict, engines: list[str]) -> dict:
     """Narrow an ``AnalysisResult`` to the issues the given engines raised.
 
-    Applied to what ``run_analysis`` returns rather than inside it, deliberately:
-    the analysis cache is keyed on (project, slug, model digest) with no engine
-    dimension, so narrowing before the cache write would store a partial run
-    under the key that the next caller asking for everything would hit.
+    This is the legacy ``rule_ids`` path only. The analyse page sends
+    ``engines``, which ``resolve_mechanisms`` honours before the element loop,
+    so an unselected engine is never entered rather than being run and then
+    filtered. Narrowing here is what remains for a caller that predates that
+    field.
+
+    Applied to what ``run_analysis`` returns rather than inside it: narrowing
+    before the cache write would store a partial run, and while
+    :class:`~app.services.analysis_cache.CacheKey` now carries the engine
+    tuple and would keep the two apart, the result a cache entry holds should
+    be the whole run its key describes.
 
     An empty or unrecognised selection returns the result untouched, so a
     caller cannot accidentally narrow a run down to nothing.
@@ -252,10 +273,12 @@ def run_corrosion(
     project_id: Annotated[int, Form(...)],
     engines: Annotated[list[str] | None, Form()] = None,
 ) -> AnalysisResultContract:
-    """Run the selected corrosion engines (GC-001, CC-001, MC-001).
+    """Run the selected corrosion engines.
 
-    Omitting ``engines`` runs all three; naming a subset runs only those, and
-    the rest are never entered.
+    All five are selectable: GC-001, CC-001 and MC-001 score each element,
+    while MM-001 and XM-001 assess the network once. Omitting ``engines`` runs
+    every one of them; naming a subset runs only those, and the rest are never
+    entered.
     """
     raw_result = run_analysis("corrosion", project_id, use_cache=False, engines=engines)
     if raw_result.get("compliance_error"):
