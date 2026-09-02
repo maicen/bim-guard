@@ -54,6 +54,15 @@ UNDETERMINED = "UNDETERMINED"
 _SCOPE_NUMERIC_PROPERTIES = {
     "nominal_diameter_mm": "NominalDiameter",
     "nominal_diameter_below_mm": "NominalDiameter",
+    # Support-derived, resolved by module2_ifc_read.ifc_supports into
+    # `scope_values` alongside the Pset-derived ones, so they need no separate
+    # machinery here. HangerRodLength is the LONGEST rod on the run: an
+    # exemption for "rods shorter than 150 mm" is only earned when every rod
+    # clears it.
+    "hanger_rod_length_below_mm": "HangerRodLength",
+    "hanger_rod_length_mm": "HangerRodLength",
+    "lateral_brace_spacing_mm": "LateralBraceSpacing",
+    "longitudinal_brace_spacing_mm": "LongitudinalBraceSpacing",
 }
 
 #: Predicate keys matched against a list-valued field of the element record.
@@ -82,6 +91,11 @@ _SCOPE_LIST_FIELDS = {
 #: but the same shortcut on an inverted predicate would waive silently.
 _SCOPE_BOOL_FIELDS = {
     "host_is_breakaway": "host_is_breakaway",
+    # True when at least one of the supports found is a hanger. None -- and so
+    # UNDETERMINED -- when no supports were found at all, since an exporter
+    # that writes no relationships looks exactly like a genuinely unsupported
+    # run.
+    "is_suspended": "is_suspended",
 }
 
 #: Predicate keys that are structurally meaningful but carry no per-element
@@ -391,10 +405,22 @@ class Module4_Comparator:
                     return UNDETERMINED, f"{key} bound {expected!r} is not numeric"
                 return (MATCH if value < limit else NO_MATCH), ""
 
-            # Otherwise a {"min": , "max": } band, both bounds inclusive and
-            # both optional.
-            if not isinstance(expected, dict):
-                return UNDETERMINED, f"{key} expects a min/max object"
+            # A bare number is a single nominated size -- "NB50", "DN65" --
+            # rather than a band. Standards tabulate rules that way (NZS 4219
+            # Table 6a is per nominal bore), so the scalar form is read as the
+            # degenerate band {min: v, max: v}.
+            #
+            # That is an EXACT match on a float, and deliberately so: widening
+            # it by some tolerance would silently pull neighbouring sizes into
+            # a rule written for one. The cost is that a model authoring the
+            # true outside diameter (50.8 for NB50) will not match a rule
+            # written against the nominal designation (50.0); such a rule
+            # states NO_MATCH, not a wrong verdict, and the mismatch belongs in
+            # rule review rather than in a fudge factor here.
+            if isinstance(expected, (int, float)) and not isinstance(expected, bool):
+                expected = {"min": expected, "max": expected}
+            elif not isinstance(expected, dict):
+                return UNDETERMINED, f"{key} expects a number or a min/max object"
             low = expected.get("min")
             high = expected.get("max")
             try:

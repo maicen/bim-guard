@@ -34,6 +34,29 @@ WHAT IS IN THE FILE
     (2½ in). Both penetrations therefore FAIL the clearance rule on geometry
     alone; only Pipe B should be waived, by the gypsum exemption.
 
+    Pipe C  IfcPipeSegment on a 100 mm hanger rod, assigned to a
+            FIREPROTECTION IfcDistributionSystem named "Sprinkler System".
+    Pipe D  identical to C but on a 450 mm rod.
+    Pipe E  identical to C but on a DOMESTICCOLDWATER system.
+
+    The three suspended runs carry no penetration at all. They exist for the
+    predicates the penetration fixtures cannot exercise -- `is_suspended`,
+    `hanger_rod_length_below_mm` and `system_type_any_of` -- and each pair
+    isolates one variable, the same discipline Wall A / Wall B follow: C vs D
+    differs only in rod length, C vs E only in system type.
+
+    NZS 4219 5.8.1 exempts rods under 150 mm and FEMA E-74 6.4.3.1 under
+    305 mm; 100 mm is below both and 450 mm above both, so C is exempt and D
+    is not under either standard.
+
+    Each hanger is an IfcDiscreteAccessory carrying three agreeing signals --
+    PredefinedType BRACKET, a name reading "Hanger Rod", and a HangerType
+    property -- so `ifc_supports.classify_support` reaches HANGER by any of its
+    routes. BRACKET rather than HANGER because IfcDiscreteAccessoryTypeEnum has
+    no HANGER member; it is `_PREDEFINED_SIGNALS` that maps the two. The rod is
+    a vertical extrusion, so `rod_length_mm` reports method "extrusion" rather
+    than falling back to a bounding box.
+
 UNITS
 
     The project length unit is millimetres, so every measure in the file --
@@ -48,6 +71,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import ifcopenshell
@@ -64,6 +88,9 @@ import ifcopenshell.guid
 import ifcopenshell.util.element
 import numpy as np
 from ifcopenshell.api import run
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 #: Default output, relative to the repository root. ``data/test_models/`` is
 #: gitignored, so the generated file is never committed; the script is.
@@ -98,6 +125,75 @@ PIPE_STEEL = "Carbon Steel"
 PENETRATIONS = (
     ("A", "Wall A - Concrete", CONCRETE, "concrete", "Pipe A - 2in through concrete", 0.0),
     ("B", "Wall B - Gypsum Board", GYPSUM, "gypsum", "Pipe B - 2in through gypsum", 4000.0),
+)
+
+#: ── Suspended runs ───────────────────────────────────────────────────────────
+#: Hanger rod diameter, millimetres. Only the rod's LENGTH is under test; the
+#: diameter just has to be plausible enough to extrude.
+ROD_DIAMETER_MM = 10.0
+
+#: NZS 4219 5.8.1 exempts piping on hanger rods shorter than 150 mm; FEMA E-74
+#: 6.4.3.1 uses 305 mm (12 in). SHORT_ROD_MM sits below both thresholds and
+#: LONG_ROD_MM above both, so one run is exempt under either standard and the
+#: other under neither -- the verdict cannot depend on which one is applied.
+SHORT_ROD_MM = 100.0
+LONG_ROD_MM = 450.0
+
+#: Where the suspended runs sit, millimetres. Well clear of the walls in y so
+#: nothing here can interfere with the penetration fixtures above.
+RUN_Y0 = 8000.0
+RUN_LENGTH = 4000.0
+RUN_Z = 2500.0
+
+#: ── Braced run ───────────────────────────────────────────────────────────────
+#: A single long run carrying several supports, which the suspended runs above
+#: cannot provide: each of those has exactly one hanger, and one support has no
+#: spacing at all. A spacing rule needs at least two.
+#:
+#: NominalDiameter is exactly 50.0, not the 50.8 mm true outside diameter of
+#: NB50, because NZS 4219 Table 6a is tabulated against the nominal
+#: designation and the comparator matches a scalar `nominal_diameter_mm`
+#: exactly. A run at 50.8 would fall out of scope -- correctly, but it would
+#: prove nothing about the spacing arithmetic.
+BRACED_NOMINAL_DIAMETER_MM = 50.0
+BRACED_RUN_X = 12000.0
+BRACED_RUN_Y0 = 16000.0
+BRACED_RUN_LENGTH = 20000.0
+BRACED_RUN_Z = 2500.0
+
+#: Stations along the braced run, millimetres from its start. The gaps are the
+#: whole point of the fixture, so each series is chosen to land on a known side
+#: of the rule that governs it:
+#:
+#:   lateral       7000 mm gaps -- OVER the 6100 mm NZS Table 6a limit  -> FAIL
+#:   longitudinal 15000 mm gap  -- under the 18000 mm Table 7a limit    -> PASS
+#:   all supports  7000 mm gap  -- over the 4000 mm BS EN 17.2.2 limit  -> FAIL
+LATERAL_BRACE_STATIONS = (1000.0, 8000.0, 15000.0)
+LONGITUDINAL_BRACE_STATIONS = (2000.0, 17000.0)
+BRACED_HANGER_STATIONS = (1000.0, 19000.0)
+
+#: (system name, IfcDistributionSystemEnum PredefinedType)
+#:
+#: The enumeration has FIREPROTECTION but NO SPRINKLER member, so a rule
+#: predicate asking for "sprinkler" can only ever match the system NAME. Both
+#: are set deliberately: the PredefinedType carries "fire_protection" and the
+#: name carries "sprinkler", which is what lets one predicate
+#: ``system_type_any_of: ["fire_protection", "sprinkler"]`` be satisfied by
+#: either half and proves the extractor has to read both.
+FIRE_SYSTEM = ("Sprinkler System - Wet Pipe", "FIREPROTECTION")
+WATER_SYSTEM = ("Domestic Cold Water", "DOMESTICCOLDWATER")
+
+#: (label, pipe name, x offset, rod length, system)
+#:
+#: Each pair differs in exactly one variable, the same discipline the two
+#: penetrations above follow: C vs D isolates rod length (same system), C vs E
+#: isolates system type (same rod). A verdict that changes between C and D can
+#: only be the hanger exemption; one that changes between C and E can only be
+#: the system-type predicate.
+SUSPENDED = (
+    ("C", "Pipe C - sprinkler, 100 mm rod", 0.0, SHORT_ROD_MM, FIRE_SYSTEM),
+    ("D", "Pipe D - sprinkler, 450 mm rod", 2000.0, LONG_ROD_MM, FIRE_SYSTEM),
+    ("E", "Pipe E - domestic water, 100 mm rod", 4000.0, SHORT_ROD_MM, WATER_SYSTEM),
 )
 
 
@@ -171,6 +267,34 @@ def _cylinder_along_y(model, context, diameter, length):
         Position=_placement3d(
             model, (0.0, 0.0, 0.0), axis=(0.0, 1.0, 0.0), ref_direction=(1.0, 0.0, 0.0)
         ),
+        ExtrudedDirection=model.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0)),
+        Depth=length,
+    )
+    return _shape(model, context, solid)
+
+
+def _cylinder_along_z(model, context, diameter, length):
+    """Circular solid of ``diameter`` extruded ``length`` mm along global +Z.
+
+    Used for hanger rods. ``ifc_supports.rod_length_mm`` reads the extrusion
+    directly through ``_extrusion_axis``, so both the rod's length and its
+    angle from vertical come from this solid rather than from a bounding box
+    -- which is what lets the fixture exercise the exact ("extrusion") path
+    the method field reports, not the bounding-box fallback.
+    """
+    profile = model.create_entity(
+        "IfcCircleProfileDef",
+        ProfileType="AREA",
+        Position=model.create_entity(
+            "IfcAxis2Placement2D",
+            Location=model.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0)),
+        ),
+        Radius=diameter / 2.0,
+    )
+    solid = model.create_entity(
+        "IfcExtrudedAreaSolid",
+        SweptArea=profile,
+        Position=_placement3d(model, (0.0, 0.0, 0.0)),
         ExtrudedDirection=model.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0)),
         Depth=length,
     )
@@ -318,6 +442,175 @@ def build(out_path: Path) -> dict:
 
         created.append((label, wall, opening, pipe))
 
+    # ── Suspended runs: distribution systems + hanger rods ────────────────
+    # These carry no penetration at all. They exist so the system-type and
+    # is_suspended predicates have something to resolve against, which the two
+    # penetration fixtures above cannot provide: neither is assigned to a
+    # system, and neither is supported by anything.
+    systems: dict[str, object] = {}
+    for _label, _name, _px, _rod, (system_name, system_type) in SUSPENDED:
+        if system_name in systems:
+            continue
+        system = run("system.add_system", model, ifc_class="IfcDistributionSystem")
+        system.Name = system_name
+        system.PredefinedType = system_type
+        systems[system_name] = system
+
+    suspended = []
+    for label, pipe_name, px, rod_length, (system_name, _system_type) in SUSPENDED:
+        pipe = run("root.create_entity", model, ifc_class="IfcPipeSegment", name=pipe_name)
+        pipe.PredefinedType = "RIGIDSEGMENT"
+        run("spatial.assign_container", model, products=[pipe], relating_structure=storey)
+        run("material.assign_material", model, products=[pipe], material=materials[PIPE_STEEL])
+        # Horizontal, running along y, so a vertical rod is perpendicular to it
+        # and `classify_orientation` has a real axis to measure against.
+        _place(
+            model,
+            pipe,
+            body,
+            _cylinder_along_y(model, body, PIPE_NOMINAL_DIAMETER_MM, RUN_LENGTH),
+            (px, RUN_Y0, RUN_Z),
+        )
+        pipe_pset = run("pset.add_pset", model, product=pipe, name="Pset_PipeSegmentTypeCommon")
+        run(
+            "pset.edit_pset",
+            model,
+            pset=pipe_pset,
+            properties={"NominalDiameter": PIPE_NOMINAL_DIAMETER_MM},
+        )
+        run("system.assign_system", model, products=[pipe], system=systems[system_name])
+
+        # ── Hanger rod, rising from the pipe to the structure above ───────
+        # Three agreeing signals, for the same reason each penetration is
+        # modelled three ways: whichever route `classify_support` takes, it
+        # reaches HANGER.
+        #
+        #   PredefinedType  BRACKET  -- IfcDiscreteAccessoryTypeEnum has no
+        #                               HANGER member, and BRACKET is the value
+        #                               `_PREDEFINED_SIGNALS` maps to HANGER.
+        #                               Using a bare "HANGER" string here would
+        #                               be schema-invalid.
+        #   Name            "Hanger Rod ..." -- matches `_NAME_SIGNALS`.
+        #   HangerType      "Clevis Hanger"  -- matches `_KIND_PROPERTY_NAMES`.
+        hanger = run(
+            "root.create_entity",
+            model,
+            ifc_class="IfcDiscreteAccessory",
+            name=f"Hanger Rod {label} - {rod_length:g} mm",
+        )
+        hanger.PredefinedType = "BRACKET"
+        run("spatial.assign_container", model, products=[hanger], relating_structure=storey)
+        _place(
+            model,
+            hanger,
+            body,
+            _cylinder_along_z(model, body, ROD_DIAMETER_MM, rod_length),
+            (px, RUN_Y0 + RUN_LENGTH / 2.0, RUN_Z),
+        )
+        hanger_pset = run("pset.add_pset", model, product=hanger, name="Pset_SupportCommon")
+        run(
+            "pset.edit_pset",
+            model,
+            pset=hanger_pset,
+            properties={"HangerType": "Clevis Hanger"},
+        )
+
+        # IfcRelConnectsElements is the "connection" route in
+        # `ifc_supports.find_supports` -- the most trusted of the three, and
+        # the only one that works with proximity matching left off.
+        model.create_entity(
+            "IfcRelConnectsElements",
+            GlobalId=ifcopenshell.guid.new(),
+            Name=f"Hanger {label}",
+            Description=f"{hanger.Name} supports {pipe_name}",
+            RelatingElement=hanger,
+            RelatedElement=pipe,
+        )
+        suspended.append((label, pipe, hanger, rod_length))
+
+    # ── Braced run: several supports at known spacing ─────────────────────
+    # Runs along +y like the suspended runs, so a vertical member is
+    # perpendicular to it (lateral) and a member along y is parallel to it
+    # (longitudinal). `classify_support` measures that angle rather than
+    # trusting the name, so the geometry is what decides each brace's kind.
+    braced = run(
+        "root.create_entity", model, ifc_class="IfcPipeSegment", name="Pipe F - braced run NB50"
+    )
+    braced.PredefinedType = "RIGIDSEGMENT"
+    run("spatial.assign_container", model, products=[braced], relating_structure=storey)
+    run("material.assign_material", model, products=[braced], material=materials[PIPE_STEEL])
+    _place(
+        model,
+        braced,
+        body,
+        _cylinder_along_y(model, body, PIPE_NOMINAL_DIAMETER_MM, BRACED_RUN_LENGTH),
+        (BRACED_RUN_X, BRACED_RUN_Y0, BRACED_RUN_Z),
+    )
+    braced_pset = run(
+        "pset.add_pset", model, product=braced, name="Pset_PipeSegmentTypeCommon"
+    )
+    run(
+        "pset.edit_pset",
+        model,
+        pset=braced_pset,
+        properties={"NominalDiameter": BRACED_NOMINAL_DIAMETER_MM},
+    )
+    run("system.assign_system", model, products=[braced], system=systems[FIRE_SYSTEM[0]])
+
+    def _support(ifc_class, name, predefined, solid, position, psets=None):
+        """Create one support, place it, and connect it to the braced run."""
+        element = run("root.create_entity", model, ifc_class=ifc_class, name=name)
+        element.PredefinedType = predefined
+        run("spatial.assign_container", model, products=[element], relating_structure=storey)
+        _place(model, element, body, solid, position)
+        if psets:
+            pset = run("pset.add_pset", model, product=element, name=psets[0])
+            run("pset.edit_pset", model, pset=pset, properties=psets[1])
+        model.create_entity(
+            "IfcRelConnectsElements",
+            GlobalId=ifcopenshell.guid.new(),
+            Name=f"Support {name}",
+            Description=f"{name} supports {braced.Name}",
+            RelatingElement=element,
+            RelatedElement=braced,
+        )
+        return element
+
+    supports = []
+    for index, station in enumerate(LATERAL_BRACE_STATIONS, start=1):
+        # Vertical: 90 degrees to a run along y, so geometry reads it LATERAL.
+        supports.append(
+            _support(
+                "IfcMember",
+                f"Sway Brace L{index}",
+                "BRACE",
+                _cylinder_along_z(model, body, ROD_DIAMETER_MM * 4, 1200.0),
+                (BRACED_RUN_X, BRACED_RUN_Y0 + station, BRACED_RUN_Z),
+            )
+        )
+    for index, station in enumerate(LONGITUDINAL_BRACE_STATIONS, start=1):
+        # Along y: parallel to the run, so geometry reads it LONGITUDINAL.
+        supports.append(
+            _support(
+                "IfcMember",
+                f"Sway Brace G{index}",
+                "BRACE",
+                _cylinder_along_y(model, body, ROD_DIAMETER_MM * 4, 1200.0),
+                (BRACED_RUN_X + 400.0, BRACED_RUN_Y0 + station, BRACED_RUN_Z),
+            )
+        )
+    for index, station in enumerate(BRACED_HANGER_STATIONS, start=1):
+        supports.append(
+            _support(
+                "IfcDiscreteAccessory",
+                f"Hanger Rod F{index} - {SHORT_ROD_MM:g} mm",
+                "BRACKET",
+                _cylinder_along_z(model, body, ROD_DIAMETER_MM, SHORT_ROD_MM),
+                (BRACED_RUN_X, BRACED_RUN_Y0 + station, BRACED_RUN_Z),
+                psets=("Pset_SupportCommon", {"HangerType": "Clevis Hanger"}),
+            )
+        )
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     model.write(str(out_path))
 
@@ -325,9 +618,12 @@ def build(out_path: Path) -> dict:
         "path": out_path,
         "schema": model.schema,
         "walls": len(created),
-        "pipes": len(created),
+        "pipes": len(created) + len(suspended) + 1,
         "openings": len(created),
         "materials": len(materials),
+        "systems": len(systems),
+        "hangers": len(suspended),
+        "braced_supports": len(supports),
         "size_bytes": out_path.stat().st_size,
     }
 
@@ -355,6 +651,53 @@ def verify(path: Path) -> list[str]:
     return lines
 
 
+def verify_suspended(path: Path) -> list[str]:
+    """Re-open the file and report it through ``ifc_supports`` itself.
+
+    Reading the fixture back with the production support reader rather than
+    with a bespoke traversal is the point: it proves the hangers are findable
+    by the code that will actually gate ``is_suspended``, not merely present in
+    the file. A fixture that only a purpose-written checker can see would pass
+    here and still leave the predicate UNDETERMINED in a real run.
+    """
+    from app.modules.module2_ifc_read import ifc_supports
+    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+
+    model = ifcopenshell.open(str(path))
+    # element_axis needs a centroid to turn an extrusion direction into a
+    # positioned centreline, so the extractor is not optional here: without it
+    # every rod length comes back None and the fixture would look broken when
+    # it is only unmeasured.
+    geometry = IFCGeometryExtractor(model)
+    lines = []
+    for pipe in model.by_type("IfcPipeSegment"):
+        supports = ifc_supports.find_supports(pipe, geometry_extractor=geometry)
+        if not supports:
+            continue
+        systems = [
+            rel.RelatingGroup
+            for rel in getattr(pipe, "HasAssignments", None) or []
+            if rel.is_a("IfcRelAssignsToGroup")
+            and rel.RelatingGroup.is_a("IfcDistributionSystem")
+        ]
+        system_text = ", ".join(
+            f"{s.Name} [{s.PredefinedType}]" for s in systems
+        ) or "unassigned"
+        rods = []
+        for support in supports:
+            length, detail = ifc_supports.rod_length_mm(
+                support["element"], geometry_extractor=geometry
+            )
+            rods.append(
+                f"{support['kind']} via {support['route']} "
+                f"station={support['station_mm']} "
+                f"rod={length if length is None else f'{length:g} mm'} "
+                f"({detail['method']}, plumb={detail['is_plumb']})"
+            )
+        lines.append(f"{pipe.Name}: system={system_text}; {'; '.join(rods)}")
+    return lines
+
+
 def main() -> None:
     """Build the file, re-read it, and report what was written."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -373,9 +716,14 @@ def main() -> None:
     print(f"  pipes:     {stats['pipes']}")
     print(f"  openings:  {stats['openings']}")
     print(f"  materials: {stats['materials']}")
+    print(f"  systems:   {stats['systems']}")
+    print(f"  hangers:   {stats['hangers']}")
     print(f"  size:      {stats['size_bytes'] / 1024:.1f} KB")
-    print("Read-back:")
+    print("Read-back (penetrations):")
     for line in verify(args.out):
+        print(f"  {line}")
+    print("Read-back (suspended runs, via ifc_supports):")
+    for line in verify_suspended(args.out):
         print(f"  {line}")
 
 

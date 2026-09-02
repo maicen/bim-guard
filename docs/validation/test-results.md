@@ -301,7 +301,38 @@ fills `issue_stats` only on the MEP branch; `_format_result` then defaults each
 band to 0. Seismic populates its stats correctly (`data_quality: 427` before the
 geometry fix), which is what makes this a bug rather than a design choice.
 
-## Finding 6 — the unit suite needs a database it does not document needing
+## Finding 6 — the unit suite needs a database it does not document needing — RESOLVED
+
+Re-measured at `c15ac1f` (2026-09-02), four days after the run this report
+otherwise records:
+
+`uv run pytest tests/`: **982 passed, 2 skipped, 5 xfailed, 0 failed** (23m10s).
+
+The 29 failures are gone. `tests/conftest.py::IMPORT_REGRESSIONS` is now empty,
+so the four modules that raised at import no longer do — and the registry being
+empty is itself the one skip inside `test_imports.py`, which reports "got empty
+parameter set for (module)" because there is no longer a regression to
+parametrise over. `KNOWN_IMPORT_FAILURES` retains a single environmental entry,
+`module1_doc_parser.tfidf_analyzer`, which wants scikit-learn from the optional
+`ml-pipeline` group; it is excluded from the sweep rather than skipped. The
+suite's second skip is one of the several conditional guards elsewhere in
+`tests/` (absent checkout files, optional dependencies) and was not isolated.
+
+The repair happened across the intervening commits rather than in one change,
+and this re-measurement did not bisect which; the finding is recorded as
+resolved on the evidence of a green suite and an empty regression registry, not
+on a traced cause.
+
+The count also grew from 791 collected to 989, so the two numbers are not a
+like-for-like comparison — tests were added throughout, including 34 in
+`c15ac1f` (`tests/test_ifc_penetrations.py`, additions to
+`tests/test_comparator_scope_waivers.py`).
+
+**The E2E numbers in the Summary above were NOT re-measured.** They remain
+those of the 2026-08-30 run at `7aa8cf0` / `3659bcf`. Only the unit suite was
+re-run.
+
+### The original observation, for the record
 
 `uv run pytest tests/`: **29 failed, 762 passed, 5 skipped, 5 xfailed** — before
 and after both fixes, so neither regressed anything. The failures trace to the

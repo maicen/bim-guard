@@ -168,6 +168,16 @@ PC_001_03 = {
 }
 
 
+def _penetrating(extraction):
+    """Return the two pipes that pass through a wall.
+
+    The mock model also carries suspended runs used by the support tests, and
+    those penetrate nothing. Selecting by name keeps these assertions about the
+    penetration pair even as the shared model grows.
+    """
+    return [el for el in extraction[0]["elements"] if "through" in el["name"]]
+
+
 @pytest.fixture(scope="module")
 def pc001_result(mock_model_path):
     """Run the requirement plus its exemption through Modules 2 and 4."""
@@ -189,8 +199,18 @@ class TestPC001EndToEnd:
 
     def test_clearance_was_derived_from_geometry(self, pc001_result):
         extraction, _ = pc001_result
-        for el in extraction[0]["elements"]:
+        for el in _penetrating(extraction):
             assert el["actual_value"] == pytest.approx(6.35, abs=0.01)
+
+    def test_suspended_pipes_have_no_clearance_to_derive(self, pc001_result):
+        # The model also carries suspended runs that pass through nothing.
+        # They must report no clearance rather than a fabricated one.
+        extraction, _ = pc001_result
+        suspended = [
+            el for el in extraction[0]["elements"] if "through" not in el["name"]
+        ]
+        assert suspended, "the mock model no longer carries suspended runs"
+        assert all(el["actual_value"] is None for el in suspended)
 
     def test_rule_fails_overall(self, pc001_result):
         _, results = pc001_result
@@ -224,7 +244,8 @@ class TestPC001EndToEnd:
         # Guards the claim the model rests on: if the two pipes differed in
         # anything else, the verdict split would prove nothing.
         extraction, _ = pc001_result
-        elements = extraction[0]["elements"]
+        elements = _penetrating(extraction)
+        assert len(elements) == 2
         assert {e["host_is_breakaway"] for e in elements} == {True, False}
         assert len({e["actual_value"] for e in elements}) == 1
         assert len({tuple(e["scope_values"].items()) for e in elements}) == 1

@@ -15,5 +15,9 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "enableAllProjectMcpServers": true
 }

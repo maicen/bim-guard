@@ -79,6 +79,12 @@ except ImportError:
     _PENETRATIONS_AVAILABLE = False
 
 try:
+    from .ifc_supports import build_support_index, support_context
+    _SUPPORTS_AVAILABLE = True
+except ImportError:
+    _SUPPORTS_AVAILABLE = False
+
+try:
     from .ifc_quality.validator import IFCValidator
 
     _QUALITY_TOOLS_AVAILABLE = True
@@ -201,6 +207,21 @@ _IFC_TYPE_MAP = {
     "IfcMassMeasure": "real",
     "IfcTimeMeasure": "real",
     "IfcThermalTransmittanceMeasure": "real",
+}
+
+
+#: Property name (lower-cased, separators stripped) -> where it lives in
+#: ``ifc_supports.support_context``. ``kind`` selects one of the per-kind
+#: spacing series; ``field`` names the value inside it.
+#:
+#: Every entry reports the LARGEST gap, because a spacing limit is a maximum
+#: and it is the worst gap on the run that has to satisfy it.
+_SUPPORT_DERIVED_PROPERTIES = {
+    "lateralbracespacing": ("lateral_spacing", "max_gap_mm"),
+    "longitudinalbracespacing": ("longitudinal_spacing", "max_gap_mm"),
+    "hangerspacing": ("hanger_spacing", "max_gap_mm"),
+    "supportspacing": ("support_spacing", "max_gap_mm"),
+    "hangerrodlength": ("rod_lengths", "max"),
 }
 
 
@@ -550,7 +571,13 @@ class Module2_IFCRead:
         mat_type = "none"
 
         try:
-            mat = ifcopenshell.util.element.get_material(element)
+            # should_inherit is ifcopenshell's default today, but stated
+            # explicitly: a pipe's material commonly sits on its
+            # IfcPipeSegmentType, and a future default flip would
+            # silently empty `materials` for every such element.
+            mat = ifcopenshell.util.element.get_material(
+                element, should_inherit=True
+            )
             if mat is None:
                 return {"material_type": "none", "layers": [], "materials": []}
 
@@ -785,6 +812,7 @@ class Module2_IFCRead:
         material_info: dict | None = None,
         door_space_connection: dict | None = None,
         penetration: dict | None = None,
+        support: dict | None = None,
         unit_scale_mm: float = 1.0,
     ) -> tuple[object, "str | None", dict]:
         """
@@ -855,6 +883,14 @@ class Module2_IFCRead:
                 detail = dict((penetration or {}).get("annular_clearance_detail") or {})
                 detail["unit"] = "mm"
                 return clearance, "geometry:penetration", detail
+        elif prop_lower_name in _SUPPORT_DERIVED_PROPERTIES:
+            # Support spacings and rod lengths: relationships plus geometry,
+            # resolved by ifc_supports, never a Pset key. Falls through to the
+            # Pset passes when the traversal produced nothing, so a model that
+            # authors e.g. HangerSpacing as a real property still has it read.
+            value, detail = self._support_derived_value(prop_lower_name, support)
+            if value is not None:
+                return value, "geometry:supports", detail
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -1091,6 +1127,10 @@ class Module2_IFCRead:
         # re-examined by every rule targeting IfcPipeSegment, and the traversal
         # reads geometry.
         _penetration_cache: dict[int, dict] = {}
+        # Same pattern for supports: the candidate scan and the per-element
+        # traversal are both worth caching across rules.
+        _support_index: list | None = None
+        _support_cache: dict[int, dict] = {}
 
         for rule_index, rule in enumerate(rules, start=1):
             rule_started_at = time.monotonic()
@@ -1132,6 +1172,12 @@ class Module2_IFCRead:
             )
             if needs_penetration and _interference_index is None:
                 _interference_index = build_interference_index(self.ifc_file)
+
+            needs_support = _SUPPORTS_AVAILABLE and self._needs_support_context(
+                prop_name, scope_predicate, resolved_exceptions
+            )
+            if needs_support and _support_index is None:
+                _support_index = build_support_index(self.ifc_file)
             logger.info(
                 "Rule extraction rule=%d/%d reference=%s target=%s property=%s pset=%s operator=%s fallback=%s",
                 rule_index,
@@ -1235,6 +1281,27 @@ class Module2_IFCRead:
                             penetration = {}
                         _penetration_cache[pen_id] = penetration
 
+                # Supports holding this element: hangers, braces, and the
+                # spacings between them. Cached per element like the
+                # penetration traversal above, and for the same reason.
+                support = {}
+                if needs_support:
+                    sup_id = el.id()
+                    if sup_id in _support_cache:
+                        support = _support_cache[sup_id]
+                    else:
+                        try:
+                            support = support_context(
+                                el,
+                                geometry_extractor=self.geometry_extractor,
+                                unit_scale_mm=_unit_scale_mm,
+                                support_index=_support_index,
+                            )
+                        except Exception as exc:
+                            logger.debug("Support context failed for %s: %s", el, exc)
+                            support = {}
+                        _support_cache[sup_id] = support
+
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
                     prop_name,
@@ -1244,6 +1311,7 @@ class Module2_IFCRead:
                     material_info=mat_info,
                     door_space_connection=door_space,
                     penetration=penetration,
+                    support=support,
                     unit_scale_mm=_unit_scale_mm,
                 )
 
@@ -1283,7 +1351,12 @@ class Module2_IFCRead:
                 for scope_prop in scope_property_names:
                     try:
                         scope_value, _, _ = self._resolve_element_property(
-                            el, scope_prop, spatial=spatial, unit_scale_mm=_unit_scale_mm
+                            el,
+                            scope_prop,
+                            spatial=spatial,
+                            penetration=penetration,
+                            support=support,
+                            unit_scale_mm=_unit_scale_mm,
                         )
                     except Exception:
                         scope_value = None
@@ -1365,6 +1438,16 @@ class Module2_IFCRead:
                         "annular_clearance_detail": penetration.get(
                             "annular_clearance_detail"
                         ),
+                        # Supports holding this element. Empty for rules that
+                        # ask about neither a spacing nor a rod.
+                        "support_count": support.get("support_count"),
+                        "supports": support.get("supports"),
+                        "lateral_spacing": support.get("lateral_spacing"),
+                        "longitudinal_spacing": support.get("longitudinal_spacing"),
+                        "hanger_spacing": support.get("hanger_spacing"),
+                        "support_spacing": support.get("support_spacing"),
+                        "rod_lengths": support.get("rod_lengths"),
+                        "is_suspended": support.get("is_suspended"),
                     }
                 )
 
@@ -2105,6 +2188,13 @@ class Module2_IFCRead:
     _SCOPE_PROPERTY_SOURCES = {
         "nominal_diameter_mm": "NominalDiameter",
         "nominal_diameter_below_mm": "NominalDiameter",
+        # Resolved by the support traversal rather than from a Pset, but it
+        # travels the same route: the comparator reads it out of `scope_values`
+        # and needs no new machinery.
+        "hanger_rod_length_below_mm": "HangerRodLength",
+        "hanger_rod_length_mm": "HangerRodLength",
+        "lateral_brace_spacing_mm": "LateralBraceSpacing",
+        "longitudinal_brace_spacing_mm": "LongitudinalBraceSpacing",
     }
 
     #: Predicate keys answered by the penetration traversal (``ifc_penetrations``)
@@ -2122,6 +2212,42 @@ class Module2_IFCRead:
     #: Property names that only the penetration traversal can produce, matched
     #: case- and separator-insensitively against a rule's ``property_name``.
     _PENETRATION_PROPERTIES = frozenset({"annularclearance"})
+
+    #: Property names produced by the support traversal (``ifc_supports``),
+    #: matched the same way. Each is a distinct measurement:
+    #:
+    #:   LateralBraceSpacing       largest gap between consecutive lateral braces
+    #:   LongitudinalBraceSpacing  largest gap between consecutive longitudinal braces
+    #:   HangerSpacing             largest gap between consecutive hangers
+    #:   SupportSpacing            largest gap between consecutive supports of ANY kind
+    #:   HangerRodLength           the LONGEST rod carrying this run
+    #:
+    #: There is deliberately no bare ``Spacing``. A rule limiting lateral brace
+    #: spacing, evaluated against a series that also contains hangers, passes
+    #: whenever the hangers are close together -- a run with hangers every 2 m
+    #: and no braces at all would satisfy a 6.1 m brace limit. The ambiguity
+    #: cannot be resolved safely by this side, so the rule has to say which
+    #: spacing it means.
+    _SUPPORT_PROPERTIES = frozenset(
+        {
+            "lateralbracespacing",
+            "longitudinalbracespacing",
+            "hangerspacing",
+            "supportspacing",
+            "hangerrodlength",
+        }
+    )
+
+    #: Predicate keys answered by the support traversal.
+    _SUPPORT_PREDICATE_KEYS = frozenset(
+        {
+            "hanger_rod_length_below_mm",
+            "hanger_rod_length_mm",
+            "lateral_brace_spacing_mm",
+            "longitudinal_brace_spacing_mm",
+            "support_count_min",
+        }
+    )
 
     #: Operators marking a rule as a waiver *definition* rather than a
     #: requirement. Such a row states the condition under which some other rule
@@ -2153,6 +2279,64 @@ class Module2_IFCRead:
             return True
         for predicate in [scope] + [e.get("predicate") or {} for e in exceptions]:
             if cls._PENETRATION_PREDICATE_KEYS & set(predicate or {}):
+                return True
+        return False
+
+    @staticmethod
+    def _support_derived_value(prop_lower_name: str, support: dict | None):
+        """Return (value, detail) for a support-derived property, or (None, {}).
+
+        None means the traversal could not answer -- no supports of that kind,
+        or fewer than two so there is no gap between them. It is never 0.0: a
+        run with one brace has no spacing, which a maximum-spacing rule must
+        see as missing data rather than as the tightest possible result.
+        """
+        source, field = _SUPPORT_DERIVED_PROPERTIES[prop_lower_name]
+        context = support or {}
+
+        if source == "rod_lengths":
+            lengths = [
+                r.get("length_mm")
+                for r in context.get("rod_lengths") or []
+                if r.get("length_mm") is not None
+            ]
+            if not lengths:
+                return None, {}
+            # The longest rod governs: an exemption for "rods shorter than
+            # 150 mm" is only satisfied when every rod clears it.
+            return round(max(lengths), 4), {
+                "unit": "mm",
+                "rod_count": len(lengths),
+                "shortest_rod_mm": round(min(lengths), 4),
+            }
+
+        series = context.get(source) or {}
+        value = series.get(field)
+        if value is None:
+            return None, {}
+        return value, {
+            "unit": "mm",
+            "support_count": series.get("count"),
+            "gaps_mm": series.get("gaps_mm"),
+            "start_offset_mm": series.get("start_offset_mm"),
+            "end_offset_mm": series.get("end_offset_mm"),
+        }
+
+    @classmethod
+    def _needs_support_context(
+        cls, prop_name: str, scope: dict, exceptions: list[dict]
+    ) -> bool:
+        """Whether this rule needs the support traversal for its elements.
+
+        Gated exactly like the penetration traversal, and for the same reason:
+        it walks relationships and reads geometry per element, so it must not
+        run for the rules that never ask about a hanger or a brace.
+        """
+        normalized = str(prop_name or "").replace("_", "").replace(" ", "").lower()
+        if normalized in cls._SUPPORT_PROPERTIES:
+            return True
+        for predicate in [scope] + [e.get("predicate") or {} for e in exceptions]:
+            if cls._SUPPORT_PREDICATE_KEYS & set(predicate or {}):
                 return True
         return False
 
