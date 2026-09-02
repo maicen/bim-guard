@@ -51,12 +51,33 @@ lands in ``_SCOPE_NUMERIC_PROPERTIES``, drop ``nominal_diameter_mm`` from this
 rule rather than leaving both in place. ``--revert`` restores the imported
 scope; it does not do that migration.
 
+Retiring the proxy
+------------------
+That day has arrived. ``app/modules/module2_ifc_read/ifc_seismic.py`` resolves
+``mass_kg`` per element and ``module4_comparator._SCOPE_NUMERIC_PROPERTIES``
+now maps ``mass_kg`` -> ``MassKg``, which is the exact condition
+``scope_patch.retire_proxy_when`` was written against. ``--retire-proxy``
+drops ``nominal_diameter_mm`` and leaves the clause's own threshold to do the
+narrowing on its own.
+
+This is not ``--revert``. Revert restores the *imported* scope, abstract
+target class and all; retiring keeps the IfcPipeSegment narrowing -- which was
+always correct and is independent of the proxy -- and removes only the
+stand-in.
+
+Why the proxy is now a false negative, not merely redundant: the keys are
+ANDed, so a 25 mm run carrying 40 kg reads NO_MATCH on the diameter band,
+which SETTLES the predicate. The element drops out of scope and the clause
+that governs it never runs. Under the old extractor that could not happen,
+because the diameter band was the only enforceable key it had.
+
 Usage::
 
-    python scripts/patch_nzs4219_513_scope.py              # dry run (default)
-    python scripts/patch_nzs4219_513_scope.py --print-sql  # emit the SQL form
-    python scripts/patch_nzs4219_513_scope.py --apply      # write to Supabase
+    python scripts/patch_nzs4219_513_scope.py                    # dry run (default)
+    python scripts/patch_nzs4219_513_scope.py --print-sql        # emit the SQL form
+    python scripts/patch_nzs4219_513_scope.py --apply            # write to Supabase
     python scripts/patch_nzs4219_513_scope.py --revert --apply
+    python scripts/patch_nzs4219_513_scope.py --retire-proxy --apply
 
 Exit codes: ``0`` success (including a dry run), ``1`` the rule was not found
 or the write failed.
@@ -127,6 +148,47 @@ OLD_APPLIES_WHEN = {
     "mass_kg": {"min": MASS_MIN_KG},
 }
 
+#: Stamped by --retire-proxy, so a row that has had the stand-in removed is
+#: distinguishable from one that never carried it.
+RETIRE_PATCHER = "patch_nzs4219_513_scope/2"
+
+RETIRED_DESCRIPTION = (
+    "Seismic clearance for independently supported pipework in ceiling voids."
+)
+
+#: What the clause actually says, now that the extractor can evaluate it.
+#: `mass_kg` does the narrowing on its own; `location` is still unrecognised by
+#: the comparator and still rides along as UNDETERMINED, which keeps an element
+#: in scope rather than dropping it -- the safe direction, and the reason it is
+#: kept rather than deleted.
+#:
+#: `nominal_diameter_mm` is deliberately absent. See the module docstring: with
+#: mass extractable the two keys AND together, and the band would drop a heavy
+#: small-bore run out of scope entirely.
+RETIRED_APPLIES_WHEN = {
+    "target_ifc_class": NEW_TARGET,
+    "location": "ceiling_void",
+    "mass_kg": {"min": MASS_MIN_KG},
+}
+
+#: Provenance for the retirement. `previous_applies_when` points at the v1
+#: patched scope rather than the imported one, so the row's history reads
+#: import -> narrow -> retire in order.
+RETIRE_PATCH_PARAM = {
+    "patcher": RETIRE_PATCHER,
+    "supersedes": PATCHER,
+    "removed_key": "nominal_diameter_mm",
+    "removed_min_mm": PROXY_DIAMETER_MIN_MM,
+    "reason": (
+        "mass_kg is resolvable by module2_ifc_read.ifc_seismic and mapped in "
+        "module4_comparator._SCOPE_NUMERIC_PROPERTIES, which is the condition "
+        "scope_patch.retire_proxy_when named. Keeping the band would AND with "
+        "the mass gate and drop a heavy small-bore run out of scope."
+    ),
+    "target_ifc_class_retained": NEW_TARGET,
+    "previous_applies_when": NEW_APPLIES_WHEN,
+}
+
 #: Provenance merged into the row's `parameters` blob.
 SCOPE_PATCH_PARAM = {
     "patcher": PATCHER,
@@ -160,30 +222,64 @@ def _sql_literal(text: str) -> str:
     return "'" + str(text).replace("'", "''") + "'"
 
 
-def build_sql(revert: bool = False) -> str:
+#: The three states this row can be written to. A boolean `revert` flag
+#: expressed only two, and retiring the proxy is neither of them: it keeps the
+#: v1 target narrowing and drops only the stand-in key.
+MODE_PATCH = "patch"
+MODE_REVERT = "revert"
+MODE_RETIRE = "retire"
+
+#: mode -> (applies_when, target_ifc_class, description, scope_patch value).
+#: A None provenance means "delete the key", which is what revert wants: the
+#: row should end up as the importer produced it, unstamped.
+_PLANS: dict[str, tuple[dict, str, str, dict | None]] = {
+    MODE_PATCH: (NEW_APPLIES_WHEN, NEW_TARGET, NEW_DESCRIPTION, SCOPE_PATCH_PARAM),
+    MODE_REVERT: (OLD_APPLIES_WHEN, OLD_TARGET, OLD_DESCRIPTION, None),
+    MODE_RETIRE: (
+        RETIRED_APPLIES_WHEN,
+        NEW_TARGET,
+        RETIRED_DESCRIPTION,
+        RETIRE_PATCH_PARAM,
+    ),
+}
+
+_HEADLINES = {
+    MODE_PATCH: (
+        "Narrows IfcDistributionElement -> IfcPipeSegment and adds the\n"
+        "-- enforceable nominal-bore band that proxies for mass_kg."
+    ),
+    MODE_REVERT: "Restores the scope as imported from NotebookLM.",
+    MODE_RETIRE: (
+        "Drops the nominal_diameter_mm proxy now that mass_kg is extractable.\n"
+        "-- The keys are ANDed, so leaving the band in place would drop a heavy\n"
+        "-- small-bore run out of scope -- a false negative the clause does not\n"
+        "-- intend. The IfcPipeSegment narrowing from the v1 patch is kept."
+    ),
+}
+
+_VERBS = {MODE_PATCH: "Patch", MODE_REVERT: "Revert", MODE_RETIRE: "Retire proxy in"}
+
+
+def build_sql(mode: str = MODE_PATCH) -> str:
     """Return the equivalent SQL patch, for running via the Supabase editor.
 
     Written against `reference` rather than the primary key so it is portable
     across environments, and idempotent: re-running matches the same row and
     rewrites it to the same values.
     """
-    applies_when = OLD_APPLIES_WHEN if revert else NEW_APPLIES_WHEN
-    target = OLD_TARGET if revert else NEW_TARGET
-    description = OLD_DESCRIPTION if revert else NEW_DESCRIPTION
-    # On revert the provenance key is removed rather than rewritten, so the
-    # row is left as the importer produced it.
+    applies_when, target, description, provenance = _PLANS[mode]
+    # With no provenance the key is removed rather than rewritten, so the row
+    # is left as the importer produced it.
     parameters_expr = (
         "(coalesce(nullif(parameters, ''), '{}')::jsonb - 'scope_patch')::text"
-        if revert
+        if provenance is None
         else (
             "(coalesce(nullif(parameters, ''), '{}')::jsonb || "
-            f"jsonb_build_object('scope_patch', {_sql_literal(json.dumps(SCOPE_PATCH_PARAM))}::jsonb))::text"
+            f"jsonb_build_object('scope_patch', {_sql_literal(json.dumps(provenance))}::jsonb))::text"
         )
     )
-    verb = "Revert" if revert else "Patch"
-    return f"""-- {verb} {REFERENCE} scope.
--- {'Restores the scope as imported from NotebookLM.' if revert else 'Narrows IfcDistributionElement -> IfcPipeSegment and adds the'}
--- {'' if revert else 'enforceable nominal-bore band that proxies for mass_kg.'}
+    return f"""-- {_VERBS[mode]} {REFERENCE} scope.
+-- {_HEADLINES[mode]}
 -- `applies_when` and `parameters` are text columns holding JSON (see
 -- supabase/migrations/20260721135500_init_core_public_tables.sql), hence the
 -- ::jsonb round trip on the merge.
@@ -198,15 +294,20 @@ update public.rules
 """
 
 
-def summarise(rows: list[dict], revert: bool) -> None:
+_TITLES = {
+    MODE_PATCH: "scope narrowing",
+    MODE_REVERT: "revert",
+    MODE_RETIRE: "retire nominal_diameter_mm proxy",
+}
+
+
+def summarise(rows: list[dict], mode: str) -> None:
     """Print the before/after for every matching row."""
-    applies_when = OLD_APPLIES_WHEN if revert else NEW_APPLIES_WHEN
-    target = OLD_TARGET if revert else NEW_TARGET
-    description = OLD_DESCRIPTION if revert else NEW_DESCRIPTION
+    applies_when, target, description, _ = _PLANS[mode]
 
     print()
     print("=" * 78)
-    print(f"{REFERENCE} — {'revert' if revert else 'scope narrowing'}")
+    print(f"{REFERENCE} — {_TITLES[mode]}")
     print("=" * 78)
 
     for row in rows:
@@ -218,7 +319,7 @@ def summarise(rows: list[dict], revert: bool) -> None:
         print(f"    applies_when: {json.dumps(current_scope)}")
         print(f"                  ->  {json.dumps(applies_when)}")
 
-    if not revert:
+    if mode == MODE_PATCH:
         print("\n  evaluation, per module4_comparator._evaluate_predicate (AND):")
         print(f"    NominalDiameter <  {PROXY_DIAMETER_MIN_MM:.0f} mm"
               "  -> NO_MATCH   -> NOT_APPLICABLE, element dropped from the rule")
@@ -226,6 +327,16 @@ def summarise(rows: list[dict], revert: bool) -> None:
               "  -> UNDETERMINED (mass_kg, location unresolved) -> stays in scope,"
               "\n                              reported under undetermined_predicates")
         print("    NominalDiameter absent      -> UNDETERMINED -> stays in scope")
+    elif mode == MODE_RETIRE:
+        print("\n  evaluation, per module4_comparator._evaluate_predicate (AND):")
+        print(f"    MassKg <  {MASS_MIN_KG:.0f} kg"
+              "  -> NO_MATCH   -> NOT_APPLICABLE, element dropped from the rule")
+        print(f"    MassKg >= {MASS_MIN_KG:.0f} kg"
+              "  -> UNDETERMINED (location unresolved) -> stays in scope")
+        print("    MassKg absent  -> UNDETERMINED -> stays in scope, gap reported")
+        print("\n  what this fixes: a run under NB50 carrying more than "
+              f"{MASS_MIN_KG:.0f} kg was\n  dropped from the rule by the diameter "
+              "band. It is now governed.")
 
 
 def main() -> int:
@@ -240,12 +351,28 @@ def main() -> int:
         "--revert", action="store_true", help="restore the scope as imported"
     )
     parser.add_argument(
+        "--retire-proxy",
+        action="store_true",
+        help="drop nominal_diameter_mm now that mass_kg is extractable",
+    )
+    parser.add_argument(
         "--print-sql", action="store_true", help="print the equivalent SQL and exit"
     )
     args = parser.parse_args()
 
+    if args.revert and args.retire_proxy:
+        parser.error(
+            "--revert and --retire-proxy write different scopes; pick one. "
+            "Revert restores the imported scope; retire keeps the "
+            "IfcPipeSegment narrowing and drops only the proxy key."
+        )
+
+    mode = (
+        MODE_REVERT if args.revert else MODE_RETIRE if args.retire_proxy else MODE_PATCH
+    )
+
     if args.print_sql:
-        print(build_sql(revert=args.revert))
+        print(build_sql(mode))
         return 0
 
     from app.environment import load_env_file
@@ -263,15 +390,13 @@ def main() -> int:
         print(f"error: no rule with reference {REFERENCE!r} in the catalog", file=sys.stderr)
         return 1
 
-    summarise(rows, revert=args.revert)
+    summarise(rows, mode)
 
     if not args.apply:
         print("\n  dry run: nothing written. Re-run with --apply.")
         return 0
 
-    applies_when = OLD_APPLIES_WHEN if args.revert else NEW_APPLIES_WHEN
-    target = OLD_TARGET if args.revert else NEW_TARGET
-    description = OLD_DESCRIPTION if args.revert else NEW_DESCRIPTION
+    applies_when, target, description, provenance = _PLANS[mode]
 
     for row in rows:
         rule_id = row["id"]
@@ -282,10 +407,10 @@ def main() -> int:
                 target_ifc_class=target,
                 description=description,
             )
-            if args.revert:
+            if provenance is None:
                 service.remove_rule_parameter(rule_id, "scope_patch")
             else:
-                service.set_rule_parameter(rule_id, "scope_patch", SCOPE_PATCH_PARAM)
+                service.set_rule_parameter(rule_id, "scope_patch", provenance)
         except Exception as exc:  # noqa: BLE001 - reported, not swallowed
             print(f"error writing rule {rule_id}: {exc}", file=sys.stderr)
             return 1

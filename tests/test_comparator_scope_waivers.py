@@ -387,74 +387,109 @@ class TestWaiverDefinitionsAreNotEvaluated:
         assert results[0]["status"] == "FAIL"
 
 
-class TestNzs4219_513PatchedScope:
-    """The narrowed NZS-4219-5.13 scope, as written by scripts/patch_nzs4219_513_scope.py.
+class TestNzs4219_513RetiredProxyScope:
+    """NZS-4219-5.13 after scripts/patch_nzs4219_513_scope.py --retire-proxy.
 
-    The clause's own gate is `mass_kg >= 10`, which the extractor cannot
-    resolve. The patch pairs it with a nominal-bore band that the extractor
-    can, and relies on the asymmetry between NO_MATCH and UNDETERMINED rather
-    than on a disjunction the predicate language does not have: the diameter
-    settles the scope when it fails, and the unevaluable mass key never
-    suppresses a check on its own.
+    The clause's own gate is `mass_kg >= 10`. While that was unresolvable the
+    rule carried a nominal-bore band as an enforceable stand-in, and leaned on
+    the asymmetry between NO_MATCH and UNDETERMINED: the diameter settled the
+    scope when it failed, and the inert mass key never suppressed a check on
+    its own.
+
+    ifc_seismic resolves mass now, so the stand-in has been removed. Keeping
+    it would have inverted its purpose -- the predicate keys are ANDed, so a
+    heavy small-bore run would have been dropped from the rule by the very key
+    that was added to make the rule enforceable. See
+    `test_heavy_small_bore_run_is_no_longer_dropped` below, which is the
+    regression this retirement exists to prevent.
     """
 
-    #: Mirrors NEW_APPLIES_WHEN in scripts/patch_nzs4219_513_scope.py.
+    #: Mirrors RETIRED_APPLIES_WHEN in scripts/patch_nzs4219_513_scope.py.
     SCOPE = {
         "target_ifc_class": "IfcPipeSegment",
-        "nominal_diameter_mm": {"min": 50.0},
         "location": "ceiling_void",
         "mass_kg": {"min": 10.0},
-        "note": "nominal bore proxies for the unextractable mass threshold",
     }
 
-    def _pipe(self, name, actual, diameter):
-        return _element(name, actual, scope_values={"NominalDiameter": diameter})
+    def _pipe(self, name, actual, mass=None, diameter=None):
+        scope_values = {}
+        if mass is not None:
+            scope_values["MassKg"] = mass
+        if diameter is not None:
+            scope_values["NominalDiameter"] = diameter
+        return _element(name, actual, scope_values=scope_values)
 
-    def test_below_the_band_is_out_of_scope(self):
-        # The whole point of the patch: a 25 mm run no longer gets a verdict.
-        # NO_MATCH settles the predicate before the undetermined keys are
-        # reached, which is why the inert mass_kg key does not rescue it.
-        pipe = self._pipe("pipe-dn25", 10.0, 25.0)
+    def test_below_the_mass_threshold_is_out_of_scope(self):
+        # The clause's own gate now does the narrowing a proxy used to do.
+        pipe = self._pipe("pipe-light", 10.0, mass=4.0)
         result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
         assert result["not_applicable_count"] == 1
         assert result["fail_count"] == 0
         assert result["status"] == "NOT_APPLICABLE"
 
-    def test_at_the_band_floor_stays_in_scope_and_fails(self):
-        # 50.0 is inclusive, so NB50 itself is governed.
-        pipe = self._pipe("pipe-dn50", 10.0, 50.0)
+    def test_at_the_threshold_stays_in_scope_and_fails(self):
+        # 10.0 is inclusive, so a run of exactly 10 kg is governed.
+        pipe = self._pipe("pipe-10kg", 10.0, mass=10.0)
         result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
         assert result["fail_count"] == 1
         assert result["not_applicable_count"] == 0
 
-    def test_above_the_band_passes_on_adequate_clearance(self):
-        pipe = self._pipe("pipe-dn100", 80.0, 100.0)
+    def test_above_the_threshold_passes_on_adequate_clearance(self):
+        pipe = self._pipe("pipe-heavy", 80.0, mass=95.0)
         result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
         assert result["status"] == "PASS"
 
-    def test_unextractable_keys_are_reported_not_silently_dropped(self):
-        # mass_kg and location leave the predicate UNDETERMINED for an
-        # in-band pipe. The element stays in scope and the gap is surfaced,
-        # so the rule is visibly incomplete rather than quietly inert.
-        #
-        # mass_kg is extractable now -- ifc_seismic resolves it into
-        # scope_values as MassKg -- so the note names the property that this
-        # synthetic element does not carry, rather than an unsupported key.
-        # location remains genuinely unsupported by the comparator.
-        pipe = self._pipe("pipe-dn100", 10.0, 100.0)
-        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
-        assert result["fail_count"] == 1
-        notes = result["undetermined_predicates"]
-        assert any("MassKg" in n for n in notes)
-        assert any("location" in n for n in notes)
-        # `note` is an annotation key and must not be reported as unsupported.
-        assert not any("'note'" in n for n in notes)
-
-    def test_unresolved_diameter_keeps_the_element_in_scope(self):
-        # A model that does not author NominalDiameter must not have the
-        # check silently suppressed by the proxy.
-        pipe = _element("pipe-unknown-dn", 10.0)
+    def test_heavy_small_bore_run_is_no_longer_dropped(self):
+        # THE REGRESSION THIS RETIREMENT PREVENTS. A 25 mm run carrying 40 kg
+        # is exactly what the clause is about, and exactly what the retired
+        # nominal-bore band excluded: NO_MATCH on the diameter settled the
+        # predicate before the mass gate was ever consulted, so the element
+        # left the rule's scope and no verdict was produced for it.
+        pipe = self._pipe("pipe-dn25-heavy", 10.0, mass=40.0, diameter=25.0)
         result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
         assert result["fail_count"] == 1
         assert result["not_applicable_count"] == 0
-        assert any("NominalDiameter" in n for n in result["undetermined_predicates"])
+
+        # And the proof that the old scope really did drop it, so this test
+        # cannot quietly stop testing anything if the scope is edited back.
+        retired = dict(self.SCOPE, nominal_diameter_mm={"min": 50.0})
+        assert _evaluate(_rule([pipe], applies_when=retired))["fail_count"] == 0
+
+    def test_unresolved_mass_keeps_the_element_in_scope(self):
+        # A model that does not author or yield a mass must not have the check
+        # silently suppressed -- an unevaluable narrowing never drops an
+        # element, it only reports the gap.
+        pipe = self._pipe("pipe-unknown-mass", 10.0)
+        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
+        assert result["fail_count"] == 1
+        assert result["not_applicable_count"] == 0
+        assert any("MassKg" in n for n in result["undetermined_predicates"])
+
+    def test_location_remains_reported_as_unsupported(self):
+        # `location` is still not a key the comparator can evaluate. It stays
+        # in the predicate holding the clause's real condition, and surfaces
+        # as an undetermined predicate rather than being quietly dropped.
+        pipe = self._pipe("pipe-heavy", 10.0, mass=40.0)
+        result = _evaluate(_rule([pipe], applies_when=self.SCOPE))
+        assert any("location" in n for n in result["undetermined_predicates"])
+
+    def test_scope_matches_the_patch_script_and_the_corpus(self):
+        # The scope now lives in three places -- this test, the patch script
+        # that writes the catalog, and the NotebookLM corpus the rule was
+        # imported from. They are three copies of one fact, so assert they
+        # agree rather than letting them drift the way the retired `note` did.
+        import json
+        import pathlib
+
+        from scripts.patch_nzs4219_513_scope import REFERENCE, RETIRED_APPLIES_WHEN
+
+        assert self.SCOPE == RETIRED_APPLIES_WHEN
+        assert "nominal_diameter_mm" not in RETIRED_APPLIES_WHEN
+
+        corpus = json.loads(
+            pathlib.Path("data/notebooklm_exports/real_seismic_rules.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        row = next(r for r in corpus if r["reference"] == REFERENCE)
+        assert row["applies_when"] == RETIRED_APPLIES_WHEN
