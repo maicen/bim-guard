@@ -24,7 +24,9 @@ xmlschema = pytest.importorskip(
 
 from app.modules.module5_reporter.bcf_generator import (  # noqa: E402
     BCFIssue,
+    bcf_topic_guid,
     generate_bcf,
+    is_ifc_guid,
     issues_from_results,
 )
 
@@ -263,6 +265,139 @@ def test_synthetic_element_guids_survive_into_a_valid_viewpoint(visinfo_schema):
 
     errors = _errors(visinfo_schema, _read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0]))
     assert not errors, "viewpoint.bcfv schema violations:\n  " + "\n  ".join(errors)
+
+
+# --------------------------------------------------------------------------
+# Named regressions — GUID typing (violations 7–10)
+#
+# markup.xsd types Topic/@Guid as a hyphenated UUID, and File/@IfcProject and
+# Component/@IfcGuid as 22-character IFC GlobalIds. Production callers hand the
+# generator ISO 19650 project codes, blank or UUID-shaped element ids and
+# "BGR-0007" finding ids, none of which satisfy those facets.
+# --------------------------------------------------------------------------
+
+BCF_GUID_RE = re.compile(
+    r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+)
+
+
+def test_iso19650_project_code_is_not_written_as_ifcproject(markup_schema):
+    """Regression 7: File/@IfcProject is an IfcGuid, not a project code."""
+    import xml.etree.ElementTree as ET
+
+    issue = create_test_bcf_issue(
+        project_code="PRJ1", originator="BIMG", suitability_code="S1", cde_state="WIP"
+    )
+    bcf_bytes = generate_bcf([issue])
+    markup = _read(bcf_bytes, _entries(bcf_bytes, "markup.bcf")[0])
+
+    errors = _errors(markup_schema, markup)
+    assert not errors, "markup.bcf schema violations:\n  " + "\n  ".join(errors)
+    assert ET.fromstring(markup).find("./Header/File").get("IfcProject") is None
+    # The ISO 19650 container identity is still delivered to the reviewer.
+    assert "ISO 19650 Container: PRJ1-BIMG" in markup
+    assert "<Labels>Suitability:S1</Labels>" in markup
+
+
+def test_real_ifcproject_guid_is_written_as_ifcproject(markup_schema):
+    import xml.etree.ElementTree as ET
+
+    bcf_bytes = generate_bcf([create_test_bcf_issue(project_code="0YvctVUKr0kugbFTf53O9L")])
+    markup = _read(bcf_bytes, _entries(bcf_bytes, "markup.bcf")[0])
+
+    assert not _errors(markup_schema, markup)
+    header_file = ET.fromstring(markup).find("./Header/File")
+    assert header_file.get("IfcProject") == "0YvctVUKr0kugbFTf53O9L"
+
+
+@pytest.mark.parametrize(
+    "bad_guid",
+    ["", "7A0E74E1-3CC3-46E8-B94E-516D2A12AD47", "COMP-001", "{2O2Fr$t4X7Zf8NOew3FLOH}"],
+    ids=["blank", "uuid", "label", "braced"],
+)
+def test_non_ifc_component_guid_is_dropped_from_ifcguid_attribute(visinfo_schema, bad_guid):
+    """Regression 8: Component/@IfcGuid is omitted rather than written malformed."""
+    import xml.etree.ElementTree as ET
+
+    bcf_bytes = generate_bcf([create_test_bcf_issue(component_guid=bad_guid)])
+    viewpoint = _read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0])
+
+    errors = _errors(visinfo_schema, viewpoint)
+    assert not errors, "viewpoint.bcfv schema violations:\n  " + "\n  ".join(errors)
+
+    root = ET.fromstring(viewpoint)
+    components = list(root.iter("Component"))
+    assert components, "the selection and colouring components must still be emitted"
+    assert all(c.get("IfcGuid") is None for c in components)
+    # The raw id is preserved for the reader in AuthoringToolId.
+    tool_id = root.find("./Components/Selection/Component/AuthoringToolId").text
+    assert tool_id == (bad_guid or None)
+
+
+def test_valid_ifc_component_guid_is_kept():
+    import xml.etree.ElementTree as ET
+
+    bcf_bytes = generate_bcf([create_test_bcf_issue(component_guid="2O2Fr$t4X7Zf8NOew3FLOH")])
+    root = ET.fromstring(_read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0]))
+    guids = {c.get("IfcGuid") for c in root.iter("Component")}
+    assert guids == {"2O2Fr$t4X7Zf8NOew3FLOH"}
+
+
+def test_engine_result_without_guid_still_validates(visinfo_schema):
+    """issues_from_results used to invent a random UUID as the IfcGuid."""
+    issues = issues_from_results([{"overall_band": "HIGH", "name": "Riser"}])
+    assert issues[0].component_guid == ""
+
+    bcf_bytes = generate_bcf(issues)
+    errors = _errors(visinfo_schema, _read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0]))
+    assert not errors, "viewpoint.bcfv schema violations:\n  " + "\n  ".join(errors)
+
+
+def test_non_uuid_issue_id_maps_to_a_stable_topic_guid_and_folder(markup_schema):
+    """Regression 9: a "BGR-0007" finding id becomes a deterministic UUID5 topic."""
+    import xml.etree.ElementTree as ET
+
+    first = generate_bcf([create_test_bcf_issue(guid="BGR-0007")])
+    second = generate_bcf([create_test_bcf_issue(guid="BGR-0007")])
+
+    folders = {n.split("/")[0] for n in _entries(first, "markup.bcf")}
+    assert folders == {bcf_topic_guid("BGR-0007")}
+    assert folders == {n.split("/")[0] for n in _entries(second, "markup.bcf")}, (
+        "the same finding must export to the same topic GUID every time"
+    )
+
+    markup = _read(first, _entries(first, "markup.bcf")[0])
+    errors = _errors(markup_schema, markup)
+    assert not errors, "markup.bcf schema violations:\n  " + "\n  ".join(errors)
+
+    root = ET.fromstring(markup)
+    topic_guid = root.find("Topic").get("Guid")
+    assert BCF_GUID_RE.match(topic_guid)
+    assert topic_guid == bcf_topic_guid("BGR-0007")
+    assert "Source finding id: BGR-0007" in root.find("./Comment/Comment").text
+
+
+def test_uuid_issue_ids_pass_through_unchanged():
+    """Regression 10: a real UUID keeps its identity verbatim (only braces are stripped).
+
+    Case is preserved on purpose: the pipeline mints lower-case UUID5 topic
+    ids and the BCF sync service compares them as strings.
+    """
+    canonical = "7A0E74E1-3CC3-46E8-B94E-516D2A12AD47"
+    assert bcf_topic_guid(canonical) == canonical
+    assert bcf_topic_guid(canonical.lower()) == canonical.lower()
+    assert bcf_topic_guid("{" + canonical + "}") == canonical
+    assert bcf_topic_guid("BGR-0007") == bcf_topic_guid("BGR-0007")
+    assert bcf_topic_guid("BGR-0007") != bcf_topic_guid("BGR-0008")
+    assert bcf_topic_guid("") != bcf_topic_guid(""), "blank ids must not collapse into one topic"
+
+
+def test_is_ifc_guid_matches_the_schema_facets():
+    assert is_ifc_guid("2O2Fr$t4X7Zf8NOew3FLOH")
+    assert not is_ifc_guid("")
+    assert not is_ifc_guid("2O2Fr$t4X7Zf8NOew3FLO")  # 21 chars
+    assert not is_ifc_guid("7A0E74E1-3CC3-46E8-B94E-516D2A12AD47")
+    assert not is_ifc_guid("{2O2Fr$t4X7Zf8NOew3FLOH}")
 
 
 # --------------------------------------------------------------------------
