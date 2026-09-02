@@ -41,8 +41,18 @@ CREATE INDEX IF NOT EXISTS idx_project_ifc_files_cde_state ON public.project_ifc
 CREATE INDEX IF NOT EXISTS idx_projects_suitability_revision ON public.projects(suitability_code, revision_code);
 
 -- RLS Enforcement: Mutation Guard Trigger function to prevent modification of PUBLISHED or ARCHIVED rows
+--
+-- SET search_path = public pins the function's schema resolution instead of
+-- leaving it mutable: an unset search_path lets a caller with schema-create
+-- privileges shadow unqualified references (OLD.*/NEW.* are trigger row
+-- variables, not affected, but any unqualified type/function lookup would
+-- be) with objects of their own, which is exactly what the Supabase
+-- linter's function_search_path_mutable WARN flags.
 CREATE OR REPLACE FUNCTION public.prevent_published_cde_mutation()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
 BEGIN
     IF OLD.cde_state IN ('PUBLISHED', 'ARCHIVED') THEN
         -- Allow state transition from PUBLISHED/ARCHIVED if explicitly archiving or updating state,
@@ -57,7 +67,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_projects_cde_guard ON public.projects;
 CREATE TRIGGER trg_projects_cde_guard

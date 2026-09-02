@@ -27,3 +27,9 @@ VALUES (
     'Official BIM-Guard test models repository containing architectural, structural, HVAC, electrical, and plumbing IFC models.'
 )
 ON CONFLICT (url) DO NOTHING;
+
+-- The app uses the service-role key, which bypasses RLS; enabling it denies
+-- anon/authenticated clients by default (see client_documents migration).
+-- This was missing from the original migration, flagged by the Supabase
+-- linter's rls_disabled_in_public ERROR once the table went live.
+ALTER TABLE public.github_repositories ENABLE ROW LEVEL SECURITY;
