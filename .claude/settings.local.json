@@ -18,11 +18,19 @@
       "WebFetch(domain:docs.unstructured.io)",
       "Bash(uv add *)",
       "Bash(uv run python -c ' *)",
-      "Bash(mkdir -p .claude .vscode .antigravity)"
+      "Bash(mkdir -p .claude .vscode .antigravity)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git push *)",
+      "Bash(uv run *)",
+      "Bash(time uv run pytest tests/ -q --durations=30 -p no:cacheprovider)",
+      "Bash(tail -80 /tmp_pytest_run.log)",
+      "Bash(wc -l /tmp_pytest_run.log)",
+      "Bash(tail -100 /tmp_pytest_run.log)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "supabase"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
