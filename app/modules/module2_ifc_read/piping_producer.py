@@ -166,6 +166,80 @@ if _UNCANONICAL:
     )
 
 
+# ---------------------------------------------------------------------------
+# Designation aliases (fallback only)
+# ---------------------------------------------------------------------------
+# Real models label pipework by element symbol ("Cu") or by the product
+# standard the spec cites ("ASTM B88") rather than by material name, and none
+# of those hit a substring rule above. They are matched only AFTER the
+# substring rules fail, so every result _MATERIAL_RULES produces today is
+# unchanged and these can only rescue what currently returns "Unknown".
+#
+# Matching is on normalised text (lowercased, punctuation collapsed to single
+# spaces), which is why "ASTM B88", "astm-b88" and "ASTM  B88" all key the
+# same entry.
+#
+# Deliberately EXCLUDED as ambiguous — a wrong material is worse than an
+# honest "Unknown" here, because it scores as a real galvanic couple:
+#   ASTM A53  — covers both black AND hot-dipped galvanised steel pipe
+#   ASTM A312 — austenitic stainless pipe, grade-agnostic (304 vs 316)
+
+# Matched as a whole PHRASE inside the normalised text, so "ASTM B88 Type L"
+# and "Copper tube to EN 1057" both resolve, while "PE1000" does not collide
+# with "PE100".
+_MATERIAL_DESIGNATIONS: dict[str, str] = {
+    # Copper tube — ASTM B88 is seamless copper water tube, EN 1057 its
+    # European counterpart; C11000 is ETP and C12200 DHP copper.
+    "astm b88": "Copper_C12200",
+    "en 1057": "Copper_C12200",
+    "c11000": "Copper_C12200",
+    # Copper-nickel alloy designations
+    "c70600": "CuNi_9010",
+    "c71500": "CuNi_7030",
+    # Carbon steel line and pressure pipe
+    "astm a106": "CarbonSteel",
+    "api 5l": "CarbonSteel",
+    # Irons
+    "astm a536": "DuctileIron",
+    "en 545": "DuctileIron",
+    "astm a48": "CastIron",
+    # Plastics
+    "astm d1785": "PVC",
+    "astm f876": "PEX",
+    "pe100": "HDPE",
+    "pe80": "HDPE",
+}
+
+# Element symbols, matched only as a standalone WORD in the normalised text.
+# A substring test would be actively harmful here: "cu" is inside
+# "cupronickel" and "vacuum", "al" inside "alkathene" and "galvanised".
+_MATERIAL_SYMBOLS: dict[str, str] = {
+    "cu": "Copper_C12200",
+    "ti": "Titanium",
+    "al": "Aluminium",
+}
+
+_UNCANONICAL_ALIASES = (
+    set(_MATERIAL_DESIGNATIONS.values()) | set(_MATERIAL_SYMBOLS.values())
+) - CANONICAL_MATERIALS
+if _UNCANONICAL_ALIASES:
+    raise ValueError(
+        f"material aliases emit non-canonical keys: {sorted(_UNCANONICAL_ALIASES)}"
+    )
+
+
+def _normalise_material_text(raw: str) -> str:
+    """Lowercase *raw* and collapse every non-alphanumeric run to one space."""
+    return " ".join("".join(c if c.isalnum() else " " for c in raw.lower()).split())
+
+
+# Longest designation first, so a future short entry can never shadow a longer
+# one that contains it.
+_DESIGNATIONS_BY_LENGTH: tuple[str, ...] = tuple(
+    sorted(_MATERIAL_DESIGNATIONS, key=len, reverse=True)
+)
+
+
 def normalise_material(raw: Optional[str]) -> str:
     """Map a free-text IFC material name to a CANONICAL_MATERIALS key.
 
@@ -188,6 +262,19 @@ def normalise_material(raw: Optional[str]) -> str:
 
     for needles, canonical in _MATERIAL_RULES:
         if all(needle in text for needle in needles):
+            return canonical
+
+    # Fallback: product-standard designations and element symbols. Reached only
+    # when no substring rule matched, so this never overrides existing results.
+    normalised = _normalise_material_text(text)
+    padded = f" {normalised} "
+    for designation in _DESIGNATIONS_BY_LENGTH:
+        if f" {designation} " in padded:
+            return _MATERIAL_DESIGNATIONS[designation]
+
+    words = set(normalised.split())
+    for symbol, canonical in _MATERIAL_SYMBOLS.items():
+        if symbol in words:
             return canonical
 
     return "Unknown"
@@ -559,6 +646,58 @@ def _material_name(entity: Any) -> Optional[str]:
         except Exception:
             continue
     return None
+
+
+def extract_normalized_material(element: Any) -> Optional[str]:
+    """Return the element's material as a CANONICAL_MATERIALS key, or None.
+
+    Resolves the material by IfcRelAssociatesMaterial — via
+    ifcopenshell.util.element.get_materials, which follows the association to
+    IfcMaterial, IfcMaterialLayerSet(Usage), IfcMaterialConstituentSet and
+    IfcMaterialProfileSet alike, and inherits from the element's type (a pipe
+    routinely carries its material on IfcPipeSegmentType, not on the
+    occurrence) — then normalises the free text with normalise_material.
+
+    TRI-STATE FAIL-SAFE
+        Returns None, never a guess and never a falsy sentinel a caller could
+        score, in all three unresolvable cases:
+
+          * the element carries no material association at all;
+          * the association exists but yields no usable name;
+          * a name exists but matches no rule (normalise_material said
+            "Unknown"), e.g. "TBC", "Default" or a vendor part code.
+
+        None means Undetermined. A caller must surface it as a data-quality
+        finding — XM-001 already does this via its "material_not_in_series"
+        path — and must not fall through to a default material, because a
+        defaulted material scores as a real galvanic couple and would turn a
+        missing input into a fabricated Pass or Fail.
+
+    VOCABULARY
+        Emits CANONICAL_MATERIALS keys ("Copper_C12200", "GalvanisedSteel",
+        "CarbonSteel"), which is the vocabulary the Path B rule packs key off
+        case-sensitively. This is deliberately NOT the Path A vocabulary of
+        ifc_parser.normalise_material_name ("Copper", "Galvanized_steel"); see
+        this module's header note on the two not being interchangeable.
+
+    Args:
+        element: An IFC element (ifcopenshell entity_instance), or None.
+
+    Returns:
+        A member of CANONICAL_MATERIALS other than "Unknown", or None when
+        the material cannot be determined.
+    """
+    if element is None:
+        return None
+
+    raw = _material_name(element)
+    if not raw:
+        return None
+
+    canonical = normalise_material(raw)
+    if canonical == "Unknown":
+        return None
+    return canonical
 
 
 def _unit_scale_to_metres(model: Any) -> float:

@@ -55,6 +55,14 @@ try:
 except ImportError:
     _SHAPELY_AVAILABLE = False
 
+try:
+    from scipy.spatial import cKDTree
+
+    _SCIPY_AVAILABLE = True
+except ImportError:
+    _SCIPY_AVAILABLE = False
+    logger.warning("scipy not available — element proximity checks return Undetermined")
+
 
 # ---------------------------------------------------------------------------
 # Property → method name lookup
@@ -144,6 +152,12 @@ class IFCGeometryExtractor:
         # Keyed on the STEP entity instance id, never on id(element): see
         # _get_shape for why the Python object address is not an identity.
         self._shape_cache: dict[int, object] = {}  # STEP #id → shape
+        # Vertex clouds and their KD-trees, keyed the same way and for the same
+        # reason. XM-001 sweeps every dissimilar-material pair in a network, so
+        # an element is queried once per candidate partner; rebuilding its tree
+        # each time turns an O(n) extraction into O(n^2) tessellations.
+        self._vertex_cache: dict[int, object] = {}   # STEP #id → (N, 3) mm array
+        self._kdtree_cache: dict[int, object] = {}   # STEP #id → cKDTree
 
         if IFCOS_AVAILABLE and ifc_model is not None:
             try:
@@ -531,6 +545,130 @@ class IFCGeometryExtractor:
         if self._get_shape(element) is None:
             return None
         return self.get_centroid(element)
+
+    # ── PROXIMITY / SEPARATION ────────────────────────────────────────────────
+
+    def _get_vertices_mm(self, element):
+        """Return the element's world-coordinate vertices as an (N, 3) mm array.
+
+        Returns None when the element has no resolvable tessellation, when
+        numpy is unavailable, or when the mesh is empty. Cached on the STEP
+        entity id for the same identity reason as _get_shape.
+        """
+        if not _NP_AVAILABLE:
+            return None
+
+        eid = None
+        try:
+            eid = element.id()
+        except Exception:
+            eid = None
+        if eid is not None and eid in self._vertex_cache:
+            return self._vertex_cache[eid]
+
+        verts = None
+        shape = self._get_shape(element)
+        if shape is not None:
+            try:
+                if IFCOS_AVAILABLE:
+                    verts = np.asarray(
+                        _ifcos_shape.get_vertices(shape.geometry), dtype=float
+                    ) * self._mesher_scale
+                else:
+                    raw = shape.geometry.verts
+                    verts = (
+                        np.asarray(raw, dtype=float).reshape(-1, 3) * self._mesher_scale
+                    )
+                if verts.size == 0:
+                    verts = None
+            except Exception as exc:
+                logger.debug(f"vertex extraction failed for {element}: {exc}")
+                verts = None
+
+        if eid is not None:
+            self._vertex_cache[eid] = verts
+        return verts
+
+    def _get_kdtree(self, element):
+        """Return a cKDTree over the element's world vertices, or None."""
+        if not _SCIPY_AVAILABLE:
+            return None
+
+        eid = None
+        try:
+            eid = element.id()
+        except Exception:
+            eid = None
+        if eid is not None and eid in self._kdtree_cache:
+            return self._kdtree_cache[eid]
+
+        verts = self._get_vertices_mm(element)
+        tree = None
+        if verts is not None:
+            try:
+                tree = cKDTree(verts)
+            except Exception as exc:
+                logger.debug(f"cKDTree build failed for {element}: {exc}")
+                tree = None
+
+        if eid is not None:
+            self._kdtree_cache[eid] = tree
+        return tree
+
+    def calculate_shortest_distance(self, element_a, element_b) -> float | None:
+        """Return the shortest distance between two elements in millimetres.
+
+        Both elements are tessellated in world coordinates and the minimum
+        vertex-to-vertex separation is found with a scipy cKDTree over one
+        cloud queried by the other. The result is symmetric: the minimum over
+        all cross pairs does not depend on which cloud builds the tree.
+
+        Tri-state contract — this returns None (Undetermined), never a
+        distance the caller could mistake for a measurement, whenever the
+        separation cannot be established:
+
+          * either element is None, or has no resolvable geometry;
+          * either tessellation is empty;
+          * numpy or scipy is unavailable.
+
+        A caller must therefore treat None as "not assessed" and must not
+        compare it against a clearance threshold.
+
+        Accuracy note: this is a *vertex*-to-vertex distance, so it is an
+        upper bound on true surface-to-surface separation — a coarsely
+        tessellated face can carry its nearest surface point well away from
+        any vertex. It is exact for coincident vertices (0.0) and tightens as
+        mesh density rises, which makes it sound for the "are these two
+        elements touching or near-touching?" question XM-001 asks, and
+        unsuitable for certifying a precise clearance.
+
+        Args:
+            element_a: First IFC element.
+            element_b: Second IFC element.
+
+        Returns:
+            Shortest vertex-to-vertex distance in mm, or None if undetermined.
+        """
+        if element_a is None or element_b is None:
+            return None
+        if not (_SCIPY_AVAILABLE and _NP_AVAILABLE):
+            logger.debug("shortest distance undetermined — scipy/numpy unavailable")
+            return None
+
+        verts_b = self._get_vertices_mm(element_b)
+        if verts_b is None:
+            return None
+
+        tree_a = self._get_kdtree(element_a)
+        if tree_a is None:
+            return None
+
+        try:
+            distances, _ = tree_a.query(verts_b, k=1)
+            return round(float(np.min(distances)), 4)
+        except Exception as exc:
+            logger.debug(f"shortest distance failed for {element_a}/{element_b}: {exc}")
+            return None
 
     # ── GEOMETRY VALUE DISPATCHER ─────────────────────────────────────────────
 

@@ -108,6 +108,20 @@ try:
 except ImportError:
     _QUALITY_TOOLS_AVAILABLE = False
 
+try:
+    # Re-exported so callers can reach the tri-state material read as
+    # `from app.modules.module2_ifc_read import extract_normalized_material`
+    # without depending on the producer's internal layout. Returns a
+    # CANONICAL_MATERIALS key, or None when the material is Undetermined.
+    from .piping_producer import (  # noqa: F401
+        extract_normalized_material,
+        normalise_material,
+    )
+
+    _MATERIAL_NORMALISATION_AVAILABLE = True
+except ImportError:
+    _MATERIAL_NORMALISATION_AVAILABLE = False
+
 # Minimum quality score (0-100) that triggers a Projects-page improvement warning.
 IFC_MIN_QUALITY_SCORE = 70
 

@@ -33,6 +33,7 @@ dependencies = [
     "langchain-core>=0.3.0",
     "langchain-litellm>=0.2.0",
     "ifctester>=0.8.5",
+    "scipy>=1.11",
 ]
 
 [project.scripts]
