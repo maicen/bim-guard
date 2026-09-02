@@ -127,7 +127,20 @@ class IFCGeometryExtractor:
     def __init__(self, ifc_model=None):
         self.model = ifc_model
         self._settings = None
-        self._unit_scale: float = 1.0        # model-unit → mm
+        # Two distinct scales, because the mesher does NOT emit model units:
+        #
+        #   _unit_scale   model-unit → mm.  For values read straight from the
+        #                 file (storey elevations, Pset lengths).  Module2
+        #                 relies on this meaning when it scales floor_z.
+        #   _mesher_scale mesher-output → mm.  ifcopenshell.geom normalises
+        #                 tessellated coordinates to SI metres whenever the
+        #                 model declares a length unit (convert-back-units is
+        #                 False by default), so this is 1000.0 for a
+        #                 millimetre model -- NOT 1.0.  Treating mesh output
+        #                 as model units made every mm-model bounding box,
+        #                 height, width and centroid 1000x too small.
+        self._unit_scale: float = 1.0
+        self._mesher_scale: float = 1.0
         # Keyed on the STEP entity instance id, never on id(element): see
         # _get_shape for why the Python object address is not an identity.
         self._shape_cache: dict[int, object] = {}  # STEP #id → shape
@@ -137,10 +150,59 @@ class IFCGeometryExtractor:
                 self._settings = ifcopenshell.geom.settings()
                 self._settings.set(self._settings.USE_WORLD_COORDS, True)
                 self._unit_scale = self._detect_length_unit_scale(ifc_model)
+                self._mesher_scale = self._detect_mesher_scale_mm(
+                    ifc_model, self._settings, self._unit_scale
+                )
             except Exception as exc:
                 logger.warning(f"Could not initialise geometry settings: {exc}")
 
     # ── Unit detection ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _has_declared_length_unit(ifc_model) -> bool:
+        """Return True if the model's IfcUnitAssignment declares a LENGTHUNIT."""
+        try:
+            for ua in ifc_model.by_type("IfcUnitAssignment"):
+                for unit in (ua.Units or []):
+                    if not hasattr(unit, "UnitType"):
+                        continue
+                    if "LENGTHUNIT" in str(unit.UnitType).upper():
+                        return True
+        except Exception:
+            pass
+        return False
+
+    @classmethod
+    def _detect_mesher_scale_mm(cls, ifc_model, settings=None, unit_scale: float = 1.0) -> float:
+        """Return multiplier that converts mesher output coordinates to mm.
+
+        ifcopenshell.geom applies the model's declared length unit while
+        tessellating and emits SI metres, regardless of whether the file is
+        authored in millimetres, metres, feet or inches.  Two exceptions:
+
+        * ``convert-back-units`` is enabled on *settings* -- the mesher then
+          undoes that normalisation and emits model units.
+        * The model declares no length unit at all -- the mesher has nothing
+          to normalise with and passes raw coordinates through unchanged.
+
+        In both exceptions the output is in model units, so the model-unit →
+        mm factor (*unit_scale*) applies.  Otherwise the factor is a flat
+        metres → mm conversion.
+        """
+        if settings is not None:
+            try:
+                if bool(settings.get("convert-back-units")):
+                    return unit_scale
+            except Exception:
+                # Older ifcopenshell exposes the flag as an attribute constant.
+                try:
+                    if bool(settings.get(settings.CONVERT_BACK_UNITS)):
+                        return unit_scale
+                except Exception:
+                    pass
+        if not cls._has_declared_length_unit(ifc_model):
+            return unit_scale
+        return 1000.0
 
     @staticmethod
     def _detect_length_unit_scale(ifc_model) -> float:
@@ -236,7 +298,7 @@ class IFCGeometryExtractor:
         if shape is None:
             return None
         try:
-            s = self._unit_scale
+            s = self._mesher_scale
             if IFCOS_AVAILABLE and _NP_AVAILABLE:
                 verts = _ifcos_shape.get_vertices(shape.geometry) * s
                 return {
@@ -266,7 +328,7 @@ class IFCGeometryExtractor:
         if shape is None:
             return None
         try:
-            return round(_ifcos_shape.get_z(shape.geometry) * self._unit_scale, 1)
+            return round(_ifcos_shape.get_z(shape.geometry) * self._mesher_scale, 1)
         except Exception:
             return None
 
@@ -276,7 +338,7 @@ class IFCGeometryExtractor:
         if shape is None:
             return None
         try:
-            return round(_ifcos_shape.get_max_xy(shape.geometry) * self._unit_scale, 1)
+            return round(_ifcos_shape.get_max_xy(shape.geometry) * self._mesher_scale, 1)
         except Exception:
             return None
 
@@ -286,7 +348,7 @@ class IFCGeometryExtractor:
         if shape is None:
             return None
         try:
-            return round(_ifcos_shape.get_bottom_elevation(shape.geometry) * self._unit_scale, 1)
+            return round(_ifcos_shape.get_bottom_elevation(shape.geometry) * self._mesher_scale, 1)
         except Exception:
             return None
 
@@ -296,7 +358,7 @@ class IFCGeometryExtractor:
         if shape is None:
             return None
         try:
-            return round(_ifcos_shape.get_top_elevation(shape.geometry) * self._unit_scale, 1)
+            return round(_ifcos_shape.get_top_elevation(shape.geometry) * self._mesher_scale, 1)
         except Exception:
             return None
 
@@ -306,7 +368,7 @@ class IFCGeometryExtractor:
         if shape is None:
             return None
         try:
-            s = self._unit_scale
+            s = self._mesher_scale
             rise = _ifcos_shape.get_z(shape.geometry) * s
             run  = _ifcos_shape.get_max_xy(shape.geometry) * s
             if run <= 0:
@@ -321,14 +383,15 @@ class IFCGeometryExtractor:
         """
         Exact element volume in m³ via ifcopenshell.util.shape.get_volume().
 
-        get_volume() returns value in model-unit³; we convert to m³.
+        get_volume() returns value in mesher-unit³ (SI metres unless the
+        model declares no length unit); scale to mm³ then convert to m³.
         """
         shape = self._get_shape(element)
         if shape is None:
             return None
         try:
             vol_native = _ifcos_shape.get_volume(shape.geometry)
-            vol_mm3 = vol_native * (self._unit_scale ** 3)
+            vol_mm3 = vol_native * (self._mesher_scale ** 3)
             return round(vol_mm3 / 1e9, 6)
         except Exception:
             return None
@@ -343,7 +406,7 @@ class IFCGeometryExtractor:
             return None
         try:
             area_native = _ifcos_shape.get_footprint_area(shape.geometry)
-            area_mm2 = area_native * (self._unit_scale ** 2)
+            area_mm2 = area_native * (self._mesher_scale ** 2)
             return round(area_mm2 / 1e6, 4)
         except Exception:
             return None
@@ -354,7 +417,7 @@ class IFCGeometryExtractor:
         if shape is None:
             return None
         try:
-            return round(_ifcos_shape.get_footprint_perimeter(shape.geometry) * self._unit_scale, 1)
+            return round(_ifcos_shape.get_footprint_perimeter(shape.geometry) * self._mesher_scale, 1)
         except Exception:
             return None
 
@@ -368,7 +431,7 @@ class IFCGeometryExtractor:
             return None
         try:
             area_native = _ifcos_shape.get_outer_surface_area(shape.geometry)
-            area_mm2 = area_native * (self._unit_scale ** 2)
+            area_mm2 = area_native * (self._mesher_scale ** 2)
             return round(area_mm2 / 1e6, 4)
         except Exception:
             return None
@@ -398,7 +461,7 @@ class IFCGeometryExtractor:
             return None
 
         try:
-            s = self._unit_scale
+            s = self._mesher_scale
             if _NP_AVAILABLE:
                 verts = _ifcos_shape.get_vertices(shape.geometry)
                 pts_2d = [(float(v[0] * s), float(v[1] * s)) for v in verts]
@@ -440,12 +503,12 @@ class IFCGeometryExtractor:
             return (0.0, 0.0, 0.0)
         try:
             if _NP_AVAILABLE:
-                verts = _ifcos_shape.get_vertices(shape.geometry) * self._unit_scale
+                verts = _ifcos_shape.get_vertices(shape.geometry) * self._mesher_scale
                 cx, cy, cz = verts.mean(axis=0)
                 return (round(float(cx), 4), round(float(cy), 4), round(float(cz), 4))
             # Manual fallback
             raw = shape.geometry.verts
-            s = self._unit_scale
+            s = self._mesher_scale
             n = len(raw) // 3
             if n == 0:
                 return (0.0, 0.0, 0.0)
