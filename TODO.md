@@ -227,6 +227,45 @@ Builds on the base Supabase Auth / JWT work in Priority 4.1.
 
 Owner: unassigned.
 
+## Priority 10: AI Framework Integration: LlamaIndex & LangGraph Architecture
+
+### Module 1 & 1b: Document Ingestion & NLP Annotation (LlamaIndex Core)
+
+- [ ] Integrate LlamaIndex as the primary ingestion engine for BEP PDFs, ISO 19650
+      guidelines, and regulatory codes (e.g., DIN 4149, NZ Seismic).
+- [ ] Implement table- and layout-aware document chunking to prevent fragmentation
+      of complex engineering tables, schedules, and nested matrices.
+- [ ] Attach granular clause metadata (clause ID, page numbers, parent section
+      headers) to all extracted nodes to maintain traceability in generated BCF
+      issue reports.
+- [ ] Implement deontic entity extraction via LlamaIndex Pydantic extractors to
+      isolate normative requirements ("shall", "must", "should") into typed
+      intermediate schemas.
+
+### Module 3: Deterministic Rule Generation & IDS Export (LlamaIndex)
+
+- [ ] Use LlamaIndex structured data extraction to translate unstructured clause
+      chunks into machine-readable rule definitions (`RuleCatalog`, clearance
+      tolerances, and material compatibility matrices).
+- [ ] Build an automated translation pipeline from extracted rule schemas into
+      buildingSMART IDS (Information Delivery Specification) XML schemas.
+
+### Agent & CDE Orchestration (`app/agent`, Module 4 & Services) (LangGraph)
+
+- [ ] Implement a LangGraph state machine for the Digital Inspector agent
+      (`app/agent`) to coordinate cyclical multi-tool execution (querying IFC
+      models, checking database cache, dispatching bSDD lookups, running
+      validation engines).
+- [ ] Expose LlamaIndex retrieval and rule-extraction modules as callable tools
+      inside the LangGraph supervisor agent.
+- [ ] Model ISO 19650 Common Data Environment (CDE) state transitions
+      (`WIP` → `Shared` → `Published` → `Archived`) as a LangGraph state graph
+      with automated compliance gates.
+- [ ] Implement LangChain-compatible webhook handlers for asynchronous
+      notifications to external issue-tracking platforms (e.g., ACC, BIM Track).
+
+Owner: unassigned.
+
 ## Validation Gates
 
 - [x] Audit tests prove the source IFC hash is unchanged.
