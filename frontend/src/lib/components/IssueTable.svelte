@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Eye, ArrowUpDown, ArrowUp, ArrowDown, Download, Copy, Check, CheckSquare, Sparkles } from 'lucide-svelte';
+  import { Eye, ScanEye, ArrowUpDown, ArrowUp, ArrowDown, Download, Copy, Check, CheckSquare, Sparkles, Fingerprint, FlaskConical } from 'lucide-svelte';
   import type { AuditIssue, IssueStats } from '../types';
   import TablePagination from './TablePagination.svelte';
   import BulkActionBar from './BulkActionBar.svelte';
@@ -7,6 +7,8 @@
   import SortHeader from './SortHeader.svelte';
   import TableCheckbox from './TableCheckbox.svelte';
   import SeverityBadge from './SeverityBadge.svelte';
+  import HoverCard from './HoverCard.svelte';
+  import { describeMechanism, describeSeverity } from '../glossary';
 
   export let issues: AuditIssue[] = [];
   export let stats: IssueStats | null = null;
@@ -122,6 +124,36 @@
     isDetailsModalOpen = true;
   }
 
+  // Copy feedback for the element GUID hover card.
+  let copiedGuid: string | null = null;
+  let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function copyGuid(guid: string) {
+    try {
+      await navigator.clipboard.writeText(guid);
+      copiedGuid = guid;
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => (copiedGuid = null), 1600);
+    } catch {
+      // Clipboard is unavailable (insecure origin, denied permission). The
+      // full GUID is already selectable in the card, so there is nothing to
+      // recover from and nothing worth interrupting the reviewer about.
+    }
+  }
+
+  // The five stat tiles are the one place a severity band appears without a
+  // row of context, so the definition of each band hangs off them rather than
+  // off every badge in the table.
+  $: bandCards = stats
+    ? [
+        { key: 'critical', label: 'Critical', value: stats.critical, tone: 'border-rose-900/40 bg-rose-950/20', text: 'text-rose-400' },
+        { key: 'high', label: 'High Risk', value: stats.high, tone: 'border-amber-900/40 bg-amber-950/20', text: 'text-amber-400' },
+        { key: 'medium', label: 'Medium Risk', value: stats.medium, tone: 'border-yellow-900/40 bg-yellow-950/20', text: 'text-yellow-300' },
+        { key: 'low', label: 'Low Risk', value: stats.low, tone: 'border-emerald-900/40 bg-emerald-950/20', text: 'text-emerald-400' },
+        { key: 'data_quality', label: 'Data Quality', value: stats.data_quality || 0, tone: 'border-indigo-900/40 bg-indigo-950/20', text: 'text-indigo-300' },
+      ]
+    : [];
+
   function getBandPill(band?: string) {
     switch ((band || '').toLowerCase()) {
       case 'critical':
@@ -142,26 +174,27 @@
   <!-- Stats Cards -->
   {#if stats}
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-      <div class="p-4 rounded-xl border border-rose-900/40 bg-rose-950/20 backdrop-blur">
-        <div class="text-xs uppercase tracking-wider font-semibold text-rose-400">Critical</div>
-        <div class="text-2xl font-bold text-white mt-1">{stats.critical}</div>
-      </div>
-      <div class="p-4 rounded-xl border border-amber-900/40 bg-amber-950/20 backdrop-blur">
-        <div class="text-xs uppercase tracking-wider font-semibold text-amber-400">High Risk</div>
-        <div class="text-2xl font-bold text-white mt-1">{stats.high}</div>
-      </div>
-      <div class="p-4 rounded-xl border border-yellow-900/40 bg-yellow-950/20 backdrop-blur">
-        <div class="text-xs uppercase tracking-wider font-semibold text-yellow-300">Medium Risk</div>
-        <div class="text-2xl font-bold text-white mt-1">{stats.medium}</div>
-      </div>
-      <div class="p-4 rounded-xl border border-emerald-900/40 bg-emerald-950/20 backdrop-blur">
-        <div class="text-xs uppercase tracking-wider font-semibold text-emerald-400">Low Risk</div>
-        <div class="text-2xl font-bold text-white mt-1">{stats.low}</div>
-      </div>
-      <div class="p-4 rounded-xl border border-indigo-900/40 bg-indigo-950/20 backdrop-blur">
-        <div class="text-xs uppercase tracking-wider font-semibold text-indigo-300">Data Quality</div>
-        <div class="text-2xl font-bold text-white mt-1">{stats.data_quality || 0}</div>
-      </div>
+      {#each bandCards as card}
+        {@const info = describeSeverity(card.key)}
+        <HoverCard
+          side="bottom"
+          align="start"
+          width="w-72"
+          triggerClass="block"
+          title={info?.label || card.label}
+          subtitle="Severity band"
+        >
+          <span
+            slot="trigger"
+            class="block w-full p-4 rounded-xl border backdrop-blur cursor-help {card.tone}"
+          >
+            <span class="block text-xs uppercase tracking-wider font-semibold {card.text}">{card.label}</span>
+            <span class="block text-2xl font-bold text-slate-100 mt-1">{card.value}</span>
+          </span>
+
+          {info?.description || 'No definition available for this band.'}
+        </HoverCard>
+      {/each}
     </div>
   {/if}
 
@@ -251,6 +284,7 @@
             </tr>
           {:else}
             {#each paginatedIssues as issue}
+              {@const mech = describeMechanism(issue.mechanism)}
               <tr class="hover:bg-slate-800/30 transition-colors {selectedIssueIds.includes(issue.id) ? 'bg-blue-950/20' : ''}">
                 <td class="py-3 px-4 w-10">
                   <TableCheckbox
@@ -266,10 +300,72 @@
                   <SeverityBadge severity={issue.band || 'low'} />
                 </td>
                 <td class="py-3 px-4 text-slate-300 font-medium whitespace-nowrap">
-                  {issue.mechanism}
+                  {#if mech}
+                    <HoverCard
+                      side="top"
+                      align="start"
+                      width="w-80"
+                      icon={FlaskConical}
+                      title="{issue.mechanism} — {mech.label}"
+                      subtitle="Compliance mechanism"
+                      showFooter={!!mech.reference}
+                    >
+                      <span slot="trigger" class="cursor-help border-b border-dotted border-slate-600">
+                        {issue.mechanism}
+                      </span>
+
+                      {mech.description}
+
+                      <span slot="footer" class="font-mono">{mech.reference}</span>
+                    </HoverCard>
+                  {:else}
+                    {issue.mechanism}
+                  {/if}
                 </td>
-                <td class="py-3 px-4 font-mono text-xs text-slate-400 truncate max-w-[140px]" title={issue.element_id}>
-                  {issue.element_id}
+                <td class="py-3 px-4 font-mono text-xs text-slate-400 max-w-[140px]">
+                  <!-- The GUID is truncated to keep the row scannable, which
+                       makes it useless for the one thing it is for: pasting
+                       into the authoring tool. The card restores the full
+                       value plus a copy action. -->
+                  <HoverCard
+                    side="top"
+                    align="start"
+                    width="w-80"
+                    icon={Fingerprint}
+                    title="IFC element GUID"
+                    subtitle={issue.rule_id ? `Flagged by ${issue.rule_id}` : ''}
+                    triggerClass="max-w-full"
+                  >
+                    <span slot="trigger" class="truncate cursor-help">{issue.element_id}</span>
+
+                    <div class="space-y-2">
+                      <code class="block break-all rounded-lg bg-slate-950/70 border border-slate-800 px-2 py-1.5 text-[10px] text-emerald-300 select-all">
+                        {issue.element_id || '—'}
+                      </code>
+                      <div class="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          on:click={() => copyGuid(issue.element_id)}
+                          class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium transition-colors"
+                        >
+                          {#if copiedGuid === issue.element_id}
+                            <Check class="w-3 h-3 text-emerald-400" /> Copied
+                          {:else}
+                            <Copy class="w-3 h-3" /> Copy GUID
+                          {/if}
+                        </button>
+                        {#if onSelectViewer}
+                          <button
+                            type="button"
+                            on:click={() => onSelectViewer && onSelectViewer(issue.element_id)}
+                            class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-[10px] font-medium transition-colors"
+                          >
+                            <ScanEye class="w-3 h-3" /> Show in 3D
+                          </button>
+                        {/if}
+                      </div>
+                    </div>
+                  </HoverCard>
                 </td>
                 <td class="py-3 px-4 text-slate-200">
                   <div class="font-medium text-white">{issue.title}</div>

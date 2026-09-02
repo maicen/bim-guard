@@ -34,6 +34,8 @@
   import LoadingState from "../lib/components/LoadingState.svelte";
   import RuleForm from "../lib/components/RuleForm.svelte";
   import IdsImportForm from "../lib/components/IdsImportForm.svelte";
+  import HoverCard from "../lib/components/HoverCard.svelte";
+  import { describeMechanism } from "../lib/glossary";
 
   // Top-level tab: Rules catalog vs saved Rule Configuration Snapshots
   let activeMainTab: "rules" | "snapshots" = "rules";
@@ -1196,6 +1198,7 @@
               </thead>
               <tbody class="divide-y divide-slate-800/60">
                 {#each paginatedRules as rule}
+                  {@const mech = describeMechanism(rule.mechanism || "CODE")}
                   <tr class="hover:bg-slate-900/60 transition-colors {selectedRuleIds.includes(rule.id) ? 'bg-blue-950/20' : ''}">
                     <td class="py-3 px-4 w-10">
                       <input
@@ -1206,12 +1209,56 @@
                       />
                     </td>
                     <td class="py-3 px-4">
-                      <div class="font-mono font-bold text-white">
-                        {rule.rule_id || `Rule #${rule.id}`}
-                      </div>
-                      <div class="text-[11px] text-slate-400 truncate max-w-xs">
-                        {rule.description || "No description"}
-                      </div>
+                      <!-- The description is clipped to one line here. Reading
+                           it in full used to mean opening the rule; the card
+                           makes it a hover, and adds the source citation the
+                           reviewer needs to judge whether the rule is right. -->
+                      <HoverCard
+                        side="right"
+                        align="start"
+                        width="w-96"
+                        icon={FileText}
+                        title={rule.rule_id || `Rule #${rule.id}`}
+                        subtitle={rule.ruleset_id || undefined}
+                        triggerClass="max-w-full"
+                        showFooter={!!rule.source_text}
+                      >
+                        <span slot="trigger" class="block min-w-0 cursor-help text-left">
+                          <span class="block font-mono font-bold text-slate-100">
+                            {rule.rule_id || `Rule #${rule.id}`}
+                          </span>
+                          <span class="block text-[11px] text-slate-400 truncate max-w-xs">
+                            {rule.description || "No description"}
+                          </span>
+                        </span>
+
+                        <div class="space-y-2">
+                          <p>{rule.description || "This rule carries no description."}</p>
+
+                          <dl class="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-[10px]">
+                            <dt class="text-slate-500 uppercase tracking-wider">Checks</dt>
+                            <dd class="font-mono text-slate-200 break-words">
+                              {rule.property_set || "Pset_Compliance"}.{rule.property_name || "-"}
+                            </dd>
+                            <dt class="text-slate-500 uppercase tracking-wider">Category</dt>
+                            <dd class="font-mono text-slate-200 break-words">
+                              {rule.rule_category || rule.category || "-"}
+                            </dd>
+                            <dt class="text-slate-500 uppercase tracking-wider">Severity</dt>
+                            <dd class="font-mono text-slate-200">{rule.severity || "-"}</dd>
+                          </dl>
+
+                          {#if rule.needs_review}
+                            <p class="text-[10px] text-amber-400">
+                              Extracted automatically and not yet confirmed by a reviewer.
+                            </p>
+                          {/if}
+                        </div>
+
+                        <span slot="footer" class="break-words italic">
+                          “{rule.source_text}”
+                        </span>
+                      </HoverCard>
                     </td>
                     <td class="py-3 px-4">
                       <span
@@ -1225,11 +1272,34 @@
                       </span>
                     </td>
                     <td class="py-3 px-4">
-                      <span
-                        class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 font-mono"
-                      >
-                        {rule.mechanism || "CODE"}
-                      </span>
+                      {#if mech}
+                        <HoverCard
+                          side="top"
+                          align="start"
+                          width="w-80"
+                          icon={Database}
+                          title="{rule.mechanism || 'CODE'} — {mech.label}"
+                          subtitle="Compliance mechanism"
+                          showFooter={!!mech.reference}
+                        >
+                          <span
+                            slot="trigger"
+                            class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 font-mono cursor-help"
+                          >
+                            {rule.mechanism || "CODE"}
+                          </span>
+
+                          {mech.description}
+
+                          <span slot="footer" class="font-mono">{mech.reference}</span>
+                        </HoverCard>
+                      {:else}
+                        <span
+                          class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 font-mono"
+                        >
+                          {rule.mechanism || "CODE"}
+                        </span>
+                      {/if}
                     </td>
                     <td class="py-3 px-4 text-slate-300 font-mono text-[11px]">
                       <div>{rule.property_name || "-"}</div>
