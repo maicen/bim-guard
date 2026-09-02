@@ -162,6 +162,7 @@ class RuleService:
             else PersistenceService.get_table(
                 "rule_folders",
                 _FOLDER_COLUMNS,
+                db=db,
             )
         )
         self._folders_enabled = True
@@ -1230,11 +1231,11 @@ class RuleService:
         return export_ids_for_ruleset(ruleset_id, rules)
 
     @staticmethod
-    def import_ids_xml(xml_text: str) -> list[dict]:
+    def import_ids_xml(xml_text: str, ruleset_id: str | None = None) -> list[dict]:
         """Import rules from an IDS XML payload."""
         from app.modules.module3_rule_builder.ids_exporter import import_ids_ruleset
 
-        return import_ids_ruleset(xml_text)
+        return import_ids_ruleset(xml_text, ruleset_id)
 
 
 RulesService = RuleService

@@ -19,13 +19,51 @@
     Eye,
     X,
     RotateCw,
+    Upload,
+    Camera,
+    FileText,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
-  import type { Rule, RuleFolder, RulesetCategory } from "../lib/types";
+  import type { Rule, RuleFolder, RulesetCategory, RuleSnapshot, RuleSnapshotSourceMode } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
+  import TableCheckbox from "../lib/components/TableCheckbox.svelte";
+  import SortHeader from "../lib/components/SortHeader.svelte";
+  import EmptyState from "../lib/components/EmptyState.svelte";
+  import LoadingState from "../lib/components/LoadingState.svelte";
+
+  // Top-level tab: Rules catalog vs saved Rule Configuration Snapshots
+  let activeMainTab: "rules" | "snapshots" = "rules";
+
+  // Snapshots tab state
+  let snapshots: RuleSnapshot[] = [];
+  let isLoadingSnapshots = false;
+  let snapshotsError = "";
+  let snapshotSearchQuery = "";
+  let snapshotSortField: "name" | "source_ruleset_id" | "category" | "rule_count" | "created_at" = "created_at";
+  let snapshotSortAsc = false;
+  let snapshotCurrentPage = 1;
+  let snapshotPageSize = 10;
+  let selectedSnapshotIds: Set<number> = new Set();
+  let snapshotToDelete: RuleSnapshot | null = null;
+  let isBulkDeleteSnapshotsModalOpen = false;
+
+  // Import IDS modal state
+  let isImportIdsModalOpen = false;
+  let importIdsFile: File | null = null;
+  let importIdsRulesetId = "";
+  let isImportingIds = false;
+  let importIdsError = "";
+
+  // Save Snapshot modal state
+  let isSaveSnapshotModalOpen = false;
+  let saveSnapshotName = "";
+  let saveSnapshotNotes = "";
+  let saveSnapshotSourceMode: RuleSnapshotSourceMode = "manual";
+  let isSavingSnapshot = false;
+  let saveSnapshotError = "";
 
   const cachedRules = rulesApi.getCachedList();
   const cachedFolders = rulesApi.getCachedFolders();
@@ -376,6 +414,171 @@
     }
   }
 
+  // ── Snapshots tab ──────────────────────────────────────────────────────
+
+  function switchMainTab(tab: "rules" | "snapshots") {
+    activeMainTab = tab;
+    if (tab === "snapshots" && snapshots.length === 0 && !isLoadingSnapshots) {
+      loadSnapshots();
+    }
+  }
+
+  async function loadSnapshots() {
+    isLoadingSnapshots = true;
+    snapshotsError = "";
+    try {
+      snapshots = await rulesApi.listSnapshots();
+    } catch (err: any) {
+      snapshotsError = err.message || "Failed to load snapshots.";
+    } finally {
+      isLoadingSnapshots = false;
+    }
+  }
+
+  function openImportIdsModal() {
+    importIdsFile = null;
+    importIdsRulesetId = selectedFolderId || "";
+    importIdsError = "";
+    isImportIdsModalOpen = true;
+  }
+
+  async function handleImportIds() {
+    if (!importIdsFile || !importIdsRulesetId.trim()) {
+      importIdsError = "Please choose an IDS file and a Rule Folder name.";
+      return;
+    }
+    isImportingIds = true;
+    importIdsError = "";
+    try {
+      const res = await rulesApi.importIds(importIdsFile, importIdsRulesetId.trim());
+      successMessage = `Imported ${res.created_count} of ${res.total_parsed} rules from IDS file into "${res.ruleset_id}".`;
+      isImportIdsModalOpen = false;
+      await loadData(true);
+    } catch (err: any) {
+      importIdsError = err.message || "Failed to import IDS file.";
+    } finally {
+      isImportingIds = false;
+    }
+  }
+
+  function openSaveSnapshotModal() {
+    if (!selectedFolderId) return;
+    saveSnapshotName = selectedFolderId;
+    saveSnapshotNotes = "";
+    const folder = folders.find((f) => f.ruleset_id === selectedFolderId);
+    saveSnapshotSourceMode = "manual";
+    saveSnapshotError = "";
+    isSaveSnapshotModalOpen = true;
+  }
+
+  async function handleSaveSnapshot() {
+    if (!selectedFolderId || !saveSnapshotName.trim()) {
+      saveSnapshotError = "Please provide a snapshot name.";
+      return;
+    }
+    isSavingSnapshot = true;
+    saveSnapshotError = "";
+    try {
+      await rulesApi.createSnapshot({
+        ruleset_id: selectedFolderId,
+        name: saveSnapshotName.trim(),
+        notes: saveSnapshotNotes.trim(),
+        source_mode: saveSnapshotSourceMode,
+      });
+      successMessage = `Saved snapshot "${saveSnapshotName.trim()}".`;
+      isSaveSnapshotModalOpen = false;
+      snapshots = [];
+      await loadSnapshots();
+    } catch (err: any) {
+      saveSnapshotError = err.message || "Failed to save snapshot.";
+    } finally {
+      isSavingSnapshot = false;
+    }
+  }
+
+  function confirmDeleteSnapshot() {
+    if (!snapshotToDelete) return;
+    const id = snapshotToDelete.id;
+    rulesApi
+      .deleteSnapshot(id)
+      .then(() => {
+        snapshots = snapshots.filter((s) => s.id !== id);
+        selectedSnapshotIds.delete(id);
+        selectedSnapshotIds = selectedSnapshotIds;
+      })
+      .catch((err: any) => {
+        snapshotsError = err.message || "Failed to delete snapshot.";
+      })
+      .finally(() => {
+        snapshotToDelete = null;
+      });
+  }
+
+  async function confirmBulkDeleteSnapshots() {
+    const ids = Array.from(selectedSnapshotIds);
+    for (const id of ids) {
+      try {
+        await rulesApi.deleteSnapshot(id);
+      } catch (err: any) {
+        snapshotsError = err.message || `Failed to delete snapshot ${id}.`;
+      }
+    }
+    snapshots = snapshots.filter((s) => !selectedSnapshotIds.has(s.id));
+    selectedSnapshotIds = new Set();
+    isBulkDeleteSnapshotsModalOpen = false;
+  }
+
+  function toggleSnapshotSelection(id: number) {
+    if (selectedSnapshotIds.has(id)) {
+      selectedSnapshotIds.delete(id);
+    } else {
+      selectedSnapshotIds.add(id);
+    }
+    selectedSnapshotIds = selectedSnapshotIds;
+  }
+
+  function toggleAllSnapshotsSelection() {
+    if (selectedSnapshotIds.size === paginatedSnapshots.length && paginatedSnapshots.length > 0) {
+      selectedSnapshotIds = new Set();
+    } else {
+      selectedSnapshotIds = new Set(paginatedSnapshots.map((s) => s.id));
+    }
+  }
+
+  function handleSnapshotSort(col: string) {
+    if (snapshotSortField === col) {
+      snapshotSortAsc = !snapshotSortAsc;
+    } else {
+      snapshotSortField = col as typeof snapshotSortField;
+      snapshotSortAsc = true;
+    }
+  }
+
+  $: filteredSnapshots = snapshots.filter((s) => {
+    if (!snapshotSearchQuery.trim()) return true;
+    const q = snapshotSearchQuery.toLowerCase();
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.source_ruleset_id.toLowerCase().includes(q) ||
+      (s.notes || "").toLowerCase().includes(q)
+    );
+  });
+
+  $: sortedSnapshots = [...filteredSnapshots].sort((a, b) => {
+    const av = a[snapshotSortField];
+    const bv = b[snapshotSortField];
+    const cmp = typeof av === "number" && typeof bv === "number"
+      ? av - bv
+      : String(av ?? "").localeCompare(String(bv ?? ""));
+    return snapshotSortAsc ? cmp : -cmp;
+  });
+
+  $: snapshotTotalPages = Math.max(1, Math.ceil(sortedSnapshots.length / snapshotPageSize));
+  $: paginatedSnapshots = sortedSnapshots.slice(
+    (snapshotCurrentPage - 1) * snapshotPageSize,
+    snapshotCurrentPage * snapshotPageSize,
+  );
+
   function openCreateModal() {
     isEditing = false;
     editRuleId = null;
@@ -678,25 +881,47 @@
         <span>Seed Engines</span>
       </button>
 
-      {#if selectedFolderId}
-        <a
-          href={ruleExtractionApi.getIdsExportUrl(selectedFolderId)}
+      {#if activeMainTab === "rules"}
+        <button
+          type="button"
+          on:click={openImportIdsModal}
           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition-colors"
-          title="Export current ruleset into buildingSMART IDS XML"
+          title="Import rules from a buildingSMART IDS file"
         >
-          <Download class="w-3.5 h-3.5 text-blue-400" />
-          <span>Export IDS</span>
-        </a>
-      {/if}
+          <Upload class="w-3.5 h-3.5 text-emerald-400" />
+          <span>Import IDS</span>
+        </button>
 
-      <button
-        type="button"
-        on:click={openCreateModal}
-        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
-      >
-        <Plus class="w-3.5 h-3.5" />
-        <span>New Rule</span>
-      </button>
+        {#if selectedFolderId}
+          <a
+            href={ruleExtractionApi.getIdsExportUrl(selectedFolderId)}
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition-colors"
+            title="Export current ruleset into buildingSMART IDS XML"
+          >
+            <Download class="w-3.5 h-3.5 text-blue-400" />
+            <span>Export IDS</span>
+          </a>
+
+          <button
+            type="button"
+            on:click={openSaveSnapshotModal}
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition-colors"
+            title="Save the current folder's rules as a reusable snapshot"
+          >
+            <Camera class="w-3.5 h-3.5 text-purple-400" />
+            <span>Save Snapshot</span>
+          </button>
+        {/if}
+
+        <button
+          type="button"
+          on:click={openCreateModal}
+          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          <span>New Rule</span>
+        </button>
+      {/if}
     </div>
   </div>
 
@@ -717,6 +942,34 @@
     </div>
   {/if}
 
+  <!-- Main Tab Toggle: Rules Catalog vs Saved Snapshots -->
+  <div class="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/60 border border-slate-800 w-fit">
+    <button
+      type="button"
+      on:click={() => switchMainTab("rules")}
+      class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {activeMainTab === 'rules'
+        ? 'bg-[#0071e3] text-white shadow-sm'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
+    >
+      <ListChecks class="w-3.5 h-3.5" />
+      <span>Rules Catalog</span>
+    </button>
+    <button
+      type="button"
+      on:click={() => switchMainTab("snapshots")}
+      class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {activeMainTab === 'snapshots'
+        ? 'bg-[#0071e3] text-white shadow-sm'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}"
+    >
+      <Camera class="w-3.5 h-3.5" />
+      <span>Snapshots</span>
+      {#if snapshots.length > 0}
+        <span class="text-[10px] opacity-75 ml-0.5">({snapshots.length})</span>
+      {/if}
+    </button>
+  </div>
+
+  {#if activeMainTab === "rules"}
   <!-- Category Selector Tabs: Arch | Piping | seismic -->
   <div class="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/60 border border-slate-800 w-fit">
     <button
@@ -1210,6 +1463,122 @@
       </div>
     </div>
   </div>
+  {:else}
+  <!-- Snapshots: persisted, timestamped rule-configuration exports -->
+  <div class="space-y-4">
+    {#if snapshotsError}
+      <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+        {snapshotsError}
+      </div>
+    {/if}
+
+    <div class="flex flex-col md:flex-row items-center gap-3">
+      <div class="relative flex-1 w-full">
+        <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          bind:value={snapshotSearchQuery}
+          placeholder="Search snapshots by name, source folder, or notes..."
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+        />
+      </div>
+    </div>
+
+    <BulkActionBar
+      selectedCount={selectedSnapshotIds.size}
+      itemLabel="snapshot"
+      onClearSelection={() => (selectedSnapshotIds = new Set())}
+      onBulkDelete={() => (isBulkDeleteSnapshotsModalOpen = true)}
+    />
+
+    {#if isLoadingSnapshots}
+      <LoadingState message="Loading snapshots..." />
+    {:else if sortedSnapshots.length === 0}
+      <EmptyState
+        title="No snapshots saved yet"
+        description="Save a rule folder's current configuration as a named snapshot to download it as a structured PDF later, or to keep a durable record independent of future edits."
+        icon={Camera}
+      />
+    {:else}
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-slate-800">
+              <th class="py-3 px-4 w-10">
+                <TableCheckbox
+                  checked={selectedSnapshotIds.size === paginatedSnapshots.length && paginatedSnapshots.length > 0}
+                  indeterminate={selectedSnapshotIds.size > 0 && selectedSnapshotIds.size < paginatedSnapshots.length}
+                  on:change={toggleAllSnapshotsSelection}
+                  ariaLabel="Select all snapshots"
+                />
+              </th>
+              <SortHeader column="name" sortField={snapshotSortField} sortAsc={snapshotSortAsc} onSort={handleSnapshotSort}>Name</SortHeader>
+              <SortHeader column="source_ruleset_id" sortField={snapshotSortField} sortAsc={snapshotSortAsc} onSort={handleSnapshotSort}>Source Folder</SortHeader>
+              <th class="py-3 px-4 text-left text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Mode</th>
+              <SortHeader column="category" sortField={snapshotSortField} sortAsc={snapshotSortAsc} onSort={handleSnapshotSort}>Category</SortHeader>
+              <SortHeader column="rule_count" sortField={snapshotSortField} sortAsc={snapshotSortAsc} onSort={handleSnapshotSort} align="center">Rules</SortHeader>
+              <SortHeader column="created_at" sortField={snapshotSortField} sortAsc={snapshotSortAsc} onSort={handleSnapshotSort}>Saved</SortHeader>
+              <th class="py-3 px-4 text-right text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each paginatedSnapshots as snap (snap.id)}
+              <tr class="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors">
+                <td class="py-3 px-4">
+                  <TableCheckbox
+                    checked={selectedSnapshotIds.has(snap.id)}
+                    on:change={() => toggleSnapshotSelection(snap.id)}
+                    ariaLabel={`Select snapshot ${snap.name}`}
+                  />
+                </td>
+                <td class="py-3 px-4 text-white font-medium">{snap.name}</td>
+                <td class="py-3 px-4 text-slate-400 font-mono">{snap.source_ruleset_id}</td>
+                <td class="py-3 px-4">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700 uppercase">
+                    {snap.source_mode}
+                  </span>
+                </td>
+                <td class="py-3 px-4 text-slate-400">{snap.category}</td>
+                <td class="py-3 px-4 text-center text-slate-300">{snap.rule_count}</td>
+                <td class="py-3 px-4 text-slate-400">{snap.created_at ? new Date(snap.created_at).toLocaleString() : "—"}</td>
+                <td class="py-3 px-4">
+                  <div class="flex items-center justify-end gap-1">
+                    <a
+                      href={rulesApi.getSnapshotPdfUrl(snap.id)}
+                      class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      title="Download PDF"
+                    >
+                      <FileText class="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      on:click={() => (snapshotToDelete = snap)}
+                      class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                      title="Delete snapshot"
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+
+      <TablePagination
+        currentPage={snapshotCurrentPage}
+        pageSize={snapshotPageSize}
+        totalItems={sortedSnapshots.length}
+        onPageChange={(p) => (snapshotCurrentPage = p)}
+        onPageSizeChange={(s) => {
+          snapshotPageSize = s;
+          snapshotCurrentPage = 1;
+        }}
+      />
+    {/if}
+  </div>
+  {/if}
 </div>
 
 <!-- Rule Edit/Create Modal -->
@@ -2117,4 +2486,198 @@
   danger={true}
   onConfirm={confirmBulkDeleteFolders}
   onCancel={() => (isBulkDeleteFoldersModalOpen = false)}
+/>
+
+<!-- Import IDS Modal -->
+{#if isImportIdsModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <Upload class="w-5 h-5" />
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white tracking-tight">Import IDS File</h2>
+            <p class="text-xs text-slate-400">Parse a buildingSMART IDS (.ids/XML) file into new rules</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          on:click={() => (isImportIdsModalOpen = false)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        {#if importIdsError}
+          <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300">
+            {importIdsError}
+          </div>
+        {/if}
+
+        <div class="space-y-1.5">
+          <label for="import-ids-file" class="block font-semibold text-slate-300">
+            IDS File <span class="text-rose-400">*</span>
+          </label>
+          <input
+            id="import-ids-file"
+            type="file"
+            accept=".ids,.xml"
+            on:change={(e) => (importIdsFile = (e.target as HTMLInputElement).files?.[0] || null)}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-white file:text-xs focus:outline-none focus:border-[#0071e3]"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="import-ids-ruleset" class="block font-semibold text-slate-300">
+            Rule Folder <span class="text-rose-400">*</span>
+          </label>
+          <input
+            id="import-ids-ruleset"
+            type="text"
+            bind:value={importIdsRulesetId}
+            placeholder="e.g. IMPORTED-IDS or an existing folder name"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3] font-mono"
+          />
+          <p class="text-[11px] text-slate-500">
+            Imported rules are saved under this folder and flagged for review (needs_review).
+          </p>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          on:click={() => (isImportIdsModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={isImportingIds || !importIdsFile || !importIdsRulesetId.trim()}
+          on:click={handleImportIds}
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+        >
+          <span>{isImportingIds ? "Importing..." : "Import Rules"}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Save Snapshot Modal -->
+{#if isSaveSnapshotModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <Camera class="w-5 h-5" />
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white tracking-tight">Save Rule Snapshot</h2>
+            <p class="text-xs text-slate-400">
+              Freeze "{selectedFolderId}"'s current rules into a named, downloadable snapshot
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          on:click={() => (isSaveSnapshotModalOpen = false)}
+          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        {#if saveSnapshotError}
+          <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300">
+            {saveSnapshotError}
+          </div>
+        {/if}
+
+        <div class="space-y-1.5">
+          <label for="snapshot-name" class="block font-semibold text-slate-300">
+            Snapshot Name <span class="text-rose-400">*</span>
+          </label>
+          <input
+            id="snapshot-name"
+            type="text"
+            bind:value={saveSnapshotName}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="snapshot-mode" class="block font-semibold text-slate-300">Source Mode</label>
+          <select
+            id="snapshot-mode"
+            bind:value={saveSnapshotSourceMode}
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          >
+            <option value="manual">Manual</option>
+            <option value="pdf">PDF Extraction</option>
+            <option value="ids">IDS Import</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="snapshot-notes" class="block font-semibold text-slate-300">Notes</label>
+          <textarea
+            id="snapshot-notes"
+            rows="3"
+            bind:value={saveSnapshotNotes}
+            placeholder="Optional context for this configuration..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3] resize-y"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          on:click={() => (isSaveSnapshotModalOpen = false)}
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={isSavingSnapshot || !saveSnapshotName.trim()}
+          on:click={handleSaveSnapshot}
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+        >
+          <span>{isSavingSnapshot ? "Saving..." : "Save Snapshot"}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Delete Snapshot Confirmation Modal -->
+<ConfirmModal
+  isOpen={snapshotToDelete !== null}
+  title="Delete Snapshot"
+  message={`Are you sure you want to delete snapshot "${snapshotToDelete?.name || ""}"? This cannot be undone.`}
+  confirmText="Delete Snapshot"
+  danger={true}
+  onConfirm={confirmDeleteSnapshot}
+  onCancel={() => (snapshotToDelete = null)}
+/>
+
+<!-- Bulk Delete Snapshots Confirmation Modal -->
+<ConfirmModal
+  bind:isOpen={isBulkDeleteSnapshotsModalOpen}
+  title="Delete Selected Snapshots"
+  message={`Are you sure you want to delete ${selectedSnapshotIds.size} selected snapshot(s)? This cannot be undone.`}
+  confirmText="Delete Snapshots"
+  danger={true}
+  onConfirm={confirmBulkDeleteSnapshots}
+  onCancel={() => (isBulkDeleteSnapshotsModalOpen = false)}
 />

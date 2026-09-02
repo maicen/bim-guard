@@ -25,6 +25,7 @@ import type {
   GitHubRepoCreatePayload,
   GitHubRepoStructure,
   GitHubRepoUpdatePayload,
+  IdsImportResult,
   IFCValidationReport,
   NamingCatalog,
   NamingConfig,
@@ -50,6 +51,8 @@ import type {
   RuleFolderCreatePayload,
   RuleFolderUpdatePayload,
   RulesetCategory,
+  RuleSnapshot,
+  RuleSnapshotCreatePayload,
   WorkflowStatus,
 } from './types';
 import {
@@ -478,6 +481,47 @@ export const rulesApi = {
       return `${API_BASE}/rules/export-ids/${encodeURIComponent(rulesetId)}`;
     }
     return `${API_BASE}/rules/export-ids`;
+  },
+
+  async importIds(file: File, rulesetId: string): Promise<IdsImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('ruleset_id', rulesetId);
+    const res = await fetch(`${API_BASE}/rules/import-ids`, {
+      method: 'POST',
+      body: form,
+    });
+    const result = await handleResponse<IdsImportResult>(res);
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
+    return result;
+  },
+
+  async createSnapshot(payload: RuleSnapshotCreatePayload): Promise<RuleSnapshot> {
+    const res = await fetch(`${API_BASE}/rules/snapshots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<RuleSnapshot>(res);
+  },
+
+  async listSnapshots(): Promise<RuleSnapshot[]> {
+    const res = await fetch(`${API_BASE}/rules/snapshots`);
+    return handleResponse<RuleSnapshot[]>(res);
+  },
+
+  async deleteSnapshot(snapshotId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/rules/snapshots/${snapshotId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to delete snapshot ${snapshotId}`);
+    }
+  },
+
+  getSnapshotPdfUrl(snapshotId: number): string {
+    return `${API_BASE}/rules/snapshots/${snapshotId}/pdf`;
   },
 };
 
