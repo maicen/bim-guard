@@ -93,13 +93,13 @@ def list_rules(
         rules = [
             r
             for r in rules
-            if kw in (r.get("rule_id") or "").lower()
+            if kw in (r.get("rule_id") or r.get("reference") or "").lower()
             or kw in (r.get("description") or "").lower()
             or kw in (r.get("source_text") or "").lower()
             or kw in (r.get("property_name") or "").lower()
         ]
 
-    return [RuleResponse(**r) for r in rules]
+    return [_rule_response(r) for r in rules]
 
 
 @router.get("/folders", response_model=list[RuleFolderResponse], summary="List ruleset folders")
@@ -113,7 +113,7 @@ def list_rule_folders(
     folders = service.list_folders_with_rules(category=category)
     result: list[RuleFolderResponse] = []
     for f in folders:
-        rules_list = [RuleResponse(**r) for r in f.get("rules", [])]
+        rules_list = [_rule_response(r) for r in f.get("rules", [])]
         result.append(
             RuleFolderResponse(
                 id=f.get("id"),
@@ -411,7 +411,7 @@ def get_rule_folder(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ruleset folder '{ruleset_id}' not found.",
         )
-    rules_list = [RuleResponse(**r) for r in folder.get("rules", [])]
+    rules_list = [_rule_response(r) for r in folder.get("rules", [])]
     return RuleFolderResponse(
         id=folder.get("id"),
         ruleset_id=folder.get("ruleset_id", ""),
@@ -449,7 +449,7 @@ def update_rule_folder(
     folders = service.list_folders_with_rules()
     for f in folders:
         if service.normalize_ruleset_id(f.get("ruleset_id")) == service.normalize_ruleset_id(ruleset_id):
-            rules_list = [RuleResponse(**r) for r in f.get("rules", [])]
+            rules_list = [_rule_response(r) for r in f.get("rules", [])]
             return RuleFolderResponse(
                 id=f.get("id"),
                 ruleset_id=f.get("ruleset_id", ""),
@@ -547,7 +547,7 @@ def get_rule(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Rule with ID {rule_id} not found.",
         )
-    return RuleResponse(**rule)
+    return _rule_response(rule)
 
 
 @router.post(
@@ -590,7 +590,7 @@ def create_rule(
             extraction_method=payload.extraction_method or "manual",
             needs_review=payload.needs_review,
         )
-        return RuleResponse(**created)
+        return _rule_response(created)
     except Exception as exc:
         logger.error("Failed to create rule: %s", exc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -612,7 +612,7 @@ def update_rule(
 
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
     updated = service.update_rule(rule_id, **updates)
-    return RuleResponse(**(updated or service.get_rule(rule_id)))
+    return _rule_response(updated or service.get_rule(rule_id))
 
 
 @router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete rule")
