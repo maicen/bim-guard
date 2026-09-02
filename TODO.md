@@ -186,27 +186,56 @@ Owner: Osama.
 
 ## Priority 8: IFC Ingestion Correctness
 
-- [ ] Coerce numeric strings before the `isinstance(value, (int, float))` guard in
+- [x] Coerce numeric strings before the `isinstance(value, (int, float))` guard in
       Module 2's unit-conversion pass. Quantities stored as `IfcLabel('1.2')` currently
       skip conversion and are compared raw, so a 1.2 m window is evaluated as 1.2 mm and
-      fails every dimensional rule.
+      fails every dimensional rule. Fixed in `_resolve_element_property`'s Pass 8
+      (`app/modules/module2_ifc_read/__init__.py`): a string value is coerced with
+      `float()` before the numeric-type check, so a non-numeric string (e.g.
+      `FireRating`) still passes through untouched. Covered by
+      `tests/test_module2_property_resolution.py::TestNumericStringUnitConversion`.
 - [ ] Log a warning when a length-typed or length-named property is found but skipped
       by unit conversion, so silent misreporting is visible in the run log.
 - [ ] Surface the `_get_length_unit_scale_mm` fallback-to-1.0 path as an explicit model
       warning instead of a silent default. Read from source, not reproduced — the reference
       models both declare a valid `LENGTHUNIT`.
-- [ ] Investigate `ClearWidth` and `OverallWidth` resolving to 2,125 mm on `IfcDoor`
+- [x] Investigate `ClearWidth` and `OverallWidth` resolving to 2,125 mm on `IfcDoor`
       in the same report where `Width` correctly resolves to 950 mm; 2,125 mm is the door
       height. `_GEOMETRY_PROPERTY_MAP` maps `overallwidth` to the width extractor and
       `clearwidth` to the corridor-width extractor, so the mapping alone does not explain
-      it. Cause not yet identified. Reproduction: golden reference model, Doors card,
-      rule folder "All folders".
+      it. Reproduction: golden reference model, Doors card, rule folder "All folders".
+      **Found and fixed one real defect**: when a door/window has neither a Pset value
+      nor a populated `OverallWidth`/`OverallHeight` attribute, `ClearWidth` fell through
+      to Pass 7 geometry, which mapped it to `get_corridor_width_mm()` — the *shortest*
+      side of the element's own bounding footprint. That algorithm is correct for a
+      room/corridor (its narrow passable dimension) but wrong for a door/window leaf,
+      whose own footprint is a thin panel: the shortest side there is the frame/leaf
+      *thickness*, not the openable width (confirmed against a synthetic 950×50×2125 mm
+      door: `ClearWidth` came back 50 mm, the thickness, not 2,125 mm). Fixed in
+      `get_geometry_value()` (`app/modules/module2_ifc_read/ifc_geometry.py`) to route
+      `IfcDoor`/`IfcDoorStandardCase`/`IfcWindow`/`IfcWindowStandardCase` through the same
+      width extractor as `OverallWidth` instead, matching the precedence already
+      documented in `docs/ifc-property-mapping.md` ("ClearWidth → OverallWidth, closest
+      available"). Covered by
+      `tests/test_ifc_geometry_units.py::test_clear_width_on_door_uses_overall_width_not_leaf_thickness`
+      (and `test_corridor_width_still_used_for_rooms` for the non-regression case).
+      **Not reproduced**: the exact reported symptom — both `OverallWidth` and
+      `ClearWidth` resolving to precisely the door *height* (2,125 mm), with `Width`
+      correctly resolving to 950 mm in the same run — could not be reproduced against
+      synthetic Pset, Qto, direct-attribute, type-vs-instance-precedence, or axis-aligned
+      geometry scenarios (all resolved correctly in isolation; see session notes). This
+      needs the actual golden reference model or the live rule definitions used in that
+      report to pin down further — re-open if it still reproduces after this fix.
 - [ ] Confirm precedence between a declared property value and the geometry
       bounding-box fallback. `Pset_DoorCommon_Egress.ClearWidth` is declared as
       `IFCREAL(0.95)` on the reference model but does not appear as 950 mm in the report.
-- [ ] Add `requiredheadroom` to `_LENGTH_DIRECT_ATTRS`; the list contains
+- [x] Add `requiredheadroom` to `_LENGTH_DIRECT_ATTRS`; the list contains
       `requireheadroom`, so `Pset_StairCommon.RequiredHeadroom` only converts when it
-      carries an explicit measure type.
+      carries an explicit measure type. Fixed the typo in both
+      `app/modules/module2_ifc_read/__init__.py`'s `_LENGTH_DIRECT_ATTRS` and the same
+      typo in `ifc_geometry.py`'s `_GEOMETRY_PROPERTY_MAP` (the header comment on
+      `_LENGTH_DIRECT_ATTRS` explicitly requires the two stay in sync). Covered by
+      `tests/test_module2_property_resolution.py::TestRequiredHeadroomTypo`.
 
 Owner: unassigned.
 
