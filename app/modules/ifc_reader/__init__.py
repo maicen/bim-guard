@@ -132,9 +132,12 @@ IFC_MIN_QUALITY_SCORE = 70
 # returns nothing, try each fallback in order.  For IfcStair specifically we
 # also walk IsDecomposedBy to recover the individual IfcStairFlight children.
 _IFC_CLASS_FALLBACKS: dict[str, list[str]] = {
-    "IfcStairFlight":      ["IfcStair"],
+    # IfcStair first (container -> flight decomposition, handled specially
+    # below), then the generic proxy bucket for stairs a bad export dropped
+    # to IfcBuildingElementProxy entirely — filtered by _PROXY_RECLASSIFY_HINTS.
+    "IfcStairFlight":      ["IfcStair", "IfcBuildingElementProxy"],
     "IfcRampFlight":       ["IfcRamp"],
-    "IfcRailing":          ["IfcHandRail", "IfcMember"],
+    "IfcRailing":          ["IfcHandRail", "IfcMember", "IfcBuildingElementProxy"],
     "IfcSlab":             ["IfcPlate", "IfcFooting"],
     "IfcSpace":            ["IfcZone"],
     "IfcSanitaryTerminal": ["IfcFlowTerminal"],
@@ -164,8 +167,10 @@ _IFC_CLASS_FALLBACKS: dict[str, list[str]] = {
 # target class, when the fallback class is that catch-all bucket. See
 # _matches_reclass_hint().
 _PROXY_RECLASSIFY_HINTS: dict[str, list[str]] = {
-    "IfcDoor":   ["door"],
-    "IfcWindow": ["window", "glazing", "glaze"],
+    "IfcDoor":        ["door"],
+    "IfcWindow":      ["window", "glazing", "glaze"],
+    "IfcStairFlight": ["stair", "step", "flight"],
+    "IfcRailing":     ["railing", "handrail", "guard", "guardrail", "balustrade"],
 }
 
 # ── Property alias map ────────────────────────────────────────────────────────
@@ -179,6 +184,11 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
     "TreadLength":      ["TreadDepth", "GoingType", "Going", "TreadRun", "StepDepth"],
     "RiserHeight":      ["RiserType", "Riser", "RiserHeightType", "StepHeight"],
     "RequiredHeadroom": ["HeadroomClearance", "Headroom", "ClearHeight", "ClearanceHeight"],
+    # Reverse of RequiredHeadroom above: Pset_StairFlightCommon's own property
+    # is spelled "Headroom" (not "RequiredHeadroom", which is Pset_StairCommon's
+    # name on the IfcStair container) — a rule authored as "Headroom" against
+    # IfcStair would otherwise never try the container-level name.
+    "Headroom":         ["RequiredHeadroom", "HeadroomClearance", "ClearHeight", "ClearanceHeight"],
     "HandrailHeight":   ["Height", "RailingHeight", "BarrierHeight"],
     "Area":             ["ClearOpeningArea", "GrossArea", "NetArea", "OpeningArea"],
     "RequiredSlope":    ["Slope", "PitchAngle", "SlopeAngle", "Gradient"],
@@ -187,6 +197,22 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
     "LongName":         ["Name", "SpaceName", "RoomName"],
     "ModelNumber":      ["ModelReference", "ModelLabel"],
     "OpeningDirection": ["OperationType"],
+    # Pset_StairCommon / Pset_StairFlightCommon name variants a rule author
+    # (human or the LLM rule-builder) is likely to type instead of the exact
+    # IFC schema property name.
+    "NosingLength":       ["Nosing", "NosingProjection", "NosingDepth"],
+    "WaistThickness":     ["Waist", "StairWaist"],
+    "HandicapAccessible": ["Accessible", "IsAccessible", "AccessibleRoute"],
+    "HasNonSkidSurface":  ["NonSkidSurface", "SlipResistant", "SlipResistance", "AntiSlip"],
+    "WalkingLineOffset":  ["WalklineOffset", "WalkLineOffset"],
+    "FireExit":           ["IsFireExit", "EmergencyExit"],
+    # NOTE: deliberately NOT aliasing a landing's clear width to
+    # Qto_SlabBaseQuantities' "Width" — that Qto property is slab THICKNESS,
+    # not the landing's clear walking width, on every IfcSlab including
+    # PredefinedType=LANDING. A rule wanting clear width must ask for
+    # "ClearWidth", which already routes to the geometry-derived corridor
+    # width instead (see ifc_geometry._GEOMETRY_PROPERTY_MAP). See
+    # docs/ifc-property-mapping.md.
 }
 
 
@@ -211,13 +237,15 @@ _LENGTH_DIRECT_ATTRS: frozenset[str] = frozenset([
     "overallwidth", "overallheight", "width", "height",
     "treadlength", "treaddepth", "going", "riserheight",
     "handrailheight", "sillheight", "headroomclearance",
-    "requiredheadroom", "clearwidth", "nominalwidth", "nominalheight",
+    "requiredheadroom", "headroom", "clearwidth", "nominalwidth", "nominalheight",
     "clearheight", "elevationwithflooring",
     "grosswidth", "grossheight", "netwidth", "netheight",
     "thickness", "length", "depth",
     "corridorwidth", "minimumwidth", "passagewidth",
     "perimeter", "footprintperimeter",
     "diameter", "nominaldiameter",
+    "nosinglength", "waistthickness", "walkinglineoffset",
+    "treadlengthatoffset", "treadlengthatinnerside",
 ])
 
 # ── IFC property-type → Python type label ────────────────────────────────────

@@ -127,3 +127,39 @@ what action maps it correctly.*
 Required for: `IfcDoor.Width`, `IfcDoor.Height`, `IfcWindow.Area`,
 `IfcSlab.Width`, `IfcSpace.Height` — all come from `Qto_*` quantity sets.
 The BIMGuard IFC4 Export config already has this enabled.
+
+---
+
+## Stair / railing / landing property notes
+
+Aliases now resolved automatically (no rule or Revit change needed) — a rule
+authored with any of the left-hand names now also tries the right-hand ones:
+
+| Rule `property_name` | Also tries | IFC Class |
+|---|---|---|
+| `NosingLength` | `Nosing`, `NosingProjection`, `NosingDepth` | IfcStairFlight, IfcStair |
+| `WaistThickness` | `Waist`, `StairWaist` | IfcStairFlight, IfcStair |
+| `HandicapAccessible` | `Accessible`, `IsAccessible`, `AccessibleRoute` | IfcStair |
+| `HasNonSkidSurface` | `NonSkidSurface`, `SlipResistant`, `SlipResistance`, `AntiSlip` | IfcStair |
+| `Headroom` | `RequiredHeadroom`, `HeadroomClearance`, `ClearHeight`, `ClearanceHeight` | IfcStair (reverse of the existing `RequiredHeadroom` alias, for rules that ask using the flight-level name against the stair container) |
+| `WalkingLineOffset` | `WalklineOffset`, `WalkLineOffset` | IfcStairFlight, IfcStair |
+| `FireExit` | `IsFireExit`, `EmergencyExit` | IfcStair |
+
+Stairs and railings exported as generic `IfcBuildingElementProxy` (bad
+export, or an authoring tool that doesn't model a proper `IfcStair`/
+`IfcRailing`) are now recovered the same way doors/windows already were —
+matched by `Name`/`ObjectType`/`Tag` containing "stair"/"step"/"flight" or
+"railing"/"handrail"/"guard"/"balustrade" respectively.
+
+### ⚠️ Landmine: landing clear width vs. `Qto_SlabBaseQuantities.Width`
+
+`Qto_SlabBaseQuantities.Width` means **slab thickness**, on every `IfcSlab`
+including a landing (`PredefinedType = LANDING`) — never the landing's clear
+walking width. A rule asking for `Width` on a landing will silently get the
+slab thickness back, not what it likely wants.
+
+**Do not** author a landing clear-width rule with `property_name: Width`.
+Use `property_name: ClearWidth` instead — that name is *not* aliased to
+`Width` for this reason, and instead falls through to the geometry-derived
+corridor-width calculation (`ifc_geometry.get_corridor_width_mm`), which
+computes the landing's actual minimum clear plan dimension from its mesh.
