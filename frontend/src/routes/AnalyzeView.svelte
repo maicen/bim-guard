@@ -49,6 +49,8 @@
   import { toasts } from "../lib/toast.svelte";
   import Modal from "../lib/components/Modal.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
+  import { createTableState } from "../lib/tableState.svelte";
+  import SortHeader from "../lib/components/SortHeader.svelte";
 
   interface Props {
     initialProjectId?: number | null;
@@ -90,9 +92,6 @@
   }
 
   // Options & Filters
-  let searchQuery = $state("");
-  let severityFilter = $state("all");
-  let mechanismFilter = $state("all");
 
   // Engine selector (PIPING only). SEISMIC runs the single Blue Halo kernel,
   // so a selector there would offer a choice of one.
@@ -261,48 +260,8 @@
   }
 
   // Finding table multi-selection, sort, and pagination state
-  let selectedFindingIds: string[] = $state([]);
-  let findingSortField: "band" | "rule_id" | "element_id" | "title" | "score" = $state("band");
-  let findingSortAsc = $state(false);
-  let findingCurrentPage = $state(1);
-  let findingPageSize = $state(10);
-
-  const SEVERITY_WEIGHTS: Record<string, number> = {
-    critical: 4,
-    high: 3,
-    medium: 2,
-    low: 1,
-    data_quality: 0,
-  };
-
-  function toggleSelectAllFindings() {
-    if (allFilteredFindingsSelected) {
-      selectedFindingIds = [];
-    } else {
-      selectedFindingIds = sortedFilteredIssues.map((i) => i.id);
-    }
-  }
-
-  function toggleSelectFinding(id: string) {
-    if (selectedFindingIds.includes(id)) {
-      selectedFindingIds = selectedFindingIds.filter((iId) => iId !== id);
-    } else {
-      selectedFindingIds = [...selectedFindingIds, id];
-    }
-  }
-
-  function toggleFindingSort(field: "band" | "rule_id" | "element_id" | "title" | "score") {
-    if (findingSortField === field) {
-      findingSortAsc = !findingSortAsc;
-    } else {
-      findingSortField = field;
-      findingSortAsc = true;
-    }
-  }
-
   function exportFindingsToCsv() {
-    const toExport = (result?.audit_issues || []).filter((i) => selectedFindingIds.includes(i.id));
-    const target = toExport.length ? toExport : sortedFilteredIssues;
+    const target = table.selectedCount ? table.selectedRows : table.sorted;
     const headers = [
       "FindingID",
       "Severity",
@@ -382,94 +341,69 @@
     }
   });
   let currentProject = $derived(relevantProjects.find((p) => p.id === selectedProjectId) || null);
-  let filteredIssues = $derived(
-    (result?.audit_issues || []).filter((issue: AuditIssue) => {
-      // Low risk filter (Note: data_quality issues are doctrine-exempt and ALWAYS shown)
-      if (
-        !showLowRisk &&
-        issue.band === "low" &&
-        issue.mechanism !== "data_quality" &&
-        issue.mechanism !== "Data Quality"
-      ) {
-        return false;
-      }
+  // Ordering for the severity column: bands are ranked, not alphabetical.
+  const SEVERITY_WEIGHTS: Record<string, number> = {
+    critical: 4,
+    high: 3,
+    medium: 2,
+    low: 1,
+    data_quality: 0,
+  };
 
-      const matchesSearch =
-        searchQuery === "" ||
-        issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.rule_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.element_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.mechanism.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (issue.citations || []).some(
-          (c) =>
-            c.standard.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.clause.toLowerCase().includes(searchQuery.toLowerCase()),
+  function isDataQuality(issue: AuditIssue): boolean {
+    return issue.mechanism === "data_quality" || issue.mechanism === "Data Quality";
+  }
+
+  // Search, filter, sort, paginate and select for the findings table.
+  //
+  // The always-on constraints — the low-risk toggle and the engine selector —
+  // shape the row source rather than being dropdown filters, so the table's own
+  // filters stay one-per-control. Data-quality findings are doctrine-exempt
+  // throughout: they report what could not be assessed, so they survive the
+  // low-risk toggle and belong to no single engine.
+  const table = createTableState<AuditIssue, string>({
+    rows: () =>
+      (result?.audit_issues || []).filter((issue: AuditIssue) => {
+        const dq = isDataQuality(issue);
+        if (!showLowRisk && issue.band === "low" && !dq) return false;
+        return (
+          activeCategory === "seismic" ||
+          dq ||
+          selectedEngines.some((id) => issue.rule_id.startsWith(id) || issue.mechanism.includes(id))
         );
+      }),
+    getId: (issue) => issue.id,
+    searchFields: (issue) => [
+      issue.title,
+      issue.rule_id,
+      issue.element_id,
+      issue.mechanism,
+      ...(issue.citations || []).flatMap((c) => [c.standard, c.clause]),
+    ],
+    filters: {
+      severity: (issue, value) =>
+        value === "data_quality"
+          ? isDataQuality(issue)
+          : issue.band === value && !isDataQuality(issue),
+      mechanism: (issue, value) =>
+        value === "data_quality"
+          ? isDataQuality(issue)
+          : issue.rule_id.startsWith(value) || issue.mechanism.includes(value),
+    },
+    comparators: {
+      band: (a, b) =>
+        (SEVERITY_WEIGHTS[(a.band || "").toLowerCase()] ?? 0) -
+        (SEVERITY_WEIGHTS[(b.band || "").toLowerCase()] ?? 0),
+    },
+    initialSort: { field: "band", asc: false },
+  });
 
-      const matchesSeverity =
-        severityFilter === "all" ||
-        (severityFilter === "data_quality"
-          ? issue.mechanism === "data_quality" || issue.mechanism === "Data Quality"
-          : issue.band === severityFilter &&
-            issue.mechanism !== "data_quality" &&
-            issue.mechanism !== "Data Quality");
-
-      const matchesMechanism =
-        mechanismFilter === "all" ||
-        (mechanismFilter === "data_quality"
-          ? issue.mechanism === "data_quality" || issue.mechanism === "Data Quality"
-          : issue.rule_id.startsWith(mechanismFilter) || issue.mechanism.includes(mechanismFilter));
-
-      // Engine selector, PIPING only. Data-quality findings are doctrine-exempt:
-      // they report what could not be assessed and belong to no single engine.
-      const isDataQuality =
-        issue.mechanism === "data_quality" || issue.mechanism === "Data Quality";
-      const matchesEngine =
-        activeCategory === "seismic" ||
-        isDataQuality ||
-        selectedEngines.some((id) => issue.rule_id.startsWith(id) || issue.mechanism.includes(id));
-
-      return matchesSearch && matchesSeverity && matchesMechanism && matchesEngine;
-    }),
-  );
-  // Data-quality findings are doctrine-exempt: they report what could not be
-  // assessed rather than a violation, so they are counted separately from the
-  // severity bands. Older payloads may omit the stat, hence the fallback.
   let dataQualityCount = $derived(
     result?.issue_stats?.data_quality ??
       (result?.audit_issues || []).filter(
         (issue: AuditIssue) =>
           issue.mechanism === "data_quality" || issue.mechanism === "Data Quality",
       ).length,
-  );
-  let sortedFilteredIssues = $derived(
-    [...filteredIssues].sort((a, b) => {
-      let valA: any = a[findingSortField];
-      let valB: any = b[findingSortField];
-      if (findingSortField === "band") {
-        valA = SEVERITY_WEIGHTS[(a.band || "").toLowerCase()] ?? 0;
-        valB = SEVERITY_WEIGHTS[(b.band || "").toLowerCase()] ?? 0;
-      } else {
-        if (valA === undefined || valA === null) valA = "";
-        if (valB === undefined || valB === null) valB = "";
-        if (typeof valA === "string") valA = valA.toLowerCase();
-        if (typeof valB === "string") valB = valB.toLowerCase();
-      }
-      if (valA < valB) return findingSortAsc ? -1 : 1;
-      if (valA > valB) return findingSortAsc ? 1 : -1;
-      return 0;
-    }),
-  );
-  let findingTotalItems = $derived(sortedFilteredIssues.length);
-  let paginatedIssues = $derived(
-    sortedFilteredIssues.slice(
-      (findingCurrentPage - 1) * findingPageSize,
-      findingCurrentPage * findingPageSize,
-    ),
-  );
-  let allFilteredFindingsSelected = $derived(
-    sortedFilteredIssues.length > 0 &&
-      sortedFilteredIssues.every((i) => selectedFindingIds.includes(i.id)),
   );
 </script>
 
@@ -937,7 +871,7 @@
             <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
               <span>Audit Findings</span>
               <span class="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
-                {filteredIssues.length} of {result.audit_issues.length}
+                {table.totalItems} of {result.audit_issues.length}
               </span>
             </h2>
             <p class="mt-0.5 text-xs text-slate-400">
@@ -999,7 +933,7 @@
             <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              bind:value={searchQuery}
+              bind:value={table.search}
               placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
               class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
@@ -1008,7 +942,7 @@
           <!-- Severity Filter -->
           <div class="sm:col-span-3">
             <select
-              bind:value={severityFilter}
+              bind:value={table.filters.severity}
               class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="all">All Severities</option>
@@ -1023,7 +957,7 @@
           <!-- Mechanism Filter -->
           <div class="sm:col-span-3">
             <select
-              bind:value={mechanismFilter}
+              bind:value={table.filters.mechanism}
               class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="all">All Mechanisms</option>
@@ -1052,15 +986,15 @@
             <span>Include Low Severity verdicts in list</span>
           </label>
           <span class="text-caption text-slate-500">
-            Showing {filteredIssues.length} items
+            Showing {table.totalItems} items
           </span>
         </div>
 
         <!-- Bulk Actions Bar -->
         <BulkActionBar
-          selectedCount={selectedFindingIds.length}
+          selectedCount={table.selectedCount}
           itemLabel="finding"
-          onClearSelection={() => (selectedFindingIds = [])}
+          onClearSelection={() => table.clearSelection()}
           onBulkExport={exportFindingsToCsv}
           onBulkDelete={null}
           onBulkEdit={null}
@@ -1068,7 +1002,7 @@
 
         <!-- Tabular Findings Table -->
         <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
-          {#if sortedFilteredIssues.length === 0}
+          {#if table.totalItems === 0}
             <div class="p-12 text-center text-xs text-slate-500">
               No compliance issues match your selected filters.
             </div>
@@ -1082,96 +1016,68 @@
                     <th class="w-10 px-4 py-3.5">
                       <input
                         type="checkbox"
-                        checked={allFilteredFindingsSelected}
-                        onchange={toggleSelectAllFindings}
+                        checked={table.allFilteredSelected}
+                        indeterminate={table.someFilteredSelected}
+                        onchange={() => table.toggleSelectAll()}
                         class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
                         title="Select all findings"
                       />
                     </th>
-                    <th
-                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
-                      onclick={() => toggleFindingSort("band")}
+                    <SortHeader
+                      column="band"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3.5"
                     >
-                      <div class="flex items-center gap-1">
-                        <span>Severity</span>
-                        {#if findingSortField === "band"}
-                          {#if findingSortAsc}<ArrowUp
-                              class="h-3 w-3 text-accent"
-                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
-                        {:else}
-                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
-                        {/if}
-                      </div>
-                    </th>
-                    <th
-                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
-                      onclick={() => toggleFindingSort("rule_id")}
+                      Severity
+                    </SortHeader>
+                    <SortHeader
+                      column="rule_id"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3.5"
                     >
-                      <div class="flex items-center gap-1">
-                        <span>Rule &amp; Mechanism</span>
-                        {#if findingSortField === "rule_id"}
-                          {#if findingSortAsc}<ArrowUp
-                              class="h-3 w-3 text-accent"
-                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
-                        {:else}
-                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
-                        {/if}
-                      </div>
-                    </th>
-                    <th
-                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
-                      onclick={() => toggleFindingSort("element_id")}
+                      Rule &amp; Mechanism
+                    </SortHeader>
+                    <SortHeader
+                      column="element_id"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3.5"
                     >
-                      <div class="flex items-center gap-1">
-                        <span>Element GUID</span>
-                        {#if findingSortField === "element_id"}
-                          {#if findingSortAsc}<ArrowUp
-                              class="h-3 w-3 text-accent"
-                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
-                        {:else}
-                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
-                        {/if}
-                      </div>
-                    </th>
-                    <th
-                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
-                      onclick={() => toggleFindingSort("title")}
+                      Element GUID
+                    </SortHeader>
+                    <SortHeader
+                      column="title"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3.5"
                     >
-                      <div class="flex items-center gap-1">
-                        <span>Finding &amp; Citations</span>
-                        {#if findingSortField === "title"}
-                          {#if findingSortAsc}<ArrowUp
-                              class="h-3 w-3 text-accent"
-                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
-                        {:else}
-                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
-                        {/if}
-                      </div>
-                    </th>
-                    <th
-                      class="cursor-pointer select-none px-4 py-3.5 text-center transition-colors hover:text-slate-50"
-                      onclick={() => toggleFindingSort("score")}
+                      Finding &amp; Citations
+                    </SortHeader>
+                    <SortHeader
+                      column="score"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      align="center"
+                      customClass="px-4 py-3.5"
                     >
-                      <div class="flex items-center justify-center gap-1">
-                        <span>Score / Clearance</span>
-                        {#if findingSortField === "score"}
-                          {#if findingSortAsc}<ArrowUp
-                              class="h-3 w-3 text-accent"
-                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
-                        {:else}
-                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
-                        {/if}
-                      </div>
-                    </th>
+                      Score / Clearance
+                    </SortHeader>
                     <th class="px-4 py-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
-                  {#each paginatedIssues as issue}
+                  {#each table.paginated as issue (issue.id)}
                     {@const isDq =
                       issue.mechanism === "data_quality" || issue.mechanism === "Data Quality"}
                     <tr
-                      class="group transition-colors hover:bg-slate-900/60 {selectedFindingIds.includes(
+                      class="group transition-colors hover:bg-slate-900/60 {table.isSelected(
                         issue.id,
                       )
                         ? 'bg-blue-950/20'
@@ -1181,8 +1087,8 @@
                       <td class="w-10 px-4 py-3.5 align-top">
                         <input
                           type="checkbox"
-                          checked={selectedFindingIds.includes(issue.id)}
-                          onchange={() => toggleSelectFinding(issue.id)}
+                          checked={table.isSelected(issue.id)}
+                          onchange={() => table.toggleSelect(issue.id)}
                           class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
                         />
                       </td>
@@ -1331,13 +1237,13 @@
             </div>
 
             <TablePagination
-              currentPage={findingCurrentPage}
-              pageSize={findingPageSize}
-              totalItems={findingTotalItems}
-              onPageChange={(p) => (findingCurrentPage = p)}
-              onPageSizeChange={(s) => {
-                findingPageSize = s;
-                findingCurrentPage = 1;
+              currentPage={table.page}
+              pageSize={table.pageSize}
+              totalItems={table.totalItems}
+              onPageChange={(p) => (table.requestedPage = p)}
+              onPageSizeChange={(size) => {
+                table.pageSize = size;
+                table.requestedPage = 1;
               }}
             />
           {/if}
