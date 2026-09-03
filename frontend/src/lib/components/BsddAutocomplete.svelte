@@ -108,8 +108,8 @@
     bind:value
     {placeholder}
     autocomplete="off"
-    oninput={handleInput}
-    onkeydown={handleKeydown}
+    on:input={handleInput}
+    on:keydown={handleKeydown}
     onfocus={() => {
       if (suggestions.length > 0) open = true;
     }}
