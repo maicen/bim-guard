@@ -18,7 +18,6 @@
     ArrowDown,
     Eye,
     X,
-    Download,
     FileText,
   } from "lucide-svelte";
   import { revitSyncApi } from "../lib/api";
@@ -241,28 +240,6 @@ print(response.read())
         <span>POST {endpointUrl}</span>
       </div>
     </BentoBox>
-  </div>
-
-  <!-- IFC Export Setting Download -->
-  <div
-    class="flex flex-col justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 sm:flex-row sm:items-center"
-  >
-    <div>
-      <h2 class="text-base font-bold tracking-tight text-slate-50">IFC Export Setting</h2>
-      <p class="text-xs text-slate-400">
-        Preconfigured Revit IFC4 export settings (.json) tuned for BIM Guard audits — import this
-        into Revit's IFC export setup dialog for consistent property sets and base quantities.
-      </p>
-    </div>
-
-    <a
-      href="/downloads/IFC_Export_Setting.json"
-      download="IFC_Export_Setting.json"
-      class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
-    >
-      <Download class="h-3.5 w-3.5" />
-      <span>Download IFC Export Setting</span>
-    </a>
   </div>
 
   <!-- pyRevit Snippet Section -->

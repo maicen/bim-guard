@@ -21,6 +21,7 @@
   import UserManualView from "./routes/UserManualView.svelte";
   import ModelingManualView from "./routes/ModelingManualView.svelte";
   import RevitSyncView from "./routes/RevitSyncView.svelte";
+  import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
   import SettingsView from "./routes/SettingsView.svelte";
 
   import { dashboardApi, projectsApi } from "./lib/api";
@@ -244,6 +245,8 @@
           <ModelingManualView />
         {:else if activeView === "revit-sync"}
           <RevitSyncView />
+        {:else if activeView === "ifc-export-setting"}
+          <IfcExportSettingView />
         {:else if activeView === "settings"}
           <SettingsView />
         {/if}

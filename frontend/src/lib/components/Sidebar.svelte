@@ -18,6 +18,7 @@
     ChevronRight,
     RefreshCw,
     Compass,
+    Download,
   } from "lucide-svelte";
 
   interface Props {
@@ -75,7 +76,10 @@
     },
     {
       title: "Integrations",
-      items: [{ id: "revit-sync", label: "Revit Direct Sync", icon: RefreshCw }],
+      items: [
+        { id: "revit-sync", label: "Revit Direct Sync", icon: RefreshCw },
+        { id: "ifc-export-setting", label: "IFC Export Setting", icon: Download },
+      ],
     },
     {
       title: "Manuals",
