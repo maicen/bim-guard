@@ -46,6 +46,16 @@ services:
       # not the host-published UNSTRUCTURED_LOCAL_PORT — in your .env.
       - UNSTRUCTURED_LOCAL_URL=${UNSTRUCTURED_LOCAL_URL:-}
 
+      # ── Document Parsing — Docling ───────────────────────────────────────────
+      # Hosted Docling Serve account (e.g. https://developer.dcls.saas.ibm.com).
+      - DOCLING_SERVICE_URL=${DOCLING_SERVICE_URL:-}
+      - DOCLING_API_KEY=${DOCLING_API_KEY:-}
+      # Leave unset unless the `docling-serve` service below is enabled
+      # (`docker compose --profile docling up -d`); then set this to
+      # http://docling-serve:5001 — its internal compose network address,
+      # not the host-published DOCLING_LOCAL_PORT — in your .env.
+      - DOCLING_LOCAL_URL=${DOCLING_LOCAL_URL:-}
+
       # ── Terminal Agent Configuration ────────────────────────────────────────
       - BIM_GUARD_AGENT_MODEL=${BIM_GUARD_AGENT_MODEL:-openrouter/auto}
       - BIM_GUARD_AGENT_MAX_STEPS=${BIM_GUARD_AGENT_MAX_STEPS:-20}
@@ -103,6 +113,33 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    restart: unless-stopped
+
+  # ── Optional: local self-hosted Docling parsing engine ───────────────────────
+  # Open-source `docling-serve` REST server
+  # (https://github.com/docling-project/docling-serve). Not started by
+  # default — bring it up explicitly with:
+  #   docker compose --profile docling up -d
+  # Then register it as a parsing engine instance in Settings > Parsing
+  # Engines (kind "docling-local", API URL http://localhost:${DOCLING_LOCAL_PORT:-5001}
+  # from the host, or http://docling-serve:5001 from inside this compose
+  # network — e.g. set DOCLING_LOCAL_URL above to that and restart bim-guard
+  # to have it seeded automatically on first boot). No API key by default.
+  docling-serve:
+    image: quay.io/docling-project/docling-serve-cpu:latest
+    container_name: bim-guard-docling
+    profiles: ["docling"]
+    ports:
+      - "${DOCLING_LOCAL_PORT:-5001}:5001"
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=1
+    healthcheck:
+      # No curl in this image — use the Python that's already there.
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health', timeout=5)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

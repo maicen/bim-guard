@@ -743,7 +743,7 @@ export interface ProjectImportPayload {
   analysis_type?: string;
 }
 
-export type UnstructuredInstanceKind = "local" | "hosted" | "docling";
+export type UnstructuredInstanceKind = "local" | "hosted" | "docling" | "docling-local";
 
 export interface UnstructuredInstance {
   id: number;

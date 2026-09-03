@@ -5,7 +5,7 @@ Unified document-text extraction entry point used by both the web upload
 flow (documents_service.py) and the CLI/enhanced pipelines (orchestrator.py,
 enhanced_orchestrator.py).
 
-Three engine families, selected via an "instance" dict's `kind`:
+Four engine families, selected via an "instance" dict's `kind`:
   - UnstructuredExtractor, kind "hosted" — Unstructured's Workflow/Jobs API.
     Best quality (layout-aware text + real tables), but uploads the file,
     needs an API key, and takes several-to-tens of seconds per document
@@ -13,13 +13,16 @@ Three engine families, selected via an "instance" dict's `kind`:
   - UnstructuredExtractor, kind "local" — a self-hosted open-source
     unstructured-api Docker container's synchronous partition endpoint.
   - DoclingExtractor, kind "docling" — a hosted Docling Serve instance
-    (https://developer.dcls.saas.ibm.com), synchronous convert() call.
+    (e.g. https://developer.dcls.saas.ibm.com), synchronous convert() call.
+  - DoclingExtractor, kind "docling-local" — a self-hosted docling-serve
+    Docker container (https://github.com/docling-project/docling-serve),
+    same synchronous convert() call, no API key by default.
   - LightExtractor (fallback) — plain per-format readers (pypdf, python-docx,
     openpyxl, csv), no upload, no API key, no tables, effectively instant.
 
 An "instance" is an optional dict describing which structured-extraction
-engine to use — {name, kind ("local"|"hosted"|"docling"), api_url, api_key,
-strategy} — as returned by UnstructuredInstancesService
+engine to use — {name, kind ("local"|"hosted"|"docling"|"docling-local"),
+api_url, api_key, strategy} — as returned by UnstructuredInstancesService
 (app/services/unstructured_instances_service.py, which despite its name now
 registers Docling instances too). Callers with access to that service
 (documents_service.py) resolve an instance name (or the configured default)
@@ -50,12 +53,13 @@ def _build_extractor(instance: dict | None):
     """Instantiate the extractor matching an instance's kind (or the legacy hosted default)."""
     kind = (instance or {}).get("kind") or "hosted"
 
-    if kind == "docling":
+    if kind in ("docling", "docling-local"):
         from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
 
         return DoclingExtractor(
             api_key=instance.get("api_key") or None,
             api_url=instance.get("api_url") or None,
+            kind=kind,
             name=instance.get("name"),
         )
 

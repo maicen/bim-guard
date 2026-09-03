@@ -301,6 +301,7 @@ def build_default_container() -> ApplicationContainer:
     try:
         from app.modules.config import (
             DOCLING_API_KEY,
+            DOCLING_LOCAL_URL,
             DOCLING_SERVICE_URL,
             UNSTRUCTURED_API_KEY,
             UNSTRUCTURED_API_URL,
@@ -345,6 +346,13 @@ def build_default_container() -> ApplicationContainer:
                 api_url=DOCLING_SERVICE_URL,
                 api_key=DOCLING_API_KEY,
                 notes="Hosted Docling Serve instance (seeded from DOCLING_SERVICE_URL/DOCLING_API_KEY).",
+            )
+        if DOCLING_LOCAL_URL:
+            _seed_if_missing(
+                "docling-local",
+                kind="docling-local",
+                api_url=DOCLING_LOCAL_URL,
+                notes="Self-hosted docling-serve Docker container (seeded from DOCLING_LOCAL_URL).",
             )
     except Exception:
         logger.warning(

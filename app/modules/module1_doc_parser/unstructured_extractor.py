@@ -86,8 +86,17 @@ class UnstructuredExtractor:
                 f"Unknown Unstructured instance kind '{kind}'. Expected one of {sorted(VALID_KINDS)}."
             )
 
-        resolved_key = api_key if api_key is not None else UNSTRUCTURED_API_KEY
-        resolved_url = api_url if api_url is not None else UNSTRUCTURED_API_URL
+        # The env-var fallback only applies to the hosted kind — it exists so
+        # bare `UnstructuredExtractor()` calls (tests, the legacy no-instance
+        # path in document_extractor.py) keep working. A local instance with
+        # no key configured must stay keyless, never silently inherit a
+        # different account's secret meant for the hosted API.
+        if self.kind == KIND_HOSTED:
+            resolved_key = api_key if api_key is not None else UNSTRUCTURED_API_KEY
+            resolved_url = api_url if api_url is not None else UNSTRUCTURED_API_URL
+        else:
+            resolved_key = api_key or ""
+            resolved_url = api_url or ""
 
         if self.kind == KIND_HOSTED and not resolved_key:
             raise RuntimeError(

@@ -19,7 +19,8 @@ from app.services.db_adapters import DatabaseAdapter
 KIND_LOCAL = "local"
 KIND_HOSTED = "hosted"
 KIND_DOCLING = "docling"
-VALID_KINDS = {KIND_LOCAL, KIND_HOSTED, KIND_DOCLING}
+KIND_DOCLING_LOCAL = "docling-local"
+VALID_KINDS = {KIND_LOCAL, KIND_HOSTED, KIND_DOCLING, KIND_DOCLING_LOCAL}
 # Kinds that always talk to a remote account and therefore always need a key.
 KINDS_REQUIRING_API_KEY = {KIND_HOSTED, KIND_DOCLING}
 

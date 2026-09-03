@@ -1093,15 +1093,18 @@ class UnstructuredInstanceCreateRequest(BaseModel):
     """Payload for registering a new document-parsing engine instance."""
 
     name: str = Field(..., min_length=1, description="Unique display name, e.g. 'local', 'hosted-1', 'docling'")
-    kind: Literal["local", "hosted", "docling"] = Field(
+    kind: Literal["local", "hosted", "docling", "docling-local"] = Field(
         ...,
         description=(
             "'local' (self-hosted open-source Unstructured Docker container), "
-            "'hosted' (Unstructured Platform API), or 'docling' (hosted Docling Serve instance)"
+            "'hosted' (Unstructured Platform API), 'docling' (hosted Docling Serve instance), "
+            "or 'docling-local' (self-hosted docling-serve Docker container)"
         ),
     )
     api_url: str = Field(..., min_length=1, description="Base URL of the parsing engine server")
-    api_key: Optional[str] = Field(None, description="API key — required for 'hosted'/'docling', ignored for 'local'")
+    api_key: Optional[str] = Field(
+        None, description="API key — required for 'hosted'/'docling', ignored for 'local'/'docling-local'"
+    )
     strategy: Optional[str] = Field(
         "auto", description="Partition strategy (Unstructured only: auto, fast, hi_res, ocr_only); ignored for 'docling'"
     )

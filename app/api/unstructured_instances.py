@@ -158,7 +158,7 @@ def test_instance(
             response.raise_for_status()
             return UnstructuredInstanceTestResponse(ok=True, detail=response.text.strip())
 
-        if kind == "docling":
+        if kind in ("docling", "docling-local"):
             from docling.service_client import DoclingServiceClient
 
             with DoclingServiceClient(url=api_url, api_key=row.get("api_key") or "") as client:

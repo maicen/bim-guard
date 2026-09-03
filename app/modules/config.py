@@ -78,6 +78,13 @@ UNSTRUCTURED_LOCAL_URL = os.environ.get("UNSTRUCTURED_LOCAL_URL", "")
 DOCLING_SERVICE_URL = os.environ.get("DOCLING_SERVICE_URL", "")
 DOCLING_API_KEY = os.environ.get("DOCLING_API_KEY", "")
 
+# Base URL of a self-hosted docling-serve container (see docker-compose.yml's
+# `docling-serve` service, profile "docling"). Same seed-only role as
+# UNSTRUCTURED_LOCAL_URL — e.g. http://localhost:5001 for a host process
+# talking to the container's published port, or http://docling-serve:5001
+# for the bim-guard app container talking to it over the compose network.
+DOCLING_LOCAL_URL = os.environ.get("DOCLING_LOCAL_URL", "")
+
 # ── Path B feature flags ─────────────────────────────────────────────────
 # Gate the MM-001 and XM-001 comparators independently. Both default OFF.
 #
