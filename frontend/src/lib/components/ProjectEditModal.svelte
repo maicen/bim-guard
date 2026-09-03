@@ -18,10 +18,8 @@
   let errorMessage = '';
 
   let classificationStandards: BSDDDictionaryItem[] = [];
-  bsddApi
-    .listDictionaries()
-    .then((dicts) => (classificationStandards = dicts))
-    .catch(() => (classificationStandards = []));
+  $: if (isOpen && classificationStandards.length === 0)
+    bsddApi.listDictionaries().then((dicts) => (classificationStandards = dicts)).catch(() => (classificationStandards = []));
 
   $: if (isOpen && project) {
     name = project.name || '';
