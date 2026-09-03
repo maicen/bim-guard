@@ -14,6 +14,13 @@ checks a single filename can't answer on its own: GlobalId uniqueness,
 filename-vs-IfcProject.Name cross-reference, CDE-state/suitability-code
 consistency, and export provenance (author/org/timestamp/schema).
 
+Also covers model-content checks that a single IFC file genuinely can answer
+on its own, beyond the container-naming/CDE-governance checks above:
+element-level classification references, owner-history completeness,
+georeferencing, unit-declaration completeness, spatial-structure hierarchy,
+and whether the file declares a Model View Definition (declaration only —
+see _check_mvd_declared for why full MVD rule conformance is out of scope).
+
 Deliberately out of scope here (need data this function doesn't have):
 revision-sequence-over-time and duplicate-filename-across-the-CDE both need
 upload history that isn't tracked anywhere yet; real IDS-spec validation is
@@ -26,6 +33,11 @@ from __future__ import annotations
 import logging
 
 from app.modules.document_parsing.iso_validator import ISO19650Validator
+
+try:
+    import ifcopenshell.util.classification as _classification_util
+except ImportError:  # pragma: no cover - covered by _IFC_AVAILABLE below
+    _classification_util = None
 
 logger = logging.getLogger("bimguard.iso19650")
 
@@ -203,6 +215,239 @@ def _check_provenance_metadata(ifc_file) -> dict | None:
     }
 
 
+def _check_element_classification(ifc_file) -> dict | None:
+    """Do any elements carry a classification reference (e.g. Uniclass 2015)?
+
+    Expected under UK BIM Framework / ISO 19650 practice via
+    IfcRelAssociatesClassification. Coverage is reported so a project that
+    classifies only some elements still shows partial progress rather than
+    a flat pass/fail.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None or _classification_util is None:
+        return None
+    try:
+        elements = ifc_file.by_type("IfcElement")
+    except Exception:
+        return None
+    if not elements:
+        return None
+
+    classified = 0
+    for element in elements:
+        try:
+            if _classification_util.get_references(element):
+                classified += 1
+        except Exception:
+            continue
+
+    total = len(elements)
+    coverage = classified / total if total else 0.0
+    passes = classified > 0
+
+    return {
+        "check": "element_classification",
+        "severity": "warning",
+        "passes": passes,
+        "message": (
+            f"{classified}/{total} elements ({coverage:.0%}) carry a classification reference"
+            if passes
+            else "No elements carry a classification reference (e.g. Uniclass 2015) - "
+            "expected under ISO 19650 / UK BIM Framework practice"
+        ),
+        "details": {"classified_count": classified, "total_elements": total, "coverage": round(coverage, 4)},
+    }
+
+
+def _check_ownership_history(ifc_file) -> dict | None:
+    """Does every declared IfcOwnerHistory carry an owning user and application?
+
+    Authoring tools (Revit included) typically write ONE shared OwnerHistory
+    for the whole export rather than one per element, so this checks every
+    declared history record rather than trying to attribute per-element
+    authorship the file was never given.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return None
+    try:
+        histories = ifc_file.by_type("IfcOwnerHistory")
+    except Exception:
+        return None
+
+    if not histories:
+        return {
+            "check": "ownership_history",
+            "severity": "warning",
+            "passes": False,
+            "message": "No IfcOwnerHistory found in the model - element authorship cannot be traced",
+            "details": {"history_count": 0},
+        }
+
+    missing_user = sum(1 for oh in histories if not getattr(oh, "OwningUser", None))
+    missing_app = sum(1 for oh in histories if not getattr(oh, "OwningApplication", None))
+    passes = missing_user == 0 and missing_app == 0
+
+    return {
+        "check": "ownership_history",
+        "severity": "warning",
+        "passes": passes,
+        "message": (
+            "All declared owner-history record(s) carry an owning user and application"
+            if passes
+            else f"{missing_user}/{len(histories)} owner-history record(s) missing OwningUser, "
+            f"{missing_app}/{len(histories)} missing OwningApplication"
+        ),
+        "details": {
+            "history_count": len(histories),
+            "missing_owning_user": missing_user,
+            "missing_owning_application": missing_app,
+        },
+    }
+
+
+def _check_georeferencing(ifc_file) -> dict | None:
+    """Is the model georeferenced, via either the IFC4 CRS entities or the
+    older (still IFC4-legal, commonly Revit-exported) IfcSite lat/long?"""
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return None
+    try:
+        has_crs = bool(ifc_file.by_type("IfcProjectedCRS")) or bool(ifc_file.by_type("IfcMapConversion"))
+        sites = ifc_file.by_type("IfcSite")
+    except Exception:
+        return None
+
+    has_site_lat_long = any(
+        getattr(site, "RefLatitude", None) and getattr(site, "RefLongitude", None) for site in sites
+    )
+    passes = has_crs or has_site_lat_long
+    method = "IfcProjectedCRS/IfcMapConversion" if has_crs else ("IfcSite RefLatitude/RefLongitude" if has_site_lat_long else "none")
+
+    return {
+        "check": "georeferencing",
+        "severity": "warning",
+        "passes": passes,
+        "message": (
+            f"Model is georeferenced via {method}"
+            if passes
+            else "No georeferencing found (no IfcProjectedCRS/IfcMapConversion, "
+            "and no IfcSite RefLatitude/RefLongitude)"
+        ),
+        "details": {"method": method, "has_projected_crs": has_crs, "has_site_lat_long": has_site_lat_long},
+    }
+
+
+_REQUIRED_UNIT_TYPES = {"LENGTHUNIT", "AREAUNIT", "VOLUMEUNIT"}
+
+
+def _check_units_declaration(ifc_file) -> dict | None:
+    """Are length, area, and volume units all declared on IfcUnitAssignment?"""
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return None
+    try:
+        assignments = ifc_file.by_type("IfcUnitAssignment")
+    except Exception:
+        return None
+
+    if not assignments:
+        return {
+            "check": "units_declaration",
+            "severity": "error",
+            "passes": False,
+            "message": "No IfcUnitAssignment found - model has no declared units",
+            "details": {"declared_unit_types": []},
+        }
+
+    declared: set[str] = set()
+    for assignment in assignments:
+        for unit in getattr(assignment, "Units", None) or []:
+            unit_type = getattr(unit, "UnitType", None)
+            if unit_type:
+                declared.add(unit_type)
+
+    missing = _REQUIRED_UNIT_TYPES - declared
+    passes = not missing
+
+    return {
+        "check": "units_declaration",
+        "severity": "error",
+        "passes": passes,
+        "message": (
+            "Length, area, and volume units are all declared"
+            if passes
+            else f"Missing unit declaration(s): {', '.join(sorted(missing))}"
+        ),
+        "details": {"declared_unit_types": sorted(declared)},
+    }
+
+
+def _check_spatial_structure(ifc_file) -> dict | None:
+    """Does the Project -> Site -> Building -> Storey hierarchy actually exist?
+
+    Presence-only (at least one of each level) — not a check that every
+    element decomposes correctly into it.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return None
+    try:
+        levels = {
+            "IfcProject": bool(ifc_file.by_type("IfcProject")),
+            "IfcSite": bool(ifc_file.by_type("IfcSite")),
+            "IfcBuilding": bool(ifc_file.by_type("IfcBuilding")),
+            "IfcBuildingStorey": bool(ifc_file.by_type("IfcBuildingStorey")),
+        }
+    except Exception:
+        return None
+
+    missing = [name for name, present in levels.items() if not present]
+    passes = not missing
+
+    return {
+        "check": "spatial_structure",
+        "severity": "error",
+        "passes": passes,
+        "message": (
+            "Project -> Site -> Building -> Storey spatial hierarchy is present"
+            if passes
+            else f"Missing spatial structure level(s): {', '.join(missing)}"
+        ),
+        "details": levels,
+    }
+
+
+def _check_mvd_declared(ifc_file) -> dict | None:
+    """Does the STEP header declare a Model View Definition?
+
+    Presence/declaration only — e.g. confirms the file says "ViewDefinition
+    [CoordinationView_2.0]". It does NOT validate that the file's content
+    actually conforms to that MVD's rules; real conformance checking needs a
+    full express-schema/rule validator, a separate and much larger feature.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return None
+    try:
+        header = ifc_file.wrapped_data.header().file_description_py()
+        names = header.get_attribute_names()
+        info = {n: header.get_attribute_value(i) for i, n in enumerate(names)}
+    except Exception:
+        return None
+
+    descriptions = info.get("description") or ()
+    mvd_text = next((d for d in descriptions if "ViewDefinition" in str(d)), None)
+    passes = bool(mvd_text)
+
+    return {
+        "check": "mvd_declared",
+        "severity": "warning",
+        "passes": passes,
+        "message": (
+            f"Declares a Model View Definition: {mvd_text}"
+            if passes
+            else "No ViewDefinition declared in the STEP header - cannot confirm which MVD "
+            "(e.g. Coordination View 2.0) this file targets"
+        ),
+        "details": {"view_definition": mvd_text},
+    }
+
+
 def check_iso19650_compliance(
     ifc_file,
     *,
@@ -233,8 +478,17 @@ def check_iso19650_compliance(
 
     results.append(_check_cde_state_consistency(suitability_code, cde_state))
 
-    provenance_check = _check_provenance_metadata(ifc_file)
-    if provenance_check:
-        results.append(provenance_check)
+    for check_fn in (
+        _check_provenance_metadata,
+        _check_element_classification,
+        _check_ownership_history,
+        _check_georeferencing,
+        _check_units_declaration,
+        _check_spatial_structure,
+        _check_mvd_declared,
+    ):
+        check_result = check_fn(ifc_file)
+        if check_result:
+            results.append(check_result)
 
     return results
