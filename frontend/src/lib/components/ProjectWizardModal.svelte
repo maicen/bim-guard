@@ -4,9 +4,15 @@
 
   import { onMount } from "svelte";
   import { X, Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from "lucide-svelte";
-  import { projectsApi, documentsApi, namingConfigApi } from "../api";
+  import { bsddApi, projectsApi, documentsApi, namingConfigApi } from "../api";
   import { IFC_FILE_ROLES } from "../types";
-  import type { Project, DocumentItem, ProjectOptions, NamingConfigPayload } from "../types";
+  import type {
+    BSDDDictionaryItem,
+    Project,
+    DocumentItem,
+    ProjectOptions,
+    NamingConfigPayload,
+  } from "../types";
   import NamingConfigStep from "./NamingConfigStep.svelte";
 
   interface Props {
@@ -31,6 +37,11 @@
   // question about the audit's scope, and only the Arch domain is judged
   // against one at all.
   let buildingCode = $state("");
+  // bSDD classification standard (Uniclass, OmniClass, IFC, ...), chosen on
+  // step 4 alongside the building code -- it too is a scope answer, not a
+  // step-1 detail.
+  let classificationStandard = $state("");
+  let classificationStandards: BSDDDictionaryItem[] = $state([]);
   // A project can carry several discipline models -- an architectural model, a
   // structural one, the site context -- and exactly one of them is primary: the
   // model an analysis run starts from, and the one projects.ifc_file_path keeps
@@ -145,6 +156,11 @@
       documents = await documentsApi.list();
     } catch {
       documents = [];
+    }
+    try {
+      classificationStandards = await bsddApi.listDictionaries();
+    } catch {
+      classificationStandards = [];
     }
     try {
       options = await projectsApi.options();
@@ -339,6 +355,7 @@
               floors_count: floorsCount ? Number(floorsCount) : null,
               document_ids: documentIds,
               standards_codes: standardsCodes,
+              classification_standard: classificationStandard || null,
             });
       createdProjectId = createdProject.id;
 
@@ -392,6 +409,7 @@
     // created against a domain the user was never shown.
     analysisType = "Arch";
     buildingCode = "";
+    classificationStandard = "";
     ifcFiles = [];
     ifcRoles = [];
     primaryIndex = 0;
@@ -847,6 +865,26 @@
               >
                 Change jurisdiction on step 1
               </button>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800">
+              <label for="wizard-classification-standard" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Classification Standard
+              </label>
+              <select
+                id="wizard-classification-standard"
+                bind:value={classificationStandard}
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+              >
+                <option value="">Not set</option>
+                {#each classificationStandards as std (std.uri)}
+                  <option value={std.code}>{std.name}</option>
+                {/each}
+              </select>
+              <p class="mt-1 text-caption text-slate-500">
+                Resolved against buildingSMART's Data Dictionary (bSDD); powers element and property
+                autocomplete in the rule builder.
+              </p>
             </div>
           </div>
         {:else if currentStep === 5}

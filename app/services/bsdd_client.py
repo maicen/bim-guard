@@ -1,6 +1,7 @@
 """buildingSMART Data Dictionary (bSDD) Client & Semantic Validation Service.
 
-Standard: ISO 12006-3 / buildingSMART bSDD REST API v1
+Standard: ISO 12006-3 / buildingSMART bSDD REST API (Dictionary v1, Class v1,
+TextSearch v2 -- see https://github.com/buildingSMART/bSDD/blob/master/Documentation/bSDD%20OpenAPI.yaml)
 Official API: https://api.bsdd.buildingsmart.org
 Test API: https://test.bsdd.buildingsmart.org
 """
@@ -245,18 +246,27 @@ class BSDDClient:
     def list_dictionaries(self) -> list[BSDDDictionaryItem]:
         """Fetch list of available dictionaries from bSDD or offline catalog."""
         api_data = self._http_get("/api/Dictionary/v1")
-        if api_data and isinstance(api_data, list):
+        # A live GET /api/Dictionary/v1 wraps the list in {"dictionaries": [...]}
+        # (DictionaryResponseContract.v1); a bare array is tolerated too in case
+        # of an older/alternate deployment.
+        dictionaries = None
+        if isinstance(api_data, dict):
+            dictionaries = api_data.get("dictionaries")
+        elif isinstance(api_data, list):
+            dictionaries = api_data
+
+        if dictionaries:
             res = []
-            for item in api_data:
+            for item in dictionaries:
                 res.append(
                     BSDDDictionaryItem(
                         uri=item.get("uri", ""),
-                        code=item.get("code", ""),
-                        name=item.get("name", ""),
-                        version=item.get("version", "1.0"),
+                        code=item.get("dictionaryCode") or item.get("code", ""),
+                        name=item.get("dictionaryName") or item.get("name", ""),
+                        version=item.get("dictionaryVersion") or item.get("version", "1.0"),
                         organization_code_owner=item.get("organizationCodeOwner", "buildingSMART"),
                         language_iso_code=item.get("languageIsoCode", "en-GB"),
-                        classes_count=item.get("classesCount", 0),
+                        classes_count=item.get("classCount", item.get("classesCount", 0)),
                     )
                 )
             return res
@@ -264,34 +274,67 @@ class BSDDClient:
         # Fallback catalog
         return [BSDDDictionaryItem(**d) for d in FALLBACK_DICTIONARIES]
 
+    @staticmethod
+    def _class_uri(dictionary_uri: str, class_code: str) -> str:
+        return f"{dictionary_uri.rstrip('/')}/class/{class_code}"
+
+    @staticmethod
+    def _first_unit(raw_property: dict[str, Any]) -> str | None:
+        """Reduce ClassPropertyContract.v1's `units` (a string array) to one display unit."""
+        units = raw_property.get("units")
+        if isinstance(units, list) and units:
+            return str(units[0])
+        if isinstance(units, str) and units:
+            return units
+        return raw_property.get("symbol")
+
+    @staticmethod
+    def _allowed_value_strings(raw_values: Any) -> list[str]:
+        """Reduce ClassPropertyValueContract.v1 entries to their display value."""
+        values: list[str] = []
+        for entry in raw_values or []:
+            if isinstance(entry, str):
+                values.append(entry)
+            elif isinstance(entry, dict):
+                text = entry.get("value") or entry.get("code") or entry.get("name")
+                if text:
+                    values.append(str(text))
+        return values
+
     def get_class(self, dictionary_uri: str, class_code: str) -> Optional[BSDDClassItem]:
         """Fetch class definition and properties from bSDD by dictionary URI and class code."""
         cache_key = f"class:{dictionary_uri}:{class_code}"
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        # Try API
-        api_data = self._http_get("/api/Class/v1", {"dictionaryUri": dictionary_uri, "code": class_code})
+        # GET /api/Class/v1 resolves by full class Uri only -- there is no
+        # separate dictionaryUri+code lookup -- so build it the same way every
+        # bSDD Uri is built: {dictionary_uri}/class/{code}.
+        class_uri = self._class_uri(dictionary_uri, class_code)
+        api_data = self._http_get(
+            "/api/Class/v1",
+            {"Uri": class_uri, "IncludeClassProperties": "true"},
+        )
 
         if api_data and isinstance(api_data, dict) and "code" in api_data:
             props = []
-            for p in api_data.get("properties", []):
+            for p in api_data.get("classProperties", api_data.get("properties", [])):
                 props.append(
                     BSDDPropertyItem(
-                        uri=p.get("uri", ""),
+                        uri=p.get("propertyUri") or p.get("uri", ""),
                         name=p.get("name", ""),
                         property_set=p.get("propertySet"),
                         data_type=p.get("dataType"),
-                        units=p.get("units"),
-                        allowed_values=p.get("allowedValues", []),
+                        units=self._first_unit(p),
+                        allowed_values=self._allowed_value_strings(p.get("allowedValues", [])),
                         description=p.get("description"),
                     )
                 )
             class_item = BSDDClassItem(
-                uri=api_data.get("uri", f"{dictionary_uri}/class/{class_code}"),
+                uri=api_data.get("uri", class_uri),
                 code=api_data.get("code", class_code),
                 name=api_data.get("name", class_code),
-                dictionary_uri=dictionary_uri,
+                dictionary_uri=api_data.get("dictionaryUri", dictionary_uri),
                 parent_class_code=api_data.get("parentClassCode"),
                 related_ifc_entities=api_data.get("relatedIfcEntities", []),
                 properties=props,
@@ -320,11 +363,13 @@ class BSDDClient:
 
     def search_classes(self, query: str, dictionary_uri: str | None = None) -> BSDDClassSearchResponse:
         """Search bSDD classes matching a text query."""
-        params = {"search": query}
+        # GET /api/TextSearch/v2 (v1 is retired): SearchText is the free-text
+        # query, DictionaryUris scopes it to one or more dictionaries.
+        params = {"SearchText": query}
         if dictionary_uri:
-            params["dictionaryUri"] = dictionary_uri
+            params["DictionaryUris"] = dictionary_uri
 
-        api_data = self._http_get("/api/TextSearch/v1", params)
+        api_data = self._http_get("/api/TextSearch/v2", params)
         if api_data and isinstance(api_data, dict) and "classes" in api_data:
             results = []
             for c in api_data.get("classes", []):
@@ -358,6 +403,54 @@ class BSDDClient:
                 )
 
         return BSDDClassSearchResponse(query=query, total=len(matched), classes=matched)
+
+    def search_properties(self, query: str, dictionary_uri: str | None = None) -> list[BSDDPropertyItem]:
+        """Search bSDD properties by name across classes matching a text query.
+
+        GET /api/TextSearch/v2 does return a top-level `properties` array
+        alongside `classes`, but its entries carry only uri/code/name/
+        description -- not the propertySet/dataType/units/allowedValues
+        BSDDPropertyItem needs for rule-builder autocomplete. So this instead
+        flattens the richer, per-class properties nested under whichever
+        classes the class search (live or offline fallback) turns up, then
+        filters those to the ones whose name/description actually matches
+        the query.
+        """
+        lowered = query.strip().lower()
+        if not lowered:
+            return []
+
+        matches = self.search_classes(query, dictionary_uri)
+        candidate_classes = list(matches.classes)[:10]
+
+        # Live class search results carry no nested properties (bSDD's
+        # TextSearch endpoint returns bare class refs) — fetch each match's
+        # full class definition to get at its properties.
+        seen_uris: set[str] = set()
+        props: list[BSDDPropertyItem] = []
+        for cls in candidate_classes:
+            full_class = cls
+            if not cls.properties and cls.dictionary_uri and cls.code:
+                fetched = self.get_class(cls.dictionary_uri, cls.code)
+                if fetched is not None:
+                    full_class = fetched
+            for prop in full_class.properties:
+                if prop.uri in seen_uris:
+                    continue
+                seen_uris.add(prop.uri)
+                props.append(prop)
+
+        # Also match properties directly by name, independent of whether
+        # their owning class matched the query text.
+        for raw in FALLBACK_CLASSES.values():
+            for p in raw.get("properties", []):
+                if p["uri"] in seen_uris:
+                    continue
+                if lowered in p.get("name", "").lower() or lowered in (p.get("description") or "").lower():
+                    seen_uris.add(p["uri"])
+                    props.append(BSDDPropertyItem(**p))
+
+        return props
 
     def validate_element_semantics(
         self,

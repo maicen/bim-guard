@@ -2,8 +2,9 @@
   import { untrack } from "svelte";
   import { SlidersHorizontal } from "lucide-svelte";
   import { rulesApi } from "../api";
-  import type { Rule, RulesetCategory } from "../types";
+  import type { BSDDClassItem, BSDDPropertyItem, Rule, RulesetCategory } from "../types";
   import type { IfcPropertySuggestion } from "../archDomains";
+  import BsddAutocomplete from "./BsddAutocomplete.svelte";
 
   interface Props {
     editingRule?: Rule | null;
@@ -94,6 +95,22 @@
   function applyPropertySuggestion() {
     const match = propertySuggestions.find((p) => p.name === formPropertyName);
     if (match) formPropertySet = match.propertySet;
+    formValueInputUnit = "mm";
+  }
+
+  // bSDD-sourced picks. A class item narrows target_ifc_class only; a
+  // property item also carries the property set and unit bSDD standardizes
+  // for it, so filling those saves the retyping applyPropertySuggestion above
+  // does for the per-category suggestion list.
+  function handleTargetClassPick(item: BSDDClassItem | BSDDPropertyItem) {
+    if ("code" in item) formTargetIfcClass = item.code;
+  }
+
+  function handlePropertyNamePick(item: BSDDClassItem | BSDDPropertyItem) {
+    if ("code" in item) return;
+    formPropertyName = item.name;
+    if (item.property_set) formPropertySet = item.property_set;
+    if (item.units) formUnit = item.units;
     formValueInputUnit = "mm";
   }
 
@@ -296,12 +313,13 @@
         Every rule added here targets this element type.
       </p>
     {:else}
-      <input
+      <BsddAutocomplete
         id="rule-target-ifc-class"
-        type="text"
+        mode="class"
         bind:value={formTargetIfcClass}
-        placeholder="e.g. IfcDoor, IfcWindow (leave blank to apply to any element)"
-        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+        placeholder="e.g. IfcDoor, IfcWindow (leave blank to apply to any element) — search bSDD as you type"
+        onSelect={handleTargetClassPick}
+        class="font-mono"
       />
     {/if}
   </div>
@@ -355,11 +373,12 @@
           {/each}
         </select>
       {:else}
-        <input
+        <BsddAutocomplete
           id="rule-pname-{formInstanceId}"
-          type="text"
+          mode="property"
           bind:value={formPropertyName}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          placeholder="search bSDD as you type"
+          onSelect={handlePropertyNamePick}
         />
       {/if}
     </div>

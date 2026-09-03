@@ -76,6 +76,8 @@ export interface Project {
   cde_state?: CDEState;
   cde_approved_by?: string;
   cde_approved_at?: string | null;
+  /** bSDD dictionary code (e.g. uniclass_2015, omniclass_2020) this project is classified against. */
+  classification_standard?: string | null;
 }
 
 /**
@@ -144,6 +146,7 @@ export interface ProjectCreatePayload {
   suitability_code?: string;
   revision_code?: string;
   cde_state?: CDEState;
+  classification_standard?: string | null;
 }
 
 /** One selectable normative reference offered by the project setup wizard. */
@@ -191,6 +194,7 @@ export interface ProjectUpdatePayload {
   suitability_code?: string;
   revision_code?: string;
   cde_state?: CDEState;
+  classification_standard?: string | null;
 }
 
 export interface ProjectBulkDeletePayload {
@@ -275,6 +279,7 @@ export interface Rule {
   ruleset_id?: string;
   rule_category?: string;
   category?: RulesetCategory | string;
+  /** IFC entity type the rule applies to (e.g. IfcPipeSegment), often bSDD-sourced. */
   target_ifc_class?: string | null;
   property_set?: string;
   property_name?: string;
@@ -800,6 +805,12 @@ export interface BSDDClassSearchResponse {
   query: string;
   total: number;
   classes: BSDDClassItem[];
+}
+
+export interface BSDDPropertySearchResponse {
+  query: string;
+  total: number;
+  properties: BSDDPropertyItem[];
 }
 
 // 2. OpenCDE Types

@@ -163,6 +163,11 @@ class ProjectCreateRequest(BaseModel):
     revision_code: Optional[str] = Field(default="P01.01", description="ISO 19650 Revision Code (P01.01, C01)")
     cde_state: CDEState = Field(default=CDEState.WIP, description="CDE State (WIP, SHARED, PUBLISHED, ARCHIVED)")
 
+    # bSDD-backed project classification standard (e.g. uniclass_2015, omniclass_2020)
+    classification_standard: Optional[str] = Field(
+        default="", description="bSDD dictionary code used for this project's element/property classification"
+    )
+
     # Wizard steps 4 and 5. Linked after the project row exists, so a failure
     # to link does not cost the caller the project.
     document_ids: list[int] = Field(
@@ -193,6 +198,7 @@ class ProjectUpdateRequest(BaseModel):
     suitability_code: Optional[str] = None
     revision_code: Optional[str] = None
     cde_state: Optional[CDEState] = None
+    classification_standard: Optional[str] = None
 
 
 class ProjectBulkDeleteRequest(BaseModel):
@@ -266,6 +272,7 @@ class ProjectResponse(BaseModel):
     cde_state: CDEState = CDEState.WIP
     cde_approved_by: Optional[str] = ""
     cde_approved_at: Optional[str] = None
+    classification_standard: Optional[str] = ""
 
 
 class ProjectIfcFileResponse(BaseModel):
@@ -443,7 +450,9 @@ class RuleCreateRequest(BaseModel):
     ruleset_id: Optional[str] = Field(default=None, description="Group or folder ruleset identifier")
     rule_category: Optional[str] = Field(default="property_check", description="Rule classification")
     category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
-    target_ifc_class: Optional[str] = Field(default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow)")
+    target_ifc_class: Optional[str] = Field(
+        default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow), often bSDD-sourced"
+    )
     property_set: Optional[str] = None
     property_name: Optional[str] = None
     operator: Optional[str] = Field(default="==", description="Evaluation operator")
@@ -499,7 +508,9 @@ class RuleResponse(BaseModel):
     ruleset_id: Optional[str] = None
     rule_category: Optional[str] = None
     category: Optional[str] = Field(default="Arch", description="Domain category: Arch, Piping, or seismic")
-    target_ifc_class: Optional[str] = Field(default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow)")
+    target_ifc_class: Optional[str] = Field(
+        default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow)"
+    )
     property_set: Optional[str] = None
     property_name: Optional[str] = None
     operator: Optional[str] = None
@@ -1152,6 +1163,14 @@ class BSDDClassSearchResponse(BaseModel):
     query: str
     total: int = 0
     classes: list[BSDDClassItem] = []
+
+
+class BSDDPropertySearchResponse(BaseModel):
+    """Response payload for bSDD property text searches."""
+
+    query: str
+    total: int = 0
+    properties: list[BSDDPropertyItem] = []
 
 
 # ------------------------------------------------------------------------------

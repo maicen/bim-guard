@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.bootstrap import get_container
 from app.services.arch_analysis_service import ArchAnalysisService
+from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
 from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
@@ -18,6 +19,11 @@ from app.services.settings_service import SettingsService
 def get_projects_service() -> ProjectsService:
     """Return the configured ProjectsService instance."""
     return get_container().projects_service
+
+
+def get_bsdd_client() -> BSDDClient:
+    """Return the shared buildingSMART Data Dictionary client singleton."""
+    return DEFAULT_BSDD_CLIENT
 
 
 def get_rules_service() -> RuleService:

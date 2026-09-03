@@ -33,6 +33,35 @@ def test_get_rule_not_found():
     assert response.status_code == 404
 
 
+def test_create_and_update_rule_persists_target_ifc_class():
+    """Verify a bSDD-sourced element name round-trips through create and update."""
+    create_res = client.post(
+        "/api/rules",
+        json={
+            "rule_id": "TARGET-IFC-CLASS-TEST-01",
+            "target_ifc_class": "IfcPipeSegment",
+            "property_name": "NominalDiameter",
+            "mechanism": "CODE",
+            "category": "Piping",
+            "severity": "Medium",
+            "ruleset_id": "BUILDING-CODE-PART9",
+        },
+    )
+    assert create_res.status_code == 201
+    created = create_res.json()
+    try:
+        assert created["target_ifc_class"] == "IfcPipeSegment"
+
+        update_res = client.put(
+            f"/api/rules/{created['id']}",
+            json={"target_ifc_class": "IfcValve"},
+        )
+        assert update_res.status_code == 200
+        assert update_res.json()["target_ifc_class"] == "IfcValve"
+    finally:
+        client.delete(f"/api/rules/{created['id']}")
+
+
 @pytest.mark.slow
 def test_rule_folder_crud():
     """Verify complete CRUD lifecycle for ruleset folders via REST API."""

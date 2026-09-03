@@ -84,6 +84,7 @@ class ProjectsService:
                     "cde_state": str,
                     "cde_approved_by": str,
                     "cde_approved_at": str,
+                    "classification_standard": str,
                 },
                 required_columns={"ifc_file_path": str, "ifc_md5_hash": str},
             )
@@ -200,17 +201,22 @@ class ProjectsService:
         "floors_count",
     )
 
-    def _insert_project_row(self, row: dict):
-        """Insert a project row, dropping wizard columns the schema lacks.
+    #: Columns added by later migrations that follow the same
+    #: retry-without-them fallback as ``_WIZARD_COLUMNS``.
+    _OPTIONAL_COLUMNS = _WIZARD_COLUMNS + ("classification_standard",)
 
-        The wizard-fields migration is applied out of band, so a deployment can
-        be running this code against a ``projects`` table that predates it.
-        Losing four descriptive fields is a far better outcome there than
-        refusing to create the project at all, so a missing-column error is
-        retried once without them and reported as a warning.
+    def _insert_project_row(self, row: dict):
+        """Insert a project row, dropping optional columns the schema lacks.
+
+        The wizard-fields and classification-standard migrations are applied
+        out of band, so a deployment can be running this code against a
+        ``projects`` table that predates them. Losing those descriptive
+        fields is a far better outcome there than refusing to create the
+        project at all, so a missing-column error is retried once without
+        them and reported as a warning.
 
         Args:
-            row: The full row, wizard columns included.
+            row: The full row, optional columns included.
 
         Returns:
             The inserted project row.
@@ -222,13 +228,14 @@ class ProjectsService:
             # other failure is a real one and belongs to the caller.
             if "PGRST204" not in str(exc):
                 raise
-            trimmed = {k: v for k, v in row.items() if k not in self._WIZARD_COLUMNS}
+            trimmed = {k: v for k, v in row.items() if k not in self._OPTIONAL_COLUMNS}
             if len(trimmed) == len(row):
                 raise
             logger.warning(
-                "Projects table is missing the wizard columns; created without "
-                "them. Apply the add_wizard_fields_to_projects and "
-                "add_building_code_to_projects migrations. dropped=%s",
+                "Projects table is missing optional columns; created without "
+                "them. Apply the add_wizard_fields_to_projects, "
+                "add_building_code_to_projects, and "
+                "add_classification_standard_to_projects migrations. dropped=%s",
                 sorted(set(row) - set(trimmed)),
             )
             return self._projects.insert(trimmed)
@@ -257,6 +264,7 @@ class ProjectsService:
         suitability_code: str = "S0",
         revision_code: str = "P01.01",
         cde_state: str = "WIP",
+        classification_standard: str | None = None,
     ):
         """Insert a new project record into the database.
 
@@ -335,6 +343,7 @@ class ProjectsService:
             ("project_size_sqm", project_size_sqm),
             ("buildings_count", buildings_count),
             ("floors_count", floors_count),
+            ("classification_standard", classification_standard),
         ):
             if value is not None and value != "":
                 row[column] = value
@@ -374,6 +383,7 @@ class ProjectsService:
         suitability_code: str | None = None,
         revision_code: str | None = None,
         cde_state: str | None = None,
+        classification_standard: str | None = None,
     ):
         """Update editable fields for an existing project."""
         updates: dict = {
@@ -406,6 +416,8 @@ class ProjectsService:
             updates["revision_code"] = revision_code.strip() or "P01.01"
         if cde_state is not None:
             updates["cde_state"] = cde_state.strip() or "WIP"
+        if classification_standard is not None:
+            updates["classification_standard"] = classification_standard.strip() or None
         if analysis_type:
             analysis_type = normalize_analysis_type(analysis_type.strip())
             if analysis_type not in ANALYSIS_TYPES:
