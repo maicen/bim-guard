@@ -64,7 +64,7 @@
       <button
         type="button"
         on:click={onBack}
-        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-slate-50 border border-slate-800 transition-colors"
       >
         <ArrowLeft class="w-3.5 h-3.5" />
         <span>Back to Rules Catalog</span>
@@ -86,9 +86,9 @@
       <div class="border border-slate-800 rounded-2xl bg-slate-900/40 p-4 space-y-3">
         <div class="flex items-center gap-2.5">
           <svelte:component this={domIcon} class="w-4 h-4 text-slate-300" />
-          <h3 class="text-sm font-bold text-white">{domain.label}</h3>
+          <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
           {#if domain.computed}
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-slate-800 text-slate-400 border border-slate-700">
+            <span class="px-2 py-0.5 rounded-full text-micro font-semibold uppercase bg-slate-800 text-slate-400 border border-slate-700">
               Computed
             </span>
           {/if}
@@ -108,14 +108,14 @@
                 <div class="flex items-center justify-between p-3">
                   <div class="flex items-center gap-2">
                     <span class="text-xs font-bold text-slate-200">{target.label}</span>
-                    <span class="text-[10px] font-mono text-slate-500">{target.ifcClass}</span>
+                    <span class="text-micro font-mono text-slate-500">{target.ifcClass}</span>
                   </div>
                   <button
                     type="button"
                     on:click={() => toggleAdd(target)}
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors {activeTarget === target.ifcClass
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-caption font-semibold transition-colors {activeTarget === target.ifcClass
                       ? 'bg-slate-800 text-slate-300 border border-slate-700'
-                      : 'bg-[#0071e3]/15 hover:bg-[#0071e3]/25 text-[#0071e3] border border-[#0071e3]/30'}"
+                      : 'bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30'}"
                   >
                     {#if activeTarget === target.ifcClass}
                       <X class="w-3 h-3" />

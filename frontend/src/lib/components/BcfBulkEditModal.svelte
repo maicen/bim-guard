@@ -77,7 +77,7 @@
       <select
         id="bulk-bcf-status"
         bind:value={topicStatus}
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
       >
         <option value="no_change">-- Keep Current Status --</option>
         <option value="Open">Open</option>
@@ -95,7 +95,7 @@
       <select
         id="bulk-bcf-priority"
         bind:value={priority}
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
       >
         <option value="no_change">-- Keep Current Priority --</option>
         <option value="Critical">Critical</option>
@@ -114,7 +114,7 @@
     <select
       id="bulk-bcf-cde"
       bind:value={cdeState}
-      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
     >
       <option value="no_change">-- Keep Current CDE State --</option>
       {#each CDE_STATE_CHOICES as state}
@@ -127,7 +127,7 @@
     <button
       type="button"
       on:click={onClose}
-      class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+      class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
     >
       Cancel
     </button>
@@ -135,7 +135,7 @@
       type="button"
       disabled={isSaving || !hasChanges}
       on:click={handleSave}
-      class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
     >
       <span>{isSaving ? 'Applying Changes...' : `Update ${selectedTopicGuids.length} Topics`}</span>
     </button>

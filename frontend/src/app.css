@@ -4,7 +4,7 @@
 
 :root,
 html.dark {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: -0.015em;
   color-scheme: dark;
 
@@ -26,6 +26,11 @@ html.dark {
   --surface-dark-2: #0f172a;
   --surface-dark-3: #1e293b;
   --border-dark: #334155;
+  --color-accent: 0 113 227;        /* #0071e3 - the one chromatic accent */
+  --color-accent-hover: 0 119 237;  /* #0077ed */
+
+  /* Retained for the handful of plain-CSS rules below that cannot use a
+     Tailwind utility; component markup must use the `accent` token instead. */
   --bimguard-blue: #0071e3;
   --bimguard-blue-hover: #0077ed;
 }
@@ -52,15 +57,39 @@ html:not(.dark) {
   --surface-dark-2: #ffffff;
   --surface-dark-3: #e2e8f0;
   --border-dark: #cbd5e1;
+
+  --color-accent: 0 102 204;        /* #0066cc - AA on white (DESIGN.md link blue) */
+  --color-accent-hover: 0 113 227;  /* #0071e3 */
+  --bimguard-blue: #0066cc;
+  --bimguard-blue-hover: #0071e3;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: -0.025em;
 }
 
 code, kbd, samp, pre {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Respect the OS "reduce motion" setting: keep state changes visible, drop the
+   movement. Covers the entrance animations above and every `animate-*` utility. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Spinners still need to read as "busy", just calmly. */
+  .animate-spin {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 .apple-blur {
@@ -169,54 +198,6 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover {
 /* =========================================================================
    LIGHT THEME ENHANCEMENTS & CONTRAST REFINEMENTS
    ========================================================================= */
-
-/* Adapt surface text that was hardcoded as text-white to primary dark text */
-html.light .text-white,
-html:not(.dark) .text-white {
-  color: #0f172a !important;
-}
-
-/* Headings in light mode */
-html.light h1,
-html.light h2,
-html.light h3,
-html.light h4,
-html.light h5,
-html.light h6,
-html:not(.dark) h1,
-html:not(.dark) h2,
-html:not(.dark) h3,
-html:not(.dark) h4,
-html:not(.dark) h5,
-html:not(.dark) h6 {
-  color: #0f172a !important;
-}
-
-/* Secondary & muted text in light mode */
-html.light .text-slate-400,
-html:not(.dark) .text-slate-400 {
-  color: #475569 !important; /* slate-600 */
-}
-
-html.light .text-slate-500,
-html:not(.dark) .text-slate-500 {
-  color: #64748b !important; /* slate-500 */
-}
-
-html.light .text-slate-300,
-html:not(.dark) .text-slate-300 {
-  color: #334155 !important; /* slate-700 */
-}
-
-html.light .text-slate-200,
-html:not(.dark) .text-slate-200 {
-  color: #1e293b !important; /* slate-800 */
-}
-
-html.light .text-slate-100,
-html:not(.dark) .text-slate-100 {
-  color: #0f172a !important; /* slate-900 */
-}
 
 /* Light mode high-contrast accent text (WCAG AA >= 4.5:1 contrast) */
 html.light .text-emerald-400,
@@ -343,59 +324,28 @@ html:not(.dark) span.bg-rose-400 {
   background-color: #f43f5e !important;
 }
 
-/* Protect white text on colored buttons, gradient badges, and brand elements ONLY */
-html.light button.bg-\[\#0071e3\],
-html.light button.bg-\[\#0071e3\] *,
-html.light button.bg-\[\#0077ed\],
-html.light button.bg-\[\#0077ed\] *,
-html.light button.bg-blue-600,
+/* Solid coloured controls keep white text in both themes. The markup now uses
+   `text-white` for exactly this case (theme-inverting text is `text-slate-50`),
+   so these only need to cover text nested inside such a control. */
+html.light .bg-accent *,
+html.light .bg-accent-hover *,
 html.light button.bg-blue-600 *,
-html.light button.bg-emerald-600,
 html.light button.bg-emerald-600 *,
-html.light button.bg-rose-600,
 html.light button.bg-rose-600 *,
-html.light a.bg-\[\#0071e3\],
-html.light a.bg-\[\#0071e3\] *,
 html.light .keep-white,
 html.light .keep-white *,
-html.light .text-white-force,
-html.light .bg-gradient-to-tr,
 html.light .bg-gradient-to-tr *,
-html.light .bg-gradient-to-r,
 html.light .bg-gradient-to-r *,
-html:not(.dark) button.bg-\[\#0071e3\],
-html:not(.dark) button.bg-\[\#0071e3\] *,
-html:not(.dark) button.bg-\[\#0077ed\],
-html:not(.dark) button.bg-\[\#0077ed\] *,
-html:not(.dark) button.bg-blue-600,
+html:not(.dark) .bg-accent *,
+html:not(.dark) .bg-accent-hover *,
 html:not(.dark) button.bg-blue-600 *,
-html:not(.dark) button.bg-emerald-600,
 html:not(.dark) button.bg-emerald-600 *,
-html:not(.dark) button.bg-rose-600,
 html:not(.dark) button.bg-rose-600 *,
-html:not(.dark) a.bg-\[\#0071e3\],
-html:not(.dark) a.bg-\[\#0071e3\] *,
 html:not(.dark) .keep-white,
 html:not(.dark) .keep-white *,
-html:not(.dark) .text-white-force,
-html:not(.dark) .bg-gradient-to-tr,
 html:not(.dark) .bg-gradient-to-tr *,
-html:not(.dark) .bg-gradient-to-r,
 html:not(.dark) .bg-gradient-to-r * {
-  color: #ffffff !important;
-}
-
-/* Secondary hover text on light surfaces */
-html.light .hover\:text-white:hover,
-html:not(.dark) .hover\:text-white:hover {
-  color: #0f172a !important;
-}
-
-html.light button.bg-\[\#0071e3\]:hover *,
-html.light [class*="bg-[#0071e3]"]:hover *,
-html:not(.dark) button.bg-\[\#0071e3\]:hover *,
-html:not(.dark) [class*="bg-[#0071e3]"]:hover * {
-  color: #ffffff !important;
+  color: #ffffff;
 }
 
 /* Light mode card elevation & shadows */
@@ -437,8 +387,8 @@ html.light textarea:focus,
 html:not(.dark) input:focus,
 html:not(.dark) select:focus,
 html:not(.dark) textarea:focus {
-  border-color: #0071e3 !important;
-  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.15) !important;
+  border-color: rgb(var(--color-accent)) !important;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent) / 0.15) !important;
 }
 
 /* Light mode dialogs / modals */

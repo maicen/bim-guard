@@ -399,13 +399,13 @@
       <!-- Header -->
       <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-bold text-white tracking-tight">New Project Setup</h2>
+          <h2 class="text-lg font-bold text-slate-50 tracking-tight">New Project Setup</h2>
           <p class="text-xs text-slate-400">Initialize a new OpenBIM compliance audit project</p>
         </div>
         <button
           type="button"
           on:click={handleClose}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
@@ -418,11 +418,11 @@
             <button
               type="button"
               on:click={() => goToStep(step.num)}
-              class="flex items-center gap-2 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] rounded-lg p-1 transition-all text-left"
+              class="flex items-center gap-2 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-lg p-1 transition-all text-left"
               title="Go to step {step.num}: {step.title}"
             >
               <div
-                class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 {currentStep === step.num ? 'bg-[#0071e3] text-white shadow-sm shadow-blue-500/50 scale-105' : currentStep > step.num ? 'bg-emerald-600 text-white group-hover:bg-emerald-500' : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'}"
+                class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 {currentStep === step.num ? 'bg-accent text-white shadow-sm shadow-blue-500/50 scale-105' : currentStep > step.num ? 'bg-emerald-600 text-white group-hover:bg-emerald-500' : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'}"
               >
                 {#if currentStep > step.num}
                   <Check class="w-3.5 h-3.5" />
@@ -430,7 +430,7 @@
                   {step.num}
                 {/if}
               </div>
-              <span class="text-xs font-medium transition-colors {currentStep === step.num ? 'text-white font-semibold' : currentStep > step.num ? 'text-slate-300 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-300'}">
+              <span class="text-xs font-medium transition-colors {currentStep === step.num ? 'text-slate-50 font-semibold' : currentStep > step.num ? 'text-slate-300 group-hover:text-slate-50' : 'text-slate-500 group-hover:text-slate-300'}">
                 {step.title}
               </span>
             </button>
@@ -461,7 +461,7 @@
                 type="text"
                 bind:value={name}
                 placeholder="e.g. BIM Headquarters Phase 1"
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
               />
             </div>
             <div>
@@ -473,7 +473,7 @@
                 bind:value={description}
                 rows="4"
                 placeholder="Scope, regulatory framework, and notes..."
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
               ></textarea>
             </div>
             <div>
@@ -483,7 +483,7 @@
               <select
                 id="wizard-status"
                 bind:value={status}
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-50 focus:outline-none focus:border-accent"
               >
                 <option value="Draft">Draft</option>
                 <option value="Active">Active</option>
@@ -498,7 +498,7 @@
               <select
                 id="wizard-jurisdiction"
                 bind:value={country}
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-50 focus:outline-none focus:border-accent"
               >
                 {#if options.countries.length}
                   {#each options.countries as c}
@@ -513,7 +513,7 @@
                   <option value="International">International</option>
                 {/if}
               </select>
-              <p class="text-[11px] text-slate-500 mt-1">
+              <p class="text-caption text-slate-500 mt-1">
                 Required for Architectural compliance checks; optional for Piping corrosion analysis.
                 The building code is chosen on step 3, from the codes this jurisdiction publishes.
               </p>
@@ -528,9 +528,9 @@
                   <button
                     type="button"
                     on:click={() => (projectType = projectType === type ? '' : type)}
-                    class="px-2.5 py-2.5 rounded-xl border text-[11px] font-semibold text-left transition-all {projectType ===
+                    class="px-2.5 py-2.5 rounded-xl border text-caption font-semibold text-left transition-all {projectType ===
                     type
-                      ? 'bg-blue-950/40 border-[#0071e3] text-white'
+                      ? 'bg-blue-950/40 border-accent text-slate-50'
                       : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}"
                   >
                     {type}
@@ -538,7 +538,7 @@
                 {/each}
               </div>
               {#if !options.project_types.length}
-                <p class="text-[11px] text-slate-500">
+                <p class="text-caption text-slate-500">
                   Building types are unavailable — the project can be created without one.
                 </p>
               {/if}
@@ -556,7 +556,7 @@
                   step="any"
                   bind:value={projectSizeSqm}
                   placeholder="5000"
-                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
                 />
               </div>
               <div>
@@ -570,7 +570,7 @@
                   step="1"
                   bind:value={buildingsCount}
                   placeholder="1"
-                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
                 />
               </div>
               <div>
@@ -584,7 +584,7 @@
                   step="1"
                   bind:value={floorsCount}
                   placeholder="2"
-                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
@@ -601,23 +601,23 @@
               on:dragleave={handleIfcDragLeave}
               on:drop|preventDefault={handleIfcDrop}
               class="border-2 border-dashed rounded-2xl p-8 text-center transition-colors {isDraggingIfc
-                ? 'border-[#0071e3] bg-blue-950/20'
-                : 'border-slate-700 hover:border-[#0071e3] bg-slate-950/40'}"
+                ? 'border-accent bg-blue-950/20'
+                : 'border-slate-700 hover:border-accent bg-slate-950/40'}"
             >
-              <Upload class="w-10 h-10 {isDraggingIfc ? 'text-[#0071e3]' : 'text-slate-400'} mx-auto mb-3" />
-              <h3 class="text-sm font-semibold text-white mb-1">Upload OpenBIM IFC Models</h3>
+              <Upload class="w-10 h-10 {isDraggingIfc ? 'text-accent' : 'text-slate-400'} mx-auto mb-3" />
+              <h3 class="text-sm font-semibold text-slate-50 mb-1">Upload OpenBIM IFC Models</h3>
               <p class="text-xs text-slate-400 max-w-sm mx-auto mb-4">
                 Drag and drop IFC 2x3 or IFC4 models here, or browse. Attach one model per
                 discipline — the primary is the one the compliance run analyses.
               </p>
-              <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium cursor-pointer transition-colors">
+              <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-xs font-medium cursor-pointer transition-colors">
                 <span>Browse Files (.ifc)</span>
                 <input type="file" accept=".ifc" multiple on:change={handleFileChange} class="hidden" />
               </label>
             </div>
 
             {#if ifcNotice}
-              <p class="text-[11px] text-amber-400">{ifcNotice}</p>
+              <p class="text-caption text-amber-400">{ifcNotice}</p>
             {/if}
 
             {#if ifcFiles.length}
@@ -626,7 +626,7 @@
                   {ifcFiles.length} model{ifcFiles.length === 1 ? '' : 's'} selected
                 </span>
                 {#if ifcFiles.length > 1}
-                  <span class="text-[11px] text-slate-500">Click a model to make it primary</span>
+                  <span class="text-caption text-slate-500">Click a model to make it primary</span>
                 {/if}
               </div>
 
@@ -634,7 +634,7 @@
                 {#each ifcFiles as file, idx (`${file.name}:${file.size}`)}
                   <div
                     class="p-3 rounded-xl border flex items-center gap-2 transition-all {idx === primaryIndex
-                      ? 'bg-blue-950/30 border-[#0071e3]'
+                      ? 'bg-blue-950/30 border-accent'
                       : 'bg-slate-950 border-slate-800'}"
                   >
                     <button
@@ -644,15 +644,15 @@
                       class="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                     >
                       <CheckCircle2
-                        class="w-4 h-4 shrink-0 {idx === primaryIndex ? 'text-[#0071e3]' : 'text-emerald-400'}"
+                        class="w-4 h-4 shrink-0 {idx === primaryIndex ? 'text-accent' : 'text-emerald-400'}"
                       />
-                      <span class="text-xs font-medium text-white truncate">{file.name}</span>
-                      <span class="text-[11px] text-slate-500 shrink-0">
+                      <span class="text-xs font-medium text-slate-50 truncate">{file.name}</span>
+                      <span class="text-caption text-slate-500 shrink-0">
                         ({(file.size / 1024 / 1024).toFixed(2)} MB)
                       </span>
                       {#if idx === primaryIndex}
                         <span
-                          class="px-1.5 py-0.5 rounded-md bg-[#0071e3] text-white text-[10px] font-semibold uppercase tracking-wide shrink-0"
+                          class="px-1.5 py-0.5 rounded-md bg-accent text-white text-micro font-semibold uppercase tracking-wide shrink-0"
                         >
                           Primary
                         </span>
@@ -666,7 +666,7 @@
                         const select = event.currentTarget;
                         if (!setIfcRole(idx, select.value)) select.value = ifcRoles[idx];
                       }}
-                      class="shrink-0 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#0071e3]"
+                      class="shrink-0 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-caption text-slate-50 focus:outline-none focus:border-accent"
                     >
                       {#each IFC_FILE_ROLES as roleOption}
                         <option value={roleOption}>{roleOption}</option>
@@ -700,13 +700,13 @@
               <select
                 id="wizard-type"
                 bind:value={analysisType}
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-50 focus:outline-none focus:border-accent"
               >
                 <option value="Arch">Arch — Doors, Egress, Daylight, Stairs</option>
                 <option value="Piping">Piping — GC-001, CC-001, MC-001</option>
                 <option value="seismic">seismic — Blue Halo Clearance Detection</option>
               </select>
-              <p class="text-[11px] text-slate-500 mt-1">
+              <p class="text-caption text-slate-500 mt-1">
                 Determines which analysis page opens once the project is created.
               </p>
             </div>
@@ -719,11 +719,11 @@
               <span class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                 Specifications
               </span>
-              <label for="wizard-building-code" class="block text-[11px] font-medium text-slate-400 mb-1.5">
+              <label for="wizard-building-code" class="block text-caption font-medium text-slate-400 mb-1.5">
                 Building Code — {country}
               </label>
               {#if buildingCodesForJurisdiction.length === 0}
-                <div class="p-3 rounded-xl border border-slate-800 text-[11px] text-slate-500">
+                <div class="p-3 rounded-xl border border-slate-800 text-caption text-slate-500">
                   Building codes are unavailable — the project can be created without one and the
                   engines will apply the ISO / IFC international standards.
                 </div>
@@ -731,7 +731,7 @@
                 <select
                   id="wizard-building-code"
                   bind:value={buildingCode}
-                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0071e3]"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-50 focus:outline-none focus:border-accent"
                 >
                   <option value="">Not specified</option>
                   {#each buildingCodesForJurisdiction as code}
@@ -739,19 +739,19 @@
                   {/each}
                 </select>
                 {#if selectedBuildingCode}
-                  <p class="text-[11px] text-slate-500 mt-1">
+                  <p class="text-caption text-slate-500 mt-1">
                     {selectedBuildingCode.description}
                     {#if selectedBuildingCode.ruleset_id}
                       <span class="text-slate-400">Ruleset: <span class="font-mono">{selectedBuildingCode.ruleset_id}</span>.</span>
                     {/if}
                   </p>
                 {:else if buildingCodeRequired}
-                  <p class="text-[11px] text-amber-400/80 mt-1">
+                  <p class="text-caption text-amber-400/80 mt-1">
                     Architectural checks are judged against a code — without one the audit falls back
                     to the ISO / IFC international standards.
                   </p>
                 {:else}
-                  <p class="text-[11px] text-slate-500 mt-1">
+                  <p class="text-caption text-slate-500 mt-1">
                     Optional for {analysisType}: corrosion and clearance checks are judged against
                     material and geometry rules, not a jurisdiction's code.
                   </p>
@@ -760,7 +760,7 @@
               <button
                 type="button"
                 on:click={() => (currentStep = 1)}
-                class="text-[11px] text-[#0071e3] hover:underline mt-2"
+                class="text-caption text-accent hover:underline mt-2"
               >
                 Change jurisdiction on step 1
               </button>
@@ -783,23 +783,23 @@
                   <button
                     type="button"
                     on:click={() => toggleDocument(doc.id)}
-                    class="w-full p-3 rounded-xl border flex items-center justify-between text-left transition-all {selectedDocIds.has(doc.id) ? 'bg-blue-950/30 border-[#0071e3]' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}"
+                    class="w-full p-3 rounded-xl border flex items-center justify-between text-left transition-all {selectedDocIds.has(doc.id) ? 'bg-blue-950/30 border-accent' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}"
                   >
                     <div class="flex items-center gap-2.5 truncate">
-                      <FileText class="w-4 h-4 {selectedDocIds.has(doc.id) ? 'text-[#0071e3]' : 'text-slate-500'}" />
+                      <FileText class="w-4 h-4 {selectedDocIds.has(doc.id) ? 'text-accent' : 'text-slate-500'}" />
                       <div class="truncate">
                         <div class="flex items-center gap-2">
-                          <span class="text-xs font-semibold text-white truncate">{doc.filename}</span>
+                          <span class="text-xs font-semibold text-slate-50 truncate">{doc.filename}</span>
                           {#if doc.doc_type}
-                            <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+                            <span class="px-1.5 py-0.2 rounded text-micro font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
                               {doc.doc_type}
                             </span>
                           {/if}
                         </div>
-                        <div class="text-[10px] text-slate-400">{doc.char_count.toLocaleString()} chars extracted</div>
+                        <div class="text-micro text-slate-400">{doc.char_count.toLocaleString()} chars extracted</div>
                       </div>
                     </div>
-                    <div class="w-4 h-4 rounded-full border flex items-center justify-center {selectedDocIds.has(doc.id) ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-slate-700'}">
+                    <div class="w-4 h-4 rounded-full border flex items-center justify-center {selectedDocIds.has(doc.id) ? 'border-accent bg-accent text-white' : 'border-slate-700'}">
                       {#if selectedDocIds.has(doc.id)}
                         <Check class="w-3 h-3" />
                       {/if}
@@ -829,18 +829,18 @@
                       class="w-full p-3 rounded-xl border flex items-center justify-between text-left transition-all {selectedStandardIds.has(
                         standard.id,
                       )
-                        ? 'bg-blue-950/30 border-[#0071e3]'
+                        ? 'bg-blue-950/30 border-accent'
                         : 'bg-slate-950 border-slate-800 hover:border-slate-700'}"
                     >
                       <div class="truncate pr-2">
-                        <div class="text-xs font-semibold text-white truncate">{standard.name}</div>
-                        <div class="text-[10px] text-slate-400 truncate">{standard.domain}</div>
+                        <div class="text-xs font-semibold text-slate-50 truncate">{standard.name}</div>
+                        <div class="text-micro text-slate-400 truncate">{standard.domain}</div>
                       </div>
                       <div
                         class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0 {selectedStandardIds.has(
                           standard.id,
                         )
-                          ? 'border-[#0071e3] bg-[#0071e3] text-white'
+                          ? 'border-accent bg-accent text-white'
                           : 'border-slate-700'}"
                       >
                         {#if selectedStandardIds.has(standard.id)}
@@ -860,33 +860,33 @@
             <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Project Name:</span>
-                <span class="font-semibold text-white">{name}</span>
+                <span class="font-semibold text-slate-50">{name}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Status:</span>
-                <span class="font-semibold text-white">{status}</span>
+                <span class="font-semibold text-slate-50">{status}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Jurisdiction:</span>
-                <span class="font-semibold text-white">{country}</span>
+                <span class="font-semibold text-slate-50">{country}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Building Type:</span>
-                <span class="font-semibold text-white">{projectType || '—'}</span>
+                <span class="font-semibold text-slate-50">{projectType || '—'}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Size / Buildings / Floors:</span>
-                <span class="font-semibold text-white">
+                <span class="font-semibold text-slate-50">
                   {projectSizeSqm ? `${projectSizeSqm} m²` : '—'} · {buildingsCount || '—'} · {floorsCount || '—'}
                 </span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Building Code:</span>
-                <span class="font-semibold text-white">{selectedBuildingCode?.name || 'Not specified'}</span>
+                <span class="font-semibold text-slate-50">{selectedBuildingCode?.name || 'Not specified'}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Analysis Domain:</span>
-                <span class="font-semibold text-white">{analysisType}</span>
+                <span class="font-semibold text-slate-50">{analysisType}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Attached Models:</span>
@@ -902,14 +902,14 @@
               </div>
               <div class="flex justify-between py-1 border-b border-slate-800">
                 <span class="text-slate-400 font-medium">Linked Documents:</span>
-                <span class="font-semibold text-white">{selectedDocIds.size} selected</span>
+                <span class="font-semibold text-slate-50">{selectedDocIds.size} selected</span>
               </div>
               <div class="flex justify-between py-1">
                 <span class="text-slate-400 font-medium">Linked Standards:</span>
-                <span class="font-semibold text-white">{selectedStandardIds.size} selected</span>
+                <span class="font-semibold text-slate-50">{selectedStandardIds.size} selected</span>
               </div>
             </div>
-            <p class="text-[11px] text-slate-400">
+            <p class="text-caption text-slate-400">
               Clicking "Create &amp; Launch Audit" saves the project, closes this wizard and opens the
               <span class="text-slate-200 font-semibold">{analysisDomainLabel}</span> analysis page with it selected.
             </p>
@@ -923,7 +923,7 @@
           <button
             type="button"
             on:click={() => (currentStep -= 1)}
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
           >
             <ArrowLeft class="w-3.5 h-3.5" />
             <span>Back</span>
@@ -943,7 +943,7 @@
               errorMessage = '';
               currentStep += 1;
             }}
-            class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all"
+            class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all"
           >
             <span>Next Step</span>
             <ArrowRight class="w-3.5 h-3.5" />

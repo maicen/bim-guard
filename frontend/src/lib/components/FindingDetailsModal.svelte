@@ -36,19 +36,19 @@
     <!-- Key Metrics Cards -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-slate-950 p-3.5 rounded-xl border border-slate-800">
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Mechanism / Domain</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Mechanism / Domain</span>
         <span class="text-slate-200 font-medium">{issue.mechanism || 'CODE'}</span>
       </div>
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Rule Reference</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Rule Reference</span>
         <span class="text-cyan-300 font-mono font-medium">{issue.rule_id || '—'}</span>
       </div>
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Risk Score / Verdict</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Risk Score / Verdict</span>
         <span class="text-amber-400 font-medium">{issue.score !== undefined ? issue.score : 'FAIL'}</span>
       </div>
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Element Type</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Element Type</span>
         <span class="text-slate-300">{issue.details?.element_type || 'IfcProduct'}</span>
       </div>
     </div>
@@ -85,7 +85,7 @@
           <button
             type="button"
             on:click={() => copyGuid(issue.element_id)}
-            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
+            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 hover:text-slate-50 transition-colors"
           >
             {#if copiedGuid}
               <Check class="w-3.5 h-3.5 text-emerald-400" />
@@ -115,7 +115,7 @@
         <span class="text-xs font-semibold text-slate-300 block">Standard Citations &amp; Clauses</span>
         <div class="flex flex-wrap gap-1.5">
           {#each issue.citations as cit}
-            <span class="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-purple-300">
+            <span class="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 font-mono text-caption text-purple-300">
               {typeof cit === 'string' ? cit : `${cit.standard} ${cit.clause}`}
             </span>
           {/each}
@@ -127,7 +127,7 @@
       <button
         type="button"
         on:click={onClose}
-        class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
       >
         Close
       </button>

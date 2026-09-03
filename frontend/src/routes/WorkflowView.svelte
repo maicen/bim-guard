@@ -39,7 +39,7 @@
       >
         Workflow
       </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
         Live Pipeline Tracker
       </h1>
       <p class="text-xs sm:text-sm text-slate-400">
@@ -52,7 +52,7 @@
     <div class="flex items-center gap-2">
       <select
         bind:value={selectedProjectId}
-        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
       >
         {#each projects as p}
           <option value={p.id}>{p.name}</option>
@@ -70,7 +70,7 @@
       >
         <div class="flex items-center gap-2">
           <Activity class="w-5 h-5 text-emerald-400 animate-pulse" />
-          <h2 class="text-base font-bold text-white tracking-tight">
+          <h2 class="text-base font-bold text-slate-50 tracking-tight">
             Active Engine Pipeline
           </h2>
         </div>

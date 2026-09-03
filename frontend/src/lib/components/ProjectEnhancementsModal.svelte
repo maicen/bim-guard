@@ -62,14 +62,14 @@
             <Sparkles class="w-5 h-5" />
           </div>
           <div>
-            <h2 class="text-lg font-bold text-white tracking-tight">Quality Improvements — {project.name}</h2>
+            <h2 class="text-lg font-bold text-slate-50 tracking-tight">Quality Improvements — {project.name}</h2>
             <p class="text-xs text-slate-400">Generate and persist an improved IFC version without mutating the original source.</p>
           </div>
         </div>
         <button
           type="button"
           on:click={onClose}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
@@ -90,7 +90,7 @@
 
         <!-- Run form -->
         <div class="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-          <h3 class="text-sm font-semibold text-white">Execute IFC Quality Improvement</h3>
+          <h3 class="text-sm font-semibold text-slate-50">Execute IFC Quality Improvement</h3>
           <p class="text-xs text-slate-400">
             Triggers an automated quality improvement pass. Normalizes geometric properties, property sets, and element GUID linkages without mutating original project IFC files.
           </p>
@@ -107,7 +107,7 @@
             </button>
 
             {#if !project.ifc_file_path}
-              <div class="text-[11px] text-amber-400 flex items-center gap-1.5">
+              <div class="text-caption text-amber-400 flex items-center gap-1.5">
                 <ShieldAlert class="w-3.5 h-3.5" />
                 <span>Cannot enhance: this project does not have an attached IFC file.</span>
               </div>
@@ -117,7 +117,7 @@
 
         <!-- Lineage History Table -->
         <div class="space-y-3">
-          <h3 class="text-sm font-semibold text-white">Persisted Improvement History</h3>
+          <h3 class="text-sm font-semibold text-slate-50">Persisted Improvement History</h3>
 
           <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/40">
             {#if isLoadingHistory}
@@ -129,7 +129,7 @@
             {:else}
               <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-slate-300">
-                  <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                  <thead class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold">
                     <tr>
                       <th class="px-4 py-3">Source Ver</th>
                       <th class="px-4 py-3">Generated Ver</th>
@@ -145,14 +145,14 @@
                         <td class="px-4 py-3 font-mono text-slate-400">v{row.source_version}</td>
                         <td class="px-4 py-3 font-semibold text-purple-300 font-mono">v{row.version}</td>
                         <td class="px-4 py-3">
-                          <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/50 text-emerald-400 border border-emerald-800/60">
+                          <span class="inline-block px-2 py-0.5 rounded-full text-micro font-semibold bg-emerald-950/50 text-emerald-400 border border-emerald-800/60">
                             {row.status}
                           </span>
                         </td>
-                        <td class="px-4 py-3 font-mono text-[11px] text-slate-400 max-w-xs truncate">
+                        <td class="px-4 py-3 font-mono text-caption text-slate-400 max-w-xs truncate">
                           {JSON.stringify(row.summary || {})}
                         </td>
-                        <td class="px-4 py-3 text-slate-400 text-[11px] whitespace-nowrap">
+                        <td class="px-4 py-3 text-slate-400 text-caption whitespace-nowrap">
                           {row.created_at ? row.created_at.substring(0, 10) : '-'}
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -160,7 +160,7 @@
                             <button
                               type="button"
                               on:click={() => (selectedVersionForView = row)}
-                              class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                              class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                               title="Inspect version details"
                             >
                               <Eye class="w-3.5 h-3.5" />
@@ -192,7 +192,7 @@
         <button
           type="button"
           on:click={onClose}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
         >
           Close
         </button>
@@ -207,12 +207,12 @@
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
           <Sparkles class="w-4 h-4 text-purple-400" />
-          <h3 class="text-sm font-bold text-white">Lineage Version v{selectedVersionForView.version} Details</h3>
+          <h3 class="text-sm font-bold text-slate-50">Lineage Version v{selectedVersionForView.version} Details</h3>
         </div>
         <button
           type="button"
           on:click={() => (selectedVersionForView = null)}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-4 h-4" />
         </button>
@@ -227,12 +227,12 @@
         </div>
 
         <div>
-          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Modifications Summary</span>
-          <pre class="mt-1 p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-[11px] overflow-auto max-h-56 font-mono">{JSON.stringify(selectedVersionForView.summary, null, 2)}</pre>
+          <span class="text-caption font-semibold text-slate-400 uppercase tracking-wider">Modifications Summary</span>
+          <pre class="mt-1 p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-caption overflow-auto max-h-56 font-mono">{JSON.stringify(selectedVersionForView.summary, null, 2)}</pre>
         </div>
 
         {#if selectedVersionForView.output_reference}
-          <div class="text-[11px] text-slate-400 truncate">
+          <div class="text-caption text-slate-400 truncate">
             <span class="font-semibold text-slate-300">Storage Ref:</span> {selectedVersionForView.output_reference}
           </div>
         {/if}
@@ -242,7 +242,7 @@
         <button
           type="button"
           on:click={() => (selectedVersionForView = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
         >
           Close
         </button>

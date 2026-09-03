@@ -16,7 +16,7 @@
     <div class="flex items-center gap-2.5 font-medium">
       <CheckSquare class="w-4 h-4 text-blue-400 shrink-0" />
       <span>
-        <strong class="text-white font-bold">{selectedCount}</strong>
+        <strong class="text-slate-50 font-bold">{selectedCount}</strong>
         {itemLabel}{selectedCount === 1 ? "" : "s"} selected
       </span>
     </div>
@@ -60,7 +60,7 @@
       <button
         type="button"
         on:click={onClearSelection}
-        class="p-1 rounded-lg hover:bg-blue-900/60 text-blue-300 hover:text-white transition-colors"
+        class="p-1 rounded-lg hover:bg-blue-900/60 text-blue-300 hover:text-slate-50 transition-colors"
         title="Clear selection"
       >
         <X class="w-4 h-4" />

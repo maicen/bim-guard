@@ -172,7 +172,7 @@
           type="text"
           bind:value={formRuleId}
           placeholder="e.g. OBC-9.9.4.2"
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         />
       </div>
       <div>
@@ -184,7 +184,7 @@
         <select
           id="rule-sev-top"
           bind:value={formSeverity}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="mandatory">Mandatory</option>
           <option value="recommended">Recommended</option>
@@ -208,7 +208,7 @@
           type="text"
           bind:value={formRuleId}
           placeholder="e.g. OBC-9.9.4.2"
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         />
       </div>
       <div>
@@ -220,7 +220,7 @@
         <select
           id="rule-domain-category"
           bind:value={formDomainCategory}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="Arch">Arch</option>
           <option value="Piping">Piping</option>
@@ -236,7 +236,7 @@
         <select
           id="rule-mechanism"
           bind:value={formMechanism}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="CODE">CODE</option>
           <option value="GC-001">GC-001</option>
@@ -256,7 +256,7 @@
       <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300">
         {lockedTargetIfcClass}
       </div>
-      <p class="text-[11px] text-slate-500 mt-1">
+      <p class="text-caption text-slate-500 mt-1">
         Every rule added here targets this element type.
       </p>
     {:else}
@@ -265,7 +265,7 @@
         type="text"
         bind:value={formTargetIfcClass}
         placeholder="e.g. IfcDoor, IfcWindow (leave blank to apply to any element)"
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-[#0071e3]"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-50 focus:outline-none focus:border-accent"
       />
     {/if}
   </div>
@@ -280,7 +280,7 @@
       id="rule-desc"
       bind:value={formDescription}
       rows="2"
-      class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+      class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
     ></textarea>
   </div>
 
@@ -296,7 +296,7 @@
           id="rule-pset"
           type="text"
           bind:value={formPropertySet}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         />
       </div>
     {/if}
@@ -311,7 +311,7 @@
           id="rule-pname-{formInstanceId}"
           bind:value={formPropertyName}
           on:change={applyPropertySuggestion}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="" disabled>Choose a property…</option>
           {#each propertySuggestions as prop}
@@ -323,7 +323,7 @@
           id="rule-pname-{formInstanceId}"
           type="text"
           bind:value={formPropertyName}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         />
       {/if}
     </div>
@@ -339,7 +339,7 @@
           type="text"
           bind:value={formUnit}
           placeholder="e.g. mm, min, m²"
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         />
       </div>
     {/if}
@@ -355,7 +355,7 @@
       <select
         id="rule-op"
         bind:value={formOperator}
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
       >
         <option value="==">== (Exact match)</option>
         <option value="!=">!= (Not equal)</option>
@@ -389,12 +389,12 @@
             type="text"
             bind:value={formCheckValue}
             placeholder="e.g. 2.03"
-            class="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
           />
           <select
             bind:value={formValueInputUnit}
             aria-label="Value unit"
-            class="shrink-0 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="shrink-0 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="mm">mm</option>
             <option value="cm">cm</option>
@@ -403,7 +403,7 @@
             <option value="ft">ft</option>
           </select>
         </div>
-        <p class="text-[11px] text-slate-500 mt-1 h-3.5">
+        <p class="text-caption text-slate-500 mt-1 h-3.5">
           {convertedValuePreview || "Compared in millimetres — the IFC unit BIM-Guard checks against."}
         </p>
       {:else}
@@ -412,7 +412,7 @@
           type="text"
           bind:value={formCheckValue}
           placeholder="Literal value or threshold"
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         />
       {/if}
     </div>
@@ -421,10 +421,10 @@
   <!-- Field Consistency section -->
   {#if !compact && formOperator === "field_consistency"}
     <div class="p-3 rounded-xl bg-slate-950 border border-amber-900/40 space-y-2.5">
-      <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+      <div class="text-caption font-bold text-amber-400 uppercase tracking-wider">
         Field Consistency (Element-to-Element Property Match)
       </div>
-      <p class="text-[11px] text-slate-400">
+      <p class="text-caption text-slate-400">
         Validates that Property Name's value matches another property on
         the SAME element (e.g. wall Name matches Cod_Object).
       </p>
@@ -432,7 +432,7 @@
         <div>
           <label
             for="rule-compare-prop"
-            class="block text-[11px] font-semibold text-slate-300 mb-1"
+            class="block text-caption font-semibold text-slate-300 mb-1"
             >Compare Property</label
           >
           <input
@@ -440,13 +440,13 @@
             type="text"
             bind:value={formCompareProperty}
             placeholder="e.g. Cod_Object"
-            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
           />
         </div>
         <div>
           <label
             for="rule-name-pattern"
-            class="block text-[11px] font-semibold text-slate-300 mb-1"
+            class="block text-caption font-semibold text-slate-300 mb-1"
             >Name Pattern (Regex extraction)</label
           >
           <input
@@ -454,7 +454,7 @@
             type="text"
             bind:value={formNamePattern}
             placeholder="e.g. ([A-Z]+)_.*_(\d+)$"
-            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
           />
         </div>
       </div>
@@ -464,23 +464,23 @@
   <!-- Uniqueness Scope section -->
   {#if !compact && formOperator === "unique_within_scope"}
     <div class="p-3 rounded-xl bg-slate-950 border border-purple-900/40 space-y-2.5">
-      <div class="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
+      <div class="text-caption font-bold text-purple-400 uppercase tracking-wider">
         Scope Uniqueness Verification
       </div>
-      <p class="text-[11px] text-slate-400">
+      <p class="text-caption text-slate-400">
         Ensures Property Name's value is unique across elements within the
         selected building hierarchy scope.
       </p>
       <div>
         <label
           for="rule-unique-scope"
-          class="block text-[11px] font-semibold text-slate-300 mb-1"
+          class="block text-caption font-semibold text-slate-300 mb-1"
           >Uniqueness Scope</label
         >
         <select
           id="rule-unique-scope"
           bind:value={formUniquenessScope}
-          class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="building">building (entire model)</option>
           <option value="storey">storey (same floor)</option>
@@ -493,11 +493,11 @@
   {#if !compact}
     <!-- Dynamic relative threshold section -->
     <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
-      <div class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+      <div class="text-caption font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
         <SlidersHorizontal class="w-3.5 h-3.5 text-blue-400" />
         <span>Dynamic Property-Relative Range (Optional)</span>
       </div>
-      <p class="text-[11px] text-slate-400">
+      <p class="text-caption text-slate-400">
         Compare target property dynamically against other properties on the
         same element with optional offsets (e.g. RiserHeight &lt;= 0.5 *
         StairHeight + 25mm).
@@ -507,7 +507,7 @@
         <div>
           <label
             for="rule-min-prop"
-            class="block text-[11px] font-semibold text-slate-300 mb-1"
+            class="block text-caption font-semibold text-slate-300 mb-1"
             >Min Dynamic Property / Offset</label
           >
           <div class="grid grid-cols-2 gap-2">
@@ -516,20 +516,20 @@
               type="text"
               bind:value={formValueMinProperty}
               placeholder="e.g. TreadWidth"
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
             />
             <input
               type="number"
               bind:value={formValueMinOffset}
               placeholder="Offset (0)"
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
             />
           </div>
         </div>
         <div>
           <label
             for="rule-max-prop"
-            class="block text-[11px] font-semibold text-slate-300 mb-1"
+            class="block text-caption font-semibold text-slate-300 mb-1"
             >Max Dynamic Property / Offset</label
           >
           <div class="grid grid-cols-2 gap-2">
@@ -538,13 +538,13 @@
               type="text"
               bind:value={formValueMaxProperty}
               placeholder="e.g. TreadWidth"
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
             />
             <input
               type="number"
               bind:value={formValueMaxOffset}
               placeholder="Offset (+25)"
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
             />
           </div>
         </div>
@@ -561,7 +561,7 @@
         <select
           id="rule-sev"
           bind:value={formSeverity}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="mandatory">Mandatory</option>
           <option value="recommended">Recommended</option>
@@ -581,7 +581,7 @@
           id="rule-ruleset"
           type="text"
           bind:value={formRulesetId}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         />
       </div>
     </div>
@@ -592,7 +592,7 @@
           type="checkbox"
           checked={formNeedsReview === 1}
           on:change={(e) => (formNeedsReview = e.currentTarget.checked ? 1 : 0)}
-          class="rounded border-slate-700 bg-slate-950 text-[#0071e3]"
+          class="rounded border-slate-700 bg-slate-950 text-accent"
         />
         <span>Flag for engineering review (Needs Review)</span>
       </label>
@@ -603,7 +603,7 @@
     <button
       type="button"
       on:click={onCancel}
-      class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
+      class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50"
     >
       Cancel
     </button>
@@ -611,7 +611,7 @@
       type="button"
       disabled={isSaving}
       on:click={handleSaveRule}
-      class="px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white disabled:opacity-50"
+      class="px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white disabled:opacity-50"
     >
       {isSaving ? "Saving..." : "Save Rule"}
     </button>

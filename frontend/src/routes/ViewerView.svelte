@@ -92,7 +92,7 @@
       >
         Viewer
       </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
         3D OpenBIM Viewer
       </h1>
       <p class="text-xs sm:text-sm text-slate-400">
@@ -113,7 +113,7 @@
         <select
           id="viewer-project-select"
           bind:value={selectedProjectId}
-          class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           {#each projects as p}
             <option value={p.id}>{p.name} (#{p.id})</option>
@@ -130,7 +130,7 @@
           <select
             id="viewer-file-select"
             bind:value={selectedFileId}
-            class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-[#0071e3] max-w-[260px]"
+            class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-50 focus:outline-none focus:border-accent max-w-[260px]"
           >
             {#each ifcFiles as file}
               <option value={file.id}>
@@ -173,7 +173,7 @@
       <button
         type="button"
         on:click={() => (selectedElementGuid = null)}
-        class="text-blue-400 hover:text-white underline text-[11px]"
+        class="text-blue-400 hover:text-slate-50 underline text-caption"
       >
         Clear Selection
       </button>

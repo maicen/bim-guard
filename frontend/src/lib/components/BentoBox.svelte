@@ -13,16 +13,16 @@
 
 <div
   class="rounded-[1.75rem] border transition-all duration-300 hover:scale-[1.01] p-6 flex flex-col justify-between {dark
-    ? 'bg-slate-900/90 border-slate-700 text-white shadow-xl shadow-black/40'
+    ? 'bg-slate-900/90 border-slate-700 text-slate-50 shadow-xl shadow-black/40'
     : 'bg-slate-900/50 border-slate-800/80 text-slate-100'} {cls}"
 >
   <div class="flex items-start justify-between gap-3">
     <div class="space-y-1.5">
-      <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+      <p class="text-caption font-bold uppercase tracking-widest text-slate-400">
         {title}
       </p>
       {#if value !== null}
-        <h3 class="text-3xl font-extrabold tracking-tight {dark ? 'text-white' : 'text-slate-100'}">
+        <h3 class="text-3xl font-extrabold tracking-tight {dark ? 'text-slate-50' : 'text-slate-100'}">
           {value}
         </h3>
       {/if}

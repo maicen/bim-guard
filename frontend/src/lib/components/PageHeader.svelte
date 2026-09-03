@@ -10,7 +10,7 @@
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
   <div>
     {#if category}
-      <div class="text-xs font-bold uppercase tracking-widest text-[#0071e3] mb-1 flex items-center gap-1.5">
+      <div class="text-xs font-bold uppercase tracking-widest text-accent mb-1 flex items-center gap-1.5">
         <span>{category}</span>
         <slot name="category-extra" />
       </div>
@@ -18,9 +18,9 @@
 
     <div class="flex items-center gap-3 flex-wrap">
       {#if icon}
-        <svelte:component this={icon} class="w-6 h-6 text-[#0071e3] shrink-0" />
+        <svelte:component this={icon} class="w-6 h-6 text-accent shrink-0" />
       {/if}
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50 flex items-center gap-2.5">
         <span>{title}</span>
         <slot name="badge" />
       </h1>

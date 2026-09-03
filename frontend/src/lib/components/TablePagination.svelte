@@ -59,7 +59,7 @@
       type="button"
       on:click={() => goToPage(1)}
       disabled={currentPage === 1}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       title="First Page"
     >
       <ChevronsLeft class="w-4 h-4" />
@@ -70,7 +70,7 @@
       type="button"
       on:click={() => goToPage(currentPage - 1)}
       disabled={currentPage === 1}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       title="Previous Page"
     >
       <ChevronLeft class="w-4 h-4" />
@@ -86,7 +86,7 @@
       type="button"
       on:click={() => goToPage(currentPage + 1)}
       disabled={currentPage === totalPages}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       title="Next Page"
     >
       <ChevronRight class="w-4 h-4" />
@@ -97,7 +97,7 @@
       type="button"
       on:click={() => goToPage(totalPages)}
       disabled={currentPage === totalPages}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       title="Last Page"
     >
       <ChevronsRight class="w-4 h-4" />

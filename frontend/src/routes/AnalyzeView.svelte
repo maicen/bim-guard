@@ -431,7 +431,7 @@
   >
     <div>
       <div
-        class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#0071e3] mb-1"
+        class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-accent mb-1"
       >
         <span>Analysis Gateway</span>
         <span>•</span>
@@ -442,7 +442,7 @@
         </span>
       </div>
       <h1
-        class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3 flex-wrap"
+        class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50 flex items-center gap-3 flex-wrap"
       >
         <span
           >{activeCategory === "seismic"
@@ -459,7 +459,7 @@
         </span>
         {#if result?.cached}
           <span
-            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/80 shadow-sm"
+            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-caption font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/80 shadow-sm"
           >
             <Sparkles class="w-3 h-3 text-blue-400" />
             Cached SHA-256
@@ -481,12 +481,12 @@
       {#if categoryFolders.length > 0}
         <div class="flex items-center gap-1.5 flex-wrap mt-3">
           <span
-            class="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+            class="text-micro font-bold uppercase tracking-wider text-slate-500"
             >Active Rulesets:</span
           >
           {#each categoryFolders as folder}
             <span
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium border {activeCategory ===
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-micro font-mono font-medium border {activeCategory ===
               'seismic'
                 ? 'bg-purple-950/40 border-purple-800/50 text-purple-300'
                 : 'bg-amber-950/40 border-amber-800/50 text-amber-300'}"
@@ -507,7 +507,7 @@
         <select
           bind:value={selectedProjectId}
           on:change={handleProjectChange}
-          class="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs font-medium text-white focus:outline-none focus:border-[#0071e3] shadow-sm appearance-none pr-8 cursor-pointer"
+          class="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs font-medium text-slate-50 focus:outline-none focus:border-accent shadow-sm appearance-none pr-8 cursor-pointer"
         >
           {#if relevantProjects.length === 0}
             <option value={null}>No {activeCategory} projects found</option>
@@ -532,7 +532,7 @@
           ? "Select at least one engine to run"
           : "Run the audit against the selected engines"}
         on:click={() => handleRun(false)}
-        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:pointer-events-none"
+        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:pointer-events-none"
       >
         {#if isRunning}
           <RefreshCw class="w-3.5 h-3.5 animate-spin" />
@@ -551,7 +551,7 @@
           aria-label="Corrosion engines"
         >
           <span
-            class="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+            class="text-micro font-bold uppercase tracking-wider text-slate-500"
             >Engines</span
           >
           {#each PIPING_ENGINES as engine}
@@ -572,7 +572,7 @@
             >
               <label
                 slot="trigger"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border cursor-pointer select-none transition-colors {selectedEngines.includes(
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-caption font-mono font-semibold border cursor-pointer select-none transition-colors {selectedEngines.includes(
                   engine.id,
                 )
                   ? 'bg-amber-950/60 text-amber-300 border-amber-800/80'
@@ -607,7 +607,7 @@
             engineSelectionEmpty}
           on:click={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
-          class="p-2 rounded-full border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+          class="p-2 rounded-full border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-50 transition-colors"
         >
           <RefreshCw class="w-3.5 h-3.5 {isRunning ? 'animate-spin' : ''}" />
         </button>
@@ -628,7 +628,7 @@
             >Target Project</span
           >
           <span
-            class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase {currentProject.status ===
+            class="px-2 py-0.5 rounded text-micro font-semibold uppercase {currentProject.status ===
             'Active'
               ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
               : 'bg-slate-800 text-slate-400'}"
@@ -637,7 +637,7 @@
           </span>
         </div>
         <div>
-          <div class="text-sm font-bold text-white truncate">
+          <div class="text-sm font-bold text-slate-50 truncate">
             {currentProject.name}
           </div>
           <div class="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
@@ -659,13 +659,13 @@
           >
           {#if currentProject.ifc_file_path}
             <span
-              class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800/60"
+              class="px-2 py-0.5 rounded text-micro font-semibold uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800/60"
             >
               Model Ready
             </span>
           {:else}
             <span
-              class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-950/60 text-amber-400 border border-amber-800/60"
+              class="px-2 py-0.5 rounded text-micro font-semibold uppercase bg-amber-950/60 text-amber-400 border border-amber-800/60"
             >
               No Model Attached
             </span>
@@ -674,14 +674,14 @@
         {#if currentProject.ifc_file_path}
           <div class="text-xs space-y-1">
             <div
-              class="text-slate-300 font-mono text-[11px] truncate"
+              class="text-slate-300 font-mono text-caption truncate"
               title={currentProject.ifc_file_path}
             >
               {currentProject.ifc_file_path.split("/").pop()}
             </div>
             {#if currentProject.ifc_md5_hash}
               <div
-                class="text-slate-500 font-mono text-[10px] flex items-center gap-1.5"
+                class="text-slate-500 font-mono text-micro flex items-center gap-1.5"
               >
                 <span>Digest: {currentProject.ifc_md5_hash.slice(0, 16)}…</span>
                 <button
@@ -698,7 +698,7 @@
             <button
               type="button"
               on:click={() => onSelectProjectForViewer(currentProject.id)}
-              class="inline-flex items-center gap-1 text-xs font-semibold text-[#0071e3] hover:text-blue-400 transition-colors"
+              class="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-blue-400 transition-colors"
             >
               <ScanEye class="w-3.5 h-3.5" />
               <span>Open 3D Viewer</span>
@@ -707,7 +707,7 @@
             <button
               type="button"
               on:click={() => (isUploadModalOpen = true)}
-              class="text-xs text-slate-400 hover:text-white transition-colors"
+              class="text-xs text-slate-400 hover:text-slate-50 transition-colors"
             >
               Replace Model
             </button>
@@ -744,7 +744,7 @@
           <div class="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto pr-1">
             {#each analysisInputs as inp}
               <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium {inp.kind ===
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-micro font-medium {inp.kind ===
                 'standard'
                   ? 'bg-indigo-950/60 text-indigo-300 border border-indigo-800/60'
                   : 'bg-teal-950/60 text-teal-300 border border-teal-800/60'}"
@@ -758,7 +758,7 @@
             Default regulatory rulepacks will be evaluated.
           </div>
         {/if}
-        <div class="pt-1 flex items-center gap-1.5 text-[10px] text-slate-400 border-t border-slate-800/60">
+        <div class="pt-1 flex items-center gap-1.5 text-micro text-slate-400 border-t border-slate-800/60">
           <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/60 font-semibold">
             <ShieldCheck class="w-3 h-3 text-blue-400" />
             bSDD Verified
@@ -812,7 +812,7 @@
       >
         <Info class="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
         <div>
-          <strong class="font-bold text-white"
+          <strong class="font-bold text-slate-50"
             >White Box Data-Quality Doctrine:</strong
           >
           <span>
@@ -830,27 +830,27 @@
         class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-sm"
       >
         <div
-          class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider"
+          class="text-caption text-slate-400 font-semibold uppercase tracking-wider"
         >
           Total Findings
         </div>
-        <div class="text-2xl font-bold text-white mt-1">
+        <div class="text-2xl font-bold text-slate-50 mt-1">
           {result.issue_stats.total}
         </div>
-        <div class="text-[10px] text-slate-500 mt-0.5">Non-compliant items</div>
+        <div class="text-micro text-slate-500 mt-0.5">Non-compliant items</div>
       </div>
       <div
         class="p-4 rounded-2xl bg-red-950/30 border border-red-900/40 shadow-sm"
       >
         <div
-          class="text-[11px] text-red-300 font-semibold uppercase tracking-wider"
+          class="text-caption text-red-300 font-semibold uppercase tracking-wider"
         >
           Critical
         </div>
         <div class="text-2xl font-bold text-red-400 mt-1">
           {result.issue_stats.critical}
         </div>
-        <div class="text-[10px] text-red-400/60 mt-0.5">
+        <div class="text-micro text-red-400/60 mt-0.5">
           Immediate intervention
         </div>
       </div>
@@ -858,14 +858,14 @@
         class="p-4 rounded-2xl bg-orange-950/30 border border-orange-900/40 shadow-sm"
       >
         <div
-          class="text-[11px] text-orange-300 font-semibold uppercase tracking-wider"
+          class="text-caption text-orange-300 font-semibold uppercase tracking-wider"
         >
           High Risk
         </div>
         <div class="text-2xl font-bold text-orange-400 mt-1">
           {result.issue_stats.high}
         </div>
-        <div class="text-[10px] text-orange-400/60 mt-0.5">
+        <div class="text-micro text-orange-400/60 mt-0.5">
           Mandatory remediation
         </div>
       </div>
@@ -873,14 +873,14 @@
         class="p-4 rounded-2xl bg-yellow-950/30 border border-yellow-900/40 shadow-sm"
       >
         <div
-          class="text-[11px] text-yellow-300 font-semibold uppercase tracking-wider"
+          class="text-caption text-yellow-300 font-semibold uppercase tracking-wider"
         >
           Medium Risk
         </div>
         <div class="text-2xl font-bold text-yellow-400 mt-1">
           {result.issue_stats.medium}
         </div>
-        <div class="text-[10px] text-yellow-400/60 mt-0.5">
+        <div class="text-micro text-yellow-400/60 mt-0.5">
           Recommended mitigation
         </div>
       </div>
@@ -888,14 +888,14 @@
         class="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-900/40 shadow-sm"
       >
         <div
-          class="text-[11px] text-emerald-300 font-semibold uppercase tracking-wider"
+          class="text-caption text-emerald-300 font-semibold uppercase tracking-wider"
         >
           Low Risk
         </div>
         <div class="text-2xl font-bold text-emerald-400 mt-1">
           {result.issue_stats.low}
         </div>
-        <div class="text-[10px] text-emerald-400/60 mt-0.5">
+        <div class="text-micro text-emerald-400/60 mt-0.5">
           Minor tolerance variance
         </div>
       </div>
@@ -903,14 +903,14 @@
         class="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-900/40 shadow-sm"
       >
         <div
-          class="text-[11px] text-indigo-300 font-semibold uppercase tracking-wider"
+          class="text-caption text-indigo-300 font-semibold uppercase tracking-wider"
         >
           Data Quality
         </div>
         <div class="text-2xl font-bold text-indigo-300 mt-1">
           {dataQualityCount}
         </div>
-        <div class="text-[10px] text-indigo-300/60 mt-0.5">
+        <div class="text-micro text-indigo-300/60 mt-0.5">
           Unassessed mechanisms
         </div>
       </div>
@@ -926,7 +926,7 @@
       >
         <div>
           <h2
-            class="text-base font-bold text-white tracking-tight flex items-center gap-2"
+            class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2"
           >
             <span>Audit Findings</span>
             <span
@@ -951,7 +951,7 @@
                 "bcf",
                 requestedEngines,
               )}
-              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm transition-all hover:scale-[1.02]"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm transition-all hover:scale-[1.02]"
               title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
             >
               <Download class="w-3.5 h-3.5" />
@@ -964,7 +964,7 @@
                 "csv",
                 requestedEngines,
               )}
-              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
               title="Download tabulated audit spreadsheet with lineage and citations"
             >
               <Download class="w-3.5 h-3.5" />
@@ -977,7 +977,7 @@
                 "json",
                 requestedEngines,
               )}
-              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
               title="Download structured machine-readable JSON analysis report"
             >
               <Download class="w-3.5 h-3.5" />
@@ -998,7 +998,7 @@
             type="text"
             bind:value={searchQuery}
             placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
           />
         </div>
 
@@ -1006,7 +1006,7 @@
         <div class="sm:col-span-3">
           <select
             bind:value={severityFilter}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="all">All Severities</option>
             <option value="critical">Critical</option>
@@ -1021,7 +1021,7 @@
         <div class="sm:col-span-3">
           <select
             bind:value={mechanismFilter}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="all">All Mechanisms</option>
             {#if selectedSlug === "corrosion"}
@@ -1046,11 +1046,11 @@
           <input
             type="checkbox"
             bind:checked={showLowRisk}
-            class="rounded border-slate-700 bg-slate-900 text-[#0071e3] focus:ring-0 w-3.5 h-3.5"
+            class="rounded border-slate-700 bg-slate-900 text-accent focus:ring-0 w-3.5 h-3.5"
           />
           <span>Include Low Severity verdicts in list</span>
         </label>
-        <span class="text-[11px] text-slate-500">
+        <span class="text-caption text-slate-500">
           Showing {filteredIssues.length} items
         </span>
       </div>
@@ -1077,7 +1077,7 @@
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-300">
               <thead
-                class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
+                class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
               >
                 <tr>
                   <th class="py-3.5 px-4 w-10">
@@ -1085,70 +1085,70 @@
                       type="checkbox"
                       checked={allFilteredFindingsSelected}
                       on:change={toggleSelectAllFindings}
-                      class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                      class="rounded bg-slate-950 border-slate-700 text-accent focus:ring-accent cursor-pointer w-4 h-4"
                       title="Select all findings"
                     />
                   </th>
                   <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
                     on:click={() => toggleFindingSort("band")}
                   >
                     <div class="flex items-center gap-1">
                       <span>Severity</span>
                       {#if findingSortField === "band"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
                       {:else}
                         <ArrowUpDown class="w-3 h-3 text-slate-600" />
                       {/if}
                     </div>
                   </th>
                   <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
                     on:click={() => toggleFindingSort("rule_id")}
                   >
                     <div class="flex items-center gap-1">
                       <span>Rule &amp; Mechanism</span>
                       {#if findingSortField === "rule_id"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
                       {:else}
                         <ArrowUpDown class="w-3 h-3 text-slate-600" />
                       {/if}
                     </div>
                   </th>
                   <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
                     on:click={() => toggleFindingSort("element_id")}
                   >
                     <div class="flex items-center gap-1">
                       <span>Element GUID</span>
                       {#if findingSortField === "element_id"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
                       {:else}
                         <ArrowUpDown class="w-3 h-3 text-slate-600" />
                       {/if}
                     </div>
                   </th>
                   <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-white transition-colors select-none"
+                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
                     on:click={() => toggleFindingSort("title")}
                   >
                     <div class="flex items-center gap-1">
                       <span>Finding &amp; Citations</span>
                       {#if findingSortField === "title"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
                       {:else}
                         <ArrowUpDown class="w-3 h-3 text-slate-600" />
                       {/if}
                     </div>
                   </th>
                   <th
-                    class="py-3.5 px-4 text-center cursor-pointer hover:text-white transition-colors select-none"
+                    class="py-3.5 px-4 text-center cursor-pointer hover:text-slate-50 transition-colors select-none"
                     on:click={() => toggleFindingSort("score")}
                   >
                     <div class="flex items-center justify-center gap-1">
                       <span>Score / Clearance</span>
                       {#if findingSortField === "score"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-[#0071e3]" />{:else}<ArrowDown class="w-3 h-3 text-[#0071e3]" />{/if}
+                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
                       {:else}
                         <ArrowUpDown class="w-3 h-3 text-slate-600" />
                       {/if}
@@ -1169,7 +1169,7 @@
                         type="checkbox"
                         checked={selectedFindingIds.includes(issue.id)}
                         on:change={() => toggleSelectFinding(issue.id)}
-                        class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4"
+                        class="rounded bg-slate-950 border-slate-700 text-accent focus:ring-accent cursor-pointer w-4 h-4"
                       />
                     </td>
 
@@ -1177,31 +1177,31 @@
                     <td class="py-3.5 px-4 align-top whitespace-nowrap">
                       {#if isDq}
                         <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700"
+                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700"
                         >
                           Data Quality
                         </span>
                       {:else if issue.band === "critical"}
                         <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-red-950/80 text-red-400 border border-red-800/80 shadow-sm"
+                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-red-950/80 text-red-400 border border-red-800/80 shadow-sm"
                         >
                           Critical
                         </span>
                       {:else if issue.band === "high"}
                         <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-orange-950/80 text-orange-400 border border-orange-800/80 shadow-sm"
+                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-orange-950/80 text-orange-400 border border-orange-800/80 shadow-sm"
                         >
                           High
                         </span>
                       {:else if issue.band === "medium"}
                         <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-yellow-950/80 text-yellow-400 border border-yellow-800/80 shadow-sm"
+                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-yellow-950/80 text-yellow-400 border border-yellow-800/80 shadow-sm"
                         >
                           Medium
                         </span>
                       {:else}
                         <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 shadow-sm"
+                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 shadow-sm"
                         >
                           Low
                         </span>
@@ -1210,10 +1210,10 @@
 
                     <!-- Rule & Mechanism -->
                     <td class="py-3.5 px-4 align-top font-mono">
-                      <div class="font-bold text-white text-xs">
+                      <div class="font-bold text-slate-50 text-xs">
                         {issue.rule_id}
                       </div>
-                      <div class="text-[10px] text-slate-400 mt-0.5">
+                      <div class="text-micro text-slate-400 mt-0.5">
                         {issue.mechanism}
                       </div>
                     </td>
@@ -1221,7 +1221,7 @@
                     <!-- Element GUID -->
                     <td class="py-3.5 px-4 align-top">
                       <div
-                        class="flex items-center gap-1.5 font-mono text-slate-300 text-[11px]"
+                        class="flex items-center gap-1.5 font-mono text-slate-300 text-caption"
                       >
                         <span
                           class="truncate max-w-[140px]"
@@ -1230,7 +1230,7 @@
                         <button
                           type="button"
                           on:click={() => copyText(issue.element_id)}
-                          class="text-slate-500 hover:text-white transition-colors"
+                          class="text-slate-500 hover:text-slate-50 transition-colors"
                           title="Copy GUID"
                         >
                           <Copy class="w-3 h-3" />
@@ -1238,7 +1238,7 @@
                       </div>
                       {#if issue.details?.ifc_type}
                         <div
-                          class="text-[10px] text-slate-500 font-mono mt-0.5"
+                          class="text-micro text-slate-500 font-mono mt-0.5"
                         >
                           {issue.details.ifc_type}
                         </div>
@@ -1252,7 +1252,7 @@
                       </div>
                       {#if issue.mitigation}
                         <div
-                          class="text-[11px] text-slate-400 mt-1 line-clamp-2"
+                          class="text-caption text-slate-400 mt-1 line-clamp-2"
                         >
                           {issue.mitigation}
                         </div>
@@ -1263,7 +1263,7 @@
                         <div class="flex flex-wrap items-center gap-1.5 mt-2">
                           {#each issue.citations as cit}
                             <span
-                              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-900 text-indigo-300 border border-indigo-900/60"
+                              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-micro font-medium bg-slate-900 text-indigo-300 border border-indigo-900/60"
                               title={cit.reason}
                             >
                               <FileText class="w-2.5 h-2.5 opacity-70" />
@@ -1277,21 +1277,21 @@
                     <!-- Score or Clearance Depth -->
                     <td class="py-3.5 px-4 align-top text-center font-mono">
                       {#if isDq}
-                        <span class="text-slate-500 text-[11px]">N/A</span>
+                        <span class="text-slate-500 text-caption">N/A</span>
                       {:else if issue.score !== undefined && issue.score > 0}
-                        <div class="text-xs font-bold text-white">
+                        <div class="text-xs font-bold text-slate-50">
                           {issue.score.toFixed(2)}
                         </div>
-                        <div class="text-[9px] text-slate-500">Risk Score</div>
+                        <div class="text-nano text-slate-500">Risk Score</div>
                       {:else if issue.details?.intrusion_depth_mm !== undefined}
                         <div class="text-xs font-bold text-red-400">
                           {issue.details.intrusion_depth_mm} mm
                         </div>
-                        <div class="text-[9px] text-slate-500">
+                        <div class="text-nano text-slate-500">
                           Clash Intrusion
                         </div>
                       {:else}
-                        <span class="text-slate-500 text-[11px]">-</span>
+                        <span class="text-slate-500 text-caption">-</span>
                       {/if}
                     </td>
 
@@ -1302,7 +1302,7 @@
                       <button
                         type="button"
                         on:click={() => (inspectedIssue = issue)}
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 text-xs font-semibold transition-colors"
                       >
                         <span>Details</span>
                       </button>
@@ -1315,7 +1315,7 @@
                               selectedProjectId!,
                               issue.element_id,
                             )}
-                          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0071e3]/20 hover:bg-[#0071e3]/30 text-[#0071e3] hover:text-blue-300 text-xs font-semibold transition-colors"
+                          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent hover:text-blue-300 text-xs font-semibold transition-colors"
                         >
                           <ScanEye class="w-3.5 h-3.5" />
                           <span>3D</span>
@@ -1351,7 +1351,7 @@
         <Compass class="w-6 h-6" />
       </div>
       <div>
-        <div class="text-sm font-bold text-white">No Analysis Run Loaded</div>
+        <div class="text-sm font-bold text-slate-50">No Analysis Run Loaded</div>
         <div class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
           Select an OpenBIM project above and click <strong>"Run Audit"</strong>
           to compute compliance across corrosion engines or Blue Halo seismic clearance
@@ -1379,22 +1379,22 @@
       >
         <div class="flex items-center gap-2.5">
           <span
-            class="px-2.5 py-1 rounded-md bg-slate-800 text-white font-mono text-xs font-bold border border-slate-700"
+            class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-50 font-mono text-xs font-bold border border-slate-700"
           >
             {inspectedIssue.id}
           </span>
-          <span class="text-sm font-bold text-white"
+          <span class="text-sm font-bold text-slate-50"
             >{inspectedIssue.rule_id}</span
           >
           {#if isDq}
             <span
-              class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700"
+              class="px-2 py-0.5 rounded text-micro font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700"
             >
               Data Quality
             </span>
           {:else}
             <span
-              class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase {inspectedIssue.band ===
+              class="px-2 py-0.5 rounded text-micro font-semibold uppercase {inspectedIssue.band ===
               'critical'
                 ? 'bg-red-950/80 text-red-400'
                 : inspectedIssue.band === 'high'
@@ -1410,7 +1410,7 @@
         <button
           type="button"
           on:click={() => (inspectedIssue = null)}
-          class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          class="p-1 rounded-lg text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
@@ -1420,7 +1420,7 @@
       <div class="p-6 space-y-6 overflow-y-auto">
         <!-- Title & Mechanism -->
         <div>
-          <h3 class="text-base font-bold text-white">{inspectedIssue.title}</h3>
+          <h3 class="text-base font-bold text-slate-50">{inspectedIssue.title}</h3>
           <p class="text-xs text-slate-400 mt-1">
             Mechanism: <strong class="text-slate-200"
               >{inspectedIssue.mechanism}</strong
@@ -1447,7 +1447,7 @@
                 <button
                   type="button"
                   on:click={() => copyText(inspectedIssue?.element_id || "")}
-                  class="text-slate-400 hover:text-white"
+                  class="text-slate-400 hover:text-slate-50"
                 >
                   <Copy class="w-3 h-3" />
                 </button>
@@ -1515,7 +1515,7 @@
                     <span>{cit.standard} — {cit.clause}</span>
                   </div>
                   {#if cit.reason}
-                    <div class="text-[11px] text-slate-300 mt-1">
+                    <div class="text-caption text-slate-300 mt-1">
                       {cit.reason}
                     </div>
                   {/if}
@@ -1534,7 +1534,7 @@
               Metadata Parameters
             </h4>
             <pre
-              class="text-[11px] font-mono text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800 overflow-x-auto">{JSON.stringify(
+              class="text-caption font-mono text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800 overflow-x-auto">{JSON.stringify(
                 inspectedIssue.details,
                 null,
                 2,
@@ -1550,7 +1550,7 @@
         <button
           type="button"
           on:click={() => (inspectedIssue = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
         >
           Close
         </button>
@@ -1565,7 +1565,7 @@
                 onSelectProjectForViewer(selectedProjectId, elId);
               }
             }}
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white transition-colors"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white transition-colors"
           >
             <ScanEye class="w-4 h-4" />
             <span>Isolate in 3D Viewer</span>
@@ -1585,11 +1585,11 @@
       class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4"
     >
       <div class="flex items-center justify-between">
-        <h3 class="text-base font-bold text-white">Upload IFC Model</h3>
+        <h3 class="text-base font-bold text-slate-50">Upload IFC Model</h3>
         <button
           type="button"
           on:click={() => (isUploadModalOpen = false)}
-          class="text-slate-400 hover:text-white"
+          class="text-slate-400 hover:text-slate-50"
         >
           <X class="w-5 h-5" />
         </button>
@@ -1609,7 +1609,7 @@
           type="file"
           accept=".ifc"
           on:change={(e) => (uploadFile = e.currentTarget.files?.[0] || null)}
-          class="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#0071e3] file:text-white hover:file:bg-[#0077ed]"
+          class="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-accent file:text-white hover:file:bg-accent-hover"
         />
       </div>
 
@@ -1633,7 +1633,7 @@
         <button
           type="button"
           on:click={() => (isUploadModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-slate-50"
         >
           Cancel
         </button>
@@ -1641,7 +1641,7 @@
           type="button"
           disabled={!uploadFile || isUploading}
           on:click={handleUploadIfc}
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] text-white hover:bg-[#0077ed] disabled:opacity-50"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover disabled:opacity-50"
         >
           {#if isUploading}
             <RefreshCw class="w-3.5 h-3.5 animate-spin" />

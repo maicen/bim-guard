@@ -317,7 +317,7 @@
         <select
           id="rule-doc-source"
           bind:value={selectedDocId}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value={null}>-- Select from Document Library --</option>
           {#each documents as doc}
@@ -339,7 +339,7 @@
         <select
           id="rule-ai-model"
           bind:value={selectedModel}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           {#each LLM_MODELS as model}
             <option value={model.id}>{model.name}</option>
@@ -362,7 +362,7 @@
           bind:value={rawText}
           rows="6"
           placeholder="e.g. Section 3.4.1: Exterior exit doors shall have a minimum clear width of 900 mm and fire protection rating of not less than 45 minutes..."
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3] font-mono leading-relaxed"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent font-mono leading-relaxed"
         ></textarea>
       </div>
     {/if}
@@ -372,7 +372,7 @@
         type="button"
         disabled={isExtracting}
         on:click={handleExtract}
-        class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+        class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
       >
         <Sparkles class="w-4 h-4" />
         <span>{isExtracting ? "Extracting Rules via AI..." : "Extract Compliance Rules"}</span>
@@ -385,7 +385,7 @@
     <div class="space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 class="text-lg font-bold text-white tracking-tight">
+          <h2 class="text-lg font-bold text-slate-50 tracking-tight">
             Extracted Rules Review ({extractedRules.length} rules identified)
           </h2>
           <p class="text-xs text-slate-400">
@@ -397,21 +397,21 @@
           <div class="flex flex-col">
             <label
               for="extraction-ruleset"
-              class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5"
+              class="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-0.5"
               >Rule Folder</label
             >
             <input
               id="extraction-ruleset"
               type="text"
               bind:value={formRulesetId}
-              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3] w-44"
+              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent w-44"
             />
           </div>
 
           <button
             type="button"
             on:click={addManualDraftRule}
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-all"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-all"
           >
             <Plus class="w-3.5 h-3.5" />
             <span>Add Rule</span>
@@ -437,14 +437,14 @@
             type="text"
             bind:value={draftSearchQuery}
             placeholder="Search draft rules by reference, description, property..."
-            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
           />
         </div>
 
         <div class="flex items-center gap-2 w-full md:w-auto">
           <select
             bind:value={draftSeverityFilter}
-            class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="ALL">All Severities</option>
             <option value="Critical">Critical</option>
@@ -472,7 +472,7 @@
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-300">
             <thead
-              class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
+              class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
             >
               <tr>
                 <th class="py-3 px-3 w-10 text-center">
@@ -513,32 +513,32 @@
                       ariaLabel={`Select rule ${rule.rule_id}`}
                     />
                   </td>
-                  <td class="py-3 px-3 font-mono font-bold text-white">
+                  <td class="py-3 px-3 font-mono font-bold text-slate-50">
                     <input
                       type="text"
                       bind:value={rule.rule_id}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-[#0071e3] text-xs font-mono font-bold text-white focus:outline-none w-24"
+                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs font-mono font-bold text-slate-50 focus:outline-none w-24"
                     />
                   </td>
                   <td class="py-3 px-3">
                     <input
                       type="text"
                       bind:value={rule.description}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-[#0071e3] text-xs text-slate-300 focus:outline-none w-full min-w-[200px]"
+                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs text-slate-300 focus:outline-none w-full min-w-[200px]"
                     />
                   </td>
                   <td class="py-3 px-3 text-slate-400 font-mono">
                     <input
                       type="text"
                       bind:value={rule.property_set}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-[#0071e3] text-xs text-slate-400 focus:outline-none w-28"
+                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs text-slate-400 focus:outline-none w-28"
                     />
                   </td>
                   <td class="py-3 px-3 text-slate-300 font-mono">
                     <input
                       type="text"
                       bind:value={rule.property_name}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-[#0071e3] text-xs text-slate-300 focus:outline-none w-28"
+                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs text-slate-300 focus:outline-none w-28"
                     />
                   </td>
                   <td class="py-3 px-3 text-slate-400 font-mono">
@@ -553,7 +553,7 @@
                   <td class="py-3 px-3">
                     <select
                       bind:value={rule.severity}
-                      class="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-[10px] font-semibold text-white focus:outline-none"
+                      class="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-micro font-semibold text-slate-50 focus:outline-none"
                     >
                       <option value="Critical">Critical</option>
                       <option value="High">High</option>
@@ -566,7 +566,7 @@
                       <button
                         type="button"
                         on:click={() => (viewingDraftRule = rule)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                         title="Inspect draft details"
                       >
                         <Eye class="w-3.5 h-3.5" />
@@ -608,13 +608,13 @@
     <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
-          <FileText class="w-4 h-4 text-[#0071e3]" />
-          <h3 class="text-sm font-bold text-white font-mono">{viewingDraftRule.rule_id || 'Draft Rule'}</h3>
+          <FileText class="w-4 h-4 text-accent" />
+          <h3 class="text-sm font-bold text-slate-50 font-mono">{viewingDraftRule.rule_id || 'Draft Rule'}</h3>
         </div>
         <button
           type="button"
           on:click={() => (viewingDraftRule = null)}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-4 h-4" />
         </button>
@@ -628,7 +628,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 text-[11px] font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
+        <div class="grid grid-cols-2 gap-2 text-caption font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div><span class="text-slate-500">Pset:</span> <span class="text-slate-300">{viewingDraftRule.property_set || '—'}</span></div>
           <div><span class="text-slate-500">Property:</span> <span class="text-slate-300">{viewingDraftRule.property_name || '—'}</span></div>
           <div><span class="text-slate-500">Operator:</span> <span class="text-cyan-300">{viewingDraftRule.operator || '=='}</span></div>
@@ -641,7 +641,7 @@
         <button
           type="button"
           on:click={() => (viewingDraftRule = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
         >
           Close
         </button>
@@ -657,12 +657,12 @@
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
           <SlidersHorizontal class="w-4 h-4 text-blue-400" />
-          <h3 class="text-sm font-bold text-white">Bulk Edit Draft Rules ({selectedDraftCount} selected)</h3>
+          <h3 class="text-sm font-bold text-slate-50">Bulk Edit Draft Rules ({selectedDraftCount} selected)</h3>
         </div>
         <button
           type="button"
           on:click={() => (isDraftBulkEditModalOpen = false)}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-4 h-4" />
         </button>
@@ -674,7 +674,7 @@
           <select
             id="bulk-draft-severity"
             bind:value={bulkDraftSeverity}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="no_change">-- Keep Current Severity --</option>
             <option value="Critical">Critical</option>
@@ -691,7 +691,7 @@
             type="text"
             bind:value={bulkDraftPset}
             placeholder="Leave empty to keep current"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-50 placeholder-slate-600 focus:outline-none focus:border-accent"
           />
         </div>
 
@@ -700,7 +700,7 @@
           <select
             id="bulk-draft-op"
             bind:value={bulkDraftOperator}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="no_change">-- Keep Current Operator --</option>
             <option value="==">== (Equals)</option>
@@ -719,14 +719,14 @@
         <button
           type="button"
           on:click={() => (isDraftBulkEditModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50"
         >
           Cancel
         </button>
         <button
           type="button"
           on:click={applyDraftBulkEdit}
-          class="px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white"
+          class="px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white"
         >
           Apply Changes
         </button>

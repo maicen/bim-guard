@@ -205,13 +205,13 @@
         type="text"
         placeholder="Search issues, elements, rules, descriptions..."
         bind:value={searchQuery}
-        class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+        class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent"
       />
     </div>
     <div class="flex gap-2 w-full sm:w-auto">
       <select
         bind:value={selectedBand}
-        class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-[#0071e3]"
+        class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-accent"
       >
         <option value="all">All Severities</option>
         <option value="critical">Critical</option>
@@ -223,7 +223,7 @@
       {#if mechanisms.length > 0}
         <select
           bind:value={selectedMechanism}
-          class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-[#0071e3]"
+          class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-accent"
         >
           <option value="all">All Mechanisms</option>
           {#each mechanisms as mech}
@@ -248,7 +248,7 @@
   <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs">
-        <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase text-slate-400 font-semibold">
+        <thead class="bg-slate-950 border-b border-slate-800 text-caption uppercase text-slate-400 font-semibold">
           <tr>
             <th class="py-3 px-4 w-10">
               <TableCheckbox
@@ -339,14 +339,14 @@
                     <span slot="trigger" class="truncate cursor-help">{issue.element_id}</span>
 
                     <div class="space-y-2">
-                      <code class="block break-all rounded-lg bg-slate-950/70 border border-slate-800 px-2 py-1.5 text-[10px] text-emerald-300 select-all">
+                      <code class="block break-all rounded-lg bg-slate-950/70 border border-slate-800 px-2 py-1.5 text-micro text-emerald-300 select-all">
                         {issue.element_id || '—'}
                       </code>
                       <div class="flex items-center gap-1.5">
                         <button
                           type="button"
                           on:click={() => copyGuid(issue.element_id)}
-                          class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium transition-colors"
+                          class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-micro font-medium transition-colors"
                         >
                           {#if copiedGuid === issue.element_id}
                             <Check class="w-3 h-3 text-emerald-400" /> Copied
@@ -358,7 +358,7 @@
                           <button
                             type="button"
                             on:click={() => onSelectViewer && onSelectViewer(issue.element_id)}
-                            class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-[10px] font-medium transition-colors"
+                            class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-micro font-medium transition-colors"
                           >
                             <ScanEye class="w-3 h-3" /> Show in 3D
                           </button>
@@ -368,7 +368,7 @@
                   </HoverCard>
                 </td>
                 <td class="py-3 px-4 text-slate-200">
-                  <div class="font-medium text-white">{issue.title}</div>
+                  <div class="font-medium text-slate-50">{issue.title}</div>
                   {#if issue.description && issue.description !== issue.title}
                     <div class="text-xs text-slate-400 mt-0.5 line-clamp-2">{issue.description}</div>
                   {/if}
@@ -378,7 +378,7 @@
                     <button
                       type="button"
                       on:click={() => openDetails(issue)}
-                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                       title="Inspect finding details & citations"
                     >
                       <Eye class="w-3.5 h-3.5" />

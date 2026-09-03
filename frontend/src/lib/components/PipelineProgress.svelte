@@ -107,10 +107,10 @@
   <div class="flex items-center justify-between flex-wrap gap-4">
     <div>
       <div class="flex items-center gap-2.5">
-        <Activity class="w-4 h-4 text-[#0071e3] {avgProgress > 0 && avgProgress < 100 ? 'animate-pulse' : ''}" />
-        <h3 class="text-sm font-bold text-white tracking-tight">Real-Time Pipeline Execution Tracker</h3>
+        <Activity class="w-4 h-4 text-accent {avgProgress > 0 && avgProgress < 100 ? 'animate-pulse' : ''}" />
+        <h3 class="text-sm font-bold text-slate-50 tracking-tight">Real-Time Pipeline Execution Tracker</h3>
         {#if isStreaming}
-          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-micro font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
             SSE Live
           </span>
@@ -129,7 +129,7 @@
           style="width: {avgProgress}%"
         ></div>
       </div>
-      <span class="text-xs font-mono font-bold text-white">{avgProgress}%</span>
+      <span class="text-xs font-mono font-bold text-slate-50">{avgProgress}%</span>
     </div>
   </div>
 
@@ -140,7 +140,7 @@
       {@const isCurrent = avgProgress > ((stage.num - 1) / 6) * 100 && avgProgress < (stage.num / 6) * 100}
       <div class="p-3 rounded-xl border text-left transition-all {isDone ? 'bg-emerald-950/20 border-emerald-800/50 text-emerald-300' : isCurrent ? 'bg-blue-950/40 border-blue-600/70 text-blue-200 ring-1 ring-blue-500/40' : 'bg-slate-950/60 border-slate-800/80 text-slate-500'}">
         <div class="flex items-center justify-between">
-          <span class="text-[10px] font-mono uppercase font-bold tracking-wider opacity-80">Stage {stage.num}</span>
+          <span class="text-micro font-mono uppercase font-bold tracking-wider opacity-80">Stage {stage.num}</span>
           {#if isDone}
             <CheckCircle2 class="w-3.5 h-3.5 text-emerald-400" />
           {:else if isCurrent}
@@ -149,8 +149,8 @@
             <Clock class="w-3.5 h-3.5 opacity-40" />
           {/if}
         </div>
-        <div class="text-xs font-bold mt-1 text-white truncate">{stage.name}</div>
-        <div class="text-[10px] text-slate-400 line-clamp-1 mt-0.5 opacity-70">{stage.desc}</div>
+        <div class="text-xs font-bold mt-1 text-slate-50 truncate">{stage.name}</div>
+        <div class="text-micro text-slate-400 line-clamp-1 mt-0.5 opacity-70">{stage.desc}</div>
       </div>
     {/each}
   </div>
@@ -159,24 +159,24 @@
   {#if currentStatus && Object.keys(currentStatus.engines || {}).length > 0}
     <div class="space-y-3 pt-2 border-t border-slate-800/80">
       <div class="flex items-center justify-between">
-        <h4 class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Engine Execution Matrix</h4>
-        <span class="text-[10px] text-slate-500 font-mono">Phase 6–9 Pipeline Engines</span>
+        <h4 class="text-caption uppercase tracking-wider text-slate-400 font-semibold">Engine Execution Matrix</h4>
+        <span class="text-micro text-slate-500 font-mono">Phase 6–9 Pipeline Engines</span>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         {#each Object.entries(currentStatus.engines) as [code, engine]}
           <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/50 flex flex-col justify-between gap-2.5 hover:border-slate-700 transition-colors">
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-md bg-slate-800/80 text-white font-mono text-xs font-bold border border-slate-700">{code}</span>
+                <span class="px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-50 font-mono text-xs font-bold border border-slate-700">{code}</span>
                 <span class="text-xs font-semibold text-slate-200">{engine.label || code}</span>
               </div>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border uppercase tracking-wider {getStatusBadge(engine.status)}">
+              <span class="px-2 py-0.5 rounded-full text-micro font-semibold border uppercase tracking-wider {getStatusBadge(engine.status)}">
                 {engine.status}
               </span>
             </div>
 
             <!-- Engine metrics & Stage -->
-            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-900">
+            <div class="flex items-center justify-between text-caption text-slate-400 pt-1 border-t border-slate-900">
               <div class="flex items-center gap-2">
                 {#if engine.stage_name}
                   <span>Stage: <strong class="text-slate-300">{engine.stage_name}</strong></span>
@@ -185,7 +185,7 @@
                 {/if}
               </div>
               {#if engine.metrics && Object.keys(engine.metrics).length > 0}
-                <div class="flex items-center gap-2 text-[10px] font-mono text-slate-400">
+                <div class="flex items-center gap-2 text-micro font-mono text-slate-400">
                   {#if engine.metrics.elements_total}
                     <span>{engine.metrics.elements_total} elements</span>
                   {/if}

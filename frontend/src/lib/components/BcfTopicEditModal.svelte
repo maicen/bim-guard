@@ -123,7 +123,7 @@
             <FolderArchive class="w-5 h-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold text-white tracking-tight">
+            <h2 class="text-base font-bold text-slate-50 tracking-tight">
               {isEditing ? 'Edit BCF Topic' : 'Create Live BCF 2.1 Topic'}
             </h2>
             <p class="text-xs text-slate-400">
@@ -134,7 +134,7 @@
         <button
           type="button"
           on:click={onClose}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
@@ -159,7 +159,7 @@
             type="text"
             bind:value={title}
             placeholder="e.g. Non-compliant Door Clear Width at Level 1"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
           />
         </div>
 
@@ -172,7 +172,7 @@
             <select
               id="topic-type"
               bind:value={topicType}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="Issue">Issue</option>
               <option value="Clash / Compliance">Clash / Compliance</option>
@@ -189,7 +189,7 @@
             <select
               id="topic-status"
               bind:value={topicStatus}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
@@ -206,7 +206,7 @@
             <select
               id="topic-priority"
               bind:value={priority}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="Critical">Critical</option>
               <option value="High">High</option>
@@ -226,7 +226,7 @@
             bind:value={description}
             rows="3"
             placeholder="Detailed description of the architectural or engineering non-compliance..."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
           ></textarea>
         </div>
 
@@ -241,7 +241,7 @@
               type="text"
               bind:value={assignedTo}
               placeholder="e.g. Lead Architect / BIM Coordinator"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
             />
           </div>
 
@@ -253,7 +253,7 @@
               id="topic-due"
               type="date"
               bind:value={dueDate}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
             />
           </div>
         </div>
@@ -267,11 +267,11 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="space-y-1">
-              <label for="topic-cde" class="block text-[11px] font-semibold text-slate-400">CDE State</label>
+              <label for="topic-cde" class="block text-caption font-semibold text-slate-400">CDE State</label>
               <select
                 id="topic-cde"
                 bind:value={cdeState}
-                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
               >
                 {#each CDE_STATE_CHOICES as state}
                   <option value={state}>{state}</option>
@@ -280,11 +280,11 @@
             </div>
 
             <div class="space-y-1">
-              <label for="topic-suitability" class="block text-[11px] font-semibold text-slate-400">Suitability</label>
+              <label for="topic-suitability" class="block text-caption font-semibold text-slate-400">Suitability</label>
               <select
                 id="topic-suitability"
                 bind:value={suitabilityCode}
-                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
               >
                 {#each SUITABILITY_CODES as code}
                   <option value={code}>{code}</option>
@@ -293,13 +293,13 @@
             </div>
 
             <div class="space-y-1">
-              <label for="topic-revision" class="block text-[11px] font-semibold text-slate-400">Revision Code</label>
+              <label for="topic-revision" class="block text-caption font-semibold text-slate-400">Revision Code</label>
               <input
                 id="topic-revision"
                 type="text"
                 bind:value={revisionCode}
                 placeholder="P01.01"
-                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-50 focus:outline-none focus:border-accent"
               />
             </div>
           </div>
@@ -315,7 +315,7 @@
             type="text"
             bind:value={componentGuidsText}
             placeholder="e.g. 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d, 2b3c4d5e-..."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-accent"
           />
         </div>
       </div>
@@ -325,7 +325,7 @@
         <button
           type="button"
           on:click={onClose}
-          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
         >
           Cancel
         </button>
@@ -333,7 +333,7 @@
           type="button"
           disabled={isSaving}
           on:click={handleSave}
-          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white transition-all disabled:opacity-40"
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white transition-all disabled:opacity-40"
         >
           {#if isSaving}
             <div class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

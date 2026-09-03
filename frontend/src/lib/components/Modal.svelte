@@ -43,7 +43,7 @@
         <div class="flex items-center gap-3 min-w-0">
           {#if icon}
             <div
-              class="w-9 h-9 rounded-xl bg-blue-950/60 border border-blue-800/60 flex items-center justify-center text-[#0071e3] shrink-0"
+              class="w-9 h-9 rounded-xl bg-blue-950/60 border border-blue-800/60 flex items-center justify-center text-accent shrink-0"
             >
               <svelte:component this={icon} class="w-4 h-4" />
             </div>
@@ -51,7 +51,7 @@
           <div class="min-w-0">
             <h3
               id="modal-title"
-              class="text-base font-bold text-white tracking-tight truncate"
+              class="text-base font-bold text-slate-50 tracking-tight truncate"
             >
               {title}
             </h3>
@@ -66,7 +66,7 @@
           <button
             type="button"
             on:click={onClose}
-            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            class="p-1.5 rounded-lg text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
             title="Close dialog"
           >
             <X class="w-4 h-4" />

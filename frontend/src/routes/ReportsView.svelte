@@ -437,7 +437,7 @@
           loadReport();
           loadBcfTopics();
         }}
-        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
       >
         {#each projects as p}
           <option value={p.id}>{p.name}</option>
@@ -463,11 +463,11 @@
         <div>
           <div class="flex items-center gap-2">
             <FolderArchive class="w-4 h-4 text-blue-400" />
-            <h2 class="text-base font-bold text-white tracking-tight">
+            <h2 class="text-base font-bold text-slate-50 tracking-tight">
               buildingSMART BCF Collaboration Hub
             </h2>
             <span
-              class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700"
+              class="px-2 py-0.5 rounded-full text-micro font-semibold bg-slate-800 text-slate-300 border border-slate-700"
             >
               {activeTab === 'live_bcf' ? `${bcfTopics.length} Live Topics` : `${bcfArtifacts.length} Artifacts`}
             </span>
@@ -487,7 +487,7 @@
               on:click={() => (activeTab = "live_bcf")}
               class="px-3 py-1 rounded-lg font-medium transition-colors {activeTab === 'live_bcf'
                 ? 'bg-blue-600 text-white'
-                : 'text-slate-400 hover:text-white'}"
+                : 'text-slate-400 hover:text-slate-50'}"
             >
               Live BCF 2.1 Topics
             </button>
@@ -495,8 +495,8 @@
               type="button"
               on:click={() => (activeTab = "artifacts")}
               class="px-3 py-1 rounded-lg font-medium transition-colors {activeTab === 'artifacts'
-                ? 'bg-slate-800 text-white'
-                : 'text-slate-400 hover:text-white'}"
+                ? 'bg-slate-800 text-slate-50'
+                : 'text-slate-400 hover:text-slate-50'}"
             >
               BCF Zip Artifacts
             </button>
@@ -520,7 +520,7 @@
               else loadBcfArtifacts();
             }}
             disabled={isTopicsLoading || isBcfLoading}
-            class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors disabled:opacity-50"
+            class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 border border-slate-700 transition-colors disabled:opacity-50"
             title="Refresh Deliverables"
           >
             <RefreshCw
@@ -541,14 +541,14 @@
               type="text"
               bind:value={topicSearchQuery}
               placeholder="Search topics by title, GUID, assignee, or description..."
-              class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
             />
           </div>
 
           <div class="flex items-center gap-2 w-full md:w-auto flex-wrap">
             <select
               bind:value={topicStatusFilter}
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="ALL">All Statuses</option>
               <option value="Open">Open</option>
@@ -559,7 +559,7 @@
 
             <select
               bind:value={topicPriorityFilter}
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="ALL">All Priorities</option>
               <option value="Critical">Critical</option>
@@ -570,7 +570,7 @@
 
             <select
               bind:value={topicCdeFilter}
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="ALL">All CDE States</option>
               <option value="WIP">WIP</option>
@@ -616,7 +616,7 @@
             <table class="w-full text-left text-xs border-collapse">
               <thead>
                 <tr
-                  class="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-semibold uppercase tracking-wider text-[10px]"
+                  class="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-semibold uppercase tracking-wider text-micro"
                 >
                   <th class="py-3 px-4 w-10">
                     <TableCheckbox
@@ -652,17 +652,17 @@
                         ariaLabel={`Select topic ${topic.title}`}
                       />
                     </td>
-                    <td class="py-3 px-4 font-mono text-[11px] text-slate-400">
+                    <td class="py-3 px-4 font-mono text-caption text-slate-400">
                       {topic.guid.substring(0, 8)}...
                     </td>
                     <td class="py-3 px-4">
-                      <div class="font-medium text-white">{topic.title}</div>
-                      <div class="text-[10px] text-slate-400">{topic.topic_type || 'Clash / Compliance'}</div>
+                      <div class="font-medium text-slate-50">{topic.title}</div>
+                      <div class="text-micro text-slate-400">{topic.topic_type || 'Clash / Compliance'}</div>
                     </td>
                     <td class="py-3 px-4">
                       <div class="flex items-center gap-1.5">
                         <SeverityBadge severity={topic.topic_status || 'Open'} />
-                        <span class="text-[10px] text-slate-400 font-medium">
+                        <span class="text-micro text-slate-400 font-medium">
                           {topic.priority || 'Normal'}
                         </span>
                       </div>
@@ -678,7 +678,7 @@
                       {topic.component_guids ? topic.component_guids.length : 0} GUID{topic.component_guids?.length === 1 ? '' : 's'}
                     </td>
                     <td class="py-3 px-4">
-                      <span class="inline-flex items-center gap-1 text-slate-300 text-[11px]">
+                      <span class="inline-flex items-center gap-1 text-slate-300 text-caption">
                         <Camera class="w-3 h-3 text-blue-400" />
                         <span>{topic.viewpoints_count || 1}</span>
                       </span>
@@ -688,7 +688,7 @@
                         <button
                           type="button"
                           on:click={() => openTopicDetails(topic)}
-                          class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                          class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                           title="View topic discussion & viewpoints"
                         >
                           <Eye class="w-3.5 h-3.5" />
@@ -740,7 +740,7 @@
               type="text"
               bind:value={artifactSearchQuery}
               placeholder="Filter BCF archives by filename or project..."
-              class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
             />
           </div>
 
@@ -750,8 +750,8 @@
                 type="button"
                 on:click={() => (filterToSelectedProject = false)}
                 class="px-2.5 py-1 rounded-lg font-medium transition-colors {!filterToSelectedProject
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:text-white'}"
+                  ? 'bg-slate-800 text-slate-50'
+                  : 'text-slate-400 hover:text-slate-50'}"
               >
                 All Projects
               </button>
@@ -760,7 +760,7 @@
                 on:click={() => (filterToSelectedProject = true)}
                 class="px-2.5 py-1 rounded-lg font-medium transition-colors {filterToSelectedProject
                   ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white'}"
+                  : 'text-slate-400 hover:text-slate-50'}"
               >
                 {currentProject?.name || "Selected"}
               </button>
@@ -797,7 +797,7 @@
             <table class="w-full text-left text-xs border-collapse">
               <thead>
                 <tr
-                  class="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-semibold uppercase tracking-wider text-[10px]"
+                  class="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-semibold uppercase tracking-wider text-micro"
                 >
                   <th class="py-3 px-4 w-10">
                     <TableCheckbox
@@ -836,7 +836,7 @@
                       />
                     </td>
                     <td class="py-3 px-4 font-mono text-slate-500">#{artifact.id}</td>
-                    <td class="py-3 px-4 font-medium text-white">
+                    <td class="py-3 px-4 font-medium text-slate-50">
                       {getProjectName(artifact.project_id)}
                     </td>
                     <td class="py-3 px-4">
@@ -849,7 +849,7 @@
                     </td>
                     <td class="py-3 px-4">
                       <span
-                        class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border {artifact.issue_count > 0
+                        class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold border {artifact.issue_count > 0
                           ? 'bg-rose-950/60 text-rose-300 border-rose-800'
                           : 'bg-emerald-950/60 text-emerald-300 border-emerald-800'}"
                       >

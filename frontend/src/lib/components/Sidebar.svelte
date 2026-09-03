@@ -82,24 +82,24 @@
     {#if !collapsed}
       <div class="flex items-center gap-2.5 overflow-hidden">
         <div
-          class="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0071e3] to-cyan-400 flex items-center justify-center font-bold text-white text-sm shadow-md shadow-blue-500/20 shrink-0"
+          class="w-8 h-8 rounded-xl bg-gradient-to-tr from-accent to-cyan-400 flex items-center justify-center font-bold text-white text-sm shadow-md shadow-blue-500/20 shrink-0"
         >
           BG
         </div>
         <div class="flex flex-col truncate">
           <span
-            class="font-bold text-base tracking-tight text-white leading-none"
+            class="font-bold text-base tracking-tight text-slate-50 leading-none"
             >BIM Guard</span
           >
           <span
-            class="text-[10px] text-slate-400 uppercase tracking-widest mt-1 font-semibold"
+            class="text-micro text-slate-400 uppercase tracking-widest mt-1 font-semibold"
             >OpenBIM Compliance</span
           >
         </div>
       </div>
     {:else}
       <div
-        class="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0071e3] to-cyan-400 flex items-center justify-center font-bold text-white text-sm shadow-md shadow-blue-500/20 mx-auto"
+        class="w-8 h-8 rounded-xl bg-gradient-to-tr from-accent to-cyan-400 flex items-center justify-center font-bold text-white text-sm shadow-md shadow-blue-500/20 mx-auto"
       >
         BG
       </div>
@@ -108,7 +108,7 @@
     <button
       type="button"
       on:click={() => (collapsed = !collapsed)}
-      class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-900 transition-colors shrink-0"
+      class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-900 transition-colors shrink-0"
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
     >
       {#if collapsed}
@@ -125,7 +125,7 @@
       <div class="space-y-1">
         {#if !collapsed}
           <div
-            class="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500"
+            class="px-2.5 py-1 text-caption font-bold uppercase tracking-wider text-slate-500"
           >
             {section.title}
           </div>
@@ -137,14 +137,14 @@
             on:click={() => onSelectView(item.id)}
             class="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-sm font-medium transition-all group relative {activeView ===
             item.id
-              ? 'bg-[#0071e3] text-white shadow-sm shadow-blue-600/30'
+              ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
               : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'}"
             title={collapsed ? item.label : undefined}
           >
             <svelte:component
               this={item.icon}
               class="w-4 h-4 shrink-0 {activeView === item.id
-                ? 'text-white'
+                ? 'text-slate-50'
                 : 'text-slate-400 group-hover:text-slate-200'}"
             />
             {#if !collapsed}
@@ -170,7 +170,7 @@
       on:click={() => onSelectView("settings")}
       class="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-sm font-medium transition-all group {activeView ===
       'settings'
-        ? 'bg-[#0071e3] text-white'
+        ? 'bg-accent text-white'
         : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'} {collapsed
         ? 'justify-center'
         : ''}"
@@ -178,7 +178,7 @@
     >
       <Settings
         class="w-4 h-4 shrink-0 {activeView === 'settings'
-          ? 'text-white'
+          ? 'text-slate-50'
           : 'text-slate-400 group-hover:text-slate-200'}"
       />
       {#if !collapsed}

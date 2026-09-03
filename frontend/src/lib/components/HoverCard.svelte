@@ -321,7 +321,7 @@
         >
           {#if icon}
             <div
-              class="w-7 h-7 rounded-lg bg-blue-950/50 border border-blue-800/50 flex items-center justify-center text-[#0071e3] shrink-0"
+              class="w-7 h-7 rounded-lg bg-blue-950/50 border border-blue-800/50 flex items-center justify-center text-accent shrink-0"
             >
               <svelte:component this={icon} class="w-3.5 h-3.5" />
             </div>
@@ -335,7 +335,7 @@
               </div>
             {/if}
             {#if subtitle}
-              <div class="text-[10px] text-slate-400 mt-0.5 break-words">
+              <div class="text-micro text-slate-400 mt-0.5 break-words">
                 {subtitle}
               </div>
             {/if}
@@ -343,13 +343,13 @@
         </div>
       {/if}
 
-      <div class="px-3.5 py-2.5 text-[11px] leading-relaxed text-slate-300">
+      <div class="px-3.5 py-2.5 text-caption leading-relaxed text-slate-300">
         <slot />
       </div>
 
       {#if $$slots.footer && showFooter}
         <div
-          class="px-3.5 py-2 border-t border-slate-800/80 text-[10px] text-slate-400"
+          class="px-3.5 py-2 border-t border-slate-800/80 text-micro text-slate-400"
         >
           <slot name="footer" />
         </div>

@@ -35,7 +35,7 @@
   <button
     type="button"
     on:click|stopPropagation={toggle}
-    class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none"
+    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors focus:outline-none"
     title="Actions"
   >
     <MoreVertical class="w-4 h-4" />
@@ -53,9 +53,9 @@
               isOpen = false;
               onView();
             }}
-            class="group flex items-center gap-2.5 w-full px-3.5 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors text-left"
+            class="group flex items-center gap-2.5 w-full px-3.5 py-1.5 text-xs text-slate-300 hover:text-slate-50 hover:bg-slate-800/80 transition-colors text-left"
           >
-            <Eye class="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+            <Eye class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-50" />
             <span>{viewLabel}</span>
           </button>
         {/if}
@@ -67,9 +67,9 @@
               isOpen = false;
               onEdit();
             }}
-            class="group flex items-center gap-2.5 w-full px-3.5 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors text-left"
+            class="group flex items-center gap-2.5 w-full px-3.5 py-1.5 text-xs text-slate-300 hover:text-slate-50 hover:bg-slate-800/80 transition-colors text-left"
           >
-            <Pencil class="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+            <Pencil class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-50" />
             <span>{editLabel}</span>
           </button>
         {/if}

@@ -77,7 +77,7 @@
     >
       Manuals
     </div>
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
       3D Modeling Reference Manual
     </h1>
     <p class="text-xs sm:text-sm text-slate-400">
@@ -88,11 +88,11 @@
 
   <!-- Architectural 3D Model Checklist -->
   <div class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
-    <h2 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
-      <CheckCircle2 class="w-4 h-4 text-[#0071e3]" />
+    <h2 class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2">
+      <CheckCircle2 class="w-4 h-4 text-accent" />
       <span>Architectural 3D Model Checklist</span>
     </h2>
-    <p class="text-[11px] text-slate-400 -mt-2">
+    <p class="text-caption text-slate-400 -mt-2">
       Modeling mistakes that make an element invisible to checking entirely, or fail
       a rule that has nothing to do with a real code issue &mdash; regardless of
       whether its properties are filled in correctly. Check these before export.
@@ -100,14 +100,14 @@
 
     {#each CHECKLISTS as group}
       <div class="space-y-2">
-        <div class="font-semibold text-xs text-white">{group.domain}</div>
+        <div class="font-semibold text-xs text-slate-50">{group.domain}</div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           {#each group.items as item}
             <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex gap-3">
-              <CheckCircle2 class="w-4 h-4 text-[#0071e3] shrink-0 mt-0.5" />
+              <CheckCircle2 class="w-4 h-4 text-accent shrink-0 mt-0.5" />
               <div class="space-y-1">
-                <div class="font-semibold text-xs text-white">{item.title}</div>
-                <p class="text-[11px] text-slate-400 leading-relaxed">{item.why}</p>
+                <div class="font-semibold text-xs text-slate-50">{item.title}</div>
+                <p class="text-caption text-slate-400 leading-relaxed">{item.why}</p>
               </div>
             </div>
           {/each}
@@ -122,9 +122,9 @@
         class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4"
       >
         <h2
-          class="text-base font-bold text-white tracking-tight flex items-center gap-2"
+          class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2"
         >
-          <Layers class="w-4 h-4 text-[#0071e3]" />
+          <Layers class="w-4 h-4 text-accent" />
           <span>{group.domain}</span>
         </h2>
 
@@ -133,8 +133,8 @@
             <div
               class="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2"
             >
-              <div class="font-semibold text-xs text-white">{item.element}</div>
-              <p class="text-[11px] text-slate-400 leading-relaxed">
+              <div class="font-semibold text-xs text-slate-50">{item.element}</div>
+              <p class="text-caption text-slate-400 leading-relaxed">
                 {item.rules}
               </p>
             </div>

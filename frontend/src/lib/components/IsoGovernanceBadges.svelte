@@ -39,7 +39,7 @@
 
 <div
   class="flex items-center gap-1.5 font-mono {size === 'xs'
-    ? 'text-[10px]'
+    ? 'text-micro'
     : 'text-xs'}"
 >
   <HoverCard
@@ -107,7 +107,7 @@
 
     <!-- The state alone does not show how far along the container is; the
          ladder does, which is the question a reviewer actually has. -->
-    <div class="flex items-center gap-1 mt-2 font-mono text-[9px]">
+    <div class="flex items-center gap-1 mt-2 font-mono text-nano">
       {#each CDE_ORDER as state, i}
         {#if i > 0}
           <span class="text-slate-600">→</span>
@@ -115,7 +115,7 @@
         <span
           class="px-1.5 py-0.5 rounded border {state ===
           cdeCode.toUpperCase()
-            ? 'bg-[#0071e3]/15 border-[#0071e3]/50 text-[#0071e3] font-bold'
+            ? 'bg-accent/15 border-accent/50 text-accent font-bold'
             : 'bg-slate-800/60 border-slate-700/50 text-slate-500'}"
         >
           {state}

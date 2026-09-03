@@ -355,7 +355,7 @@
   <!-- ═══ Header ═══ -->
   <div>
     <div class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Analysis</div>
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
       {#if result}
         {result.project_name} — ARCH Analysis{folderNote}
       {:else}
@@ -409,7 +409,7 @@
     <select
       bind:value={selectedProjectId}
       on:change={handleProjectChange}
-      class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+      class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
     >
       {#if relevantProjects.length === 0}
         <option value={null}>No Arch projects found</option>
@@ -446,7 +446,7 @@
       type="button"
       disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
       on:click={handleRunClick}
-      class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+      class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
     >
       <Play class="w-3.5 h-3.5" />
       {isRunning ? 'Auditing…' : isCheckingEnhancement ? 'Checking model…' : 'Run ARCH Audit'}
@@ -488,7 +488,7 @@
         <select
           bind:value={selectedFolder}
           disabled={isFoldersLoading}
-          class="w-full bg-slate-800/60 border border-slate-700 rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium text-white focus:outline-none focus:border-[#0071e3] appearance-none disabled:opacity-60"
+          class="w-full bg-slate-800/60 border border-slate-700 rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium text-slate-50 focus:outline-none focus:border-accent appearance-none disabled:opacity-60"
         >
           <option value="">{isFoldersLoading ? 'Loading folders…' : 'All Rules'}</option>
           {#each ruleFolders as folder}
@@ -498,9 +498,9 @@
         <ChevronDown class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       </div>
       {#if selectedFolder}
-        <span class="text-[10px] text-slate-500 shrink-0">Selected: <span class="text-slate-300 font-mono">{selectedFolder}</span> (scopes audit to this ruleset only)</span>
+        <span class="text-micro text-slate-500 shrink-0">Selected: <span class="text-slate-300 font-mono">{selectedFolder}</span> (scopes audit to this ruleset only)</span>
       {:else}
-        <span class="text-[10px] text-slate-500 shrink-0">Scope: <span class="text-slate-300">All building code rules</span></span>
+        <span class="text-micro text-slate-500 shrink-0">Scope: <span class="text-slate-300">All building code rules</span></span>
       {/if}
     </div>
   {/if}
@@ -540,7 +540,7 @@
           class="w-full flex items-center justify-between p-4 text-left hover:bg-slate-800/30 transition-colors"
           on:click={() => toggleSection('building')}
         >
-          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+          <h2 class="text-sm font-bold text-slate-50 flex items-center gap-2">
             <Building2 class="w-4 h-4 text-blue-400" />
             Building Overview
           </h2>
@@ -554,21 +554,21 @@
         <!-- Stat strip (always visible) -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 pb-4">
           <div class="text-center px-4 py-3 bg-slate-800/60 rounded-xl">
-            <span class="text-2xl font-bold text-white block">{buildingSummary.storey_count || 0}</span>
+            <span class="text-2xl font-bold text-slate-50 block">{buildingSummary.storey_count || 0}</span>
             <span class="text-xs text-slate-400">Storeys</span>
           </div>
           <div class="text-center px-4 py-3 bg-slate-800/60 rounded-xl">
-            <span class="text-2xl font-bold text-white block">{buildingSummary.room_count || 0}</span>
+            <span class="text-2xl font-bold text-slate-50 block">{buildingSummary.room_count || 0}</span>
             <span class="text-xs text-slate-400">Rooms / Spaces</span>
           </div>
           <div class="text-center px-4 py-3 bg-slate-800/60 rounded-xl">
-            <span class="text-2xl font-bold text-white block">
+            <span class="text-2xl font-bold text-slate-50 block">
               {buildingSummary.total_gfa_m2 ? buildingSummary.total_gfa_m2.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—'}
             </span>
             <span class="text-xs text-slate-400">GFA m²</span>
           </div>
           <div class="text-center px-4 py-3 bg-slate-800/60 rounded-xl">
-            <span class="text-2xl font-bold text-white block">{buildingSummary.external_door_count || 0}</span>
+            <span class="text-2xl font-bold text-slate-50 block">{buildingSummary.external_door_count || 0}</span>
             <span class="text-xs text-slate-400">Exit Doors</span>
           </div>
         </div>
@@ -595,7 +595,7 @@
                         {@const ri = buildingSummary.rooms_per_storey?.[s.name]}
                         {@const hMm = floorHeightMap[s.name]}
                         <tr class="border-b border-slate-800/60 last:border-0">
-                          <td class="px-3 py-2 text-xs font-medium text-white">{s.name}</td>
+                          <td class="px-3 py-2 text-xs font-medium text-slate-50">{s.name}</td>
                           <td class="px-3 py-2 text-xs font-mono text-slate-300">
                             {#if hMm}
                               {hMm >= 1000 ? `${(hMm / 1000).toFixed(2)} m` : `${hMm.toLocaleString()} mm`}
@@ -702,8 +702,8 @@
           >
             <div class="flex items-center gap-3">
               <Footprints class="w-4 h-4 text-amber-400" />
-              <h3 class="text-sm font-bold text-white">{domain.label}</h3>
-              <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {eBadge.cls}">{eBadge.label}</span>
+              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <span class="inline-block px-2.5 py-0.5 rounded-full text-caption font-semibold border {eBadge.cls}">{eBadge.label}</span>
             </div>
             {#if isOpen}<ChevronDown class="w-4 h-4 text-slate-400" />{:else}<ChevronRight class="w-4 h-4 text-slate-400" />{/if}
           </button>
@@ -717,7 +717,7 @@
                   <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('exit-count')}>
                     {#if openSections['exit-count']}<ChevronDown class="w-3.5 h-3.5" />{:else}<ChevronRight class="w-3.5 h-3.5" />{/if}
                     Exit Count ({exitData.total_exterior_doors || 0} exterior door(s))
-                    <span class="text-[10px] font-mono text-slate-500">{ePass}/{exitResults.length} pass</span>
+                    <span class="text-micro font-mono text-slate-500">{ePass}/{exitResults.length} pass</span>
                   </button>
                   {#if openSections['exit-count']}
                     <div class="overflow-auto border border-slate-800 rounded-lg">
@@ -731,7 +731,7 @@
                         <tbody>
                           {#each exitResults as r}
                             <tr class="border-b border-slate-800/60 last:border-0">
-                              <td class="px-3 py-2 text-xs text-white">{r.storey}</td>
+                              <td class="px-3 py-2 text-xs text-slate-50">{r.storey}</td>
                               <td class="px-3 py-2 text-xs font-mono text-center text-slate-300">{r.exit_count}</td>
                               <td class="px-3 py-2 text-xs font-mono text-center text-slate-300">{r.required_min}</td>
                               <td class="px-3 py-2 text-xs font-semibold {r.passes ? 'text-emerald-400' : 'text-rose-400'}">{r.passes ? '✓ Pass' : '✗ Fail'}</td>
@@ -753,7 +753,7 @@
                   <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('travel-dist')}>
                     {#if openSections['travel-dist']}<ChevronDown class="w-3.5 h-3.5" />{:else}<ChevronRight class="w-3.5 h-3.5" />{/if}
                     Travel Distance
-                    <span class="text-[10px] font-mono text-slate-500">{tdPass}/{travel.length} pass</span>
+                    <span class="text-micro font-mono text-slate-500">{tdPass}/{travel.length} pass</span>
                   </button>
                   {#if openSections['travel-dist']}
                     <div class="overflow-auto border border-slate-800 rounded-lg max-h-64">
@@ -769,7 +769,7 @@
                           {#each [...travel].sort((a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1)) as r}
                             <tr class="border-b border-slate-800/60 last:border-0">
                               <td class="px-3 py-2 text-xs text-slate-400">{r.storey_name || '—'}</td>
-                              <td class="px-3 py-2 text-xs text-white">{(r.space_name || '').slice(0, 35)}</td>
+                              <td class="px-3 py-2 text-xs text-slate-50">{(r.space_name || '').slice(0, 35)}</td>
                               <td class="px-3 py-2 text-xs font-mono text-right text-slate-300">
                                 {r.travel_distance_m !== null && r.travel_distance_m !== undefined ? `${r.travel_distance_m.toFixed(1)} m` : 'No path'}
                               </td>
@@ -800,8 +800,8 @@
           <button type="button" class="w-full flex items-center justify-between p-4 text-left hover:bg-slate-800/30 transition-colors" on:click={() => toggleDomain(domain.key)}>
             <div class="flex items-center gap-3">
               <Droplets class="w-4 h-4 text-cyan-400" />
-              <h3 class="text-sm font-bold text-white">{domain.label}</h3>
-              <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {pBadge.cls}">{pBadge.label}</span>
+              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <span class="inline-block px-2.5 py-0.5 rounded-full text-caption font-semibold border {pBadge.cls}">{pBadge.label}</span>
             </div>
             {#if isOpen}<ChevronDown class="w-4 h-4 text-slate-400" />{:else}<ChevronRight class="w-4 h-4 text-slate-400" />{/if}
           </button>
@@ -832,8 +832,8 @@
           <button type="button" class="w-full flex items-center justify-between p-4 text-left hover:bg-slate-800/30 transition-colors" on:click={() => toggleDomain(domain.key)}>
             <div class="flex items-center gap-3">
               <Car class="w-4 h-4 text-slate-300" />
-              <h3 class="text-sm font-bold text-white">{domain.label}</h3>
-              <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {gBadge.cls}">{gBadge.label}</span>
+              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <span class="inline-block px-2.5 py-0.5 rounded-full text-caption font-semibold border {gBadge.cls}">{gBadge.label}</span>
             </div>
             {#if isOpen}<ChevronDown class="w-4 h-4 text-slate-400" />{:else}<ChevronRight class="w-4 h-4 text-slate-400" />{/if}
           </button>
@@ -853,7 +853,7 @@
                   <tbody>
                     {#each [...gResults].sort((a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1)) as r}
                       <tr class="border-b border-slate-800/60 last:border-0">
-                        <td class="px-3 py-2 text-xs font-semibold text-white">{r.element_type}</td>
+                        <td class="px-3 py-2 text-xs font-semibold text-slate-50">{r.element_type}</td>
                         <td class="px-3 py-2 text-xs font-mono text-slate-300">{(r.element_name || '').slice(0, 35)}</td>
                         <td class="px-3 py-2 text-xs text-slate-300">{(r.garage_space || '').slice(0, 25)}</td>
                         <td class="px-3 py-2 text-xs text-slate-300">{(r.adjacent_space || '').slice(0, 25)}</td>
@@ -884,8 +884,8 @@
           >
             <div class="flex items-center gap-3">
               <svelte:component this={domIcon} class="w-4 h-4 {domain.key === 'fire' ? 'text-rose-400' : domain.key === 'windows' ? 'text-cyan-400' : 'text-slate-300'}" />
-              <h3 class="text-sm font-bold text-white">{domain.label}</h3>
-              <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {badge.cls}">{badge.label}</span>
+              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <span class="inline-block px-2.5 py-0.5 rounded-full text-caption font-semibold border {badge.cls}">{badge.label}</span>
             </div>
             {#if isOpen}<ChevronDown class="w-4 h-4 text-slate-400" />{:else}<ChevronRight class="w-4 h-4 text-slate-400" />{/if}
           </button>
@@ -902,7 +902,7 @@
                     <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('daylight')}>
                       {#if openSections['daylight']}<ChevronDown class="w-3.5 h-3.5" />{:else}<ChevronRight class="w-3.5 h-3.5" />{/if}
                       Daylight Ratio
-                      <span class="text-[10px] font-mono text-slate-500">{dPass}/{daylight.length} pass</span>
+                      <span class="text-micro font-mono text-slate-500">{dPass}/{daylight.length} pass</span>
                     </button>
                     {#if openSections['daylight'] || dFail > 0}
                       <div class="overflow-auto border border-slate-800 rounded-lg max-h-64">
@@ -919,7 +919,7 @@
                             {#each [...daylight].sort((a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1)) as r}
                               <tr class="border-b border-slate-800/60 last:border-0">
                                 <td class="px-3 py-2 text-xs text-slate-400">{r.storey_name || '—'}</td>
-                                <td class="px-3 py-2 text-xs text-white">{(r.space_name || '').slice(0, 35)}</td>
+                                <td class="px-3 py-2 text-xs text-slate-50">{(r.space_name || '').slice(0, 35)}</td>
                                 <td class="px-3 py-2 text-xs font-mono text-right text-slate-300">{r.floor_area_m2.toFixed(1)}</td>
                                 <td class="px-3 py-2 text-xs font-mono text-right text-slate-300">{r.total_window_area_m2.toFixed(2)}</td>
                                 <td class="px-3 py-2 text-xs font-mono text-right text-slate-300">{r.daylight_ratio.toFixed(3)}</td>
@@ -944,7 +944,7 @@
                     <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('fire-sep')}>
                       {#if openSections['fire-sep']}<ChevronDown class="w-3.5 h-3.5" />{:else}<ChevronRight class="w-3.5 h-3.5" />{/if}
                       Fire Separation
-                      <span class="text-[10px] font-mono text-slate-500">{fPass}/{fireSep.length} pass</span>
+                      <span class="text-micro font-mono text-slate-500">{fPass}/{fireSep.length} pass</span>
                     </button>
                     {#if openSections['fire-sep'] || fFail > 0}
                       <div class="overflow-auto border border-slate-800 rounded-lg max-h-64">
@@ -959,7 +959,7 @@
                             {#each [...fireSep].sort((a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1)) as r}
                               {@const spaces = (r.adjacent_spaces || []).slice(0, 2).join(', ') + (r.adjacent_spaces?.length > 2 ? ` +${r.adjacent_spaces.length - 2}` : '')}
                               <tr class="border-b border-slate-800/60 last:border-0">
-                                <td class="px-3 py-2 text-xs font-mono text-white">{(r.wall_name || '').slice(0, 35)}</td>
+                                <td class="px-3 py-2 text-xs font-mono text-slate-50">{(r.wall_name || '').slice(0, 35)}</td>
                                 <td class="px-3 py-2 text-xs text-slate-300">{spaces.slice(0, 50)}</td>
                                 <td class="px-3 py-2 text-xs font-mono {r.missing_rating ? 'text-rose-400' : r.passes ? 'text-emerald-400' : 'text-amber-400'}">
                                   {r.fire_rating_raw || '⚠ Not declared'}
@@ -980,7 +980,7 @@
                     <button type="button" class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2" on:click={() => toggleSection('alarms')}>
                       {#if openSections['alarms']}<ChevronDown class="w-3.5 h-3.5" />{:else}<ChevronRight class="w-3.5 h-3.5" />{/if}
                       Alarm Inventory
-                      <span class="text-[10px] font-mono text-slate-500">{Object.values(buildingSummary.alarm_counts).reduce((a, b) => a + b, 0)} alarms</span>
+                      <span class="text-micro font-mono text-slate-500">{Object.values(buildingSummary.alarm_counts).reduce((a, b) => a + b, 0)} alarms</span>
                     </button>
                     {#if openSections['alarms']}
                       <div class="flex flex-wrap gap-2">
@@ -1018,7 +1018,7 @@
                         {#if isRuleOpen}<ChevronDown class="w-3.5 h-3.5 text-slate-400 shrink-0" />{:else}<ChevronRight class="w-3.5 h-3.5 text-slate-400 shrink-0" />{/if}
                         <span class="text-xs font-medium text-slate-200 truncate">{ruleLabel}</span>
                       </div>
-                      <span class="text-[10px] font-mono text-slate-400 shrink-0 ml-2">{summaryTxt} · {ruleRequiredText(rule)}</span>
+                      <span class="text-micro font-mono text-slate-400 shrink-0 ml-2">{summaryTxt} · {ruleRequiredText(rule)}</span>
                     </button>
 
                     {#if isRuleOpen}
@@ -1045,7 +1045,7 @@
                               {@const rowBg = elStatus === 'FAIL' ? 'bg-rose-950/20' : elStatus === 'MISSING' ? 'bg-amber-950/20' : ''}
                               <tr class="border-b border-slate-800/40 last:border-0 {rowBg}">
                                 <td class="px-3 py-2">
-                                  <span class="text-xs font-mono text-white">{(el.element_name || '—').slice(0, 32)}</span>
+                                  <span class="text-xs font-mono text-slate-50">{(el.element_name || '—').slice(0, 32)}</span>
                                 </td>
                                 <td class="px-3 py-2">
                                   <span class="text-xs text-slate-300 block">{el.storey || '—'}</span>
@@ -1086,7 +1086,7 @@
 
   {:else if isRunning}
     <div class="p-16 text-center text-xs text-slate-400 space-y-2">
-      <div class="animate-spin w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full mx-auto"></div>
+      <div class="animate-spin w-6 h-6 border-2 border-accent border-t-transparent rounded-full mx-auto"></div>
       <p>
         {#if selectedFolder}
           Running "{selectedFolderDisplayName}" ruleset compliance analysis…

@@ -162,7 +162,7 @@
       {#if loading}
         <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950/60 border border-blue-800/60 text-xs text-blue-300">
           <Loader2 class="w-3.5 h-3.5 animate-spin text-blue-400" />
-          <span class="font-medium text-[11px]">{loadingMessage}</span>
+          <span class="font-medium text-caption">{loadingMessage}</span>
         </div>
       {/if}
 
@@ -185,7 +185,7 @@
       <button
         type="button"
         on:click={() => fileInputEl?.click()}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-colors"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 text-xs font-medium transition-colors"
         title="Open a local IFC model directly"
       >
         <UploadCloud class="w-3.5 h-3.5" />
@@ -212,7 +212,7 @@
         <button
           type="button"
           on:click={() => loadProjectModel(projectId, fileId)}
-          class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-900/80 hover:bg-red-800 text-white text-[11px] font-medium transition-colors"
+          class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-900/80 hover:bg-red-800 text-slate-50 text-caption font-medium transition-colors"
         >
           <RefreshCw class="w-3 h-3" />
           <span>Retry</span>

@@ -48,7 +48,7 @@
           </div>
         {/if}
         <div class="space-y-1.5 flex-1 min-w-0">
-          <h2 id="confirm-modal-title" class="text-base font-bold text-white tracking-tight">
+          <h2 id="confirm-modal-title" class="text-base font-bold text-slate-50 tracking-tight">
             {title}
           </h2>
           <p id="confirm-modal-body" class="text-xs text-slate-400 leading-relaxed">
@@ -62,7 +62,7 @@
           type="button"
           on:click={handleCancel}
           disabled={isSubmitting}
-          class="h-9 px-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50"
+          class="h-9 px-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 hover:text-slate-50 transition-colors disabled:opacity-50"
         >
           {cancelText}
         </button>
@@ -73,7 +73,7 @@
           disabled={isSubmitting}
           class="h-9 px-4 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 {danger
             ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950/50'
-            : 'bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-lg shadow-blue-950/50'}"
+            : 'bg-accent hover:bg-accent-hover text-white shadow-lg shadow-blue-950/50'}"
         >
           {isSubmitting ? 'Processing...' : confirmText}
         </button>

@@ -365,7 +365,7 @@
       <button
         type="button"
         on:click={() => loadDocuments(true)}
-        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-slate-50 border border-slate-800 transition-colors"
         title="Refresh document specifications"
       >
         <RotateCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
@@ -375,7 +375,7 @@
       <button
         type="button"
         on:click={() => openUploadModal()}
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
       >
         <Upload class="w-3.5 h-3.5" />
         <span>Upload Specification</span>
@@ -424,7 +424,7 @@
         <select
           bind:value={selectedDocTypeFilter}
           aria-label="Filter by document type"
-          class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none focus:border-[#0071e3]"
+          class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none focus:border-accent"
         >
           <option value="ALL">All Types</option>
           {#each DOCUMENT_TYPES as type}
@@ -449,7 +449,7 @@
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-300">
           <thead
-            class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
+            class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
           >
             <tr>
               <th class="py-3 px-4 w-10">
@@ -492,18 +492,18 @@
                 <td class="py-3 px-4">
                   <div class="flex items-center gap-2">
                     <FileText class="w-4 h-4 text-blue-400 shrink-0" />
-                    <span class="font-semibold text-white truncate max-w-xs"
+                    <span class="font-semibold text-slate-50 truncate max-w-xs"
                       >{doc.filename}</span
                     >
                   </div>
                 </td>
                 <td class="py-3 px-4 whitespace-nowrap">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-caption font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
                     {doc.doc_type || 'Specification'}
                   </span>
                 </td>
                 <td
-                  class="py-3 px-4 text-slate-400 text-[11px] max-w-sm truncate"
+                  class="py-3 px-4 text-slate-400 text-caption max-w-sm truncate"
                 >
                   {doc.extracted_text_preview || "No preview available"}
                 </td>
@@ -518,7 +518,7 @@
                     <button
                       type="button"
                       on:click={() => openReader(doc.id)}
-                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                       title="Inspect extracted text"
                     >
                       <Eye class="w-3.5 h-3.5" />
@@ -572,11 +572,11 @@
       <div
         class="flex items-center justify-between border-b border-slate-800 pb-3"
       >
-        <h2 class="text-base font-bold text-white">Add Rule Source</h2>
+        <h2 class="text-base font-bold text-slate-50">Add Rule Source</h2>
         <button
           type="button"
           on:click={() => (isUploadModalOpen = false)}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800"
         >
           <X class="w-5 h-5" />
         </button>
@@ -588,8 +588,8 @@
           type="button"
           on:click={() => (uploadTab = "document")}
           class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'document'
-            ? 'bg-[#0071e3] text-white shadow-sm'
-            : 'text-slate-400 hover:text-white hover:bg-slate-900'}"
+            ? 'bg-accent text-white shadow-sm'
+            : 'text-slate-400 hover:text-slate-50 hover:bg-slate-900'}"
         >
           PDF / Word / Excel / TXT
         </button>
@@ -597,8 +597,8 @@
           type="button"
           on:click={() => (uploadTab = "ids")}
           class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'ids'
-            ? 'bg-[#0071e3] text-white shadow-sm'
-            : 'text-slate-400 hover:text-white hover:bg-slate-900'}"
+            ? 'bg-accent text-white shadow-sm'
+            : 'text-slate-400 hover:text-slate-50 hover:bg-slate-900'}"
         >
           IDS XML File
         </button>
@@ -606,7 +606,7 @@
           type="button"
           on:click={goToManualRuleEditor}
           title="Opens the Manual Rule Editor page, organized by building element category"
-          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-900 transition-colors inline-flex items-center justify-center gap-1"
+          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-900 transition-colors inline-flex items-center justify-center gap-1"
         >
           <span>Manual</span>
           <ExternalLink class="w-3 h-3 opacity-60" />
@@ -629,13 +629,13 @@
               <select
                 id="upload-doc-type"
                 bind:value={uploadDocType}
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
               >
                 {#each DOCUMENT_TYPES as type}
                   <option value={type}>{type}</option>
                 {/each}
               </select>
-              <p class="text-[11px] text-slate-500">
+              <p class="text-caption text-slate-500">
                 Classifies the document for filtering — used later in Rule Extraction Studio.
               </p>
             </div>
@@ -647,7 +647,7 @@
               <select
                 id="upload-parser"
                 bind:value={uploadParser}
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
               >
                 <option value="auto">Auto (Unstructured API, falls back to local)</option>
                 <option value="unstructured">Unstructured API only (best quality, slower, uploads file)</option>
@@ -656,14 +656,14 @@
             </div>
 
             <div
-              class="border-2 border-dashed border-slate-700 hover:border-[#0071e3] transition-colors rounded-xl p-6 text-center bg-slate-950/40"
+              class="border-2 border-dashed border-slate-700 hover:border-accent transition-colors rounded-xl p-6 text-center bg-slate-950/40"
             >
               <FileText class="w-8 h-8 text-slate-400 mx-auto mb-2" />
               <p class="text-xs text-slate-400 mb-3">
                 Upload PDF, Word, Excel, CSV, TXT, or Markdown specifications
               </p>
               <label
-                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer transition-colors"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-xs font-semibold cursor-pointer transition-colors"
               >
                 <span>Choose File</span>
                 <input
@@ -680,7 +680,7 @@
 
             {#if uploadFile}
               <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                <span class="text-white font-medium truncate">{uploadFile.name}</span>
+                <span class="text-slate-50 font-medium truncate">{uploadFile.name}</span>
                 <span class="text-slate-500">{(uploadFile.size / 1024).toFixed(1)} KB</span>
               </div>
             {/if}
@@ -689,7 +689,7 @@
               <button
                 type="button"
                 on:click={() => (isUploadModalOpen = false)}
-                class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
+                class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50"
               >
                 Cancel
               </button>
@@ -697,7 +697,7 @@
                 type="button"
                 disabled={!uploadFile || isUploading}
                 on:click={handleUpload}
-                class="px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white disabled:opacity-50"
+                class="px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white disabled:opacity-50"
               >
                 {isUploading ? "Extracting Text..." : "Upload & Extract"}
               </button>
@@ -728,11 +728,11 @@
       >
         <div>
           <div class="flex items-center gap-2">
-            <h2 class="text-base font-bold text-white tracking-tight">
+            <h2 class="text-base font-bold text-slate-50 tracking-tight">
               {selectedDoc.filename}
             </h2>
             {#if selectedDoc.doc_type}
-              <span class="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+              <span class="px-2 py-0.5 rounded-md text-caption font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
                 {selectedDoc.doc_type}
               </span>
             {/if}
@@ -744,7 +744,7 @@
         <button
           type="button"
           on:click={() => (selectedDoc = null)}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800"
         >
           <X class="w-5 h-5" />
         </button>
@@ -766,7 +766,7 @@
             selectedDoc = null;
             if (doc) openEdit(doc);
           }}
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
         >
           <Pencil class="w-3.5 h-3.5" />
           <span>Edit Document</span>
@@ -775,7 +775,7 @@
         <button
           type="button"
           on:click={() => (selectedDoc = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50"
         >
           Close
         </button>
@@ -801,7 +801,7 @@
             <Pencil class="w-5 h-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold text-white tracking-tight">
+            <h2 class="text-base font-bold text-slate-50 tracking-tight">
               Edit Document #{docToEdit.id}
             </h2>
             <p class="text-xs text-slate-400">
@@ -812,7 +812,7 @@
         <button
           type="button"
           on:click={() => (isEditModalOpen = false)}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800"
         >
           <X class="w-5 h-5" />
         </button>
@@ -837,7 +837,7 @@
             type="text"
             bind:value={editFilename}
             placeholder="e.g. OBC_Part9_Specifications.pdf"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
           />
         </div>
 
@@ -848,7 +848,7 @@
           <select
             id="edit-doc-type"
             bind:value={editDocType}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             {#each DOCUMENT_TYPES as type}
               <option value={type}>{type}</option>
@@ -865,7 +865,7 @@
             rows="10"
             bind:value={editExtractedText}
             placeholder="Parsed specification clauses and text content..."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#0071e3] leading-relaxed resize-y"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-accent leading-relaxed resize-y"
           ></textarea>
         </div>
       </div>
@@ -877,7 +877,7 @@
         <button
           type="button"
           on:click={() => (isEditModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-800"
         >
           Cancel
         </button>
@@ -885,7 +885,7 @@
           type="button"
           disabled={isSavingEdit || !editFilename.trim()}
           on:click={handleSaveEdit}
-          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
         >
           <span>{isSavingEdit ? "Saving..." : "Save Changes"}</span>
         </button>

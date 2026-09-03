@@ -59,7 +59,7 @@
   {/if}
 
   <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 text-xs text-slate-400 leading-relaxed">
-    Select properties to update across all <strong class="text-white">{selectedDocIds.length}</strong> selected documents.
+    Select properties to update across all <strong class="text-slate-50">{selectedDocIds.length}</strong> selected documents.
   </div>
 
   <!-- Document Type -->
@@ -70,7 +70,7 @@
     <select
       id="bulk-doc-type"
       bind:value={docType}
-      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
     >
       <option value="no_change">-- Keep Current Type --</option>
       {#each DOCUMENT_TYPES as type}
@@ -83,7 +83,7 @@
     <button
       type="button"
       on:click={onClose}
-      class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+      class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
     >
       Cancel
     </button>
@@ -91,7 +91,7 @@
       type="button"
       disabled={isSaving || !hasChanges}
       on:click={handleSave}
-      class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
     >
       <span>{isSaving ? 'Applying Changes...' : `Update ${selectedDocIds.length} Documents`}</span>
     </button>

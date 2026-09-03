@@ -102,9 +102,9 @@
           </div>
           <div class="space-y-1 flex-1">
             <h2
-              class="text-base font-bold text-white tracking-tight flex items-center gap-2"
+              class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2"
             >
-              <svelte:component this={s.icon} class="w-4 h-4 text-[#0071e3]" />
+              <svelte:component this={s.icon} class="w-4 h-4 text-accent" />
               <span>{s.title}</span>
             </h2>
             <p class="text-xs text-slate-300 leading-relaxed">
@@ -126,8 +126,8 @@
               type="button"
               on:click={() => onNavigate(act.view)}
               class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all {act.primary
-                ? 'bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white'}"
+                ? 'bg-accent hover:bg-accent-hover text-white shadow-sm'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50'}"
             >
               <span>{act.label}</span>
               <ArrowRight class="w-3 h-3" />

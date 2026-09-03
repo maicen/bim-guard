@@ -356,7 +356,7 @@
       <select
         bind:value={selectedSource}
         on:change={handleSourceChange}
-        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-blue-500 max-w-[240px] truncate"
+        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-50 focus:outline-none focus:border-blue-500 max-w-[240px] truncate"
       >
         <option value="supabase">Supabase Database (Main Registry)</option>
         {#if repos.length > 0}
@@ -384,7 +384,7 @@
         <button
           type="button"
           on:click={() => loadProjects(true)}
-          class="p-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+          class="p-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-50 transition-colors"
           title="Refresh project registry"
         >
           <RotateCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
@@ -422,14 +422,14 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Filter projects by name or description..."
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
         />
       </div>
 
       <div class="flex items-center gap-2 w-full md:w-auto">
         <select
           bind:value={statusFilter}
-          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="all">All Statuses</option>
           <option value="Active">Active</option>
@@ -439,7 +439,7 @@
 
         <select
           bind:value={domainFilter}
-          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="all">All Domains</option>
           <option value="Arch">Arch</option>
@@ -478,7 +478,7 @@
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-300">
-            <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+            <thead class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold">
               <tr>
                 <th class="py-3 px-4 w-10">
                   <TableCheckbox
@@ -516,11 +516,11 @@
                       ariaLabel={`Select project ${project.name}`}
                     />
                   </td>
-                  <td class="py-3 px-4 font-semibold text-white">
+                  <td class="py-3 px-4 font-semibold text-slate-50">
                     <div class="flex flex-col">
                       <span class="text-sm">{project.name}</span>
                       {#if project.description}
-                        <span class="text-[11px] text-slate-400 font-normal truncate max-w-sm">
+                        <span class="text-caption text-slate-400 font-normal truncate max-w-sm">
                           {project.description}
                         </span>
                       {/if}
@@ -528,7 +528,7 @@
                   </td>
                   <td class="py-3 px-4">
                     <span
-                      class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border {project.status ===
+                      class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold border {project.status ===
                       'Active'
                         ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
                         : project.status === 'Archived'
@@ -542,18 +542,18 @@
                     {#if project.ifc_file_path}
                       <div class="flex items-center gap-1.5 text-emerald-400 font-medium">
                         <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-                        <span class="text-[11px] truncate max-w-[120px]" title={project.ifc_file_path}>Attached</span>
+                        <span class="text-caption truncate max-w-[120px]" title={project.ifc_file_path}>Attached</span>
                       </div>
                     {:else}
                       <div class="flex items-center gap-1.5 text-slate-500">
                         <XCircle class="w-4 h-4" />
-                        <span class="text-[11px]">None</span>
+                        <span class="text-caption">None</span>
                       </div>
                     {/if}
                   </td>
                   <td class="py-3 px-4">
                     <span
-                      class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold font-mono {project.analysis_type ===
+                      class="inline-block px-2 py-0.5 rounded text-micro font-semibold font-mono {project.analysis_type ===
                       'Piping'
                         ? 'bg-amber-950/60 border border-amber-800/50 text-amber-300'
                         : project.analysis_type === 'Seismic'
@@ -572,7 +572,7 @@
                       <button
                         type="button"
                         on:click={() => openDetails(project)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                         title="View project details"
                       >
                         <Eye class="w-3.5 h-3.5" />
@@ -582,7 +582,7 @@
                         <button
                           type="button"
                           on:click={() => onSelectProjectForViewer(project.id)}
-                          class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                          class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                           title="Open in 3D Viewer"
                         >
                           <ScanEye class="w-3.5 h-3.5" />
@@ -659,10 +659,10 @@
           <div class="space-y-1">
             <div class="flex items-center gap-2">
               <FolderGit2 class="w-5 h-5 text-blue-400" />
-              <h2 class="text-lg font-bold text-white">
+              <h2 class="text-lg font-bold text-slate-50">
                 {activeRepoStructure.owner}/{activeRepoStructure.name}
               </h2>
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-400">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-caption text-slate-400">
                 <GitBranch class="w-3 h-3 text-blue-400" />
                 {activeRepoStructure.branch}
               </span>
@@ -694,7 +694,7 @@
               type="text"
               bind:value={searchQuery}
               placeholder="Search repository IFC models by filename or path..."
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -702,7 +702,7 @@
             <div class="flex items-center gap-2 w-full md:w-auto">
               <select
                 bind:value={repoCategoryFilter}
-                class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-blue-500"
               >
                 <option value="all">All Category Folders</option>
                 {#each activeRepoStructure.categories as cat}
@@ -722,7 +722,7 @@
           {:else}
             <div class="overflow-x-auto">
               <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                <thead class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold">
                   <tr>
                     <th class="py-3 px-4">IFC Model Name</th>
                     <th class="py-3 px-4">Repository Path</th>
@@ -735,17 +735,17 @@
                   {#each filteredRepoItems as item}
                     {@const importedProject = getImportedProject(item)}
                     <tr class="hover:bg-slate-900/60 transition-colors">
-                      <td class="py-3 px-4 font-semibold text-white">
+                      <td class="py-3 px-4 font-semibold text-slate-50">
                         <div class="flex items-center gap-2">
                           <Box class="w-4 h-4 text-blue-400 shrink-0" />
                           <span class="text-sm">{item.name}</span>
                         </div>
                       </td>
-                      <td class="py-3 px-4 text-slate-400 font-mono text-[11px] truncate max-w-xs" title={item.path}>
+                      <td class="py-3 px-4 text-slate-400 font-mono text-caption truncate max-w-xs" title={item.path}>
                         {item.path}
                       </td>
                       <td class="py-3 px-4">
-                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold font-mono uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                        <span class="inline-block px-2 py-0.5 rounded text-micro font-semibold font-mono uppercase bg-slate-800 text-slate-300 border border-slate-700">
                           {item.category}
                         </span>
                       </td>
@@ -758,7 +758,7 @@
                             href={item.download_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                            class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                             title="Direct download raw IFC"
                           >
                             <Download class="w-3.5 h-3.5" />

@@ -31,5 +31,5 @@
   {title}
   aria-label={ariaLabel}
   on:change={handleChange}
-  class="rounded bg-slate-950 border-slate-700 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer w-4 h-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+  class="rounded bg-slate-950 border-slate-700 text-accent focus:ring-accent cursor-pointer w-4 h-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
 />

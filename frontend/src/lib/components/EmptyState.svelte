@@ -23,7 +23,7 @@
   </div>
 
   <div class="space-y-1">
-    <div class="text-sm font-bold text-white">{title}</div>
+    <div class="text-sm font-bold text-slate-50">{title}</div>
     {#if description}
       <div class="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
         {description}
@@ -38,7 +38,7 @@
       <button
         type="button"
         on:click={onAction}
-        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
+        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
       >
         <span>{actionLabel}</span>
       </button>

@@ -138,7 +138,7 @@
       <button
         type="button"
         on:click={onOpenWizard}
-        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
+        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
       >
         <Plus class="w-3.5 h-3.5" />
         <span>New Project</span>
@@ -172,7 +172,7 @@
         >
         <FolderOpen class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
       </div>
-      <div class="text-3xl font-bold text-white tracking-tight">
+      <div class="text-3xl font-bold text-slate-50 tracking-tight">
         {stats.total_projects}
       </div>
       <div class="text-xs text-slate-400 flex items-center justify-between">
@@ -193,7 +193,7 @@
         >
         <BookOpen class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
       </div>
-      <div class="text-3xl font-bold text-white tracking-tight">
+      <div class="text-3xl font-bold text-slate-50 tracking-tight">
         {stats.total_documents}
       </div>
       <div class="text-xs text-slate-400 flex items-center justify-between">
@@ -214,7 +214,7 @@
         >
         <ListChecks class="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
       </div>
-      <div class="text-3xl font-bold text-white tracking-tight">
+      <div class="text-3xl font-bold text-slate-50 tracking-tight">
         {stats.total_rules}
       </div>
       <div class="text-xs text-slate-400 flex items-center justify-between">
@@ -251,7 +251,7 @@
   >
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-base font-bold text-white tracking-tight">
+        <h2 class="text-base font-bold text-slate-50 tracking-tight">
           Recent Projects
         </h2>
         <p class="text-xs text-slate-400">
@@ -261,7 +261,7 @@
       <button
         type="button"
         on:click={() => onNavigate("projects")}
-        class="text-xs font-semibold text-[#0071e3] hover:text-blue-400 flex items-center gap-1"
+        class="text-xs font-semibold text-accent hover:text-blue-400 flex items-center gap-1"
       >
         <span>View all</span>
         <ArrowRight class="w-3.5 h-3.5" />
@@ -278,7 +278,7 @@
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-300">
           <thead
-            class="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold"
+            class="border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
           >
             <tr>
               <th class="py-2.5 px-3">Name</th>
@@ -291,12 +291,12 @@
           <tbody class="divide-y divide-slate-800/60">
             {#each recentProjects as project}
               <tr class="hover:bg-slate-900/60 transition-colors">
-                <td class="py-3 px-3 font-semibold text-white truncate max-w-xs"
+                <td class="py-3 px-3 font-semibold text-slate-50 truncate max-w-xs"
                   >{project.name}</td
                 >
                 <td class="py-3 px-3">
                   <span
-                    class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold font-mono {project.analysis_type ===
+                    class="inline-block px-2 py-0.5 rounded text-micro font-semibold font-mono {project.analysis_type ===
                     'Piping'
                       ? 'bg-amber-950/60 border border-amber-800/50 text-amber-300'
                       : project.analysis_type === 'Seismic'
@@ -308,7 +308,7 @@
                 </td>
                 <td class="py-3 px-3">
                   <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-semibold {project.status ===
+                    class="px-2 py-0.5 rounded-full text-micro font-semibold {project.status ===
                     'Active'
                       ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/60'
                       : 'bg-slate-800 text-slate-400'}"
@@ -319,13 +319,13 @@
                 <td class="py-3 px-3">
                   {#if project.ifc_file_path}
                     <span
-                      class="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium"
+                      class="inline-flex items-center gap-1 text-caption text-emerald-400 font-medium"
                     >
                       <CheckCircle2 class="w-3.5 h-3.5" />
                       <span>IFC Ready</span>
                     </span>
                   {:else}
-                    <span class="text-[11px] text-slate-500">No Model</span>
+                    <span class="text-caption text-slate-500">No Model</span>
                   {/if}
                 </td>
                 <td class="py-3 px-3 text-right">
@@ -333,7 +333,7 @@
                     <button
                       type="button"
                       on:click={() => openDetails(project)}
-                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                       title="View project details"
                     >
                       <Eye class="w-3.5 h-3.5" />
@@ -343,7 +343,7 @@
                       <button
                         type="button"
                         on:click={() => onSelectProjectForViewer(project.id)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                         title="Open in 3D Viewer"
                       >
                         <ScanEye class="w-3.5 h-3.5" />
@@ -398,7 +398,7 @@
         <Sparkles class="w-4 h-4" />
       </div>
       <h3
-        class="text-sm font-semibold text-white group-hover:text-purple-300 transition-colors"
+        class="text-sm font-semibold text-slate-50 group-hover:text-purple-300 transition-colors"
       >
         Rule Extraction Studio
       </h3>
@@ -419,7 +419,7 @@
         <ScanEye class="w-4 h-4" />
       </div>
       <h3
-        class="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors"
+        class="text-sm font-semibold text-slate-50 group-hover:text-cyan-300 transition-colors"
       >
         OpenBIM 3D Viewer
       </h3>
@@ -440,7 +440,7 @@
         <Cpu class="w-4 h-4" />
       </div>
       <h3
-        class="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors"
+        class="text-sm font-semibold text-slate-50 group-hover:text-emerald-300 transition-colors"
       >
         Architectural Audit
       </h3>

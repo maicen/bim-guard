@@ -58,7 +58,7 @@
       <Icon class="w-4 h-4 shrink-0 mt-0.5 {conf.iconColor}" />
       <div class="space-y-0.5 min-w-0">
         {#if title}
-          <div class="font-bold text-white text-[13px] tracking-tight">
+          <div class="font-bold text-slate-50 text-[13px] tracking-tight">
             {title}
           </div>
         {/if}
@@ -72,7 +72,7 @@
       <button
         type="button"
         onclick={handleDismiss}
-        class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors shrink-0"
+        class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-500/10 transition-colors shrink-0"
         title="Dismiss alert"
       >
         <X class="w-3.5 h-3.5" />

@@ -107,14 +107,14 @@
             <FolderGit2 class="w-5 h-5" />
           </div>
           <div>
-            <h2 class="text-lg font-semibold text-white">GitHub Project Storage Repositories</h2>
+            <h2 class="text-lg font-semibold text-slate-50">GitHub Project Storage Repositories</h2>
             <p class="text-xs text-slate-400">Manage external GitHub repositories hosting OpenBIM IFC models.</p>
           </div>
         </div>
         <button
           type="button"
           on:click={onClose}
-          class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          class="p-2 rounded-xl text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
@@ -157,7 +157,7 @@
             <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Register New Repository</h3>
 
             <div>
-              <label for="repo-url" class="block text-[11px] font-semibold text-slate-400 mb-1">
+              <label for="repo-url" class="block text-caption font-semibold text-slate-400 mb-1">
                 Repository URL <span class="text-rose-400">*</span>
               </label>
               <input
@@ -166,41 +166,41 @@
                 required
                 bind:value={newUrl}
                 placeholder="https://github.com/maicen/bimguard-test-models"
-                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label for="repo-name" class="block text-[11px] font-semibold text-slate-400 mb-1">Display Name (Optional)</label>
+                <label for="repo-name" class="block text-caption font-semibold text-slate-400 mb-1">Display Name (Optional)</label>
                 <input
                   id="repo-name"
                   type="text"
                   bind:value={newName}
                   placeholder="bimguard-test-models"
-                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label for="repo-branch" class="block text-[11px] font-semibold text-slate-400 mb-1">Git Branch</label>
+                <label for="repo-branch" class="block text-caption font-semibold text-slate-400 mb-1">Git Branch</label>
                 <input
                   id="repo-branch"
                   type="text"
                   bind:value={newBranch}
                   placeholder="main"
-                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
 
             <div>
-              <label for="repo-desc" class="block text-[11px] font-semibold text-slate-400 mb-1">Description (Optional)</label>
+              <label for="repo-desc" class="block text-caption font-semibold text-slate-400 mb-1">Description (Optional)</label>
               <input
                 id="repo-desc"
                 type="text"
                 bind:value={newDescription}
                 placeholder="Repository containing OpenBIM test models..."
-                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -208,7 +208,7 @@
               <button
                 type="button"
                 on:click={() => (showAddForm = false)}
-                class="px-3 py-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white text-xs transition-colors"
+                class="px-3 py-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-slate-50 text-xs transition-colors"
               >
                 Cancel
               </button>
@@ -244,13 +244,13 @@
               <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 flex items-start justify-between gap-3 transition-colors">
                 <div class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-white">{repo.owner}/{repo.name}</span>
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400">
+                    <span class="text-sm font-semibold text-slate-50">{repo.owner}/{repo.name}</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-micro font-mono text-slate-400">
                       <GitBranch class="w-3 h-3 text-blue-400" />
                       {repo.branch}
                     </span>
                     {#if repo.url.includes("maicen/bimguard-test-models")}
-                      <span class="px-2 py-0.5 rounded-md bg-blue-950/80 border border-blue-800/60 text-blue-300 text-[10px] font-semibold">
+                      <span class="px-2 py-0.5 rounded-md bg-blue-950/80 border border-blue-800/60 text-blue-300 text-micro font-semibold">
                         Default Test Repo
                       </span>
                     {/if}
@@ -258,7 +258,7 @@
                   {#if repo.description}
                     <p class="text-xs text-slate-400 leading-relaxed">{repo.description}</p>
                   {/if}
-                  <div class="text-[11px] text-slate-500 flex items-center gap-2 pt-0.5">
+                  <div class="text-caption text-slate-500 flex items-center gap-2 pt-0.5">
                     <a
                       href={repo.url}
                       target="_blank"

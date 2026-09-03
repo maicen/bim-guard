@@ -86,7 +86,7 @@
       href="/api/docs"
       target="_blank"
       rel="noopener noreferrer"
-      class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900/60 flex items-center gap-1 transition-colors"
+      class="text-xs text-slate-400 hover:text-slate-50 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900/60 flex items-center gap-1 transition-colors"
       title="Open Swagger OpenAPI Documentation"
     >
       <span>API Docs</span>

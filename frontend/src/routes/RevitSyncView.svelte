@@ -293,7 +293,7 @@ print(response.read())
       class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
     >
       <div>
-        <h2 class="text-base font-bold text-white tracking-tight">
+        <h2 class="text-base font-bold text-slate-50 tracking-tight">
           pyRevit / IronPython Push Script
         </h2>
         <p class="text-xs text-slate-400">
@@ -306,7 +306,7 @@ print(response.read())
         <button
           type="button"
           on:click={copyScript}
-          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold border border-slate-700 transition-colors"
+          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-50 text-xs font-semibold border border-slate-700 transition-colors"
         >
           {#if copied}
             <Check class="w-3.5 h-3.5 text-emerald-400" />
@@ -321,7 +321,7 @@ print(response.read())
           type="button"
           disabled={isSendingTest}
           on:click={runSimulation}
-          class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
         >
           <Send class="w-3.5 h-3.5" />
           <span>{isSendingTest ? "Auditing Payload..." : "Simulate Push"}</span>
@@ -361,7 +361,7 @@ print(response.read())
           >
             Sync Results Received
           </div>
-          <h2 class="text-lg font-bold text-white">
+          <h2 class="text-lg font-bold text-slate-50">
             {samplePayload.project_name}
           </h2>
           <p class="text-xs text-slate-400">
@@ -402,14 +402,14 @@ print(response.read())
             type="text"
             bind:value={searchQuery}
             placeholder="Search rules by reference, target, property..."
-            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
           />
         </div>
 
         <div class="flex items-center gap-2 w-full sm:w-auto">
           <select
             bind:value={statusFilter}
-            class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="ALL">All Verdicts</option>
             <option value="PASS">PASS Only</option>
@@ -434,7 +434,7 @@ print(response.read())
           <table class="w-full text-left text-xs border-collapse">
             <thead>
               <tr
-                class="border-b border-slate-800 bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider font-semibold"
+                class="border-b border-slate-800 bg-slate-950/80 text-slate-400 uppercase text-micro tracking-wider font-semibold"
               >
                 <th class="py-3 px-3 w-10">
                   <TableCheckbox
@@ -479,11 +479,11 @@ print(response.read())
                         ariaLabel={`Select rule ${rule.rule_ref}`}
                       />
                     </td>
-                    <td class="py-3 px-3 font-semibold text-white font-mono">
+                    <td class="py-3 px-3 font-semibold text-slate-50 font-mono">
                       {rule.rule_ref || "Custom Rule"}
                       {#if rule.rule_desc}
                         <div
-                          class="text-[11px] text-slate-400 font-sans font-normal mt-0.5"
+                          class="text-caption text-slate-400 font-sans font-normal mt-0.5"
                         >
                           {rule.rule_desc}
                         </div>
@@ -522,7 +522,7 @@ print(response.read())
                         <div class="space-y-1">
                           {#each rule.failures as f}
                             <div
-                              class="text-[11px] text-rose-300 font-mono truncate"
+                              class="text-caption text-rose-300 font-mono truncate"
                               title={f.reason || f.guid}
                             >
                               • {f.reason || f.guid}
@@ -537,7 +537,7 @@ print(response.read())
                       <button
                         type="button"
                         on:click={() => (viewingRule = rule)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
                         title="Inspect rule result details"
                       >
                         <Eye class="w-3.5 h-3.5" />
@@ -571,13 +571,13 @@ print(response.read())
     <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
-          <FileText class="w-4 h-4 text-[#0071e3]" />
-          <h3 class="text-sm font-bold text-white font-mono">{viewingRule.rule_ref || 'Rule Result'}</h3>
+          <FileText class="w-4 h-4 text-accent" />
+          <h3 class="text-sm font-bold text-slate-50 font-mono">{viewingRule.rule_ref || 'Rule Result'}</h3>
         </div>
         <button
           type="button"
           on:click={() => (viewingRule = null)}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-4 h-4" />
         </button>
@@ -591,7 +591,7 @@ print(response.read())
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 text-[11px] font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
+        <div class="grid grid-cols-2 gap-2 text-caption font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div><span class="text-slate-500">Target:</span> <span class="text-slate-300">{viewingRule.target || '—'}</span></div>
           <div><span class="text-slate-500">Property:</span> <span class="text-slate-300">{viewingRule.property_name || '—'}</span></div>
           <div><span class="text-slate-500">Verdict:</span> <span class="font-bold {viewingRule.status === 'PASS' ? 'text-emerald-400' : 'text-rose-400'}">{viewingRule.status}</span></div>
@@ -603,9 +603,9 @@ print(response.read())
             <span class="text-slate-400 font-semibold block mb-1">Non-Compliant Element Instances ({viewingRule.failures.length})</span>
             <div class="max-h-48 overflow-y-auto space-y-1.5 p-2 bg-slate-950 rounded-xl border border-slate-800">
               {#each viewingRule.failures as f}
-                <div class="p-2 bg-rose-950/20 border border-rose-900/40 rounded-lg text-rose-300 font-mono text-[11px]">
+                <div class="p-2 bg-rose-950/20 border border-rose-900/40 rounded-lg text-rose-300 font-mono text-caption">
                   <div class="font-bold">{f.guid}</div>
-                  {#if f.reason}<div class="text-slate-400 text-[10px] mt-0.5">{f.reason}</div>{/if}
+                  {#if f.reason}<div class="text-slate-400 text-micro mt-0.5">{f.reason}</div>{/if}
                 </div>
               {/each}
             </div>
@@ -617,7 +617,7 @@ print(response.read())
         <button
           type="button"
           on:click={() => (viewingRule = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
         >
           Close
         </button>

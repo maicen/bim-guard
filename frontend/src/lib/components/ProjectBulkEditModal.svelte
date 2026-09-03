@@ -55,7 +55,7 @@
             <SlidersHorizontal class="w-5 h-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold text-white tracking-tight">
+            <h2 class="text-base font-bold text-slate-50 tracking-tight">
               Bulk Edit ({selectedProjectIds.length} Projects)
             </h2>
             <p class="text-xs text-slate-400">
@@ -66,7 +66,7 @@
         <button
           type="button"
           on:click={onClose}
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
@@ -94,7 +94,7 @@
             <select
               id="bulk-proj-status"
               bind:value={status}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="no_change">-- Keep Current Status --</option>
               <option value="Active">Active</option>
@@ -111,7 +111,7 @@
             <select
               id="bulk-proj-country"
               bind:value={country}
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
             >
               <option value="no_change">-- Keep Current Jurisdiction --</option>
               <option value="Canada">Canada (NBC)</option>
@@ -130,7 +130,7 @@
           <select
             id="bulk-proj-domain"
             bind:value={analysisType}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#0071e3]"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="no_change">-- Keep Current Domain --</option>
             <option value="Arch">Arch</option>
@@ -145,7 +145,7 @@
         <button
           type="button"
           on:click={onClose}
-          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
         >
           Cancel
         </button>
@@ -153,7 +153,7 @@
           type="button"
           disabled={isSaving || !hasChanges}
           on:click={handleSave}
-          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
         >
           <Check class="w-3.5 h-3.5" />
           <span>{isSaving ? 'Applying Changes...' : 'Apply Bulk Update'}</span>

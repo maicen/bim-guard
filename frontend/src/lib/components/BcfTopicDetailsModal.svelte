@@ -91,19 +91,19 @@
     <!-- Topic Properties Grid -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-slate-950 p-3.5 rounded-xl border border-slate-800">
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Type</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Type</span>
         <span class="text-slate-200 font-medium">{topic.topic_type || 'Issue'}</span>
       </div>
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Priority</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Priority</span>
         <span class="text-amber-400 font-medium">{topic.priority || 'Normal'}</span>
       </div>
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Assignee</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Assignee</span>
         <span class="text-slate-200 font-medium">{topic.assigned_to || 'Unassigned'}</span>
       </div>
       <div>
-        <span class="text-[10px] font-semibold text-slate-500 uppercase block">Created</span>
+        <span class="text-micro font-semibold text-slate-500 uppercase block">Created</span>
         <span class="text-slate-400">{formatDate(topic.creation_date)}</span>
       </div>
     </div>
@@ -126,7 +126,7 @@
           <span>ISO 19650 Governance Tags</span>
         </div>
         {#if topic.project_code}
-          <span class="text-[10px] font-mono text-slate-400">Project: {topic.project_code}</span>
+          <span class="text-micro font-mono text-slate-400">Project: {topic.project_code}</span>
         {/if}
       </div>
       <IsoGovernanceBadges
@@ -143,12 +143,12 @@
         <span class="text-xs font-semibold text-slate-300 block">Linked IFC Elements ({topic.component_guids.length})</span>
         <div class="flex flex-wrap gap-1.5">
           {#each topic.component_guids as guid}
-            <div class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-cyan-300">
+            <div class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 font-mono text-caption text-cyan-300">
               <span>{guid}</span>
               <button
                 type="button"
                 on:click={() => copyToClipboard(guid)}
-                class="p-0.5 hover:text-white"
+                class="p-0.5 hover:text-slate-50"
                 title="Copy GUID"
               >
                 <Copy class="w-3 h-3" />
@@ -157,7 +157,7 @@
                 <button
                   type="button"
                   on:click={() => onSelectViewer && onSelectViewer(Number(projectId), guid)}
-                  class="text-[10px] text-emerald-400 hover:underline ml-1 font-sans"
+                  class="text-micro text-emerald-400 hover:underline ml-1 font-sans"
                 >
                   View 3D
                 </button>
@@ -178,11 +178,11 @@
         <div class="grid grid-cols-2 gap-2">
           {#each viewpoints as vp}
             <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-              <div class="font-mono text-[10px] text-slate-400">Viewpoint #{vp.index}</div>
+              <div class="font-mono text-micro text-slate-400">Viewpoint #{vp.index}</div>
               {#if vp.snapshot_url}
                 <img src={vp.snapshot_url} alt="Viewpoint snapshot" class="w-full h-24 object-cover rounded mt-1 border border-slate-800" />
               {:else}
-                <div class="text-[11px] text-slate-500 mt-1">3D Perspective Camera Vector Stored</div>
+                <div class="text-caption text-slate-500 mt-1">3D Perspective Camera Vector Stored</div>
               {/if}
             </div>
           {/each}
@@ -207,7 +207,7 @@
         <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
           {#each comments as c}
             <div class="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs space-y-1">
-              <div class="flex items-center justify-between text-[10px] text-slate-500">
+              <div class="flex items-center justify-between text-micro text-slate-500">
                 <span class="font-semibold text-slate-300">{c.author || 'Anonymous'}</span>
                 <span>{formatDate(c.date)}</span>
               </div>
@@ -224,7 +224,7 @@
           bind:value={newCommentText}
           placeholder="Post a coordination reply or update..."
           on:keydown={(e) => e.key === 'Enter' && handleAddComment()}
-          class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0071e3]"
+          class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
         />
         <button
           type="button"
@@ -242,7 +242,7 @@
       <button
         type="button"
         on:click={onClose}
-        class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
       >
         Close
       </button>
