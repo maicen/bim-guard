@@ -52,6 +52,9 @@ from app.api import (
 from app.api import (
     settings as api_settings,
 )
+from app.api import (
+    unstructured_instances as api_unstructured_instances,
+)
 from app.environment import load_env_file
 from app.logging_config import configure_logging, get_logger
 
@@ -222,6 +225,11 @@ app.include_router(api_bcf.router, prefix="/api/bcf", tags=["BCF API"])
 app.include_router(api_settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(
     api_naming_config.router, prefix="/api/naming-config", tags=["ISO 19650 Naming"]
+)
+app.include_router(
+    api_unstructured_instances.router,
+    prefix="/api/parsing-engines",
+    tags=["Parsing Engines"],
 )
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 

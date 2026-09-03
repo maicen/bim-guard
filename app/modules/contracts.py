@@ -1085,6 +1085,64 @@ class ProjectImportFromRepoRequest(BaseModel):
 
 
 # ==============================================================================
+# Unstructured Parsing Engine Instance Contracts
+# ==============================================================================
+
+
+class UnstructuredInstanceCreateRequest(BaseModel):
+    """Payload for registering a new Unstructured parsing-engine instance."""
+
+    name: str = Field(..., min_length=1, description="Unique display name, e.g. 'local', 'hosted-1'")
+    kind: Literal["local", "hosted"] = Field(
+        ..., description="'local' (self-hosted open-source Docker container) or 'hosted' (Unstructured Platform API)"
+    )
+    api_url: str = Field(..., min_length=1, description="Base URL of the Unstructured server")
+    api_key: Optional[str] = Field(None, description="API key — required for 'hosted', ignored for 'local'")
+    strategy: Optional[str] = Field("auto", description="Partition strategy: auto, fast, hi_res, ocr_only")
+    is_default: Optional[bool] = Field(False, description="Use this instance when none is explicitly selected")
+    is_enabled: Optional[bool] = Field(True, description="Whether this instance is selectable")
+    notes: Optional[str] = Field("", description="Optional free-text notes")
+
+
+class UnstructuredInstanceUpdateRequest(BaseModel):
+    """Payload for updating an existing Unstructured parsing-engine instance."""
+
+    name: Optional[str] = Field(None, description="Updated display name")
+    api_url: Optional[str] = Field(None, description="Updated server URL")
+    api_key: Optional[str] = Field(None, description="Updated API key (omit to leave unchanged)")
+    strategy: Optional[str] = Field(None, description="Updated partition strategy")
+    is_default: Optional[bool] = Field(None, description="Make (or unmake) this the default instance")
+    is_enabled: Optional[bool] = Field(None, description="Toggle whether this instance is selectable")
+    notes: Optional[str] = Field(None, description="Updated notes")
+
+
+class UnstructuredInstanceResponse(BaseModel):
+    """Response contract for a registered Unstructured parsing-engine instance.
+
+    The stored api_key is never echoed back — only whether one is set.
+    """
+
+    id: int
+    name: str
+    kind: str
+    api_url: str
+    has_api_key: bool = False
+    strategy: str = "auto"
+    is_default: bool = False
+    is_enabled: bool = True
+    notes: str = ""
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class UnstructuredInstanceTestResponse(BaseModel):
+    """Result of a connectivity check against a configured instance."""
+
+    ok: bool
+    detail: str = ""
+
+
+# ==============================================================================
 # buildingSMART Ecosystem Contracts
 # ==============================================================================
 

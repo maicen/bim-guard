@@ -51,6 +51,10 @@ import type {
   RulesetCategory,
   RuleSnapshot,
   RuleSnapshotCreatePayload,
+  UnstructuredInstance,
+  UnstructuredInstanceCreatePayload,
+  UnstructuredInstanceTestResult,
+  UnstructuredInstanceUpdatePayload,
   WorkflowStatus,
 } from "./types";
 import {
@@ -732,6 +736,7 @@ export const documentsApi = {
       suitability_code?: string;
       revision_code?: string;
       parser?: "auto" | "unstructured" | "light";
+      unstructured_instance?: string;
     },
   ): Promise<DocumentDetail> {
     const form = new FormData();
@@ -742,6 +747,8 @@ export const documentsApi = {
     if (isoOptions?.suitability_code) form.append("suitability_code", isoOptions.suitability_code);
     if (isoOptions?.revision_code) form.append("revision_code", isoOptions.revision_code);
     if (isoOptions?.parser) form.append("parser", isoOptions.parser);
+    if (isoOptions?.unstructured_instance)
+      form.append("unstructured_instance", isoOptions.unstructured_instance);
     const res = await fetch(`${API_BASE}/documents`, {
       method: "POST",
       body: form,
@@ -961,6 +968,49 @@ export const githubReposApi = {
     const created = await handleResponse<Project>(res);
     _projectsStore.addOrUpdate(created);
     return created;
+  },
+};
+
+// =============================================================================
+// Unstructured Parsing Engines API Client
+// =============================================================================
+
+export const parsingEnginesApi = {
+  async list(): Promise<UnstructuredInstance[]> {
+    const res = await fetch(`${API_BASE}/parsing-engines`);
+    return handleResponse<UnstructuredInstance[]>(res);
+  },
+
+  async create(payload: UnstructuredInstanceCreatePayload): Promise<UnstructuredInstance> {
+    const res = await fetch(`${API_BASE}/parsing-engines`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<UnstructuredInstance>(res);
+  },
+
+  async update(id: number, payload: UnstructuredInstanceUpdatePayload): Promise<UnstructuredInstance> {
+    const res = await fetch(`${API_BASE}/parsing-engines/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<UnstructuredInstance>(res);
+  },
+
+  async delete(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/parsing-engines/${id}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
+  },
+
+  async test(id: number): Promise<UnstructuredInstanceTestResult> {
+    const res = await fetch(`${API_BASE}/parsing-engines/${id}/test`, {
+      method: "POST",
+    });
+    return handleResponse<UnstructuredInstanceTestResult>(res);
   },
 };
 

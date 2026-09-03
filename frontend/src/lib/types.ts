@@ -743,6 +743,48 @@ export interface ProjectImportPayload {
   analysis_type?: string;
 }
 
+export type UnstructuredInstanceKind = "local" | "hosted";
+
+export interface UnstructuredInstance {
+  id: number;
+  name: string;
+  kind: UnstructuredInstanceKind;
+  api_url: string;
+  has_api_key: boolean;
+  strategy: string;
+  is_default: boolean;
+  is_enabled: boolean;
+  notes: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface UnstructuredInstanceCreatePayload {
+  name: string;
+  kind: UnstructuredInstanceKind;
+  api_url: string;
+  api_key?: string;
+  strategy?: string;
+  is_default?: boolean;
+  is_enabled?: boolean;
+  notes?: string;
+}
+
+export interface UnstructuredInstanceUpdatePayload {
+  name?: string;
+  api_url?: string;
+  api_key?: string;
+  strategy?: string;
+  is_default?: boolean;
+  is_enabled?: boolean;
+  notes?: string;
+}
+
+export interface UnstructuredInstanceTestResult {
+  ok: boolean;
+  detail: string;
+}
+
 // =============================================================================
 // buildingSMART Ecosystem Frontend Types
 // =============================================================================

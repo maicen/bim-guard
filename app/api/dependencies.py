@@ -14,6 +14,7 @@ from app.services.pipeline_services import AnalysisService
 from app.services.projects_service import ProjectsService
 from app.services.rules_service import RuleService
 from app.services.settings_service import SettingsService
+from app.services.unstructured_instances_service import UnstructuredInstancesService
 
 
 def get_projects_service() -> ProjectsService:
@@ -70,3 +71,8 @@ def get_naming_config_service() -> NamingConfigService:
 def get_digital_inspector_service() -> DigitalInspectorService:
     """Return the configured DigitalInspectorService instance."""
     return get_container().digital_inspector_service
+
+
+def get_unstructured_instances_service() -> UnstructuredInstancesService:
+    """Return the configured UnstructuredInstancesService instance."""
+    return get_container().unstructured_instances_service

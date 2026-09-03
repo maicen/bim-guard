@@ -15,9 +15,15 @@
     FolderSync,
     ExternalLink,
   } from "lucide-svelte";
-  import { documentsApi } from "../lib/api";
+  import { documentsApi, parsingEnginesApi } from "../lib/api";
   import { DOCUMENT_TYPES } from "../lib/types";
-  import type { DocumentItem, DocumentDetail, DocumentType, IdsImportResult } from "../lib/types";
+  import type {
+    DocumentItem,
+    DocumentDetail,
+    DocumentType,
+    IdsImportResult,
+    UnstructuredInstance,
+  } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { createTableState } from "../lib/tableState.svelte";
@@ -79,8 +85,19 @@
   let uploadFile: File | null = $state(null);
   let uploadDocType = $state("Specification");
   let uploadParser: "auto" | "unstructured" | "light" = $state("auto");
+  let uploadInstance = $state("");
+  let parsingEngines: UnstructuredInstance[] = $state([]);
   let isUploading = $state(false);
   let uploadError = $state("");
+
+  async function loadParsingEngines() {
+    try {
+      parsingEngines = await parsingEnginesApi.list();
+    } catch {
+      // Non-fatal — the instance selector just stays empty (uses the
+      // server's default engine) when this can't be loaded.
+    }
+  }
 
   let successMessage = $state("");
 
@@ -144,6 +161,7 @@
       documents = updatedDocs;
     });
     loadDocuments();
+    loadParsingEngines();
   });
 
   onDestroy(() => {
@@ -199,12 +217,14 @@
     try {
       const created = await documentsApi.upload(uploadFile, uploadDocType, {
         parser: uploadParser,
+        unstructured_instance: uploadParser === "light" ? undefined : uploadInstance || undefined,
       });
       documents = [created, ...documents];
       isUploadModalOpen = false;
       uploadFile = null;
       uploadDocType = "Specification";
       uploadParser = "auto";
+      uploadInstance = "";
     } catch (err: any) {
       uploadError = err.message || "Failed to upload document.";
     } finally {
@@ -633,6 +653,31 @@
                 <option value="light">Light local extraction only (instant, no upload)</option>
               </select>
             </div>
+
+            {#if uploadParser !== "light" && parsingEngines.length > 0}
+              <div class="space-y-1.5">
+                <label for="upload-instance" class="block text-xs font-semibold text-slate-300">
+                  Instance
+                </label>
+                <select
+                  id="upload-instance"
+                  bind:value={uploadInstance}
+                  class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                >
+                  <option value="">Default</option>
+                  {#each parsingEngines as engine (engine.id)}
+                    <option value={engine.name} disabled={!engine.is_enabled}>
+                      {engine.name} ({engine.kind}{engine.is_default ? ", default" : ""}{!engine.is_enabled
+                        ? ", disabled"
+                        : ""})
+                    </option>
+                  {/each}
+                </select>
+                <p class="text-caption text-slate-500">
+                  Which configured parsing engine to use — see Settings &gt; Parsing Engines.
+                </p>
+              </div>
+            {/if}
 
             <div
               class="rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/40 p-6 text-center transition-colors hover:border-accent"

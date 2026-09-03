@@ -13,10 +13,21 @@ Two engines:
   - LightExtractor (fallback) — plain per-format readers (pypdf, python-docx,
     openpyxl, csv), no upload, no API key, no tables, effectively instant.
 
+An "instance" is an optional dict describing which Unstructured engine to use
+— {name, kind ("local"|"hosted"), api_url, api_key, strategy} — as returned
+by UnstructuredInstancesService (app/services/unstructured_instances_service.py).
+Callers with access to that service (documents_service.py) resolve an
+instance name (or the configured default) before calling in; callers that
+don't pass one fall back to the legacy env-var-only hosted configuration
+(UNSTRUCTURED_API_KEY / _API_URL / _STRATEGY), preserving old behavior.
+
 Usage:
     from module1_doc_parser.document_extractor import extract_document_text
     text, tables = extract_document_text("code.pdf", file_bytes)                # auto
     text, tables = extract_document_text("code.pdf", file_bytes, parser="light")
+    text, tables = extract_document_text(
+        "code.pdf", file_bytes, parser="unstructured", instance=resolved_instance
+    )
 """
 
 from app.logging_config import get_logger
@@ -30,7 +41,7 @@ VALID_PARSERS = {PARSER_AUTO, PARSER_UNSTRUCTURED, PARSER_LIGHT}
 
 
 def extract_document_text(
-    filename: str, content: bytes, parser: str = PARSER_AUTO
+    filename: str, content: bytes, parser: str = PARSER_AUTO, instance: dict | None = None
 ) -> tuple:
     """
     Extract text (and tables, when available) from an uploaded document.
@@ -42,10 +53,15 @@ def extract_document_text(
                                               configured, else LightExtractor;
                                               also falls back automatically on
                                               a failed or empty extraction
-                          "unstructured"    — force the hosted API; raises if
-                                              the key is missing or the call fails
+                          "unstructured"    — force Unstructured; raises if no
+                                              instance is configured or the call fails
                           "light"           — force the local, dependency-light
                                               extractor
+        instance (dict | None): a resolved Unstructured instance — {name, kind,
+                                 api_url, api_key, strategy} — selecting which
+                                 configured engine (local container, or which
+                                 hosted account) to use. When omitted, falls
+                                 back to the legacy env-var-only hosted config.
 
     Returns:
         text   (str)
@@ -60,32 +76,47 @@ def extract_document_text(
     if parser == PARSER_LIGHT:
         return LightExtractor().extract(filename, content), []
 
-    if parser == PARSER_UNSTRUCTURED and not UNSTRUCTURED_API_KEY:
+    have_engine = bool(instance) or bool(UNSTRUCTURED_API_KEY)
+
+    if parser == PARSER_UNSTRUCTURED and not have_engine:
         raise RuntimeError(
-            "UNSTRUCTURED_API_KEY is not set; cannot force the 'unstructured' parser."
+            "No Unstructured instance is configured; cannot force the 'unstructured' parser."
         )
 
-    if UNSTRUCTURED_API_KEY:
+    if have_engine:
         from app.modules.module1_doc_parser.unstructured_extractor import UnstructuredExtractor
 
         try:
-            text, tables = UnstructuredExtractor().extract_bytes(content, filename)
+            if instance:
+                extractor = UnstructuredExtractor(
+                    api_key=instance.get("api_key") or None,
+                    api_url=instance.get("api_url") or None,
+                    strategy=instance.get("strategy") or None,
+                    kind=instance.get("kind") or "hosted",
+                    name=instance.get("name"),
+                )
+            else:
+                extractor = UnstructuredExtractor()
+            text, tables = extractor.extract_bytes(content, filename)
             if text.strip():
                 return text, tables
             logger.warning(
-                "Unstructured extraction returned empty text filename=%s", filename
+                "Unstructured extraction returned empty text filename=%s instance=%s",
+                filename,
+                instance.get("name") if instance else "env-default",
             )
         except Exception as exc:
             if parser == PARSER_UNSTRUCTURED:
                 raise
             logger.warning(
-                "Unstructured extraction failed filename=%s error=%s — falling back to light extractor",
+                "Unstructured extraction failed filename=%s instance=%s error=%s — falling back to light extractor",
                 filename,
+                instance.get("name") if instance else "env-default",
                 exc,
             )
     elif parser == PARSER_AUTO:
         logger.info(
-            "UNSTRUCTURED_API_KEY not set — using light extractor for filename=%s", filename
+            "No Unstructured instance configured — using light extractor for filename=%s", filename
         )
 
     return LightExtractor().extract(filename, content), []

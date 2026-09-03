@@ -44,6 +44,7 @@ from app.services.static_data_service import (
     _STATIC_ASSET_SCHEMA,
     StaticDataService,
 )
+from app.services.unstructured_instances_service import UnstructuredInstancesService
 
 logger = get_logger(__name__)
 
@@ -64,6 +65,7 @@ class ApplicationContainer:
     settings_repo: DatabaseAdapter
     github_repos_repo: DatabaseAdapter
     naming_config_repo: DatabaseAdapter
+    unstructured_instances_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
@@ -72,6 +74,7 @@ class ApplicationContainer:
     settings_service: SettingsService
     github_repo_service: GitHubRepoService
     naming_config_service: NamingConfigService
+    unstructured_instances_service: UnstructuredInstancesService
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
@@ -215,6 +218,23 @@ def build_default_container() -> ApplicationContainer:
         _NAMING_CONFIG_SCHEMA,
     )
 
+    unstructured_instances_repo = PersistenceService.get_table(
+        "unstructured_instances",
+        {
+            "id": int,
+            "name": str,
+            "kind": str,
+            "api_url": str,
+            "api_key": str,
+            "strategy": str,
+            "is_default": bool,
+            "is_enabled": bool,
+            "notes": str,
+            "created_at": str,
+            "updated_at": str,
+        },
+    )
+
     # 3. Model Lineage & Static Data
     lineage = SupabaseModelLineageRepository(lineage_repo=lineage_repo)
     static_data_service = StaticDataService(
@@ -266,6 +286,47 @@ def build_default_container() -> ApplicationContainer:
         naming_repo=naming_config_repo,
     )
 
+    unstructured_instances_service = UnstructuredInstancesService(
+        instances_repo=unstructured_instances_repo,
+    )
+
+    # Seed the registry from legacy env vars on first boot, so existing
+    # UNSTRUCTURED_API_KEY / UNSTRUCTURED_LOCAL_URL deployments keep working
+    # without manual setup. Once any instance exists the registry is the
+    # sole source of truth and these env vars are no longer consulted.
+    try:
+        if not unstructured_instances_service.list_instances():
+            from app.modules.config import (
+                UNSTRUCTURED_API_KEY,
+                UNSTRUCTURED_API_URL,
+                UNSTRUCTURED_LOCAL_URL,
+                UNSTRUCTURED_STRATEGY,
+            )
+
+            if UNSTRUCTURED_LOCAL_URL:
+                unstructured_instances_service.create_instance(
+                    name="local",
+                    kind="local",
+                    api_url=UNSTRUCTURED_LOCAL_URL,
+                    strategy=UNSTRUCTURED_STRATEGY,
+                    is_default=not UNSTRUCTURED_API_KEY,
+                    notes="Self-hosted Unstructured Docker container (seeded from UNSTRUCTURED_LOCAL_URL).",
+                )
+            if UNSTRUCTURED_API_KEY:
+                unstructured_instances_service.create_instance(
+                    name="hosted-default",
+                    kind="hosted",
+                    api_url=UNSTRUCTURED_API_URL or "https://api.unstructuredapp.io",
+                    api_key=UNSTRUCTURED_API_KEY,
+                    strategy=UNSTRUCTURED_STRATEGY,
+                    is_default=True,
+                    notes="Unstructured Platform API (seeded from UNSTRUCTURED_API_KEY).",
+                )
+    except Exception:
+        logger.warning(
+            "Could not seed default Unstructured instances; continuing startup", exc_info=True
+        )
+
     analysis_service = AnalysisService()
     phase6_service = Phase6Service()
 
@@ -295,6 +356,7 @@ def build_default_container() -> ApplicationContainer:
         settings_repo=settings_repo,
         github_repos_repo=github_repos_repo,
         naming_config_repo=naming_config_repo,
+        unstructured_instances_repo=unstructured_instances_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
@@ -303,6 +365,7 @@ def build_default_container() -> ApplicationContainer:
         settings_service=settings_service,
         github_repo_service=github_repo_service,
         naming_config_service=naming_config_service,
+        unstructured_instances_service=unstructured_instances_service,
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,

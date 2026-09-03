@@ -61,6 +61,15 @@ RETRY_BACKOFF_MULTIPLIER = 2.0  # Exponential backoff: 1s, 2s, 4s
 UNSTRUCTURED_API_KEY = os.environ.get("UNSTRUCTURED_API_KEY", "")
 UNSTRUCTURED_API_URL = os.environ.get("UNSTRUCTURED_API_URL", "")
 UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
+# Base URL of a self-hosted / local open-source unstructured-api container
+# (see docker-compose.yml's `unstructured-api` service, profile "unstructured").
+# Used only to seed the `unstructured_instances` registry on first boot —
+# once instances exist in the database, they are the source of truth and
+# these env vars are no longer read. e.g. http://localhost:8001 for a host
+# process talking to the container's published port, or
+# http://unstructured-api:8000 for the bim-guard app container talking to it
+# over the compose network.
+UNSTRUCTURED_LOCAL_URL = os.environ.get("UNSTRUCTURED_LOCAL_URL", "")
 
 # ── Path B feature flags ─────────────────────────────────────────────────
 # Gate the MM-001 and XM-001 comparators independently. Both default OFF.
