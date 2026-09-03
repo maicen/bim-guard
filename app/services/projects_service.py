@@ -417,7 +417,7 @@ class ProjectsService:
         if cde_state is not None:
             updates["cde_state"] = cde_state.strip() or "WIP"
         if classification_standard is not None:
-            updates["classification_standard"] = classification_standard.strip()
+            updates["classification_standard"] = classification_standard.strip() or None
         if analysis_type:
             analysis_type = normalize_analysis_type(analysis_type.strip())
             if analysis_type not in ANALYSIS_TYPES:
