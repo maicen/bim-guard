@@ -31,6 +31,7 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
   let documents: DocumentItem[] = $state([]);
@@ -652,7 +653,12 @@
           </div>
           <div>
             <span class="text-slate-500">Property:</span>
-            <span class="text-slate-300">{viewingDraftRule.property_name || "—"}</span>
+            <BsddBadge
+              kind="property"
+              value={viewingDraftRule.property_name}
+              propertySet={viewingDraftRule.property_set}
+              class="text-slate-300"
+            />
           </div>
           <div>
             <span class="text-slate-500">Operator:</span>

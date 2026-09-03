@@ -30,6 +30,7 @@
   import SortHeader from "../lib/components/SortHeader.svelte";
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
+  import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
   let copied = $state(false);
@@ -466,10 +467,10 @@ print(response.read())
                       {/if}
                     </td>
                     <td class="px-3 py-3 font-mono text-slate-300">
-                      {rule.target || "—"}
+                      <BsddBadge kind="class" value={rule.target} />
                     </td>
                     <td class="px-3 py-3 font-mono text-slate-300">
-                      {rule.property_name || "—"}
+                      <BsddBadge kind="property" value={rule.property_name} />
                     </td>
                     <td class="px-3 py-3">
                       <Badge
@@ -572,11 +573,11 @@ print(response.read())
         >
           <div>
             <span class="text-slate-500">Target:</span>
-            <span class="text-slate-300">{viewingRule.target || "—"}</span>
+            <BsddBadge kind="class" value={viewingRule.target} class="text-slate-300" />
           </div>
           <div>
             <span class="text-slate-500">Property:</span>
-            <span class="text-slate-300">{viewingRule.property_name || "—"}</span>
+            <BsddBadge kind="property" value={viewingRule.property_name} class="text-slate-300" />
           </div>
           <div>
             <span class="text-slate-500">Verdict:</span>

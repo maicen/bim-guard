@@ -19,6 +19,7 @@
   import type { ArchDomainTarget } from "../lib/archDomains";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import RuleForm from "../lib/components/RuleForm.svelte";
+  import BsddBadge from "../lib/components/BsddBadge.svelte";
 
   interface Props {
     onBack: () => void;
@@ -122,7 +123,7 @@
                 <div class="flex items-center justify-between p-3">
                   <div class="flex items-center gap-2">
                     <span class="text-xs font-bold text-slate-200">{target.label}</span>
-                    <span class="font-mono text-micro text-slate-500">{target.ifcClass}</span>
+                    <BsddBadge kind="class" value={target.ifcClass} class="font-mono text-micro text-slate-500" />
                   </div>
                   <button
                     type="button"
