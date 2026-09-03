@@ -31,7 +31,7 @@
     ArrowUp,
     ArrowDown,
   } from "lucide-svelte";
-  import { analyzeApi, projectsApi, rulesApi } from "../lib/api";
+  import { isAbortError, analyzeApi, projectsApi, rulesApi } from "../lib/api";
   import HoverCard from "../lib/components/HoverCard.svelte";
   import { describeMechanism } from "../lib/glossary";
   import type {
@@ -209,27 +209,55 @@
     }
   }
 
+  // Lets an in-flight run be abandoned, either by the user or because they
+  // switched to a different project while it was still going.
+  let runController: AbortController | null = null;
+
   async function handleRun(forceRecompute = false) {
     if (!selectedProjectId) return;
+    runController?.abort();
+    const controller = new AbortController();
+    runController = controller;
+
     isRunning = true;
     error = "";
-    result = null;
+    // The previous report is deliberately kept until the new one lands: if this
+    // run fails, discarding it first would have left the user with nothing but
+    // an error message. It is dimmed while the run is in flight.
     try {
-      result = await analyzeApi.run(
+      const next = await analyzeApi.run(
         selectedProjectId,
         selectedSlug,
         false,
         !forceRecompute,
         requestedEngines,
+        controller.signal,
       );
+      if (runController !== controller) return; // superseded by a newer run
+      result = next;
     } catch (err: any) {
+      if (isAbortError(err)) return;
       error = err.message || "Analysis failed";
+      toasts.fromError(err, "Analysis failed.");
     } finally {
-      isRunning = false;
+      if (runController === controller) {
+        runController = null;
+        isRunning = false;
+      }
     }
   }
 
+  function handleCancelRun() {
+    runController?.abort();
+    runController = null;
+    isRunning = false;
+    toasts.info("Analysis cancelled.");
+  }
+
   async function handleProjectChange() {
+    runController?.abort();
+    runController = null;
+    isRunning = false;
     error = "";
     result = null;
     await Promise.all([fetchResults(), loadInputs()]);
@@ -248,10 +276,10 @@
       const data = await projectsApi.list();
       projects = data.projects || [];
       uploadFile = null;
-      setTimeout(() => {
-        isUploadModalOpen = false;
-        uploadSuccessMsg = "";
-      }, 1500);
+      // The success message carries the SHA-256 digest, which is the whole point
+      // of showing it; a 1.5s auto-close dismissed it before it could be read.
+      // The user closes the dialog when they are done with it.
+      toasts.success(`Attached ${res.filename}.`, "IFC model uploaded");
     } catch (err: any) {
       uploadErrorMsg = err.message || "Upload failed";
     } finally {
@@ -550,6 +578,17 @@
         {/if}
       </button>
 
+      {#if isRunning}
+        <button
+          type="button"
+          on:click={handleCancelRun}
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-slate-50 transition-colors"
+          title="Abandon the run in progress"
+        >
+          <span>Cancel</span>
+        </button>
+      {/if}
+
       <!-- Engine Selector (PIPING only) -->
       {#if activeCategory !== "seismic"}
         <div
@@ -797,8 +836,13 @@
     <PipelineProgress projectId={selectedProjectId} />
   {/if}
 
-  <!-- Results Section -->
+  <!-- Results Section. While a run is in flight the previous report stays on
+       screen, dimmed and inert, so a failed run does not leave the user with
+       nothing. -->
   {#if result}
+    <div
+      class="{isRunning ? 'opacity-40 pointer-events-none' : ''} transition-opacity duration-200"
+    >
     <!-- Demo Mode Notice -->
     {#if result.compliance_is_demo}
       <div
@@ -1347,6 +1391,7 @@
           />
         {/if}
       </div>
+    </div>
     </div>
   {:else if !isRunning}
     <div

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
   import type { WorkflowStatus } from '../types';
   import { analyzeApi } from '../api';
   import { subscribeToPipelineEvents } from '../sse';
@@ -58,6 +58,9 @@
 
     try {
       unsubscribeSSE = subscribeToPipelineEvents(projectId, {
+        onOpen: () => {
+          isStreaming = true;
+        },
         onStatus: (newStatus) => {
           internalStatus = newStatus;
           isStreaming = true;
@@ -72,17 +75,20 @@
       isStreaming = false;
     }
 
-    // Fallback light poller
-    pollInterval = setInterval(fetchStatus, 3000);
+    // Poll only as a fallback. Previously this ran unconditionally alongside a
+    // healthy stream, costing ~20 redundant status requests a minute; now each
+    // tick short-circuits while the stream is delivering.
+    pollInterval = setInterval(() => {
+      if (!isStreaming) fetchStatus();
+    }, 3000);
   }
 
+  // Runs on first render and on every projectId change; setupSubscription
+  // tears down any previous stream first. onMount used to call this a second
+  // time, rebuilding the EventSource immediately after it was opened.
   $: if (projectId) {
     setupSubscription();
   }
-
-  onMount(() => {
-    if (projectId) setupSubscription();
-  });
 
   onDestroy(() => {
     if (unsubscribeSSE) unsubscribeSSE();

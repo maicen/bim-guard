@@ -4,6 +4,8 @@ export interface SSESubscriptionOptions {
   onStatus?: (status: WorkflowStatus) => void;
   onEvent?: (event: PipelineEvent) => void;
   onError?: (err: Event) => void;
+  /** Fires when the stream connects, and again on each automatic reconnect. */
+  onOpen?: () => void;
 }
 
 export function subscribeToPipelineEvents(
@@ -31,6 +33,13 @@ export function subscribeToPipelineEvents(
       console.error('Error parsing SSE pipeline_event:', err);
     }
   });
+
+  // EventSource reconnects on its own; surfacing `open` lets the caller mark
+  // the stream live as soon as it connects, rather than waiting for the first
+  // message, and lets it clear a "reconnecting" state after a drop.
+  es.onopen = () => {
+    options.onOpen?.();
+  };
 
   es.onerror = (err) => {
     console.warn(`SSE connection error on project ${projectId}:`, err);

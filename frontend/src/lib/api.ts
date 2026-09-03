@@ -539,6 +539,11 @@ function engineQuery(engines?: string[]): string {
   return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join('');
 }
 
+/** True when a rejection is an aborted fetch rather than a real failure. */
+export function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
 export const analyzeApi = {
   async uploadIfc(projectId: number, file: File): Promise<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }> {
     const form = new FormData();
@@ -552,17 +557,25 @@ export const analyzeApi = {
     return handleResponse<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }>(res);
   },
 
-  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true, engines?: string[]): Promise<AnalysisResult> {
+  /**
+   * Trigger a compliance run.
+   *
+   * `signal` lets the caller abandon a run in flight — both for an explicit
+   * Cancel and to discard a stale response when the user switches project
+   * mid-request, which would otherwise land on top of the newer selection.
+   */
+  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true, engines?: string[], signal?: AbortSignal): Promise<AnalysisResult> {
     const res = await fetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project_id: projectId, slug, use_cache: useCache, engines: engines ?? null }),
+      signal,
     });
     return handleResponse<AnalysisResult>(res);
   },
 
-  async getResults(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', useCache = true, engines?: string[]): Promise<AnalysisResult> {
-    const res = await fetch(`${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}`);
+  async getResults(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', useCache = true, engines?: string[], signal?: AbortSignal): Promise<AnalysisResult> {
+    const res = await fetch(`${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}`, { signal });
     return handleResponse<AnalysisResult>(res);
   },
 
