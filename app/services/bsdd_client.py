@@ -12,6 +12,7 @@ import json
 import os
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
 from cachetools import TTLCache
@@ -361,11 +362,15 @@ class BSDDClient:
 
         return None
 
-    def search_classes(self, query: str, dictionary_uri: str | None = None) -> BSDDClassSearchResponse:
+    def search_classes(self, query: str, dictionary_uri: str | None = None, limit: int = 10) -> BSDDClassSearchResponse:
         """Search bSDD classes matching a text query."""
         # GET /api/TextSearch/v2 (v1 is retired): SearchText is the free-text
         # query, DictionaryUris scopes it to one or more dictionaries.
-        params = {"SearchText": query}
+        # No TypeFilter here (unlike search_properties): bSDD's "classes"
+        # bucket also carries classType=GroupOfProperties entries (e.g.
+        # "S4-IfcDoor-Sustainability"), and TypeFilter=Class was verified
+        # live to drop those -- and even plain "Door" -- entirely.
+        params = {"SearchText": query, "Limit": str(limit)}
         if dictionary_uri:
             params["DictionaryUris"] = dictionary_uri
 
@@ -404,53 +409,103 @@ class BSDDClient:
 
         return BSDDClassSearchResponse(query=query, total=len(matched), classes=matched)
 
-    def search_properties(self, query: str, dictionary_uri: str | None = None) -> list[BSDDPropertyItem]:
-        """Search bSDD properties by name across classes matching a text query.
+    def get_property(self, uri: str) -> Optional[BSDDPropertyItem]:
+        """Fetch one property's full definition (dataType/units/allowedValues) by URI.
 
-        GET /api/TextSearch/v2 does return a top-level `properties` array
-        alongside `classes`, but its entries carry only uri/code/name/
-        description -- not the propertySet/dataType/units/allowedValues
-        BSDDPropertyItem needs for rule-builder autocomplete. So this instead
-        flattens the richer, per-class properties nested under whichever
-        classes the class search (live or offline fallback) turns up, then
-        filters those to the ones whose name/description actually matches
-        the query.
+        GET /api/Property/v5 -- a bare Property carries no `propertySet`
+        (that name is a Class-Property *relation* attribute, only meaningful
+        once a property is attached to a particular class; see
+        ClassPropertyContract.propertySet in the bSDD OpenAPI spec), so this
+        always returns property_set=None. Callers that need a pset-scoped
+        property should go through get_class()'s classProperties instead.
+        """
+        if not uri:
+            return None
+        cache_key = f"property:{uri}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        api_data = self._http_get("/api/Property/v5", {"uri": uri})
+        if api_data and isinstance(api_data, dict) and api_data.get("uri"):
+            item = BSDDPropertyItem(
+                uri=api_data.get("uri", uri),
+                name=api_data.get("name", ""),
+                property_set=None,
+                data_type=api_data.get("dataType"),
+                units=self._first_unit(api_data),
+                allowed_values=self._allowed_value_strings(api_data.get("allowedValues", [])),
+                description=api_data.get("description") or api_data.get("definition"),
+            )
+            self._cache[cache_key] = item
+            return item
+        return None
+
+    def search_properties(
+        self, query: str, dictionary_uri: str | None = None, limit: int = 8
+    ) -> list[BSDDPropertyItem]:
+        """Search bSDD properties whose own name/description matches a text query.
+
+        GET /api/TextSearch/v2 accepts TypeFilter=Property, which searches
+        properties directly by their own name/description -- unlike an
+        earlier version of this method, which searched *classes* matching
+        the query text and returned whichever properties happened to belong
+        to those classes. That gave zero results for real property names
+        (no bSDD class is literally named "Width" or "FireRating") and dumped
+        dozens of unrelated properties for a class-shaped query like "Door".
         """
         lowered = query.strip().lower()
         if not lowered:
             return []
 
-        matches = self.search_classes(query, dictionary_uri)
-        candidate_classes = list(matches.classes)[:10]
+        params = {"SearchText": query, "TypeFilter": "Property", "Limit": str(limit)}
+        if dictionary_uri:
+            params["DictionaryUris"] = dictionary_uri
 
-        # Live class search results carry no nested properties (bSDD's
-        # TextSearch endpoint returns bare class refs) — fetch each match's
-        # full class definition to get at its properties.
+        api_data = self._http_get("/api/TextSearch/v2", params)
+        if api_data and isinstance(api_data, dict) and "properties" in api_data:
+            hits = (api_data.get("properties") or [])[:limit]
+            uris = [p.get("uri", "") for p in hits if p.get("uri")]
+            # TextSearchResponsePropertyContract.v2 carries only uri/code/name/
+            # description -- fetch each hit's full Property/v5 record (cached,
+            # 1hr TTL) for the dataType/units/allowedValues the rule-builder
+            # autocomplete needs. Done in parallel since these are independent,
+            # short-lived HTTP GETs and a search-as-you-type field can't afford
+            # N sequential round trips on every keystroke.
+            details: dict[str, BSDDPropertyItem] = {}
+            if uris:
+                with ThreadPoolExecutor(max_workers=min(8, len(uris))) as pool:
+                    for prop_uri, item in zip(uris, pool.map(self.get_property, uris)):
+                        if item is not None:
+                            details[prop_uri] = item
+
+            results: list[BSDDPropertyItem] = []
+            for p in hits:
+                uri = p.get("uri", "")
+                item = details.get(uri)
+                if item is None:
+                    # Detail fetch failed/missing -- fall back to the bare
+                    # search hit rather than dropping a real match.
+                    item = BSDDPropertyItem(
+                        uri=uri,
+                        name=p.get("name", ""),
+                        description=p.get("description"),
+                    )
+                results.append(item)
+            if results:
+                return results
+
+        # Fully offline: no live bSDD reachable at all. Match the small
+        # built-in catalog directly by property name/description.
         seen_uris: set[str] = set()
-        props: list[BSDDPropertyItem] = []
-        for cls in candidate_classes:
-            full_class = cls
-            if not cls.properties and cls.dictionary_uri and cls.code:
-                fetched = self.get_class(cls.dictionary_uri, cls.code)
-                if fetched is not None:
-                    full_class = fetched
-            for prop in full_class.properties:
-                if prop.uri in seen_uris:
-                    continue
-                seen_uris.add(prop.uri)
-                props.append(prop)
-
-        # Also match properties directly by name, independent of whether
-        # their owning class matched the query text.
+        fallback: list[BSDDPropertyItem] = []
         for raw in FALLBACK_CLASSES.values():
             for p in raw.get("properties", []):
                 if p["uri"] in seen_uris:
                     continue
                 if lowered in p.get("name", "").lower() or lowered in (p.get("description") or "").lower():
                     seen_uris.add(p["uri"])
-                    props.append(BSDDPropertyItem(**p))
-
-        return props
+                    fallback.append(BSDDPropertyItem(**p))
+        return fallback
 
     def validate_element_semantics(
         self,
