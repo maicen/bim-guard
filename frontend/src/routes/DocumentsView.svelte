@@ -20,6 +20,7 @@
   import type { DocumentItem, DocumentDetail, DocumentType, IdsImportResult } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { toasts } from "../lib/toast.svelte";
+  import { createTableState } from "../lib/tableState.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
@@ -100,21 +101,16 @@
   let selectedDoc: DocumentDetail | null = null;
   let isLoadingDocDetail = false;
 
-  let searchQuery = "";
-  let selectedDocTypeFilter: string = "ALL";
-
-  // Sorting state
-  let sortField: "id" | "filename" | "doc_type" | "char_count" | "upload_date" = "id";
-  let sortAsc = false;
-
-  function toggleSort(field: "id" | "filename" | "doc_type" | "char_count" | "upload_date") {
-    if (sortField === field) {
-      sortAsc = !sortAsc;
-    } else {
-      sortField = field;
-      sortAsc = true;
-    }
-  }
+  // Search, filter, sort, paginate and select — all owned by the shared state.
+  const table = createTableState<DocumentItem, number>({
+    rows: () => documents,
+    getId: (d) => d.id,
+    searchFields: (d) => [d.filename, d.extracted_text_preview],
+    filters: {
+      docType: (d, value) => (d.doc_type || "Specification") === value,
+    },
+    initialSort: { field: "id", asc: false },
+  });
 
   async function loadDocuments(force = false) {
     if (!documents.length) {
@@ -148,63 +144,10 @@
     }
   });
 
-  $: filteredDocuments = documents
-    .filter((d) => {
-      const matchesSearch =
-        d.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (d.extracted_text_preview || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesType =
-        selectedDocTypeFilter === "ALL" ||
-        (d.doc_type || "Specification") === selectedDocTypeFilter;
-      return matchesSearch && matchesType;
-    })
-    .sort((a, b) => {
-      let valA: any = a[sortField];
-      let valB: any = b[sortField];
-      if (valA === undefined || valA === null) valA = "";
-      if (valB === undefined || valB === null) valB = "";
-      if (typeof valA === "string") valA = valA.toLowerCase();
-      if (typeof valB === "string") valB = valB.toLowerCase();
-      if (valA < valB) return sortAsc ? -1 : 1;
-      if (valA > valB) return sortAsc ? 1 : -1;
-      return 0;
-    });
-
-  let selectedDocIds: number[] = [];
   let isBulkDeleteModalOpen = false;
 
-  let currentPage = 1;
-  let pageSize = 10;
-
-  $: totalItems = filteredDocuments.length;
-  $: paginatedDocuments = filteredDocuments.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
-
-  $: allFilteredSelected =
-    filteredDocuments.length > 0 &&
-    filteredDocuments.every((d) => selectedDocIds.includes(d.id));
-
-  function toggleSelectAll() {
-    if (allFilteredSelected) {
-      selectedDocIds = [];
-    } else {
-      selectedDocIds = filteredDocuments.map((d) => d.id);
-    }
-  }
-
-  function toggleSelectDoc(id: number) {
-    if (selectedDocIds.includes(id)) {
-      selectedDocIds = selectedDocIds.filter((dId) => dId !== id);
-    } else {
-      selectedDocIds = [...selectedDocIds, id];
-    }
-  }
-
   function exportSelectedToCsv() {
-    const docsToExport = documents.filter((d) => selectedDocIds.includes(d.id));
-    const targetDocs = docsToExport.length ? docsToExport : filteredDocuments;
+    const targetDocs = table.selectedCount ? table.selectedRows : table.sorted;
     const headers = ["ID", "Filename", "DocType", "CharCount", "UploadDate"];
     const rows = targetDocs.map((d) => [
       d.id,
@@ -228,23 +171,17 @@
   }
 
   async function confirmBulkDelete() {
-    if (!selectedDocIds.length) return;
+    if (!table.selectedCount) return;
     try {
-      for (const id of selectedDocIds) {
+      for (const id of table.selectedIdList) {
         await documentsApi.delete(id);
       }
-      documents = documents.filter((d) => !selectedDocIds.includes(d.id));
-      selectedDocIds = [];
+      documents = documents.filter((d) => !table.selectedIds.has(d.id));
+      table.clearSelection();
       isBulkDeleteModalOpen = false;
     } catch (err: any) {
       error = `Could not delete selected documents: ${err.message}`;
     }
-  }
-
-  $: {
-    searchQuery;
-    selectedDocTypeFilter;
-    currentPage = 1;
   }
 
   async function handleUpload() {
@@ -403,9 +340,9 @@
 
   <!-- Bulk Actions Bar -->
   <BulkActionBar
-    selectedCount={selectedDocIds.length}
+    selectedCount={table.selectedCount}
     itemLabel="document"
-    onClearSelection={() => (selectedDocIds = [])}
+    onClearSelection={() => table.clearSelection()}
     onBulkEdit={() => (isBulkEditModalOpen = true)}
     onBulkExport={exportSelectedToCsv}
     onBulkDelete={() => (isBulkDeleteModalOpen = true)}
@@ -416,14 +353,14 @@
     class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40"
   >
     <DataTableHeader
-      bind:searchQuery
+      bind:searchQuery={table.search}
       searchPlaceholder="Filter documents by file name or text..."
       {isRefreshing}
       onRefresh={() => loadDocuments(true)}
     >
       <div slot="filters" class="flex items-center gap-1.5">
         <select
-          bind:value={selectedDocTypeFilter}
+          bind:value={table.filters.docType}
           aria-label="Filter by document type"
           class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none focus:border-accent"
         >
@@ -437,7 +374,7 @@
 
     {#if isLoading}
       <LoadingState message="Loading document library..." />
-    {:else if filteredDocuments.length === 0}
+    {:else if table.totalItems === 0}
       <div class="p-6">
         <EmptyState
           title="No specification documents found"
@@ -455,37 +392,38 @@
             <tr>
               <th class="py-3 px-4 w-10">
                 <TableCheckbox
-                  checked={allFilteredSelected}
-                  on:change={toggleSelectAll}
+                  checked={table.allFilteredSelected}
+                  indeterminate={table.someFilteredSelected}
+                  on:change={() => table.toggleSelectAll()}
                   title="Select or deselect all visible documents"
                 />
               </th>
-              <SortHeader column="id" {sortField} {sortAsc} onSort={toggleSort}>
+              <SortHeader column="id" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                 ID
               </SortHeader>
-              <SortHeader column="filename" {sortField} {sortAsc} onSort={toggleSort}>
+              <SortHeader column="filename" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                 Document File
               </SortHeader>
-              <SortHeader column="doc_type" {sortField} {sortAsc} onSort={toggleSort}>
+              <SortHeader column="doc_type" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                 Type
               </SortHeader>
               <th class="py-3 px-4">Extracted Text</th>
-              <SortHeader column="char_count" {sortField} {sortAsc} onSort={toggleSort}>
+              <SortHeader column="char_count" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                 Characters
               </SortHeader>
-              <SortHeader column="upload_date" {sortField} {sortAsc} onSort={toggleSort}>
+              <SortHeader column="upload_date" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                 Uploaded
               </SortHeader>
               <th class="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
-            {#each paginatedDocuments as doc}
-              <tr class="hover:bg-slate-900/60 transition-colors {selectedDocIds.includes(doc.id) ? 'bg-blue-950/20' : ''}">
+            {#each table.paginated as doc (doc.id)}
+              <tr class="hover:bg-slate-900/60 transition-colors {table.isSelected(doc.id) ? 'bg-blue-950/20' : ''}">
                 <td class="py-3 px-4 w-10">
                   <TableCheckbox
-                    checked={selectedDocIds.includes(doc.id)}
-                    on:change={() => toggleSelectDoc(doc.id)}
+                    checked={table.isSelected(doc.id)}
+                    on:change={() => table.toggleSelect(doc.id)}
                     ariaLabel={`Select document ${doc.filename}`}
                   />
                 </td>
@@ -549,13 +487,13 @@
       </div>
 
       <TablePagination
-        {currentPage}
-        {pageSize}
-        totalItems={totalItems}
-        onPageChange={(p) => (currentPage = p)}
-        onPageSizeChange={(s) => {
-          pageSize = s;
-          currentPage = 1;
+        currentPage={table.page}
+        pageSize={table.pageSize}
+        totalItems={table.totalItems}
+        onPageChange={(p) => (table.requestedPage = p)}
+        onPageSizeChange={(size) => {
+          table.pageSize = size;
+          table.requestedPage = 1;
         }}
       />
     {/if}
@@ -908,11 +846,11 @@
 <ConfirmModal
   bind:isOpen={isBulkDeleteModalOpen}
   title="Delete Selected Documents"
-  message={`Are you sure you want to delete ${selectedDocIds.length} selected document specification(s)? This action cannot be undone.`}
+  message={`Are you sure you want to delete ${table.selectedCount} selected document specification(s)? This action cannot be undone.`}
   confirmText="Delete Selected Documents"
   danger={true}
   onConfirm={confirmBulkDelete}
-  onCancel={() => (selectedDocIds = [])}
+  onCancel={() => table.clearSelection()}
 />
 
 <OpenCdeSyncModal
@@ -923,11 +861,11 @@
 
 <DocumentBulkEditModal
   isOpen={isBulkEditModalOpen}
-  {selectedDocIds}
+  selectedDocIds={table.selectedIdList}
   onClose={() => (isBulkEditModalOpen = false)}
   onBulkUpdated={() => {
     loadDocuments(true);
-    selectedDocIds = [];
+    table.clearSelection();
   }}
 />
 

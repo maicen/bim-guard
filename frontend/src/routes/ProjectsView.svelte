@@ -38,6 +38,8 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import { createTableState } from "../lib/tableState.svelte";
+  import { normalizeAnalysisDomain } from "../lib/analysisDomain";
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
 
   export let onSelectProjectForAudit: (projectId: number) => void;
@@ -59,10 +61,20 @@
   let repoCategoryFilter = "all";
   let importingPath = "";
 
-  // Filter state
-  let searchQuery = "";
-  let statusFilter = "all";
-  let domainFilter = "all";
+  // Search, filter, sort, paginate and select — all owned by the shared state.
+  // The domain filter reuses normalizeAnalysisDomain rather than restating the
+  // legacy alias list ("Architectural", "Piping (Corrosive)", "Halo", ...).
+  const table = createTableState<Project, number>({
+    rows: () => projects || [],
+    getId: (p) => p.id,
+    searchFields: (p) => [p.name, p.description],
+    filters: {
+      status: (p, value) => p.status === value,
+      domain: (p, value) =>
+        p.analysis_type === value || normalizeAnalysisDomain(p.analysis_type) === value,
+    },
+    initialSort: { field: "id", asc: true },
+  });
 
   // Modals state
   let isEditModalOpen = false;
@@ -76,7 +88,6 @@
   let projectToDelete: { id: number; name: string } | null = null;
 
   // Bulk selection state
-  let selectedProjectIds: number[] = [];
   let isBulkEditModalOpen = false;
   let isBulkDeleteModalOpen = false;
 
@@ -149,83 +160,11 @@
     }
   });
 
-  function toggleSelectAll() {
-    if (allFilteredSelected) {
-      selectedProjectIds = [];
-    } else {
-      selectedProjectIds = filteredProjects.map((p) => p.id);
-    }
-  }
-
-  function toggleSelectProject(id: number) {
-    if (selectedProjectIds.includes(id)) {
-      selectedProjectIds = selectedProjectIds.filter((pId) => pId !== id);
-    } else {
-      selectedProjectIds = [...selectedProjectIds, id];
-    }
-  }
-
-  $: filteredProjects = (projects || []).filter((p) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      (p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
-    const matchesDomain =
-      domainFilter === "all" ||
-      p.analysis_type === domainFilter ||
-      (domainFilter === "Arch" && (p.analysis_type === "Architecture" || p.analysis_type === "Architectural")) ||
-      (domainFilter === "Piping" && p.analysis_type === "Piping (Corrosive)") ||
-      (domainFilter === "seismic" && (p.analysis_type === "Seismic" || p.analysis_type === "Halo"));
-    return matchesSearch && matchesStatus && matchesDomain;
-  });
-
-  $: allFilteredSelected =
-    filteredProjects.length > 0 &&
-    filteredProjects.every((p) => selectedProjectIds.includes(p.id));
-
-  let sortField: 'id' | 'name' | 'status' | 'analysis_type' | 'jurisdiction' | 'created_at' = 'id';
-  let sortAsc = true;
-
-  function toggleSort(field: 'id' | 'name' | 'status' | 'analysis_type' | 'jurisdiction' | 'created_at') {
-    if (sortField === field) {
-      sortAsc = !sortAsc;
-    } else {
-      sortField = field;
-      sortAsc = true;
-    }
-  }
-
-  $: sortedProjects = [...filteredProjects].sort((a, b) => {
-    let valA: any = (a as any)[sortField] || '';
-    let valB: any = (b as any)[sortField] || '';
-    if (typeof valA === 'string') {
-      return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-    }
-    return sortAsc ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
-  });
-
-  let currentPage = 1;
-  let pageSize = 10;
-
-  $: totalItems = sortedProjects.length;
-  $: paginatedProjects = sortedProjects.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
-
-  $: {
-    searchQuery;
-    statusFilter;
-    domainFilter;
-    currentPage = 1;
-  }
-
   $: filteredRepoItems = (activeRepoStructure?.items || []).filter((item) => {
     const matchesSearch =
-      searchQuery === "" ||
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.path.toLowerCase().includes(searchQuery.toLowerCase());
+      table.search === "" ||
+      item.name.toLowerCase().includes(table.search.toLowerCase()) ||
+      item.path.toLowerCase().includes(table.search.toLowerCase());
     const matchesCategory = repoCategoryFilter === "all" || item.category === repoCategoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -248,7 +187,7 @@
   function handleViewInMainRegistry(project: Project) {
     selectedSource = "supabase";
     activeRepoStructure = null;
-    searchQuery = project.name;
+    table.search = project.name;
   }
 
   async function handleImportRepoModel(item: GitHubRepoItem) {
@@ -282,7 +221,7 @@
     try {
       await projectsApi.delete(projectToDelete.id);
       projects = projects.filter((p) => p.id !== projectToDelete!.id);
-      selectedProjectIds = selectedProjectIds.filter((id) => id !== projectToDelete!.id);
+      table.selectedIds.delete(projectToDelete!.id);
       projectToDelete = null;
     } catch (err: any) {
       error = `Could not delete project: ${err.message}`;
@@ -290,11 +229,11 @@
   }
 
   async function confirmBulkDelete() {
-    if (!selectedProjectIds.length) return;
+    if (!table.selectedCount) return;
     try {
-      await projectsApi.bulkDelete(selectedProjectIds);
-      projects = projects.filter((p) => !selectedProjectIds.includes(p.id));
-      selectedProjectIds = [];
+      await projectsApi.bulkDelete(table.selectedIdList);
+      projects = projects.filter((p) => !table.selectedIds.has(p.id));
+      table.clearSelection();
       isBulkDeleteModalOpen = false;
     } catch (err: any) {
       error = `Could not delete selected projects: ${err.message}`;
@@ -303,7 +242,7 @@
 
   async function handleBulkUpdated() {
     await loadProjects(true);
-    selectedProjectIds = [];
+    table.clearSelection();
   }
 
   function openEnhancements(project: Project) {
@@ -420,7 +359,7 @@
         <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           type="text"
-          bind:value={searchQuery}
+          bind:value={table.search}
           placeholder="Filter projects by name or description..."
           class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
         />
@@ -428,7 +367,7 @@
 
       <div class="flex items-center gap-2 w-full md:w-auto">
         <select
-          bind:value={statusFilter}
+          bind:value={table.filters.status}
           class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="all">All Statuses</option>
@@ -438,7 +377,7 @@
         </select>
 
         <select
-          bind:value={domainFilter}
+          bind:value={table.filters.domain}
           class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
         >
           <option value="all">All Domains</option>
@@ -451,9 +390,9 @@
 
     <!-- Bulk Operations Toolbar -->
     <BulkActionBar
-      selectedCount={selectedProjectIds.length}
+      selectedCount={table.selectedCount}
       itemLabel="project"
-      onClearSelection={() => (selectedProjectIds = [])}
+      onClearSelection={() => table.clearSelection()}
       onBulkEdit={() => (isBulkEditModalOpen = true)}
       onBulkDelete={() => (isBulkDeleteModalOpen = true)}
     />
@@ -462,16 +401,14 @@
     <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
       {#if isLoading}
         <LoadingState message="Loading project registry..." />
-      {:else if filteredProjects.length === 0}
+      {:else if table.totalItems === 0}
         <div class="p-6">
           <EmptyState
             title="No projects match your current filters"
             description="Adjust your search criteria or create a project using the Wizard."
             actionLabel="Reset filters"
             onAction={() => {
-              searchQuery = "";
-              statusFilter = "all";
-              domainFilter = "all";
+              table.reset();
             }}
           />
         </div>
@@ -482,37 +419,38 @@
               <tr>
                 <th class="py-3 px-4 w-10">
                   <TableCheckbox
-                    checked={allFilteredSelected}
-                    on:change={toggleSelectAll}
+                    checked={table.allFilteredSelected}
+                    indeterminate={table.someFilteredSelected}
+                    on:change={() => table.toggleSelectAll()}
                     title="Select or deselect all visible projects"
                   />
                 </th>
-                <SortHeader column="name" {sortField} {sortAsc} onSort={toggleSort}>
+                <SortHeader column="name" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                   Project Name
                 </SortHeader>
-                <SortHeader column="status" {sortField} {sortAsc} onSort={toggleSort}>
+                <SortHeader column="status" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                   Status
                 </SortHeader>
                 <th class="py-3 px-4">IFC Model</th>
-                <SortHeader column="analysis_type" {sortField} {sortAsc} onSort={toggleSort}>
+                <SortHeader column="analysis_type" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                   Analysis Domain
                 </SortHeader>
-                <SortHeader column="jurisdiction" {sortField} {sortAsc} onSort={toggleSort}>
+                <SortHeader column="jurisdiction" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                   Jurisdiction
                 </SortHeader>
-                <SortHeader column="created_at" {sortField} {sortAsc} onSort={toggleSort}>
+                <SortHeader column="created_at" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
                   Created
                 </SortHeader>
                 <th class="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
-              {#each paginatedProjects as project}
-                <tr class="hover:bg-slate-900/60 transition-colors {selectedProjectIds.includes(project.id) ? 'bg-blue-950/20' : ''}">
+              {#each table.paginated as project (project.id)}
+                <tr class="hover:bg-slate-900/60 transition-colors {table.isSelected(project.id) ? 'bg-blue-950/20' : ''}">
                   <td class="py-3 px-4 w-10">
                     <TableCheckbox
-                      checked={selectedProjectIds.includes(project.id)}
-                      on:change={() => toggleSelectProject(project.id)}
+                      checked={table.isSelected(project.id)}
+                      on:change={() => table.toggleSelect(project.id)}
                       ariaLabel={`Select project ${project.name}`}
                     />
                   </td>
@@ -632,13 +570,13 @@
         </div>
 
         <TablePagination
-          {currentPage}
-          {pageSize}
-          totalItems={totalItems}
-          onPageChange={(p) => (currentPage = p)}
-          onPageSizeChange={(s) => {
-            pageSize = s;
-            currentPage = 1;
+          currentPage={table.page}
+          pageSize={table.pageSize}
+          totalItems={table.totalItems}
+          onPageChange={(p) => (table.requestedPage = p)}
+          onPageSizeChange={(size) => {
+            table.pageSize = size;
+            table.requestedPage = 1;
           }}
         />
       {/if}
@@ -692,7 +630,7 @@
             <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              bind:value={searchQuery}
+              bind:value={table.search}
               placeholder="Search repository IFC models by filename or path..."
               class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
             />
@@ -858,7 +796,7 @@
 
 <ProjectBulkEditModal
   isOpen={isBulkEditModalOpen}
-  selectedProjectIds={selectedProjectIds}
+  selectedProjectIds={table.selectedIdList}
   onClose={() => (isBulkEditModalOpen = false)}
   onBulkUpdated={handleBulkUpdated}
 />
@@ -866,8 +804,8 @@
 <ConfirmModal
   bind:isOpen={isBulkDeleteModalOpen}
   title="Delete Selected Projects"
-  message={`Are you sure you want to delete ${selectedProjectIds.length} project(s) and their associated artifacts? This cannot be undone.`}
-  confirmText={`Delete ${selectedProjectIds.length} Project(s)`}
+  message={`Are you sure you want to delete ${table.selectedCount} project(s) and their associated artifacts? This cannot be undone.`}
+  confirmText={`Delete ${table.selectedCount} Project(s)`}
   danger={true}
   onConfirm={confirmBulkDelete}
   onCancel={() => (isBulkDeleteModalOpen = false)}

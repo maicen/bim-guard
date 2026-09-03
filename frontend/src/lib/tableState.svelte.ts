@@ -23,11 +23,13 @@ import { SvelteSet } from "svelte/reactivity";
 
 export type SortDirection = "asc" | "desc";
 
-export interface TableStateOptions<T> {
+export type RowId = string | number;
+
+export interface TableStateOptions<T, Id extends RowId = RowId> {
   /** Getter for the full row set; called inside a $derived so it stays live. */
   rows: () => T[];
   /** Stable identity for selection. */
-  getId: (row: T) => string | number;
+  getId: (row: T) => Id;
   /** Values the free-text search matches against. */
   searchFields?: (row: T) => (string | null | undefined)[];
   /**
@@ -52,8 +54,8 @@ function defaultCompare(a: unknown, b: unknown): number {
   return 0;
 }
 
-export class TableState<T> {
-  #options: TableStateOptions<T>;
+export class TableState<T, Id extends RowId = RowId> {
+  #options: TableStateOptions<T, Id>;
 
   search = $state("");
   filters = $state<Record<string, string>>({});
@@ -62,9 +64,9 @@ export class TableState<T> {
   pageSize = $state(10);
   /** Requested page. Read `page` for the clamped, always-valid value. */
   requestedPage = $state(1);
-  selectedIds = new SvelteSet<string | number>();
+  selectedIds = new SvelteSet<Id>();
 
-  constructor(options: TableStateOptions<T>) {
+  constructor(options: TableStateOptions<T, Id>) {
     this.#options = options;
     this.sortField = options.initialSort?.field ?? "";
     this.sortAsc = options.initialSort?.asc ?? true;
@@ -124,6 +126,9 @@ export class TableState<T> {
 
   selectedCount = $derived(this.selectedIds.size);
 
+  /** Selected ids as an array, for components that take a plain list prop. */
+  selectedIdList = $derived([...this.selectedIds]);
+
   /** Ids of the currently filtered rows, i.e. what "select all" acts on. */
   #filteredIds = $derived(this.filtered.map((row) => this.#options.getId(row)));
 
@@ -135,11 +140,11 @@ export class TableState<T> {
     !this.allFilteredSelected && this.#filteredIds.some((id) => this.selectedIds.has(id)),
   );
 
-  isSelected(id: string | number): boolean {
+  isSelected(id: Id): boolean {
     return this.selectedIds.has(id);
   }
 
-  toggleSelect(id: string | number) {
+  toggleSelect(id: Id) {
     if (this.selectedIds.has(id)) this.selectedIds.delete(id);
     else this.selectedIds.add(id);
   }
@@ -194,6 +199,8 @@ export class TableState<T> {
   }
 }
 
-export function createTableState<T>(options: TableStateOptions<T>): TableState<T> {
+export function createTableState<T, Id extends RowId = RowId>(
+  options: TableStateOptions<T, Id>,
+): TableState<T, Id> {
   return new TableState(options);
 }

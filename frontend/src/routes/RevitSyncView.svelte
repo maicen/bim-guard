@@ -48,7 +48,7 @@
   let indexedResults: IndexedRuleResult[] = [];
 
   // Search, filter, sort, paginate and select — all owned by the shared state.
-  const table = createTableState<IndexedRuleResult>({
+  const table = createTableState<IndexedRuleResult, number>({
     rows: () => indexedResults,
     getId: (r) => r.rowId,
     searchFields: (r) => [r.rule_ref, r.rule_desc, r.target, r.property_name],
