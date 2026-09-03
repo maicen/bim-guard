@@ -24,12 +24,50 @@ function installErrorHighlighting(components, world) {
         renderedFaces: 0,
     });
 
+    const hider = components.get(OBC.Hider);
+
+    // Tracks the ModelIdMap behind whatever is currently highlighted (a single
+    // topic's viewpoint selection, or the joined selection of a multi-select),
+    // so the "Isolate" toolbar button knows what to show/hide without having
+    // to recompute it, and so isolate mode can follow the selection as it changes.
+    let currentSelectionMap = null;
+    let isolateActive = false;
+    const selectionListeners = new Set();
+
+    async function applyIsolation(map) {
+        if (map) {
+            await hider.isolate(map);
+        } else {
+            await hider.set(true);
+        }
+    }
+
+    function setSelectionMap(map) {
+        currentSelectionMap = map;
+        if (isolateActive) applyIsolation(map);
+        for (const listener of selectionListeners) listener(map);
+    }
+
+    function toggleIsolate() {
+        isolateActive = !isolateActive;
+        applyIsolation(isolateActive ? currentSelectionMap : null);
+        return isolateActive;
+    }
+
+    function resetIsolate() {
+        isolateActive = false;
+        currentSelectionMap = null;
+        hider.set(true);
+    }
+
     const originalGo = OBC.Viewpoint.prototype.go;
     OBC.Viewpoint.prototype.go = async function highlightingGo(config) {
         await originalGo.call(this, config);
         await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
         const selectionMap = await this.getSelectionMap();
-        if (!OBC.ModelIdMapUtils.isEmpty(selectionMap)) {
+        const map = OBC.ModelIdMapUtils.isEmpty(selectionMap) ? null : selectionMap;
+        setSelectionMap(map);
+        if (map) {
             await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, selectionMap, false, false);
         }
     };
@@ -48,12 +86,23 @@ function installErrorHighlighting(components, world) {
             if (!OBC.ModelIdMapUtils.isEmpty(map)) maps.push(map);
         }
         await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
-        if (maps.length > 0) {
-            await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, OBC.ModelIdMapUtils.join(maps), false, false);
+        const joined = maps.length > 0 ? OBC.ModelIdMapUtils.join(maps) : null;
+        setSelectionMap(joined);
+        if (joined) {
+            await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, joined, false, false);
         }
     }
 
-    return { highlightTopics };
+    return {
+        highlightTopics,
+        isolate: {
+            toggle: toggleIsolate,
+            reset: resetIsolate,
+            isActive: () => isolateActive,
+            hasSelection: () => currentSelectionMap !== null,
+            onSelectionChange: (cb) => selectionListeners.add(cb),
+        },
+    };
 }
 
 const USERS = {
@@ -298,7 +347,7 @@ function createTopicsWorkspace(components, world, viewport, highlightTopics) {
 //   • Toggle section clipping planes (double-click viewport to add, toolbar to delete all / toggle)
 //   • Toggle grid
 //   • Fullscreen
-function createViewerToolbar(components, world, viewport, grids) {
+function createViewerToolbar(components, world, viewport, grids, isolate) {
     // ── Clipping planes ────────────────────────────────────────────────────
     const clipper = components.get(OBC.Clipper);
     clipper.enabled = false;   // start with clipping disabled
@@ -316,10 +365,23 @@ function createViewerToolbar(components, world, viewport, grids) {
     // ── Grid visibility ────────────────────────────────────────────────────
     let gridVisible = true;
 
+    // ── Isolate selected element ───────────────────────────────────────────
+    // isolate mode follows whatever is currently highlighted (a "View in 3D"
+    // element, or a selected topic) so switching topics while isolated keeps
+    // showing only the new selection, rather than snapping back to the full model.
+    isolate.onSelectionChange(() => updateToolbar({}));
+
     // ── Toolbar: stateful BUI component so updateToolbar() triggers re-renders ─
     const [toolbar, updateToolbar] = BUI.Component.create(
         (state) => {
             const { clippingActive, clippingEnabled, gridVisible } = state;
+            const isolateActive = isolate.isActive();
+            const canIsolate = isolate.hasSelection();
+
+            const toggleIsolate = () => {
+                isolate.toggle();
+                updateToolbar({});
+            };
 
             // Camera projection
             const toggleProjection = () => {
@@ -509,6 +571,24 @@ function createViewerToolbar(components, world, viewport, grids) {
 
                     <div class="bimguard-toolbar-divider"></div>
 
+                    <!-- Isolate selected element -->
+                    <div class="bimguard-toolbar-group">
+                        <button
+                            class="bimguard-tb-btn ${isolateActive ? 'active' : ''}"
+                            ?disabled=${!canIsolate}
+                            @click=${toggleIsolate}
+                            title="${canIsolate
+                                ? (isolateActive ? 'Show all elements' : 'Show only the selected element')
+                                : 'Select an element to isolate it'}">
+                            <span class="bimguard-tb-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                            </span>
+                            <span class="bimguard-tb-label">${isolateActive ? 'Isolated' : 'Isolate'}</span>
+                        </button>
+                    </div>
+
+                    <div class="bimguard-toolbar-divider"></div>
+
                     <!-- Fullscreen -->
                     <div class="bimguard-toolbar-group">
                         <button class="bimguard-tb-btn" @click=${toggleFullscreen} title="Toggle fullscreen">
@@ -618,6 +698,11 @@ function createViewerToolbar(components, world, viewport, grids) {
                 border-color: rgba(239, 68, 68, 0.4);
                 color: #fca5a5;
             }
+            .bimguard-tb-btn:disabled {
+                opacity: 0.35;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
             .bimguard-tb-icon {
                 display: flex;
                 align-items: center;
@@ -682,7 +767,7 @@ export async function initViewer(containerOrId) {
     const grids = components.get(OBC.Grids);
     grids.create(world);
 
-    const { highlightTopics } = installErrorHighlighting(components, world);
+    const { highlightTopics, isolate } = installErrorHighlighting(components, world);
 
     const fragments = components.get(OBC.FragmentsManager);
     const workerUrl = await OBC.FragmentsManager.getWorker();
@@ -713,7 +798,7 @@ export async function initViewer(containerOrId) {
 
     // Wrap the viewport (which is already embedded inside workspace.app) with a
     // toolbar overlay. We intercept by replacing the viewport inside the grid layout.
-    const viewportWrapper = createViewerToolbar(components, world, viewport, grids);
+    const viewportWrapper = createViewerToolbar(components, world, viewport, grids, isolate);
 
     // Patch the bim-grid layout to use the wrapper instead of the raw viewport
     // by updating its element references before the first layout is set.
@@ -733,6 +818,7 @@ export async function initViewer(containerOrId) {
 
     async function clearModels() {
         try {
+            isolate.reset();
             for (const [, model] of fragments.list) {
                 if (model.object) world.scene.three.remove(model.object);
                 if (model.dispose) model.dispose();
