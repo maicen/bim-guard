@@ -80,6 +80,75 @@
   let isBulkEditModalOpen = false;
   let isBulkDeleteModalOpen = false;
 
+  // Data loading. The view paints instantly from the synchronous client cache
+  // above; these refresh it and keep it in sync with mutations made elsewhere.
+  async function loadProjects(force = false) {
+    if (!projects.length) {
+      isLoading = true;
+    } else {
+      isRefreshing = true;
+    }
+    error = "";
+    try {
+      const response = await projectsApi.list({ forceRefresh: force });
+      projects = response.projects || [];
+    } catch (err: any) {
+      if (!projects.length) {
+        error = err.message || "Failed to load the project registry.";
+      }
+    } finally {
+      isLoading = false;
+      isRefreshing = false;
+    }
+  }
+
+  async function loadRepos() {
+    try {
+      repos = await githubReposApi.list();
+    } catch (err: any) {
+      error = err.message || "Failed to load connected GitHub repositories.";
+    }
+  }
+
+  async function loadSelectedRepoStructure(repoId: number, force = false) {
+    isRepoLoading = true;
+    error = "";
+    try {
+      activeRepoStructure = await githubReposApi.getStructure(repoId, force);
+    } catch (err: any) {
+      activeRepoStructure = null;
+      error = err.message || "Failed to read the repository structure.";
+    } finally {
+      isRepoLoading = false;
+    }
+  }
+
+  // Switching storage source swaps which collection the table renders, so the
+  // repo manifest is fetched lazily and the previous one dropped.
+  async function handleSourceChange() {
+    repoCategoryFilter = "all";
+    if (selectedSource.startsWith("repo:")) {
+      const repoId = parseInt(selectedSource.split(":")[1], 10);
+      await loadSelectedRepoStructure(repoId);
+    } else {
+      activeRepoStructure = null;
+    }
+  }
+
+  onMount(() => {
+    unsubscribe = projectsApi.subscribe((updated) => {
+      projects = updated;
+    });
+    loadProjects();
+    loadRepos();
+  });
+
+  onDestroy(() => {
+    if (unsubscribe) {
+      unsubscribe();
+    }
+  });
+
   function toggleSelectAll() {
     if (allFilteredSelected) {
       selectedProjectIds = [];

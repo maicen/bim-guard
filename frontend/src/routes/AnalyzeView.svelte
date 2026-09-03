@@ -260,8 +260,6 @@
     }, 2000);
   }
 
-  $: currentProject = projects.find((p) => p.id === selectedProjectId);
-
   $: filteredIssues = (result?.audit_issues || []).filter(
     (issue: AuditIssue) => {
       // Low risk filter (Note: data_quality issues are doctrine-exempt and ALWAYS shown)
@@ -320,6 +318,16 @@
       );
     },
   );
+
+  // Data-quality findings are doctrine-exempt: they report what could not be
+  // assessed rather than a violation, so they are counted separately from the
+  // severity bands. Older payloads may omit the stat, hence the fallback.
+  $: dataQualityCount =
+    result?.issue_stats?.data_quality ??
+    (result?.audit_issues || []).filter(
+      (issue: AuditIssue) =>
+        issue.mechanism === "data_quality" || issue.mechanism === "Data Quality",
+    ).length;
 
   // Finding table multi-selection, sort, and pagination state
   let selectedFindingIds: string[] = [];

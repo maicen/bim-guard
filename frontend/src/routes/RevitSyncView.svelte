@@ -261,7 +261,7 @@ print(response.read())
 
   <!-- Bento Grid Overview -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <BentoBox title="Instant Evaluation" class="md:col-span-1">
+    <BentoBox title="Instant Evaluation" cls="md:col-span-1">
       <p class="text-xs text-slate-400 leading-relaxed mb-4">
         Push elements from active views or entire Revit project models directly
         to BIM Guard without exporting IFC files.
@@ -272,7 +272,7 @@ print(response.read())
       </div>
     </BentoBox>
 
-    <BentoBox title="Gateway Endpoint" class="md:col-span-2">
+    <BentoBox title="Gateway Endpoint" cls="md:col-span-2">
       <p class="text-xs text-slate-400 mb-2">
         HTTP POST target receiving JSON element collections from Revit
         extensions:

@@ -2,7 +2,7 @@
   import type { ComponentType } from 'svelte';
 
   export let title: string;
-  export let value: string | number;
+  export let value: string | number | null = null;
   export let description: string | null = null;
   export let dark: boolean = false;
   export let icon: ComponentType | null = null;
@@ -21,9 +21,11 @@
       <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">
         {title}
       </p>
-      <h3 class="text-3xl font-extrabold tracking-tight {dark ? 'text-white' : 'text-slate-100'}">
-        {value}
-      </h3>
+      {#if value !== null}
+        <h3 class="text-3xl font-extrabold tracking-tight {dark ? 'text-white' : 'text-slate-100'}">
+          {value}
+        </h3>
+      {/if}
     </div>
 
     {#if icon}
@@ -32,6 +34,12 @@
       </div>
     {/if}
   </div>
+
+  {#if $$slots.default}
+    <div class="mt-4">
+      <slot />
+    </div>
+  {/if}
 
   {#if description || trend}
     <div class="mt-4 flex items-center gap-2 text-xs">

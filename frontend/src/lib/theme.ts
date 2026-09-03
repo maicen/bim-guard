@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
@@ -77,9 +77,7 @@ export function setTheme(mode: ThemeMode) {
 }
 
 export function toggleTheme() {
-  let current: ResolvedTheme = 'dark';
-  const unsubscribe = resolvedTheme.subscribe((val) => (current = val));
-  unsubscribe();
+  const current = get(resolvedTheme);
   const next: ThemeMode = current === 'dark' ? 'light' : 'dark';
   setTheme(next);
 }
@@ -96,10 +94,7 @@ export function initTheme() {
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   const handleMediaChange = (e: MediaQueryListEvent) => {
     systemDark.set(e.matches);
-    let mode: ThemeMode = 'dark';
-    const unsub = themeMode.subscribe((val) => (mode = val));
-    unsub();
-    if (mode === 'system') {
+    if (get(themeMode) === 'system') {
       applyThemeToDom(e.matches ? 'dark' : 'light');
     }
   };

@@ -12,7 +12,7 @@
 
   export let issues: AuditIssue[] = [];
   export let stats: IssueStats | null = null;
-  export let onSelectViewer?: ((elementGuid: string) => void) | undefined = undefined;
+  export let onSelectViewer: ((elementGuid: string) => void) | undefined = undefined;
 
   let searchQuery = '';
   let selectedBand: string = 'all';

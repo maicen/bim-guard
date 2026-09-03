@@ -27,6 +27,14 @@ export interface ISO19650Metadata {
   cde_approved_at?: string | null;
 }
 
+/**
+ * Canonical analysis domains. Mirrors the keys normalised by
+ * `normalize_analysis_type` in app/constants.py; legacy stored values
+ * ('Architectural', 'Piping (Corrosive)', 'Halo') collapse onto these via
+ * `normalizeAnalysisDomain` in ./analysisDomain.ts.
+ */
+export type AnalysisDomain = 'Arch' | 'Piping' | 'seismic';
+
 export interface Project {
   id: number;
   name: string;
@@ -457,19 +465,6 @@ export interface DashboardStats {
   issues_found: number;
   db_ok: boolean;
   db_backend: string;
-}
-
-export interface DocumentItem {
-  id: number;
-  filename: string;
-  file_path?: string | null;
-  upload_date?: string | null;
-  extracted_text_preview?: string | null;
-  char_count: number;
-}
-
-export interface DocumentDetail extends DocumentItem {
-  extracted_text: string;
 }
 
 export interface SettingItem {

@@ -34,6 +34,16 @@
 
   // Sync Form
   let externalCdeType = "Autodesk Construction Cloud (ACC)";
+
+  // The sync contract needs the CDE's base URL, while the picker shows the
+  // platform's product name; keep the two associated here.
+  const CDE_PLATFORM_URLS: Record<string, string> = {
+    "Autodesk Construction Cloud (ACC)": "https://developer.api.autodesk.com/bim360/docs/v1",
+    "Autodesk BIM 360": "https://developer.api.autodesk.com/bim360/docs/v1",
+    "Dalux Box": "https://api.dalux.com/opencde/v1",
+    "Trimble Connect": "https://app.connect.trimble.com/tc/api/opencde/v1",
+    "Procore OpenBIM": "https://api.procore.com/rest/v1/opencde",
+  };
   let externalProjectId = "urn:adsk.wipprod:dm.lineage:prj-001";
   let targetCdeState: CDEState = "SHARED";
 
@@ -78,8 +88,11 @@
     syncMessage = "";
 
     try {
-      const res = await cdeApi.syncDocuments(selectedProjectId, {
-        cde_state: targetCdeState,
+      const res = await cdeApi.syncDocuments({
+        cde_server_url:
+          CDE_PLATFORM_URLS[externalCdeType] ?? CDE_PLATFORM_URLS["Autodesk Construction Cloud (ACC)"],
+        project_id: selectedProjectId,
+        external_project_id: externalProjectId,
       });
       syncSuccess = true;
       syncMessage = `Synchronized ${res.synced_documents_count ?? 1} documents and models via OpenCDE Documents API (ISO 19650 State: ${targetCdeState}).`;

@@ -161,7 +161,7 @@
                 </div>
                 <div class="p-1.5 rounded bg-slate-950/70 border border-slate-800/80">
                   <span class="text-slate-500 block">Stage 2: Schema</span>
-                  <span class="text-blue-400 font-semibold">{project.ifc_schema || 'IFC4 / IFC2X3'}</span>
+                  <span class="text-blue-400 font-semibold">IFC4 / IFC2X3</span>
                 </div>
                 <div class="p-1.5 rounded bg-slate-950/70 border border-slate-800/80">
                   <span class="text-slate-500 block">Stage 3: Gherkin</span>

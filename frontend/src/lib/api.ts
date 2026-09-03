@@ -124,8 +124,6 @@ export const projectsApi = {
     return {
       projects: list,
       total: list.length,
-      limit: list.length,
-      offset: 0,
     };
   },
 
@@ -147,8 +145,6 @@ export const projectsApi = {
     return {
       projects: list,
       total: list.length,
-      limit: list.length,
-      offset: 0,
     };
   },
 
@@ -704,7 +700,7 @@ export const documentsApi = {
       doc_type: created.doc_type || docType,
       file_path: created.file_path,
       upload_date: created.upload_date,
-      extracted_text_preview: created.extracted_text_preview || created.extracted_text?.slice(0, 200) || '',
+      extracted_text_preview: created.extracted_text?.slice(0, 200) || '',
       char_count: created.char_count ?? created.extracted_text?.length ?? 0,
       project_code: created.project_code,
       originator: created.originator,
@@ -729,7 +725,7 @@ export const documentsApi = {
       doc_type: updated.doc_type || payload.doc_type,
       file_path: updated.file_path,
       upload_date: updated.upload_date,
-      extracted_text_preview: updated.extracted_text_preview || updated.extracted_text?.slice(0, 200) || '',
+      extracted_text_preview: updated.extracted_text?.slice(0, 200) || '',
       char_count: updated.char_count ?? updated.extracted_text?.length ?? 0,
     });
     _documentDetailStore.set(updated.id, updated);

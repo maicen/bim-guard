@@ -22,6 +22,7 @@
     Download,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi } from "../lib/api";
+  import type { DocumentItem, ExtractedRule } from "../lib/types";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";

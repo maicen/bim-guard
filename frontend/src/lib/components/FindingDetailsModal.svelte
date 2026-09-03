@@ -45,11 +45,11 @@
       </div>
       <div>
         <span class="text-[10px] font-semibold text-slate-500 uppercase block">Risk Score / Verdict</span>
-        <span class="text-amber-400 font-medium">{issue.risk_score !== undefined ? issue.risk_score : 'FAIL'}</span>
+        <span class="text-amber-400 font-medium">{issue.score !== undefined ? issue.score : 'FAIL'}</span>
       </div>
       <div>
         <span class="text-[10px] font-semibold text-slate-500 uppercase block">Element Type</span>
-        <span class="text-slate-300">{issue.element_type || 'IfcProduct'}</span>
+        <span class="text-slate-300">{issue.details?.element_type || 'IfcProduct'}</span>
       </div>
     </div>
 
@@ -64,14 +64,14 @@
     {/if}
 
     <!-- Remediation Recommendation -->
-    {#if issue.remediation}
+    {#if issue.mitigation}
       <div class="space-y-1">
         <span class="text-xs font-semibold text-emerald-400 block flex items-center gap-1.5">
           <CheckCircle2 class="w-3.5 h-3.5" />
           <span>Recommended Remediation</span>
         </span>
         <div class="p-3 bg-emerald-950/20 rounded-xl border border-emerald-900/40 text-xs text-emerald-200 leading-relaxed">
-          {issue.remediation}
+          {issue.mitigation}
         </div>
       </div>
     {/if}
