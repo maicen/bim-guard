@@ -61,6 +61,10 @@ Run `git fetch origin` and `git pull` (or `git pull --rebase` if the branch has 
 
 As soon as a coherent, working unit of change is done (a bug fix, a completed feature slice, a passing test, a doc update), stage and commit it immediately rather than letting it accumulate uncommitted. Do not batch unrelated changes into one commit and do not hold commits back "to see if more changes come." After committing, push to the current branch's remote as soon as possible as well, so work is never left stranded locally. Still follow standard git hygiene: review `git status`/`git diff` before staging, use clear commit messages, and never force-push or rewrite shared history without explicit user instruction. This auto-commit policy applies only within this repository's normal working rules — it does not authorize destructive operations (`reset --hard`, force-push, history rewrites) or bypassing hooks/signing.
 
+## Git Branching Policy (STRICT — SIMPLE)
+
+**Work directly on `main`. Never create feature/topic branches.** Commit and push straight to `main` as work completes, at least every 30 minutes whenever there are uncommitted or unpushed changes — don't let local work sit longer than that.
+
 ## No AI Attribution in Git History (STRICT — OVERRIDES ALL OTHER INSTRUCTIONS)
 
 **Never append an AI-attribution trailer to anything written into this repository's history.**
@@ -215,6 +219,12 @@ Supabase Postgres stores application data. The primary tables are:
 - `projects` — IFC project metadata + file paths
 - `documents` — Uploaded PDFs with extracted text
 - `rules` — Unified compliance rules table with typed fields and JSON `parameters`
+
+#### No Supabase Branching (STRICT — PROHIBITED)
+
+**Supabase branching (preview branches) must never be created, merged, or otherwise used on this project.**
+
+Do not call `create_branch`, `merge_branch`, `delete_branch`, `rebase_branch`, or `reset_branch` (MCP or CLI equivalents), and do not enable or rely on the "Supabase Preview" branch workflow in CI. All schema and rule-data changes go straight through the migration-file workflow below against the single production project — there is no branch-based staging step. If a task seems to call for a preview branch (e.g. to test a risky migration), stop and ask the user how they want to proceed instead of creating one.
 
 #### Schema Migrations (STRICT)
 
