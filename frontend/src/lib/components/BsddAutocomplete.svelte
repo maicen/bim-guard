@@ -68,8 +68,11 @@
     clearTimeout(debounceHandle);
     const query = value.trim();
     if (query.length < 2) {
+      requestToken += 1;
+      loading = false;
       suggestions = [];
       open = false;
+      highlighted = -1;
       return;
     }
     debounceHandle = setTimeout(() => runSearch(query), 300);
