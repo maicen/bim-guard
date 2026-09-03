@@ -1,8 +1,8 @@
 """
 tests/test_document_parsing.py
 ----------------------
-Unit tests for Module 1 — SectionChunker, KeywordFilter, TableRuleBuilder,
-UnstructuredExtractor (PDF parsing), and regression snapshots.
+Unit tests for Module 1 — SectionChunker, UnstructuredExtractor (PDF parsing),
+and regression snapshots.
 
 Run with: pytest tests/test_document_parsing.py -v
 
@@ -14,12 +14,9 @@ SETUP:
 import json
 import os
 
-import pandas as pd
 import pytest
-from document_parsing.keyword_filter import KeywordFilter
 from document_parsing.keywords.keyword_master import ALL_KEYWORDS, BIGRAM_PHRASES, KEYWORD_WEIGHTS
 from document_parsing.section_chunker import SectionChunker
-from document_parsing.table_rule_builder import TableRuleBuilder
 
 TEST_DB = "tests/test_rules_m1.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -155,212 +152,6 @@ def test_chunker_char_count_field(chunker):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# KeywordFilter tests
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture
-def kf():
-    return KeywordFilter()
-
-
-def test_keyword_filter_high_confidence(kf):
-    chunk = {
-        "section_number": "4",
-        "section_name": "Stairs",
-        "text": (
-            "Every exit stair shall not be less than 860 mm in clear width.\n\n"
-            "The riser height shall be between 125 mm and 200 mm minimum maximum.\n\n"
-            "Guards shall be required at all landings with a height of not less than 900 mm."
-        ),
-        "char_count": 200,
-    }
-    filtered = kf.score_chunks([chunk])
-    high_count = filtered[0]["count_high"]
-    assert high_count >= 1, "Expected at least 1 HIGH confidence paragraph"
-
-
-def test_keyword_filter_low_confidence_flagged(kf):
-    chunk = {
-        "section_number": "4",
-        "section_name": "Stairs",
-        "text": "See the appendix for further reference details only.",
-        "char_count": 55,
-    }
-    filtered = kf.score_chunks([chunk])
-    filtered_txt = filtered[0]["filtered_text"]
-    assert "[LOW_CONFIDENCE]" in filtered_txt
-
-
-def test_keyword_filter_bigram_scored_highest(kf):
-    chunk = {
-        "section_number": "4",
-        "section_name": "Stairs",
-        "text": "The rise shall not exceed 200 mm.",
-        "char_count": 35,
-    }
-    filtered = kf.score_chunks([chunk])
-    paras = filtered[0]["scored_paragraphs"]
-    assert paras[0]["score"] >= 6
-
-
-def test_keyword_filter_new_group10_permissive(kf):
-    chunk = {
-        "section_number": "4",
-        "section_name": "Stairs",
-        "text": "The handrail need not be continuous if an opening is provided.",
-        "char_count": 65,
-    }
-    filtered = kf.score_chunks([chunk])
-    matched = filtered[0]["scored_paragraphs"][0]["matched"]
-    assert "need not" in matched
-
-
-def test_keyword_filter_new_group11_deemed(kf):
-    chunk = {
-        "section_number": "4",
-        "section_name": "Stairs",
-        "text": "This design is deemed to comply with the structural requirements.",
-        "char_count": 65,
-    }
-    filtered = kf.score_chunks([chunk])
-    matched = filtered[0]["scored_paragraphs"][0]["matched"]
-    assert "deemed to comply" in matched
-
-
-def test_keyword_filter_multiple_chunks(kf):
-    """Filter should handle a batch of chunks without mixing results."""
-    chunks = [
-        {
-            "section_number": "4",
-            "section_name": "Stairs",
-            "text": "Every stair shall have a clear width of 860 mm.",
-            "char_count": 50,
-        },
-        {
-            "section_number": "6",
-            "section_name": "Guards",
-            "text": "Guards shall not be less than 900 mm in height.",
-            "char_count": 50,
-        },
-    ]
-    filtered = kf.score_chunks(chunks)
-    assert len(filtered) == 2
-    assert filtered[0]["section_number"] == "4"
-    assert filtered[1]["section_number"] == "6"
-
-
-def test_keyword_filter_no_keywords(kf):
-    """Text with zero compliance keywords should get low/zero score."""
-    chunk = {
-        "section_number": "1",
-        "section_name": "Intro",
-        "text": "This is a general introduction to the document.",
-        "char_count": 50,
-    }
-    filtered = kf.score_chunks([chunk])
-    paras = filtered[0]["scored_paragraphs"]
-    if paras:
-        assert paras[0]["score"] <= 2, "Non-compliance text should score low"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TableRuleBuilder tests
-# ═══════════════════════════════════════════════════════════════════════════════
-
-import os
-
-from rule_builder.rule_generator import RuleGenerator
-from rule_builder.rule_store import RuleStore
-
-
-@pytest.fixture
-def store_and_gen():
-    store = RuleStore(TEST_DB)
-    store.clear_all_rules()
-    gen = RuleGenerator(store)
-    yield store, gen
-    store.close()
-    try:
-        if os.path.exists(TEST_DB):
-            os.remove(TEST_DB)
-    except OSError:
-        pass
-
-
-def test_table_builder_extracts_range_rules(store_and_gen):
-    store, gen = store_and_gen
-    builder = TableRuleBuilder(store)
-
-    df = pd.DataFrame(
-        {
-            "Measurement": ["Rise", "Run"],
-            "Min": [125, 255],
-            "Max": [200, 355],
-        }
-    )
-    tables = [{"table_index": 0, "dataframe": df, "row_count": 2, "col_count": 3}]
-    saved = builder.process_all_tables(tables, gen)
-    assert saved == 2
-    assert store.count() == 2
-
-
-def test_table_builder_skips_non_minmax_table(store_and_gen):
-    store, gen = store_and_gen
-    builder = TableRuleBuilder(store)
-
-    df = pd.DataFrame(
-        {
-            "Element": ["Stair", "Door"],
-            "Notes": ["See 9.8", "See 9.6"],
-        }
-    )
-    tables = [{"table_index": 0, "dataframe": df, "row_count": 2, "col_count": 2}]
-    saved = builder.process_all_tables(tables, gen)
-    assert saved == 0
-    assert store.count() == 0
-
-
-def test_table_builder_rule_schema(store_and_gen):
-    """Every saved rule must have the required fields for Module 4 to consume."""
-    store, gen = store_and_gen
-    builder = TableRuleBuilder(store)
-
-    df = pd.DataFrame(
-        {
-            "Measurement": ["Rise"],
-            "Min": [125],
-            "Max": [200],
-        }
-    )
-    tables = [{"table_index": 0, "dataframe": df, "row_count": 1, "col_count": 3}]
-    builder.process_all_tables(tables, gen)
-
-    rules = store.get_all_rules()
-    required_fields = {"target", "property_name", "operator", "rule_type", "desc"}
-    for rule in rules:
-        rule_data = rule if isinstance(rule, dict) else json.loads(rule)
-        missing = required_fields - set(rule_data.keys())
-        assert not missing, f"Rule missing fields: {missing} — rule: {rule_data}"
-
-
-def test_table_builder_multiple_tables(store_and_gen):
-    """Should process multiple tables in one call."""
-    store, gen = store_and_gen
-    builder = TableRuleBuilder(store)
-
-    df1 = pd.DataFrame({"Measurement": ["Rise"], "Min": [125], "Max": [200]})
-    df2 = pd.DataFrame({"Measurement": ["Width"], "Min": [860], "Max": [1200]})
-    tables = [
-        {"table_index": 0, "dataframe": df1, "row_count": 1, "col_count": 3},
-        {"table_index": 1, "dataframe": df2, "row_count": 1, "col_count": 3},
-    ]
-    saved = builder.process_all_tables(tables, gen)
-    assert saved == 2
-    assert store.count() == 2
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # UnstructuredExtractor tests (PDF parsing — the critical gap)
 # ═══════════════════════════════════════════════════════════════════════════════
 #
@@ -468,28 +259,3 @@ Guards shall not be less than 900 mm in height.
         for got, exp in zip(chunks, expected):
             assert got["section_number"] == exp["section_number"]
             assert got["section_name"] == exp["section_name"]
-
-    def test_keyword_filter_snapshot(self, kf):
-        chunk = {
-            "section_number": "4",
-            "section_name": "Stairs",
-            "text": (
-                "Every exit stair shall not be less than 860 mm in clear width.\n\n"
-                "The riser height shall be between 125 mm and 200 mm."
-            ),
-            "char_count": 120,
-        }
-        filtered = kf.score_chunks([chunk])
-        snap_file = self._snapshot_path("keyword_filter_basic")
-
-        if not os.path.exists(snap_file):
-            with open(snap_file, "w") as f:
-                json.dump(filtered, f, indent=2)
-            pytest.skip("Snapshot created — re-run to verify")
-
-        with open(snap_file) as f:
-            expected = json.load(f)
-
-        assert filtered[0]["count_high"] == expected[0]["count_high"], (
-            "HIGH confidence count changed — check keyword scoring"
-        )

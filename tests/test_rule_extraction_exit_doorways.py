@@ -82,7 +82,6 @@ def test_candidate_to_draft_maps_target_ifc_class_for_ids_export():
         ),
     )
     candidate = _LLMRuleCandidate(
-        found=True,
         rule_id="8.14.1",
         description="Space must have two exits when occupant load exceeds Table 8.14.1",
         target_ifc_class="IfcSpace",
@@ -111,7 +110,6 @@ def test_candidate_to_draft_upgrades_severity_from_shall_deontic():
         metadata=ClauseMetadata(clause_id="8.14.2", node_type="paragraph", source_document_id=1),
     )
     candidate = _LLMRuleCandidate(
-        found=True,
         rule_id="8.14.2",
         description="Exits must remain unobstructed",
         target_ifc_class="IfcDoor",
@@ -130,12 +128,12 @@ def test_candidate_to_draft_upgrades_severity_from_shall_deontic():
     assert draft.proposed_rule.severity == "mandatory"
 
 
-def test_candidate_to_draft_returns_none_when_not_found():
+def test_candidate_to_draft_returns_none_for_empty_description():
     node = DocumentNodeContract(
         node_id="node-def",
         text="This section defines the term 'exit access'.",
         metadata=ClauseMetadata(node_type="paragraph", source_document_id=1),
     )
-    candidate = _LLMRuleCandidate(found=False)
+    candidate = _LLMRuleCandidate(description="")
 
     assert _candidate_to_draft(candidate, node) is None

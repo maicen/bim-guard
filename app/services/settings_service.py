@@ -19,13 +19,6 @@ DEFAULT_SETTINGS = [
         "scope": "runtime",
         "description": "Route document ingestion through LlamaIndexIngestor (clause metadata + deontic extraction) instead of the plain SectionChunker path.",
     },
-    {
-        "key": "BIM_GUARD_RULE_EXTRACTION_PROVIDER",
-        "value": "litellm",
-        "value_type": "string",
-        "scope": "runtime",
-        "description": "Rule-extraction provider: 'litellm' (LiteLLMRuleExtractor, hand-rolled parsing) or 'llamaindex' (LlamaIndexRuleGenerator, Pydantic-validated).",
-    },
 ]
 _MANAGED_SETTING_KEYS = {item["key"] for item in DEFAULT_SETTINGS}
 

@@ -1,6 +1,5 @@
-"""
-document_parsing
-------------------
+"""document_parsing.
+
 Public interface for Module 1 — PDF → structured text pipeline.
 
 Exports
@@ -8,11 +7,6 @@ Exports
 DocumentReader
     Thin wrapper around LightExtractor's pypdf reader. Used as a fallback
     in the web pipeline and for plain text / markdown uploads.
-
-run_module1_pipeline(pdf_path, **kwargs) -> dict
-    Full enhanced pipeline (Unstructured/LightExtractor + TF-IDF + optional BERT).
-    Works both from the web app and as a CLI call.
-    Returns the same summary dict as the CLI would print.
 """
 
 import re
@@ -122,23 +116,3 @@ class DocumentReader:
         if current:
             chunks.append(" ".join(current).strip())
         return chunks
-
-
-def run_module1_pipeline(pdf_path: str, **kwargs) -> dict:
-    """
-    Run the full enhanced Module 1 pipeline from the web app or CLI.
-
-    This is the same pipeline as `enhanced_orchestrator.run_enhanced_pipeline()`
-    but callable without needing to manage import paths.
-
-    Args:
-        pdf_path (str): path to the PDF file on disk
-        **kwargs: forwarded to run_enhanced_pipeline()
-                  e.g. use_bert=True, discover_keywords=False
-
-    Returns:
-        dict: pipeline summary (table_rules, prose_rules, total_rules, ...)
-    """
-    from app.modules.document_parsing.enhanced_orchestrator import run_enhanced_pipeline
-
-    return run_enhanced_pipeline(pdf_path, **kwargs)

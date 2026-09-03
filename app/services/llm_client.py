@@ -180,7 +180,7 @@ class LiteLLMClientWithRetry(BaseLLMClient):
     client is accepted::
 
         client = LiteLLMClientWithRetry(LiteLLMClient(model=DEFAULT_LLM_MODEL))
-        extractor = LiteLLMRuleExtractor(client=client)
+        raw = await client.complete(messages)
 
     Only transient provider failures are retried (see ``_RETRYABLE``).
     Authentication errors, unknown models, and malformed requests fail the same

@@ -1,21 +1,28 @@
 """LLM-only compliance rule extraction from pre-extracted document text."""
 
+from typing import Protocol
+
 from app.logging_config import get_logger
 from app.modules import contracts
-from app.modules.config import (
-    COMPLIANCE_TEMPERATURE,
-    DEFAULT_LLM_MODEL,
-    MAX_TOKENS_RULE_EXTRACTION,
-)
 from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
 from app.modules.document_parsing.section_chunker import SectionChunker
+from app.modules.rule_builder.llamaindex_rule_generator import LlamaIndexRuleGenerator
 from app.services import pipeline_tracker
-from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
-from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
 
 logger = get_logger(__name__)
 
 _TRACKER_CODE = "LLAMA-INGEST"
+
+
+class RuleExtractionProvider(Protocol):
+    """Protocol used by RuleExtractionService (Dependency Inversion)."""
+
+    async def extract_rules_from_text(
+        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1
+    ) -> list[dict]:
+        """Extract structured rule dicts from one text chunk."""
+        ...
+
 
 class ExtractionResult:
     """Holds the rules list and any non-fatal warnings from the pipeline."""
@@ -35,15 +42,7 @@ class RuleExtractionService:
         ingestor: LlamaIndexIngestor | None = None,
     ):
         """Initialize the extraction provider dependency."""
-        self._provider = provider or LiteLLMRuleExtractor(
-            client=LiteLLMClientWithRetry(
-                LiteLLMClient(
-                    model=DEFAULT_LLM_MODEL,
-                    temperature=COMPLIANCE_TEMPERATURE,
-                    max_tokens=MAX_TOKENS_RULE_EXTRACTION,
-                )
-            )
-        )
+        self._provider = provider or LlamaIndexRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
 
     async def extract_rules_from_text(self, text: str) -> ExtractionResult:
@@ -116,9 +115,6 @@ class RuleExtractionService:
         `pending_review` drafts via RuleDraftService — the entry point for
         `POST /api/documents/{id}/rules/extract-drafts`.
         """
-        from app.modules.rule_builder.llamaindex_rule_generator import (
-            LlamaIndexRuleGenerator,
-        )
         from app.services.rule_draft_service import RuleDraftService
 
         nodes = await self.ingest_with_llamaindex(document_id, text)
@@ -131,14 +127,13 @@ class RuleExtractionService:
         drafts: list[contracts.RuleExtractionDraft] = []
         for node in nodes:
             try:
-                draft = await generator.generate_draft_from_node(
+                node_drafts = await generator.generate_drafts_from_node(
                     node, deontic=deontic_by_node.get(node.node_id)
                 )
             except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                 logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
                 continue
-            if draft is not None:
-                drafts.append(draft)
+            drafts.extend(node_drafts)
 
         saved_drafts = RuleDraftService().save_drafts(drafts)
         logger.info(

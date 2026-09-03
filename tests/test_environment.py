@@ -86,6 +86,5 @@ def test_settings_service_exposes_only_database_managed_values(monkeypatch):
         [
             "BIM_GUARD_LOG_LEVEL",
             "BIM_GUARD_USE_LLAMAINDEX_INGESTION",
-            "BIM_GUARD_RULE_EXTRACTION_PROVIDER",
         ]
     )

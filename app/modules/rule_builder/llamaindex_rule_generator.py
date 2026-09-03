@@ -1,22 +1,18 @@
-"""
-rule_builder/llamaindex_rule_generator.py
----------------------------------------------------
-Structured, Pydantic-validated rule generation from LlamaIndex document
-nodes (Module 3), replacing the hand-rolled JSON parsing/normalisation in
-`app.services.rule_extractor.LiteLLMRuleExtractor` with a typed LlamaIndex
-Pydantic program whose output schema *is* `RuleCreateRequest` — so a
-malformed LLM response fails Pydantic validation instead of being silently
-coerced.
+"""rule_builder/llamaindex_rule_generator.py.
 
-Implements the existing `RuleExtractionProvider` Protocol
-(app.services.rule_extractor) so it is a drop-in alternative to
-`LiteLLMRuleExtractor` wherever a provider is accepted, selected via the
-`BIM_GUARD_RULE_EXTRACTION_PROVIDER` setting.
+Structured, Pydantic-validated rule generation from LlamaIndex document
+nodes (Module 3). This is BIM-Guard's single LLM-based rule-extraction
+engine: a typed LlamaIndex Pydantic program whose output schema validates
+every extracted rule field, so a malformed LLM response fails Pydantic
+validation instead of being silently coerced (the failure mode of the
+legacy hand-rolled `json.loads` + defensive-dict-coercion approach this
+replaced).
 
 One clause/section (a `DocumentNodeContract`, already section-scoped by
-SectionChunker) is assumed to express at most one checkable rule — a
-simplification relative to the legacy extractor's per-chunk multi-rule
-extraction, appropriate because Module 1's nodes are already fine-grained.
+SectionChunker) commonly expresses more than one checkable requirement
+(e.g. a table-driven threshold plus its sprinkler exception), so the
+program's output schema is a `rules` array, not a single candidate —
+generate_drafts_from_node() returns zero or more drafts per node.
 """
 
 from pydantic import BaseModel, Field
@@ -36,24 +32,24 @@ logger = get_logger(__name__)
 _RULE_PROMPT = """\
 You are a BIM compliance rule extraction engine for building regulations.
 
-Read the clause text below and determine whether it expresses a single,
-discrete, checkable requirement (a numeric limit, a required property, a
+Read the clause text below and extract every discrete, checkable
+requirement it expresses (a numeric limit, a required property, a
 classification, a presence check, or a required count of elements) against
-an IFC element.
+an IFC element. A single clause commonly expresses more than one rule (for
+example a base threshold plus an exception that changes it) — extract each
+as its own entry in "rules". If the text expresses no checkable requirement
+at all (e.g. it is a definition, example, or purely descriptive text),
+return an empty "rules" array.
 
-If it does NOT express a checkable requirement (e.g. it is a definition,
-example, or purely descriptive text), set found=false and leave the other
-fields at their defaults.
-
-If it DOES, set found=true and fill in:
+For each rule found, fill in:
 - rule_id: a short identifier, e.g. the clause reference if present, else
   "REQ-AI-<short-slug>"
 - description: short plain-English rule description
 - mechanism: "CODE" unless the text is clearly about corrosion (GC-001,
   CC-001, MC-001)
 - target_ifc_class: the IFC entity type the rule applies to, e.g. "IfcDoor",
-  "IfcSpace", "IfcStairFlight" — required whenever found=true, since it is
-  what lets a rule be checked against a model and exported to IDS
+  "IfcSpace", "IfcStairFlight" — required for every rule, since it is what
+  lets a rule be checked against a model and exported to IDS
 - property_set: IFC Pset name, e.g. "Pset_StairFlightCommon", or empty
 - property_name: IFC property to measure, e.g. "TreadLength", or empty
 - rule_type: "numeric_range" | "exists_check" | "count_check" | "classification"
@@ -77,9 +73,8 @@ CLAUSE TEXT:
 
 
 class _LLMRuleCandidate(BaseModel):
-    """Structured LLM output schema — a Pydantic program target, not a dict."""
+    """One extracted rule — an item in the Pydantic program's output array."""
 
-    found: bool = False
     rule_id: str = ""
     description: str = ""
     mechanism: str = "CODE"
@@ -97,18 +92,24 @@ class _LLMRuleCandidate(BaseModel):
     needs_review: int = 0
 
 
+class _LLMRuleExtractionResult(BaseModel):
+    """Structured LLM output schema — a Pydantic program target, not a dict."""
+
+    rules: list[_LLMRuleCandidate] = Field(default_factory=list)
+
+
 def _candidate_to_draft(
     candidate: _LLMRuleCandidate,
     node: DocumentNodeContract,
     *,
     deontic: DeonticStatement | None = None,
 ) -> RuleExtractionDraft | None:
-    """Map a validated LLM candidate onto a RuleExtractionDraft, or None if no rule.
+    """Map a validated LLM candidate onto a RuleExtractionDraft, or None if empty.
 
     A pure function (no LLM call) so the candidate->draft mapping is directly
     unit-testable without mocking LlamaIndex's program machinery.
     """
-    if not candidate.found or not candidate.description.strip():
+    if not candidate.description.strip():
         return None
 
     severity = candidate.severity
@@ -147,14 +148,16 @@ def _candidate_to_draft(
 class LlamaIndexRuleGenerator:
     """Generates Pydantic-validated rule drafts from document nodes.
 
-    Implements RuleExtractionProvider (app.services.rule_extractor) for
-    drop-in compatibility with the legacy chunk-text extraction path.
+    Implements RuleExtractionProvider (app.services.rule_extraction_service)
+    via extract_rules_from_text() so it is usable both for the draft-review
+    workflow (generate_drafts_from_node) and the free-text/file extraction
+    endpoint.
     """
 
-    async def generate_draft_from_node(
+    async def generate_drafts_from_node(
         self, node: DocumentNodeContract, *, deontic: DeonticStatement | None = None
-    ) -> RuleExtractionDraft | None:
-        """Run the Pydantic program over one node's text; None if no rule found.
+    ) -> list[RuleExtractionDraft]:
+        """Run the Pydantic program over one node's text; [] if no rule found.
 
         Args:
             node: A clause-annotated document node (Module 1 output).
@@ -164,25 +167,26 @@ class LlamaIndexRuleGenerator:
         from llama_index.core.program import LLMTextCompletionProgram
 
         program = LLMTextCompletionProgram.from_defaults(
-            output_cls=_LLMRuleCandidate,
+            output_cls=_LLMRuleExtractionResult,
             prompt_template_str=_RULE_PROMPT,
             llm=build_llm(),
         )
-        candidate: _LLMRuleCandidate = await program.acall(clause_text=node.text)
+        result: _LLMRuleExtractionResult = await program.acall(clause_text=node.text)
 
-        return _candidate_to_draft(candidate, node, deontic=deontic)
+        drafts = [_candidate_to_draft(candidate, node, deontic=deontic) for candidate in result.rules]
+        return [draft for draft in drafts if draft is not None]
 
     # ── RuleExtractionProvider conformance ──────────────────────────────────
 
     async def extract_rules_from_text(
         self, text: str, *, chunk_index: int = 1, total_chunks: int = 1
     ) -> list[dict]:
-        """Drop-in RuleExtractionProvider method for the legacy chunk-text path.
+        """Drop-in RuleExtractionProvider method for the chunk-text extraction path.
 
-        Wraps the raw text as a single ad-hoc node and returns 0 or 1
-        normalised rule dicts, in the same shape LiteLLMRuleExtractor
-        produces, so callers that dedupe/merge on ('desc', 'target') keep
-        working unchanged.
+        Wraps the raw text as a single ad-hoc node and returns 0+ normalised
+        rule dicts, in the same shape the legacy extractor produced, so
+        callers that dedupe/merge on ('desc', 'target') keep working
+        unchanged.
         """
         if not text.strip():
             return []
@@ -192,29 +196,32 @@ class LlamaIndexRuleGenerator:
             text=text,
             metadata=ClauseMetadata(node_type="paragraph", source_document_id=0),
         )
-        draft = await self.generate_draft_from_node(node)
-        if draft is None:
+        drafts = await self.generate_drafts_from_node(node)
+        if not drafts:
             return []
 
-        rule = draft.proposed_rule
-        return [
-            {
-                "ref": rule.rule_id,
-                "desc": rule.description,
-                "source_text": text[:500],
-                "target": rule.target_ifc_class or "Unspecified",
-                "property_set": rule.property_set or "",
-                "property_name": rule.property_name or "",
-                "rule_type": "numeric_range" if rule.operator in {">=", "<=", "between"} else "exists_check",
-                "operator": rule.operator,
-                "value": rule.check_value,
-                "check_value": rule.check_value,
-                "value_min": rule.value_min,
-                "value_max": rule.value_max,
-                "unit": rule.unit or "",
-                "severity": rule.severity,
-                "confidence": draft.confidence,
-                "extraction_method": "llamaindex_pydantic",
-                "needs_review": bool(rule.needs_review),
-            }
-        ]
+        results = []
+        for draft in drafts:
+            rule = draft.proposed_rule
+            results.append(
+                {
+                    "ref": rule.rule_id,
+                    "desc": rule.description,
+                    "source_text": text[:500],
+                    "target": rule.target_ifc_class or "Unspecified",
+                    "property_set": rule.property_set or "",
+                    "property_name": rule.property_name or "",
+                    "rule_type": "numeric_range" if rule.operator in {">=", "<=", "between"} else "exists_check",
+                    "operator": rule.operator,
+                    "value": rule.check_value,
+                    "check_value": rule.check_value,
+                    "value_min": rule.value_min,
+                    "value_max": rule.value_max,
+                    "unit": rule.unit or "",
+                    "severity": rule.severity,
+                    "confidence": draft.confidence,
+                    "extraction_method": "llamaindex_pydantic",
+                    "needs_review": bool(rule.needs_review),
+                }
+            )
+        return results
