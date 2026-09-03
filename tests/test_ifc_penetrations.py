@@ -19,14 +19,14 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.module4_comparator import Module4_Comparator
+from app.modules.comparator import ComplianceComparator
 
 ifcopenshell = pytest.importorskip("ifcopenshell")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GENERATOR = REPO_ROOT / "scripts" / "generate_mock_ifc_penetrations.py"
 
-from app.modules.module2_ifc_read import ifc_penetrations  # noqa: E402
+from app.modules.ifc_reader import ifc_penetrations  # noqa: E402
 
 
 def _load_generator():
@@ -181,12 +181,12 @@ def _penetrating(extraction):
 @pytest.fixture(scope="module")
 def pc001_result(mock_model_path):
     """Run the requirement plus its exemption through Modules 2 and 4."""
-    from app.modules.module2_ifc_read import Module2_IFCRead
+    from app.modules.ifc_reader import IFCReader
 
-    extraction = Module2_IFCRead(mock_model_path).extract_for_compliance(
+    extraction = IFCReader(mock_model_path).extract_for_compliance(
         [PC_001_01, PC_001_03]
     )
-    return extraction, Module4_Comparator().validate_metadata(extraction)
+    return extraction, ComplianceComparator().validate_metadata(extraction)
 
 
 class TestPC001EndToEnd:

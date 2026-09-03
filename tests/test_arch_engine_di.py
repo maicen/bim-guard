@@ -9,15 +9,15 @@ import pytest
 from app.bootstrap import get_container, reset_container
 from app.engines.bimguard_arch_engine import EgressAnalysisEngine, SpatialDaylightEngine
 from app.modules.contracts import RuleEvaluationResult
-from app.modules.module2_ifc_read.ifc_egress import (
+from app.modules.ifc_reader.ifc_egress import (
     check_egress_travel_distance,
     check_exit_count,
 )
-from app.modules.module2_ifc_read.ifc_spatial import (
+from app.modules.ifc_reader.ifc_spatial import (
     check_daylight_ratios,
     check_fire_separation,
 )
-from app.modules.module4_comparator.engine_registry import (
+from app.modules.comparator.engine_registry import (
     RuleEngineRegistry,
     RuleEvaluator,
     register_default_engines,

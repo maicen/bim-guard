@@ -41,8 +41,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.modules.module2_producer.halo_volume_generator import BraceType  # noqa: E402
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand  # noqa: E402
+from app.modules.blue_halo.halo_volume_generator import BraceType  # noqa: E402
+from app.modules.comparator.issue_schema import Issue, RiskBand  # noqa: E402
 from app.modules.phase_6.phase_6b_parsing import parse_ifc_file  # noqa: E402
 from app.modules.phase_6.phase_6c_corrosion_ui import run_corrosion_analysis  # noqa: E402
 from app.modules.phase_6.phase_6d_seismic import (  # noqa: E402

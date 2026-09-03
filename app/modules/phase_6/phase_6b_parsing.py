@@ -17,7 +17,7 @@ drive every design decision here:
    on a sha256 of the source, so re-parses can be avoided with the existing
    mechanism rather than a second one.
 
-The element shape is :class:`~app.modules.module2_ifc_read.ifc_parser.ServiceElement`,
+The element shape is :class:`~app.modules.ifc_reader.ifc_parser.ServiceElement`,
 which already exists and is **not** redefined here — this module composes the
 Module 2 reader into the envelope the Phase 6+ sessions agreed on.
 
@@ -26,7 +26,7 @@ THE SECOND ELEMENT VIEW: ``piping_elements``
     ``ServiceElement`` carries no operating temperature and no connectivity, so
     it cannot drive MM-001 (which needs the temperature the medium runs at) or
     XM-001 (which needs to know what touches what). Those two engines read
-    :class:`~app.modules.module2_ifc_read.piping_schema.PipingElement`, which
+    :class:`~app.modules.ifc_reader.piping_schema.PipingElement`, which
     the Module 2 piping producer builds from the same model.
 
     It is produced here, from the model this module already has open, rather
@@ -49,13 +49,13 @@ from typing import Any, TypedDict
 
 from app.logging_config import get_logger
 from app.modules.config import FEATURE_XM_GEOMETRIC_ADJACENCY
-from app.modules.module2_ifc_read.ifc_parser import (
+from app.modules.ifc_reader.ifc_parser import (
     ServiceElement,
     get_schema_compatibility_note,
     parse_ifc_model,
 )
-from app.modules.module2_ifc_read.piping_producer import produce_piping_elements_from_model
-from app.modules.module2_ifc_read.piping_schema import PipingElement
+from app.modules.ifc_reader.piping_producer import produce_piping_elements_from_model
+from app.modules.ifc_reader.piping_schema import PipingElement
 
 logger = get_logger(__name__)
 

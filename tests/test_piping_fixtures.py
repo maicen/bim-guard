@@ -13,10 +13,10 @@ Run: uv run pytest tests/test_piping_fixtures.py -v
 
 import pytest
 
-from app.modules.module2_ifc_read import piping_fixtures as fx
-from app.modules.module2_ifc_read import piping_producer as pp
-from app.modules.module2_ifc_read import piping_schema as ps
-from app.modules.module2_ifc_read.piping_schema import (
+from app.modules.ifc_reader import piping_fixtures as fx
+from app.modules.ifc_reader import piping_producer as pp
+from app.modules.ifc_reader import piping_schema as ps
+from app.modules.ifc_reader.piping_schema import (
     CANONICAL_MATERIALS,
     EnvironmentClass,
     PipingSystem,
@@ -289,7 +289,7 @@ class TestExpectedVerdicts:
 
     def test_copper_steel_couple_flagged(self, network):
         """Cu/carbon-steel in a wet system must be flagged, steel as anode."""
-        from app.modules.module4_comparator.cross_material import compare, load_rule_pack
+        from app.modules.comparator.cross_material import compare, load_rule_pack
         from tests.test_cross_material import TEST_SERIES, TEST_THRESHOLDS
 
         issues = compare(network, load_rule_pack(
@@ -311,8 +311,8 @@ class TestExpectedVerdicts:
         import json
         from pathlib import Path
 
-        from app.modules.module4_comparator.issue_schema import RiskBand
-        from app.modules.module4_comparator.material_media import compare
+        from app.modules.comparator.issue_schema import RiskBand
+        from app.modules.comparator.material_media import compare
 
         pack = json.loads(
             Path("data/rulesets/mm_001_material_media.json").read_text(encoding="utf-8")
@@ -325,7 +325,7 @@ class TestExpectedVerdicts:
 
     def test_fire_loop_clean_under_xm001(self, network):
         """The uniform galvanised loop must produce no XM-001 couple."""
-        from app.modules.module4_comparator.cross_material import compare, load_rule_pack
+        from app.modules.comparator.cross_material import compare, load_rule_pack
         from tests.test_cross_material import TEST_SERIES, TEST_THRESHOLDS
 
         issues = compare(network, load_rule_pack(
@@ -344,7 +344,7 @@ class TestExpectedVerdicts:
 
     def test_nogeo_excluded_with_data_quality_issue(self, network):
         """NOGEO-01 must be skipped with a data-quality issue, not passed."""
-        from app.modules.module4_comparator.cross_material import compare, load_rule_pack
+        from app.modules.comparator.cross_material import compare, load_rule_pack
         from tests.test_cross_material import TEST_SERIES, TEST_THRESHOLDS
 
         issues = compare(network, load_rule_pack(

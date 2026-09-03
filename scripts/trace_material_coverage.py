@@ -41,7 +41,7 @@ warnings.filterwarnings("ignore")
 
 import ifcopenshell  # noqa: E402
 
-from app.modules.module2_ifc_read import piping_producer as pp  # noqa: E402
+from app.modules.ifc_reader import piping_producer as pp  # noqa: E402
 
 DEFAULT_MODELS_DIR = Path("test-models/models")
 

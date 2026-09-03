@@ -18,14 +18,14 @@ reaches a user.
 |---|---|---|
 | Element model | `ServiceElement` (`ifc_parser.py`) | `PipingElement` (`piping_schema.py`) |
 | Producer | `parse_ifc_model(ifc_file)` | `produce_piping_elements(ifc_path)` |
-| Engines | GC-001, CC-001, MC-001 (`app/engines/`) | MM-001, XM-001 (`module4_comparator/`) |
+| Engines | GC-001, CC-001, MC-001 (`app/engines/`) | MM-001, XM-001 (`comparator/`) |
 | Runner | `run_compliance_checks(elements) -> list[dict]` | `compare(elements, rule_pack) -> list[Issue]` |
 | Output shape | one flat dict **per element**, 30+ keys, always emitted | `Issue` dataclass, emitted **only when there is a finding** |
 | Banding | `"LOW"/"MEDIUM"/"HIGH"/"CRITICAL"` strings | `RiskBand` enum, lowercase values |
 | Reaches the UI | yes, via `orchestrate_workflow()` | no |
 
 **Path A entry point.** `BIMGuard_App.orchestrate_workflow()` (`app/modules/orchestrator.py:293`)
-opens the IFC once through `Module2_IFCRead`, and when `analysis_theme == "MEP"` calls
+opens the IFC once through `IFCReader`, and when `analysis_theme == "MEP"` calls
 `parse_ifc_model(m2_reader.ifc_file)` then `run_compliance_checks(elements)`
 (`orchestrator.py:424`). Results are band-normalised to Title case, counted into `issue_stats`, and
 returned under `compliance_results`. `app/routes/analyze.py::_compliance_card` renders them.
@@ -71,10 +71,10 @@ These are not risks; they are present-tense defects verified at `2701563`.
 
 ### B1 — `ComplianceOrchestrator` does not import
 
-`app/modules/module4_comparator/compliance_orchestrator.py:8`:
+`app/modules/comparator/compliance_orchestrator.py:8`:
 
 ```python
-from app.modules.module4_comparator.compliance_runner import run_compliance
+from app.modules.comparator.compliance_runner import run_compliance
 ```
 
 `compliance_runner.py` defines `run_compliance_checks`. There is no `run_compliance`. The module
@@ -113,7 +113,7 @@ def produce_piping_elements(ifc_path: str, *, adjacency_tolerance_m: float = 0.0
 ```
 
 It takes a **path** and calls `ifcopenshell.open()` itself. `orchestrate_workflow()` has already
-opened the same file via `Module2_IFCRead`. Calling it as-is doubles IFC ingestion.
+opened the same file via `IFCReader`. Calling it as-is doubles IFC ingestion.
 
 This is not a theoretical cost. The benchmark in `docs/benchmarks/halo_performance_analysis.md`
 measures ingestion at a median **33.2 elements/s** and **98.6% of end-to-end wall-clock** on the
@@ -238,7 +238,7 @@ binding design constraint on F6, not a cleanup item — read it before wiring th
 
 ## 4. The adapter
 
-New module: `app/modules/module4_comparator/issue_adapter.py`. It is the only place that knows both
+New module: `app/modules/comparator/issue_adapter.py`. It is the only place that knows both
 shapes.
 
 ### 4.1 Path A dicts → Issues
@@ -421,7 +421,7 @@ Two exist:
 
 | Writer | Input | Output | State |
 |---|---|---|---|
-| `module5_reporter/bcf_generator.py` | `list[BCFIssue]` via `issues_from_results(list[dict])` | full BCF 2.1 **ZIP** (markup + viewpoint + snapshot) | complete; snapshot is a 1×1 placeholder |
+| `reporter/bcf_generator.py` | `list[BCFIssue]` via `issues_from_results(list[dict])` | full BCF 2.1 **ZIP** (markup + viewpoint + snapshot) | complete; snapshot is a 1×1 placeholder |
 | `app/services/bcf_exporter.py` | `list[Issue]` | markup **XML only**, no ZIP | importable now (its old broken import is gone); no viewpoint, no ZIP |
 
 **Use `bcf_generator.py`.** A BCF consumer expects a `.bcfzip`; markup XML alone is not a loadable
@@ -429,7 +429,7 @@ deliverable. Add an `Issue`-accepting adapter beside the existing `issues_from_r
 replacing it.
 
 ```python
-# app/modules/module5_reporter/bcf_generator.py
+# app/modules/reporter/bcf_generator.py
 
 def bcf_issues_from_issues(
     issues: list[Issue],
@@ -586,16 +586,16 @@ as unverified.
 
 | # | File | Change | Signature |
 |---|---|---|---|
-| F1 | `module4_comparator/compliance_runner.py` | Fix B1: export the canonical name | `run_compliance = run_compliance_checks` (alias) or rename at the import site |
-| F2 | `module2_ifc_read/piping_producer.py` | Fix B3: accept an open model | `def produce_piping_elements_from_model(model: Any, *, source_path: str \| None = None, adjacency_tolerance_m: float = 0.05) -> list[PipingElement]` — existing `produce_piping_elements()` becomes a two-line wrapper that opens the path and delegates |
-| F3 | `module4_comparator/material_media.py` | Add the loader XM-001 already has | `def load_rule_pack(*, path: Path \| None = None) -> dict` — reads `data/rulesets/mm_001_material_media.json`, validates `_REQUIRED_KEYS`, raises `ValueError` naming the missing keys |
-| F4 | **new** `module4_comparator/issue_adapter.py` | The adapter | `issues_from_path_a(results, *, id_allocator, include_low=False) -> list[Issue]`; `path_a_view(issues, base_results) -> list[dict]`; `class IssueIdAllocator` |
-| F5 | `module4_comparator/issue_schema.py` | Nothing structural | Confirm `summarise()` counts by band for the new card; no schema change needed |
+| F1 | `comparator/compliance_runner.py` | Fix B1: export the canonical name | `run_compliance = run_compliance_checks` (alias) or rename at the import site |
+| F2 | `ifc_reader/piping_producer.py` | Fix B3: accept an open model | `def produce_piping_elements_from_model(model: Any, *, source_path: str \| None = None, adjacency_tolerance_m: float = 0.05) -> list[PipingElement]` — existing `produce_piping_elements()` becomes a two-line wrapper that opens the path and delegates |
+| F3 | `comparator/material_media.py` | Add the loader XM-001 already has | `def load_rule_pack(*, path: Path \| None = None) -> dict` — reads `data/rulesets/mm_001_material_media.json`, validates `_REQUIRED_KEYS`, raises `ValueError` naming the missing keys |
+| F4 | **new** `comparator/issue_adapter.py` | The adapter | `issues_from_path_a(results, *, id_allocator, include_low=False) -> list[Issue]`; `path_a_view(issues, base_results) -> list[dict]`; `class IssueIdAllocator` |
+| F5 | `comparator/issue_schema.py` | Nothing structural | Confirm `summarise()` counts by band for the new card; no schema change needed |
 | F6 | `modules/orchestrator.py` | Call Path B (section 5) | `orchestrate_workflow()` gains the guarded block; returns `path_b_issues: list[dict]`, `path_b_errors: dict[str, str]` |
 | F7 | `modules/config.py` | Feature flags | `FEATURE_PATH_B_MM: bool`, `FEATURE_PATH_B_XM: bool`, both default `False` |
-| F8 | `module5_reporter/bcf_generator.py` | Issue → BCF | `def bcf_issues_from_issues(issues: list[Issue], elements_by_id: dict[str, PipingElement]) -> list[BCFIssue]` — the lookup is required, see 6.1; extend `_markup_xml(issue, index, component_guids: list[str] \| None = None) -> str` for the XM couple |
+| F8 | `reporter/bcf_generator.py` | Issue → BCF | `def bcf_issues_from_issues(issues: list[Issue], elements_by_id: dict[str, PipingElement]) -> list[BCFIssue]` — the lookup is required, see 6.1; extend `_markup_xml(issue, index, component_guids: list[str] \| None = None) -> str` for the XM couple |
 | F9 | `routes/analyze.py` | Render + fix B2 | `def _path_b_card(issues: list[dict], errors: dict[str, str], is_demo: bool)`; rewrite `bcf_download(project_id: int)` to generate; add MM/XM to `_mep_engine_rules_card()` |
-| F10 | `module5_reporter/cost_model.py` | Stop inventing rates | `_lookup_rate(...) -> dict \| None`; `calculate_impact()` gains `unpriced_count: int` on `ImpactSummary` |
+| F10 | `reporter/cost_model.py` | Stop inventing rates | `_lookup_rate(...) -> dict \| None`; `calculate_impact()` gains `unpriced_count: int` on `ImpactSummary` |
 | F11 | **new** `routes/analyze.py` route | Asset register (if in scope) | `def asset_register_csv(project_id: int)` |
 | F12 | `data/rulesets/xm_001_cross_material.json` | Gate | Leave DRAFT. Flip to APPROVED only via the Expert Review process in `docs/expert_review_process.md`, with `approved_by` recorded |
 | F13 | **new** `tests/test_issue_adapter.py` | Cover F4 | see section 9 |

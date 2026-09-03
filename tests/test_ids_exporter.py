@@ -1,4 +1,4 @@
-from app.modules.module3_rule_builder.ids_exporter import (
+from app.modules.rule_builder.ids_exporter import (
     build_ids_document,
     export_ids_for_ruleset,
     filter_exportable_rules,

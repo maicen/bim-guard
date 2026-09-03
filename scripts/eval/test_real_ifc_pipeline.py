@@ -23,7 +23,7 @@ path — placement matrices, tessellated vertices, metre->mm unit scaling —
 is covered too. That path is exactly what mock dataclasses cannot test.
 
 Regenerate the fixture with:
-    uv run python app/modules/module2_producer/build_test_ifc.py
+    uv run python app/modules/blue_halo/build_test_ifc.py
 
 Usage:
     uv run python test_real_ifc_pipeline.py
@@ -39,7 +39,7 @@ sys.path.insert(0, ".")
 
 import ifcopenshell  # noqa: E402
 
-from app.modules.module2_producer.halo_volume_generator import (  # noqa: E402
+from app.modules.blue_halo.halo_volume_generator import (  # noqa: E402
     BraceType,
     ClashReport,
     ClearanceConfig,
@@ -49,7 +49,7 @@ from app.modules.module2_producer.halo_volume_generator import (  # noqa: E402
     load_clearance_config,
     unit_scale_to_mm,
 )
-from app.modules.module5_reporter.blue_halo_bcf_exporter import (  # noqa: E402
+from app.modules.reporter.blue_halo_bcf_exporter import (  # noqa: E402
     PSET_HALO_RESERVATION,
     generate_bcf_zip_from_halo_clashes,
     generate_pset_halo_reservation,
@@ -108,7 +108,7 @@ def load_ifc() -> tuple:
     if not IFC_PATH.exists():
         raise FileNotFoundError(
             f"{IFC_PATH} not found — regenerate it with:\n"
-            "  uv run python app/modules/module2_producer/build_test_ifc.py"
+            "  uv run python app/modules/blue_halo/build_test_ifc.py"
         )
 
     model = ifcopenshell.open(str(IFC_PATH))
@@ -147,7 +147,7 @@ def extract_elements(model, scale: float) -> tuple:
     candidates = collect(CLASH_CANDIDATE_CLASSES)
 
     _out(f"\n  MEP elements to brace ({len(mep)}):")
-    from app.modules.module2_producer.halo_volume_generator import element_bbox_mm
+    from app.modules.blue_halo.halo_volume_generator import element_bbox_mm
 
     for element in mep:
         bbox = element_bbox_mm(element, scale)

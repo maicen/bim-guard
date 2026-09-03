@@ -11,15 +11,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.logging_config import get_logger
-from app.modules.module1_doc_parser.engines.docling_driver import (
+from app.modules.document_parsing.engines.docling_driver import (
     DoclingHostedDriver,
     DoclingLocalDriver,
 )
-from app.modules.module1_doc_parser.engines.unstructured_driver import (
+from app.modules.document_parsing.engines.unstructured_driver import (
     UnstructuredHostedDriver,
     UnstructuredLocalDriver,
 )
-from app.modules.module4_comparator.engine_registry import (
+from app.modules.comparator.engine_registry import (
     RuleEngineRegistry,
     register_default_engines,
 )

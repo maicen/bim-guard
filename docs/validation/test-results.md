@@ -313,7 +313,7 @@ so the four modules that raised at import no longer do — and the registry bein
 empty is itself the one skip inside `test_imports.py`, which reports "got empty
 parameter set for (module)" because there is no longer a regression to
 parametrise over. `KNOWN_IMPORT_FAILURES` retains a single environmental entry,
-`module1_doc_parser.tfidf_analyzer`, which wants scikit-learn from the optional
+`document_parsing.tfidf_analyzer`, which wants scikit-learn from the optional
 `ml-pipeline` group; it is excluded from the sweep rather than skipped. The
 suite's second skip is one of the several conditional guards elsewhere in
 `tests/` (absent checkout files, optional dependencies) and was not isolated.
@@ -351,7 +351,7 @@ raise at import. Whatever fixes finding 4 should let them import.
   band all 861. Control elements are an IFC subtype of `IfcDistributionElement`,
   which is deliberately in the parser's service map. A domain question.
 - The identical geometry limitation remains in
-  `module2_ifc_read/piping_producer._local_vertices`, which feeds the corrosion
+  `ifc_reader/piping_producer._local_vertices`, which feeds the corrosion
   network geometry. Left alone deliberately — changing it would move the
   corrosion numbers above.
 - An `IFC2X2_FINAL` file is refused cleanly ("Unsupported schema"), and a 148 MB

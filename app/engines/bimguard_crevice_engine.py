@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from typing import Any, Optional
 
 from app.modules.contracts import RuleEvaluationResult
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_cc_catalog
 from app.services.pipeline_tracker import CC_ENGINE, Stage, emit, increment
 from app.services.pipeline_tracker import fail as track_failure
@@ -712,7 +712,7 @@ def _write_bcf(bcf_issues: list, output_path: str) -> None:
 def generate_cc_bcf(results: list, output_path: str) -> int:
     """Generate BCF 2.1 ZIP for CC-001 findings.
 
-    The archive is rendered by ``module5_reporter.bcf_generator``, the one
+    The archive is rendered by ``reporter.bcf_generator``, the one
     writer validated against the buildingSMART XSDs; this function only maps
     results onto ``BCFIssue`` objects.
 

@@ -1,4 +1,4 @@
-"""Scope gating and waiver gating in Module4_Comparator.
+"""Scope gating and waiver gating in ComplianceComparator.
 
 Covers the two gates added for BIMGUARD-PC-001 (NFPA 13 Sec. 18.5 clearance):
 ``applies_when`` narrows which elements a rule governs, and ``exceptions``
@@ -10,7 +10,7 @@ neither field, and must evaluate exactly as it did before.
 
 from __future__ import annotations
 
-from app.modules.module4_comparator import Module4_Comparator
+from app.modules.comparator import ComplianceComparator
 
 
 def _element(name: str, actual, **extra) -> dict:
@@ -46,7 +46,7 @@ def _rule(elements: list[dict], **extra) -> dict:
 
 
 def _evaluate(item: dict) -> dict:
-    return Module4_Comparator().validate_metadata([item])[0]
+    return ComplianceComparator().validate_metadata([item])[0]
 
 
 class TestBackwardCompatibility:
@@ -248,7 +248,7 @@ class TestHostPredicates:
     """`penetrates`, `host_material_any_of` and `host_is_breakaway`.
 
     These describe what the element passes THROUGH, resolved by
-    module2_ifc_read.ifc_penetrations, and are a different question from
+    ifc_reader.ifc_penetrations, and are a different question from
     `material_any_of`, which is the element's own material.
     """
 
@@ -377,12 +377,12 @@ class TestWaiverDefinitionsAreNotEvaluated:
     def test_exempt_operator_is_dropped(self):
         exemption = _rule([_element("pipe-a", 10.0)], operator="exempt", check_value=None)
         exemption["rule_ref"] = "PC-001.03"
-        assert Module4_Comparator().validate_metadata([exemption]) == []
+        assert ComplianceComparator().validate_metadata([exemption]) == []
 
     def test_requirement_alongside_exemption_still_evaluates(self):
         requirement = _rule([_element("pipe-a", 10.0)])
         exemption = _rule([_element("pipe-a", 10.0)], operator="exempt", check_value=None)
-        results = Module4_Comparator().validate_metadata([requirement, exemption])
+        results = ComplianceComparator().validate_metadata([requirement, exemption])
         assert len(results) == 1
         assert results[0]["status"] == "FAIL"
 

@@ -1,8 +1,8 @@
 # BCF 2.1 schema validation: GUID typing fixes
 
 Date: 2026-09-02
-Scope: `app/modules/module5_reporter/bcf_generator.py`, `app/services/bcf_exporter.py`,
-`app/modules/module5_reporter/blue_halo_bcf_exporter.py`
+Scope: `app/modules/reporter/bcf_generator.py`, `app/services/bcf_exporter.py`,
+`app/modules/reporter/blue_halo_bcf_exporter.py`
 Schemas: official buildingSMART BCF 2.1 `markup.xsd` and `visinfo.xsd`, vendored verbatim
 under `tests/schemas/bcf21/` (see `NOTICE.md` there).
 
@@ -22,7 +22,7 @@ pass exposed a different family of violations, all in GUID typing:
 | # | Attribute | Schema type | Offending input | Source |
 |---|-----------|-------------|-----------------|--------|
 | 1 | `Header/File/@IfcProject` | `IfcGuid` (exactly 22 chars `[0-9A-Za-z_$]`) | ISO 19650 project code (`PRJ1`, `ZIG-001`) or the literal `BIMGuard` | `BCFIssue.project_code`; `BCFExporter` header |
-| 2 | `Component/@IfcGuid` | `IfcGuid` | empty string when a failure has no GlobalId | `Module5_Reporter.bcf_issues_for_results`, `ReportArtifactService` |
+| 2 | `Component/@IfcGuid` | `IfcGuid` | empty string when a failure has no GlobalId | `ComplianceReporter.bcf_issues_for_results`, `ReportArtifactService` |
 | 3 | `Component/@IfcGuid` | `IfcGuid` | random 36-char UUID minted as a fallback | `issues_from_results` |
 | 4 | `Component/@IfcGuid` | `IfcGuid` | labels such as `COMP-001`, braced GUIDs | callers and tests |
 | 5 | `Topic/@Guid` and folder name | `Guid` (hyphenated UUID) | Module 4 finding ids (`BGR-0001`), IFC GUIDs used as topic ids | `BCFExporter.build_archive`, `phase_6e_export`, `ReportArtifactService` |
@@ -61,7 +61,7 @@ End-to-end proof (every production entry point, each `markup.bcf` and `viewpoint
 validated by both `xmlschema` and `lxml` against the vendored XSDs):
 
 ```
-== module5_reporter.bcf_generator.generate_bcf ==
+== reporter.bcf_generator.generate_bcf ==
   OK  clean issue                                                topics=  1
   OK  ISO 19650 metadata (project_code=ZIG-001)                  topics=  1
   OK  real IfcProject GlobalId                                   topics=  1

@@ -27,12 +27,12 @@ pytest.importorskip("ifcopenshell.geom")
 pytest.importorskip("ifcopenshell.api")  # attaches ifcopenshell.api submodule
 pytest.importorskip("scipy")
 
-from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor  # noqa: E402
-from app.modules.module2_ifc_read.piping_producer import (  # noqa: E402
+from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor  # noqa: E402
+from app.modules.ifc_reader.piping_producer import (  # noqa: E402
     extract_normalized_material,
     normalise_material,
 )
-from app.modules.module2_ifc_read.piping_schema import CANONICAL_MATERIALS  # noqa: E402
+from app.modules.ifc_reader.piping_schema import CANONICAL_MATERIALS  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Model builders

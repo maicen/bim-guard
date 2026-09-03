@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | BG-DEF-001 |
 | **Component** | Component 1 — rule extraction (Module 3) |
-| **Files** | `app/modules/module3_rule_builder/rule_generator.py` (`_enrich_target`, `_enrich_property_set`), `app/modules/config.py` (`CODE_TO_IFC_MAP`, `IFC_PROPERTY_SET_MAP`) |
+| **Files** | `app/modules/rule_builder/rule_generator.py` (`_enrich_target`, `_enrich_property_set`), `app/modules/config.py` (`CODE_TO_IFC_MAP`, `IFC_PROPERTY_SET_MAP`) |
 | **Severity** | High — produces silent false negatives in a compliance tool |
 | **Status** | Open. Verified present at commit `f8d9f34`. **No code change has been made**: `app/` is locked while engine work is in flight, so this document is the work order. |
 | **Discovered by** | The SS316 feedback-loop worked example (`docs/ss316_feedback_loop_case_study.md`, §1.3.4 of the submission draft) |

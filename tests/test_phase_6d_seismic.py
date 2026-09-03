@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.module4_comparator.issue_schema import RiskBand
+from app.modules.comparator.issue_schema import RiskBand
 from app.modules.phase_6.phase_6d_seismic import (
     BRACED_CLASSES,
     DATA_QUALITY,
@@ -210,7 +210,7 @@ class TestConfig:
         assert DEFAULT_CONFIG_PATH.exists()
 
     def test_config_declares_standards(self):
-        from app.modules.module2_producer.halo_volume_generator import load_clearance_config
+        from app.modules.blue_halo.halo_volume_generator import load_clearance_config
 
         config = load_clearance_config(DEFAULT_CONFIG_PATH)
         assert config.standards_cited, "citations are built from these"

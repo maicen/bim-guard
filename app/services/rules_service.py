@@ -1263,14 +1263,14 @@ class RuleService:
     @staticmethod
     def export_ids_xml(ruleset_id: str, rules: list[dict]) -> str:
         """Export rules as an IDS XML payload."""
-        from app.modules.module3_rule_builder.ids_exporter import export_ids_for_ruleset
+        from app.modules.rule_builder.ids_exporter import export_ids_for_ruleset
 
         return export_ids_for_ruleset(ruleset_id, rules)
 
     @staticmethod
     def import_ids_xml(xml_text: str, ruleset_id: str | None = None) -> list[dict]:
         """Import rules from an IDS XML payload."""
-        from app.modules.module3_rule_builder.ids_exporter import import_ids_ruleset
+        from app.modules.rule_builder.ids_exporter import import_ids_ruleset
 
         return import_ids_ruleset(xml_text, ruleset_id)
 

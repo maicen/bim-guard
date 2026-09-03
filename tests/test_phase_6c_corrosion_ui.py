@@ -20,10 +20,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.module2_ifc_read import piping_fixtures
-from app.modules.module2_ifc_read.ifc_parser import ServiceElement
-from app.modules.module2_ifc_read.piping_schema import CANONICAL_MATERIALS
-from app.modules.module4_comparator.issue_schema import RiskBand
+from app.modules.comparator.issue_schema import RiskBand
+from app.modules.ifc_reader import piping_fixtures
+from app.modules.ifc_reader.ifc_parser import ServiceElement
+from app.modules.ifc_reader.piping_schema import CANONICAL_MATERIALS
 from app.modules.phase_6.phase_6c_corrosion_ui import (
     BAND_RANK,
     DATA_QUALITY,
@@ -571,7 +571,7 @@ class TestEngineGating:
             raise AssertionError("XM-001 ran despite being unselected")
 
         monkeypatch.setattr(
-            "app.modules.module4_comparator.cross_material.compare", spy
+            "app.modules.comparator.cross_material.compare", spy
         )
         run_corrosion_analysis(
             parsed_ifc(piping_elements=network), include_low=True, engines=["MM"]

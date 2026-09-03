@@ -80,17 +80,17 @@ import numpy as np  # noqa: E402
 
 import ifcopenshell  # noqa: E402
 
-from app.modules.module2_ifc_read.piping_producer import (  # noqa: E402
+from app.modules.ifc_reader.piping_producer import (  # noqa: E402
     media_for_system,
     produce_piping_elements_from_model,
 )
-from app.modules.module2_producer.halo_volume_generator import (  # noqa: E402
+from app.modules.blue_halo.halo_volume_generator import (  # noqa: E402
     ElementGeometry,
     detect_halo_clash_against_geometry,
     generate_halo_volume_from_geometry,
     load_clearance_config,
 )
-from app.modules.module4_comparator.compliance_runner import (  # noqa: E402
+from app.modules.comparator.compliance_runner import (  # noqa: E402
     run_crevice_compliance_check,
     run_galvanic_compliance_check,
     run_mic_compliance_check,

@@ -34,7 +34,7 @@ Ruled out
 
 Root cause
 ----------
-app/modules/module2_ifc_read/ifc_geometry.py, IFCGeometryExtractor._get_shape
+app/modules/ifc_reader/ifc_geometry.py, IFCGeometryExtractor._get_shape
 cached tessellated shapes under id(element) -- the CPython address of the
 ifcopenshell entity_instance wrapper.
 

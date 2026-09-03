@@ -193,7 +193,7 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
     # thresholds. Life-safety window properties (fire/acoustic/security
     # rating, thermal transmittance, egress/fire-exit flags, ...) live in
     # Pset_WindowCommon but are almost never populated by default in
-    # authoring tools — Module4_Comparator already treats a missing
+    # authoring tools — ComplianceComparator already treats a missing
     # property as MISSING_DATA (or PARTIAL if some elements have it), never
     # PASS, so these rules surface "this window has no documented X" rather
     # than asserting compliance against a threshold nobody has verified.

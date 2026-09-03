@@ -188,9 +188,9 @@ class DocumentService:
         engine), or "light" (force the local extractor). `instance`
         optionally selects which configured parsing engine to use (a local
         container, or which hosted account) — see
-        module1_doc_parser/document_extractor.py.
+        document_parsing/document_extractor.py.
         """
-        from app.modules.module1_doc_parser.document_extractor import extract_document_text
+        from app.modules.document_parsing.document_extractor import extract_document_text
 
         text, _tables = extract_document_text(filename, content, parser=parser, instance=instance)
         return text

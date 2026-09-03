@@ -15,7 +15,7 @@ from app.modules.contracts import (
     ParsingEngineInstanceUpdateRequest,
     ParsingEngineKindResponse,
 )
-from app.modules.module1_doc_parser.engines import ParsingEngineRegistry
+from app.modules.document_parsing.engines import ParsingEngineRegistry
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 
 logger = get_logger(__name__)
@@ -48,7 +48,7 @@ def list_kinds() -> list[ParsingEngineKindResponse]:
     """Return metadata for every registered parsing-engine driver.
 
     The Settings UI renders its "Kind" selector from this list instead of a
-    hardcoded set — a new backend driver (see app/modules/module1_doc_parser/
+    hardcoded set — a new backend driver (see app/modules/document_parsing/
     engines) appears here, and therefore in the UI, without any frontend change.
     """
     return [

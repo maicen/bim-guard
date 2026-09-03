@@ -50,15 +50,15 @@ from eval_gold_code_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
 
 sys.path.insert(0, "app/modules")
 
-from module1_doc_parser import Module1_DocReader  # noqa: E402
-from module1_doc_parser.unstructured_extractor import UnstructuredExtractor  # noqa: E402
-from module1_doc_parser.section_chunker import SectionChunker  # noqa: E402
-from module1_doc_parser.keyword_filter import KeywordFilter  # noqa: E402
-from module1_doc_parser.dependency_parser import DependencyParser  # noqa: E402
-from module1_doc_parser.confidence_scorer import ConfidenceScorer  # noqa: E402
-from module1_doc_parser.table_rule_builder import TableRuleBuilder  # noqa: E402
-from module3_rule_builder.regex_rule_converter import RegexRuleConverter  # noqa: E402
-from module2_ifc_read import _PROPERTY_ALIASES  # noqa: E402
+from document_parsing import DocumentReader  # noqa: E402
+from document_parsing.unstructured_extractor import UnstructuredExtractor  # noqa: E402
+from document_parsing.section_chunker import SectionChunker  # noqa: E402
+from document_parsing.keyword_filter import KeywordFilter  # noqa: E402
+from document_parsing.dependency_parser import DependencyParser  # noqa: E402
+from document_parsing.confidence_scorer import ConfidenceScorer  # noqa: E402
+from document_parsing.table_rule_builder import TableRuleBuilder  # noqa: E402
+from rule_builder.regex_rule_converter import RegexRuleConverter  # noqa: E402
+from ifc_reader import _PROPERTY_ALIASES  # noqa: E402
 
 PDF_PATH = glob.glob("data/uploads/*pdf_stairs_mock.pdf")[0]
 
@@ -75,7 +75,7 @@ OLLAMA_MODEL = "ollama_chat/qwen3:14b"
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_API_KEY = "ollama"  # placeholder — Ollama ignores it; litellm just wants a value
 
-# ── Property-name equivalence (mirrors module2_ifc_read's alias table) ──────
+# ── Property-name equivalence (mirrors ifc_reader's alias table) ──────
 _ALIAS_GROUPS: list[set[str]] = [{canon, *aliases} for canon, aliases in _PROPERTY_ALIASES.items()]
 
 
@@ -142,7 +142,7 @@ def prepare_sendable_chunks(text: str) -> list[dict]:
     if code_chunks:
         chunks_to_process = code_chunks
     else:
-        generic = Module1_DocReader().extract_text_sections(text)
+        generic = DocumentReader().extract_text_sections(text)
         chunks_to_process = [
             {"section_number": str(i + 1), "section_name": f"Section {i + 1}",
              "text": t, "char_count": len(t)}
@@ -165,7 +165,7 @@ def part_a():
     print("=" * 70)
 
     pdf_bytes = open(PDF_PATH, "rb").read()
-    pypdf_text = Module1_DocReader().parse_pdf(pdf_bytes)
+    pypdf_text = DocumentReader().parse_pdf(pdf_bytes)
     unstructured_text, unstructured_tables = UnstructuredExtractor().extract(PDF_PATH)
 
     # ── A1: heading detection gap ────────────────────────────────────────
@@ -332,7 +332,7 @@ async def part_b(sendable: list[dict]):
     canonical = {c.lower() for group in _ALIAS_GROUPS for c in group}
     unresolvable = [r for r in llm_rules if str(r.get("property_name", "")).lower() not in canonical]
     print(f"\n     property_name grounding: {len(llm_rules) - len(unresolvable)}/{len(llm_rules)} "
-          f"extracted property names are in module2_ifc_read's known vocabulary")
+          f"extracted property names are in ifc_reader's known vocabulary")
     if unresolvable:
         seen = sorted({r.get("property_name") for r in unresolvable})
         print(f"     unresolvable property_names seen: {seen}")

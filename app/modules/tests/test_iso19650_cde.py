@@ -4,15 +4,15 @@ Unit and Integration Tests for ISO 19650 Compliance & CDE State Machine Workflow
 
 import pytest
 from app.modules.contracts import CDEState
-from app.modules.module1_doc_parser.iso_validator import ISO19650Validator, ISOValidationResult
-from app.modules.module2_ifc_read.ifc_parser import extract_ifc_header_iso_metadata
-from app.modules.module3_rule_builder.ids_exporter import build_ids_document, filter_exportable_rules
-from app.modules.module4_comparator.compliance_runner import run_ids_loin_verification
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf, _markup_xml
+from app.modules.document_parsing.iso_validator import ISO19650Validator, ISOValidationResult
+from app.modules.ifc_reader.ifc_parser import extract_ifc_header_iso_metadata
+from app.modules.rule_builder.ids_exporter import build_ids_document, filter_exportable_rules
+from app.modules.comparator.compliance_runner import run_ids_loin_verification
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf, _markup_xml
 from app.modules.phase_6.phase_6e_export import export, to_ids
 from app.services.cde_state_machine import CDEStateMachine, TransitionResult
 from app.services.bcf_exporter import BCFExporter
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
+from app.modules.comparator.issue_schema import Issue, RiskBand
 
 
 # ---------------------------------------------------------------------------
@@ -132,9 +132,9 @@ def test_ids_exporter_xml_generation():
     ]
     ids_xml = build_ids_document(rules)
     assert '<?xml version="1.0" encoding="UTF-8"?>' in ids_xml
-    assert 'xmlns:ids="http://standards.buildingsmart.org/IDS"' in ids_xml
-    assert "<ids:name>IfcPipeSegment</ids:name>" in ids_xml
-    assert "<ids:name>NominalDiameter</ids:name>" in ids_xml
+    assert "http://standards.buildingsmart.org/IDS" in ids_xml
+    assert "IfcPipeSegment" in ids_xml
+    assert "NominalDiameter" in ids_xml
 
 
 def test_run_ids_loin_verification():

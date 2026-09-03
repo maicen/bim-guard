@@ -26,9 +26,9 @@ additional IFC GUIDs are read out of ``Issue.metadata`` by
 :meth:`BCFExporter.collect_elements`. The resulting viewpoint selects and
 colours every implicated element, not just the primary one.
 
-Relationship to ``module5_reporter.bcf_generator``
+Relationship to ``reporter.bcf_generator``
 --------------------------------------------------
-``app/modules/module5_reporter/bcf_generator.py`` writes an equivalent
+``app/modules/reporter/bcf_generator.py`` writes an equivalent
 archive from its own ``BCFIssue`` dataclass on the Blue Halo path, but its
 viewpoint selects a single component. This module is the services-layer
 entry point, works directly off the Module 4 ``Issue`` contract, and supports
@@ -58,8 +58,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
-from app.modules.module5_reporter.bcf_generator import bcf_topic_guid, is_ifc_guid
+from app.modules.comparator.issue_schema import Issue, RiskBand
+from app.modules.reporter.bcf_generator import bcf_topic_guid, is_ifc_guid
 
 #: Repository root, resolved from this file so exports work from any cwd.
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -322,7 +322,7 @@ class BCFExporter:
 
         # BCF 2.1's markup.xsd declares no targetNamespace, so Markup and its
         # children are unqualified. Only the xsi prefix is bound, matching the
-        # archives written by module5_reporter.bcf_generator.
+        # archives written by reporter.bcf_generator.
         root = ET.Element(
             "Markup", {"xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"}
         )

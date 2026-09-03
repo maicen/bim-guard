@@ -213,7 +213,7 @@ PROPERTY_NAMES = {
     "separation": "SeparationDistance",
 }
 
-#: Operators the comparator dispatches on (``module4_comparator._compare``
+#: Operators the comparator dispatches on (``comparator._compare``
 #: plus the operators it handles before reaching it).
 SUPPORTED_OPERATORS = {
     ">=",
@@ -285,7 +285,7 @@ def _supported_predicate_keys() -> set[str] | None:
     is skipped rather than reported wrongly.
     """
     try:
-        from app.modules import module4_comparator as m4
+        from app.modules import comparator as m4
     except Exception:  # noqa: BLE001 - advisory only, never fatal to an import
         return None
     groups = [

@@ -1,5 +1,5 @@
 """
-Unit tests for Module4_Comparator operators.
+Unit tests for ComplianceComparator operators.
 
 Tests 10 operators across 3 dispatch paths (exists, numeric compare, string
 compare), the boolean fast path, status aggregation (5 outcomes), and four
@@ -10,13 +10,13 @@ Run: uv run pytest tests/test_comparator.py -v
 
 import pytest
 
-from app.modules.module4_comparator import Module4_Comparator
+from app.modules.comparator import ComplianceComparator
 
 
 @pytest.fixture
 def cmp():
     """Return a comparator instance; it is stateless, so one per test is cheap."""
-    return Module4_Comparator()
+    return ComplianceComparator()
 
 
 def verdict(cmp, operator, actual, check_val=None, val_min=None, val_max=None, unit=""):

@@ -21,7 +21,7 @@ import pathlib
 
 import pytest
 
-from app.modules.module2_ifc_read import ifc_supports as sup
+from app.modules.ifc_reader import ifc_supports as sup
 
 # ── Pure math: no IFC required ────────────────────────────────────────────────
 
@@ -308,7 +308,7 @@ def braced_model(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def extractor(braced_model):
-    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+    from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
     return IFCGeometryExtractor(braced_model)
 
@@ -534,11 +534,11 @@ def nfpa_model_path(tmp_path_factory):
 
 
 def _evaluate(model_path, rules):
-    from app.modules.module2_ifc_read import Module2_IFCRead
-    from app.modules.module4_comparator import Module4_Comparator
+    from app.modules.ifc_reader import IFCReader
+    from app.modules.comparator import ComplianceComparator
 
-    extraction = Module2_IFCRead(model_path).extract_for_compliance(rules)
-    results = Module4_Comparator().validate_metadata(extraction)
+    extraction = IFCReader(model_path).extract_for_compliance(rules)
+    results = ComplianceComparator().validate_metadata(extraction)
     return {r["rule_ref"]: r for r in results}
 
 

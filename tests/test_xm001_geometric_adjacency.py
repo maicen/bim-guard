@@ -41,14 +41,14 @@ pytest.importorskip("ifcopenshell.guid")
 pytest.importorskip("scipy")
 np = pytest.importorskip("numpy")
 
-from app.modules.module2_ifc_read import piping_producer as pp  # noqa: E402
-from app.modules.module2_ifc_read.piping_schema import (  # noqa: E402
+from app.modules.comparator.cross_material import compare, load_rule_pack  # noqa: E402
+from app.modules.ifc_reader import piping_producer as pp  # noqa: E402
+from app.modules.ifc_reader.piping_schema import (  # noqa: E402
     BoundingBox,
     EnvironmentClass,
     PipingSystem,
     Point3D,
 )
-from app.modules.module4_comparator.cross_material import compare, load_rule_pack  # noqa: E402
 from tests.test_cross_material import TEST_SERIES, TEST_THRESHOLDS  # noqa: E402
 
 MM = {"is_metric": True, "raw": "MILLIMETERS"}
@@ -409,7 +409,7 @@ def test_mid_span_contact_is_detected_by_surface_distance():
     900 mm apart. Only the narrow phase - point to triangle, over the faces
     incident on that pair - sees the contact.
     """
-    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+    from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
     f, body = _new_model()
     riser = _add(f, body, "IfcPipeSegment", "P1", "Copper", (100, 100, 2000), (0, 0, 0))
@@ -423,7 +423,7 @@ def test_mid_span_contact_is_detected_by_surface_distance():
 
 def test_mid_span_measurement_is_symmetric():
     """Both directions are measured, so argument order cannot change the answer."""
-    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+    from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
     f, body = _new_model()
     riser = _add(f, body, "IfcPipeSegment", "P1", "Copper", (100, 100, 2000), (0, 0, 0))
@@ -437,7 +437,7 @@ def test_mid_span_measurement_is_symmetric():
 
 def test_mid_span_gap_is_measured_not_rounded_to_contact():
     """A branch stopped 20 mm short of the riser face measures 20 mm, not 0."""
-    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+    from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
     f, body = _new_model()
     riser = _add(f, body, "IfcPipeSegment", "P1", "Copper", (100, 100, 2000), (0, 0, 0))
@@ -455,7 +455,7 @@ def test_mid_span_gap_is_measured_not_rounded_to_contact():
 
 def test_point_to_triangle_measures_to_the_face_interior():
     """A point above the middle of a triangle measures its perpendicular height."""
-    from app.modules.module2_ifc_read.ifc_geometry import _point_to_triangle_distance
+    from app.modules.ifc_reader.ifc_geometry import _point_to_triangle_distance
 
     a = np.array([[0.0, 0.0, 0.0]])
     b = np.array([[10.0, 0.0, 0.0]])
@@ -466,7 +466,7 @@ def test_point_to_triangle_measures_to_the_face_interior():
 
 def test_point_to_triangle_falls_back_to_edge_and_corner():
     """Outside the face, the nearest point is on an edge or at a corner."""
-    from app.modules.module2_ifc_read.ifc_geometry import _point_to_triangle_distance
+    from app.modules.ifc_reader.ifc_geometry import _point_to_triangle_distance
 
     a = np.array([[0.0, 0.0, 0.0]])
     b = np.array([[10.0, 0.0, 0.0]])
@@ -480,7 +480,7 @@ def test_point_to_triangle_falls_back_to_edge_and_corner():
 
 def test_point_to_triangle_is_vectorised_over_a_batch():
     """One point against many triangles returns one distance per triangle."""
-    from app.modules.module2_ifc_read.ifc_geometry import _point_to_triangle_distance
+    from app.modules.ifc_reader.ifc_geometry import _point_to_triangle_distance
 
     a = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 100.0]])
     b = np.array([[10.0, 0.0, 0.0], [10.0, 0.0, 100.0]])

@@ -100,7 +100,7 @@ import numpy as np
 # Reuse the project's own geometry primitives rather than redefining them, so
 # the benchmark measures the same data contract the platform would use.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from app.modules.module2_ifc_read.piping_schema import BoundingBox, Point3D  # noqa: E402
+from app.modules.ifc_reader.piping_schema import BoundingBox, Point3D  # noqa: E402
 from app.services.object_storage import ObjectStorage  # noqa: E402
 
 logger = logging.getLogger("bimguard.benchmark")

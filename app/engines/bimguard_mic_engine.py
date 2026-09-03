@@ -33,7 +33,7 @@ from datetime import UTC, datetime
 from typing import Any, Optional
 
 from app.modules.contracts import RuleEvaluationResult
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_mc_catalog
 
 RULESET_VERSION = "BIMGUARD-MC-001 v1.0.0"
@@ -551,7 +551,7 @@ def generate_mic_bcf(results: list[MICResult], output_path: str) -> int:
     Only Medium, High, and Critical results generate BCF issues.
     Returns count of issues generated.
 
-    The archive is rendered by ``module5_reporter.bcf_generator``, the one
+    The archive is rendered by ``reporter.bcf_generator``, the one
     writer validated against the buildingSMART XSDs; this function only maps
     results onto ``BCFIssue`` objects.
     """

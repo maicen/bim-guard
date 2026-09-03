@@ -10,7 +10,7 @@ Archives are generated output and are not tracked in git; only this README is.
 ## Engine demo archives
 
 The corrosion engines' standalone demos also write here, via the same
-`module5_reporter.bcf_generator` the services exporter shares:
+`reporter.bcf_generator` the services exporter shares:
 
 | Archive | Written by |
 | ------- | ---------- |
@@ -29,7 +29,7 @@ path = BCFExporter().export(issues, "galvanic_review")
 ```
 
 `issues` is a list of `Issue` objects from
-`app/modules/module4_comparator/issue_schema.py`, exactly as the Module 4
+`app/modules/comparator/issue_schema.py`, exactly as the Module 4
 comparators emit them.
 
 ## Multi-element findings

@@ -3,7 +3,7 @@
 import asyncio
 
 from app.modules.contracts import ClauseMetadata, DeonticStatement, DocumentNodeContract
-from app.modules.module1_doc_parser.llamaindex_ingestor import LlamaIndexIngestor
+from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
 
 SAMPLE_TEXT = """9.8.2.1 Stair Width
 Every stair shall have a minimum width of 900 mm.
@@ -57,7 +57,7 @@ def test_extract_deontic_statements_skips_non_deontic_nodes(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "app.modules.module1_doc_parser.llamaindex_program.extract_deontic_statement",
+        "app.modules.document_parsing.llamaindex_program.extract_deontic_statement",
         fake_extract,
     )
 
@@ -80,7 +80,7 @@ def test_extract_deontic_statements_empty_nodes_short_circuits(monkeypatch):
         called = True
 
     monkeypatch.setattr(
-        "app.modules.module1_doc_parser.llamaindex_program.extract_deontic_statement",
+        "app.modules.document_parsing.llamaindex_program.extract_deontic_statement",
         fake_extract,
     )
 

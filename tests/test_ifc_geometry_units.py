@@ -19,7 +19,7 @@ ifcopenshell = pytest.importorskip("ifcopenshell")
 pytest.importorskip("ifcopenshell.geom")
 pytest.importorskip("ifcopenshell.api")  # attaches ifcopenshell.api submodule
 
-from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor  # noqa: E402
+from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor  # noqa: E402
 
 
 def _build_model(

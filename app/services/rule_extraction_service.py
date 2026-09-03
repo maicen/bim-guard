@@ -7,8 +7,8 @@ from app.modules.config import (
     DEFAULT_LLM_MODEL,
     MAX_TOKENS_RULE_EXTRACTION,
 )
-from app.modules.module1_doc_parser.llamaindex_ingestor import LlamaIndexIngestor
-from app.modules.module1_doc_parser.section_chunker import SectionChunker
+from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
+from app.modules.document_parsing.section_chunker import SectionChunker
 from app.services import pipeline_tracker
 from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
@@ -116,7 +116,7 @@ class RuleExtractionService:
         `pending_review` drafts via RuleDraftService — the entry point for
         `POST /api/documents/{id}/rules/extract-drafts`.
         """
-        from app.modules.module3_rule_builder.llamaindex_rule_generator import (
+        from app.modules.rule_builder.llamaindex_rule_generator import (
             LlamaIndexRuleGenerator,
         )
         from app.services.rule_draft_service import RuleDraftService

@@ -19,7 +19,7 @@ pyRevit sends:
         ]
     }
 
-This service produces the same list[dict] that Module2_IFCRead.extract_for_compliance()
+This service produces the same list[dict] that IFCReader.extract_for_compliance()
 returns, so Module 4 and 5 run with zero changes.
 """
 
@@ -43,7 +43,7 @@ class RevitSyncService:
             theme:    "Architecture" or "MEP"
 
         Returns:
-            list[dict] matching Module2_IFCRead.extract_for_compliance() output
+            list[dict] matching IFCReader.extract_for_compliance() output
         """
         rules = RuleService().list_by_theme(theme)
 

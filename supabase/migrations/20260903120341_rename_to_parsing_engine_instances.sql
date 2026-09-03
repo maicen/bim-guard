@@ -2,7 +2,7 @@
 -- Description: Rename unstructured_instances -> parsing_engine_instances now
 -- that the registry covers Docling instances too, and drop the kind CHECK
 -- constraint — the set of valid kinds is now owned by ParsingEngineRegistry
--- (app/modules/module1_doc_parser/engines) in application code, which the
+-- (app/modules/document_parsing/engines) in application code, which the
 -- service validates against at request time. This lets a new engine kind
 -- be added without a schema migration.
 

@@ -16,7 +16,7 @@ full below rather than quietly replaced.
 | Location | Convention it applied | Verdict |
 |---|---|---|
 | [`bimguard_corrosion_engine.py:353`](../../app/engines/bimguard_corrosion_engine.py) — **live** | more positive = anodic | **CORRECT** |
-| [`galvanic.py:190`](../../app/modules/module4_comparator/galvanic.py) — dormant, Path B | more negative = anodic | **WRONG — fixed** |
+| [`galvanic.py:190`](../../app/modules/comparator/galvanic.py) — dormant, Path B | more negative = anodic | **WRONG — fixed** |
 
 Because the wrong engine was never wired up, **no user-facing galvanic finding ever named the wrong
 material**, and no previously issued report needs reissuing. The earlier draft's worst case did not

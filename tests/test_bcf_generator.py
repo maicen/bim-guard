@@ -22,7 +22,7 @@ xmlschema = pytest.importorskip(
     "xmlschema", reason="xmlschema is required for BCF schema validation (dev dependency group)"
 )
 
-from app.modules.module5_reporter.bcf_generator import (  # noqa: E402
+from app.modules.reporter.bcf_generator import (  # noqa: E402
     BCFIssue,
     bcf_topic_guid,
     generate_bcf,
@@ -248,7 +248,7 @@ def test_visibility_precedes_coloring():
 
 def test_synthetic_element_guids_are_valid_ifc_guids():
     """Regression 6: demo elements must carry real IfcGuids, not sliced UUIDs."""
-    from app.modules.module2_ifc_read.ifc_parser import generate_synthetic_elements
+    from app.modules.ifc_reader.ifc_parser import generate_synthetic_elements
 
     guids = [element.guid for element in generate_synthetic_elements(10)]
     assert guids
@@ -258,7 +258,7 @@ def test_synthetic_element_guids_are_valid_ifc_guids():
 
 def test_synthetic_element_guids_survive_into_a_valid_viewpoint(visinfo_schema):
     """The demo GUID fix must hold end-to-end, not just at the parser."""
-    from app.modules.module2_ifc_read.ifc_parser import generate_synthetic_elements
+    from app.modules.ifc_reader.ifc_parser import generate_synthetic_elements
 
     element = generate_synthetic_elements(1)[0]
     bcf_bytes = generate_bcf([create_test_bcf_issue(component_guid=element.guid)])

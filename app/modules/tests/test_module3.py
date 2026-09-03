@@ -18,8 +18,8 @@ Test groups:
 import os
 
 import pytest
-from module3_rule_builder.rule_generator import RuleGenerator
-from module3_rule_builder.rule_store import RuleStore
+from rule_builder.rule_generator import RuleGenerator
+from rule_builder.rule_store import RuleStore
 
 TEST_DB = "tests/test_rules_m3.db"
 
@@ -30,16 +30,12 @@ TEST_DB = "tests/test_rules_m3.db"
 
 
 @pytest.fixture
-def store():
-    s = RuleStore(TEST_DB)
+def store(tmp_path):
+    db_path = str(tmp_path / "test_rules_m3.db")
+    s = RuleStore(db_path)
     s.clear_all_rules()
     yield s
     s.close()
-    try:
-        if os.path.exists(TEST_DB):
-            os.remove(TEST_DB)
-    except OSError:
-        pass
 
 
 @pytest.fixture
@@ -424,7 +420,7 @@ class TestRuleConverterLLM:
 
     @pytest.fixture
     def converter(self, store):
-        from module3_rule_builder.rule_converter import RuleConverter
+        from rule_builder.rule_converter import RuleConverter
 
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:

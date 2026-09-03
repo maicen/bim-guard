@@ -33,7 +33,7 @@ from datetime import UTC, datetime
 from typing import Any, Optional
 
 from app.modules.contracts import RuleEvaluationResult
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_gc_catalog
 from app.services.pipeline_tracker import GC_ENGINE, Stage, emit, increment
 from app.services.pipeline_tracker import fail as track_failure
@@ -731,7 +731,7 @@ def generate_gc_bcf(results: list, output_path: str) -> int:
     Only Medium, High, and Critical results generate BCF issues.
     Returns count of issues generated.
 
-    The archive is rendered by ``module5_reporter.bcf_generator``, the one
+    The archive is rendered by ``reporter.bcf_generator``, the one
     writer validated against the buildingSMART XSDs; this function only maps
     results onto ``BCFIssue`` objects.
 

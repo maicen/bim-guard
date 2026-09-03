@@ -156,7 +156,7 @@ class EngineSpec:
 #: ``MM-001`` / ``XM-001``
 #:     Path B comparators. ``FEATURE_PATH_B_MM`` / ``FEATURE_PATH_B_XM`` in
 #:     :mod:`app.modules.config` gate them only in
-#:     ``module4_comparator.compliance_orchestrator``, which no API route calls.
+#:     ``comparator.compliance_orchestrator``, which no API route calls.
 #:     On the live path they are ``NETWORK_MECHANISMS`` in
 #:     ``phase_6c_corrosion_ui`` and run whenever selected -- which the analyse
 #:     page now does by default. ``pending`` here means "not instrumented",

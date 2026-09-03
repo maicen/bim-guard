@@ -21,16 +21,16 @@ import json
 
 import pytest
 
-from app.modules.module2_ifc_read import piping_fixtures as fx
-from app.modules.module2_ifc_read import piping_producer as pp
-from app.modules.module2_ifc_read.piping_schema import (
+from app.modules.ifc_reader import piping_fixtures as fx
+from app.modules.ifc_reader import piping_producer as pp
+from app.modules.ifc_reader.piping_schema import (
     EnvironmentClass,
     JointType,
     PipingElement,
     PipingSystem,
 )
-from app.modules.module4_comparator.cross_material import compare, load_rule_pack
-from app.modules.module4_comparator.issue_schema import RiskBand
+from app.modules.comparator.cross_material import compare, load_rule_pack
+from app.modules.comparator.issue_schema import RiskBand
 
 # TEST DATA ONLY - see module docstring. Not a published galvanic series.
 # Values mirror the real GC-001 series, which is an ANODIC INDEX: every entry is

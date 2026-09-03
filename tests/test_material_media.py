@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.module2_ifc_read import piping_fixtures as fx
-from app.modules.module2_ifc_read.piping_schema import EnvironmentClass, PipingElement, PipingSystem
-from app.modules.module4_comparator.issue_schema import RiskBand
-from app.modules.module4_comparator.material_media import compare
+from app.modules.ifc_reader import piping_fixtures as fx
+from app.modules.ifc_reader.piping_schema import EnvironmentClass, PipingElement, PipingSystem
+from app.modules.comparator.issue_schema import RiskBand
+from app.modules.comparator.material_media import compare
 
 RULE_PACK_PATH = Path("data/rulesets/mm_001_material_media.json")
 

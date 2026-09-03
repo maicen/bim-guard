@@ -30,7 +30,7 @@ from tests.conftest import FLAG_COMBO_IDS, FLAG_COMBOS, REPO_ROOT
 pytestmark = pytest.mark.slow
 
 ORCHESTRATOR_PATH = (
-    REPO_ROOT / "app" / "modules" / "module4_comparator" / "compliance_orchestrator.py"
+    REPO_ROOT / "app" / "modules" / "comparator" / "compliance_orchestrator.py"
 )
 
 # Drives one full orchestrate_workflow() call and reports how far it got.
@@ -44,7 +44,7 @@ except Exception:
 
 verdict = {"imported": False, "ran": False}
 try:
-    from app.modules.module4_comparator.compliance_orchestrator import orchestrate_workflow
+    from app.modules.comparator.compliance_orchestrator import orchestrate_workflow
     verdict["imported"] = True
 except Exception as exc:
     verdict["error"] = "%s: %s" % (type(exc).__name__, exc)

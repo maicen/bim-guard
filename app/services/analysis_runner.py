@@ -28,7 +28,7 @@ ENGINE SELECTION
 from __future__ import annotations
 
 from app.logging_config import get_logger
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
+from app.modules.comparator.issue_schema import Issue, RiskBand
 from app.modules.phase_6.phase_6b_parsing import parse_ifc_bytes, sha256_of
 from app.modules.phase_6.phase_6c_corrosion_ui import (
     DATA_QUALITY,

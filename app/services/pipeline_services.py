@@ -53,7 +53,7 @@ class AnalysisService:
         """Evaluate immutable input elements and return rows, issues, and BCF topics."""
         evaluator = self._evaluator
         if evaluator is None:
-            from app.modules.module4_comparator.compliance_runner import run_compliance_checks
+            from app.modules.comparator.compliance_runner import run_compliance_checks
 
             evaluator = run_compliance_checks
 
@@ -85,7 +85,7 @@ class AnalysisService:
     @staticmethod
     def _build_issues(rows: list[dict[str, Any]], *, run_id: str) -> tuple[AuditIssue, ...]:
         """Convert evaluator rows into immutable per-mechanism audit findings."""
-        from app.modules.module4_comparator.issue_adapter import (
+        from app.modules.comparator.issue_adapter import (
             IssueIdAllocator,
             issues_from_path_a,
         )
@@ -358,63 +358,63 @@ class PipelineOrchestratorService:
     @staticmethod
     def export_bcf(report_data: dict[str, Any], output_path: str | Path) -> str:
         """Export BCF file from report payload via service boundary."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        reporter = Module5_Reporter()
+        reporter = ComplianceReporter()
         return reporter.generate_bcf(report_data, output_path=output_path)
 
     @staticmethod
     def export_csv(report_data: dict[str, Any], output_path: str | Path) -> str:
         """Export CSV file from report payload via service boundary."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        reporter = Module5_Reporter()
+        reporter = ComplianceReporter()
         return reporter.generate_csv(report_data, output_path=output_path)
 
     @staticmethod
     def iter_csv_summary(results: list[dict[str, Any]]):
         """Stream CSV compliance summary rows."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        return Module5_Reporter().iter_csv_summary(results)
+        return ComplianceReporter().iter_csv_summary(results)
 
     @staticmethod
     def generate_bcf_zip(results: list[dict[str, Any]]) -> bytes:
         """Generate BCF zip file bytes from compliance results."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        return Module5_Reporter().generate_bcf_zip(results)
+        return ComplianceReporter().generate_bcf_zip(results)
 
     @staticmethod
     def get_ifc_graph(
         ifc_file_path: str | Path, violations: list[dict[str, Any]] | None = None
     ) -> dict[str, Any]:
         """Generate element hierarchy graph payload."""
-        from app.modules.module2_ifc_read.ifc_graph import render_ifc_graph
+        from app.modules.ifc_reader.ifc_graph import render_ifc_graph
 
         return render_ifc_graph(ifc_file_path, violations=violations)
 
     @staticmethod
     def run_comparator_check(elements: list[Any], rules: list[Any]) -> list[dict[str, Any]]:
         """Run comparator rule evaluation against element properties."""
-        from app.modules.module4_comparator import Module4_Comparator
+        from app.modules.comparator import ComplianceComparator
 
-        comparator = Module4_Comparator()
+        comparator = ComplianceComparator()
         return comparator.check_compliance(elements, rules)
 
     @staticmethod
     def validate_metadata(extraction: dict[str, Any]) -> list[dict[str, Any]]:
         """Validate metadata extraction payload via comparator."""
-        from app.modules.module4_comparator import Module4_Comparator
+        from app.modules.comparator import ComplianceComparator
 
-        return Module4_Comparator().validate_metadata(extraction)
+        return ComplianceComparator().validate_metadata(extraction)
 
     @staticmethod
     def render_visual_report(compliance: list[dict[str, Any]]) -> dict[str, Any]:
         """Render visual report summary via reporter module."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        return Module5_Reporter().render_visual_report(compliance)
+        return ComplianceReporter().render_visual_report(compliance)
 
     @staticmethod
     def export_phase6(
@@ -458,7 +458,7 @@ def execute_model_enhancement(
 ) -> dict[str, Any]:
     """Execute the production enhancement pipeline with repository dependencies."""
     if service is None:
-        from app.modules.module2_ifc_read.ifc_quality.improver import improve_ifc_file
+        from app.modules.ifc_reader.ifc_quality.improver import improve_ifc_file
         from app.services.model_lineage import SupabaseModelLineageRepository
         from app.services.object_storage import ObjectStorage
 

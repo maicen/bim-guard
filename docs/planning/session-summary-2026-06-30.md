@@ -13,7 +13,7 @@ alternative data source.
 ### 1. Missing `regex_rule_converter.py` (critical)
 - **Problem:** `orchestrator.py` imports `RegexRuleConverter` when `USE_GPT4O = False`
   (the default), but the file did not exist — the entire free pipeline was broken.
-- **Fix:** Created `app/modules/module3_rule_builder/regex_rule_converter.py`
+- **Fix:** Created `app/modules/rule_builder/regex_rule_converter.py`
   with a `RegexRuleConverter` class that matches the same `extract_rules(chunk)`
   interface as the GPT-4o converter.
 - **How it works:** Pattern-matches CODE prose phrasings ("not less than X mm",
@@ -45,7 +45,7 @@ alternative data source.
 - **Problem:** `MISSING_DATA` rows showed `0 / 0 / 167` but no way to see
   which specific elements were missing the property.
 - **Fix:**
-  - Added `missing_elements` list to `Module4_Comparator._result()` — tracks
+  - Added `missing_elements` list to `ComplianceComparator._result()` — tracks
     element name, storey, GUID for every element where `actual_value is None`.
   - Added two collapsibles to `app/routes/analyze.py`:
     - Red: "X failing element(s)" — shows element name, actual value, reason
@@ -64,7 +64,7 @@ alternative data source.
 ### 1. IFC Property Diagnostic Script
 **File:** `scripts/inspect_ifc_properties.py`
 
-Runs `Module2_IFCRead.extract_for_compliance()` against any IFC file and diffs
+Runs `IFCReader.extract_for_compliance()` against any IFC file and diffs
 the results against rules in `public.rules`. Reports per target class:
 - `[OK]` — property found (shows which Pset it came from)
 - `[NEAR-MISS]` — property not found but a similarly named one exists (fuzzy match)
@@ -187,7 +187,7 @@ and mapped via a user-defined property sets `.txt` file:
 
 ### IFC Graph visualization disabled
 `app/routes/analyze.py:_build_ifc_graph_card()` returns a placeholder.
-The PyVis graph (`app/modules/module2_ifc_read/ifc_graph.py`) is built and
+The PyVis graph (`app/modules/ifc_reader/ifc_graph.py`) is built and
 working — re-enable once the analysis UI flow is stable.
 
 ### pyRevit extension not yet built

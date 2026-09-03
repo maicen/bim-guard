@@ -48,7 +48,7 @@ Still pending:
 ### Current state
 
 - `RuleExtractionService` orchestrates:
-  - PDF parse (`Module1_DocReader.parse_pdf`)
+  - PDF parse (`DocumentReader.parse_pdf`)
   - chunk generation (`extract_text_sections`)
   - chunk-wise provider calls
   - de-duplication of extracted rules

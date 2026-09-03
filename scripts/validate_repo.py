@@ -331,7 +331,7 @@ except Exception as exc:
 _ORCH_FLAG_PROBE = r"""
 import json, os, sys
 sys.path.insert(0, ".")
-src = open("app/modules/module4_comparator/compliance_orchestrator.py", encoding="utf-8").read()
+src = open("app/modules/comparator/compliance_orchestrator.py", encoding="utf-8").read()
 print(json.dumps({
     "mm": os.environ.get("FEATURE_PATH_B_MM", "0") == "1",
     "xm": os.environ.get("FEATURE_PATH_B_XM", "0") == "1",
@@ -426,10 +426,10 @@ def check_flags() -> Result:
 _ADAPTER_PROBE = r'''
 import copy, json, sys
 sys.path.insert(0, ".")
-from app.modules.module4_comparator.issue_adapter import (
+from app.modules.comparator.issue_adapter import (
     IssueIdAllocator, issues_from_path_a, path_a_view,
 )
-from app.modules.module4_comparator.issue_schema import RiskBand, make_issue
+from app.modules.comparator.issue_schema import RiskBand, make_issue
 
 checks = {}
 
@@ -570,7 +570,7 @@ except Exception:
 
 verdict = {"imported": False}
 try:
-    from app.modules.module4_comparator.compliance_orchestrator import orchestrate_workflow
+    from app.modules.comparator.compliance_orchestrator import orchestrate_workflow
     verdict["imported"] = True
 except Exception as exc:
     verdict["error"] = "%s: %s" % (type(exc).__name__, exc)
@@ -711,7 +711,7 @@ sys.path.insert(0, ".")
 out = {}
 
 # 7a. Is the F2 producer overload called by anything outside its own module?
-producer = Path("app/modules/module2_ifc_read/piping_producer.py")
+producer = Path("app/modules/ifc_reader/piping_producer.py")
 callers = []
 for path in list(Path("app").rglob("*.py")) + list(Path("tests").rglob("*.py")):
     if path == producer or "__pycache__" in path.parts:
@@ -721,7 +721,7 @@ for path in list(Path("app").rglob("*.py")) + list(Path("tests").rglob("*.py")):
 out["f2_callers"] = callers
 out["f2_app_callers"] = [c for c in callers if c.startswith("app/")]
 
-orch_path = Path("app/modules/module4_comparator/compliance_orchestrator.py")
+orch_path = Path("app/modules/comparator/compliance_orchestrator.py")
 orch_src = orch_path.read_text(encoding="utf-8", errors="replace")
 out["orchestrator_uses_producer"] = "produce_piping_elements" in orch_src
 
@@ -729,7 +729,7 @@ out["orchestrator_uses_producer"] = "produce_piping_elements" in orch_src
 targets = {"compare_mm": "material_media", "compare_xm": "cross_material"}
 sigs = {}
 try:
-    from app.modules.module4_comparator import cross_material, material_media
+    from app.modules.comparator import cross_material, material_media
     sigs["material_media"] = inspect.signature(material_media.compare)
     sigs["cross_material"] = inspect.signature(cross_material.compare)
     out["signatures"] = {k: str(v) for k, v in sigs.items()}
@@ -758,9 +758,9 @@ for node in ast.walk(ast.parse(orch_src)):
 out["path_b_calls"] = calls
 
 # 7c. Does Path B honour the run-wide id allocator, or mint its own ids?
-mm_src = Path("app/modules/module4_comparator/material_media.py").read_text(
+mm_src = Path("app/modules/comparator/material_media.py").read_text(
     encoding="utf-8", errors="replace")
-xm_src = Path("app/modules/module4_comparator/cross_material.py").read_text(
+xm_src = Path("app/modules/comparator/cross_material.py").read_text(
     encoding="utf-8", errors="replace")
 out["path_b_mints_own_ids"] = ('id=f"BGR-' in mm_src) and ('id=f"BGR-' in xm_src)
 out["path_b_accepts_allocator"] = "id_allocator" in mm_src or "id_allocator" in xm_src

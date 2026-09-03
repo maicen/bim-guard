@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from app.logging_config import get_logger
 from app.modules.contracts import ArchAnalysisResponse
-from app.modules.module4_comparator.engine_registry import (
+from app.modules.comparator.engine_registry import (
     DEFAULT_ENGINE_REGISTRY,
     RuleEngineRegistry,
 )

@@ -23,7 +23,7 @@ from app.engines.bimguard_corrosion_engine import GalvanicCorrosionEngine
 from app.engines.bimguard_crevice_engine import CreviceCorrosionEngine
 from app.engines.bimguard_mic_engine import MICEngine
 from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
-from app.modules.module4_comparator.engine_registry import (
+from app.modules.comparator.engine_registry import (
     CallableRuleEvaluator,
     RuleEngineRegistry,
     RuleEvaluator,

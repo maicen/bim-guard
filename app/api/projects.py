@@ -257,7 +257,7 @@ async def create_project_with_ifc(
 
     if ifc_file is not None and ifc_file.filename:
         ifc_file_path, ifc_md5_hash = await service.prepare_ifc_upload(ifc_file)
-        from app.modules.module1_doc_parser.iso_validator import ISO19650Validator
+        from app.modules.document_parsing.iso_validator import ISO19650Validator
         val = ISO19650Validator.validate_filename(ifc_file.filename)
         if val.is_valid:
             project_code = val.fields.get("project_code", "")
@@ -785,7 +785,7 @@ def validate_project_iso_naming(
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ) -> dict:
     """Validate project attached primary model filename against ISO 19650 National Annex."""
-    from app.modules.module1_doc_parser.iso_validator import ISO19650Validator
+    from app.modules.document_parsing.iso_validator import ISO19650Validator
 
     project = service.get_project(project_id)
     if not project:

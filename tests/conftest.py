@@ -58,7 +58,7 @@ def reset_in_memory_cache():
 BASELINE_COMMIT = "4edba3a"
 
 KNOWN_IMPORT_FAILURES: dict[str, str] = {
-    "app.modules.module1_doc_parser.tfidf_analyzer": (
+    "app.modules.document_parsing.tfidf_analyzer": (
         "needs scikit-learn from the optional ml-pipeline group "
         "(uv sync --group ml-pipeline)"
     ),
@@ -201,7 +201,7 @@ def path_a_results() -> list[dict]:
 @pytest.fixture
 def allocator():
     """Return a fresh run-wide Issue id allocator."""
-    from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
+    from app.modules.comparator.issue_adapter import IssueIdAllocator
 
     return IssueIdAllocator("BGR-TEST")
 

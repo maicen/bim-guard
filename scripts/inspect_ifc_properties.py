@@ -1,7 +1,7 @@
 """
 scripts/inspect_ifc_properties.py
 ------------------------------------
-Diagnostic tool: runs the same Module2_IFCRead.extract_for_compliance()
+Diagnostic tool: runs the same IFCReader.extract_for_compliance()
 lookup Module 4 uses during a real analysis, and reports per rule whether
 the expected IFC class and property were actually found in a file. For
 anything reported missing, also lists nearby property names so a near-miss
@@ -29,19 +29,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import ifcopenshell
 import ifcopenshell.util.element
 
-from app.modules.module2_ifc_read import Module2_IFCRead
+from app.modules.ifc_reader import IFCReader
 from app.services.rules_service import RuleService
 
 
-def _load_reader(ifc_path: Path) -> Module2_IFCRead:
+def _load_reader(ifc_path: Path) -> IFCReader:
     # Bypass load_ifc_file()'s quality-score auto-improve step on purpose --
     # this is a read-only diagnostic and must not write an "_improved" file.
-    reader = Module2_IFCRead()
+    reader = IFCReader()
     reader.ifc_file = ifcopenshell.open(str(ifc_path))
     return reader
 
 
-def _actual_property_names(reader: Module2_IFCRead, target: str) -> set[str]:
+def _actual_property_names(reader: IFCReader, target: str) -> set[str]:
     """Union of every pset/qto/direct-attribute name found across all elements of a class."""
     try:
         elements = reader.ifc_file.by_type(target)

@@ -5,11 +5,11 @@
 BIMGuard is an automated BIM quality and compliance platform that bridges natural-language engineering specifications (such as corrosion standards, material compatibility, and MEP guidelines) with Industry Foundation Classes (.ifc) models.  
 An audit of the codebase (app/modules, app/components, app/engines, and app/routes) shows a working domain pipeline spanning:
 
-> 1. **Document Parsing** (module1_doc_parser & module1b_nlp_annotator)  
-> 2. **IFC Parsing & Geometry/Topology Analysis** (module2_ifc_read)  
-> 3. **Rule Generation** (module3_rule_builder)  
-> 4. **Compliance & Physics/Corrosion Engines** (module4_comparator & app/engines)  
-> 5. **BCF/Reporting Exporters** (module5_reporter)
+> 1. **Document Parsing** (document_parsing & nlp_annotation)  
+> 2. **IFC Parsing & Geometry/Topology Analysis** (ifc_reader)  
+> 3. **Rule Generation** (rule_builder)  
+> 4. **Compliance & Physics/Corrosion Engines** (comparator & app/engines)  
+> 5. **BCF/Reporting Exporters** (reporter)
 
 To make BIMGuard scalable, enterprise-grade, and openBIM-compliant, several core structural shifts are needed. The architectural roadmap below details enhancements across all requested areas.
 
@@ -214,7 +214,7 @@ The buildingSMART **Information Delivery Specification (IDS)** is the global sta
 ### **Implementation Blueprint**
 
 > 1. **Incorporate ifcopenshell.ids:** Use the built-in IDS engine in IfcOpenShell instead of writing custom AST checkers for alphanumeric property verification.  
-> 2. **Extend the Rule Converter (module3_rule_builder):** Add an IDSRuleExporter that outputs valid .ids files from extracted NLP specifications.  
+> 2. **Extend the Rule Converter (rule_builder):** Add an IDSRuleExporter that outputs valid .ids files from extracted NLP specifications.  
 > 3. **Maintain a Hybrid Engine Approach:**  
 >
    * **Layer 1 (Standard IDS):** Use ifcopenshell.ids for checking entity names, predefined types, property sets, and material names.  
@@ -226,7 +226,7 @@ The buildingSMART **Information Delivery Specification (IDS)** is the global sta
 
 ### **Current Bottlenecks**
 
-* The current pipeline relies on a chain of Regex, keyword heuristics, and basic tokenizers (module1b_nlp_annotator/deontic_extractor.py, condition_parser.py, regex_rule_converter.py).  
+* The current pipeline relies on a chain of Regex, keyword heuristics, and basic tokenizers (nlp_annotation/deontic_extractor.py, condition_parser.py, regex_rule_converter.py).  
 * Brittle regex patterns frequently break when parsing complex sentence structures, engineering footnotes, multi-column tables, or conditional clauses (e.g., *"Unless protected by sacrificial anodes, carbon steel shall not be within 50mm of 316 stainless steel in submerged zones"*).
 
 ### **Recommended Modernization Architecture**

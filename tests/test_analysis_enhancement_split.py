@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-import app.modules.module2_ifc_read as ifc_read_module
+import app.modules.ifc_reader as ifc_read_module
 from app.services.persistence import PersistenceService, _MemoryClient
 from app.services.pipeline_services import (
     AnalysisService,
@@ -40,7 +40,7 @@ def test_low_quality_reader_reports_warning_without_improving(tmp_path, monkeypa
     monkeypatch.setattr(ifc_read_module, "_SPATIAL_AVAILABLE", False)
     monkeypatch.setattr(ifc_read_module, "_EGRESS_AVAILABLE", False)
 
-    reader = ifc_read_module.Module2_IFCRead(source_path)
+    reader = ifc_read_module.IFCReader(source_path)
 
     assert reader.quality_improvements == []
     assert "Run Quality Improvements from the Projects page" in reader.quality_warnings[0]

@@ -67,7 +67,7 @@ Completion evidence (2026-08-29):
 - Added strict Pydantic contracts `RuleEvaluationRequest` and `RuleEvaluationResult` to `app/modules/contracts.py` with dictionary-like mapping compatibility (`__getitem__`, `.get()`, `__contains__`, `__eq__`, `to_dict()`).
 - Implemented `RuleEvaluator` protocol directly across physics engines (`GalvanicCorrosionEngine`, `CreviceCorrosionEngine`, `MICEngine`) and architectural engines (`EgressAnalysisEngine`, `SpatialDaylightEngine` in `app/engines/bimguard_arch_engine.py`).
 - Seeded database-driven architectural code rules (`CODE 9.9.10.1`, `CODE 9.9.4.1`, `CODE 9.7.2.3`, `CODE 9.10.9.14.PW`) under `BUILDING-CODE-PART9`, parameterizing `ifc_egress.py` and `ifc_spatial.py` with dynamic threshold resolution.
-- Updated `register_default_engines()` in `app/modules/module4_comparator/engine_registry.py` to register all corrosion and architectural engine instances directly without `CallableRuleEvaluator` wrapping.
+- Updated `register_default_engines()` in `app/modules/comparator/engine_registry.py` to register all corrosion and architectural engine instances directly without `CallableRuleEvaluator` wrapping.
 - Refactored `ProjectsService`, `DocumentService`, `RuleService`, `SettingsService`, `StaticDataService`, `SupabaseModelLineageRepository`, and `ObjectStorage` to accept optional injected repositories and storage instances.
 - Created `ArchAnalysisService` with constructor dependency injection and wired it into `ApplicationContainer` and FastAPI dependency injection (`/api/analyze/arch`).
 - Created `app/bootstrap.py` with `ApplicationContainer`, `build_default_container()`, `get_container()`, `set_container()`, and `reset_container()` for single-point composition of persistence adapters, engines, and domain services.
@@ -190,7 +190,7 @@ Owner: Osama.
       Module 2's unit-conversion pass. Quantities stored as `IfcLabel('1.2')` currently
       skip conversion and are compared raw, so a 1.2 m window is evaluated as 1.2 mm and
       fails every dimensional rule. Fixed in `_resolve_element_property`'s Pass 8
-      (`app/modules/module2_ifc_read/__init__.py`): a string value is coerced with
+      (`app/modules/ifc_reader/__init__.py`): a string value is coerced with
       `float()` before the numeric-type check, so a non-numeric string (e.g.
       `FireRating`) still passes through untouched. Covered by
       `tests/test_module2_property_resolution.py::TestNumericStringUnitConversion`.
@@ -212,7 +212,7 @@ Owner: Osama.
       whose own footprint is a thin panel: the shortest side there is the frame/leaf
       *thickness*, not the openable width (confirmed against a synthetic 950×50×2125 mm
       door: `ClearWidth` came back 50 mm, the thickness, not 2,125 mm). Fixed in
-      `get_geometry_value()` (`app/modules/module2_ifc_read/ifc_geometry.py`) to route
+      `get_geometry_value()` (`app/modules/ifc_reader/ifc_geometry.py`) to route
       `IfcDoor`/`IfcDoorStandardCase`/`IfcWindow`/`IfcWindowStandardCase` through the same
       width extractor as `OverallWidth` instead, matching the precedence already
       documented in `docs/ifc-property-mapping.md` ("ClearWidth → OverallWidth, closest
@@ -232,7 +232,7 @@ Owner: Osama.
 - [x] Add `requiredheadroom` to `_LENGTH_DIRECT_ATTRS`; the list contains
       `requireheadroom`, so `Pset_StairCommon.RequiredHeadroom` only converts when it
       carries an explicit measure type. Fixed the typo in both
-      `app/modules/module2_ifc_read/__init__.py`'s `_LENGTH_DIRECT_ATTRS` and the same
+      `app/modules/ifc_reader/__init__.py`'s `_LENGTH_DIRECT_ATTRS` and the same
       typo in `ifc_geometry.py`'s `_GEOMETRY_PROPERTY_MAP` (the header comment on
       `_LENGTH_DIRECT_ATTRS` explicitly requires the two stay in sync). Covered by
       `tests/test_module2_property_resolution.py::TestRequiredHeadroomTypo`.
@@ -266,7 +266,7 @@ Owner: unassigned.
       `BIM_GUARD_USE_LLAMAINDEX_INGESTION`.
 - [x] Implement table- and layout-aware document chunking to prevent fragmentation
       of complex engineering tables, schedules, and nested matrices
-      (`LlamaIndexIngestor`, `app/modules/module1_doc_parser/llamaindex_ingestor.py`).
+      (`LlamaIndexIngestor`, `app/modules/document_parsing/llamaindex_ingestor.py`).
 - [x] Attach granular clause metadata (clause ID, page numbers, parent section
       headers) to all extracted nodes to maintain traceability in generated BCF
       issue reports (`ClauseMetadata`, `DocumentNodeContract`; `document_nodes` table).

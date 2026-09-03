@@ -605,7 +605,7 @@ def stub_geometries(monkeypatch, per_model: list[tuple[list, list]]) -> None:
 
 def box(element_id: str):
     """Return an ElementGeometry for a braced element: a 1m cube at the origin."""
-    from app.modules.module2_producer.halo_volume_generator import (
+    from app.modules.blue_halo.halo_volume_generator import (
         BoundingBox,
         ElementGeometry,
         Point3D,

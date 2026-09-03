@@ -30,13 +30,13 @@ import sys
 
 import pytest
 
-from app.modules.module4_comparator.issue_adapter import issues_from_path_a, path_a_view
-from app.modules.module4_comparator.issue_schema import RiskBand, make_issue
+from app.modules.comparator.issue_adapter import issues_from_path_a, path_a_view
+from app.modules.comparator.issue_schema import RiskBand, make_issue
 from tests.conftest import REPO_ROOT
 
 APP_DIR = REPO_ROOT / "app"
-PRODUCER_PATH = APP_DIR / "modules" / "module2_ifc_read" / "piping_producer.py"
-ORCHESTRATOR_PATH = APP_DIR / "modules" / "module4_comparator" / "compliance_orchestrator.py"
+PRODUCER_PATH = APP_DIR / "modules" / "ifc_reader" / "piping_producer.py"
+ORCHESTRATOR_PATH = APP_DIR / "modules" / "comparator" / "compliance_orchestrator.py"
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ def test_producer_wrapper_delegates_to_the_overload():
     This one passes: it is the half of F2 that did land, and it is what makes
     the dead-code finding above a wiring gap rather than a broken feature.
     """
-    from app.modules.module2_ifc_read import piping_producer
+    from app.modules.ifc_reader import piping_producer
 
     wrapper = inspect.getsource(piping_producer.produce_piping_elements)
     assert "produce_piping_elements_from_model(" in wrapper, (
@@ -123,7 +123,7 @@ def test_path_b_call_sites_bind_to_the_comparator_signature(alias):
     statically so it reports the mismatch without needing the surrounding
     module to import.
     """
-    from app.modules.module4_comparator import cross_material, material_media
+    from app.modules.comparator import cross_material, material_media
 
     module = {"material_media": material_media, "cross_material": cross_material}[
         _PATH_B_ALIASES[alias]
@@ -148,7 +148,7 @@ def test_path_b_call_sites_bind_to_the_comparator_signature(alias):
 @pytest.mark.parametrize("module_name", ["material_media", "cross_material"])
 def test_path_b_accepts_the_run_wide_id_allocator(module_name):
     """Both comparators must take ids from the run, not from a local counter."""
-    from app.modules.module4_comparator import cross_material, material_media
+    from app.modules.comparator import cross_material, material_media
 
     module = {"material_media": material_media, "cross_material": cross_material}[
         module_name
@@ -166,7 +166,7 @@ def test_the_allocator_keeps_prefixes_independent():
     Passes today: the allocator itself is correct. That is what makes the
     xfails above a wiring defect rather than a design one.
     """
-    from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
+    from app.modules.comparator.issue_adapter import IssueIdAllocator
 
     alloc = IssueIdAllocator("BGR-2026")
     minted = [alloc.next("MM"), alloc.next("XM"), alloc.next("MM"), alloc.next("XM")]

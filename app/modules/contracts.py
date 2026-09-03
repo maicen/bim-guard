@@ -1090,7 +1090,7 @@ class ProjectImportFromRepoRequest(BaseModel):
 #
 # `kind` is deliberately a plain `str`, not a Literal enumerating known
 # values: the set of valid kinds is owned by ParsingEngineRegistry
-# (app/modules/module1_doc_parser/engines), which can grow without touching
+# (app/modules/document_parsing/engines), which can grow without touching
 # this contract. ParsingEngineInstancesService validates a submitted kind
 # against the registry at request time; GET /api/parsing-engines/kinds
 # (ParsingEngineKindResponse) is the discoverable source of truth for what's

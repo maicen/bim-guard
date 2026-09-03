@@ -4,7 +4,7 @@
 **Implements:** `app/modules/piping_schema.py`
 **Schema version:** 1.0.0
 
-This document is the human-readable companion to `piping_schema.py`. Sam needs this to implement `Module2_IFCRead`'s piping extraction path. The piping comparators in `Module4_Comparator` consume the same structure on the other side.
+This document is the human-readable companion to `piping_schema.py`. Sam needs this to implement `IFCReader`'s piping extraction path. The piping comparators in `ComplianceComparator` consume the same structure on the other side.
 
 If the code and this doc disagree, the code wins — but flag the drift in a PR so we can fix the doc.
 

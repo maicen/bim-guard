@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
-from app.modules.module5_reporter.bcf_generator import bcf_topic_guid
+from app.modules.comparator.issue_schema import Issue, RiskBand
+from app.modules.reporter.bcf_generator import bcf_topic_guid
 from app.services.bcf_exporter import DEFAULT_EXPORT_DIR, BCFExporter, ElementRef
 
 SCHEMA_DIR = Path(__file__).parent / "schemas" / "bcf21"

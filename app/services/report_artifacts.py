@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.logging_config import get_logger
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import now_iso_utc

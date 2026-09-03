@@ -6,7 +6,7 @@ being large enough to be tedious to inspect.
 
 WHAT THE PIPELINE ACTUALLY READS, AND WHY THIS FILE IS SHAPED THIS WAY
 
-    ``module2_ifc_read.ifc_parser`` decides three things from the file, and each
+    ``ifc_reader.ifc_parser`` decides three things from the file, and each
     one dictates something here:
 
     * **Material** comes from ``ifcopenshell.util.element.get_materials``, then

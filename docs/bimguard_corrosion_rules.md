@@ -289,7 +289,7 @@ from typing import Any
 
 from app.logging_config import get_logger
 from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
-from app.modules.module4_comparator.engine_registry import RuleEvaluationContext, RuleEvaluator
+from app.modules.comparator.engine_registry import RuleEvaluationContext, RuleEvaluator
 from app.services.rules_service import RuleService
 
 logger = get_logger(__name__)
@@ -5043,19 +5043,19 @@ USE_GPT4O = False
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
-    from .module1_doc_parser import Module1_DocReader
-    from .module1_doc_parser.docling_extractor import DoclingExtractor
-    from .module1_doc_parser.keyword_filter import KeywordFilter
-    from .module1_doc_parser.section_chunker import SectionChunker
-    from .module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from .module3_rule_builder.code_seed_rules import seed_rules
-    from .module3_rule_builder.rule_generator import RuleGenerator
-    from .module3_rule_builder.rule_store import RuleStore
+    from .document_parsing import DocumentReader
+    from .document_parsing.docling_extractor import DoclingExtractor
+    from .document_parsing.keyword_filter import KeywordFilter
+    from .document_parsing.section_chunker import SectionChunker
+    from .document_parsing.table_rule_builder import TableRuleBuilder
+    from .rule_builder.code_seed_rules import seed_rules
+    from .rule_builder.rule_generator import RuleGenerator
+    from .rule_builder.rule_store import RuleStore
 
     if USE_GPT4O:
-        from .module3_rule_builder.rule_converter import RuleConverter
+        from .rule_builder.rule_converter import RuleConverter
     else:
-        from .module3_rule_builder.regex_rule_converter import RegexRuleConverter as RuleConverter
+        from .rule_builder.regex_rule_converter import RegexRuleConverter as RuleConverter
     _PIPELINE_AVAILABLE = True
 except ImportError:
     _PIPELINE_AVAILABLE = False
@@ -5160,7 +5160,7 @@ def run_pipeline(
         # of giving up and sending nothing downstream.
         print("  [SectionChunker] 0 sections — falling back to generic chunking")
         logger.warning("Section chunker returned no sections; using generic fallback")
-        generic_blocks = Module1_DocReader().extract_text_sections(text)
+        generic_blocks = DocumentReader().extract_text_sections(text)
         chunks = [
             {
                 "section_number": str(i + 1),
@@ -5319,8 +5319,8 @@ class BIMGuard_App:
         from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
 
-        from .module2_ifc_read import Module2_IFCRead
-        from .module2_ifc_read.ifc_parser import (
+        from .ifc_reader import IFCReader
+        from .ifc_reader.ifc_parser import (
             generate_synthetic_elements,
             get_schema_compatibility_note,
             parse_ifc_model,
@@ -5384,7 +5384,7 @@ class BIMGuard_App:
         ifc_type_counts: dict = {}
         ifc_totals: dict = {}
         is_demo = False
-        m2_reader: Module2_IFCRead | None = None
+        m2_reader: IFCReader | None = None
         ifc_quality_report: dict = {}
         ifc_quality_warnings: list[str] = []
         ifc_quality_improvements: list[str] = []
@@ -5397,7 +5397,7 @@ class BIMGuard_App:
             try:
                 # Open IFC once, then reuse the loaded model for both parsing paths.
                 log_progress(20, "ifc-model-loading", source=ifc_path)
-                m2_reader = Module2_IFCRead(ifc_path)
+                m2_reader = IFCReader(ifc_path)
                 log_progress(30, "ifc-model-loaded")
                 ifc_quality_report = m2_reader.quality_report or {}
                 ifc_quality_warnings = m2_reader.quality_warnings or []
@@ -5605,8 +5605,8 @@ class BIMGuard_App:
         rule_validations: list[dict] = []  # kept for backward-compat
 
         try:
-            from .module4_comparator import Module4_Comparator
-            from .module5_reporter import Module5_Reporter
+            from .comparator import ComplianceComparator
+            from .reporter import ComplianceReporter
 
             if rule_folder:
                 library_rules = RuleService().list_by_ruleset(rule_folder)
@@ -5655,7 +5655,7 @@ class BIMGuard_App:
                 _compliance_started_at = time.perf_counter()
                 extraction = m2_reader.extract_for_compliance(library_rules)
                 log_progress(82, "rule-validation-started", extracted=len(extraction))
-                rule_compliance = Module4_Comparator().validate_metadata(extraction)
+                rule_compliance = ComplianceComparator().validate_metadata(extraction)
                 compliance_duration_seconds = time.perf_counter() - _compliance_started_at
                 for rule_index, result in enumerate(rule_compliance, start=1):
                     logger.info(
@@ -5677,7 +5677,7 @@ class BIMGuard_App:
                         result.get("missing_count", 0),
                     )
                 log_progress(90, "report-generation-started", results=len(rule_compliance))
-                rule_compliance_summary = Module5_Reporter().render_visual_report(
+                rule_compliance_summary = ComplianceReporter().render_visual_report(
                     rule_compliance, duration_seconds=compliance_duration_seconds
                 )
                 logger.info(
@@ -5821,9 +5821,9 @@ This module documentation uses an CODE example dataset, but the BIM-Guard app ar
 app/modules/
 ├── config.py
 ├── orchestrator.py
-├── module1_doc_parser/          (unchanged)
-├── module2_ifc_read/            ← was module2_ifc_read.py
-│   ├── __init__.py              (Module2_IFCRead + quality gate)
+├── document_parsing/          (unchanged)
+├── ifc_reader/            ← was ifc_reader.py
+│   ├── __init__.py              (IFCReader + quality gate)
 │   ├── ifc_parser.py
 │   ├── ifc_geometry.py
 │   ├── piping_schema.py
@@ -5831,15 +5831,15 @@ app/modules/
 │       ├── validator.py
 │       ├── improver.py
 │       └── generator.py
-├── module3_rule_builder/        (unchanged)
-├── module4_comparator/          ← was module4_comparator.py
-│   ├── __init__.py              (Module4_Comparator)
+├── rule_builder/        (unchanged)
+├── comparator/          ← was comparator.py
+│   ├── __init__.py              (ComplianceComparator)
 │   ├── compliance_runner.py
 │   ├── galvanic.py
 │   ├── issue_schema.py
 │   └── issue_tracker.py
-└── module5_reporter/            ← was module5_reporter.py
-    ├── __init__.py              (Module5_Reporter)
+└── reporter/            ← was reporter.py
+    ├── __init__.py              (ComplianceReporter)
     ├── bcf_generator.py
     ├── report_generator.py
     ├── schedule_impact.py
@@ -5858,56 +5858,56 @@ OUT
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/__init__.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/__pycache__
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/config.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/bert_classifier.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/confidence_scorer.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/dependency_parser.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/docling_extractor.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/enhanced_orchestrator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keyword_filter.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords/keyword_master.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/section_chunker.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/table_rule_builder.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/tfidf_analyzer.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_geometry.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_parser.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/improver.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/validator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/piping_schema.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/module3_rule_builder_mock.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/code_seed_rules.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_converter.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_store.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/compliance_runner.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/galvanic.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/issue_schema.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/issue_tracker.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/bcf_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/cost_model.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/report_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/schedule_impact.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/bert_classifier.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/confidence_scorer.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/dependency_parser.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/docling_extractor.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/enhanced_orchestrator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keyword_filter.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/keyword_master.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/section_chunker.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/table_rule_builder.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/tfidf_analyzer.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_geometry.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_parser.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/improver.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/validator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/piping_schema.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_builder_mock.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/code_seed_rules.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_converter.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_store.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/compliance_runner.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/galvanic.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/issue_schema.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/issue_tracker.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/bcf_generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/cost_model.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/report_generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/schedule_impact.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/orchestrator.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/requirements.txt
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests
@@ -5928,7 +5928,7 @@ app/modules/
 ├── requirements.txt
 ├── README.md
 │
-├── module1_doc_parser/          — PDF extraction → structured rules
+├── document_parsing/          — PDF extraction → structured rules
 │   ├── __init__.py
 │   ├── docling_extractor.py
 │   ├── enhanced_orchestrator.py
@@ -5943,8 +5943,8 @@ app/modules/
 │       ├── __init__.py
 │       └── keyword_master.py
 │
-├── module2_ifc_read/            — IFC parsing + quality gate
-│   ├── __init__.py              ← Module2_IFCRead (with auto quality check)
+├── ifc_reader/            — IFC parsing + quality gate
+│   ├── __init__.py              ← IFCReader (with auto quality check)
 │   ├── ifc_parser.py            — raw IFC element reader (ServiceElement)
 │   ├── ifc_geometry.py          — geometry extraction from pipe segments
 │   ├── piping_schema.py         — M2→M4 data contract (PipingElement)
@@ -5954,23 +5954,23 @@ app/modules/
 │       ├── improver.py          — auto-add missing GUIDs, names, Psets
 │       └── generator.py        — generate well-formed test IFC files
 │
-├── module3_rule_builder/        — NLP → structured compliance rules
+├── rule_builder/        — NLP → structured compliance rules
 │   ├── __init__.py
 │   ├── rule_generator.py
 │   ├── rule_converter.py        — OpenAI GPT-4o rule extractor
 │   ├── rule_store.py            — shared rule persistence via app services
 │   ├── code_seed_rules.py        — 25+ CODE baseline rules
-│   └── module3_rule_builder_mock.py
+│   └── rule_builder_mock.py
 │
-├── module4_comparator/          — IFC data vs rule library validation
-│   ├── __init__.py              ← Module4_Comparator
+├── comparator/          — IFC data vs rule library validation
+│   ├── __init__.py              ← ComplianceComparator
 │   ├── compliance_runner.py     — GC-001 / CC-001 engine orchestrator
 │   ├── galvanic.py              — galvanic corrosion comparator
 │   ├── issue_schema.py          — Issue data contract (M4 → M5)
 │   └── issue_tracker.py         — issue history across runs
 │
-├── module5_reporter/            — report generation
-│   ├── __init__.py              ← Module5_Reporter
+├── reporter/            — report generation
+│   ├── __init__.py              ← ComplianceReporter
 │   ├── bcf_generator.py         — BCF 2.1 ZIP output
 │   ├── report_generator.py      — Word / PDF compliance report
 │   ├── schedule_impact.py       — delay days + Gantt data
@@ -6058,7 +6058,7 @@ print(result)
 Seed them without uploading a PDF:
 
 ```bash
-uv run python -m app.modules.module3_rule_builder.code_seed_rules
+uv run python -m app.modules.rule_builder.code_seed_rules
 ```
 
 ---
@@ -6077,7 +6077,7 @@ uv run pytest app/modules/tests -v
 bim-guard/
 ├── app/
 │   └── modules/
-│       ├── module1_doc_parser/
+│       ├── document_parsing/
 │       │   ├── docling_extractor.py        ← Step 1: PDF → text + tables
 │       │   ├── table_rule_builder.py       ← Step 2: tables → rules directly
 │       │   ├── section_chunker.py          ← Step 3: text → 13 sections
@@ -6089,7 +6089,7 @@ bim-guard/
 │       │   ├── enhanced_orchestrator.py    ← runs all 4 improvements
 │       │   └── keywords/
 │       │       └── keyword_master.py       ← 193 keywords, 12 groups
-│       ├── module3_rule_builder/
+│       ├── rule_builder/
 │       │   ├── rule_store.py               ← shared CRUD via RuleService
 │       │   ├── rule_generator.py           ← validate + save rules
 │       │   ├── rule_converter.py           ← GPT-4o + RAG NLP engine
@@ -6147,19 +6147,19 @@ Once rules.db is populated:
 
 ---
 
-## app/modules/module1_doc_parser
+## app/modules/document_parsing
 
-### app/modules/module1_doc_parser/__init__.py
+### app/modules/document_parsing/__init__.py
 
 ```python
 """
-module1_doc_parser
+document_parsing
 ------------------
 Public interface for Module 1 — PDF → structured text pipeline.
 
 Exports
 -------
-Module1_DocReader
+DocumentReader
     Basic pypdf-based reader. Used as a fallback in the web pipeline
     and for plain text / markdown uploads.
 
@@ -6175,7 +6175,7 @@ from io import BytesIO
 from pypdf import PdfReader
 
 
-class Module1_DocReader:
+class DocumentReader:
     """
     Basic PDF reader (pypdf).
     Used as the pypdf fallback when Docling is unavailable or fails.
@@ -6303,18 +6303,18 @@ def run_module1_pipeline(pdf_path: str, **kwargs) -> dict:
     Returns:
         dict: pipeline summary (table_rules, prose_rules, total_rules, ...)
     """
-    from app.modules.module1_doc_parser.enhanced_orchestrator import run_enhanced_pipeline
+    from app.modules.document_parsing.enhanced_orchestrator import run_enhanced_pipeline
 
     return run_enhanced_pipeline(pdf_path, **kwargs)
 ```
 
 ---
 
-### app/modules/module1_doc_parser/bert_classifier.py
+### app/modules/document_parsing/bert_classifier.py
 
 ```python
 """
-module1_doc_parser/bert_classifier.py
+document_parsing/bert_classifier.py
 ---------------------------------------
 Improvement 4 — BERT Sentence Classifier.
 
@@ -6349,7 +6349,7 @@ DOWNLOAD CODE-ACCORD DATASET:
 
 Usage:
     # Zero-shot (no training, works immediately)
-    from module1_doc_parser.bert_classifier import BERTClassifier
+    from document_parsing.bert_classifier import BERTClassifier
     clf     = BERTClassifier(mode="zero_shot")
     results = clf.classify_chunks(filtered_chunks)
 
@@ -6803,11 +6803,11 @@ class BERTClassifier:
 
 ---
 
-### app/modules/module1_doc_parser/confidence_scorer.py
+### app/modules/document_parsing/confidence_scorer.py
 
 ```python
 """
-module1_doc_parser/confidence_scorer.py
+document_parsing/confidence_scorer.py
 -----------------------------------------
 Improvement 3 — Enhanced Confidence Scoring.
 
@@ -6840,7 +6840,7 @@ HOW IT IMPROVES THE PIPELINE:
         → combined: SEND_HIGH → sent with higher priority
 
 Usage:
-    from module1_doc_parser.confidence_scorer import ConfidenceScorer
+    from document_parsing.confidence_scorer import ConfidenceScorer
     scorer  = ConfidenceScorer()
     scored  = scorer.combine(filtered_chunks, dep_chunks, bert_chunks)
 """
@@ -7069,11 +7069,11 @@ class ConfidenceScorer:
 
 ---
 
-### app/modules/module1_doc_parser/dependency_parser.py
+### app/modules/document_parsing/dependency_parser.py
 
 ```python
 """
-module1_doc_parser/dependency_parser.py
+document_parsing/dependency_parser.py
 -----------------------------------------
 Improvement 2 — spaCy Dependency Parsing.
 
@@ -7111,7 +7111,7 @@ PATTERNS DETECTED:
     4. Existence check     — shall/must + be + provided/installed/included
 
 Usage:
-    from module1_doc_parser.dependency_parser import DependencyParser
+    from document_parsing.dependency_parser import DependencyParser
     dp      = DependencyParser()
     results = dp.analyse_chunks(filtered_chunks)
 """
@@ -7412,11 +7412,11 @@ class DependencyParser:
 
 ---
 
-### app/modules/module1_doc_parser/docling_extractor.py
+### app/modules/document_parsing/docling_extractor.py
 
 ```python
 """
-module1_doc_parser/docling_extractor.py
+document_parsing/docling_extractor.py
 -----------------------------------------
 Step 1 — PDF extraction using Docling (IBM, MIT license).
 Extracts both prose text and tables in one call.
@@ -7425,7 +7425,7 @@ Install: pip install docling
 First run downloads vision models (~2 min, one-time only).
 
 Usage:
-    from module1_doc_parser.docling_extractor import DoclingExtractor
+    from document_parsing.docling_extractor import DoclingExtractor
     extractor = DoclingExtractor()
     text, tables = extractor.extract("data/input_docs/BuildingCode_Part9.pdf")
 """
@@ -7489,7 +7489,7 @@ class DoclingExtractor:
 
 ---
 
-### app/modules/module1_doc_parser/enhanced_orchestrator.py
+### app/modules/document_parsing/enhanced_orchestrator.py
 
 ```python
 """
@@ -7514,7 +7514,7 @@ Pipeline flow:
 USAGE:
 
     # Full enhanced pipeline
-    python -m app.modules.module1_doc_parser.enhanced_orchestrator data/input_docs/BuildingCode_Part9.pdf
+    python -m app.modules.document_parsing.enhanced_orchestrator data/input_docs/BuildingCode_Part9.pdf
 
     # Or import:
     from enhanced_orchestrator import run_enhanced_pipeline
@@ -7530,35 +7530,35 @@ import sys
 from pathlib import Path
 
 # Imports work both as a CLI script (python enhanced_orchestrator.py)
-# and when imported by the web app (from app.modules.module1_doc_parser...).
+# and when imported by the web app (from app.modules.document_parsing...).
 try:
     from config import OPENAI_API_KEY
-    from module1_doc_parser.docling_extractor import DoclingExtractor
-    from module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from module1_doc_parser.section_chunker import SectionChunker
-    from module1_doc_parser.keyword_filter import KeywordFilter
-    from module1_doc_parser.dependency_parser import DependencyParser
-    from module1_doc_parser.confidence_scorer import ConfidenceScorer
-    from module3_rule_builder.code_seed_rules import seed_rules
-    from module3_rule_builder.rule_store import RuleStore
-    from module3_rule_builder.rule_generator import RuleGenerator
-    from module3_rule_builder.rule_converter import RuleConverter
+    from document_parsing.docling_extractor import DoclingExtractor
+    from document_parsing.table_rule_builder import TableRuleBuilder
+    from document_parsing.section_chunker import SectionChunker
+    from document_parsing.keyword_filter import KeywordFilter
+    from document_parsing.dependency_parser import DependencyParser
+    from document_parsing.confidence_scorer import ConfidenceScorer
+    from rule_builder.code_seed_rules import seed_rules
+    from rule_builder.rule_store import RuleStore
+    from rule_builder.rule_generator import RuleGenerator
+    from rule_builder.rule_converter import RuleConverter
 except ImportError:
     from app.modules.config import OPENAI_API_KEY
-    from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
-    from app.modules.module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from app.modules.module1_doc_parser.section_chunker import SectionChunker
-    from app.modules.module1_doc_parser.keyword_filter import KeywordFilter
-    from app.modules.module1_doc_parser.dependency_parser import DependencyParser
-    from app.modules.module1_doc_parser.confidence_scorer import ConfidenceScorer
-    from app.modules.module3_rule_builder.code_seed_rules import seed_rules
-    from app.modules.module3_rule_builder.rule_store import RuleStore
-    from app.modules.module3_rule_builder.rule_generator import RuleGenerator
-    from app.modules.module3_rule_builder.rule_converter import RuleConverter
+    from app.modules.document_parsing.docling_extractor import DoclingExtractor
+    from app.modules.document_parsing.table_rule_builder import TableRuleBuilder
+    from app.modules.document_parsing.section_chunker import SectionChunker
+    from app.modules.document_parsing.keyword_filter import KeywordFilter
+    from app.modules.document_parsing.dependency_parser import DependencyParser
+    from app.modules.document_parsing.confidence_scorer import ConfidenceScorer
+    from app.modules.rule_builder.code_seed_rules import seed_rules
+    from app.modules.rule_builder.rule_store import RuleStore
+    from app.modules.rule_builder.rule_generator import RuleGenerator
+    from app.modules.rule_builder.rule_converter import RuleConverter
 
 # TF-IDF requires scikit-learn — optional
 try:
-    from app.modules.module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
+    from app.modules.document_parsing.tfidf_analyzer import TFIDFAnalyzer
     _TFIDF_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     _TFIDF_AVAILABLE = False
@@ -7659,9 +7659,9 @@ def run_enhanced_pipeline(
     if use_bert:
         print("\n── IMPROVEMENT 3: BERT CLASSIFIER ──")
         try:
-            from module1_doc_parser.bert_classifier import BERTClassifier
+            from document_parsing.bert_classifier import BERTClassifier
         except ImportError:
-            from app.modules.module1_doc_parser.bert_classifier import BERTClassifier
+            from app.modules.document_parsing.bert_classifier import BERTClassifier
         bert = BERTClassifier(mode=bert_mode, model_path=bert_model_path)
         bert_chunks = bert.classify_chunks(filtered_chunks)
     else:
@@ -7745,11 +7745,11 @@ if __name__ == "__main__":
 
 ---
 
-### app/modules/module1_doc_parser/keyword_filter.py
+### app/modules/document_parsing/keyword_filter.py
 
 ```python
 """
-module1_doc_parser/keyword_filter.py
+document_parsing/keyword_filter.py
 --------------------------------------
 Step 4 — Scores each paragraph using spaCy lemmatization
 and weighted keyword matching.
@@ -7762,7 +7762,7 @@ Confidence levels:
 Install: pip install spacy && python -m spacy download en_core_web_sm
 
 Usage:
-    from module1_doc_parser.keyword_filter import KeywordFilter
+    from document_parsing.keyword_filter import KeywordFilter
     kf       = KeywordFilter()
     filtered = kf.score_chunks(chunks)
 """
@@ -7770,13 +7770,13 @@ Usage:
 import re
 
 try:
-    from module1_doc_parser.keywords.keyword_master import (
+    from document_parsing.keywords.keyword_master import (
         ALL_SINGLE_KEYWORDS,
         BIGRAM_PHRASES,
         KEYWORD_WEIGHTS,
     )
 except ImportError:
-    from app.modules.module1_doc_parser.keywords.keyword_master import (
+    from app.modules.document_parsing.keywords.keyword_master import (
         ALL_SINGLE_KEYWORDS,
         BIGRAM_PHRASES,
         KEYWORD_WEIGHTS,
@@ -7899,11 +7899,11 @@ class KeywordFilter:
 
 ---
 
-### app/modules/module1_doc_parser/section_chunker.py
+### app/modules/document_parsing/section_chunker.py
 
 ```python
 """
-module1_doc_parser/section_chunker.py
+document_parsing/section_chunker.py
 ---------------------------------------
 Step 3 — Splits Docling markdown text into section chunks.
 
@@ -7923,11 +7923,11 @@ Recognises headings in this priority order:
 Documents whose PDF extraction collapses to too few line breaks for any of
 the above to find (e.g. a single undifferentiated block of text) yield zero
 chunks here; callers should fall back to a generic size-bounded chunker
-(see Module1_DocReader.extract_text_sections) rather than sending nothing
+(see DocumentReader.extract_text_sections) rather than sending nothing
 downstream.
 
 Usage:
-    from module1_doc_parser.section_chunker import SectionChunker
+    from document_parsing.section_chunker import SectionChunker
     chunker = SectionChunker()
     chunks  = chunker.chunk(docling_text)
 """
@@ -8067,17 +8067,17 @@ class SectionChunker:
 
 ---
 
-### app/modules/module1_doc_parser/table_rule_builder.py
+### app/modules/document_parsing/table_rule_builder.py
 
 ```python
 """
-module1_doc_parser/table_rule_builder.py
+document_parsing/table_rule_builder.py
 ------------------------------------------
 Step 2 — Converts Docling table DataFrames directly into rules.db entries.
 No LLM required for tables — Min/Max columns map directly to numeric_range rules.
 
 Usage:
-    from module1_doc_parser.table_rule_builder import TableRuleBuilder
+    from document_parsing.table_rule_builder import TableRuleBuilder
     builder = TableRuleBuilder(store)
     builder.process_all_tables(tables, generator)
 """
@@ -8117,7 +8117,7 @@ _UNIT_COL_ALIASES = ("unit", "units")
 _REQUIREMENT_COL_ALIASES = ("requirement", "description", "desc")
 _REF_COL_ALIASES = ("rule id", "ref", "reference", "id")
 
-# Maps an Operator cell to a Module4_Comparator-supported operator symbol.
+# Maps an Operator cell to a ComplianceComparator-supported operator symbol.
 # PDF fonts sometimes encode >=/<= with glyphs Docling can't decode cleanly
 # (observed as stray characters, e.g. '‡'/'£' for one sample PDF) —
 # unrecognized symbols fall back to inferring intent from the plain-English
@@ -8263,7 +8263,7 @@ class TableRuleBuilder:
     def _normalize_operator(
         self, raw_op: str, property_name: str, requirement_text: str
     ) -> tuple[str, bool, float]:
-        """Resolve a table 'Operator' cell to a Module4_Comparator operator symbol.
+        """Resolve a table 'Operator' cell to a ComplianceComparator operator symbol.
 
         Returns (operator, needs_review, confidence). Falls back to inferring
         intent from the plain-English requirement text when the cell holds an
@@ -8420,11 +8420,11 @@ class TableRuleBuilder:
 
 ---
 
-### app/modules/module1_doc_parser/tfidf_analyzer.py
+### app/modules/document_parsing/tfidf_analyzer.py
 
 ```python
 """
-module1_doc_parser/tfidf_analyzer.py
+document_parsing/tfidf_analyzer.py
 --------------------------------------
 Improvement 1 — TF-IDF Auto Keyword Discovery.
 
@@ -8446,10 +8446,10 @@ HOW IT WORKS:
     6. Returns ranked list of NEW keywords to consider adding
 
 RUN DIRECTLY to analyse your CODE text:
-    python -m module1_doc_parser.tfidf_analyzer
+    python -m document_parsing.tfidf_analyzer
 
 OR import and call:
-    from module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer
+    from document_parsing.tfidf_analyzer import TFIDFAnalyzer
     analyzer = TFIDFAnalyzer()
     new_keywords = analyzer.discover(filtered_chunks)
     analyzer.print_report(new_keywords)
@@ -8460,9 +8460,9 @@ import numpy as np
 import re
 
 try:
-    from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
+    from document_parsing.keywords.keyword_master import ALL_KEYWORDS
 except ImportError:
-    from app.modules.module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS
+    from app.modules.document_parsing.keywords.keyword_master import ALL_KEYWORDS
 
 # Words to always ignore — structural words with no compliance value
 STOP_WORDS = {
@@ -8735,7 +8735,7 @@ class TFIDFAnalyzer:
             )
 
         print("\n  Add high-scoring words to:")
-        print("  module1_doc_parser/keywords/keyword_master.py")
+        print("  document_parsing/keywords/keyword_master.py")
         print("=" * 65)
 
     def export_to_keyword_master(self, candidates: list, threshold: float = 0.01) -> list:
@@ -8764,7 +8764,7 @@ if __name__ == "__main__":
     """
     print("TF-IDF Analyzer — run after KeywordFilter to discover missing keywords")
     print("Usage:")
-    print("  from module1_doc_parser.tfidf_analyzer import TFIDFAnalyzer")
+    print("  from document_parsing.tfidf_analyzer import TFIDFAnalyzer")
     print("  analyzer = TFIDFAnalyzer()")
     print("  new_keywords = analyzer.discover(filtered_chunks)")
     print("  analyzer.print_report(new_keywords)")
@@ -8772,21 +8772,21 @@ if __name__ == "__main__":
 
 ---
 
-## app/modules/module1_doc_parser/keywords
+## app/modules/document_parsing/keywords
 
-### app/modules/module1_doc_parser/keywords/__init__.py
+### app/modules/document_parsing/keywords/__init__.py
 
 ```python
-# module1_doc_parser/keywords/__init__.py
+# document_parsing/keywords/__init__.py
 ```
 
 ---
 
-### app/modules/module1_doc_parser/keywords/keyword_master.py
+### app/modules/document_parsing/keywords/keyword_master.py
 
 ```python
 """
-module1_doc_parser/keywords/keyword_master.py
+document_parsing/keywords/keyword_master.py
 -----------------------------------------------
 Master keyword list for BIMGuard CODE compliance rule detection.
 193 keywords across 12 groups with weighted scoring.
@@ -9093,13 +9093,13 @@ for _kw in PROHIBITION_KEYWORDS:
 
 ---
 
-## app/modules/module1b_nlp_annotator
+## app/modules/nlp_annotation
 
-### app/modules/module1b_nlp_annotator/__init__.py
+### app/modules/nlp_annotation/__init__.py
 
 ```python
 """
-module1b_nlp_annotator
+nlp_annotation
 -----------------------
 Module 1-b: NLP Annotation Layer.
 
@@ -9121,10 +9121,10 @@ These annotations are:
        without any interface changes.
 
 Usage:
-    from app.modules.module1b_nlp_annotator import Module1b_NLPAnnotator
+    from app.modules.nlp_annotation import NLPAnnotator
 
     # Takes ConfidenceScorer output, returns annotated version
-    annotated_chunks = Module1b_NLPAnnotator().annotate(final_chunks)
+    annotated_chunks = NLPAnnotator().annotate(final_chunks)
 """
 
 from .deontic_extractor  import DeonticExtractor
@@ -9140,7 +9140,7 @@ except ImportError:
     CODE_TO_IFC_MAP = {}
 
 
-class Module1b_NLPAnnotator:
+class NLPAnnotator:
     """
     NLP annotation layer. Annotates chunks in-place and enriches filtered_text
     with a structured pre-analysis preamble for the downstream LLM.
@@ -9297,11 +9297,11 @@ class Module1b_NLPAnnotator:
 
 ---
 
-### app/modules/module1b_nlp_annotator/annotation_schema.py
+### app/modules/nlp_annotation/annotation_schema.py
 
 ```python
 """
-module1b_nlp_annotator/annotation_schema.py
+nlp_annotation/annotation_schema.py
 ---------------------------------------------
 TypedDict definitions for the per-paragraph NLP annotation produced by Module 1-b.
 These feed into the filtered_text preamble that Module 3 / OpenAI receives.
@@ -9364,11 +9364,11 @@ class ParagraphAnnotation(TypedDict):
 
 ---
 
-### app/modules/module1b_nlp_annotator/condition_parser.py
+### app/modules/nlp_annotation/condition_parser.py
 
 ```python
 """
-module1b_nlp_annotator/condition_parser.py
+nlp_annotation/condition_parser.py
 --------------------------------------------
 Splits building code sentences into structural clauses:
     applicability  — the WHERE/WHEN/IF clause (scope of the rule)
@@ -9595,11 +9595,11 @@ class ConditionParser:
 
 ---
 
-### app/modules/module1b_nlp_annotator/cross_ref_resolver.py
+### app/modules/nlp_annotation/cross_ref_resolver.py
 
 ```python
 """
-module1b_nlp_annotator/cross_ref_resolver.py
+nlp_annotation/cross_ref_resolver.py
 ----------------------------------------------
 Extracts and normalises cross-references from building code text.
 
@@ -9862,11 +9862,11 @@ class CrossRefResolver:
 
 ---
 
-### app/modules/module1b_nlp_annotator/deontic_extractor.py
+### app/modules/nlp_annotation/deontic_extractor.py
 
 ```python
 """
-module1b_nlp_annotator/deontic_extractor.py
+nlp_annotation/deontic_extractor.py
 ---------------------------------------------
 Extracts deontic modal operators from building code text.
 
@@ -9957,11 +9957,11 @@ class DeonticExtractor:
 
 ---
 
-### app/modules/module1b_nlp_annotator/dependency_mapper.py
+### app/modules/nlp_annotation/dependency_mapper.py
 
 ```python
 """
-module1b_nlp_annotator/dependency_mapper.py
+nlp_annotation/dependency_mapper.py
 ---------------------------------------------
 Identifies complex logical dependencies in building code text.
 
@@ -10104,11 +10104,11 @@ class DependencyMapper:
 
 ---
 
-### app/modules/module1b_nlp_annotator/dimension_extractor.py
+### app/modules/nlp_annotation/dimension_extractor.py
 
 ```python
 """
-module1b_nlp_annotator/dimension_extractor.py
+nlp_annotation/dimension_extractor.py
 -----------------------------------------------
 Extracts numeric dimensions and their units from building code text.
 
@@ -10322,13 +10322,13 @@ class DimensionExtractor:
 
 ---
 
-## app/modules/module2_ifc_read
+## app/modules/ifc_reader
 
-### app/modules/module2_ifc_read/__init__.py
+### app/modules/ifc_reader/__init__.py
 
 ```python
 """
-module2_ifc_read.py
+ifc_reader.py
 --------------------
 IFC model reader for BIMGuard compliance checking.
 
@@ -10527,7 +10527,7 @@ _IFC_TYPE_MAP = {
 }
 
 
-class Module2_IFCRead:
+class IFCReader:
     """Full IFC reader for Module 2 compliance extraction."""
 
     def __init__(self, file_path: Path | str | None = None):
@@ -12313,11 +12313,11 @@ class Module2_IFCRead:
 
 ---
 
-### app/modules/module2_ifc_read/ifc_egress.py
+### app/modules/ifc_reader/ifc_egress.py
 
 ```python
 """
-module2_ifc_read/ifc_egress.py
+ifc_reader/ifc_egress.py
 --------------------------------
 Tier 3 egress path engine using NetworkX.
 
@@ -12765,7 +12765,7 @@ def check_egress_travel_distance(
 
 ---
 
-### app/modules/module2_ifc_read/ifc_geometry.py
+### app/modules/ifc_reader/ifc_geometry.py
 
 ```python
 """
@@ -12940,7 +12940,7 @@ class IFCGeometryExtractor:
                         }
                         # IFC enum values are uppercase by schema convention, but
                         # some exporters deviate — normalise defensively so this
-                        # matches Module2_IFCRead._get_length_unit_scale_mm()
+                        # matches IFCReader._get_length_unit_scale_mm()
                         # (the Pset/attribute-side unit detector) exactly.
                         prefix = str(getattr(unit, "Prefix", "") or "").upper()
                         name = str(getattr(unit, "Name", "METRE") or "METRE").upper()
@@ -13463,7 +13463,7 @@ def dn_to_od_m(dn: int) -> float:
 
 ---
 
-### app/modules/module2_ifc_read/ifc_graph.py
+### app/modules/ifc_reader/ifc_graph.py
 
 ```python
 """Build IFC relationship graphs and render them as PyVis HTML."""
@@ -13718,7 +13718,7 @@ def render_ifc_graph(ifc_path: Path | str, violations: list[dict] | None = None)
 
 ---
 
-### app/modules/module2_ifc_read/ifc_parser.py
+### app/modules/ifc_reader/ifc_parser.py
 
 ```python
 """
@@ -14374,11 +14374,11 @@ def generate_synthetic_elements(n: int = 25) -> list[ServiceElement]:
 
 ---
 
-### app/modules/module2_ifc_read/ifc_spatial.py
+### app/modules/ifc_reader/ifc_spatial.py
 
 ```python
 """
-module2_ifc_read/ifc_spatial.py
+ifc_reader/ifc_spatial.py
 ---------------------------------
 Tier 2 spatial adjacency engine.
 
@@ -15101,7 +15101,7 @@ def check_door_space_connection(adjacency: IFCSpatialAdjacency, ifc_file) -> lis
 
 ---
 
-### app/modules/module2_ifc_read/piping_fixtures.py
+### app/modules/ifc_reader/piping_fixtures.py
 
 ```python
 """
@@ -15145,8 +15145,8 @@ import math
 from dataclasses import dataclass
 from typing import Optional
 
-from app.modules.module2_ifc_read.piping_producer import _build_adjacency
-from app.modules.module2_ifc_read.piping_schema import (
+from app.modules.ifc_reader.piping_producer import _build_adjacency
+from app.modules.ifc_reader.piping_schema import (
     BoundingBox,
     Centerline,
     ElementSubtype,
@@ -15725,7 +15725,7 @@ def dissimilar_material_pairs(elements: list[PipingElement]) -> list[tuple[str, 
 
 ---
 
-### app/modules/module2_ifc_read/piping_producer.py
+### app/modules/ifc_reader/piping_producer.py
 
 ```python
 """
@@ -15771,7 +15771,7 @@ import ifcopenshell
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
 
-from app.modules.module2_ifc_read.piping_schema import (
+from app.modules.ifc_reader.piping_schema import (
     CANONICAL_MATERIALS,
     BoundingBox,
     Centerline,
@@ -16866,7 +16866,7 @@ def summarise(elements: list[PipingElement]) -> str:
 
 ---
 
-### app/modules/module2_ifc_read/piping_schema.py
+### app/modules/ifc_reader/piping_schema.py
 
 ```python
 """
@@ -17395,9 +17395,9 @@ if __name__ == "__main__":
 
 ---
 
-## app/modules/module2_ifc_read/ifc_quality
+## app/modules/ifc_reader/ifc_quality
 
-### app/modules/module2_ifc_read/ifc_quality/__init__.py
+### app/modules/ifc_reader/ifc_quality/__init__.py
 
 ```python
 from .validator import IFCValidator, validate_ifc_file
@@ -17413,7 +17413,7 @@ __all__ = [
 
 ---
 
-### app/modules/module2_ifc_read/ifc_quality/generator.py
+### app/modules/ifc_reader/ifc_quality/generator.py
 
 ```python
 """
@@ -17622,7 +17622,7 @@ if __name__ == "__main__":
 
 ---
 
-### app/modules/module2_ifc_read/ifc_quality/improver.py
+### app/modules/ifc_reader/ifc_quality/improver.py
 
 ```python
 """
@@ -17810,7 +17810,7 @@ if __name__ == "__main__":
 
 ---
 
-### app/modules/module2_ifc_read/ifc_quality/validator.py
+### app/modules/ifc_reader/ifc_quality/validator.py
 
 ```python
 """
@@ -18428,17 +18428,17 @@ if __name__ == "__main__":
 
 ---
 
-## app/modules/module3_rule_builder
+## app/modules/rule_builder
 
-### app/modules/module3_rule_builder/__init__.py
+### app/modules/rule_builder/__init__.py
 
 ```python
-# module3_rule_builder/__init__.py
+# rule_builder/__init__.py
 ```
 
 ---
 
-### app/modules/module3_rule_builder/code_extended_rules.py
+### app/modules/rule_builder/code_extended_rules.py
 
 ```python
 """Load extended building-code rules from database static assets."""
@@ -18463,7 +18463,7 @@ EXTENDED_CODE_RULES = _load_extended_rules()
 
 ---
 
-### app/modules/module3_rule_builder/code_seed_rules.py
+### app/modules/rule_builder/code_seed_rules.py
 
 ```python
 """Load and seed baseline building-code rules from database static assets."""
@@ -18471,8 +18471,8 @@ EXTENDED_CODE_RULES = _load_extended_rules()
 from __future__ import annotations
 
 from app.modules.config import SOURCE_DOC_SEED
-from app.modules.module3_rule_builder.rule_generator import RuleGenerator
-from app.modules.module3_rule_builder.rule_store import RuleStore
+from app.modules.rule_builder.rule_generator import RuleGenerator
+from app.modules.rule_builder.rule_store import RuleStore
 from app.services.static_data_service import StaticDataService
 
 
@@ -18518,7 +18518,7 @@ if __name__ == "__main__":
 
 ---
 
-### app/modules/module3_rule_builder/ids_exporter.py
+### app/modules/rule_builder/ids_exporter.py
 
 ```python
 """IDS export adapter for rule rows stored in the canonical BIMGuard rule table.
@@ -18849,11 +18849,11 @@ __all__ = [
 
 ---
 
-### app/modules/module3_rule_builder/regex_rule_converter.py
+### app/modules/rule_builder/regex_rule_converter.py
 
 ```python
 """
-module3_rule_builder/regex_rule_converter.py
+rule_builder/regex_rule_converter.py
 ------------------------------------------------
 Free, offline alternative to rule_converter.py (GPT-4o). Same public
 interface (extract_rules(chunk) -> list[dict]) so orchestrator.py can
@@ -18865,7 +18865,7 @@ Trades recall for zero cost: anything it can't confidently parse is
 simply skipped rather than guessed at.
 
 Usage:
-    from module3_rule_builder.regex_rule_converter import RegexRuleConverter
+    from rule_builder.regex_rule_converter import RegexRuleConverter
     converter = RegexRuleConverter()
     rules = converter.extract_rules(chunk)
 """
@@ -19161,11 +19161,11 @@ class RegexRuleConverter:
 
 ---
 
-### app/modules/module3_rule_builder/rule_converter.py
+### app/modules/rule_builder/rule_converter.py
 
 ````python
 """
-module3_rule_builder/rule_converter.py
+rule_builder/rule_converter.py
 ----------------------------------------
 NLP Engine — sends scored text chunks to GPT-4o and returns structured rules.
 Uses RAG (Retrieval Augmented Generation) to ground the LLM output
@@ -19178,8 +19178,8 @@ Responsibilities:
     - Handle JSON parse errors gracefully
 
 Usage:
-    from module3_rule_builder.rule_converter import RuleConverter
-    from module3_rule_builder.rule_store import RuleStore
+    from rule_builder.rule_converter import RuleConverter
+    from rule_builder.rule_store import RuleStore
     from config import OPENAI_API_KEY
 
     store     = RuleStore()
@@ -19399,11 +19399,11 @@ class RuleConverter:
 
 ---
 
-### app/modules/module3_rule_builder/rule_generator.py
+### app/modules/rule_builder/rule_generator.py
 
 ```python
 """
-module3_rule_builder/rule_generator.py
+rule_builder/rule_generator.py
 ----------------------------------------
 Validates, enriches, and saves rules to the RuleStore.
 Acts as the gatekeeper between raw LLM output and the database.
@@ -19417,8 +19417,8 @@ Responsibilities:
     - Handle both single rules and batches
 
 Usage:
-    from module3_rule_builder.rule_generator import RuleGenerator
-    from module3_rule_builder.rule_store import RuleStore
+    from rule_builder.rule_generator import RuleGenerator
+    from rule_builder.rule_store import RuleStore
 
     store     = RuleStore()
     generator = RuleGenerator(store)
@@ -19650,11 +19650,11 @@ class RuleGenerator:
 
 ---
 
-### app/modules/module3_rule_builder/rule_store.py
+### app/modules/rule_builder/rule_store.py
 
 ```python
 """
-module3_rule_builder/rule_store.py
+rule_builder/rule_store.py
 -----------------------------------
 Adapter that forwards all reads/writes to the web app's RuleService so every
 pipeline uses the same Supabase-backed rules table.
@@ -19916,13 +19916,13 @@ class RuleStore:
 
 ---
 
-## app/modules/module4_comparator
+## app/modules/comparator
 
-### app/modules/module4_comparator/__init__.py
+### app/modules/comparator/__init__.py
 
 ```python
 """
-module4_comparator.py
+comparator.py
 ----------------------
 Compares IFC property values extracted by Module 2 against the rule library.
 
@@ -19942,14 +19942,14 @@ import re
 _BOOL_ALIASES = {"true": True, "false": False, "yes": True, "no": False}
 
 
-class Module4_Comparator:
+class ComplianceComparator:
     """Validates IFC model data against the BIMGuard rule library."""
 
     # ── Public API ────────────────────────────────────────────────────────────
 
     def validate_metadata(self, extraction_results: list[dict]) -> list[dict]:
         """
-        Main entry point. Takes Module2_IFCRead.extract_for_compliance() output
+        Main entry point. Takes IFCReader.extract_for_compliance() output
         and returns one compliance record per rule.
 
         Args:
@@ -20339,7 +20339,7 @@ class Module4_Comparator:
 
 ---
 
-### app/modules/module4_comparator/compliance_orchestrator.py
+### app/modules/comparator/compliance_orchestrator.py
 
 ```python
 """
@@ -20355,22 +20355,22 @@ Entry point: orchestrate_workflow(elements, run_id)
 from typing import Any
 
 from app.modules.config import FEATURE_PATH_B_MM, FEATURE_PATH_B_XM
-from app.modules.module4_comparator.compliance_runner import run_compliance_checks
-from app.modules.module4_comparator.cross_material import (
+from app.modules.comparator.compliance_runner import run_compliance_checks
+from app.modules.comparator.cross_material import (
     compare as compare_xm,
 )
-from app.modules.module4_comparator.cross_material import (
+from app.modules.comparator.cross_material import (
     load_rule_pack as load_xm_pack,
 )
-from app.modules.module4_comparator.issue_adapter import (
+from app.modules.comparator.issue_adapter import (
     IssueIdAllocator,
     issues_from_path_a,
     path_a_view,
 )
-from app.modules.module4_comparator.material_media import (
+from app.modules.comparator.material_media import (
     compare as compare_mm,
 )
-from app.modules.module4_comparator.material_media import (
+from app.modules.comparator.material_media import (
     load_rule_pack as load_mm_pack,
 )
 
@@ -20413,7 +20413,7 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
 
         emit_event(
             event_type="COMPLIANCE_COMPLETED",
-            source_module="module4_comparator",
+            source_module="comparator",
             project_id=0,
             payload={"element_count": len(output), "issue_count": len(all_issues), "run_id": run_id},
         )
@@ -20425,7 +20425,7 @@ def orchestrate_workflow(elements: list[Any], run_id: str = "BGR-2026") -> list[
 
 ---
 
-### app/modules/module4_comparator/compliance_runner.py
+### app/modules/comparator/compliance_runner.py
 
 ```python
 from typing import Any
@@ -20433,7 +20433,7 @@ from typing import Any
 from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_risk
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
 from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
-from app.modules.module4_comparator.engine_registry import DEFAULT_ENGINE_REGISTRY, register_default_engines
+from app.modules.comparator.engine_registry import DEFAULT_ENGINE_REGISTRY, register_default_engines
 
 
 def _coerce_gc_element(element: Any) -> GCElement:
@@ -20701,7 +20701,7 @@ def run_compliance_checks(elements: list[Any]) -> list[dict]:
 
 ---
 
-### app/modules/module4_comparator/cross_material.py
+### app/modules/comparator/cross_material.py
 
 ```python
 """
@@ -20740,13 +20740,13 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
-from app.modules.module2_ifc_read.piping_producer import CONNECTIVITY_SOURCE_KEY
-from app.modules.module2_ifc_read.piping_schema import (
+from app.modules.ifc_reader.piping_producer import CONNECTIVITY_SOURCE_KEY
+from app.modules.ifc_reader.piping_schema import (
     EnvironmentClass,
     JointType,
     PipingElement,
 )
-from app.modules.module4_comparator.issue_schema import (
+from app.modules.comparator.issue_schema import (
     Issue,
     RiskBand,
     band_from_score,
@@ -21403,7 +21403,7 @@ def compare(
 
 ---
 
-### app/modules/module4_comparator/engine_registry.py
+### app/modules/comparator/engine_registry.py
 
 ```python
 """Rule engine registry for Module 4 comparator checks.
@@ -21565,7 +21565,7 @@ def register_default_engines(registry: RuleEngineRegistry | None = None) -> Rule
 
 ---
 
-### app/modules/module4_comparator/galvanic.py
+### app/modules/comparator/galvanic.py
 
 ```python
 """
@@ -21631,7 +21631,7 @@ from .issue_schema import (
     band_from_score,
     make_issue,
 )
-from ..module2_ifc_read.piping_schema import (
+from ..ifc_reader.piping_schema import (
     CANONICAL_MATERIALS,
     EnvironmentClass,
     PipingElement,
@@ -22068,7 +22068,7 @@ if __name__ == "__main__":
     here = Path(__file__).resolve().parent
     sys.path.insert(0, str(here.parent.parent.parent))
 
-    from app.modules.module2_ifc_read.piping_schema import (  # noqa: E402
+    from app.modules.ifc_reader.piping_schema import (  # noqa: E402
         example_pump,
         example_ss316_pipe_in_plant_room,
         example_valve,
@@ -22096,11 +22096,11 @@ if __name__ == "__main__":
 
 ---
 
-### app/modules/module4_comparator/issue_adapter.py
+### app/modules/comparator/issue_adapter.py
 
 ```python
 """
-app/modules/module4_comparator/issue_adapter.py
+app/modules/comparator/issue_adapter.py
 
 The only module that knows both Module4 shapes.
 
@@ -22118,7 +22118,7 @@ See docs/integration_plan_mm_xm.md section 4 for the decisions behind this.
 
 from __future__ import annotations
 
-from app.modules.module4_comparator.issue_schema import (
+from app.modules.comparator.issue_schema import (
     Issue,
     RiskBand,
     make_issue,
@@ -22434,7 +22434,7 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
 
 ---
 
-### app/modules/module4_comparator/issue_schema.py
+### app/modules/comparator/issue_schema.py
 
 ```python
 """
@@ -22675,7 +22675,7 @@ if __name__ == "__main__":
 
 ---
 
-### app/modules/module4_comparator/issue_tracker.py
+### app/modules/comparator/issue_tracker.py
 
 ```python
 """
@@ -23053,7 +23053,7 @@ if records:
 
 ---
 
-### app/modules/module4_comparator/material_media.py
+### app/modules/comparator/material_media.py
 
 ```python
 """
@@ -23087,14 +23087,14 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
-from app.modules.module2_ifc_read.piping_producer import media_for_system
-from app.modules.module2_ifc_read.piping_schema import (
+from app.modules.ifc_reader.piping_producer import media_for_system
+from app.modules.ifc_reader.piping_schema import (
     CANONICAL_MATERIALS,
     EnvironmentClass,
     PipingElement,
     PipingSystem,
 )
-from app.modules.module4_comparator.issue_schema import (
+from app.modules.comparator.issue_schema import (
     Issue,
     RiskBand,
     band_from_score,
@@ -23487,13 +23487,13 @@ def compare(
 
 ---
 
-## app/modules/module5_reporter
+## app/modules/reporter
 
-### app/modules/module5_reporter/__init__.py
+### app/modules/reporter/__init__.py
 
 ```python
 """
-module5_reporter.py
+reporter.py
 --------------------
 Generates reports from Module 4 compliance results.
 
@@ -23508,7 +23508,7 @@ import io
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 
 # severity -> (BCF priority, BCF status, days until due)
 # Matches the Critical/Major/Normal/Minor + Active/Open/Info vocabulary the
@@ -23522,7 +23522,7 @@ _SEVERITY_TO_BCF = {
 }
 
 
-class Module5_Reporter:
+class ComplianceReporter:
     """Generates compliance reports from Module 4 results."""
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -23802,7 +23802,7 @@ class Module5_Reporter:
 
 ---
 
-### app/modules/module5_reporter/bcf_generator.py
+### app/modules/reporter/bcf_generator.py
 
 ```python
 """
@@ -24142,7 +24142,7 @@ def issues_from_results(results: list[dict]) -> list[BCFIssue]:
 
 ---
 
-### app/modules/module5_reporter/cost_model.py
+### app/modules/reporter/cost_model.py
 
 ```python
 """
@@ -24608,7 +24608,7 @@ if st.session_state.get("compliance_results"):
 
 ---
 
-### app/modules/module5_reporter/report_generator.py
+### app/modules/reporter/report_generator.py
 
 ```python
 """
@@ -25146,7 +25146,7 @@ else:
 
 ---
 
-### app/modules/module5_reporter/schedule_impact.py
+### app/modules/reporter/schedule_impact.py
 
 ```python
 """
@@ -25672,7 +25672,7 @@ drive every design decision here:
    on a sha256 of the source, so re-parses can be avoided with the existing
    mechanism rather than a second one.
 
-The element shape is :class:`~app.modules.module2_ifc_read.ifc_parser.ServiceElement`,
+The element shape is :class:`~app.modules.ifc_reader.ifc_parser.ServiceElement`,
 which already exists and is **not** redefined here — this module composes the
 Module 2 reader into the envelope the Phase 6+ sessions agreed on.
 
@@ -25681,7 +25681,7 @@ THE SECOND ELEMENT VIEW: ``piping_elements``
     ``ServiceElement`` carries no operating temperature and no connectivity, so
     it cannot drive MM-001 (which needs the temperature the medium runs at) or
     XM-001 (which needs to know what touches what). Those two engines read
-    :class:`~app.modules.module2_ifc_read.piping_schema.PipingElement`, which
+    :class:`~app.modules.ifc_reader.piping_schema.PipingElement`, which
     the Module 2 piping producer builds from the same model.
 
     It is produced here, from the model this module already has open, rather
@@ -25703,13 +25703,13 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from app.logging_config import get_logger
-from app.modules.module2_ifc_read.ifc_parser import (
+from app.modules.ifc_reader.ifc_parser import (
     ServiceElement,
     get_schema_compatibility_note,
     parse_ifc_model,
 )
-from app.modules.module2_ifc_read.piping_producer import produce_piping_elements_from_model
-from app.modules.module2_ifc_read.piping_schema import PipingElement
+from app.modules.ifc_reader.piping_producer import produce_piping_elements_from_model
+from app.modules.ifc_reader.piping_schema import PipingElement
 
 logger = get_logger(__name__)
 
@@ -26074,7 +26074,7 @@ WHAT THIS DOES NOT DO
 
     It does not implement GC-001, CC-001, MC-001, MM-001 or XM-001. Those
     engines already exist — GC/CC/MC in ``app/engines/``, MM/XM in
-    ``app/modules/module4_comparator/`` — and are thesis-backing work; this
+    ``app/modules/comparator/`` — and are thesis-backing work; this
     module is the wiring that feeds them elements and turns their results into
     the shared ``Issue`` shape.
 
@@ -26152,10 +26152,10 @@ from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_ris
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
 from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
 from app.logging_config import get_logger
-from app.modules.module2_ifc_read.ifc_parser import ServiceElement
-from app.modules.module4_comparator import cross_material, material_media
-from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
+from app.modules.ifc_reader.ifc_parser import ServiceElement
+from app.modules.comparator import cross_material, material_media
+from app.modules.comparator.issue_adapter import IssueIdAllocator
+from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
 
 logger = get_logger(__name__)
 
@@ -26964,7 +26964,7 @@ added later, with no per-mechanism branch.
 
 BCF IS NOT REIMPLEMENTED
 
-    ``module5_reporter.bcf_generator`` already produces spec-compliant BCF 2.1
+    ``reporter.bcf_generator`` already produces spec-compliant BCF 2.1
     archives, and ``blue_halo_bcf_exporter`` already renders Halo clashes
     through the same helpers. This module maps :class:`Issue` onto
     ``BCFIssue`` and calls ``generate_bcf``; it writes no XML of its own.
@@ -26988,8 +26988,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.logging_config import get_logger
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.comparator.issue_schema import Issue, RiskBand
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 
 logger = get_logger(__name__)
 
@@ -27274,7 +27274,7 @@ import sys
 
 import pytest
 
-# Test modules use bare imports (e.g. `from module1_doc_parser...`) written for
+# Test modules use bare imports (e.g. `from document_parsing...`) written for
 # `python -m tests.x` run with cwd=app/modules/, while some of those modules in
 # turn use absolute imports (e.g. `from app.services...`) that need the repo
 # root on sys.path instead. Add both so either style resolves under pytest,
@@ -27813,11 +27813,11 @@ import os
 import time
 
 import pytest
-from module1_doc_parser.keyword_filter import KeywordFilter
-from module1_doc_parser.section_chunker import SectionChunker
-from module1_doc_parser.table_rule_builder import TableRuleBuilder
-from module3_rule_builder.rule_generator import RuleGenerator
-from module3_rule_builder.rule_store import RuleStore
+from document_parsing.keyword_filter import KeywordFilter
+from document_parsing.section_chunker import SectionChunker
+from document_parsing.table_rule_builder import TableRuleBuilder
+from rule_builder.rule_generator import RuleGenerator
+from rule_builder.rule_store import RuleStore
 
 TEST_DB = "tests/test_rules_integration.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -27897,7 +27897,7 @@ def pipeline():
 @pytest.fixture
 def docling_extractor():
     try:
-        from module1_doc_parser.docling_extractor import DoclingExtractor
+        from document_parsing.docling_extractor import DoclingExtractor
 
         return DoclingExtractor()
     except ImportError:
@@ -28130,10 +28130,10 @@ import os
 
 import pandas as pd
 import pytest
-from module1_doc_parser.keyword_filter import KeywordFilter
-from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS, BIGRAM_PHRASES, KEYWORD_WEIGHTS
-from module1_doc_parser.section_chunker import SectionChunker
-from module1_doc_parser.table_rule_builder import TableRuleBuilder
+from document_parsing.keyword_filter import KeywordFilter
+from document_parsing.keywords.keyword_master import ALL_KEYWORDS, BIGRAM_PHRASES, KEYWORD_WEIGHTS
+from document_parsing.section_chunker import SectionChunker
+from document_parsing.table_rule_builder import TableRuleBuilder
 
 TEST_DB = "tests/test_rules_m1.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -28384,8 +28384,8 @@ def test_keyword_filter_no_keywords(kf):
 
 import os
 
-from module3_rule_builder.rule_generator import RuleGenerator
-from module3_rule_builder.rule_store import RuleStore
+from rule_builder.rule_generator import RuleGenerator
+from rule_builder.rule_store import RuleStore
 
 
 @pytest.fixture
@@ -28493,7 +28493,7 @@ SAMPLE_PDF_PATH = os.path.join(FIXTURES_DIR, SAMPLE_PDF)
 def docling_extractor():
     """Import lazily — Docling may not be installed in all environments."""
     try:
-        from module1_doc_parser.docling_extractor import DoclingExtractor
+        from document_parsing.docling_extractor import DoclingExtractor
 
         return DoclingExtractor()
     except ImportError:
@@ -28633,8 +28633,8 @@ Test groups:
 import os
 
 import pytest
-from module3_rule_builder.rule_generator import RuleGenerator
-from module3_rule_builder.rule_store import RuleStore
+from rule_builder.rule_generator import RuleGenerator
+from rule_builder.rule_store import RuleStore
 
 TEST_DB = "tests/test_rules_m3.db"
 
@@ -29036,7 +29036,7 @@ class TestRuleConverterLLM:
 
     @pytest.fixture
     def converter(self, store):
-        from module3_rule_builder.rule_converter import RuleConverter
+        from rule_builder.rule_converter import RuleConverter
 
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
@@ -29583,7 +29583,7 @@ ENGINE SELECTION
 from __future__ import annotations
 
 from app.logging_config import get_logger
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
+from app.modules.comparator.issue_schema import Issue, RiskBand
 from app.modules.phase_6.phase_6b_parsing import parse_ifc_bytes, sha256_of
 from app.modules.phase_6.phase_6c_corrosion_ui import (
     DATA_QUALITY,
@@ -30012,7 +30012,7 @@ from __future__ import annotations
 
 from app.logging_config import get_logger
 from app.modules.contracts import ArchAnalysisResponse
-from app.modules.module4_comparator.engine_registry import (
+from app.modules.comparator.engine_registry import (
     DEFAULT_ENGINE_REGISTRY,
     RuleEngineRegistry,
 )
@@ -30116,7 +30116,7 @@ from datetime import datetime
 from typing import List
 from uuid import uuid4
 
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
+from app.modules.comparator.issue_schema import Issue, RiskBand
 
 
 class BCFExporter:
@@ -31806,9 +31806,9 @@ class DocumentService:
     @staticmethod
     def parse_pdf_content(content: bytes) -> str:
         """Parse raw PDF content bytes via doc parser module."""
-        from app.modules.module1_doc_parser import Module1_DocReader
+        from app.modules.document_parsing import DocumentReader
 
-        reader = Module1_DocReader()
+        reader = DocumentReader()
         return reader.parse_pdf(content)
 ```
 
@@ -32945,7 +32945,7 @@ class AnalysisService:
         """Evaluate immutable input elements and return rows, issues, and BCF topics."""
         evaluator = self._evaluator
         if evaluator is None:
-            from app.modules.module4_comparator.compliance_runner import run_compliance_checks
+            from app.modules.comparator.compliance_runner import run_compliance_checks
 
             evaluator = run_compliance_checks
 
@@ -32977,7 +32977,7 @@ class AnalysisService:
     @staticmethod
     def _build_issues(rows: list[dict[str, Any]], *, run_id: str) -> tuple[AuditIssue, ...]:
         """Convert evaluator rows into immutable per-mechanism audit findings."""
-        from app.modules.module4_comparator.issue_adapter import (
+        from app.modules.comparator.issue_adapter import (
             IssueIdAllocator,
             issues_from_path_a,
         )
@@ -33250,63 +33250,63 @@ class PipelineOrchestratorService:
     @staticmethod
     def export_bcf(report_data: dict[str, Any], output_path: str | Path) -> str:
         """Export BCF file from report payload via service boundary."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        reporter = Module5_Reporter()
+        reporter = ComplianceReporter()
         return reporter.generate_bcf(report_data, output_path=output_path)
 
     @staticmethod
     def export_csv(report_data: dict[str, Any], output_path: str | Path) -> str:
         """Export CSV file from report payload via service boundary."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        reporter = Module5_Reporter()
+        reporter = ComplianceReporter()
         return reporter.generate_csv(report_data, output_path=output_path)
 
     @staticmethod
     def iter_csv_summary(results: list[dict[str, Any]]):
         """Stream CSV compliance summary rows."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        return Module5_Reporter().iter_csv_summary(results)
+        return ComplianceReporter().iter_csv_summary(results)
 
     @staticmethod
     def generate_bcf_zip(results: list[dict[str, Any]]) -> bytes:
         """Generate BCF zip file bytes from compliance results."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        return Module5_Reporter().generate_bcf_zip(results)
+        return ComplianceReporter().generate_bcf_zip(results)
 
     @staticmethod
     def get_ifc_graph(
         ifc_file_path: str | Path, violations: list[dict[str, Any]] | None = None
     ) -> dict[str, Any]:
         """Generate element hierarchy graph payload."""
-        from app.modules.module2_ifc_read.ifc_graph import render_ifc_graph
+        from app.modules.ifc_reader.ifc_graph import render_ifc_graph
 
         return render_ifc_graph(ifc_file_path, violations=violations)
 
     @staticmethod
     def run_comparator_check(elements: list[Any], rules: list[Any]) -> list[dict[str, Any]]:
         """Run comparator rule evaluation against element properties."""
-        from app.modules.module4_comparator import Module4_Comparator
+        from app.modules.comparator import ComplianceComparator
 
-        comparator = Module4_Comparator()
+        comparator = ComplianceComparator()
         return comparator.check_compliance(elements, rules)
 
     @staticmethod
     def validate_metadata(extraction: dict[str, Any]) -> list[dict[str, Any]]:
         """Validate metadata extraction payload via comparator."""
-        from app.modules.module4_comparator import Module4_Comparator
+        from app.modules.comparator import ComplianceComparator
 
-        return Module4_Comparator().validate_metadata(extraction)
+        return ComplianceComparator().validate_metadata(extraction)
 
     @staticmethod
     def render_visual_report(compliance: list[dict[str, Any]]) -> dict[str, Any]:
         """Render visual report summary via reporter module."""
-        from app.modules.module5_reporter import Module5_Reporter
+        from app.modules.reporter import ComplianceReporter
 
-        return Module5_Reporter().render_visual_report(compliance)
+        return ComplianceReporter().render_visual_report(compliance)
 
     @staticmethod
     def export_phase6(
@@ -33350,7 +33350,7 @@ def execute_model_enhancement(
 ) -> dict[str, Any]:
     """Execute the production enhancement pipeline with repository dependencies."""
     if service is None:
-        from app.modules.module2_ifc_read.ifc_quality.improver import improve_ifc_file
+        from app.modules.ifc_reader.ifc_quality.improver import improve_ifc_file
         from app.services.model_lineage import SupabaseModelLineageRepository
         from app.services.object_storage import ObjectStorage
 
@@ -35204,7 +35204,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.logging_config import get_logger
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import now_iso_utc
@@ -35376,7 +35376,7 @@ pyRevit sends:
         ]
     }
 
-This service produces the same list[dict] that Module2_IFCRead.extract_for_compliance()
+This service produces the same list[dict] that IFCReader.extract_for_compliance()
 returns, so Module 4 and 5 run with zero changes.
 """
 
@@ -35400,7 +35400,7 @@ class RevitSyncService:
             theme:    "Architecture" or "MEP"
 
         Returns:
-            list[dict] matching Module2_IFCRead.extract_for_compliance() output
+            list[dict] matching IFCReader.extract_for_compliance() output
         """
         rules = RuleService().list_by_theme(theme)
 
@@ -35487,7 +35487,7 @@ from app.modules.config import (
     DEFAULT_LLM_MODEL,
     MAX_TOKENS_RULE_EXTRACTION,
 )
-from app.modules.module1_doc_parser.section_chunker import SectionChunker
+from app.modules.document_parsing.section_chunker import SectionChunker
 from app.services.llm_client import LiteLLMClient, LiteLLMClientWithRetry
 from app.services.rule_extractor import LiteLLMRuleExtractor, RuleExtractionProvider
 
@@ -36936,14 +36936,14 @@ class RuleService:
     @staticmethod
     def export_ids_xml(ruleset_id: str, rules: list[dict]) -> str:
         """Export rules as an IDS XML payload."""
-        from app.modules.module3_rule_builder.ids_exporter import export_ids_for_ruleset
+        from app.modules.rule_builder.ids_exporter import export_ids_for_ruleset
 
         return export_ids_for_ruleset(ruleset_id, rules)
 
     @staticmethod
     def import_ids_xml(xml_text: str) -> list[dict]:
         """Import rules from an IDS XML payload."""
-        from app.modules.module3_rule_builder.ids_exporter import import_ids_ruleset
+        from app.modules.rule_builder.ids_exporter import import_ids_ruleset
 
         return import_ids_ruleset(xml_text)
 
@@ -39080,13 +39080,13 @@ D:\Zigurat Masters\bim-guard\
 │   ├── modules/                the compliance pipeline
 │   │   ├── orchestrator.py      BIMGuard_App.orchestrate_workflow()
 │   │   ├── pipeline_services.py execute_model_enhancement()
-│   │   ├── module1_doc_parser/  PDF → text → sections → candidate rules
-│   │   ├── module1b_nlp_annotator/
-│   │   ├── module2_ifc_read/    IFC parsing, geometry, spatial, egress, piping
+│   │   ├── document_parsing/  PDF → text → sections → candidate rules
+│   │   ├── nlp_annotation/
+│   │   ├── ifc_reader/    IFC parsing, geometry, spatial, egress, piping
 │   │   ├── module2_producer/    Blue Halo clearance algorithm
-│   │   ├── module3_rule_builder/
-│   │   ├── module4_comparator/  corrosion engines + Issue contract
-│   │   └── module5_reporter/    BCF 2.1, cost model, report generator
+│   │   ├── rule_builder/
+│   │   ├── comparator/  corrosion engines + Issue contract
+│   │   └── reporter/    BCF 2.1, cost model, report generator
 │   └── engines/                 GC/CC/MC reference implementations
 ├── data/
 │   ├── cache/supabase-storage/  local materialisation of remote objects
@@ -39164,8 +39164,8 @@ re-download on every request.
 | Parse/validate | `_run_analysis_request` | returns `(dict, None)` or `(None, Alert)` |
 | Run pipeline | `modules/orchestrator.py :: BIMGuard_App.orchestrate_workflow` | **plain dict** |
 | Materialise IFC | `object_storage.materialize_local_path` | downloads to local cache if needed |
-| Read IFC | `module2_ifc_read` | elements, geometry, spatial, egress |
-| Compare | `module4_comparator` | `Issue` dataclasses |
+| Read IFC | `ifc_reader` | elements, geometry, spatial, egress |
+| Compare | `comparator` | `Issue` dataclasses |
 | Render | `_compliance_card`, `_rule_compliance_card`, … | FastHTML component tree |
 | Respond | `Div(*sections)` | **HTML fragment** (HTMX swap) |
 
@@ -39258,7 +39258,7 @@ public.model_enhancement_lineage -- append-only, enforced by trigger
 works only because values are ISO-8601.
 
 **`issues` is not populated by the workflow.** `IssueTracker` /
-`issue_adapter` exist in `module4_comparator` but are not referenced by
+`issue_adapter` exist in `comparator` but are not referenced by
 `orchestrator.py`, `pipeline_services.py`, or any route. The table is
 vestigial with respect to the live analysis path.
 
@@ -40198,7 +40198,7 @@ standards and client documents into one list so a caller sees a single stream:
 
 Session B (`phase-6b-parsing`) turns a stored IFC reference into structured
 elements. The element shape **already exists** as `ServiceElement` in
-`app/modules/module2_ifc_read/ifc_parser.py`:
+`app/modules/ifc_reader/ifc_parser.py`:
 
 ```python
 @dataclass
@@ -40297,7 +40297,7 @@ C and D consume and extend it. The keys that matter across the boundary:
 
 ## 3. `Issue` — the finding contract
 
-**Already defined.** `app/modules/module4_comparator/issue_schema.py`, whose
+**Already defined.** `app/modules/comparator/issue_schema.py`, whose
 own docstring reads *"Data contract between Module4 (comparators) and Module5
 (reporter)"*. `SCHEMA_VERSION = "1.0.0"`.
 
@@ -40459,7 +40459,7 @@ derived from a band no engine produced.
 
 This question has been answered here before; do not re-litigate it.
 
-`app/modules/module2_ifc_read/piping_schema.py:34` (NULLABILITY POLICY):
+`app/modules/ifc_reader/piping_schema.py:34` (NULLABILITY POLICY):
 
 > *"If a comparator cannot run because a required field is None, it emits a
 > Low-severity issue with `mechanism="data_quality"` pointing at the offending
@@ -40475,7 +40475,7 @@ This question has been answered here before; do not re-litigate it.
 never be mistaken for a verdict.
 
 **Reference implementation:** `_data_quality_issue()` at
-`app/modules/module4_comparator/galvanic.py:441` — `mechanism="data_quality"`,
+`app/modules/comparator/galvanic.py:441` — `mechanism="data_quality"`,
 `band=RiskBand.LOW`, `score=0.10`, `metadata["check"]`, and an
 `assignee_role="BIM coordinator"` so it lands as actionable work.
 
@@ -40581,7 +40581,7 @@ skip, and not a crash.
 
 #### The pattern to copy
 
-`issues_from_path_a()` in `app/modules/module4_comparator/issue_adapter.py`
+`issues_from_path_a()` in `app/modules/comparator/issue_adapter.py`
 already does this correctly and is the reference implementation:
 
 ```python
@@ -40645,7 +40645,7 @@ Tests to add:
 The second assertion is the one that proves step 4 was not skipped.
 
 > **Not a band:** `HIGH`/`MEDIUM`/`LOW` in
-> `app/modules/module1_doc_parser/` are rule-extraction **confidence** levels, a
+> `app/modules/document_parsing/` are rule-extraction **confidence** levels, a
 > separate concept with its own scale. Do not feed them to `_band_badge`,
 > `_band_int` or `RiskBand`.
 
@@ -40780,7 +40780,7 @@ Before merging a Phase 6+ branch:
 **Implements:** `app/modules/piping_schema.py`
 **Schema version:** 1.0.0
 
-This document is the human-readable companion to `piping_schema.py`. Sam needs this to implement `Module2_IFCRead`'s piping extraction path. The piping comparators in `Module4_Comparator` consume the same structure on the other side.
+This document is the human-readable companion to `piping_schema.py`. Sam needs this to implement `IFCReader`'s piping extraction path. The piping comparators in `ComplianceComparator` consume the same structure on the other side.
 
 If the code and this doc disagree, the code wins — but flag the drift in a PR so we can fix the doc.
 
@@ -41336,7 +41336,7 @@ The third iteration passed the rubric and was published. Component 2 then evalua
 plant-room pipework and returned **PASS**: the modelled material is SS316L, exactly as specified.
 
 At the same time, Component 3 scored the same element. Using the `PipingElement` fixture
-`example_ss316_pipe_in_plant_room()` [verified, `app/modules/module2_ifc_read/piping_schema.py`]:
+`example_ss316_pipe_in_plant_room()` [verified, `app/modules/ifc_reader/piping_schema.py`]:
 
 | Field | Value |
 |---|---|
@@ -44115,7 +44115,7 @@ full below rather than quietly replaced.
 | Location | Convention it applied | Verdict |
 |---|---|---|
 | [`bimguard_corrosion_engine.py:353`](../../app/engines/bimguard_corrosion_engine.py) — **live** | more positive = anodic | **CORRECT** |
-| [`galvanic.py:190`](../../app/modules/module4_comparator/galvanic.py) — dormant, Path B | more negative = anodic | **WRONG — fixed** |
+| [`galvanic.py:190`](../../app/modules/comparator/galvanic.py) — dormant, Path B | more negative = anodic | **WRONG — fixed** |
 
 Because the wrong engine was never wired up, **no user-facing galvanic finding ever named the wrong
 material**, and no previously issued report needs reissuing. The earlier draft's worst case did not
@@ -44360,7 +44360,7 @@ git history, after the live database proved unreachable.*
 |---|---|
 | **ID** | BG-DEF-001 |
 | **Component** | Component 1 — rule extraction (Module 3) |
-| **Files** | `app/modules/module3_rule_builder/rule_generator.py` (`_enrich_target`, `_enrich_property_set`), `app/modules/config.py` (`CODE_TO_IFC_MAP`, `IFC_PROPERTY_SET_MAP`) |
+| **Files** | `app/modules/rule_builder/rule_generator.py` (`_enrich_target`, `_enrich_property_set`), `app/modules/config.py` (`CODE_TO_IFC_MAP`, `IFC_PROPERTY_SET_MAP`) |
 | **Severity** | High — produces silent false negatives in a compliance tool |
 | **Status** | Open. Verified present at commit `f8d9f34`. **No code change has been made**: `app/` is locked while engine work is in flight, so this document is the work order. |
 | **Discovered by** | The SS316 feedback-loop worked example (`docs/ss316_feedback_loop_case_study.md`, §1.3.4 of the submission draft) |
@@ -55613,11 +55613,11 @@ ISO 19650-1 official standard page. Scope, abstract, and publication details. Us
 BIMGuard is an automated BIM quality and compliance platform that bridges natural-language engineering specifications (such as corrosion standards, material compatibility, and MEP guidelines) with Industry Foundation Classes (.ifc) models.  
 An audit of the codebase (app/modules, app/components, app/engines, and app/routes) shows a working domain pipeline spanning:
 
-> 1. **Document Parsing** (module1_doc_parser & module1b_nlp_annotator)  
-> 2. **IFC Parsing & Geometry/Topology Analysis** (module2_ifc_read)  
-> 3. **Rule Generation** (module3_rule_builder)  
-> 4. **Compliance & Physics/Corrosion Engines** (module4_comparator & app/engines)  
-> 5. **BCF/Reporting Exporters** (module5_reporter)
+> 1. **Document Parsing** (document_parsing & nlp_annotation)  
+> 2. **IFC Parsing & Geometry/Topology Analysis** (ifc_reader)  
+> 3. **Rule Generation** (rule_builder)  
+> 4. **Compliance & Physics/Corrosion Engines** (comparator & app/engines)  
+> 5. **BCF/Reporting Exporters** (reporter)
 
 To make BIMGuard scalable, enterprise-grade, and openBIM-compliant, several core structural shifts are needed. The architectural roadmap below details enhancements across all requested areas.
 
@@ -55822,7 +55822,7 @@ The buildingSMART **Information Delivery Specification (IDS)** is the global sta
 ### **Implementation Blueprint**
 
 > 1. **Incorporate ifcopenshell.ids:** Use the built-in IDS engine in IfcOpenShell instead of writing custom AST checkers for alphanumeric property verification.  
-> 2. **Extend the Rule Converter (module3_rule_builder):** Add an IDSRuleExporter that outputs valid .ids files from extracted NLP specifications.  
+> 2. **Extend the Rule Converter (rule_builder):** Add an IDSRuleExporter that outputs valid .ids files from extracted NLP specifications.  
 > 3. **Maintain a Hybrid Engine Approach:**  
 >
    * **Layer 1 (Standard IDS):** Use ifcopenshell.ids for checking entity names, predefined types, property sets, and material names.  
@@ -55834,7 +55834,7 @@ The buildingSMART **Information Delivery Specification (IDS)** is the global sta
 
 ### **Current Bottlenecks**
 
-* The current pipeline relies on a chain of Regex, keyword heuristics, and basic tokenizers (module1b_nlp_annotator/deontic_extractor.py, condition_parser.py, regex_rule_converter.py).  
+* The current pipeline relies on a chain of Regex, keyword heuristics, and basic tokenizers (nlp_annotation/deontic_extractor.py, condition_parser.py, regex_rule_converter.py).  
 * Brittle regex patterns frequently break when parsing complex sentence structures, engineering footnotes, multi-column tables, or conditional clauses (e.g., *"Unless protected by sacrificial anodes, carbon steel shall not be within 50mm of 316 stainless steel in submerged zones"*).
 
 ### **Recommended Modernization Architecture**
@@ -56056,7 +56056,7 @@ Still pending:
 ### Current state
 
 - `RuleExtractionService` orchestrates:
-  - PDF parse (`Module1_DocReader.parse_pdf`)
+  - PDF parse (`DocumentReader.parse_pdf`)
   - chunk generation (`extract_text_sections`)
   - chunk-wise provider calls
   - de-duplication of extracted rules
@@ -56365,14 +56365,14 @@ reaches a user.
 |---|---|---|
 | Element model | `ServiceElement` (`ifc_parser.py`) | `PipingElement` (`piping_schema.py`) |
 | Producer | `parse_ifc_model(ifc_file)` | `produce_piping_elements(ifc_path)` |
-| Engines | GC-001, CC-001, MC-001 (`app/engines/`) | MM-001, XM-001 (`module4_comparator/`) |
+| Engines | GC-001, CC-001, MC-001 (`app/engines/`) | MM-001, XM-001 (`comparator/`) |
 | Runner | `run_compliance_checks(elements) -> list[dict]` | `compare(elements, rule_pack) -> list[Issue]` |
 | Output shape | one flat dict **per element**, 30+ keys, always emitted | `Issue` dataclass, emitted **only when there is a finding** |
 | Banding | `"LOW"/"MEDIUM"/"HIGH"/"CRITICAL"` strings | `RiskBand` enum, lowercase values |
 | Reaches the UI | yes, via `orchestrate_workflow()` | no |
 
 **Path A entry point.** `BIMGuard_App.orchestrate_workflow()` (`app/modules/orchestrator.py:293`)
-opens the IFC once through `Module2_IFCRead`, and when `analysis_theme == "MEP"` calls
+opens the IFC once through `IFCReader`, and when `analysis_theme == "MEP"` calls
 `parse_ifc_model(m2_reader.ifc_file)` then `run_compliance_checks(elements)`
 (`orchestrator.py:424`). Results are band-normalised to Title case, counted into `issue_stats`, and
 returned under `compliance_results`. `app/routes/analyze.py::_compliance_card` renders them.
@@ -56418,10 +56418,10 @@ These are not risks; they are present-tense defects verified at `2701563`.
 
 ### B1 — `ComplianceOrchestrator` does not import
 
-`app/modules/module4_comparator/compliance_orchestrator.py:8`:
+`app/modules/comparator/compliance_orchestrator.py:8`:
 
 ```python
-from app.modules.module4_comparator.compliance_runner import run_compliance
+from app.modules.comparator.compliance_runner import run_compliance
 ```
 
 `compliance_runner.py` defines `run_compliance_checks`. There is no `run_compliance`. The module
@@ -56460,7 +56460,7 @@ def produce_piping_elements(ifc_path: str, *, adjacency_tolerance_m: float = 0.0
 ```
 
 It takes a **path** and calls `ifcopenshell.open()` itself. `orchestrate_workflow()` has already
-opened the same file via `Module2_IFCRead`. Calling it as-is doubles IFC ingestion.
+opened the same file via `IFCReader`. Calling it as-is doubles IFC ingestion.
 
 This is not a theoretical cost. The benchmark in `docs/benchmarks/halo_performance_analysis.md`
 measures ingestion at a median **33.2 elements/s** and **98.6% of end-to-end wall-clock** on the
@@ -56585,7 +56585,7 @@ binding design constraint on F6, not a cleanup item — read it before wiring th
 
 ## 4. The adapter
 
-New module: `app/modules/module4_comparator/issue_adapter.py`. It is the only place that knows both
+New module: `app/modules/comparator/issue_adapter.py`. It is the only place that knows both
 shapes.
 
 ### 4.1 Path A dicts → Issues
@@ -56768,7 +56768,7 @@ Two exist:
 
 | Writer | Input | Output | State |
 |---|---|---|---|
-| `module5_reporter/bcf_generator.py` | `list[BCFIssue]` via `issues_from_results(list[dict])` | full BCF 2.1 **ZIP** (markup + viewpoint + snapshot) | complete; snapshot is a 1×1 placeholder |
+| `reporter/bcf_generator.py` | `list[BCFIssue]` via `issues_from_results(list[dict])` | full BCF 2.1 **ZIP** (markup + viewpoint + snapshot) | complete; snapshot is a 1×1 placeholder |
 | `app/services/bcf_exporter.py` | `list[Issue]` | markup **XML only**, no ZIP | importable now (its old broken import is gone); no viewpoint, no ZIP |
 
 **Use `bcf_generator.py`.** A BCF consumer expects a `.bcfzip`; markup XML alone is not a loadable
@@ -56776,7 +56776,7 @@ deliverable. Add an `Issue`-accepting adapter beside the existing `issues_from_r
 replacing it.
 
 ```python
-# app/modules/module5_reporter/bcf_generator.py
+# app/modules/reporter/bcf_generator.py
 
 def bcf_issues_from_issues(
     issues: list[Issue],
@@ -56933,16 +56933,16 @@ as unverified.
 
 | # | File | Change | Signature |
 |---|---|---|---|
-| F1 | `module4_comparator/compliance_runner.py` | Fix B1: export the canonical name | `run_compliance = run_compliance_checks` (alias) or rename at the import site |
-| F2 | `module2_ifc_read/piping_producer.py` | Fix B3: accept an open model | `def produce_piping_elements_from_model(model: Any, *, source_path: str \| None = None, adjacency_tolerance_m: float = 0.05) -> list[PipingElement]` — existing `produce_piping_elements()` becomes a two-line wrapper that opens the path and delegates |
-| F3 | `module4_comparator/material_media.py` | Add the loader XM-001 already has | `def load_rule_pack(*, path: Path \| None = None) -> dict` — reads `data/rulesets/mm_001_material_media.json`, validates `_REQUIRED_KEYS`, raises `ValueError` naming the missing keys |
-| F4 | **new** `module4_comparator/issue_adapter.py` | The adapter | `issues_from_path_a(results, *, id_allocator, include_low=False) -> list[Issue]`; `path_a_view(issues, base_results) -> list[dict]`; `class IssueIdAllocator` |
-| F5 | `module4_comparator/issue_schema.py` | Nothing structural | Confirm `summarise()` counts by band for the new card; no schema change needed |
+| F1 | `comparator/compliance_runner.py` | Fix B1: export the canonical name | `run_compliance = run_compliance_checks` (alias) or rename at the import site |
+| F2 | `ifc_reader/piping_producer.py` | Fix B3: accept an open model | `def produce_piping_elements_from_model(model: Any, *, source_path: str \| None = None, adjacency_tolerance_m: float = 0.05) -> list[PipingElement]` — existing `produce_piping_elements()` becomes a two-line wrapper that opens the path and delegates |
+| F3 | `comparator/material_media.py` | Add the loader XM-001 already has | `def load_rule_pack(*, path: Path \| None = None) -> dict` — reads `data/rulesets/mm_001_material_media.json`, validates `_REQUIRED_KEYS`, raises `ValueError` naming the missing keys |
+| F4 | **new** `comparator/issue_adapter.py` | The adapter | `issues_from_path_a(results, *, id_allocator, include_low=False) -> list[Issue]`; `path_a_view(issues, base_results) -> list[dict]`; `class IssueIdAllocator` |
+| F5 | `comparator/issue_schema.py` | Nothing structural | Confirm `summarise()` counts by band for the new card; no schema change needed |
 | F6 | `modules/orchestrator.py` | Call Path B (section 5) | `orchestrate_workflow()` gains the guarded block; returns `path_b_issues: list[dict]`, `path_b_errors: dict[str, str]` |
 | F7 | `modules/config.py` | Feature flags | `FEATURE_PATH_B_MM: bool`, `FEATURE_PATH_B_XM: bool`, both default `False` |
-| F8 | `module5_reporter/bcf_generator.py` | Issue → BCF | `def bcf_issues_from_issues(issues: list[Issue], elements_by_id: dict[str, PipingElement]) -> list[BCFIssue]` — the lookup is required, see 6.1; extend `_markup_xml(issue, index, component_guids: list[str] \| None = None) -> str` for the XM couple |
+| F8 | `reporter/bcf_generator.py` | Issue → BCF | `def bcf_issues_from_issues(issues: list[Issue], elements_by_id: dict[str, PipingElement]) -> list[BCFIssue]` — the lookup is required, see 6.1; extend `_markup_xml(issue, index, component_guids: list[str] \| None = None) -> str` for the XM couple |
 | F9 | `routes/analyze.py` | Render + fix B2 | `def _path_b_card(issues: list[dict], errors: dict[str, str], is_demo: bool)`; rewrite `bcf_download(project_id: int)` to generate; add MM/XM to `_mep_engine_rules_card()` |
-| F10 | `module5_reporter/cost_model.py` | Stop inventing rates | `_lookup_rate(...) -> dict \| None`; `calculate_impact()` gains `unpriced_count: int` on `ImpactSummary` |
+| F10 | `reporter/cost_model.py` | Stop inventing rates | `_lookup_rate(...) -> dict \| None`; `calculate_impact()` gains `unpriced_count: int` on `ImpactSummary` |
 | F11 | **new** `routes/analyze.py` route | Asset register (if in scope) | `def asset_register_csv(project_id: int)` |
 | F12 | `data/rulesets/xm_001_cross_material.json` | Gate | Leave DRAFT. Flip to APPROVED only via the Expert Review process in `docs/expert_review_process.md`, with `approved_by` recorded |
 | F13 | **new** `tests/test_issue_adapter.py` | Cover F4 | see section 9 |
@@ -57037,7 +57037,7 @@ alternative data source.
 ### 1. Missing `regex_rule_converter.py` (critical)
 - **Problem:** `orchestrator.py` imports `RegexRuleConverter` when `USE_GPT4O = False`
   (the default), but the file did not exist — the entire free pipeline was broken.
-- **Fix:** Created `app/modules/module3_rule_builder/regex_rule_converter.py`
+- **Fix:** Created `app/modules/rule_builder/regex_rule_converter.py`
   with a `RegexRuleConverter` class that matches the same `extract_rules(chunk)`
   interface as the GPT-4o converter.
 - **How it works:** Pattern-matches CODE prose phrasings ("not less than X mm",
@@ -57069,7 +57069,7 @@ alternative data source.
 - **Problem:** `MISSING_DATA` rows showed `0 / 0 / 167` but no way to see
   which specific elements were missing the property.
 - **Fix:**
-  - Added `missing_elements` list to `Module4_Comparator._result()` — tracks
+  - Added `missing_elements` list to `ComplianceComparator._result()` — tracks
     element name, storey, GUID for every element where `actual_value is None`.
   - Added two collapsibles to `app/routes/analyze.py`:
     - Red: "X failing element(s)" — shows element name, actual value, reason
@@ -57088,7 +57088,7 @@ alternative data source.
 ### 1. IFC Property Diagnostic Script
 **File:** `scripts/inspect_ifc_properties.py`
 
-Runs `Module2_IFCRead.extract_for_compliance()` against any IFC file and diffs
+Runs `IFCReader.extract_for_compliance()` against any IFC file and diffs
 the results against rules in `public.rules`. Reports per target class:
 - `[OK]` — property found (shows which Pset it came from)
 - `[NEAR-MISS]` — property not found but a similarly named one exists (fuzzy match)
@@ -57211,7 +57211,7 @@ and mapped via a user-defined property sets `.txt` file:
 
 ### IFC Graph visualization disabled
 `app/routes/analyze.py:_build_ifc_graph_card()` returns a placeholder.
-The PyVis graph (`app/modules/module2_ifc_read/ifc_graph.py`) is built and
+The PyVis graph (`app/modules/ifc_reader/ifc_graph.py`) is built and
 working — re-enable once the analysis UI flow is stable.
 
 ### pyRevit extension not yet built
@@ -57314,7 +57314,7 @@ ZIGURAT Institute of Technology · 2026
 BIMGuard AI is an openBIM automated compliance-checking platform that ingests vendor-neutral IFC models — from any authoring tool, Revit included — alongside regulatory PDF documents, and returns vendor-neutral BCF 2.1 issues. An optional live pyRevit integration additionally lets Revit users push element data directly, without an IFC export step, but this is a convenience layered on top of the IFC-first pipeline, not a dependency of it. It addresses two persistent gaps in AECO digital delivery — the *interpretation gap* (existing BIM tools cannot derive checks from unstructured regulatory text — building codes, BEPs — written as prose, not from software code) and the *corrosion-blindness gap* (no mainstream BIM coordination tool evaluates material compatibility or corrosion risk at design stage) — through **three distinct, purpose-built computational components**, not a single undifferentiated pipeline:
 
 1. An **LLM-assisted rule-extraction service** (Docling document parsing, spaCy/TF-IDF candidate filtering, a semantic-annotation layer, and a provider-agnostic LLM converter built on `litellm`) that turns regulatory PDF text into structured, machine-readable rules.
-2. A **generic compliance comparator** (`Module4_Comparator`) that evaluates *any* structured rule — however it was authored — against IFC or Revit element properties using ten comparison operators, and is source-independent: the same evaluator runs unchanged whether elements arrive via an uploaded IFC file or a live pyRevit push from inside Revit.
+2. A **generic compliance comparator** (`ComplianceComparator`) that evaluates *any* structured rule — however it was authored — against IFC or Revit element properties using ten comparison operators, and is source-independent: the same evaluator runs unchanged whether elements arrive via an uploaded IFC file or a live pyRevit push from inside Revit.
 3. A **standards-based corrosion risk engine** that computes weighted composite risk scores (0–1 scale, four risk bands) for three electrochemical/biological degradation mechanisms — galvanic, crevice, and microbially-influenced corrosion (MIC) — each term traceable to a named engineering standard.
 
 These three components are architecturally and conceptually separate because they solve different problems with different logic: component 2 is deterministic *threshold evaluation* against rules of arbitrary origin; component 3 is deterministic *multi-factor weighted scoring* against a fixed, standards-derived model that has no notion of a "rule" at all. Today, component 1 and component 2 are fully live in the web application; two of the three corrosion mechanisms (galvanic, crevice) are live via a dedicated compliance runner, while the third (MIC) is implemented and standards-referenced but not yet wired into the live pipeline. A persisted issue-history log shows the corrosion engine has previously produced a genuine, measured result of 25 open issues (9 Critical, 7 High, 9 Medium) — real output from an earlier version of the pipeline — but reproducing that run on today's codebase, and completing the rule-extraction accuracy evaluation (precision/recall/F1 and LLM-as-judge scoring), are the two work items scheduled ahead of final submission. This draft reports only what is genuinely implemented and evidenced today, and states what remains open rather than presenting it as already achieved.
@@ -57347,7 +57347,7 @@ Automated code compliance checking (ACCC) has a two-decade research history. Eas
 
 ### 1.1.4 Technologies and datasets leveraged
 
-The project builds on an open-source stack, verified against `pyproject.toml` and the modules that actually import each library: **IfcOpenShell** — including its `geom` and `util.shape` native mesh engine — for IFC parsing, geometry derivation and spatial-adjacency analysis (used throughout `app/modules/module2_ifc_read/`, detailed in §1.2.5), supplemented by **shapely** for 2-D polygon analysis (room/corridor width) and **numpy** for the underlying array math (`trimesh` is not currently used but is recorded as a planned future geometry backend, §1.2.5, §1.4.6); **Docling** for PDF document-structure extraction (`docling_extractor.py`); **spaCy** for lemmatisation and sentence segmentation in the live extraction path; **litellm** as the provider-agnostic LLM transport for the production rule-extraction service (`app/services/llm_client.py`), supporting OpenAI, Gemini and Anthropic model strings; and **FastHTML/MonsterUI** with a **Supabase** (Postgres + object storage) backend. A `transformers`-based BERT/DistilBERT classifier is also implemented (`bert_classifier.py`) but is not yet part of the active dependency set or the production pipeline (§1.2.2). No ML/statistical model is used anywhere in the compliance-comparison or corrosion-scoring components — both are deterministic, rule-/formula-based systems by design (§1.2.3, §1.2.4).
+The project builds on an open-source stack, verified against `pyproject.toml` and the modules that actually import each library: **IfcOpenShell** — including its `geom` and `util.shape` native mesh engine — for IFC parsing, geometry derivation and spatial-adjacency analysis (used throughout `app/modules/ifc_reader/`, detailed in §1.2.5), supplemented by **shapely** for 2-D polygon analysis (room/corridor width) and **numpy** for the underlying array math (`trimesh` is not currently used but is recorded as a planned future geometry backend, §1.2.5, §1.4.6); **Docling** for PDF document-structure extraction (`docling_extractor.py`); **spaCy** for lemmatisation and sentence segmentation in the live extraction path; **litellm** as the provider-agnostic LLM transport for the production rule-extraction service (`app/services/llm_client.py`), supporting OpenAI, Gemini and Anthropic model strings; and **FastHTML/MonsterUI** with a **Supabase** (Postgres + object storage) backend. A `transformers`-based BERT/DistilBERT classifier is also implemented (`bert_classifier.py`) but is not yet part of the active dependency set or the production pipeline (§1.2.2). No ML/statistical model is used anywhere in the compliance-comparison or corrosion-scoring components — both are deterministic, rule-/formula-based systems by design (§1.2.3, §1.2.4).
 
 Test data comprises openly available IFC reference models stored in the private Supabase Storage bucket and materialized into the disposable `data/cache/supabase-storage/` cache when needed: the buildingSMART/IFC sample set, the Pacific Continental Residence model in both IFC4.3 Reference View and IFC2x3 Coordination View, `AC20-Institute`, and `Infra-Plumbing`, among others. The Ontario Building Code (CODE), Part 9 and selected Part 3 clauses, is the regulatory corpus for rule extraction, seeded as 45 machine-readable rules at application startup (§1.2.2). Corrosion knowledge is drawn from primary engineering standards rather than learned data: NASA-STD-6012 (galvanic voltage thresholds), EN ISO 15329 and ASTM G48 (crevice corrosion), CIBSE TM13/HSE HSG274/BS 8552 (microbially-influenced corrosion), and the IMOA PREN formulation for stainless-steel grade adequacy — plus, less commonly cited elsewhere in the literature, the AUCSC Basic Corrosion Course (2024) and American Galvanizers Association (2023) as sources for galvanic-series and coating-life data respectively (stored as DB-backed static assets in `public.static_data_assets`).
 
@@ -57366,7 +57366,7 @@ Two gaps emerge, and BIMGuard AI addresses each with a purpose-fit pair or singl
 
 ### 1.2.1 System architecture: three components, two shared infrastructure modules
 
-BIMGuard AI is implemented as a modular pipeline. The diagram below groups the codebase by what each part actually is, not by folder name — this matters because the real repository structure puts the generic comparator and the corrosion engine in the same `module4_comparator/` package even though they share no code and solve different problems.
+BIMGuard AI is implemented as a modular pipeline. The diagram below groups the codebase by what each part actually is, not by folder name — this matters because the real repository structure puts the generic comparator and the corrosion engine in the same `comparator/` package even though they share no code and solve different problems.
 
 ```
 ┌─ COMPONENT 1: Rule extraction (turns text into structured rules) ─────────┐
@@ -57390,16 +57390,16 @@ BIMGuard AI is implemented as a modular pipeline. The diagram below groups the c
 │              → RevitSyncService              (source-independent shape)   │
 │                                            │                                │
 │                                            ▼                                │
-│                          Module4_Comparator.validate_metadata()            │
+│                          ComplianceComparator.validate_metadata()            │
 │                          (>=, <=, >, <, ==, !=, between, exists, …)         │
 │                                            │                                │
 │                                            ▼                                │
-│         Module5_Reporter.render_visual_report(), grouped by discipline     │
+│         ComplianceReporter.render_visual_report(), grouped by discipline     │
 │                    (Architecture / MEP — RuleService.list_by_theme)        │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌─ COMPONENT 3: Corrosion risk engine (weighted scoring, no "rules") ────────┐
-│   IFC/element data → Module4_Comparator's sibling: compliance_runner.py    │
+│   IFC/element data → ComplianceComparator's sibling: compliance_runner.py    │
 │                       (galvanic GC-001 + crevice CC-001, LIVE)             │
 │                       — MIC MC-001 implemented separately in app/engines/, │
 │                         standards-referenced, not yet wired in             │
@@ -57417,7 +57417,7 @@ Three honest notes on this diagram. First, rule extraction (Component 1) exists 
 
 **Sectioning and filtering (M1).** `SectionChunker` segments a document into up to 13 fixed CODE sections via a regex-based heading detector. `KeywordFilter` performs spaCy lemmatisation and weighted keyword/bigram scoring, classifying paragraphs into HIGH/MEDIUM/LOW confidence bands. A `TfidfAnalyzer` (`sklearn.feature_extraction.text.TfidfVectorizer`) compares rule vs non-rule paragraph vocabularies — in the live service this runs in **discovery/reporting mode only** and does not change which paragraphs are routed to the LLM. A `confidence_scorer` combines keyword, dependency-parser and (optionally) BERT signals into a weighted SEND/SKIP decision, wired into the live service.
 
-**Semantic annotation (M1b).** The `module1b_nlp_annotator` package is wired into the *live* web pipeline (not the CLI orchestrator). A `deontic_extractor` identifies obligation modality ("shall/must/should", with negation handling); a `dimension_extractor` captures quantities, units, and min/max/range/exact constraint types via regex; a `condition_parser` splits applicability/exception/qualification clauses; a `cross_ref_resolver` resolves seven families of inter-clause references. Together these build a structured "NLP pre-analysis" block prepended to the LLM prompt.
+**Semantic annotation (M1b).** The `nlp_annotation` package is wired into the *live* web pipeline (not the CLI orchestrator). A `deontic_extractor` identifies obligation modality ("shall/must/should", with negation handling); a `dimension_extractor` captures quantities, units, and min/max/range/exact constraint types via regex; a `condition_parser` splits applicability/exception/qualification clauses; a `cross_ref_resolver` resolves seven families of inter-clause references. Together these build a structured "NLP pre-analysis" block prepended to the LLM prompt.
 
 **Rule conversion — a dual-path design that exists, but in two different places.** A `USE_GPT4O` flag genuinely exists in the CLI path and switches between `RegexRuleConverter` (free, offline, deterministic) and `RuleConverter` (OpenAI SDK directly, default `gpt-4o-mini`). The live web service instead uses `LiteLLMRuleExtractor`, genuinely provider-agnostic — the UI lets a user select `openai`/`gemini`/`anthropic` model strings per request, defaulting to `gpt-4o-mini`. The regex-vs-LLM comparison central to the project's narrative is currently only demonstrable end-to-end through the CLI script; the live path has no regex-only fallback yet.
 
@@ -57427,7 +57427,7 @@ Three honest notes on this diagram. First, rule extraction (Component 1) exists 
 
 **Seed rules.** `code_seed_rules.py` contains 31 pre-built CODE Part 9 rules, and `code_extended_rules.py` adds 14 more CODE Part 9/Part 3 rules, both seeded automatically at application startup — **45 pre-built rules** in total, each with a real CODE section reference. These seed rules are consumed identically by the generic comparator in §1.2.3, regardless of whether they were seeded, LLM-extracted, or regex-extracted — a direct benefit of keeping extraction and evaluation separate.
 
-### 1.2.3 Component 2 — the generic compliance comparator (Module 4: `Module4_Comparator`)
+### 1.2.3 Component 2 — the generic compliance comparator (Module 4: `ComplianceComparator`)
 
 This component answers one question only: *given a structured rule and a set of model elements, does each element pass?* It has no knowledge of where the rule came from (LLM, regex, seed file, or a person typing it into the Rule Library UI) and no domain-specific corrosion logic — it is a general-purpose evaluator, and this generality is its main design value.
 
@@ -57435,13 +57435,13 @@ This component answers one question only: *given a structured rule and a set of 
 
 **Per-rule result status.** Each rule, evaluated against every matching element, resolves to one of five statuses: `PASS` (all elements satisfy the rule), `FAIL` (at least one element violates it — the dominant status), `MISSING_DATA` (the property is absent on every matching element), `PARTIAL` (present-but-failing plus some missing), or `NO_ELEMENTS` (no elements of the target IFC class exist in the model). Each `FAIL`/`PARTIAL` result carries a per-element failure list (element name, GUID, storey, space, actual value, and a human-readable reason string, e.g. `"820mm < required 860mm"`).
 
-**Property resolution (feeding the comparator from Module 2).** For each rule, `Module2_IFCRead.extract_for_compliance()` searches, in order: (1) the rule's nominated property set, (2) all Psets and `Qto_` quantity sets on the element, (3) direct IFC schema attributes (e.g. `OverallHeight`, `OverallWidth`). This fallback order is what lets a single CODE rule match property data authored inconsistently across different IFC exporters.
+**Property resolution (feeding the comparator from Module 2).** For each rule, `IFCReader.extract_for_compliance()` searches, in order: (1) the rule's nominated property set, (2) all Psets and `Qto_` quantity sets on the element, (3) direct IFC schema attributes (e.g. `OverallHeight`, `OverallWidth`). This fallback order is what lets a single CODE rule match property data authored inconsistently across different IFC exporters.
 
-**Source-independence — a genuine, distinctive architectural feature, with IFC as the primary and only required path.** The comparator's default and primary input is a standard, vendor-neutral IFC file — from Revit, ArchiCAD, Tekla, Vectorworks, or any other IFC-exporting tool — parsed by Module 2 (§1.2.5). A second, optional input path exists for teams already working natively in Revit; the comparator is invoked from two different live routes, on two structurally different inputs, without any change to `Module4_Comparator` itself:
-- `app/routes/analyze.py` → `Module2_IFCRead.extract_for_compliance(library_rules)` (from an uploaded IFC file — the primary, tool-agnostic path) → `Module4_Comparator().validate_metadata(extraction)`.
-- `app/routes/revit_sync.py` → an *optional* pyRevit script running inside Revit POSTs live element JSON (`{"ifc_class": "IfcStairFlight", "properties": {"Width": 900.0, "RiserHeight": 175.0}, ...}`) to `/revit-sync` → `RevitSyncService.build_extraction_results()` reshapes it into the *same* `list[dict]` contract `extract_for_compliance()` produces → `Module4_Comparator().validate_metadata(...)` runs unchanged. `RevitSyncService`'s own docstring states the intent directly: *"Converts pyRevit push data into Module 4's expected input format so the compliance pipeline runs unchanged regardless of whether data came from an IFC file... or directly from Revit."*
+**Source-independence — a genuine, distinctive architectural feature, with IFC as the primary and only required path.** The comparator's default and primary input is a standard, vendor-neutral IFC file — from Revit, ArchiCAD, Tekla, Vectorworks, or any other IFC-exporting tool — parsed by Module 2 (§1.2.5). A second, optional input path exists for teams already working natively in Revit; the comparator is invoked from two different live routes, on two structurally different inputs, without any change to `ComplianceComparator` itself:
+- `app/routes/analyze.py` → `IFCReader.extract_for_compliance(library_rules)` (from an uploaded IFC file — the primary, tool-agnostic path) → `ComplianceComparator().validate_metadata(extraction)`.
+- `app/routes/revit_sync.py` → an *optional* pyRevit script running inside Revit POSTs live element JSON (`{"ifc_class": "IfcStairFlight", "properties": {"Width": 900.0, "RiserHeight": 175.0}, ...}`) to `/revit-sync` → `RevitSyncService.build_extraction_results()` reshapes it into the *same* `list[dict]` contract `extract_for_compliance()` produces → `ComplianceComparator().validate_metadata(...)` runs unchanged. `RevitSyncService`'s own docstring states the intent directly: *"Converts pyRevit push data into Module 4's expected input format so the compliance pipeline runs unchanged regardless of whether data came from an IFC file... or directly from Revit."*
 
-`Module4_Comparator` itself has no notion of "Revit" anywhere in its code — it only ever consumes the same generic `list[dict]` shape, however it was produced. This is what makes the IFC path and the Revit convenience path equally valid, rather than the platform being a Revit-first tool with an IFC side door.
+`ComplianceComparator` itself has no notion of "Revit" anywhere in its code — it only ever consumes the same generic `list[dict]` shape, however it was produced. This is what makes the IFC path and the Revit convenience path equally valid, rather than the platform being a Revit-first tool with an IFC side door.
 
 **Measures covered today.** Across the 45 seed rules (§1.2.2), the comparator already checks five categories of regulatory measure: *dimensional* (Width, OverallWidth/Height, RiserHeight, TreadLength, FlightHeight, HandrailHeight, RequiredHeadroom, Area/NetFloorArea), *angular* (PitchAngle, WinderTurnAngle, IndividualWinderAngle), *fire/life-safety* (FireRating, present on three explicit rules covering doors, walls and slabs), *slope* (RequiredSlope), and *boolean/classification* (IsExternal, HasNonSkidSurface, PredefinedType, OperationType). One notable gap: wall/slab **thickness** is not yet an explicit checked rule, even though the `ifc_quality` improver already carries a default `Thickness: 0.15` m for `IfcWall` (§1.2.5) — extending the seed set to check thickness against fire-compartmentation or structural minimums is a natural, low-effort addition (§1.4.6).
 
@@ -57449,11 +57449,11 @@ This component answers one question only: *given a structured rule and a set of 
 
 **Rule and modelling-guidance hyperlinks — planned, not yet built.** Today, a rule's source citation (`ref`, e.g. `"9.8.2.1.(2)"`) is a plain text string, not a link — confirmed against the rule schema and the Rule Library UI. The planned feature adds two hyperlinks per checked rule in the results view: (1) a citation link back to the specific source clause (the regulatory PDF section, or an official code portal where licensing permits), extending the same traceability the `needs_review` workflow already gives at the extraction stage through to the results the user actually reads; and (2) a modelling-guidance link, combining buildingSMART's own official IFC/MVD authoring documentation with BIMGuard's own written guidance, explaining how to model the relevant element correctly (e.g., which property set a stair flight's `RiserHeight` should be authored under) so that a `MISSING_DATA` result becomes actionable rather than opaque. This directly targets the false-negative risk described in §1.2.5 — many `MISSING_DATA`/`NO_ELEMENTS` results are a modelling-quality problem rather than a genuine compliance failure, and the UI does not currently help a user tell the difference or fix it.
 
-**Extending human-in-the-loop from rules to results — planned.** `needs_review` (§1.2.2) currently covers only extracted *rules*, before they are saved. The planned extension applies the same review discipline to *results*: a reviewer would be able to mark an individual comparator or corrosion-engine issue as reviewed/accepted/dismissed, with a comment, before it is included in a finalised report or BCF export — mirroring the rule-review workflow at the results end of the pipeline. No such field or workflow currently exists on `Module4_Comparator`'s result objects or the corrosion engine's issue objects (§1.2.4); this is a design gap listed in §1.4.6, not a partially-built feature.
+**Extending human-in-the-loop from rules to results — planned.** `needs_review` (§1.2.2) currently covers only extracted *rules*, before they are saved. The planned extension applies the same review discipline to *results*: a reviewer would be able to mark an individual comparator or corrosion-engine issue as reviewed/accepted/dismissed, with a comment, before it is included in a finalised report or BCF export — mirroring the rule-review workflow at the results end of the pipeline. No such field or workflow currently exists on `ComplianceComparator`'s result objects or the corrosion engine's issue objects (§1.2.4); this is a design gap listed in §1.4.6, not a partially-built feature.
 
-**Worked example.** CODE seed rule (`code_seed_rules.py`): *"Private stair riser height — min 125 mm, max 200 mm"*, `target_ifc_class="IfcStairFlight"`, `property_name="RiserHeight"`, `operator="between"`, `value_min=125`, `value_max=200`. Given an uploaded model containing a stair flight with `RiserHeight=175mm`, the comparator resolves `actual=175`, evaluates `125 <= 175 <= 200` → `True`, and the rule status is `PASS` for that element. A second stair flight with `RiserHeight=210mm` would fail with reason `"210mm outside [125mm–200mm]"`, contributing to a `FAIL` status for the rule and a `Module5_Reporter` entry citing the specific element GUID and storey.
+**Worked example.** CODE seed rule (`code_seed_rules.py`): *"Private stair riser height — min 125 mm, max 200 mm"*, `target_ifc_class="IfcStairFlight"`, `property_name="RiserHeight"`, `operator="between"`, `value_min=125`, `value_max=200`. Given an uploaded model containing a stair flight with `RiserHeight=175mm`, the comparator resolves `actual=175`, evaluates `125 <= 175 <= 200` → `True`, and the rule status is `PASS` for that element. A second stair flight with `RiserHeight=210mm` would fail with reason `"210mm outside [125mm–200mm]"`, contributing to a `FAIL` status for the rule and a `ComplianceReporter` entry citing the specific element GUID and storey.
 
-**Current validation status.** No dedicated unit tests currently assert `Module4_Comparator`'s operator logic against hand-picked cases in isolation (the closest existing test, `test_compliance.py`, targets a `/api/v1/compliance/...` REST shape that does not exist in the current FastHTML app and predates this architecture). This is flagged as a concrete, low-effort item for §1.4.6 — the class itself is short and pure-functional, so covering all ten operators with unit tests is a same-day task.
+**Current validation status.** No dedicated unit tests currently assert `ComplianceComparator`'s operator logic against hand-picked cases in isolation (the closest existing test, `test_compliance.py`, targets a `/api/v1/compliance/...` REST shape that does not exist in the current FastHTML app and predates this architecture). This is flagged as a concrete, low-effort item for §1.4.6 — the class itself is short and pure-functional, so covering all ten operators with unit tests is a same-day task.
 
 ### 1.2.4 Component 3 — standards-based corrosion risk engines (galvanic, crevice, MIC)
 
@@ -57473,9 +57473,9 @@ Three engines are designed and implemented, each computing a weighted composite 
 
 Each ruleset JSON is a versioned specification, not just a data dump: `galvanic_corrosion_ruleset.json` carries a `ruleset_id` (`"BIMGUARD-GC-001"`), a semantic `ruleset_version` (`"1.0.0"`), a `standards_referenced` list of eight named, described sources, the composite formula written both as a human-readable string and a machine-readable `weights` dict, and — the most operationally significant part — an explicit mapping from each risk band to a BCF action: Low → *"Asset register only — no BCF issue"*, Medium → *"BCF Normal priority"*, High → *"BCF Major priority"*, Critical → *"BCF Critical priority — immediate remediation"*. This is the exact, auditable rule connecting a numeric composite score to an output decision, and it is documented as data rather than buried in conditional code.
 
-The engine actually invoked when a user runs a compliance check in the web app is `app/modules/module4_comparator/compliance_runner.py` (a sibling file to, but sharing no logic with, `Module4_Comparator`), called from `BIMGuard_App.orchestrate_workflow()`. It independently implements galvanic and crevice scoring against its own, hand-authored material/PREN/CCT tables — numerically close to, but not identical to, the reference implementation's tables — and **does not implement MIC**.
+The engine actually invoked when a user runs a compliance check in the web app is `app/modules/comparator/compliance_runner.py` (a sibling file to, but sharing no logic with, `ComplianceComparator`), called from `BIMGuard_App.orchestrate_workflow()`. It independently implements galvanic and crevice scoring against its own, hand-authored material/PREN/CCT tables — numerically close to, but not identical to, the reference implementation's tables — and **does not implement MIC**.
 
-A fourth implementation, `module4_comparator/galvanic.py`, is more substantial than a simple superseded stub and deserves its own mention: it is a complete, correct galvanic comparator built against `app/modules/module2_ifc_read/piping_schema.py`, a genuinely rich `PipingElement` data contract — 22 canonical materials, a 23-member `PipingSystem` enum (covering everything from domestic hot water to medical gases and pool circulation), a `T0`–`T5` `EnvironmentClass` wetting scale, a 14-member `JointType` enum matching a dedicated `JT-001`–`JT-014` ruleset, and explicit mass/area fields for both galvanic and seismic checks. This is the most rigorously modelled data contract in the codebase. Implementation-wise, `EnvironmentClass`, `PipingSystem` and `JointType` are all string-backed Python enums (`class X(str, Enum)`) — type-checked in code but serialising as plain strings with no separate translation layer — alongside a deliberate split between frozen, immutable dataclasses for geometric primitives (`Point3D`, `BoundingBox`) and a mutable dataclass for the element record itself (`PipingElement`), with a small hand-written recursive `to_json()` walker rather than a schema library such as Pydantic. It is, however, entirely disconnected from the live pipeline in both directions: nothing in `ifc_parser.py` constructs a `PipingElement` from real IfcOpenShell data (only three hand-written example fixtures exist, inside `piping_schema.py` itself), and `galvanic.py` is never imported by `compliance_runner.py` or any route. Closing this gap — having `ifc_parser.py` populate real `PipingElement` objects and routing them through `galvanic.py` — would be a more standards-faithful path to a unified corrosion engine than continuing to maintain `compliance_runner.py`'s separate hand-authored tables (§1.4.6).
+A fourth implementation, `comparator/galvanic.py`, is more substantial than a simple superseded stub and deserves its own mention: it is a complete, correct galvanic comparator built against `app/modules/ifc_reader/piping_schema.py`, a genuinely rich `PipingElement` data contract — 22 canonical materials, a 23-member `PipingSystem` enum (covering everything from domestic hot water to medical gases and pool circulation), a `T0`–`T5` `EnvironmentClass` wetting scale, a 14-member `JointType` enum matching a dedicated `JT-001`–`JT-014` ruleset, and explicit mass/area fields for both galvanic and seismic checks. This is the most rigorously modelled data contract in the codebase. Implementation-wise, `EnvironmentClass`, `PipingSystem` and `JointType` are all string-backed Python enums (`class X(str, Enum)`) — type-checked in code but serialising as plain strings with no separate translation layer — alongside a deliberate split between frozen, immutable dataclasses for geometric primitives (`Point3D`, `BoundingBox`) and a mutable dataclass for the element record itself (`PipingElement`), with a small hand-written recursive `to_json()` walker rather than a schema library such as Pydantic. It is, however, entirely disconnected from the live pipeline in both directions: nothing in `ifc_parser.py` constructs a `PipingElement` from real IfcOpenShell data (only three hand-written example fixtures exist, inside `piping_schema.py` itself), and `galvanic.py` is never imported by `compliance_runner.py` or any route. Closing this gap — having `ifc_parser.py` populate real `PipingElement` objects and routing them through `galvanic.py` — would be a more standards-faithful path to a unified corrosion engine than continuing to maintain `compliance_runner.py`'s separate hand-authored tables (§1.4.6).
 
 **Worked logic (galvanic, reference implementation).** For a dissimilar-metal pair, the engine looks up each metal's potential in a galvanic series (V vs. Ag/AgCl), computes the voltage gap, and normalises it against an environment-class threshold (controlled 0.50 V → normal 0.25 V → harsh 0.15 V): `voltage_risk = min(1.0, gap / (2 × threshold))`. A small anode-to-cathode area ratio escalates risk (Prosoco TN-104), and a PREN adequacy failure for the specified stainless grade floors the composite score at 0.35 (Medium).
 
@@ -57491,9 +57491,9 @@ This module is fully implemented and live, and feeds both Component 2 and Compon
 
 **Tier 1 — architectural geometry derivation (`ifc_geometry.py`).** This module has two responsibilities, per its own header docstring: (1) pipe surface-area estimation for the galvanic corrosion engine (Component 3), reading actual mesh geometry where available and falling back to nominal-diameter estimation otherwise; and (2) deriving architectural measurements — `Height`, `Width`, `SillHeight`, `HandrailHeight`, `Slope`, `Volume`, `FootprintArea`, `SurfaceArea`, and `CorridorWidth` — directly from element geometry *when those values are absent from property sets*. In practice this means a rule such as the riser-height check (§1.2.3) can still be evaluated even when an IFC export omits the `RiserHeight` property outright, because the geometry engine derives it from the stair flight's mesh instead of requiring it to be authored. This is a genuine, non-trivial fallback layer, not simple bounding-box math.
 
-**Tier 2 — spatial adjacency engine (`ifc_spatial.py`).** A second, structurally different capability: this module parses `IfcRelSpaceBoundary` relationships to map every `IfcSpace` to the walls, doors and windows that bound it, and identifies party walls shared between two spaces. Three compliance checks are built on top of this adjacency map, and are genuinely wired into the live pipeline (`module2_ifc_read/__init__.py` imports and calls all three): `check_daylight_ratios()` (CODE 9.7.2 — window area ÷ floor area ≥ 1/10), `check_fire_separation()` (CODE 9.10.9 — party walls must carry `FireRating` ≥ 45 minutes), and `check_garage_separation()`. These are relationship-aware checks that Component 2's simple operator-based comparator (§1.2.3) cannot express on its own, since they depend on which elements bound which spaces, not just a single element's own properties — a good illustration of why Module 2 has grown beyond being "just" an IFC reader.
+**Tier 2 — spatial adjacency engine (`ifc_spatial.py`).** A second, structurally different capability: this module parses `IfcRelSpaceBoundary` relationships to map every `IfcSpace` to the walls, doors and windows that bound it, and identifies party walls shared between two spaces. Three compliance checks are built on top of this adjacency map, and are genuinely wired into the live pipeline (`ifc_reader/__init__.py` imports and calls all three): `check_daylight_ratios()` (CODE 9.7.2 — window area ÷ floor area ≥ 1/10), `check_fire_separation()` (CODE 9.10.9 — party walls must carry `FireRating` ≥ 45 minutes), and `check_garage_separation()`. These are relationship-aware checks that Component 2's simple operator-based comparator (§1.2.3) cannot express on its own, since they depend on which elements bound which spaces, not just a single element's own properties — a good illustration of why Module 2 has grown beyond being "just" an IFC reader.
 
-**Tier 3 — egress and circulation analysis (`ifc_egress.py`) — real, live, and graph-based.** This is the most algorithmically sophisticated part of Module 2 and was absent from earlier drafts of this report. It builds a `networkx` graph of the building's circulation topology: nodes are `IfcSpace` GUIDs weighted by the square root of floor area (an estimated per-space traversal cost), edges connect spaces that share a physical `IfcDoor` boundary, and spaces touching an exterior door are marked as exits. Two CODE checks run on top of this graph: `check_exit_count()` (CODE 9.9.4.1 — at least one exit per storey, checked directly from `IsExternal` doors without needing the graph) and `check_egress_travel_distance()` (CODE 9.9.10.1 — runs Dijkstra's shortest-path algorithm from every habitable space to its nearest exit, flagging any path over 25 m). Habitable-space classification uses a keyword list (bedroom/living-room-type names count, bathroom/corridor-type names don't, ambiguous names default to habitable). This is genuinely wired into the live pipeline — `module2_ifc_read/__init__.py` builds the egress graph on IFC load and exposes `extract_egress_checks()`, which `app/routes/analyze.py` calls and renders on the results page. Unlike Component 2's per-element rule checks (§1.2.3) or even Tier 2's pairwise adjacency checks, this is a genuinely global, path-based analysis — no other part of the platform reasons about the building as a connected graph the way this module does.
+**Tier 3 — egress and circulation analysis (`ifc_egress.py`) — real, live, and graph-based.** This is the most algorithmically sophisticated part of Module 2 and was absent from earlier drafts of this report. It builds a `networkx` graph of the building's circulation topology: nodes are `IfcSpace` GUIDs weighted by the square root of floor area (an estimated per-space traversal cost), edges connect spaces that share a physical `IfcDoor` boundary, and spaces touching an exterior door are marked as exits. Two CODE checks run on top of this graph: `check_exit_count()` (CODE 9.9.4.1 — at least one exit per storey, checked directly from `IsExternal` doors without needing the graph) and `check_egress_travel_distance()` (CODE 9.9.10.1 — runs Dijkstra's shortest-path algorithm from every habitable space to its nearest exit, flagging any path over 25 m). Habitable-space classification uses a keyword list (bedroom/living-room-type names count, bathroom/corridor-type names don't, ambiguous names default to habitable). This is genuinely wired into the live pipeline — `ifc_reader/__init__.py` builds the egress graph on IFC load and exposes `extract_egress_checks()`, which `app/routes/analyze.py` calls and renders on the results page. Unlike Component 2's per-element rule checks (§1.2.3) or even Tier 2's pairwise adjacency checks, this is a genuinely global, path-based analysis — no other part of the platform reasons about the building as a connected graph the way this module does.
 
 **A related, complete capability that exists but is currently switched off: the IFC relationship graph (`ifc_graph.py`).** Separately from egress, `ifc_graph.py` builds a full `networkx` directed graph of the model's containment, aggregation and connectivity relationships (`IfcRelContainedInSpatialStructure`, `IfcRelAggregates`, `IfcRelConnectsElements`) and renders it as an interactive `pyvis` HTML visualisation, with violated elements highlighted in red. The code is complete and correct, but `app/routes/analyze.py` currently renders a hardcoded placeholder card ("Graph visualisation is temporarily disabled") in its place, behind an explicit `# TODO: Re-enable the PyVis IFC graph` comment — `ifc_graph.py` itself is never imported. Re-enabling it is a low-effort, high-visual-value improvement (§1.4.6), since the underlying graph-building logic already works.
 
@@ -57559,7 +57559,7 @@ function ROUNDED_BOX(half, radius, arc_segs):
 
 ### 1.2.6 Shared infrastructure — reporting: BCF, cost and schedule (Module 5)
 
-Module 5 provides two distinct outputs, consumed differently by Components 2 and 3. `Module5_Reporter.render_visual_report()` renders an on-screen HTML summary of comparator results (§1.2.3) — pass/fail counts, per-rule failure detail — and is genuinely called from both `analyze.py` and `revit_sync.py`. For BCF export, `bcf_generator.py` implements a well-formed BCF 2.1 ZIP writer (GlobalId, viewpoint, risk score, mitigation text per issue; `snapshot.png` is currently a hardcoded 1×1 placeholder pixel, a known limitation). A second BCF writer, `app/services/bcf_exporter.py`, is **broken, not just unused**: it imports `ComplianceIssue` from `app.models.compliance_models`, a module that does not exist anywhere in the repository, so this file would raise `ModuleNotFoundError` if anything tried to call it — which nothing does (zero callers found anywhere). **Neither writer is currently invoked by the live download route**: `app/routes/analyze.py`'s `/reports/bcf/{project_id}` endpoint only reads a pre-existing file named `data/compliance_project_{id}.bcf` from disk if one happens to exist — it does not generate one. The two such files that do exist (`compliance_project_1.bcf`, `compliance_project_3.bcf`, both genuine, well-formed, non-empty BCF archives) were produced by an earlier version of the pipeline whose write step is not present in the current codebase (§1.4.2). `cost_model.py` implements a configurable `CostModel` with CSV-upload support, shipping with UK MEP default rates hardcoded in Python rather than a checked-in CSV. `schedule_impact.py` computes cost (£) and programme-delay (days) per issue, keyed by risk band × mechanism, against a 10-activity baseline MEP programme (a modelling assumption, not measured project data).
+Module 5 provides two distinct outputs, consumed differently by Components 2 and 3. `ComplianceReporter.render_visual_report()` renders an on-screen HTML summary of comparator results (§1.2.3) — pass/fail counts, per-rule failure detail — and is genuinely called from both `analyze.py` and `revit_sync.py`. For BCF export, `bcf_generator.py` implements a well-formed BCF 2.1 ZIP writer (GlobalId, viewpoint, risk score, mitigation text per issue; `snapshot.png` is currently a hardcoded 1×1 placeholder pixel, a known limitation). A second BCF writer, `app/services/bcf_exporter.py`, is **broken, not just unused**: it imports `ComplianceIssue` from `app.models.compliance_models`, a module that does not exist anywhere in the repository, so this file would raise `ModuleNotFoundError` if anything tried to call it — which nothing does (zero callers found anywhere). **Neither writer is currently invoked by the live download route**: `app/routes/analyze.py`'s `/reports/bcf/{project_id}` endpoint only reads a pre-existing file named `data/compliance_project_{id}.bcf` from disk if one happens to exist — it does not generate one. The two such files that do exist (`compliance_project_1.bcf`, `compliance_project_3.bcf`, both genuine, well-formed, non-empty BCF archives) were produced by an earlier version of the pipeline whose write step is not present in the current codebase (§1.4.2). `cost_model.py` implements a configurable `CostModel` with CSV-upload support, shipping with UK MEP default rates hardcoded in Python rather than a checked-in CSV. `schedule_impact.py` computes cost (£) and programme-delay (days) per issue, keyed by risk band × mechanism, against a 10-activity baseline MEP programme (a modelling assumption, not measured project data).
 
 ### 1.2.7 Software and environment
 
@@ -57569,7 +57569,7 @@ Python 3.12, managed with `uv`. Application: FastHTML + MonsterUI (server-render
 
 **Component 1 (rule extraction).** `eval_harness.py` implements a golden set of 8 hand-authored `EVAL_CASES` and a genuine LLM-as-judge harness scoring each generated rule 1–5 on Correctness, Completeness and Executability. **Precision/recall/F1 per rule field is not yet implemented** — the methodology (confusion matrix over element/property/operator/value/unit) is specified but not coded, and a call to a `RuleGenerator.generate_rules()` method that does not exist on the current class would raise an `AttributeError` if the harness were run as-is. Both must be fixed before a live evaluation run (§1.4.3).
 
-**Component 2 (generic comparator).** Intended validation regime: unit tests exercising all ten operators against synthetic element/rule pairs, plus integration coverage confirming identical output whether elements arrive via `Module2_IFCRead` or `RevitSyncService`. Neither currently exists as passing, up-to-date test coverage (§1.2.3).
+**Component 2 (generic comparator).** Intended validation regime: unit tests exercising all ten operators against synthetic element/rule pairs, plus integration coverage confirming identical output whether elements arrive via `IFCReader` or `RevitSyncService`. Neither currently exists as passing, up-to-date test coverage (§1.2.3).
 
 **Component 3 (corrosion engines).** Intended validation regime: agreement with hand-calculated ground truth for known material pairs, environments and geometries (unit tests), plus expert review of aggregate risk-band distribution on a benchmark element set — the process by which that review is conducted, and its acceptance criteria, are now formally defined in §1.2.9. Hand-calculated unit tests do not yet exist. A real, measured historical run does exist, evidenced by a persisted issue-history log (§1.4.2) — genuine output, but not yet reproducible from the current codebase on demand, and not backed by a repeatable automated test.
 
@@ -57609,11 +57609,11 @@ Two of the three components produce output that no test can validate. A unit tes
 ### 1.3.1 Model iterations and experimental evolution
 
 - **Iteration 0, Streamlit prototype.** The team's first working end-to-end system was a Streamlit application. It is not present in this repository's git history, but its influence is: the corrosion module's own `issue_tracker.py` file still carries a `"Usage in Streamlit: from modules.issue_tracker import IssueTracker"` docstring and an embedded Streamlit integration snippet, and it produced historical run-history data now represented in `public.issue_history` (see §1.4.2).
-- **Iteration 1, Mock-first pipeline.** The rule-extraction path was first built with `module3_rule_builder_mock.py` and the CODE seed rules, letting Components 2 and 3 be developed end-to-end before the NLP layer was reliable. This mock module is now orphaned dead code.
+- **Iteration 1, Mock-first pipeline.** The rule-extraction path was first built with `rule_builder_mock.py` and the CODE seed rules, letting Components 2 and 3 be developed end-to-end before the NLP layer was reliable. This mock module is now orphaned dead code.
 - **Iteration 2, Regex baseline; Iteration 3, LLM converter.** As described in §1.2.2 — a free offline regex baseline, then an OpenAI-SDK-based GPT converter behind a `USE_GPT4O` flag (CLI path), later superseded in the live web app by a separate, `litellm`-based, genuinely provider-agnostic converter. The two have not yet been reconciled (§1.4.6).
 - **Iteration 4, NLP enrichment.** Module 1 grew from keyword filtering to a layered approach, and a Module 1b semantic-annotation layer was added and wired into the live extraction service.
-- **Iteration 5, splitting the comparator from the corrosion engine.** Originally, a single galvanic-only file (`module4_comparator/galvanic.py`) handled both roles implicitly. As crevice and MIC logic were added, the team recognised these needed a fundamentally different evaluation model (weighted composite scoring against fixed standards) from ordinary rule checking (threshold evaluation against extracted rules) — leading to `Module4_Comparator` being generalised into the operator-based evaluator described in §1.2.3, while corrosion-specific logic moved into its own `compliance_runner.py`. A fuller three-mechanism reference implementation was developed separately in `app/engines/`, but has not yet been re-integrated as the pipeline's single source of truth for corrosion (§1.4.6).
-- **Iteration 6, source-independence.** `RevitSyncService` was added specifically so `Module4_Comparator` could serve a live pyRevit integration without any change to the comparator itself — the clearest evidence in the codebase that the team was deliberately designing Component 2 as a generic, reusable evaluator rather than an IFC-only or corrosion-only tool.
+- **Iteration 5, splitting the comparator from the corrosion engine.** Originally, a single galvanic-only file (`comparator/galvanic.py`) handled both roles implicitly. As crevice and MIC logic were added, the team recognised these needed a fundamentally different evaluation model (weighted composite scoring against fixed standards) from ordinary rule checking (threshold evaluation against extracted rules) — leading to `ComplianceComparator` being generalised into the operator-based evaluator described in §1.2.3, while corrosion-specific logic moved into its own `compliance_runner.py`. A fuller three-mechanism reference implementation was developed separately in `app/engines/`, but has not yet been re-integrated as the pipeline's single source of truth for corrosion (§1.4.6).
+- **Iteration 6, source-independence.** `RevitSyncService` was added specifically so `ComplianceComparator` could serve a live pyRevit integration without any change to the comparator itself — the clearest evidence in the codebase that the team was deliberately designing Component 2 as a generic, reusable evaluator rather than an IFC-only or corrosion-only tool.
 - **Iteration 7, reporting & commercial impact.** The reporter matured to include a configurable `cost_model` and `schedule_impact`, connecting each corrosion issue to a £ cost and programme-delay figure.
 - **Iteration 8, geometry-derivation and spatial-adjacency tiers.** As real IFC exports proved inconsistent about which properties were authored, `ifc_geometry.py` was extended to derive architectural dimensions (height, width, sill height, slope, corridor width, and others) directly from mesh geometry when a property was absent, and `ifc_spatial.py` was added as a separate spatial-adjacency layer (`IfcRelSpaceBoundary` parsing) to support relationship-aware checks — daylight ratio, fire separation, garage separation — that a single-element operator rule cannot express (§1.2.5).
 - **Iteration 9, discipline-based rule sorting.** As the rule library grew to include both CODE dimensional rules and corrosion mechanisms, `RuleService` gained a `THEMES`/`infer_theme()` classifier so a compliance run can be scoped to Architecture or MEP rules specifically, rather than always evaluating the full combined rule set (§1.2.3).
@@ -57672,7 +57672,7 @@ Two of the three components produce output that no test can validate. A unit tes
 
 ### 1.4.1 Component 2 — generic comparator: what is genuinely demonstrated today
 
-**Tier (a).** The comparator is live and exercised by two independent, real entry points: an uploaded-IFC flow (`analyze.py`) and a live pyRevit push (`revit_sync.py`), both producing the same `Module5_Reporter` visual summary. This demonstrates the source-independence design goal (§1.2.3) is genuinely met, not just intended. What is not yet available is an aggregate accuracy benchmark — e.g., "of N rule × element evaluations, M matched an independently hand-checked expected result" — because no such benchmark has been built yet (§1.2.8). This is scoped as pre-final-submission work.
+**Tier (a).** The comparator is live and exercised by two independent, real entry points: an uploaded-IFC flow (`analyze.py`) and a live pyRevit push (`revit_sync.py`), both producing the same `ComplianceReporter` visual summary. This demonstrates the source-independence design goal (§1.2.3) is genuinely met, not just intended. What is not yet available is an aggregate accuracy benchmark — e.g., "of N rule × element evaluations, M matched an independently hand-checked expected result" — because no such benchmark has been built yet (§1.2.8). This is scoped as pre-final-submission work.
 
 ### 1.4.2 Component 3 — corrosion engine: what is genuinely demonstrated today
 
@@ -57810,7 +57810,7 @@ BIMGuard AI is designed to slot into the weekly BIM coordination cycle ("model-d
 23. The Expert Review process is now formally defined (§1.2.9) but largely unbuilt: there is no state machine, no enforcement gate, no record of reviewer identity, decision, rationale or failure class, and no review path for compliance findings as opposed to rules.
 
 **Improvements, in priority order for the final submission:**
-1. Add unit tests for `Module4_Comparator`'s ten operators (Component 2) — cheapest, highest-confidence item on this list.
+1. Add unit tests for `ComplianceComparator`'s ten operators (Component 2) — cheapest, highest-confidence item on this list.
 2. Restore/reimplement the corrosion engine's BCF and issue-history write path, then re-run it and the aggregate benchmark to convert §1.4.2 from tier (b)/(c) evidence to tier (a).
 3. Fix `eval_harness.py` (the `generate_rules` bug), implement precision/recall/F1, then run it to populate §1.4.3.
 4. Wire the MIC engine into `compliance_runner.py`, ideally reading tables from static asset payloads in `public.static_data_assets` instead of hardcoded Python tables.
@@ -57865,7 +57865,7 @@ Zheng, Z., et al. (2022). *[LLM/transformer rule extraction for compliance — f
 
 ### Appendices
 
-- **Appendix A — Source code repository.** `github.com/maicen/bim-guard` (verified `origin` remote). Component map: rule extraction (`app/services/rule_extraction_service.py`, `app/modules/module1_doc_parser/`, `module1b_nlp_annotator/`, `module3_rule_builder/`); generic comparator (`app/modules/module4_comparator/__init__.py`, `app/services/revit_sync_service.py`); IFC ingestion, geometry, spatial adjacency and egress analysis (`app/modules/module2_ifc_read/ifc_parser.py`, `ifc_geometry.py`, `ifc_spatial.py`, `ifc_egress.py`, `ifc_graph.py`, `ifc_quality/`, `piping_schema.py`); corrosion engine (`app/modules/module4_comparator/compliance_runner.py`, `galvanic.py`, `app/engines/`); application shell (`app/routes/projects.py`, `viewer.py`, `app/services/documents_service.py`, `object_storage.py`).
+- **Appendix A — Source code repository.** `github.com/maicen/bim-guard` (verified `origin` remote). Component map: rule extraction (`app/services/rule_extraction_service.py`, `app/modules/document_parsing/`, `nlp_annotation/`, `rule_builder/`); generic comparator (`app/modules/comparator/__init__.py`, `app/services/revit_sync_service.py`); IFC ingestion, geometry, spatial adjacency and egress analysis (`app/modules/ifc_reader/ifc_parser.py`, `ifc_geometry.py`, `ifc_spatial.py`, `ifc_egress.py`, `ifc_graph.py`, `ifc_quality/`, `piping_schema.py`); corrosion engine (`app/modules/comparator/compliance_runner.py`, `galvanic.py`, `app/engines/`); application shell (`app/routes/projects.py`, `viewer.py`, `app/services/documents_service.py`, `object_storage.py`).
 - **Appendix B — Rulesets (JSON).** DB-backed static assets for `ruleset:BIMGUARD-GC-001`, `ruleset:BIMGUARD-CC-001`, and `ruleset:BIMGUARD-MC-001` in `public.static_data_assets` — each a versioned specification (`ruleset_version: "1.0.0"`) with real, detailed material tables, thresholds, weights, an explicit risk-band-to-BCF-action mapping, and 6–8 cited standards per mechanism. Currently consumed for Rule Library documentation/display, not as the live parametrisation of the corrosion engine itself (§1.2.4, §1.4.6 improvement #4).
 - **Appendix C — Scoring models.** GC-001, CC-001, MC-001 composite formulas and risk-band definitions as implemented in `app/engines/` (reference implementation) — see §1.2.4 for how these differ from the tables actually executed by `compliance_runner.py` in production.
 - **Appendix D — Evaluation harness, tests, and historical run data.** The maintained pytest suite is in `tests/`; the research-only golden-set and LLM-as-judge harness remains in `app/modules/tests/eval_harness.py` — see §1.2.8 and §1.4.6 for fixes needed. Historical corrosion-engine run history is now represented in `public.issue_history`, the evidentiary basis for §1.4.2.
@@ -58239,7 +58239,7 @@ Ruled out
 
 Root cause
 ----------
-app/modules/module2_ifc_read/ifc_geometry.py, IFCGeometryExtractor._get_shape
+app/modules/ifc_reader/ifc_geometry.py, IFCGeometryExtractor._get_shape
 cached tessellated shapes under id(element) -- the CPython address of the
 ifcopenshell entity_instance wrapper.
 
@@ -58531,7 +58531,7 @@ Before the dimension-by-dimension audit, one fact governs almost every other fin
 |---|---|---|
 | Thesis is 73 pages, 27,903 words, 39 references | `docs/MAICEN_M10_Final_Thesis_Mark_Shane_Haines.docx` — Word's own `docProps/app.xml` metadata reports **50 pages, 17,190 words**. No other candidate file (`BIMGUARD_AI_Master_Thesis.docx` = 8,312 words, no metadata) reaches 73 pages / 27,903 words anywhere in either repo. | **[Certain]** |
 | Thesis covers Ch. 11–14 (five engines), Appendix A (validation), Chapter 15 (limitations) | Actual table of contents ends at **Chapter 14 — "The Expert Review Process"** + References. There is no Chapter 15 and no Appendix A anywhere in the document text. | **[Certain]** |
-| 38 real-world IFC models, 37 processed | `data/` contains **one** IFC file (`test_hospital_mep_scenario.ifc`). The thesis abstract itself states validation ran on a **"25-element synthetic dataset"** — generated by `generate_synthetic_elements(n=25)` in [`app/modules/module2_ifc_read/ifc_parser.py:261`](https://github.com/maicen/bim-guard/blob/main/app/modules/module2_ifc_read/ifc_parser.py#L261). | **[Certain]** |
+| 38 real-world IFC models, 37 processed | `data/` contains **one** IFC file (`test_hospital_mep_scenario.ifc`). The thesis abstract itself states validation ran on a **"25-element synthetic dataset"** — generated by `generate_synthetic_elements(n=25)` in [`app/modules/ifc_reader/ifc_parser.py:261`](https://github.com/maicen/bim-guard/blob/main/app/modules/ifc_reader/ifc_parser.py#L261). | **[Certain]** |
 | 37 BCF 2.1 files generated | **3** BCF files exist in the whole core repo (`test_output.bcf`, `data/compliance_project_1.bcf`, `data/compliance_project_3.bcf`). | **[Certain]** |
 | 223,516 clashes (211K minor / 6.6K major / 5.2K critical), 49,736 MEP elements | Not found anywhere — no test output, benchmark file, or JSON in either repo contains these figures. The only clash-count figures in the thesis are the 25-element dataset's **9 Critical / 7 High / 9 Medium** issues, and the repo's own revision note (`docs/BIMGuard_3rd_Submission_REVISED.md`) says that even *that* smaller figure is **"real output from an earlier version of the pipeline… [that] predates the current FastHTML architecture and its exact code path is no longer present in this repository, so the run cannot yet be reproduced on demand."** | **[Certain]** |
 | Platform: Python 3.11.9 | `.python-version` = `3.11`, `pyproject.toml` requires `>=3.11`, but the core repo's own `README.md` line 50 says **"Python 3.12 or later is required."** The thesis title page says the platform is **Streamlit**; the actual `main.py` is FastHTML/Uvicorn. | **[Certain]** |
@@ -58551,7 +58551,7 @@ bim-guard/
 ├── app/
 │   ├── engines/              # GC-001, CC-001, MC-001 (bimguard_*_engine.py)
 │   ├── modules/               # 5-step pipeline: doc_parser → ifc_read → rule_builder → comparator → reporter
-│   │   └── module4_comparator/material_media.py, cross_material.py   ← MM-001, XM-001 actually live HERE, not in engines/
+│   │   └── comparator/material_media.py, cross_material.py   ← MM-001, XM-001 actually live HERE, not in engines/
 │   ├── components/, routes/, services/, views/, db.py
 ├── data/  (only 1 IFC file, 3 BCF files, JSON rulesets)
 ├── docs/  (thesis .docx, presentations, benchmarks, defect reports)
@@ -58563,7 +58563,7 @@ bim-guard/
 | Check | Result | Evidence |
 |---|---|---|
 | README.md at root, documents structure | ✅ Pass | `README.md` accurately describes the *actual* layout (engines/modules/components split), better than the brief's assumed structure |
-| Main code organized logically | ⚠️ Partial | Five engines are split across two unrelated locations: `app/engines/` (GC-001, CC-001, MC-001) vs `app/modules/module4_comparator/` (MM-001, XM-001). Not documented anywhere as an intentional split — reads as accidental drift. |
+| Main code organized logically | ⚠️ Partial | Five engines are split across two unrelated locations: `app/engines/` (GC-001, CC-001, MC-001) vs `app/modules/comparator/` (MM-001, XM-001). Not documented anywhere as an intentional split — reads as accidental drift. |
 | Dedicated tests folder | ✅ Pass, but duplicated | `tests/` (22 files, root-level) **and** `app/modules/tests/` (separate suite with its own `TEST_README.md`) — two parallel test suites is a maintainability smell |
 | Data folder with models/configs/outputs | ⚠️ Partial | Present, but only 1 IFC model and 3 BCF files — not the "38 models / validation_results/" the brief expects |
 | Docs folder | ✅ Pass | Present and rich (`docs/`, `docs/Presentation-2026-May/`, `docs/benchmarks/`, `docs/defects/`) |
@@ -58580,8 +58580,8 @@ bim-guard/
 | GC-001 galvanic engine, NASA-STD-6012 | [`app/engines/bimguard_corrosion_engine.py`](https://github.com/maicen/bim-guard/blob/main/app/engines/bimguard_corrosion_engine.py#L21-L24), lines 21-24 — risk bands Low `<0.35`, Medium `0.35–0.65`, High `0.65–0.85`, Critical `>0.85`; NASA-STD-6012 voltage thresholds cited in docstring | ✅ Pass | [Certain] |
 | CC-001 crevice engine, EN ISO 15329 / ASTM G48 | [`app/engines/bimguard_crevice_engine.py`](https://github.com/maicen/bim-guard/blob/main/app/engines/bimguard_crevice_engine.py#L289), line 289 — `Score = 0.35×geometry_risk + 0.40×CCT_adequacy + 0.25×environment_severity` — matches thesis §9.5 weighting exactly | ✅ Pass | [Certain] |
 | MC-001 microbial engine | `app/engines/bimguard_mic_engine.py` exists, `RULESET_VERSION = "BIMGUARD-MC-001 v1.0.0"` | ✅ Pass in core repo | [Certain] — **but see 3.2**: analytics repo's own README marks MC-001 "🔲 Planned", not released |
-| MM-001 material-media, XM-001 cross-material | Live in `app/modules/module4_comparator/material_media.py` and `cross_material.py`, plus static rulesets `data/rulesets/mm_001_material_media.json`, `xm_001_cross_material.json` | ✅ Pass, but location inconsistent with GC/CC/MC | [Certain] |
-| Blue Halo §4.6 seismic clearance | Split across `app/modules/module2_producer/halo_volume_generator.py`, `app/modules/module5_reporter/blue_halo_bcf_exporter.py`, root `validate_blue_halo.py` | ✅ Pass (logic present), organization scattered | [Certain] |
+| MM-001 material-media, XM-001 cross-material | Live in `app/modules/comparator/material_media.py` and `cross_material.py`, plus static rulesets `data/rulesets/mm_001_material_media.json`, `xm_001_cross_material.json` | ✅ Pass, but location inconsistent with GC/CC/MC | [Certain] |
+| Blue Halo §4.6 seismic clearance | Split across `app/modules/module2_producer/halo_volume_generator.py`, `app/modules/reporter/blue_halo_bcf_exporter.py`, root `validate_blue_halo.py` | ✅ Pass (logic present), organization scattered | [Certain] |
 | "Chapter 15 — Limitations & future work" | **Does not exist.** Thesis ends at Ch.14 (Expert Review Process) + References. Ch.14.6 "Implementation status" is the closest analogue and is candid about gaps (see 1.5) | ❌ Fail (as literally claimed) | [Certain] |
 | "Appendix A — validation results" | **Does not exist** as an appendix. Validation results live in-line in Ch.5 (`Table 5.1 GC-001 validation dataset results`) and Ch.12.7/13.5 | ❌ Fail (as literally claimed) | [Certain] |
 | 38-model / 223,516-clash validation | No corresponding file, script output, or number anywhere in the repo | ❌ Fail | [Certain] |
@@ -58610,7 +58610,7 @@ bim-guard/
 - `uv sync` + `uv.lock` gives fully version-locked, reproducible installs. ✅ [Certain]
 - `validate_blue_halo.py` and `test_real_ifc_pipeline.py` exist at root and appear runnable standalone (self-contained argument parsing, no unresolved external file dependencies beyond the one committed IFC model). ✅ [Likely]
 - No file named `analyse_validation_results.py` exists anywhere in either repo — only `scripts/validate_repo.py`, which is a different, narrower structural-check script. ❌ [Certain] — if the brief's examiner expects this exact script, it does not exist.
-- **Error-handling gap**: `parse_ifc()` in [`app/modules/module2_ifc_read/ifc_parser.py`](https://github.com/maicen/bim-guard/blob/main/app/modules/module2_ifc_read/ifc_parser.py#L247-L258), lines 247-258, calls `ifcopenshell.open(ifc_path)` with **no try/except** — a malformed or missing IFC path will raise an unhandled exception at this entry point, even though other functions in the same file (lines 90, 154, 188) do wrap parsing in `try/except Exception`. **Minor priority.**
+- **Error-handling gap**: `parse_ifc()` in [`app/modules/ifc_reader/ifc_parser.py`](https://github.com/maicen/bim-guard/blob/main/app/modules/ifc_reader/ifc_parser.py#L247-L258), lines 247-258, calls `ifcopenshell.open(ifc_path)` with **no try/except** — a malformed or missing IFC path will raise an unhandled exception at this entry point, even though other functions in the same file (lines 90, 154, 188) do wrap parsing in `try/except Exception`. **Minor priority.**
 - `ifcopenshell>=0.8.4.post1` pinned, and the geometry code uses the current `ifcopenshell.geom.settings()` / `create_shape()` API — no deprecated calls found. ✅ [Likely]
 - No hardcoded absolute paths found in `.py` files (a Windows path did appear, but only pasted inside `app/modules/README.md` as an example terminal transcript, not in executable code). ✅ [Certain]
 
@@ -58703,7 +58703,7 @@ However:
 | Check | Finding | Status |
 |---|---|---|
 | Documented data contract producer→consumer | ✅ `data/schema/data-contract.md` clearly states it is what `analytics_export.py` must produce and `model.bim` must consume, with a versioned schema and change process | Pass |
-| Does the *documented* contract match what the *core* repo (`bim-guard`) actually outputs? | ⚠️ **No direct link exists.** `analytics_export.py` lives inside `bimguard-analytics/bimguard_app/`, a stale, differently-named copy of the app — not inside the current `bim-guard` repo at all. The current `bim-guard` repo has its own `app/services/bcf_exporter.py` and issue schema (`app/modules/module4_comparator/issue_schema.py`), and there is no evidence either repo's code calls the other. The two repos are **not integrated at the code level** — `bim-guard` does not import from or write to anything `bimguard-analytics` reads, and vice versa. They share duplicated engine files (`bimguard_corrosion_engine.py`, `bimguard_crevice_engine.py`, `bimguard_mic_engine.py` exist in both repos) rather than one repo depending on the other. | **Fail** |
+| Does the *documented* contract match what the *core* repo (`bim-guard`) actually outputs? | ⚠️ **No direct link exists.** `analytics_export.py` lives inside `bimguard-analytics/bimguard_app/`, a stale, differently-named copy of the app — not inside the current `bim-guard` repo at all. The current `bim-guard` repo has its own `app/services/bcf_exporter.py` and issue schema (`app/modules/comparator/issue_schema.py`), and there is no evidence either repo's code calls the other. The two repos are **not integrated at the code level** — `bim-guard` does not import from or write to anything `bimguard-analytics` reads, and vice versa. They share duplicated engine files (`bimguard_corrosion_engine.py`, `bimguard_crevice_engine.py`, `bimguard_mic_engine.py` exist in both repos) rather than one repo depending on the other. | **Fail** |
 | Versioning / compatibility statement ("requires bim-guard v1.0+") | Not found in either README | Fail |
 | Schema drift handling | `data-contract.md` documents a *process* for handling schema changes but there's no code that validates a live `bim-guard` export against it (no compatibility test between repos) | Partial |
 | Standards/threshold consistency | Severity band cutoffs are consistent (see 2.3) | Pass |
@@ -58749,7 +58749,7 @@ The underlying engineering is real and often better than a typical student FMP (
 ### Nice-to-have improvements (not blocking)
 
 - Consolidate the two parallel test suites (`tests/` and `app/modules/tests/`) in `bim-guard`.
-- Document why MM-001/XM-001 live in `module4_comparator/` rather than `app/engines/` alongside the other three engines.
+- Document why MM-001/XM-001 live in `comparator/` rather than `app/engines/` alongside the other three engines.
 - Add a one-line justification for the 6.8 MB PDF committed under `data/uploads/`.
 - Add a `measures.md` human-readable DAX reference alongside `model.bim` for examiners who don't want to read raw JSON.
 - Grow the analytics repo's commit history into meaningful incremental commits rather than one large "add compliance engines… from bim-guard" commit, if more analytics work is planned before submission.
@@ -60369,7 +60369,7 @@ raise at import. Whatever fixes finding 4 should let them import.
   band all 861. Control elements are an IFC subtype of `IfcDistributionElement`,
   which is deliberately in the parser's service map. A domain question.
 - The identical geometry limitation remains in
-  `module2_ifc_read/piping_producer._local_vertices`, which feeds the corrosion
+  `ifc_reader/piping_producer._local_vertices`, which feeds the corrosion
   network geometry. Left alone deliberately — changing it would move the
   corrosion numbers above.
 - An `IFC2X2_FINAL` file is refused cleanly ("Unsupported schema"), and a 148 MB

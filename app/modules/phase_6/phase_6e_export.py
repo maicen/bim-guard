@@ -8,7 +8,7 @@ added later, with no per-mechanism branch.
 
 BCF IS NOT REIMPLEMENTED
 
-    ``module5_reporter.bcf_generator`` already produces spec-compliant BCF 2.1
+    ``reporter.bcf_generator`` already produces spec-compliant BCF 2.1
     archives, and ``blue_halo_bcf_exporter`` already renders Halo clashes
     through the same helpers. This module maps :class:`Issue` onto
     ``BCFIssue`` and calls ``generate_bcf``; it writes no XML of its own.
@@ -32,8 +32,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.logging_config import get_logger
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
-from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.comparator.issue_schema import Issue, RiskBand
+from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 
 logger = get_logger(__name__)
 
@@ -264,7 +264,7 @@ def to_bcf(result: dict, *, include_data_quality: bool = True) -> bytes:
 
 def to_ids(result: dict) -> str:
     """Render rules / compliance requirements as buildingSMART IDS XML deliverable."""
-    from app.modules.module3_rule_builder.ids_exporter import build_ids_document
+    from app.modules.rule_builder.ids_exporter import build_ids_document
     rules = result.get("rules", []) or result.get("audit_rules", []) or []
     return build_ids_document(rules)
 

@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from app.modules.module4_comparator.compliance_runner import run_compliance_checks
-from app.modules.module4_comparator.engine_registry import (
+from app.modules.comparator.compliance_runner import run_compliance_checks
+from app.modules.comparator.engine_registry import (
     RuleEngineRegistry,
     register_default_engines,
 )

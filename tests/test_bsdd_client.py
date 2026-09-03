@@ -1,6 +1,6 @@
 """Tests for buildingSMART Data Dictionary (bSDD) Client & Semantic Validation."""
 
-from app.modules.module4_comparator.compliance_runner import run_bsdd_semantic_verification
+from app.modules.comparator.compliance_runner import run_bsdd_semantic_verification
 from app.services.bsdd_client import BSDDClient
 
 

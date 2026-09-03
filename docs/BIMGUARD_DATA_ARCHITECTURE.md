@@ -49,13 +49,13 @@ D:\Zigurat Masters\bim-guard\
 │   ├── modules/                the compliance pipeline
 │   │   ├── orchestrator.py      BIMGuard_App.orchestrate_workflow()
 │   │   ├── pipeline_services.py execute_model_enhancement()
-│   │   ├── module1_doc_parser/  PDF → text → sections → candidate rules
-│   │   ├── module1b_nlp_annotator/
-│   │   ├── module2_ifc_read/    IFC parsing, geometry, spatial, egress, piping
+│   │   ├── document_parsing/  PDF → text → sections → candidate rules
+│   │   ├── nlp_annotation/
+│   │   ├── ifc_reader/    IFC parsing, geometry, spatial, egress, piping
 │   │   ├── module2_producer/    Blue Halo clearance algorithm
-│   │   ├── module3_rule_builder/
-│   │   ├── module4_comparator/  corrosion engines + Issue contract
-│   │   └── module5_reporter/    BCF 2.1, cost model, report generator
+│   │   ├── rule_builder/
+│   │   ├── comparator/  corrosion engines + Issue contract
+│   │   └── reporter/    BCF 2.1, cost model, report generator
 │   └── engines/                 GC/CC/MC reference implementations
 ├── data/
 │   ├── cache/supabase-storage/  local materialisation of remote objects
@@ -133,8 +133,8 @@ re-download on every request.
 | Parse/validate | `_run_analysis_request` | returns `(dict, None)` or `(None, Alert)` |
 | Run pipeline | `modules/orchestrator.py :: BIMGuard_App.orchestrate_workflow` | **plain dict** |
 | Materialise IFC | `object_storage.materialize_local_path` | downloads to local cache if needed |
-| Read IFC | `module2_ifc_read` | elements, geometry, spatial, egress |
-| Compare | `module4_comparator` | `Issue` dataclasses |
+| Read IFC | `ifc_reader` | elements, geometry, spatial, egress |
+| Compare | `comparator` | `Issue` dataclasses |
 | Render | `_compliance_card`, `_rule_compliance_card`, … | FastHTML component tree |
 | Respond | `Div(*sections)` | **HTML fragment** (HTMX swap) |
 
@@ -227,7 +227,7 @@ public.model_enhancement_lineage -- append-only, enforced by trigger
 works only because values are ISO-8601.
 
 **`issues` is not populated by the workflow.** `IssueTracker` /
-`issue_adapter` exist in `module4_comparator` but are not referenced by
+`issue_adapter` exist in `comparator` but are not referenced by
 `orchestrator.py`, `pipeline_services.py`, or any route. The table is
 vestigial with respect to the live analysis path.
 

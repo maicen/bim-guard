@@ -27,7 +27,7 @@ import hashlib
 
 import pytest
 
-from app.modules.module2_ifc_read.ifc_parser import ServiceElement
+from app.modules.ifc_reader.ifc_parser import ServiceElement
 from app.modules.phase_6.phase_6b_parsing import (
     ParsedIFC,
     elements_by_guid,

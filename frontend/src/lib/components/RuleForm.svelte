@@ -73,7 +73,7 @@
   let formCheckValue = $state(seed?.check_value || "");
 
   // The compliance engine always scales a length property's real IFC value to
-  // millimetres before comparing (module2_ifc_read._resolve_element_property,
+  // millimetres before comparing (ifc_reader._resolve_element_property,
   // Pass 8) — regardless of the source model's own declared unit — so a
   // dimensional rule's check_value has to already be in millimetres or the
   // comparison is silently wrong. This lets the author type in whatever unit

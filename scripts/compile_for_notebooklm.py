@@ -137,14 +137,14 @@ ROUTING_RULES: list[tuple[str, str]] = [
     ("app/services/corrosion_rule_catalog.py", CORROSION),
     ("data/rulesets/mm_001_*", CORROSION),         # MM-001 material media
     ("data/rulesets/xm_001_*", CORROSION),         # XM-001 cross material
-    ("app/modules/module4_comparator/galvanic.py", CORROSION),
+    ("app/modules/comparator/galvanic.py", CORROSION),
     ("app/modules/phase_6/phase_6c_corrosion_ui.py", CORROSION),
 
     # -- 2. Explicit seismic paths -----------------------------------------
     ("data/rulesets/config_*.json", SEISMIC),      # EN 1998-1 / DIN 4149 configs
-    ("app/modules/module2_producer/generate_expanded_config.py", SEISMIC),
+    ("app/modules/blue_halo/generate_expanded_config.py", SEISMIC),
     ("app/modules/phase_6/phase_6d_seismic.py", SEISMIC),
-    ("app/modules/module5_reporter/blue_halo_bcf_exporter.py", SEISMIC),
+    ("app/modules/reporter/blue_halo_bcf_exporter.py", SEISMIC),
     ("docs/HERMES_CONTEXT.md", SEISMIC),
 
     # -- 3. Corrosion keyword fallbacks ------------------------------------

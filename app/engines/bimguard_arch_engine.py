@@ -17,7 +17,7 @@ from typing import Any
 
 from app.logging_config import get_logger
 from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
-from app.modules.module4_comparator.engine_registry import RuleEvaluationContext, RuleEvaluator
+from app.modules.comparator.engine_registry import RuleEvaluationContext, RuleEvaluator
 from app.services.rules_service import RuleService
 
 logger = get_logger(__name__)

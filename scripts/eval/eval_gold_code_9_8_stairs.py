@@ -11,7 +11,7 @@ Used by score_module3_extraction.py to measure rule-extraction accuracy
 against a known-correct answer key instead of eyeballing output.
 
 Field names match the LiteLLMRuleExtractor / RuleConverter schema
-(app/services/rule_extractor.py, app/modules/module3_rule_builder/rule_converter.py).
+(app/services/rule_extractor.py, app/modules/rule_builder/rule_converter.py).
 
 GOLD_RULES: clauses that ARE discrete, checkable requirements — every one of
 these should show up in extracted output with the right target/property/value.

@@ -25,14 +25,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.modules.module2_ifc_read.piping_schema import (  # noqa: E402
+from app.modules.ifc_reader.piping_schema import (  # noqa: E402
     BoundingBox,
     EnvironmentClass,
     PipingElement,
     PipingSystem,
     Point3D,
 )
-from app.modules.module4_comparator import galvanic  # noqa: E402
+from app.modules.comparator import galvanic  # noqa: E402
 
 # Potentials as they appear in the seeded GC-001 payload. Higher is more anodic.
 ZINC_V = 0.80

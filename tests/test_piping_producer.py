@@ -10,8 +10,8 @@ Run: uv run pytest tests/test_piping_producer.py -v
 
 import pytest
 
-from app.modules.module2_ifc_read import piping_producer as pp
-from app.modules.module2_ifc_read.piping_schema import (
+from app.modules.ifc_reader import piping_producer as pp
+from app.modules.ifc_reader.piping_schema import (
     CANONICAL_MATERIALS,
     Centerline,
     EnvironmentClass,

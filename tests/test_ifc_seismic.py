@@ -21,7 +21,7 @@ import math
 
 import pytest
 
-from app.modules.module2_ifc_read import ifc_seismic as seis
+from app.modules.ifc_reader import ifc_seismic as seis
 
 # ── Value parsing: no IFC required ────────────────────────────────────────────
 
@@ -475,7 +475,7 @@ def seismic_model(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def extractor(seismic_model):
-    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+    from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
     return IFCGeometryExtractor(seismic_model)
 

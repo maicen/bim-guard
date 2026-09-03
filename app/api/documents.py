@@ -176,7 +176,7 @@ async def upload_document(
     file_md5 = md5_hex(content)
 
     # Auto-extract ISO 19650 container metadata from filename if valid
-    from app.modules.module1_doc_parser.iso_validator import ISO19650Validator
+    from app.modules.document_parsing.iso_validator import ISO19650Validator
     val = ISO19650Validator.validate_filename(clean_filename)
     if val.is_valid:
         project_code = project_code or val.fields.get("project_code", "")
@@ -406,7 +406,7 @@ def list_rule_drafts(document_id: int) -> RuleExtractionDraftListResponse:
 def preview_rule_drafts_ids(document_id: int) -> Response:
     """Render an IDS preview from a document's extraction drafts, before promotion."""
     from app.modules.contracts import RuleExtractionDraft as _RuleExtractionDraft
-    from app.modules.module3_rule_builder.ids_exporter import translate_rule_drafts_to_ids
+    from app.modules.rule_builder.ids_exporter import translate_rule_drafts_to_ids
     from app.services.rule_draft_service import RuleDraftService
 
     rows = RuleDraftService().list_drafts(document_id)

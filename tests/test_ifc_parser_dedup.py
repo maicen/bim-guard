@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.module2_ifc_read.ifc_parser import (
+from app.modules.ifc_reader.ifc_parser import (
     IFC_SERVICE_LABELS,
     parse_ifc_model,
 )

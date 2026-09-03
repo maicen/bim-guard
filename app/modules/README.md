@@ -14,9 +14,9 @@ This module documentation uses an CODE example dataset, but the BIM-Guard app ar
 app/modules/
 ├── config.py
 ├── orchestrator.py
-├── module1_doc_parser/          (unchanged)
-├── module2_ifc_read/            ← was module2_ifc_read.py
-│   ├── __init__.py              (Module2_IFCRead + quality gate)
+├── document_parsing/          (unchanged)
+├── ifc_reader/            ← was ifc_reader.py
+│   ├── __init__.py              (IFCReader + quality gate)
 │   ├── ifc_parser.py
 │   ├── ifc_geometry.py
 │   ├── piping_schema.py
@@ -24,15 +24,15 @@ app/modules/
 │       ├── validator.py
 │       ├── improver.py
 │       └── generator.py
-├── module3_rule_builder/        (unchanged)
-├── module4_comparator/          ← was module4_comparator.py
-│   ├── __init__.py              (Module4_Comparator)
+├── rule_builder/        (unchanged)
+├── comparator/          ← was comparator.py
+│   ├── __init__.py              (ComplianceComparator)
 │   ├── compliance_runner.py
 │   ├── galvanic.py
 │   ├── issue_schema.py
 │   └── issue_tracker.py
-└── module5_reporter/            ← was module5_reporter.py
-    ├── __init__.py              (Module5_Reporter)
+└── reporter/            ← was reporter.py
+    ├── __init__.py              (ComplianceReporter)
     ├── bcf_generator.py
     ├── report_generator.py
     ├── schedule_impact.py
@@ -51,56 +51,56 @@ OUT
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/__init__.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/__pycache__
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/config.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/bert_classifier.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/confidence_scorer.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/dependency_parser.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/docling_extractor.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/enhanced_orchestrator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keyword_filter.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/keywords/keyword_master.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/section_chunker.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/table_rule_builder.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module1_doc_parser/tfidf_analyzer.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_geometry.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_parser.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/improver.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/ifc_quality/validator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module2_ifc_read/piping_schema.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/module3_rule_builder_mock.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/code_seed_rules.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_converter.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module3_rule_builder/rule_store.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/compliance_runner.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/galvanic.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/issue_schema.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module4_comparator/issue_tracker.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/bcf_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/cost_model.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/report_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/module5_reporter/schedule_impact.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/bert_classifier.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/confidence_scorer.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/dependency_parser.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/docling_extractor.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/enhanced_orchestrator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keyword_filter.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/keyword_master.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/section_chunker.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/table_rule_builder.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/tfidf_analyzer.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_geometry.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_parser.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/improver.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/validator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/piping_schema.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_builder_mock.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/code_seed_rules.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_converter.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_store.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/compliance_runner.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/galvanic.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/issue_schema.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/issue_tracker.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/__init__.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/__pycache__
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/bcf_generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/cost_model.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/report_generator.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/schedule_impact.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/orchestrator.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/requirements.txt
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests
@@ -121,7 +121,7 @@ app/modules/
 ├── requirements.txt
 ├── README.md
 │
-├── module1_doc_parser/          — PDF extraction → structured rules
+├── document_parsing/          — PDF extraction → structured rules
 │   ├── __init__.py
 │   ├── docling_extractor.py
 │   ├── enhanced_orchestrator.py
@@ -136,8 +136,8 @@ app/modules/
 │       ├── __init__.py
 │       └── keyword_master.py
 │
-├── module2_ifc_read/            — IFC parsing + quality gate
-│   ├── __init__.py              ← Module2_IFCRead (with auto quality check)
+├── ifc_reader/            — IFC parsing + quality gate
+│   ├── __init__.py              ← IFCReader (with auto quality check)
 │   ├── ifc_parser.py            — raw IFC element reader (ServiceElement)
 │   ├── ifc_geometry.py          — geometry extraction from pipe segments
 │   ├── piping_schema.py         — M2→M4 data contract (PipingElement)
@@ -147,23 +147,23 @@ app/modules/
 │       ├── improver.py          — auto-add missing GUIDs, names, Psets
 │       └── generator.py        — generate well-formed test IFC files
 │
-├── module3_rule_builder/        — NLP → structured compliance rules
+├── rule_builder/        — NLP → structured compliance rules
 │   ├── __init__.py
 │   ├── rule_generator.py
 │   ├── rule_converter.py        — OpenAI GPT-4o rule extractor
 │   ├── rule_store.py            — shared rule persistence via app services
 │   ├── code_seed_rules.py        — 25+ CODE baseline rules
-│   └── module3_rule_builder_mock.py
+│   └── rule_builder_mock.py
 │
-├── module4_comparator/          — IFC data vs rule library validation
-│   ├── __init__.py              ← Module4_Comparator
+├── comparator/          — IFC data vs rule library validation
+│   ├── __init__.py              ← ComplianceComparator
 │   ├── compliance_runner.py     — GC-001 / CC-001 engine orchestrator
 │   ├── galvanic.py              — galvanic corrosion comparator
 │   ├── issue_schema.py          — Issue data contract (M4 → M5)
 │   └── issue_tracker.py         — issue history across runs
 │
-├── module5_reporter/            — report generation
-│   ├── __init__.py              ← Module5_Reporter
+├── reporter/            — report generation
+│   ├── __init__.py              ← ComplianceReporter
 │   ├── bcf_generator.py         — BCF 2.1 ZIP output
 │   ├── report_generator.py      — Word / PDF compliance report
 │   ├── schedule_impact.py       — delay days + Gantt data
@@ -251,7 +251,7 @@ print(result)
 Seed them without uploading a PDF:
 
 ```bash
-uv run python -m app.modules.module3_rule_builder.code_seed_rules
+uv run python -m app.modules.rule_builder.code_seed_rules
 ```
 
 ---
@@ -270,7 +270,7 @@ uv run pytest app/modules/tests -v
 bim-guard/
 ├── app/
 │   └── modules/
-│       ├── module1_doc_parser/
+│       ├── document_parsing/
 │       │   ├── docling_extractor.py        ← Step 1: PDF → text + tables
 │       │   ├── table_rule_builder.py       ← Step 2: tables → rules directly
 │       │   ├── section_chunker.py          ← Step 3: text → 13 sections
@@ -282,7 +282,7 @@ bim-guard/
 │       │   ├── enhanced_orchestrator.py    ← runs all 4 improvements
 │       │   └── keywords/
 │       │       └── keyword_master.py       ← 193 keywords, 12 groups
-│       ├── module3_rule_builder/
+│       ├── rule_builder/
 │       │   ├── rule_store.py               ← shared CRUD via RuleService
 │       │   ├── rule_generator.py           ← validate + save rules
 │       │   ├── rule_converter.py           ← GPT-4o + RAG NLP engine

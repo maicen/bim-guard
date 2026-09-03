@@ -1,7 +1,7 @@
 """Session D — wire Blue Halo into ``AnalysisResult``.
 
 Blue Halo Phase 3. The algorithm is finished and benchmarked in
-``app/modules/module2_producer/halo_volume_generator.py``, whose own header
+``app/modules/blue_halo/halo_volume_generator.py``, whose own header
 names this task: *"Phase 3+: config-driven wiring into Module 4 comparators."*
 This module is that wiring, and reimplements none of it.
 
@@ -39,7 +39,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from app.logging_config import get_logger
-from app.modules.module2_producer.halo_volume_generator import (
+from app.modules.blue_halo.halo_volume_generator import (
     BoundingBox,
     BraceType,
     ClashReport,
@@ -53,8 +53,8 @@ from app.modules.module2_producer.halo_volume_generator import (
     load_clearance_config,
     unit_scale_to_mm,
 )
-from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
+from app.modules.comparator.issue_adapter import IssueIdAllocator
+from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
 
 logger = get_logger(__name__)
 

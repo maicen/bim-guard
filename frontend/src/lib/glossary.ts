@@ -9,7 +9,7 @@
  *
  * Sources: BS EN ISO 19650-1/-2 (suitability + revision coding, CDE workflow
  * states) and the engine module headers under `app/engines/` and
- * `app/modules/module4_comparator/` for the mechanism descriptions.
+ * `app/modules/comparator/` for the mechanism descriptions.
  */
 
 export interface GlossaryEntry {

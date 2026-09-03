@@ -148,7 +148,7 @@ The third iteration passed the rubric and was published. Component 2 then evalua
 plant-room pipework and returned **PASS**: the modelled material is SS316L, exactly as specified.
 
 At the same time, Component 3 scored the same element. Using the `PipingElement` fixture
-`example_ss316_pipe_in_plant_room()` [verified, `app/modules/module2_ifc_read/piping_schema.py`]:
+`example_ss316_pipe_in_plant_room()` [verified, `app/modules/ifc_reader/piping_schema.py`]:
 
 | Field | Value |
 |---|---|

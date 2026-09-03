@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any, NamedTuple
 
 from app.modules.contracts import CDEState
-from app.modules.module1_doc_parser.iso_validator import ISO19650Validator
+from app.modules.document_parsing.iso_validator import ISO19650Validator
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.projects_service import ProjectsService
 from app.utils import now_iso_utc

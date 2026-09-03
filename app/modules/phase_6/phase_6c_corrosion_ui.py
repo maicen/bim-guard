@@ -8,7 +8,7 @@ WHAT THIS DOES NOT DO
 
     It does not implement GC-001, CC-001, MC-001, MM-001 or XM-001. Those
     engines already exist — GC/CC/MC in ``app/engines/``, MM/XM in
-    ``app/modules/module4_comparator/`` — and are thesis-backing work; this
+    ``app/modules/comparator/`` — and are thesis-backing work; this
     module is the wiring that feeds them elements and turns their results into
     the shared ``Issue`` shape.
 
@@ -86,10 +86,10 @@ from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_ris
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
 from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
 from app.logging_config import get_logger
-from app.modules.module2_ifc_read.ifc_parser import ServiceElement
-from app.modules.module4_comparator import cross_material, material_media
-from app.modules.module4_comparator.issue_adapter import IssueIdAllocator
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
+from app.modules.ifc_reader.ifc_parser import ServiceElement
+from app.modules.comparator import cross_material, material_media
+from app.modules.comparator.issue_adapter import IssueIdAllocator
+from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
 
 logger = get_logger(__name__)
 

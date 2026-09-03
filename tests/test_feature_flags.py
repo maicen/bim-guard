@@ -44,7 +44,7 @@ _ORCHESTRATOR_PROBE = r"""
 import json, os, sys
 sys.path.insert(0, ".")
 src = open(
-    "app/modules/module4_comparator/compliance_orchestrator.py", encoding="utf-8"
+    "app/modules/comparator/compliance_orchestrator.py", encoding="utf-8"
 ).read()
 print(json.dumps({
     "mm": os.environ.get("FEATURE_PATH_B_MM", "0") == "1",

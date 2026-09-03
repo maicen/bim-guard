@@ -9,7 +9,7 @@ Pipeline flow:
         ↓  Module 1 — Step 1
     Document Extractor        → prose text + table DataFrames
                                  (Unstructured hosted API, or LightExtractor
-                                 fallback — see module1_doc_parser/document_extractor.py)
+                                 fallback — see document_parsing/document_extractor.py)
         ↓  Module 1 — Step 2
     TableRuleBuilder          → tables → rules.db directly (no LLM)
         ↓  Module 1 — Step 3
@@ -69,19 +69,19 @@ USE_GPT4O = False
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
-    from .module1_doc_parser import Module1_DocReader
-    from .module1_doc_parser.document_extractor import extract_document_text
-    from .module1_doc_parser.keyword_filter import KeywordFilter
-    from .module1_doc_parser.section_chunker import SectionChunker
-    from .module1_doc_parser.table_rule_builder import TableRuleBuilder
-    from .module3_rule_builder.code_seed_rules import seed_rules
-    from .module3_rule_builder.rule_generator import RuleGenerator
-    from .module3_rule_builder.rule_store import RuleStore
+    from .document_parsing import DocumentReader
+    from .document_parsing.document_extractor import extract_document_text
+    from .document_parsing.keyword_filter import KeywordFilter
+    from .document_parsing.section_chunker import SectionChunker
+    from .document_parsing.table_rule_builder import TableRuleBuilder
+    from .rule_builder.code_seed_rules import seed_rules
+    from .rule_builder.rule_generator import RuleGenerator
+    from .rule_builder.rule_store import RuleStore
 
     if USE_GPT4O:
-        from .module3_rule_builder.rule_converter import RuleConverter
+        from .rule_builder.rule_converter import RuleConverter
     else:
-        from .module3_rule_builder.regex_rule_converter import RegexRuleConverter as RuleConverter
+        from .rule_builder.regex_rule_converter import RegexRuleConverter as RuleConverter
     _PIPELINE_AVAILABLE = True
 except ImportError:
     _PIPELINE_AVAILABLE = False
@@ -185,7 +185,7 @@ def run_pipeline(
         # of giving up and sending nothing downstream.
         print("  [SectionChunker] 0 sections — falling back to generic chunking")
         logger.warning("Section chunker returned no sections; using generic fallback")
-        generic_blocks = Module1_DocReader().extract_text_sections(text)
+        generic_blocks = DocumentReader().extract_text_sections(text)
         chunks = [
             {
                 "section_number": str(i + 1),
@@ -344,8 +344,8 @@ class BIMGuard_App:
         from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
 
-        from .module2_ifc_read import Module2_IFCRead
-        from .module2_ifc_read.ifc_parser import (
+        from .ifc_reader import IFCReader
+        from .ifc_reader.ifc_parser import (
             generate_synthetic_elements,
             get_schema_compatibility_note,
             parse_ifc_model,
@@ -409,7 +409,7 @@ class BIMGuard_App:
         ifc_type_counts: dict = {}
         ifc_totals: dict = {}
         is_demo = False
-        m2_reader: Module2_IFCRead | None = None
+        m2_reader: IFCReader | None = None
         ifc_quality_report: dict = {}
         ifc_quality_warnings: list[str] = []
         ifc_quality_improvements: list[str] = []
@@ -423,7 +423,7 @@ class BIMGuard_App:
             try:
                 # Open IFC once, then reuse the loaded model for both parsing paths.
                 log_progress(20, "ifc-model-loading", source=ifc_path)
-                m2_reader = Module2_IFCRead(ifc_path)
+                m2_reader = IFCReader(ifc_path)
                 log_progress(30, "ifc-model-loaded")
                 ifc_quality_report = m2_reader.quality_report or {}
                 ifc_quality_warnings = m2_reader.quality_warnings or []
@@ -653,8 +653,8 @@ class BIMGuard_App:
         rule_validations: list[dict] = []  # kept for backward-compat
 
         try:
-            from .module4_comparator import Module4_Comparator
-            from .module5_reporter import Module5_Reporter
+            from .comparator import ComplianceComparator
+            from .reporter import ComplianceReporter
 
             if rule_folder:
                 library_rules = RuleService().list_by_ruleset(rule_folder)
@@ -703,7 +703,7 @@ class BIMGuard_App:
                 _compliance_started_at = time.perf_counter()
                 extraction = m2_reader.extract_for_compliance(library_rules)
                 log_progress(82, "rule-validation-started", extracted=len(extraction))
-                rule_compliance = Module4_Comparator().validate_metadata(extraction)
+                rule_compliance = ComplianceComparator().validate_metadata(extraction)
                 compliance_duration_seconds = time.perf_counter() - _compliance_started_at
                 for rule_index, result in enumerate(rule_compliance, start=1):
                     logger.info(
@@ -725,7 +725,7 @@ class BIMGuard_App:
                         result.get("missing_count", 0),
                     )
                 log_progress(90, "report-generation-started", results=len(rule_compliance))
-                rule_compliance_summary = Module5_Reporter().render_visual_report(
+                rule_compliance_summary = ComplianceReporter().render_visual_report(
                     rule_compliance, duration_seconds=compliance_duration_seconds
                 )
                 logger.info(

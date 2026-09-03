@@ -1,9 +1,9 @@
 """Score Module 1-b accuracy across all 5 capabilities."""
-from app.modules.module1b_nlp_annotator.deontic_extractor  import DeonticExtractor
-from app.modules.module1b_nlp_annotator.condition_parser   import ConditionParser
-from app.modules.module1b_nlp_annotator.cross_ref_resolver import CrossRefResolver
-from app.modules.module1b_nlp_annotator.dependency_mapper  import DependencyMapper
-from app.modules.module1b_nlp_annotator.dimension_extractor import DimensionExtractor
+from app.modules.nlp_annotation.deontic_extractor  import DeonticExtractor
+from app.modules.nlp_annotation.condition_parser   import ConditionParser
+from app.modules.nlp_annotation.cross_ref_resolver import CrossRefResolver
+from app.modules.nlp_annotation.dependency_mapper  import DependencyMapper
+from app.modules.nlp_annotation.dimension_extractor import DimensionExtractor
 
 de = DeonticExtractor()
 cp = ConditionParser()

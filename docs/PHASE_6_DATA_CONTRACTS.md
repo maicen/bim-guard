@@ -92,7 +92,7 @@ standards and client documents into one list so a caller sees a single stream:
 
 Session B (`phase-6b-parsing`) turns a stored IFC reference into structured
 elements. The element shape **already exists** as `ServiceElement` in
-`app/modules/module2_ifc_read/ifc_parser.py`:
+`app/modules/ifc_reader/ifc_parser.py`:
 
 ```python
 @dataclass
@@ -191,7 +191,7 @@ C and D consume and extend it. The keys that matter across the boundary:
 
 ## 3. `Issue` — the finding contract
 
-**Already defined.** `app/modules/module4_comparator/issue_schema.py`, whose
+**Already defined.** `app/modules/comparator/issue_schema.py`, whose
 own docstring reads *"Data contract between Module4 (comparators) and Module5
 (reporter)"*. `SCHEMA_VERSION = "1.0.0"`.
 
@@ -353,7 +353,7 @@ derived from a band no engine produced.
 
 This question has been answered here before; do not re-litigate it.
 
-`app/modules/module2_ifc_read/piping_schema.py:34` (NULLABILITY POLICY):
+`app/modules/ifc_reader/piping_schema.py:34` (NULLABILITY POLICY):
 
 > *"If a comparator cannot run because a required field is None, it emits a
 > Low-severity issue with `mechanism="data_quality"` pointing at the offending
@@ -369,7 +369,7 @@ This question has been answered here before; do not re-litigate it.
 never be mistaken for a verdict.
 
 **Reference implementation:** `_data_quality_issue()` at
-`app/modules/module4_comparator/galvanic.py:441` — `mechanism="data_quality"`,
+`app/modules/comparator/galvanic.py:441` — `mechanism="data_quality"`,
 `band=RiskBand.LOW`, `score=0.10`, `metadata["check"]`, and an
 `assignee_role="BIM coordinator"` so it lands as actionable work.
 
@@ -475,7 +475,7 @@ skip, and not a crash.
 
 #### The pattern to copy
 
-`issues_from_path_a()` in `app/modules/module4_comparator/issue_adapter.py`
+`issues_from_path_a()` in `app/modules/comparator/issue_adapter.py`
 already does this correctly and is the reference implementation:
 
 ```python
@@ -539,7 +539,7 @@ Tests to add:
 The second assertion is the one that proves step 4 was not skipped.
 
 > **Not a band:** `HIGH`/`MEDIUM`/`LOW` in
-> `app/modules/module1_doc_parser/` are rule-extraction **confidence** levels, a
+> `app/modules/document_parsing/` are rule-extraction **confidence** levels, a
 > separate concept with its own scale. Do not feed them to `_band_badge`,
 > `_band_int` or `RiskBand`.
 

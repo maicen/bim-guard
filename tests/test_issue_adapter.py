@@ -16,12 +16,12 @@ Run: uv run pytest tests/test_issue_adapter.py -v
 
 import pytest
 
-from app.modules.module4_comparator.issue_adapter import (
+from app.modules.comparator.issue_adapter import (
     IssueIdAllocator,
     issues_from_path_a,
     path_a_view,
 )
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand, make_issue
+from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
 
 # Every key the adapter reads from a Path A dict, by mechanism. Kept here so a
 # drift in run_compliance_checks() surfaces as one failing assertion rather

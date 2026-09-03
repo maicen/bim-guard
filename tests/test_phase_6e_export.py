@@ -20,7 +20,7 @@ import zipfile
 
 import pytest
 
-from app.modules.module4_comparator.issue_schema import RiskBand, make_issue
+from app.modules.comparator.issue_schema import RiskBand, make_issue
 from app.modules.phase_6.phase_6e_export import (
     BAND_RANK,
     BAND_TO_BCF_PRIORITY,

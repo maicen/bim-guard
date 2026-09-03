@@ -79,7 +79,7 @@ DESIGN NOTES
     Engine availability is measured, not assumed
         Only GC-001, CC-001 and MC-001 are wired into
         engine_registry.register_default_engines(). MM-001 and XM-001 exist
-        in module4_comparator but their load_rule_pack() validators expect a
+        in comparator but their load_rule_pack() validators expect a
         top-level pack shape that the shipped, APPROVED-v1.0 packs in
         data/rulesets/ do not have (those nest everything under
         "parameters"), and their compare() reads element.get_property(),
@@ -119,11 +119,11 @@ sys.path.insert(0, ".")
 import ifcopenshell  # noqa: E402
 import ifcopenshell.geom  # noqa: E402
 
-from app.modules.module2_ifc_read.piping_producer import (  # noqa: E402
+from app.modules.ifc_reader.piping_producer import (  # noqa: E402
     media_for_system,
     produce_piping_elements_from_model,
 )
-from app.modules.module2_producer.halo_volume_generator import (  # noqa: E402
+from app.modules.blue_halo.halo_volume_generator import (  # noqa: E402
     BoundingBox,
     ClashReport,
     ClearanceConfig,
@@ -135,13 +135,13 @@ from app.modules.module2_producer.halo_volume_generator import (  # noqa: E402
     load_clearance_config,
     unit_scale_to_mm,
 )
-from app.modules.module4_comparator.compliance_runner import (  # noqa: E402
+from app.modules.comparator.compliance_runner import (  # noqa: E402
     run_crevice_compliance_check,
     run_galvanic_compliance_check,
     run_mic_compliance_check,
 )
-from app.modules.module4_comparator.issue_adapter import IssueIdAllocator  # noqa: E402
-from app.modules.module5_reporter.blue_halo_bcf_exporter import (  # noqa: E402
+from app.modules.comparator.issue_adapter import IssueIdAllocator  # noqa: E402
+from app.modules.reporter.blue_halo_bcf_exporter import (  # noqa: E402
     generate_bcf_zip_from_halo_clashes,
 )
 
@@ -575,7 +575,7 @@ ENGINE_NAMES = ("GC-001", "CC-001", "MC-001", "MM-001", "XM-001")
 
 def run_corrosion_engines(piping_elements: list, run_id: str) -> dict[str, EngineOutcome]:
     """Run all five corrosion engines over a model's piping elements."""
-    from app.modules.module4_comparator import cross_material, material_media
+    from app.modules.comparator import cross_material, material_media
 
     allocator = IssueIdAllocator(run_id)
 

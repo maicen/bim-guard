@@ -209,7 +209,7 @@ SCENARIO 5 — multi-system plant room bay, brace-type comparison
   [PASS] All 4 brace-type variants share one sourced clearance (200mm — a documented data gap, see config.data_gaps) and therefore produce identical halo volumes, as expected
   [PASS] BCF ZIP structure valid (bcf.version + project.bcfp + 5 topic folder(s) of markup.bcf/viewpoint.bcfv/snapshot.png, matching 5 clash(es))
   [PASS] Pset_HaloReservation is a valid, JSON-serializable IFC property set dict
-  [PASS] module5_reporter imports without error (blue_halo_bcf_exporter, bcf_generator)
+  [PASS] reporter imports without error (blue_halo_bcf_exporter, bcf_generator)
 
   11/11 checks passed
 

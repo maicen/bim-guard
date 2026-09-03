@@ -1,13 +1,13 @@
 """Service layer for managing configured document-parsing engine instances.
 
 Each row names one addressable parsing engine — which "kind" (a registered
-ParsingEngineDriver — see app/modules/module1_doc_parser/engines) it is, and
+ParsingEngineDriver — see app/modules/document_parsing/engines) it is, and
 its connection details. This service owns persistence, uniqueness, and
 single-default enforcement only; it validates a `kind` by asking
 ParsingEngineRegistry whether it's registered, and asks the matching driver
 whether an API key is required — it never hardcodes the set of valid kinds
 itself, so a new engine kind never requires editing this file (Open/Closed).
-See app/modules/module1_doc_parser/document_extractor.py for how a resolved
+See app/modules/document_parsing/document_extractor.py for how a resolved
 instance dict is turned into an extractor via the same registry.
 """
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from app.modules.module1_doc_parser.engines import ParsingEngineRegistry
+from app.modules.document_parsing.engines import ParsingEngineRegistry
 from app.services.db_adapters import DatabaseAdapter
 
 

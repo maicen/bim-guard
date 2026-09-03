@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-# Test modules use bare imports (e.g. `from module1_doc_parser...`) written for
+# Test modules use bare imports (e.g. `from document_parsing...`) written for
 # `python -m tests.x` run with cwd=app/modules/, while some of those modules in
 # turn use absolute imports (e.g. `from app.services...`) that need the repo
 # root on sys.path instead. Add both so either style resolves under pytest,

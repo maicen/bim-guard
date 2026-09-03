@@ -660,8 +660,8 @@ def verify_suspended(path: Path) -> list[str]:
     the file. A fixture that only a purpose-written checker can see would pass
     here and still leave the predicate UNDETERMINED in a real run.
     """
-    from app.modules.module2_ifc_read import ifc_supports
-    from app.modules.module2_ifc_read.ifc_geometry import IFCGeometryExtractor
+    from app.modules.ifc_reader import ifc_supports
+    from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
     model = ifcopenshell.open(str(path))
     # element_axis needs a centroid to turn an extrusion direction into a

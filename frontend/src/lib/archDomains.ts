@@ -14,7 +14,7 @@
 // rules yet, so its two entries remain a best-guess placeholder.
 //
 // `unit: "mm"` marks a property as dimensional (length-valued). The
-// compliance engine (module2_ifc_read._resolve_element_property, Pass 8)
+// compliance engine (ifc_reader._resolve_element_property, Pass 8)
 // always scales the value it reads off the real IFC element to millimetres
 // before comparing — regardless of whether the source model itself is
 // authored in metres, millimetres, or feet — so a rule's stored check_value

@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from io import BytesIO
 
-from app.modules.module5_reporter.bcf_generator import bcf_topic_guid
+from app.modules.reporter.bcf_generator import bcf_topic_guid
 from app.services.report_artifacts import ReportArtifactService
 
 

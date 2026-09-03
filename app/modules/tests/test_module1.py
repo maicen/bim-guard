@@ -16,10 +16,10 @@ import os
 
 import pandas as pd
 import pytest
-from module1_doc_parser.keyword_filter import KeywordFilter
-from module1_doc_parser.keywords.keyword_master import ALL_KEYWORDS, BIGRAM_PHRASES, KEYWORD_WEIGHTS
-from module1_doc_parser.section_chunker import SectionChunker
-from module1_doc_parser.table_rule_builder import TableRuleBuilder
+from document_parsing.keyword_filter import KeywordFilter
+from document_parsing.keywords.keyword_master import ALL_KEYWORDS, BIGRAM_PHRASES, KEYWORD_WEIGHTS
+from document_parsing.section_chunker import SectionChunker
+from document_parsing.table_rule_builder import TableRuleBuilder
 
 TEST_DB = "tests/test_rules_m1.db"
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -270,8 +270,8 @@ def test_keyword_filter_no_keywords(kf):
 
 import os
 
-from module3_rule_builder.rule_generator import RuleGenerator
-from module3_rule_builder.rule_store import RuleStore
+from rule_builder.rule_generator import RuleGenerator
+from rule_builder.rule_store import RuleStore
 
 
 @pytest.fixture
@@ -383,7 +383,7 @@ SAMPLE_PDF_PATH = os.path.join(FIXTURES_DIR, SAMPLE_PDF)
 def unstructured_extractor():
     """Import lazily — requires unstructured-client and UNSTRUCTURED_API_KEY."""
     try:
-        from module1_doc_parser.unstructured_extractor import UnstructuredExtractor
+        from document_parsing.unstructured_extractor import UnstructuredExtractor
 
         return UnstructuredExtractor()
     except (ImportError, RuntimeError) as exc:

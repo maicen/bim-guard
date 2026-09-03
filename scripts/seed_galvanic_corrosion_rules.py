@@ -61,7 +61,7 @@ Four things about this seed are load-bearing and easy to get wrong:
    every historical GC-001 finding.
 
 4. **The 25 mm clearance is declarative, not enforced.** The approved XM-001
-   comparator (``app/modules/module4_comparator/cross_material.py``, pack
+   comparator (``app/modules/comparator/cross_material.py``, pack
    ``data/rulesets/xm_001_cross_material.json``, status APPROVED v1.0) models
    separation *categorically* -- ``direct_contact`` (factor 1.0) and
    ``same_loop`` (factor 0.8) -- and consumes no millimetre geometry at all.
@@ -325,7 +325,7 @@ def _warn() -> None:
         "    scores separation categorically (direct_contact / same_loop) and\n"
         "    reads no millimetre geometry, so no verdict turns on 25 mm today.\n"
         "  * applies_when.material_pair is stored but not dispatched on;\n"
-        "    module4_comparator._evaluate_rule keys off operator and\n"
+        "    comparator._evaluate_rule keys off operator and\n"
         f"    check_value alone, so each row matches every {TARGET}.\n"
         "  * The shared mitigation catalogue was NOT modified. MIT-GC-001 keeps\n"
         "    its existing dielectric-gasket wording; the clearance half of the\n"

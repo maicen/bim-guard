@@ -1,6 +1,6 @@
 import pytest
 
-from app.modules.module4_comparator.engine_registry import RuleEngineRegistry
+from app.modules.comparator.engine_registry import RuleEngineRegistry
 
 
 class DummyRuleEvaluator:

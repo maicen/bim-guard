@@ -13,7 +13,7 @@ result is a rule that governs every distribution element in the model:
 * ``IfcDistributionElement`` is the abstract supertype of ducts, cables,
   fittings, terminals and pipe alike, so the target class narrows nothing.
 * ``mass_kg`` and ``location`` are not keys
-  ``module4_comparator._predicate_key`` recognises. An unrecognised key is
+  ``comparator._predicate_key`` recognises. An unrecognised key is
   UNDETERMINED, and an undetermined *scope* deliberately keeps the element in
   scope (an unevaluable narrowing must never silently suppress a check). So
   the mass threshold does not exclude anything either.
@@ -53,8 +53,8 @@ scope; it does not do that migration.
 
 Retiring the proxy
 ------------------
-That day has arrived. ``app/modules/module2_ifc_read/ifc_seismic.py`` resolves
-``mass_kg`` per element and ``module4_comparator._SCOPE_NUMERIC_PROPERTIES``
+That day has arrived. ``app/modules/ifc_reader/ifc_seismic.py`` resolves
+``mass_kg`` per element and ``comparator._SCOPE_NUMERIC_PROPERTIES``
 now maps ``mass_kg`` -> ``MassKg``, which is the exact condition
 ``scope_patch.retire_proxy_when`` was written against. ``--retire-proxy``
 drops ``nominal_diameter_mm`` and leaves the clause's own threshold to do the
@@ -180,8 +180,8 @@ RETIRE_PATCH_PARAM = {
     "removed_key": "nominal_diameter_mm",
     "removed_min_mm": PROXY_DIAMETER_MIN_MM,
     "reason": (
-        "mass_kg is resolvable by module2_ifc_read.ifc_seismic and mapped in "
-        "module4_comparator._SCOPE_NUMERIC_PROPERTIES, which is the condition "
+        "mass_kg is resolvable by ifc_reader.ifc_seismic and mapped in "
+        "comparator._SCOPE_NUMERIC_PROPERTIES, which is the condition "
         "scope_patch.retire_proxy_when named. Keeping the band would AND with "
         "the mass gate and drop a heavy small-bore run out of scope."
     ),
@@ -201,7 +201,7 @@ SCOPE_PATCH_PARAM = {
     "proxy_is_not_clause_text": True,
     "previous_applies_when": OLD_APPLIES_WHEN,
     "retire_proxy_when": (
-        "mass_kg is added to module4_comparator._SCOPE_NUMERIC_PROPERTIES"
+        "mass_kg is added to comparator._SCOPE_NUMERIC_PROPERTIES"
     ),
 }
 
@@ -320,7 +320,7 @@ def summarise(rows: list[dict], mode: str) -> None:
         print(f"                  ->  {json.dumps(applies_when)}")
 
     if mode == MODE_PATCH:
-        print("\n  evaluation, per module4_comparator._evaluate_predicate (AND):")
+        print("\n  evaluation, per comparator._evaluate_predicate (AND):")
         print(f"    NominalDiameter <  {PROXY_DIAMETER_MIN_MM:.0f} mm"
               "  -> NO_MATCH   -> NOT_APPLICABLE, element dropped from the rule")
         print(f"    NominalDiameter >= {PROXY_DIAMETER_MIN_MM:.0f} mm"
@@ -328,7 +328,7 @@ def summarise(rows: list[dict], mode: str) -> None:
               "\n                              reported under undetermined_predicates")
         print("    NominalDiameter absent      -> UNDETERMINED -> stays in scope")
     elif mode == MODE_RETIRE:
-        print("\n  evaluation, per module4_comparator._evaluate_predicate (AND):")
+        print("\n  evaluation, per comparator._evaluate_predicate (AND):")
         print(f"    MassKg <  {MASS_MIN_KG:.0f} kg"
               "  -> NO_MATCH   -> NOT_APPLICABLE, element dropped from the rule")
         print(f"    MassKg >= {MASS_MIN_KG:.0f} kg"

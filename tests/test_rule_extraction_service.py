@@ -69,7 +69,7 @@ legacy = [
         "confidence_scorer",
         "tfidf_analyzer",
         "bert_classifier",
-        "module1b_nlp_annotator",
+        "nlp_annotation",
     ))
 ]
 print(json.dumps(legacy))

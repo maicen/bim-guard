@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-from app.modules.module4_comparator.issue_schema import Issue, RiskBand
+from app.modules.comparator.issue_schema import Issue, RiskBand
 from app.services.bcf_exporter import BCFExporter
 
 

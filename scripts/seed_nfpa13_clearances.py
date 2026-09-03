@@ -35,7 +35,7 @@ The clearance rows use the same shape as the existing ``BIMGUARD-SB-001``
 spatial clearance rule, so the comparator evaluates them today. The size
 banding and the exemptions are carried in ``applies_when`` / ``exceptions`` /
 ``parameters``, which nothing in the pipeline currently reads:
-``module4_comparator._evaluate_rule`` dispatches on ``operator`` and
+``comparator._evaluate_rule`` dispatches on ``operator`` and
 ``check_value`` alone. Until an evaluator honours them, the bands and
 exemptions are **declarative, not enforced** -- see the warning this script
 prints.
@@ -346,7 +346,7 @@ def main() -> int:
     print(f"\nwrote {written} rules ({replaced} replaced), skipped {skipped}")
     print(
         "\nWARNING: applies_when and exceptions are stored but not evaluated.\n"
-        "  module4_comparator._evaluate_rule dispatches on operator and\n"
+        "  comparator._evaluate_rule dispatches on operator and\n"
         "  check_value only, so today BOTH clearance rules match every\n"
         f"  {TARGET} regardless of diameter, and no exemption suppresses a\n"
         "  finding. Wire an evaluator before this ruleset drives verdicts."

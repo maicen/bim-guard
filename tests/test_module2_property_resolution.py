@@ -1,6 +1,6 @@
 """Regression tests for Module 2's single-property resolution cascade.
 
-Covers ``Module2_IFCRead._resolve_element_property`` for two of Priority 8's
+Covers ``IFCReader._resolve_element_property`` for two of Priority 8's
 IFC ingestion correctness bugs:
 
 * A Pset value authored as a numeric string (e.g. ``IfcLabel('1.2')``
@@ -18,12 +18,12 @@ import ifcopenshell
 import ifcopenshell.api
 import pytest
 
-from app.modules.module2_ifc_read import Module2_IFCRead
+from app.modules.ifc_reader import IFCReader
 
 
-def _empty_reader(f) -> Module2_IFCRead:
-    """Build a Module2_IFCRead bound to *f*, without the geometry/spatial extras."""
-    m2 = Module2_IFCRead.__new__(Module2_IFCRead)
+def _empty_reader(f) -> IFCReader:
+    """Build a IFCReader bound to *f*, without the geometry/spatial extras."""
+    m2 = IFCReader.__new__(IFCReader)
     m2.ifc_file = f
     m2.geometry_extractor = None
     m2.spatial_adjacency = None

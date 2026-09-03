@@ -6,7 +6,7 @@ from pathlib import Path
 import ifctester.ids as ifctester_ids
 
 from app.modules.contracts import RuleCreateRequest, RuleExtractionDraft
-from app.modules.module3_rule_builder.ids_exporter import (
+from app.modules.rule_builder.ids_exporter import (
     build_ids_document,
     filter_exportable_rules,
     import_ids_ruleset,
