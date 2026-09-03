@@ -48,7 +48,7 @@ a top-level "rules" array. Each rule MUST have ALL of the following fields:
   "property_name":     "IFC property to measure e.g. TreadLength, or null",
   "fallback_property": "alternative property name if primary missing, or null",
 
-  "rule_type":         "numeric_range | exists_check | regex_match | classification",
+  "rule_type":         "numeric_range | exists_check | count_check | regex_match | classification",
   "operator":          ">= | <= | == | != | between | exists | matches",
   "value":             860,
   "value_min":         null,
@@ -82,6 +82,14 @@ RULES:
 - Output ONLY valid JSON — no markdown, no prose, no code fences.
 - Use "between" operator + value_min/value_max for min-and-max requirements; set "value" to null.
 - Use "exists" operator + value null for presence-only checks.
+- Use rule_type "count_check" + operator ">=" + value for requirements on how
+  many of an element must be present (e.g. "two exits shall be provided"),
+  not "numeric_range".
+- When a count or threshold is looked up in a table you cannot see in full
+  (e.g. "exceeds the values in Table 8.14.1"), still extract the rule with
+  the operator/value implied by the surrounding text, set needs_review true,
+  and note the table reference in "related_refs" or "source_text" — do not
+  invent per-row table values you were not given.
 - Set confidence < 0.7 and needs_review true when the text is ambiguous.
 - Skip commentary, examples, definitions, and duplicate rules.
 - Exclude requirements that cannot be expressed as a discrete checkable rule.
@@ -114,6 +122,54 @@ run plus 25 mm.":
   "value_min_offset": 0, "value_max_offset": 25,
   "unit": "mm", "severity": "mandatory", "keyword": "shall",
   "compliance_type": "prescriptive", "confidence": 0.85, "needs_review": false
+}
+
+COMPUTED BUILDING METRICS (fractions of building/area geometry):
+Some requirements define a bound as a fraction of a metric computed over the whole
+building or area — e.g. "not less than one-half of the maximum overall diagonal
+dimension of the building or area to be served" — rather than a fixed number or a
+same-element property. This is NOT the same as value_min_property/value_max_property
+(which reference another property of the SAME element): it requires a geometric
+computation across the space. Extract these with "value" set to the described
+fraction as a plain string (e.g. "0.5 x diagonal"), needs_review true, and preserve
+the exact wording in "source_text" so a reviewer can wire up the computation.
+
+When an exception changes the fraction (e.g. a sprinklered building lowers the
+required separation from one-half to one-third of the diagonal), extract it as a
+SEPARATE rule with its own "applies_when" (e.g. {"sprinklered": true}) rather than
+folding it into "exceptions" — it is an alternate threshold, not a waiver.
+
+Example — Section 8.14.2.1: "the exit doors or exit access doorways shall be placed
+a distance apart equal to not less than one-half of the length of the maximum
+overall diagonal dimension of the building or area to be served", with an exception
+that sprinklered buildings need only one-third:
+[
+  {
+    "ref": "8.14.2.1", "desc": "Exit doorway separation must be at least half the area's diagonal dimension",
+    "target": "IfcSpace", "property_set": "", "property_name": "",
+    "rule_type": "numeric_range", "operator": ">=", "value": "0.5 x diagonal",
+    "unit": "ratio", "severity": "mandatory", "keyword": "shall",
+    "compliance_type": "prescriptive", "confidence": 0.6, "needs_review": true
+  },
+  {
+    "ref": "8.14.2.1 Exception 2", "desc": "Sprinklered area: exit doorway separation must be at least one-third the area's diagonal dimension",
+    "target": "IfcSpace", "property_set": "", "property_name": "",
+    "rule_type": "numeric_range", "operator": ">=", "value": "0.333 x diagonal",
+    "applies_when": {"sprinklered": true},
+    "unit": "ratio", "severity": "mandatory", "keyword": "shall",
+    "compliance_type": "prescriptive", "confidence": 0.6, "needs_review": true
+  }
+]
+
+Example — Section 8.14.1: "Two exits or exit access doorways from any space shall be
+provided where ... the occupant load of the space exceeds the values in Table 8.14.1":
+{
+  "ref": "8.14.1", "desc": "Space must have two exits or exit access doorways when its occupant load exceeds Table 8.14.1",
+  "target": "IfcSpace", "property_set": "", "property_name": "NumberOfExits",
+  "rule_type": "count_check", "operator": ">=", "value": 2,
+  "related_refs": ["Table 8.14.1"],
+  "unit": null, "severity": "mandatory", "keyword": "shall",
+  "compliance_type": "prescriptive", "confidence": 0.7, "needs_review": true
 }\
 """
 

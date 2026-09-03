@@ -1,0 +1,92 @@
+## SECTION 8.14 EXIT AND EXIT ACCESS DOORWAYS - 8.14.1 Exit or exit access doorways required. Two 
+exits or exit access doorways from any space shall be provided where one of the following conditions 
+exists: 1. The occupant load of the space exceeds the values in Table 8.14.1. 2. The common path of 
+egress travel exceeds the limitations of Section 8.13.3. 3. Where required by Sections 8.14.3, 8.14.4 and 
+8.14.5. Exception: Group I-2 occupancies shall comply with Section 8.13.2.2. TABLE 8.14.1 SPACES WITH 
+ONE MEANS OF EGRESS | OCCUPANCY | MAXIMUMOCCUPANT LOAD | |----------------------------|-------
+-----------------| | A, B, E, F, M, U | 50 | | H-1, H-2, H-3 | 3 | | H-4, H-5, I-1, I-3, I-4, R | 10 | | S | 30 | - 8.14.1.1 
+Three or more exits. Access to three or more exits shall be provided from a floor area where required by 
+Section 8.18.1. - 8.14.2 Exit or exit access doorway arrangement. Required exits shall be located in a 
+manner that makes their availability obvious. Exits shall be unobstructed at all times. Exit and exit access 
+doorways shall be arranged in accordance with Sections 8.14.2.1 and 8.14.2.2. - 8.14.2.1 Two exits or exit 
+access doorways. Where two exits or exit access doorways are required from any portion of the exit 
+access, the exit doors or exit access doorways shall be placed a distance apart equal to not less than one-
+half of the length of the maximum overall diagonal dimension of the building or area to be served 
+measured in a straight line between exit doors or exit access doorways. Interlocking or scissor stairs shall 
+be counted as one exit stairway. ## Exceptions 1. Where exit enclosures are provided as a portion of the 
+required exit and are interconnected by a 1 hour fire-resistance-rated corridor conforming to the 
+requirements of Section 8.16, the required exit separation shall be measured along the shortest direct line 
+of travel within the corridor. 2. Where a building is equipped throughout with an automatic sprinkler 
+system in accordance with Section 7.3 of SBC 801 the separation distance of the exit doors or exit access 
+doorways shall not be less than one-third of the length of the maximum overall diagonal dimension of 
+the area served. 3. 8.14.2.2 Three or more exits or exit access doorways. Where access to three or more 
+exits is required, at least two exit doors or exit access doorways shall be placed a distance apart equal to 
+not less than one-half of the length of the maximum overall diagonal dimension of the area served 
+measured in a straight line between such exit doors or exit access doorways. Additional exits or exit 
+access doorways shall be arranged a reasonable distance apart so that if one becomes blocked, the 
+others will be available. Exception: Where a building is equipped throughout with an automatic sprinkler 
+system in accordance with Section 7.3 of SBC 801 the separation distance of at least two of the exit doors 
+or exit access doorways shall not be less than one-third of the length of the maximum overall diagonal 
+dimension of the area served. - 8.14.3 Boiler, incinerator and furnace rooms. Two exit access doorways are 
+required in boiler, incinerator and furnace rooms where the area is over 46 m 2 and any fuelfired 
+equipment exceeds 422 000 input capacity. Where two exit access doorways are required, one is 
+permitted to be a fixed ladder or an alternating tread device. Exit access doorways shall be separated by a 
+horizontal distance equal to one-half the maximum horizontal dimension of the room. - 8.14.4 
+Refrigeration machinery rooms. Machinery rooms larger than 93 m 2 shall have not less than two exits or 
+exit access doors. Where two exit access doorways are required, one such doorway is permitted to be 
+served by a fixed ladder or an alternating tread device. Exit access doorways shall be separated by a 
+horizontal distance equal to one-half the maximum horizontal dimension of room. All portions of 
+machinery rooms shall be within 45.7 meters of an exit or exit access doorway. An increase in travel 
+distance is permitted in accordance with Section 8.15.1. Doors shall swing in the direction of egress travel, 
+regardless of the occupant load served. Doors shall be tight fitting and self-closing. - 8.14. 5 Refrigerated 
+rooms or spaces. Rooms or spaces having a floor area of 93 m 2 Exception: the volume set forth in the 
+SBC 501. or more, containing a refrigerant evaporator and maintained at a temperature below 20°C shall
+
+have access to not less than two exits or exit access doors. Travel distance shall be determined as 
+specified in Section 8.15.1, but all portions of a refrigerated room or space shall be within 45.7 meters of 
+an exit or exit access door where such rooms are not protected by an approved automatic sprinkler 
+system. Egress is allowed through adjoining refrigerated rooms or spaces. Where using refrigerants in 
+quantities limited to the amounts based on - 8.14.6 Stage means of egress. Where two means of egress 
+are required, based on the stage size or occupant load, one means of egress shall be provided on each 
+side of the stage. - 8.14.6.1 Gallery, gridiron and catwalk means of egress. The means of egress from 
+lighting and access catwalks, galleries and gridirons shall meet the requirements for occupancies in Group 
+F-2. ## Exceptions 1. A minimum width of 560 mm is permitted for lighting and access catwalks. 2. Spiral 
+stairs are permitted in the means of egress. 3. Stairways required by this subsection need not be 
+enclosed. 4. Stairways with a minimum width of 560 mm, ladders, or spiral stairs are permitted in the 
+means of egress. 5. A second means of egress is not required from these areas where a means of escape 
+to a floor or to a roof is provided. Ladders, alternating tread devices or spiral stairs are permitted in the 
+means of escape. 6. Ladders are permitted in the means of egress. ## SECTION 8.15 EXIT ACCESS TRAVEL 
+DISTANCE - 8.15.1 Travel distance limitations. Exits shall be so located on each story such that the 
+maximum length of exit access travel, measured from the most remote point within a story to the 
+entrance to an exit along the natural and unobstructed path of egress travel, shall not exceed the 
+distances given in Table 8.15.1. Where the path of exit access includes unenclosed stairways or ramps 
+within the exit access or includes unenclosed exit ramps or stairways as permitted in Section 8.19.1, the 
+distance of travel on such means of egress components shall also be included in the travel distance 
+measurement. The measurement along stairways shall be made on a plane parallel and tangent to the 
+stair tread nosings in the center of the stairway. TABLE 8.15.1 EXIT ACCESS TRAVEL DISTANCE a | 
+OCCUPANCY | WITHOUT SPRINKLER SYSTEM (meters ) | WITH SPRINKLER SYSTEM (meters ) | |------------
+---------------|--------------------------------------|-----------------------------------| | A, E, F-1, I-1, M, R, S-1 
+| 6.1 | 7.6 b | | B | 6.1 | 9.2 c | | F-2, S-2, U | 9.2 | 12.2 b | | H-1 | Not Permitted | 23 c | | H-2 | Not Permitted | 
+30 c | | H-3 | Not Permitted | 45.5 c | | H-4 | Not Permitted | 53 c | | H-5 | Not Permitted | 61 c | | I-2, I-3, I-4 | 
+45500 (150) | 61 c | - a. See the following sections for modifications to exit access travel distance 
+requirements: Section 2.15: For the distance limitation in malls. Section 2.17: For the distance limitation 
+through an atrium space. Section 8.15.2: For increased limitation in Groups F-1 and S-1. Section 8.24.7: 
+For increased limitation in assembly seating. Section 8.24.7: For increased limitation for assembly open-air 
+seating. Section 8.18.2: For buildings with one exit. Section 4.4: For the limitation in temporary structures. 
+- b. Buildings equipped throughout with an automatic sprinkler system in accordance with Section 7.3 of 
+SBC 801 for occupancies where sprinkler systems according to Section 7.3 of SBC 801 are permitted. - c. 
+Buildings equipped throughout with an automatic sprinkler system in accordance with Section 7.3 of SBC 
+801. ## Exceptions 1. Travel distance in open parking garages is permitted to be measured to the closest 
+riser of open stairs. 2. In outdoor facilities with open exit access components and open exterior stairs or 
+ramps, travel distance is permitted to be measured to the closest riser of a stair or the closest slope of the 
+ramp. 3. Where an exit stair is permitted to be unenclosed in accordance with Exception 8 or 9 of Section 
+8.19.1, the travel distance shall be measured from the most remote point within a building to an exit 
+discharge. 4. 8.15.2 Roof vent increase. In buildings which are one story in height, equipped with 
+automatic heat and smoke roof vents complying with Section 7.10 of SBC 801 and equipped throughout 
+with an automatic sprinkler system in accordance with Section 7.3 of SBC 801 the maximum exit access 
+travel distance shall be 122 m for occupancies in Group F-1 or S. 5. 8.15.3 Exterior egress balcony
+
+increase. Travel distances specified in Section 8.15.1 shall be increased up to an additional 30 meters 
+provided the last portion of the exit access leading to the exit occurs on an exterior egress balcony 
+constructed in accordance with Section 8.13.5. The length of such balcony shall not be less than the 
+amount of the increase taken

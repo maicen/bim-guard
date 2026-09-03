@@ -38,7 +38,8 @@ You are a BIM compliance rule extraction engine for building regulations.
 
 Read the clause text below and determine whether it expresses a single,
 discrete, checkable requirement (a numeric limit, a required property, a
-classification, or presence check) against an IFC element.
+classification, a presence check, or a required count of elements) against
+an IFC element.
 
 If it does NOT express a checkable requirement (e.g. it is a definition,
 example, or purely descriptive text), set found=false and leave the other
@@ -50,8 +51,14 @@ If it DOES, set found=true and fill in:
 - description: short plain-English rule description
 - mechanism: "CODE" unless the text is clearly about corrosion (GC-001,
   CC-001, MC-001)
+- target_ifc_class: the IFC entity type the rule applies to, e.g. "IfcDoor",
+  "IfcSpace", "IfcStairFlight" — required whenever found=true, since it is
+  what lets a rule be checked against a model and exported to IDS
 - property_set: IFC Pset name, e.g. "Pset_StairFlightCommon", or empty
 - property_name: IFC property to measure, e.g. "TreadLength", or empty
+- rule_type: "numeric_range" | "exists_check" | "count_check" | "classification"
+  — use "count_check" for requirements on how many of an element are present
+  (e.g. "two exits shall be provided"), not "numeric_range"
 - operator: one of ">=", "<=", "==", "!=", "between", "exists", "matches"
 - check_value: the target value as a string (numeric values as their string form), or empty
 - value_min / value_max: string bounds for "between", or empty
@@ -59,7 +66,10 @@ If it DOES, set found=true and fill in:
 - severity: "mandatory" if the clause uses "shall"/"must", "recommended" if
   "should", else "recommended"
 - confidence: 0.0-1.0, your confidence this rule is correctly extracted
-- needs_review: 1 if the text is ambiguous or you are unsure, else 0
+- needs_review: 1 if the text is ambiguous, if the threshold is looked up in
+  a table you cannot see in full, or if the bound is computed from a
+  building-level metric (e.g. "one-half of the diagonal dimension of the
+  area served") rather than a fixed value or a same-element property — else 0
 
 CLAUSE TEXT:
 {clause_text}
@@ -73,8 +83,10 @@ class _LLMRuleCandidate(BaseModel):
     rule_id: str = ""
     description: str = ""
     mechanism: str = "CODE"
+    target_ifc_class: str = ""
     property_set: str = ""
     property_name: str = ""
+    rule_type: str = "numeric_range"
     operator: str = "=="
     check_value: str = ""
     value_min: str = ""
@@ -83,6 +95,53 @@ class _LLMRuleCandidate(BaseModel):
     severity: str = "recommended"
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     needs_review: int = 0
+
+
+def _candidate_to_draft(
+    candidate: _LLMRuleCandidate,
+    node: DocumentNodeContract,
+    *,
+    deontic: DeonticStatement | None = None,
+) -> RuleExtractionDraft | None:
+    """Map a validated LLM candidate onto a RuleExtractionDraft, or None if no rule.
+
+    A pure function (no LLM call) so the candidate->draft mapping is directly
+    unit-testable without mocking LlamaIndex's program machinery.
+    """
+    if not candidate.found or not candidate.description.strip():
+        return None
+
+    severity = candidate.severity
+    if deontic is not None and deontic.modality in ("shall", "must"):
+        severity = "mandatory"
+
+    proposed_rule = RuleCreateRequest(
+        rule_id=candidate.rule_id.strip() or (node.metadata.clause_id or node.node_id[:8]),
+        description=candidate.description.strip(),
+        mechanism=candidate.mechanism.strip() or "CODE",
+        rule_category="property_check",
+        target_ifc_class=candidate.target_ifc_class.strip() or None,
+        property_set=candidate.property_set.strip() or None,
+        property_name=candidate.property_name.strip() or None,
+        operator=candidate.operator.strip() or "==",
+        check_value=candidate.check_value.strip() or None,
+        value_min=candidate.value_min.strip() or None,
+        value_max=candidate.value_max.strip() or None,
+        unit=candidate.unit.strip() or None,
+        severity=severity,
+        confidence=str(candidate.confidence),
+        extraction_method="llamaindex_pydantic",
+        needs_review=candidate.needs_review,
+    )
+
+    return RuleExtractionDraft(
+        source_document_id=node.metadata.source_document_id,
+        source_node_id=node.node_id,
+        clause=node.metadata,
+        proposed_rule=proposed_rule,
+        confidence=candidate.confidence,
+        extraction_method="llamaindex_pydantic",
+    )
 
 
 class LlamaIndexRuleGenerator:
@@ -111,39 +170,7 @@ class LlamaIndexRuleGenerator:
         )
         candidate: _LLMRuleCandidate = await program.acall(clause_text=node.text)
 
-        if not candidate.found or not candidate.description.strip():
-            return None
-
-        severity = candidate.severity
-        if deontic is not None and deontic.modality in ("shall", "must"):
-            severity = "mandatory"
-
-        proposed_rule = RuleCreateRequest(
-            rule_id=candidate.rule_id.strip() or (node.metadata.clause_id or node.node_id[:8]),
-            description=candidate.description.strip(),
-            mechanism=candidate.mechanism.strip() or "CODE",
-            rule_category="property_check",
-            property_set=candidate.property_set.strip() or None,
-            property_name=candidate.property_name.strip() or None,
-            operator=candidate.operator.strip() or "==",
-            check_value=candidate.check_value.strip() or None,
-            value_min=candidate.value_min.strip() or None,
-            value_max=candidate.value_max.strip() or None,
-            unit=candidate.unit.strip() or None,
-            severity=severity,
-            confidence=str(candidate.confidence),
-            extraction_method="llamaindex_pydantic",
-            needs_review=candidate.needs_review,
-        )
-
-        return RuleExtractionDraft(
-            source_document_id=node.metadata.source_document_id,
-            source_node_id=node.node_id,
-            clause=node.metadata,
-            proposed_rule=proposed_rule,
-            confidence=candidate.confidence,
-            extraction_method="llamaindex_pydantic",
-        )
+        return _candidate_to_draft(candidate, node, deontic=deontic)
 
     # ── RuleExtractionProvider conformance ──────────────────────────────────
 
@@ -175,7 +202,7 @@ class LlamaIndexRuleGenerator:
                 "ref": rule.rule_id,
                 "desc": rule.description,
                 "source_text": text[:500],
-                "target": "Unspecified",
+                "target": rule.target_ifc_class or "Unspecified",
                 "property_set": rule.property_set or "",
                 "property_name": rule.property_name or "",
                 "rule_type": "numeric_range" if rule.operator in {">=", "<=", "between"} else "exists_check",
