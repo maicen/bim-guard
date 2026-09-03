@@ -20,6 +20,9 @@ from app.api import (
     bcf_routes as api_bcf,
 )
 from app.api import (
+    bsdd as api_bsdd,
+)
+from app.api import (
     cde_integration as api_cde,
 )
 from app.api import (
@@ -214,6 +217,7 @@ app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(api_documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(api_cde.router, prefix="/api/cde", tags=["OpenCDE"])
+app.include_router(api_bsdd.router, prefix="/api/bsdd", tags=["bSDD"])
 app.include_router(api_bcf.router, prefix="/api/bcf", tags=["BCF API"])
 app.include_router(api_settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(
