@@ -81,12 +81,14 @@
     maxWidth="max-w-2xl"
     {onClose}
   >
-    <div slot="header-extra" class="flex items-center gap-2">
-      <SeverityBadge severity={topic.topic_status || 'Open'} />
-      <span class="text-xs font-semibold text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-full">
-        {topic.priority || 'Normal'}
-      </span>
-    </div>
+    {#snippet headerExtra()}
+      <div class="flex items-center gap-2">
+        <SeverityBadge severity={topic.topic_status || 'Open'} />
+        <span class="text-xs font-semibold text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-full">
+          {topic.priority || 'Normal'}
+        </span>
+      </div>
+    {/snippet}
 
     <!-- Topic Properties Grid -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-slate-950 p-3.5 rounded-xl border border-slate-800">
@@ -238,7 +240,7 @@
       </div>
     </div>
 
-    <div slot="footer">
+    {#snippet footer()}
       <button
         type="button"
         on:click={onClose}
@@ -246,6 +248,6 @@
       >
         Close
       </button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}

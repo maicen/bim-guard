@@ -1,16 +1,32 @@
 <script lang="ts">
-  import { AlertTriangle } from 'lucide-svelte';
+  import { AlertTriangle } from "lucide-svelte";
+  import { dialog, dialogId } from "../utils/dialog.svelte";
+  import { cn } from "../utils/cn";
 
-  export let isOpen: boolean = false;
-  export let title: string = 'Confirm Action';
-  export let message: string = 'Are you sure you want to proceed? This action cannot be undone.';
-  export let confirmText: string = 'Delete';
-  export let cancelText: string = 'Cancel';
-  export let danger: boolean = true;
-  export let onConfirm: () => void | Promise<void>;
-  export let onCancel: () => void;
+  let {
+    isOpen = $bindable(false),
+    title = "Confirm Action",
+    message = "Are you sure you want to proceed? This action cannot be undone.",
+    confirmText = "Delete",
+    cancelText = "Cancel",
+    danger = true,
+    onConfirm,
+    onCancel,
+  }: {
+    isOpen?: boolean;
+    title?: string;
+    message?: string;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+    onConfirm: () => void | Promise<void>;
+    onCancel: () => void;
+  } = $props();
 
-  let isSubmitting = false;
+  const titleId = dialogId("confirm-title");
+  const bodyId = dialogId("confirm-body");
+
+  let isSubmitting = $state(false);
 
   async function handleConfirm() {
     isSubmitting = true;
@@ -23,6 +39,7 @@
   }
 
   function handleCancel() {
+    // A confirmation must not vanish out from under an in-flight action.
     if (isSubmitting) return;
     onCancel();
     isOpen = false;
@@ -30,52 +47,60 @@
 </script>
 
 {#if isOpen}
-  <!-- Backdrop -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
-    role="dialog"
+    role="alertdialog"
     aria-modal="true"
-    aria-labelledby="confirm-modal-title"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in px-4"
+    aria-labelledby={titleId}
+    aria-describedby={bodyId}
+    tabindex="-1"
+    class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    onclick={(e) => e.target === e.currentTarget && handleCancel()}
+    {@attach dialog(handleCancel)}
   >
-    <!-- Modal Card -->
     <div
-      class="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 animate-scale-up"
+      class="animate-scale-up w-full max-w-md space-y-5 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
     >
       <div class="flex items-start gap-3.5">
         {#if danger}
-          <div class="w-10 h-10 rounded-xl bg-rose-950/80 border border-rose-800/80 flex items-center justify-center text-rose-400 shrink-0">
-            <AlertTriangle class="w-5 h-5" />
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-800/80 bg-rose-950/80 text-rose-400"
+          >
+            <AlertTriangle class="h-5 w-5" />
           </div>
         {/if}
-        <div class="space-y-1.5 flex-1 min-w-0">
-          <h2 id="confirm-modal-title" class="text-base font-bold text-slate-50 tracking-tight">
+        <div class="min-w-0 flex-1 space-y-1.5">
+          <h2 id={titleId} class="text-base font-bold tracking-tight text-slate-50">
             {title}
           </h2>
-          <p id="confirm-modal-body" class="text-xs text-slate-400 leading-relaxed">
+          <p id={bodyId} class="text-xs leading-relaxed text-slate-400">
             {message}
           </p>
         </div>
       </div>
 
-      <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800/80">
+      <div class="flex items-center justify-end gap-2.5 border-t border-slate-800/80 pt-2">
         <button
           type="button"
-          on:click={handleCancel}
+          onclick={handleCancel}
           disabled={isSubmitting}
-          class="h-9 px-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 hover:text-slate-50 transition-colors disabled:opacity-50"
+          class="h-9 rounded-xl border border-slate-700 bg-slate-800 px-4 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50 disabled:opacity-50"
         >
           {cancelText}
         </button>
 
         <button
           type="button"
-          on:click={handleConfirm}
+          onclick={handleConfirm}
           disabled={isSubmitting}
-          class="h-9 px-4 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 {danger
-            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950/50'
-            : 'bg-accent hover:bg-accent-hover text-white shadow-lg shadow-blue-950/50'}"
+          class={cn(
+            "h-9 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-50",
+            danger
+              ? "bg-rose-600 text-white shadow-lg shadow-rose-950/50 hover:bg-rose-500"
+              : "bg-accent hover:bg-accent-hover text-white shadow-lg shadow-blue-950/50",
+          )}
         >
-          {isSubmitting ? 'Processing...' : confirmText}
+          {isSubmitting ? "Processing..." : confirmText}
         </button>
       </div>
     </div>

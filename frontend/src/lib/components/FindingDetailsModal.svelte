@@ -29,9 +29,9 @@
     maxWidth="max-w-2xl"
     {onClose}
   >
-    <div slot="header-extra">
+    {#snippet headerExtra()}
       <SeverityBadge severity={issue.band || 'low'} />
-    </div>
+    {/snippet}
 
     <!-- Key Metrics Cards -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-slate-950 p-3.5 rounded-xl border border-slate-800">
@@ -123,7 +123,7 @@
       </div>
     {/if}
 
-    <div slot="footer">
+    {#snippet footer()}
       <button
         type="button"
         on:click={onClose}
@@ -131,6 +131,6 @@
       >
         Close
       </button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}

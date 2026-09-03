@@ -123,7 +123,7 @@
     </select>
   </div>
 
-  <div slot="footer">
+  {#snippet footer()}
     <button
       type="button"
       on:click={onClose}
@@ -139,5 +139,5 @@
     >
       <span>{isSaving ? 'Applying Changes...' : `Update ${selectedTopicGuids.length} Topics`}</span>
     </button>
-  </div>
+  {/snippet}
 </Modal>

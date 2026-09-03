@@ -79,7 +79,7 @@
     </select>
   </div>
 
-  <div slot="footer">
+  {#snippet footer()}
     <button
       type="button"
       on:click={onClose}
@@ -95,5 +95,5 @@
     >
       <span>{isSaving ? 'Applying Changes...' : `Update ${selectedDocIds.length} Documents`}</span>
     </button>
-  </div>
+  {/snippet}
 </Modal>
