@@ -400,6 +400,40 @@ def test_is_ifc_guid_matches_the_schema_facets():
     assert not is_ifc_guid("{2O2Fr$t4X7Zf8NOew3FLOH}")
 
 
+def test_related_component_guids_are_selected_and_coloured(visinfo_schema):
+    """A galvanic couple selects both the anode (primary) and the cathode."""
+    import xml.etree.ElementTree as ET
+
+    issue = create_test_bcf_issue(
+        component_guid="2O2Fr$t4X7Zf8NOew3FLOH",
+        related_component_guids=["0FQ6pMwzXBJucYaRTqfuw2", "2O2Fr$t4X7Zf8NOew3FLOH", "", "GC-VAL-001B"],
+    )
+    bcf_bytes = generate_bcf([issue])
+    viewpoint = _read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0])
+
+    errors = _errors(visinfo_schema, viewpoint)
+    assert not errors, "viewpoint.bcfv schema violations:\n  " + "\n  ".join(errors)
+
+    root = ET.fromstring(viewpoint)
+    selection = root.findall("./Components/Selection/Component")
+    coloured = root.findall("./Components/Coloring/Color/Component")
+    # Duplicates and blanks collapse; the label keeps a Component but no IfcGuid.
+    assert [c.get("IfcGuid") for c in selection] == [
+        "2O2Fr$t4X7Zf8NOew3FLOH",
+        "0FQ6pMwzXBJucYaRTqfuw2",
+        None,
+    ]
+    assert [c.find("AuthoringToolId").text for c in selection] == [
+        "2O2Fr$t4X7Zf8NOew3FLOH",
+        "0FQ6pMwzXBJucYaRTqfuw2",
+        "GC-VAL-001B",
+    ]
+    assert [c.get("IfcGuid") for c in coloured] == [c.get("IfcGuid") for c in selection]
+
+    markup = _read(bcf_bytes, _entries(bcf_bytes, "markup.bcf")[0])
+    assert "Related components: 0FQ6pMwzXBJucYaRTqfuw2, GC-VAL-001B" in markup
+
+
 # --------------------------------------------------------------------------
 # Archive structure
 # --------------------------------------------------------------------------

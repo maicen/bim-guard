@@ -27,12 +27,12 @@ Risk bands:
 import csv
 import os
 import uuid
-import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Optional
 
 from app.modules.contracts import RuleEvaluationResult
+from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_cc_catalog
 from app.services.pipeline_tracker import CC_ENGINE, Stage, emit, increment
 from app.services.pipeline_tracker import fail as track_failure
@@ -647,33 +647,12 @@ def combined_risk_assessment(
 
 
 # ── BCF 2.1 EXPORT ────────────────────────────────────────────────────────────
-def generate_cc_bcf(results: list, output_path: str) -> int:
-    """Generate BCF 2.1 ZIP for CC-001 findings.
-
-    Reports stage 6 (Export) to the bound pipeline tracker, including the empty
-    case: "exported nothing because nothing was above Low" is a result, and a
-    tracker that stayed silent there would look like an export that hung.
-    """
-    issues = [r for r in results if r.risk_band != "Low"]
-    emit(CC_ENGINE, Stage.EXPORT, bcf_topics=len(issues))
-    if not issues:
-        return 0
-
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for r in issues:
-            issue_id = str(uuid.uuid4())
-            mit_text = "\n".join(f"  {k}: {MITIGATIONS_CC.get(k, k)}" for k in r.mitigations)
-            cct_str = f"{r.cct_value_c}°C" if r.cct_value_c is not None else "N/A"
-            markup = f"""<?xml version="1.0" encoding="utf-8"?>
-<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Topic Guid="{issue_id}" TopicType="Issue" TopicStatus="Open">
-    <Title>CC-001 Crevice Risk — {r.risk_band} — {r.material_label} ({r.joint_type_label})</Title>
-    <Priority>{r.bcf_priority}</Priority>
-    <CreationDate>{r.assessment_date}</CreationDate>
-    <CreationAuthor>BIMGUARD AI — CC-001 v1.0.0</CreationAuthor>
-    <AssignedTo>Mechanical Engineer</AssignedTo>
-    <Description>
-Crevice Corrosion Risk Assessment — {RULESET_VERSION}
+def _cc_bcf_issue(r: CCResult) -> BCFIssue:
+    """Map one CC-001 result onto the shared BCF topic model."""
+    mit_text = "\n".join(f"  {k}: {MITIGATIONS_CC.get(k, k)}" for k in r.mitigations)
+    cct_str = f"{r.cct_value_c}°C" if r.cct_value_c is not None else "N/A"
+    description = f"""Crevice Corrosion Risk Assessment — {RULESET_VERSION}
+Assessment date: {r.assessment_date}
 
 Element:   {r.global_id}
 Type:      {r.element_type}
@@ -702,30 +681,51 @@ Recommended mitigations:
 Standards referenced:
   ASTM G48 Method B / CIRIA C692 — CCT data for {r.material_label}
   EN ISO 15329:2007 — Environment severity class {r.environment_severity_key}
-  CIBSE Guide G — Joint geometry classification
-    </Description>
-    <Components>
-      <Component IfcGuid="{r.global_id}" Selected="true" Visible="true"/>
-    </Components>
-  </Topic>
-</Markup>"""
-            viewpoint = f"""<?xml version="1.0" encoding="utf-8"?>
-<VisualizationInfo Guid="{issue_id}">
-  <Components>
-    <Selection>
-      <Component IfcGuid="{r.global_id}"/>
-    </Selection>
-  </Components>
-  <PerspectiveCamera>
-    <CameraViewPoint><X>0</X><Y>0</Y><Z>5</Z></CameraViewPoint>
-    <CameraDirection><X>0</X><Y>1</Y><Z>-0.5</Z></CameraDirection>
-    <CameraUpVector><X>0</X><Y>0</Y><Z>1</Z></CameraUpVector>
-    <FieldOfView>60</FieldOfView>
-  </PerspectiveCamera>
-</VisualizationInfo>"""
-            zf.writestr(f"{issue_id}/markup.bcf", markup)
-            zf.writestr(f"{issue_id}/viewpoint.bcfv", viewpoint)
+  CIBSE Guide G — Joint geometry classification"""
+    return BCFIssue(
+        guid=str(uuid.uuid4()).upper(),
+        title=f"CC-001 Crevice Risk — {r.risk_band} — {r.material_label} ({r.joint_type_label})",
+        description=description,
+        priority=r.bcf_priority,
+        status="Open",
+        assigned_to="Mechanical Engineer",
+        due_date="",
+        labels=["BIMGUARD-CC-001", f"Risk-{r.risk_band}", r.floor, r.system_type],
+        component_guid=r.global_id,
+        component_name=f"{r.element_type} ({r.material_label})",
+        service_type=r.system_type,
+        floor=r.floor,
+        risk_band=r.risk_band.upper(),
+        mechanism="crevice",
+        risk_score=r.composite_score,
+        mitigation=mit_text.strip(),
+    )
 
+
+def _write_bcf(bcf_issues: list, output_path: str) -> None:
+    """Write *bcf_issues* as a BCF 2.1 archive to *output_path*, creating parent dirs."""
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(output_path, "wb") as fh:
+        fh.write(generate_bcf(bcf_issues))
+
+
+def generate_cc_bcf(results: list, output_path: str) -> int:
+    """Generate BCF 2.1 ZIP for CC-001 findings.
+
+    The archive is rendered by ``module5_reporter.bcf_generator``, the one
+    writer validated against the buildingSMART XSDs; this function only maps
+    results onto ``BCFIssue`` objects.
+
+    Reports stage 6 (Export) to the bound pipeline tracker, including the empty
+    case: "exported nothing because nothing was above Low" is a result, and a
+    tracker that stayed silent there would look like an export that hung.
+    """
+    issues = [r for r in results if r.risk_band != "Low"]
+    emit(CC_ENGINE, Stage.EXPORT, bcf_topics=len(issues))
+    if not issues:
+        return 0
+
+    _write_bcf([_cc_bcf_issue(r) for r in issues], output_path)
     return len(issues)
 
 
@@ -793,6 +793,11 @@ def export_cc_asset_register(results: list, output_path: str) -> None:
 
 
 # ── CLI VALIDATION DEMO ───────────────────────────────────────────────────────
+#: Where the standalone demo writes its outputs (see CLAUDE.md on output dirs).
+DEMO_BCF_PATH = "docs/bcf_exports/CC-001_validation_demo.bcfzip"
+DEMO_CSV_PATH = "docs/validation/data/CC-001_validation_demo_asset_register.csv"
+
+
 def run_validation_demo():
     """10 validation scenarios demonstrating the CC-001 engine."""
     print("=" * 72)
@@ -967,11 +972,11 @@ def run_validation_demo():
         if count:
             print(f"  {band}: {count}")
 
-    os.makedirs("output", exist_ok=True)
-    bcf_count = generate_cc_bcf(results, "output/bimguard_cc001_validation.bcf.zip")
-    export_cc_asset_register(results, "output/bimguard_cc001_asset_register.csv")
-    print(f"\nBCF issues: {bcf_count} → output/bimguard_cc001_validation.bcf.zip")
-    print("Asset register → output/bimguard_cc001_asset_register.csv")
+    os.makedirs(os.path.dirname(DEMO_CSV_PATH), exist_ok=True)
+    bcf_count = generate_cc_bcf(results, DEMO_BCF_PATH)
+    export_cc_asset_register(results, DEMO_CSV_PATH)
+    print(f"\nBCF issues: {bcf_count} → {DEMO_BCF_PATH}")
+    print(f"Asset register → {DEMO_CSV_PATH}")
     print(f"\nRuleset: {RULESET_VERSION}")
     print("=" * 72)
     return results

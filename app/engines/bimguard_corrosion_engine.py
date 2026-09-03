@@ -28,12 +28,12 @@ import csv
 import os
 import re
 import uuid
-import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Optional
 
 from app.modules.contracts import RuleEvaluationResult
+from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_gc_catalog
 from app.services.pipeline_tracker import GC_ENGINE, Stage, emit, increment
 from app.services.pipeline_tracker import fail as track_failure
@@ -656,35 +656,18 @@ def assess_galvanic_batch(elements: list) -> list:
 
 
 # ── BCF 2.1 EXPORT ────────────────────────────────────────────────────────────
-def generate_gc_bcf(results: list, output_path: str) -> int:
-    """
-    Generate BCF 2.1 compliant ZIP for GC-001 findings.
-    Only Medium, High, and Critical results generate BCF issues.
-    Returns count of issues generated.
+def _gc_bcf_issue(r: GCResult) -> BCFIssue:
+    """Map one GC-001 result onto the shared BCF topic model.
 
-    Reports stage 6 (Export) to the bound pipeline tracker, including the empty
-    case: "exported nothing because nothing was above Low" is a result, and a
-    tracker that stayed silent there would look like an export that hung.
+    The anode is the primary component and the cathode a related one, so the
+    viewpoint selects and colours both sides of the couple. Demo ids such as
+    ``GC-VAL-001A`` are not IFC GlobalIds; the generator keeps them in
+    ``AuthoringToolId`` and omits ``IfcGuid`` rather than writing a value the
+    schema rejects.
     """
-    issues = [r for r in results if r.risk_band != "Low"]
-    emit(GC_ENGINE, Stage.EXPORT, bcf_topics=len(issues))
-    if not issues:
-        return 0
-
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for r in issues:
-            issue_id = str(uuid.uuid4())
-            mit_text = "\n".join(f"  {k}: {MITIGATIONS_GC.get(k, k)}" for k in r.mitigations)
-            markup = f"""<?xml version="1.0" encoding="utf-8"?>
-<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Topic Guid="{issue_id}" TopicType="Issue" TopicStatus="Open">
-    <Title>GC-001 Galvanic Risk — {r.risk_band} — {r.material_anode_label} / {r.material_cathode_label}</Title>
-    <Priority>{r.bcf_priority}</Priority>
-    <CreationDate>{r.assessment_date}</CreationDate>
-    <CreationAuthor>BIMGUARD AI — GC-001 v1.0.0</CreationAuthor>
-    <AssignedTo>Mechanical Engineer</AssignedTo>
-    <Description>
-Galvanic Corrosion Risk Assessment — {RULESET_VERSION}
+    mit_text = "\n".join(f"  {k}: {MITIGATIONS_GC.get(k, k)}" for k in r.mitigations)
+    description = f"""Galvanic Corrosion Risk Assessment — {RULESET_VERSION}
+Assessment date: {r.assessment_date}
 
 Anode element:   {r.global_id_anode}  ({r.material_anode_label})
 Cathode element: {r.global_id_cathode}  ({r.material_cathode_label})
@@ -713,32 +696,55 @@ Recommended mitigations:
 Standards referenced:
   NASA-STD-6012 — Voltage threshold: {r.env_threshold_v}V for {r.environment_label}
   IMOA Design Manual 4th Ed. — PREN adequacy check
-  WorldStainless / Euro Inox (2025) — Galvanic series data
-    </Description>
-    <Components>
-      <Component IfcGuid="{r.global_id_anode}" Selected="true" Visible="true"/>
-      <Component IfcGuid="{r.global_id_cathode}" Selected="true" Visible="true"/>
-    </Components>
-  </Topic>
-</Markup>"""
-            viewpoint = f"""<?xml version="1.0" encoding="utf-8"?>
-<VisualizationInfo Guid="{issue_id}">
-  <Components>
-    <Selection>
-      <Component IfcGuid="{r.global_id_anode}"/>
-      <Component IfcGuid="{r.global_id_cathode}"/>
-    </Selection>
-  </Components>
-  <PerspectiveCamera>
-    <CameraViewPoint><X>0</X><Y>0</Y><Z>5</Z></CameraViewPoint>
-    <CameraDirection><X>0</X><Y>1</Y><Z>-0.5</Z></CameraDirection>
-    <CameraUpVector><X>0</X><Y>0</Y><Z>1</Z></CameraUpVector>
-    <FieldOfView>60</FieldOfView>
-  </PerspectiveCamera>
-</VisualizationInfo>"""
-            zf.writestr(f"{issue_id}/markup.bcf", markup)
-            zf.writestr(f"{issue_id}/viewpoint.bcfv", viewpoint)
+  WorldStainless / Euro Inox (2025) — Galvanic series data"""
+    return BCFIssue(
+        guid=str(uuid.uuid4()).upper(),
+        title=f"GC-001 Galvanic Risk — {r.risk_band} — {r.material_anode_label} / {r.material_cathode_label}",
+        description=description,
+        priority=r.bcf_priority,
+        status="Open",
+        assigned_to="Mechanical Engineer",
+        due_date="",
+        labels=["BIMGUARD-GC-001", f"Risk-{r.risk_band}", r.floor, r.system_type],
+        component_guid=r.global_id_anode,
+        component_name=f"{r.material_anode_label} / {r.material_cathode_label}",
+        service_type=r.system_type,
+        floor=r.floor,
+        risk_band=r.risk_band.upper(),
+        mechanism="galvanic",
+        risk_score=r.composite_score,
+        mitigation=mit_text.strip(),
+        related_component_guids=[r.global_id_cathode],
+    )
 
+
+def _write_bcf(bcf_issues: list, output_path: str) -> None:
+    """Write *bcf_issues* as a BCF 2.1 archive to *output_path*, creating parent dirs."""
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(output_path, "wb") as fh:
+        fh.write(generate_bcf(bcf_issues))
+
+
+def generate_gc_bcf(results: list, output_path: str) -> int:
+    """
+    Generate BCF 2.1 compliant ZIP for GC-001 findings.
+    Only Medium, High, and Critical results generate BCF issues.
+    Returns count of issues generated.
+
+    The archive is rendered by ``module5_reporter.bcf_generator``, the one
+    writer validated against the buildingSMART XSDs; this function only maps
+    results onto ``BCFIssue`` objects.
+
+    Reports stage 6 (Export) to the bound pipeline tracker, including the empty
+    case: "exported nothing because nothing was above Low" is a result, and a
+    tracker that stayed silent there would look like an export that hung.
+    """
+    issues = [r for r in results if r.risk_band != "Low"]
+    emit(GC_ENGINE, Stage.EXPORT, bcf_topics=len(issues))
+    if not issues:
+        return 0
+
+    _write_bcf([_gc_bcf_issue(r) for r in issues], output_path)
     return len(issues)
 
 
@@ -808,6 +814,13 @@ def export_gc_asset_register(results: list, output_path: str) -> None:
 
 
 # ── CLI VALIDATION DEMO ───────────────────────────────────────────────────────
+#: Where the standalone demo writes its outputs. Committed BCF archives live
+#: under docs/bcf_exports/ and validation datasets under docs/validation/data/
+#: (CLAUDE.md); the repo root and a root-level ``output/`` are off limits.
+DEMO_BCF_PATH = "docs/bcf_exports/GC-001_validation_demo.bcfzip"
+DEMO_CSV_PATH = "docs/validation/data/GC-001_validation_demo_asset_register.csv"
+
+
 def run_validation_demo():
     """5 validation scenarios demonstrating the GC-001 engine."""
     print("=" * 72)
@@ -914,11 +927,11 @@ def run_validation_demo():
         if count:
             print(f"  {band}: {count}")
 
-    os.makedirs("output", exist_ok=True)
-    bcf_count = generate_gc_bcf(results, "output/bimguard_gc001_validation.bcf.zip")
-    export_gc_asset_register(results, "output/bimguard_gc001_asset_register.csv")
-    print(f"\nBCF issues: {bcf_count} → output/bimguard_gc001_validation.bcf.zip")
-    print("Asset register → output/bimguard_gc001_asset_register.csv")
+    os.makedirs(os.path.dirname(DEMO_CSV_PATH), exist_ok=True)
+    bcf_count = generate_gc_bcf(results, DEMO_BCF_PATH)
+    export_gc_asset_register(results, DEMO_CSV_PATH)
+    print(f"\nBCF issues: {bcf_count} → {DEMO_BCF_PATH}")
+    print(f"Asset register → {DEMO_CSV_PATH}")
     print(f"\nRuleset: {RULESET_VERSION}")
     print("=" * 72)
     return results

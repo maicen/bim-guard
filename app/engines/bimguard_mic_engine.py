@@ -28,12 +28,12 @@ Risk bands:
 import csv
 import os
 import uuid
-import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Optional
 
 from app.modules.contracts import RuleEvaluationResult
+from app.modules.module5_reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_mc_catalog
 
 RULESET_VERSION = "BIMGUARD-MC-001 v1.0.0"
@@ -482,30 +482,11 @@ def assess_mic_batch(elements: list[MICElement]) -> list[MICResult]:
 
 
 # ── BCF 2.1 EXPORT ────────────────────────────────────────────────────────────
-def generate_mic_bcf(results: list[MICResult], output_path: str) -> int:
-    """
-    Generate BCF 2.1 compliant ZIP archive for MC-001 findings.
-    Only Medium, High, and Critical results generate BCF issues.
-    Returns count of issues generated.
-    """
-    issues = [r for r in results if r.risk_band != "Low"]
-    if not issues:
-        return 0
-
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for result in issues:
-            issue_id = str(uuid.uuid4())
-            mit_text = "\n".join(f"  {k}: {MITIGATIONS.get(k, k)}" for k in result.mitigations)
-            markup = f"""<?xml version="1.0" encoding="utf-8"?>
-<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Topic Guid="{issue_id}" TopicType="Issue" TopicStatus="Open">
-    <Title>MC-001 MIC Risk — {result.risk_band} — {result.element_type} [{result.global_id[:8]}]</Title>
-    <Priority>{result.bcf_priority}</Priority>
-    <CreationDate>{result.assessment_date}</CreationDate>
-    <CreationAuthor>BIMGUARD AI — MC-001 v1.0.0</CreationAuthor>
-    <AssignedTo>Mechanical / Public Health Engineer</AssignedTo>
-    <Description>
-Microbially Influenced Corrosion (MIC) Risk Assessment — {RULESET_VERSION}
+def _mic_bcf_issue(result: MICResult) -> BCFIssue:
+    """Map one MC-001 result onto the shared BCF topic model."""
+    mit_text = "\n".join(f"  {k}: {MITIGATIONS.get(k, k)}" for k in result.mitigations)
+    description = f"""Microbially Influenced Corrosion (MIC) Risk Assessment — {RULESET_VERSION}
+Assessment date: {result.assessment_date}
 
 Element: {result.element_type}
 GlobalID: {result.global_id}
@@ -536,30 +517,49 @@ Relevant standards:
   CIBSE TM13:2013 — Minimising Risk from Legionella
   HSE HSG274 Parts 1–3 — Legionella Control
   BS 8552:2012 — Sampling and Monitoring of Water Systems
-  ASTM G-187 — MIC Assessment Standard Practice
-    </Description>
-    <Components>
-      <Component IfcGuid="{result.global_id}" Selected="true" Visible="true"/>
-    </Components>
-  </Topic>
-</Markup>"""
-            viewpoint = f"""<?xml version="1.0" encoding="utf-8"?>
-<VisualizationInfo Guid="{issue_id}">
-  <Components>
-    <Selection>
-      <Component IfcGuid="{result.global_id}"/>
-    </Selection>
-  </Components>
-  <PerspectiveCamera>
-    <CameraViewPoint><X>0</X><Y>0</Y><Z>5</Z></CameraViewPoint>
-    <CameraDirection><X>0</X><Y>1</Y><Z>-0.5</Z></CameraDirection>
-    <CameraUpVector><X>0</X><Y>0</Y><Z>1</Z></CameraUpVector>
-    <FieldOfView>60</FieldOfView>
-  </PerspectiveCamera>
-</VisualizationInfo>"""
-            zf.writestr(f"{issue_id}/markup.bcf", markup)
-            zf.writestr(f"{issue_id}/viewpoint.bcfv", viewpoint)
+  ASTM G-187 — MIC Assessment Standard Practice"""
+    return BCFIssue(
+        guid=str(uuid.uuid4()).upper(),
+        title=f"MC-001 MIC Risk — {result.risk_band} — {result.element_type} [{result.global_id[:8]}]",
+        description=description,
+        priority=result.bcf_priority,
+        status="Open",
+        assigned_to="Mechanical / Public Health Engineer",
+        due_date="",
+        labels=["BIMGUARD-MC-001", f"Risk-{result.risk_band}", result.floor, result.zone],
+        component_guid=result.global_id,
+        component_name=f"{result.element_type} ({result.material_label})",
+        service_type=result.system_type,
+        floor=result.floor,
+        risk_band=result.risk_band.upper(),
+        mechanism="microbiological",
+        risk_score=result.composite_score,
+        mitigation=mit_text.strip(),
+    )
 
+
+def _write_bcf(bcf_issues: list, output_path: str) -> None:
+    """Write *bcf_issues* as a BCF 2.1 archive to *output_path*, creating parent dirs."""
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(output_path, "wb") as fh:
+        fh.write(generate_bcf(bcf_issues))
+
+
+def generate_mic_bcf(results: list[MICResult], output_path: str) -> int:
+    """
+    Generate BCF 2.1 compliant ZIP archive for MC-001 findings.
+    Only Medium, High, and Critical results generate BCF issues.
+    Returns count of issues generated.
+
+    The archive is rendered by ``module5_reporter.bcf_generator``, the one
+    writer validated against the buildingSMART XSDs; this function only maps
+    results onto ``BCFIssue`` objects.
+    """
+    issues = [r for r in results if r.risk_band != "Low"]
+    if not issues:
+        return 0
+
+    _write_bcf([_mic_bcf_issue(r) for r in issues], output_path)
     return len(issues)
 
 
@@ -621,6 +621,11 @@ def export_mic_asset_register(results: list[MICResult], output_path: str) -> Non
 
 
 # ── CLI VALIDATION DEMO ───────────────────────────────────────────────────────
+#: Where the standalone demo writes its outputs (see CLAUDE.md on output dirs).
+DEMO_BCF_PATH = "docs/bcf_exports/MC-001_validation_demo.bcfzip"
+DEMO_CSV_PATH = "docs/validation/data/MC-001_validation_demo_asset_register.csv"
+
+
 def run_validation_demo():
     """
     10 validation scenarios demonstrating the MC-001 engine.
@@ -792,9 +797,9 @@ def run_validation_demo():
             print(f"  {band}: {count}")
 
     # Export outputs
-    os.makedirs("output", exist_ok=True)
-    bcf_path = "output/bimguard_mc001_validation.bcf.zip"
-    csv_path = "output/bimguard_mc001_asset_register.csv"
+    os.makedirs(os.path.dirname(DEMO_CSV_PATH), exist_ok=True)
+    bcf_path = DEMO_BCF_PATH
+    csv_path = DEMO_CSV_PATH
 
     issues = generate_mic_bcf(results, bcf_path)
     export_mic_asset_register(results, csv_path)
