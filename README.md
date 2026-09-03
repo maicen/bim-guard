@@ -282,3 +282,8 @@ Docstring policy for contributors:
 - Add docstrings for new public modules, classes, and functions.
 - Keep docstrings imperative and concise (PEP 257).
 - Include parameters/return behavior when it improves clarity.
+
+## Related Repositories
+
+- **[bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**: Dedicated evaluation companion repository. Houses all scoring harnesses, linguistic NLP annotation capabilities, multi-model validation sweeps (`test_all_38_models.py`), and research analysis (confusion matrices, standards sensitivity curves, and thesis tables/figures).
+- **[bimguard-analytics](https://github.com/maicen/bimguard-analytics)**: Dedicated analytics layer containing Power BI project files (`.pbip`), star schema specifications (`issues.csv` fact table + dimension tables), and DAX measures.

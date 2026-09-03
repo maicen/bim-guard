@@ -15,7 +15,7 @@ Usage::
     uv run python scripts/regenerate_demo_bcf.py --sweep     # also report on data/validation_bcf/*.bcf
 
 ``--sweep`` only *reports* on the archives written by the 38-model sweep
-(``scripts/eval/test_all_38_models.py``); it does not regenerate them, because
+(in ``bim-guard-evaluation``: ``eval/test_all_38_models.py``); it does not regenerate them, because
 that needs a full ``--refresh`` run of the sweep over ~1.4 GB of cached models.
 
 Exit status is non-zero when any regenerated demo archive fails validation.
@@ -140,7 +140,7 @@ def main() -> int:
         print(f"\nReport only: {len(sweep)} sweep archives in {SWEEP_DIR.relative_to(REPO_ROOT).as_posix()}")
         sweep_failed = report(sweep, schemas)
         print(f"  {len(sweep) - sweep_failed}/{len(sweep)} sweep archives valid "
-              "(regenerate with scripts/eval/test_all_38_models.py --refresh)")
+              "(regenerate with bim-guard-evaluation/eval/test_all_38_models.py --refresh)")
 
     return 1 if failed else 0
 

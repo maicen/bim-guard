@@ -33,6 +33,7 @@ These files should be treated as current sources of truth.
 - Contains methodology documents, dataset notes, and standard research matrices.
 - `logs/`: Output traces and raw text logs from full evaluation runs.
 - `data/`: JSON summaries and configs from validation sweeps.
+- **Dedicated Evaluation Companion Repository**: [maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation) — All empirical research analysis (confusion matrices, 38-model validation sweeps, accuracy scoring, and NLP annotation capabilities) are conducted and maintained in this dedicated repo.
 
 ## Project Tracking & Historical Updates (`planning/`)
 

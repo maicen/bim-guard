@@ -44,6 +44,7 @@ All newly generated files (code, tests, scripts, fixtures, data manifests, repor
   - `docs/benchmarks/` — Benchmark results, charts, and summaries
   - `docs/architecture/` — System architecture design documents
   - Also holds general reference docs and reports not covered above (e.g. `docs/architecture.md`, `docs/CONVENTIONS.md`, `docs/planning/`, `docs/thesis/`, `docs/submissions/`, `docs/client-qa/`, `docs/bimguard_*_rules.md` NotebookLM corpora)
+  - **Empirical Evaluation Companion**: Accuracy scoring harnesses, linguistic NLP annotation modules, and empirical research analysis (confusion matrices, 38-model validation sweeps, thesis tables/figures) are maintained in [maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation). Evaluation analyzes `bim-guard` through Web API (`/api/*`), programmatic Python imports, or both (configured per evaluation harness).
 - **`data/`** — Seed data, static rulesets (`data/rulesets/`), schema configs, and sample IFC files.
 - **`supabase/migrations/`** — Database migration SQL scripts.
 

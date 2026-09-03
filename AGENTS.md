@@ -44,6 +44,11 @@ The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to back
 - `supabase/migrations/` — Database schema migrations tracked in-repo
 - `data/cache/supabase-storage/` — Disposable cache for downloaded Supabase Storage objects
 - `static/` — CSS, JS, and viewer assets
+- **Companion Repositories & Inter-Repository Boundaries**:
+  - **[maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**: External evaluation, accuracy scoring, NLP annotation, and empirical research validation repository.
+    - **Scope**: Conducts all linguistic NLP annotation benchmarking, ground-truth rule extraction scoring, 38-model sweeps, and academic research analysis (confusion matrices, ROC/PR curves, standards sensitivity, and thesis validation tables/figures) completely outside the production application codebase.
+    - **Inter-Repository Analysis**: `bim-guard-evaluation` analyzes `bim-guard` via **Web API** (FastAPI REST & SSE endpoints on `http://127.0.0.1:8000`), **programmatic imports** (`app.engines`, `app.modules`, `app.services` via `PYTHONPATH`/`BIMGUARD_PATH`), or **both / hybrid** (to be decided per evaluation harness).
+  - **[maicen/bimguard-analytics](https://github.com/maicen/bimguard-analytics)**: Dedicated analytics repository containing Power BI data models (`.pbip`), star schema data contracts (`issues.csv` fact table + dimension tables), and DAX measures.
 
 ## Git workflow (STRICT)
 
