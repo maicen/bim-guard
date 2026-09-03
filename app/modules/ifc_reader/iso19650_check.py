@@ -18,26 +18,42 @@ Also covers model-content checks that a single IFC file genuinely can answer
 on its own, beyond the container-naming/CDE-governance checks above:
 element-level classification references, owner-history completeness,
 georeferencing, unit-declaration completeness, spatial-structure hierarchy,
-and whether the file declares a Model View Definition (declaration only —
-see _check_mvd_declared for why full MVD rule conformance is out of scope).
+whether the file declares a Model View Definition (declaration only - see
+_check_mvd_declared for why full MVD rule conformance is out of scope),
+GlobalId well-formedness, spatial containment (orphaned elements), and
+coverage checks for materials, quantities, documents, and property sets.
 
-Deliberately out of scope here (need data this function doesn't have):
-revision-sequence-over-time and duplicate-filename-across-the-CDE both need
-upload history that isn't tracked anywhere yet; real IDS-spec validation is
-a separate, much larger feature (BIM-Guard's CDE gate currently takes
-ids_check_passed as a caller-supplied flag, not a computed result).
+Deliberately NOT covered here, on purpose:
+- "required attributes/Psets/property values present" - that's what the
+  generic rule_compliance engine (Module4_Comparator) already does at
+  scale via user-defined and seeded rules; duplicating it here as a
+  hardcoded second implementation would just fight with the real one.
+- Element dimensions, clearances, accessibility, clash detection - that's
+  the building-code domain (egress/stairs/windows/accessibility), a
+  different engine and a different concern from ISO 19650 governance.
+- revision-sequence-over-time and duplicate-filename-across-the-CDE both
+  need upload history that isn't tracked anywhere yet; real IDS-spec
+  validation is a separate, much larger feature (BIM-Guard's CDE gate
+  currently takes ids_check_passed as a caller-supplied flag, not a
+  computed result); real clash detection and IFC-syntax/geometry validity
+  checking are each their own substantial feature, not implemented here.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 
 from app.modules.document_parsing.iso_validator import ISO19650Validator
 
 try:
+    import ifcopenshell.guid as _guid_util
     import ifcopenshell.util.classification as _classification_util
+    import ifcopenshell.util.element as _element_util
 except ImportError:  # pragma: no cover - covered by _IFC_AVAILABLE below
+    _guid_util = None
     _classification_util = None
+    _element_util = None
 
 logger = logging.getLogger("bimguard.iso19650")
 
@@ -448,6 +464,214 @@ def _check_mvd_declared(ifc_file) -> dict | None:
     }
 
 
+_GUID_ALPHABET_RE = re.compile(r"^[0-9A-Za-z_$]{22}$")
+
+
+def _check_guid_format(ifc_file) -> dict | None:
+    """Is every GlobalId a well-formed 22-character IFC-compressed GUID?
+
+    Distinct from duplicate_global_id above: this checks well-formedness
+    (right alphabet/length, and actually decodes), not uniqueness. A
+    malformed GUID breaks interoperability with any tool that round-trips
+    it through ifcopenshell.guid.expand()/compress().
+    """
+    if not _IFC_AVAILABLE or ifc_file is None or _guid_util is None:
+        return None
+    try:
+        elements = [e for e in ifc_file if hasattr(e, "GlobalId") and e.GlobalId]
+    except Exception:
+        return None
+    if not elements:
+        return None
+
+    malformed = 0
+    for element in elements:
+        gid = element.GlobalId
+        if not _GUID_ALPHABET_RE.match(gid):
+            malformed += 1
+            continue
+        try:
+            _guid_util.expand(gid)
+        except Exception:
+            malformed += 1
+
+    total = len(elements)
+    passes = malformed == 0
+
+    return {
+        "check": "guid_format",
+        "severity": "critical",
+        "passes": passes,
+        "message": (
+            f"All {total} GlobalIds are well-formed"
+            if passes
+            else f"{malformed}/{total} GlobalId(s) are not well-formed 22-character IFC GUIDs"
+        ),
+        "details": {"malformed_count": malformed, "total_guids": total},
+    }
+
+
+def _check_spatial_containment(ifc_file) -> dict | None:
+    """What fraction of elements are contained in NO spatial structure at all?
+
+    An orphaned element (no storey/space container, direct or via
+    decomposition) is invisible to storey-scoped reporting and most
+    building-code checks, even though it's still in the model.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None or _element_util is None:
+        return None
+    try:
+        elements = ifc_file.by_type("IfcElement")
+    except Exception:
+        return None
+    if not elements:
+        return None
+
+    orphaned = 0
+    for element in elements:
+        try:
+            if _element_util.get_container(element) is None:
+                orphaned += 1
+        except Exception:
+            orphaned += 1
+
+    total = len(elements)
+    passes = orphaned == 0
+
+    return {
+        "check": "spatial_containment",
+        "severity": "warning",
+        "passes": passes,
+        "message": (
+            f"All {total} elements are contained in the spatial structure"
+            if passes
+            else f"{orphaned}/{total} element(s) have no spatial container (storey/space) at all"
+        ),
+        "details": {"orphaned_count": orphaned, "total_elements": total},
+    }
+
+
+def _coverage_check(ifc_file, *, check_name: str, label: str, has_feature) -> dict | None:
+    """Shared shape for the material/quantity/document/pset coverage checks
+    below: what fraction of IfcElements satisfy `has_feature(element)`."""
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return None
+    try:
+        elements = ifc_file.by_type("IfcElement")
+    except Exception:
+        return None
+    if not elements:
+        return None
+
+    covered = 0
+    for element in elements:
+        try:
+            if has_feature(element):
+                covered += 1
+        except Exception:
+            continue
+
+    total = len(elements)
+    coverage = covered / total if total else 0.0
+    passes = covered > 0
+
+    return {
+        "check": check_name,
+        "severity": "warning",
+        "passes": passes,
+        "message": (
+            f"{covered}/{total} elements ({coverage:.0%}) have {label}"
+            if passes
+            else f"No elements have {label}"
+        ),
+        "details": {"covered_count": covered, "total_elements": total, "coverage": round(coverage, 4)},
+    }
+
+
+def _check_material_assignment(ifc_file) -> dict | None:
+    if _element_util is None:
+        return None
+    return _coverage_check(
+        ifc_file,
+        check_name="material_assignment",
+        label="a material assigned",
+        has_feature=lambda e: _element_util.get_material(e) is not None,
+    )
+
+
+def _check_quantity_sets(ifc_file) -> dict | None:
+    if _element_util is None:
+        return None
+    return _coverage_check(
+        ifc_file,
+        check_name="quantity_sets",
+        label="at least one quantity set (Qto_*)",
+        has_feature=lambda e: bool(_element_util.get_psets(e, qtos_only=True)),
+    )
+
+
+def _check_document_references(ifc_file) -> dict | None:
+    def has_document(element) -> bool:
+        for rel in getattr(element, "HasAssociations", None) or []:
+            if rel.is_a("IfcRelAssociatesDocument"):
+                return True
+        return False
+
+    return _coverage_check(
+        ifc_file,
+        check_name="document_references",
+        label="at least one associated document reference",
+        has_feature=has_document,
+    )
+
+
+def _check_property_set_coverage(ifc_file) -> dict | None:
+    """What fraction of elements carry at least one (non-quantity) Pset,
+    and how many distinct IFC classes does the model actually use? The
+    class count is informational only - there's no universal "correct"
+    count to compare it against."""
+    if not _IFC_AVAILABLE or ifc_file is None or _element_util is None:
+        return None
+    try:
+        elements = ifc_file.by_type("IfcElement")
+    except Exception:
+        return None
+    if not elements:
+        return None
+
+    covered = 0
+    classes: set[str] = set()
+    for element in elements:
+        classes.add(element.is_a())
+        try:
+            if _element_util.get_psets(element, psets_only=True):
+                covered += 1
+        except Exception:
+            continue
+
+    total = len(elements)
+    coverage = covered / total if total else 0.0
+    passes = covered > 0
+
+    return {
+        "check": "property_set_coverage",
+        "severity": "warning",
+        "passes": passes,
+        "message": (
+            f"{covered}/{total} elements ({coverage:.0%}) carry at least one property set, "
+            f"across {len(classes)} distinct IFC classes"
+            if passes
+            else f"No elements carry a property set, across {len(classes)} distinct IFC classes"
+        ),
+        "details": {
+            "covered_count": covered,
+            "total_elements": total,
+            "coverage": round(coverage, 4),
+            "unique_ifc_classes": len(classes),
+        },
+    }
+
+
 def check_iso19650_compliance(
     ifc_file,
     *,
@@ -486,6 +710,12 @@ def check_iso19650_compliance(
         _check_units_declaration,
         _check_spatial_structure,
         _check_mvd_declared,
+        _check_guid_format,
+        _check_spatial_containment,
+        _check_material_assignment,
+        _check_quantity_sets,
+        _check_document_references,
+        _check_property_set_coverage,
     ):
         check_result = check_fn(ifc_file)
         if check_result:
