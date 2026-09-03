@@ -31,6 +31,7 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import { createTableState } from "../lib/tableState.svelte";
 
   let documents: DocumentItem[] = $state([]);
   let selectedDocId: number | null = $state(null);
@@ -39,7 +40,8 @@
   let viewingDraftRule: ExtractedRule | null = $state(null);
 
   function addManualDraftRule() {
-    const newRule: ExtractedRule = {
+    const newRule: DraftRule = {
+      rowId: nextDraftRowId++,
       rule_id: `CUSTOM-${extractedRules.length + 1}`,
       description: "Custom compliance requirement",
       property_set: "Pset_Compliance",
@@ -47,32 +49,40 @@
       operator: "==",
       check_value: "",
       severity: "Medium",
-      selected: true,
     };
     extractedRules = [newRule, ...extractedRules];
+    table.selectedIds.add(newRule.rowId);
   }
 
-  function removeDraftRule(index: number) {
-    extractedRules = extractedRules.filter((_, i) => i !== index);
+  function removeDraftRule(rowId: number) {
+    extractedRules = extractedRules.filter((r) => r.rowId !== rowId);
+    table.selectedIds.delete(rowId);
   }
   let isExtracting = $state(false);
   let isSaving = $state(false);
   let error = $state("");
   let successMessage = $state("");
 
-  let extractedRules: ExtractedRule[] = $state([]);
+  let extractedRules: DraftRule[] = $state([]);
   let extractionWarnings: string[] = [];
   let formRulesetId = $state("EXTRACTED-STANDARDS");
 
   // Search, Filter, Sort & Pagination for Draft Rules
-  let draftSearchQuery = $state("");
-  let draftSeverityFilter = $state("ALL");
-  let draftSortField:
-    "rule_id" | "description" | "property_set" | "property_name" | "operator" | "severity" =
-    $state("rule_id");
-  let draftSortAsc = $state(true);
-  let draftCurrentPage = $state(1);
-  let draftPageSize = $state(10);
+  // Extracted rules carry no id of their own — `rule_id` is a code reference and
+  // repeats — so each draft gets a stable row id when it arrives.
+  type DraftRule = ExtractedRule & { rowId: number };
+  let nextDraftRowId = 0;
+
+  // Search, filter, sort, paginate and select — all owned by the shared state.
+  const table = createTableState<DraftRule, number>({
+    rows: () => extractedRules,
+    getId: (r) => r.rowId,
+    searchFields: (r) => [r.rule_id, r.description, r.property_name, r.property_set],
+    filters: {
+      severity: (r, value) => (r.severity || "Medium").toLowerCase() === value.toLowerCase(),
+    },
+    initialSort: { field: "rule_id", asc: true },
+  });
 
   // Bulk Edit Modal for Draft Rules
   let isDraftBulkEditModalOpen = $state(false);
@@ -102,8 +112,9 @@
     error = "";
     successMessage = "";
     extractedRules = [];
+    table.clearSelection();
     extractionWarnings = [];
-    draftCurrentPage = 1;
+    table.requestedPage = 1;
 
     try {
       let textToExtract = rawText;
@@ -119,8 +130,11 @@
       const res = await ruleExtractionApi.extract(undefined, textToExtract);
       extractedRules = (res.rules || []).map((r: any) => ({
         ...r,
-        selected: true,
+        rowId: nextDraftRowId++,
       }));
+      // Every freshly extracted rule starts selected, as before.
+      table.clearSelection();
+      for (const r of extractedRules) table.selectedIds.add(r.rowId);
       extractionWarnings = res.warnings || [];
 
       if (extractedRules.length === 0) {
@@ -133,69 +147,9 @@
     }
   }
 
-  let selectedDraftCount = $derived(extractedRules.filter((r) => r.selected).length);
-
-  let filteredDraftRules = $derived(
-    extractedRules
-      .filter((r) => {
-        const matchesSearch =
-          !draftSearchQuery ||
-          (r.rule_id || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
-          (r.description || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
-          (r.property_name || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
-          (r.property_set || "").toLowerCase().includes(draftSearchQuery.toLowerCase());
-        const matchesSeverity =
-          draftSeverityFilter === "ALL" ||
-          (r.severity || "Medium").toLowerCase() === draftSeverityFilter.toLowerCase();
-        return matchesSearch && matchesSeverity;
-      })
-      .sort((a, b) => {
-        let valA: any = a[draftSortField];
-        let valB: any = b[draftSortField];
-        if (valA === undefined || valA === null) valA = "";
-        if (valB === undefined || valB === null) valB = "";
-        if (typeof valA === "string") valA = valA.toLowerCase();
-        if (typeof valB === "string") valB = valB.toLowerCase();
-        if (valA < valB) return draftSortAsc ? -1 : 1;
-        if (valA > valB) return draftSortAsc ? 1 : -1;
-        return 0;
-      }),
-  );
-
-  let draftTotalItems = $derived(filteredDraftRules.length);
-  let paginatedDraftRules = $derived(
-    filteredDraftRules.slice(
-      (draftCurrentPage - 1) * draftPageSize,
-      draftCurrentPage * draftPageSize,
-    ),
-  );
-
-  let allFilteredDraftsSelected = $derived(
-    filteredDraftRules.length > 0 && filteredDraftRules.every((r) => r.selected),
-  );
-
-  function toggleSelectAllDrafts() {
-    const targetState = !allFilteredDraftsSelected;
-    filteredDraftRules.forEach((r) => {
-      r.selected = targetState;
-    });
-    extractedRules = [...extractedRules];
-  }
-
-  function toggleDraftSort(
-    field: "rule_id" | "description" | "property_set" | "property_name" | "operator" | "severity",
-  ) {
-    if (draftSortField === field) {
-      draftSortAsc = !draftSortAsc;
-    } else {
-      draftSortField = field;
-      draftSortAsc = true;
-    }
-  }
-
   function applyDraftBulkEdit() {
     extractedRules = extractedRules.map((r) => {
-      if (!r.selected) return r;
+      if (!table.isSelected(r.rowId)) return r;
       return {
         ...r,
         severity: bulkDraftSeverity !== "no_change" ? bulkDraftSeverity : r.severity,
@@ -210,13 +164,13 @@
   }
 
   function confirmBulkDeleteDrafts() {
-    extractedRules = extractedRules.filter((r) => !r.selected);
+    extractedRules = extractedRules.filter((r) => !table.isSelected(r.rowId));
+    table.clearSelection();
     isDraftBulkDeleteModalOpen = false;
   }
 
   function exportDraftRulesToCsv() {
-    const toExport = extractedRules.filter((r) => r.selected);
-    const target = toExport.length ? toExport : filteredDraftRules;
+    const target = table.selectedCount ? table.selectedRows : table.sorted;
     const headers = [
       "RuleID",
       "Description",
@@ -250,7 +204,7 @@
   }
 
   async function handleSaveSelected() {
-    const toSave = extractedRules.filter((r) => r.selected);
+    const toSave = table.selectedRows;
     if (toSave.length === 0) {
       error = "Please select at least one rule to save.";
       return;
@@ -282,6 +236,7 @@
       const res = await ruleExtractionApi.bulkCreate(payloads);
       successMessage = `Successfully saved ${res.created_count} rules into the compliance library.`;
       extractedRules = [];
+      table.clearSelection();
     } catch (err: any) {
       error = err.message || "Failed to save rules to library.";
     } finally {
@@ -431,13 +386,13 @@
 
           <button
             type="button"
-            disabled={isSaving || selectedDraftCount === 0}
+            disabled={isSaving || table.selectedCount === 0}
             onclick={handleSaveSelected}
             class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
           >
             <Save class="h-3.5 w-3.5" />
             <span
-              >{isSaving ? "Saving..." : `Save Selected (${selectedDraftCount}) to Library`}</span
+              >{isSaving ? "Saving..." : `Save Selected (${table.selectedCount}) to Library`}</span
             >
           </button>
         </div>
@@ -451,7 +406,7 @@
           <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            bind:value={draftSearchQuery}
+            bind:value={table.search}
             placeholder="Search draft rules by reference, description, property..."
             class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
@@ -459,7 +414,7 @@
 
         <div class="flex w-full items-center gap-2 md:w-auto">
           <select
-            bind:value={draftSeverityFilter}
+            bind:value={table.filters.severity}
             class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
             <option value="ALL">All Severities</option>
@@ -473,10 +428,10 @@
 
       <!-- Bulk Action Bar -->
       <BulkActionBar
-        selectedCount={selectedDraftCount}
+        selectedCount={table.selectedCount}
         itemLabel="draft rule"
         onClearSelection={() => {
-          extractedRules = extractedRules.map((r) => ({ ...r, selected: false }));
+          table.clearSelection();
         }}
         onBulkEdit={() => (isDraftBulkEditModalOpen = true)}
         onBulkExport={exportDraftRulesToCsv}
@@ -493,52 +448,53 @@
               <tr>
                 <th class="w-10 px-3 py-3 text-center">
                   <TableCheckbox
-                    checked={allFilteredDraftsSelected}
-                    onchange={toggleSelectAllDrafts}
+                    checked={table.allFilteredSelected}
+                    indeterminate={table.someFilteredSelected}
+                    onchange={() => table.toggleSelectAll()}
                     title="Select all draft rules"
                   />
                 </th>
                 <SortHeader
                   column="rule_id"
-                  sortField={draftSortField}
-                  sortAsc={draftSortAsc}
-                  onSort={toggleDraftSort}
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
                   customClass="py-3 px-3"
                 >
                   Rule Ref
                 </SortHeader>
                 <SortHeader
                   column="description"
-                  sortField={draftSortField}
-                  sortAsc={draftSortAsc}
-                  onSort={toggleDraftSort}
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
                   customClass="py-3 px-3"
                 >
                   Description
                 </SortHeader>
                 <SortHeader
                   column="property_set"
-                  sortField={draftSortField}
-                  sortAsc={draftSortAsc}
-                  onSort={toggleDraftSort}
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
                   customClass="py-3 px-3"
                 >
                   Property Set
                 </SortHeader>
                 <SortHeader
                   column="property_name"
-                  sortField={draftSortField}
-                  sortAsc={draftSortAsc}
-                  onSort={toggleDraftSort}
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
                   customClass="py-3 px-3"
                 >
                   Property
                 </SortHeader>
                 <SortHeader
                   column="operator"
-                  sortField={draftSortField}
-                  sortAsc={draftSortAsc}
-                  onSort={toggleDraftSort}
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
                   customClass="py-3 px-3"
                 >
                   Op
@@ -546,9 +502,9 @@
                 <th class="px-3 py-3">Target Value</th>
                 <SortHeader
                   column="severity"
-                  sortField={draftSortField}
-                  sortAsc={draftSortAsc}
-                  onSort={toggleDraftSort}
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
                   customClass="py-3 px-3"
                 >
                   Severity
@@ -557,15 +513,16 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
-              {#each paginatedDraftRules as rule, i}
+              {#each table.paginated as rule (rule.rowId)}
                 <tr
-                  class="transition-colors hover:bg-slate-900/60 {rule.selected
+                  class="transition-colors hover:bg-slate-900/60 {table.isSelected(rule.rowId)
                     ? 'bg-blue-950/20'
                     : ''}"
                 >
                   <td class="px-3 py-3 text-center">
                     <TableCheckbox
-                      bind:checked={rule.selected}
+                      checked={table.isSelected(rule.rowId)}
+                      onchange={() => table.toggleSelect(rule.rowId)}
                       ariaLabel={`Select rule ${rule.rule_id}`}
                     />
                   </td>
@@ -627,7 +584,7 @@
                       </button>
                       <button
                         type="button"
-                        onclick={() => removeDraftRule(i)}
+                        onclick={() => removeDraftRule(rule.rowId)}
                         class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                         title="Remove draft rule"
                       >
@@ -642,13 +599,13 @@
         </div>
 
         <TablePagination
-          currentPage={draftCurrentPage}
-          pageSize={draftPageSize}
-          totalItems={draftTotalItems}
-          onPageChange={(p) => (draftCurrentPage = p)}
-          onPageSizeChange={(s) => {
-            draftPageSize = s;
-            draftCurrentPage = 1;
+          currentPage={table.page}
+          pageSize={table.pageSize}
+          totalItems={table.totalItems}
+          onPageChange={(p) => (table.requestedPage = p)}
+          onPageSizeChange={(size) => {
+            table.pageSize = size;
+            table.requestedPage = 1;
           }}
         />
       </div>
@@ -735,7 +692,7 @@
         <div class="flex items-center gap-2">
           <SlidersHorizontal class="h-4 w-4 text-blue-400" />
           <h3 class="text-sm font-bold text-slate-50">
-            Bulk Edit Draft Rules ({selectedDraftCount} selected)
+            Bulk Edit Draft Rules ({table.selectedCount} selected)
           </h3>
         </div>
         <button
@@ -822,7 +779,7 @@
 <ConfirmModal
   bind:isOpen={isDraftBulkDeleteModalOpen}
   title="Delete Selected Draft Rules"
-  message={`Are you sure you want to remove ${selectedDraftCount} selected draft rule(s) from this extraction batch?`}
+  message={`Are you sure you want to remove ${table.selectedCount} selected draft rule(s) from this extraction batch?`}
   confirmText="Delete Draft Rules"
   danger={true}
   onConfirm={confirmBulkDeleteDrafts}

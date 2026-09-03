@@ -40,6 +40,7 @@
   import LoadingState from "../lib/components/LoadingState.svelte";
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
+  import { createTableState } from "../lib/tableState.svelte";
 
   interface Props {
     initialProjectId?: number | null;
@@ -59,36 +60,37 @@
   let bcfArtifacts: BcfArtifact[] = $state([]);
   let isBcfLoading = $state(false);
   let filterToSelectedProject = $state(false);
-  let selectedArtifactIds: number[] = $state([]);
   let isDeleteArtifactModalOpen = $state(false);
   let artifactToDelete: BcfArtifact | null = $state(null);
   let isBulkDeleteArtifactsModalOpen = $state(false);
 
-  // Artifact search, filter & sort
-  let artifactSearchQuery = $state("");
-  let artifactSortField: "id" | "filename" | "issue_count" | "byte_size" | "created_at" =
-    $state("id");
-  let artifactSortAsc = $state(false);
-  let artifactCurrentPage = $state(1);
-  let artifactPageSize = $state(10);
+  // Artifact search, sort, paginate and select.
+  const artifactTable = createTableState<BcfArtifact, number>({
+    rows: () =>
+      filterToSelectedProject && selectedProjectId
+        ? bcfArtifacts.filter((a) => a.project_id === selectedProjectId)
+        : bcfArtifacts,
+    getId: (a) => a.id,
+    searchFields: (a) => [a.filename, getProjectName(a.project_id)],
+    initialSort: { field: "id", asc: false },
+  });
 
   // Live BCF REST Topics
   let bcfTopics: BCFTopicResponse[] = $state([]);
   let isTopicsLoading = $state(false);
   let activeTab: "live_bcf" | "artifacts" = $state("live_bcf");
-  let selectedTopicGuids: string[] = $state([]);
-
-  // Topic search, filter & sort
-  let topicSearchQuery = $state("");
-  let topicStatusFilter = $state("ALL");
-  let topicPriorityFilter = $state("ALL");
-  let topicCdeFilter = $state("ALL");
-  let topicSortField:
-    "title" | "guid" | "topic_status" | "priority" | "cde_state" | "creation_date" =
-    $state("creation_date");
-  let topicSortAsc = $state(false);
-  let topicCurrentPage = $state(1);
-  let topicPageSize = $state(10);
+  // Topic search, filter, sort, paginate and select.
+  const topicTable = createTableState<BCFTopicResponse, string>({
+    rows: () => bcfTopics || [],
+    getId: (t) => t.guid,
+    searchFields: (t) => [t.title, t.guid, t.description, t.assigned_to],
+    filters: {
+      status: (t, v) => (t.topic_status || "Open") === v,
+      priority: (t, v) => (t.priority || "Normal") === v,
+      cde: (t, v) => (t.cde_state || "WIP") === v,
+    },
+    initialSort: { field: "creation_date", asc: false },
+  });
 
   // Topic Modals State
   let isTopicCreateModalOpen = $state(false);
@@ -154,36 +156,8 @@
     }
   }
 
-  function toggleSelectAllTopics() {
-    if (allFilteredTopicsSelected) {
-      selectedTopicGuids = [];
-    } else {
-      selectedTopicGuids = filteredTopics.map((t) => t.guid);
-    }
-  }
-
-  function toggleSelectTopic(guid: string) {
-    if (selectedTopicGuids.includes(guid)) {
-      selectedTopicGuids = selectedTopicGuids.filter((g) => g !== guid);
-    } else {
-      selectedTopicGuids = [...selectedTopicGuids, guid];
-    }
-  }
-
-  function toggleTopicSort(
-    field: "title" | "guid" | "topic_status" | "priority" | "cde_state" | "creation_date",
-  ) {
-    if (topicSortField === field) {
-      topicSortAsc = !topicSortAsc;
-    } else {
-      topicSortField = field;
-      topicSortAsc = true;
-    }
-  }
-
   function exportTopicsToCsv() {
-    const topicsToExport = bcfTopics.filter((t) => selectedTopicGuids.includes(t.guid));
-    const target = topicsToExport.length ? topicsToExport : filteredTopics;
+    const target = topicTable.selectedCount ? topicTable.selectedRows : topicTable.sorted;
     const headers = [
       "GUID",
       "Title",
@@ -242,7 +216,7 @@
     try {
       await bcfApi.deleteTopic(selectedProjectId, topicToDelete.guid);
       bcfTopics = bcfTopics.filter((t) => t.guid !== topicToDelete!.guid);
-      selectedTopicGuids = selectedTopicGuids.filter((g) => g !== topicToDelete!.guid);
+      topicTable.selectedIds.delete(topicToDelete!.guid);
       topicToDelete = null;
     } catch (err: any) {
       error = `Failed to delete topic: ${err.message}`;
@@ -250,48 +224,19 @@
   }
 
   async function confirmBulkDeleteTopics() {
-    if (!selectedTopicGuids.length || !selectedProjectId) return;
+    if (!topicTable.selectedCount || !selectedProjectId) return;
     try {
-      await bcfApi.bulkDeleteTopics(selectedProjectId, selectedTopicGuids);
-      bcfTopics = bcfTopics.filter((t) => !selectedTopicGuids.includes(t.guid));
-      selectedTopicGuids = [];
+      await bcfApi.bulkDeleteTopics(selectedProjectId, topicTable.selectedIdList);
+      bcfTopics = bcfTopics.filter((t) => !topicTable.selectedIds.has(t.guid));
+      topicTable.clearSelection();
       isTopicBulkDeleteModalOpen = false;
     } catch (err: any) {
       error = `Failed to delete selected topics: ${err.message}`;
     }
   }
 
-  function toggleSelectAllArtifacts() {
-    if (allFilteredArtifactsSelected) {
-      selectedArtifactIds = [];
-    } else {
-      selectedArtifactIds = displayedBcfArtifacts.map((a) => a.id);
-    }
-  }
-
-  function toggleSelectArtifact(id: number) {
-    if (selectedArtifactIds.includes(id)) {
-      selectedArtifactIds = selectedArtifactIds.filter((aId) => aId !== id);
-    } else {
-      selectedArtifactIds = [...selectedArtifactIds, id];
-    }
-  }
-
-  function toggleArtifactSort(
-    field: "id" | "filename" | "issue_count" | "byte_size" | "created_at",
-  ) {
-    if (artifactSortField === field) {
-      artifactSortAsc = !artifactSortAsc;
-    } else {
-      artifactSortField = field;
-      artifactSortAsc = true;
-    }
-  }
-
   function exportArtifactsToCsv() {
-    const target = selectedArtifactIds.length
-      ? bcfArtifacts.filter((a) => selectedArtifactIds.includes(a.id))
-      : displayedBcfArtifacts;
+    const target = artifactTable.selectedCount ? artifactTable.selectedRows : artifactTable.sorted;
     const headers = [
       "ID",
       "ProjectID",
@@ -334,7 +279,7 @@
     try {
       await analyzeApi.deleteBcfArtifact(artifactToDelete.id);
       bcfArtifacts = bcfArtifacts.filter((a) => a.id !== artifactToDelete!.id);
-      selectedArtifactIds = selectedArtifactIds.filter((id) => id !== artifactToDelete!.id);
+      artifactTable.selectedIds.delete(artifactToDelete!.id);
       artifactToDelete = null;
     } catch (err: any) {
       error = `Failed to delete BCF artifact: ${err.message}`;
@@ -342,13 +287,13 @@
   }
 
   async function confirmBulkDeleteArtifacts() {
-    if (!selectedArtifactIds.length) return;
+    if (!artifactTable.selectedCount) return;
     try {
-      for (const id of selectedArtifactIds) {
+      for (const id of artifactTable.selectedIdList) {
         await analyzeApi.deleteBcfArtifact(id);
       }
-      bcfArtifacts = bcfArtifacts.filter((a) => !selectedArtifactIds.includes(a.id));
-      selectedArtifactIds = [];
+      bcfArtifacts = bcfArtifacts.filter((a) => !artifactTable.selectedIds.has(a.id));
+      artifactTable.clearSelection();
       isBulkDeleteArtifactsModalOpen = false;
     } catch (err: any) {
       error = `Failed to delete selected BCF artifacts: ${err.message}`;
@@ -381,78 +326,6 @@
   }
   let currentProject = $derived(projects.find((p) => p.id === selectedProjectId));
   // --- TOPIC COMPUTATIONS & SELECTION ---
-  let filteredTopics = $derived(
-    (bcfTopics || [])
-      .filter((t) => {
-        const matchesSearch =
-          !topicSearchQuery ||
-          (t.title || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
-          (t.guid || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
-          (t.description || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
-          (t.assigned_to || "").toLowerCase().includes(topicSearchQuery.toLowerCase());
-        const matchesStatus =
-          topicStatusFilter === "ALL" || (t.topic_status || "Open") === topicStatusFilter;
-        const matchesPriority =
-          topicPriorityFilter === "ALL" || (t.priority || "Normal") === topicPriorityFilter;
-        const matchesCde = topicCdeFilter === "ALL" || (t.cde_state || "WIP") === topicCdeFilter;
-        return matchesSearch && matchesStatus && matchesPriority && matchesCde;
-      })
-      .sort((a, b) => {
-        let valA: any = a[topicSortField];
-        let valB: any = b[topicSortField];
-        if (valA === undefined || valA === null) valA = "";
-        if (valB === undefined || valB === null) valB = "";
-        if (typeof valA === "string") valA = valA.toLowerCase();
-        if (typeof valB === "string") valB = valB.toLowerCase();
-        if (valA < valB) return topicSortAsc ? -1 : 1;
-        if (valA > valB) return topicSortAsc ? 1 : -1;
-        return 0;
-      }),
-  );
-  let topicTotalItems = $derived(filteredTopics.length);
-  let paginatedTopics = $derived(
-    filteredTopics.slice((topicCurrentPage - 1) * topicPageSize, topicCurrentPage * topicPageSize),
-  );
-  let allFilteredTopicsSelected = $derived(
-    filteredTopics.length > 0 && filteredTopics.every((t) => selectedTopicGuids.includes(t.guid)),
-  );
-  // --- ARTIFACTS COMPUTATIONS & SELECTION ---
-  let displayedBcfArtifacts = $derived(
-    (filterToSelectedProject && selectedProjectId
-      ? bcfArtifacts.filter((a) => a.project_id === selectedProjectId)
-      : bcfArtifacts
-    )
-      .filter((a) => {
-        const projName = getProjectName(a.project_id);
-        return (
-          !artifactSearchQuery ||
-          (a.filename || "").toLowerCase().includes(artifactSearchQuery.toLowerCase()) ||
-          projName.toLowerCase().includes(artifactSearchQuery.toLowerCase())
-        );
-      })
-      .sort((a, b) => {
-        let valA: any = a[artifactSortField];
-        let valB: any = b[artifactSortField];
-        if (valA === undefined || valA === null) valA = "";
-        if (valB === undefined || valB === null) valB = "";
-        if (typeof valA === "string") valA = valA.toLowerCase();
-        if (typeof valB === "string") valB = valB.toLowerCase();
-        if (valA < valB) return artifactSortAsc ? -1 : 1;
-        if (valA > valB) return artifactSortAsc ? 1 : -1;
-        return 0;
-      }),
-  );
-  let artifactTotalItems = $derived(displayedBcfArtifacts.length);
-  let paginatedArtifacts = $derived(
-    displayedBcfArtifacts.slice(
-      (artifactCurrentPage - 1) * artifactPageSize,
-      artifactCurrentPage * artifactPageSize,
-    ),
-  );
-  let allFilteredArtifactsSelected = $derived(
-    displayedBcfArtifacts.length > 0 &&
-      displayedBcfArtifacts.every((a) => selectedArtifactIds.includes(a.id)),
-  );
 </script>
 
 <div class="mx-auto space-y-6">
@@ -575,7 +448,7 @@
             <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              bind:value={topicSearchQuery}
+              bind:value={topicTable.search}
               placeholder="Search topics by title, GUID, assignee, or description..."
               class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
@@ -583,7 +456,7 @@
 
           <div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
             <select
-              bind:value={topicStatusFilter}
+              bind:value={topicTable.filters.status}
               class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="ALL">All Statuses</option>
@@ -594,7 +467,7 @@
             </select>
 
             <select
-              bind:value={topicPriorityFilter}
+              bind:value={topicTable.filters.priority}
               class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="ALL">All Priorities</option>
@@ -605,7 +478,7 @@
             </select>
 
             <select
-              bind:value={topicCdeFilter}
+              bind:value={topicTable.filters.cde}
               class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="ALL">All CDE States</option>
@@ -619,9 +492,9 @@
 
         <!-- Bulk Action Toolbar -->
         <BulkActionBar
-          selectedCount={selectedTopicGuids.length}
+          selectedCount={topicTable.selectedCount}
           itemLabel="BCF topic"
-          onClearSelection={() => (selectedTopicGuids = [])}
+          onClearSelection={() => topicTable.clearSelection()}
           onBulkEdit={() => (isTopicBulkEditModalOpen = true)}
           onBulkExport={exportTopicsToCsv}
           onBulkDelete={() => (isTopicBulkDeleteModalOpen = true)}
@@ -631,26 +504,15 @@
           <LoadingState
             message={`Querying /api/bcf/v2.1/projects/${selectedProjectId}/topics...`}
           />
-        {:else if filteredTopics.length === 0}
+        {:else if topicTable.totalItems === 0}
           <div class="p-6">
             <EmptyState
               title={`No BCF topics match your criteria for ${currentProject?.name || "this project"}`}
               description="Create a topic or adjust filters to coordinate model findings."
-              actionLabel={topicSearchQuery ||
-              topicStatusFilter !== "ALL" ||
-              topicPriorityFilter !== "ALL"
-                ? "Reset Filters"
-                : "+ Create BCF Topic"}
+              actionLabel={topicTable.hasActiveFilters ? "Reset Filters" : "+ Create BCF Topic"}
               onAction={() => {
-                if (
-                  topicSearchQuery ||
-                  topicStatusFilter !== "ALL" ||
-                  topicPriorityFilter !== "ALL"
-                ) {
-                  topicSearchQuery = "";
-                  topicStatusFilter = "ALL";
-                  topicPriorityFilter = "ALL";
-                  topicCdeFilter = "ALL";
+                if (topicTable.hasActiveFilters) {
+                  topicTable.reset();
                 } else {
                   isTopicCreateModalOpen = true;
                 }
@@ -666,40 +528,41 @@
                 >
                   <th class="w-10 px-4 py-3">
                     <TableCheckbox
-                      checked={allFilteredTopicsSelected}
-                      onchange={toggleSelectAllTopics}
+                      checked={topicTable.allFilteredSelected}
+                      indeterminate={topicTable.someFilteredSelected}
+                      onchange={() => topicTable.toggleSelectAll()}
                       title="Select all topics"
                     />
                   </th>
                   <SortHeader
                     column="guid"
-                    sortField={topicSortField}
-                    sortAsc={topicSortAsc}
-                    onSort={toggleTopicSort}
+                    sortField={topicTable.sortField}
+                    sortAsc={topicTable.sortAsc}
+                    onSort={(f) => topicTable.toggleSort(f)}
                   >
                     Topic GUID
                   </SortHeader>
                   <SortHeader
                     column="title"
-                    sortField={topicSortField}
-                    sortAsc={topicSortAsc}
-                    onSort={toggleTopicSort}
+                    sortField={topicTable.sortField}
+                    sortAsc={topicTable.sortAsc}
+                    onSort={(f) => topicTable.toggleSort(f)}
                   >
                     Title & Type
                   </SortHeader>
                   <SortHeader
                     column="topic_status"
-                    sortField={topicSortField}
-                    sortAsc={topicSortAsc}
-                    onSort={toggleTopicSort}
+                    sortField={topicTable.sortField}
+                    sortAsc={topicTable.sortAsc}
+                    onSort={(f) => topicTable.toggleSort(f)}
                   >
                     Status & Priority
                   </SortHeader>
                   <SortHeader
                     column="cde_state"
-                    sortField={topicSortField}
-                    sortAsc={topicSortAsc}
-                    onSort={toggleTopicSort}
+                    sortField={topicTable.sortField}
+                    sortAsc={topicTable.sortAsc}
+                    onSort={(f) => topicTable.toggleSort(f)}
                   >
                     ISO 19650 Governance
                   </SortHeader>
@@ -709,9 +572,9 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
-                {#each paginatedTopics as topic}
+                {#each topicTable.paginated as topic (topic.guid)}
                   <tr
-                    class="transition-colors hover:bg-slate-900/60 {selectedTopicGuids.includes(
+                    class="transition-colors hover:bg-slate-900/60 {topicTable.isSelected(
                       topic.guid,
                     )
                       ? 'bg-blue-950/20'
@@ -719,8 +582,8 @@
                   >
                     <td class="w-10 px-4 py-3">
                       <TableCheckbox
-                        checked={selectedTopicGuids.includes(topic.guid)}
-                        onchange={() => toggleSelectTopic(topic.guid)}
+                        checked={topicTable.isSelected(topic.guid)}
+                        onchange={() => topicTable.toggleSelect(topic.guid)}
                         ariaLabel={`Select topic ${topic.title}`}
                       />
                     </td>
@@ -795,13 +658,13 @@
           </div>
 
           <TablePagination
-            currentPage={topicCurrentPage}
-            pageSize={topicPageSize}
-            totalItems={topicTotalItems}
-            onPageChange={(p) => (topicCurrentPage = p)}
-            onPageSizeChange={(s) => {
-              topicPageSize = s;
-              topicCurrentPage = 1;
+            currentPage={topicTable.page}
+            pageSize={topicTable.pageSize}
+            totalItems={topicTable.totalItems}
+            onPageChange={(p) => (topicTable.requestedPage = p)}
+            onPageSizeChange={(size) => {
+              topicTable.pageSize = size;
+              topicTable.requestedPage = 1;
             }}
           />
         {/if}
@@ -816,7 +679,7 @@
             <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              bind:value={artifactSearchQuery}
+              bind:value={artifactTable.search}
               placeholder="Filter BCF archives by filename or project..."
               class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
@@ -850,9 +713,9 @@
 
         <!-- Bulk Action Bar for Artifacts -->
         <BulkActionBar
-          selectedCount={selectedArtifactIds.length}
+          selectedCount={artifactTable.selectedCount}
           itemLabel="BCF artifact"
-          onClearSelection={() => (selectedArtifactIds = [])}
+          onClearSelection={() => artifactTable.clearSelection()}
           onBulkExport={exportArtifactsToCsv}
           onBulkDelete={() => (isBulkDeleteArtifactsModalOpen = true)}
         />
@@ -864,7 +727,7 @@
             ></div>
             Loading BCF artifacts…
           </div>
-        {:else if displayedBcfArtifacts.length === 0}
+        {:else if artifactTable.totalItems === 0}
           <div
             class="rounded-xl border border-dashed border-slate-800 p-12 text-center text-xs text-slate-500"
           >
@@ -881,49 +744,50 @@
                 >
                   <th class="w-10 px-4 py-3">
                     <TableCheckbox
-                      checked={allFilteredArtifactsSelected}
-                      onchange={toggleSelectAllArtifacts}
+                      checked={artifactTable.allFilteredSelected}
+                      indeterminate={artifactTable.someFilteredSelected}
+                      onchange={() => artifactTable.toggleSelectAll()}
                       title="Select all BCF artifacts"
                     />
                   </th>
                   <SortHeader
                     column="id"
-                    sortField={artifactSortField}
-                    sortAsc={artifactSortAsc}
-                    onSort={toggleArtifactSort}
+                    sortField={artifactTable.sortField}
+                    sortAsc={artifactTable.sortAsc}
+                    onSort={(f) => artifactTable.toggleSort(f)}
                   >
                     ID
                   </SortHeader>
                   <th class="px-4 py-3">Project</th>
                   <SortHeader
                     column="filename"
-                    sortField={artifactSortField}
-                    sortAsc={artifactSortAsc}
-                    onSort={toggleArtifactSort}
+                    sortField={artifactTable.sortField}
+                    sortAsc={artifactTable.sortAsc}
+                    onSort={(f) => artifactTable.toggleSort(f)}
                   >
                     Artifact / Filename
                   </SortHeader>
                   <SortHeader
                     column="issue_count"
-                    sortField={artifactSortField}
-                    sortAsc={artifactSortAsc}
-                    onSort={toggleArtifactSort}
+                    sortField={artifactTable.sortField}
+                    sortAsc={artifactTable.sortAsc}
+                    onSort={(f) => artifactTable.toggleSort(f)}
                   >
                     Issues
                   </SortHeader>
                   <SortHeader
                     column="byte_size"
-                    sortField={artifactSortField}
-                    sortAsc={artifactSortAsc}
-                    onSort={toggleArtifactSort}
+                    sortField={artifactTable.sortField}
+                    sortAsc={artifactTable.sortAsc}
+                    onSort={(f) => artifactTable.toggleSort(f)}
                   >
                     Size
                   </SortHeader>
                   <SortHeader
                     column="created_at"
-                    sortField={artifactSortField}
-                    sortAsc={artifactSortAsc}
-                    onSort={toggleArtifactSort}
+                    sortField={artifactTable.sortField}
+                    sortAsc={artifactTable.sortAsc}
+                    onSort={(f) => artifactTable.toggleSort(f)}
                   >
                     Date
                   </SortHeader>
@@ -931,9 +795,9 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
-                {#each paginatedArtifacts as artifact}
+                {#each artifactTable.paginated as artifact (artifact.id)}
                   <tr
-                    class="transition-colors hover:bg-slate-900/60 {selectedArtifactIds.includes(
+                    class="transition-colors hover:bg-slate-900/60 {artifactTable.isSelected(
                       artifact.id,
                     )
                       ? 'bg-blue-950/20'
@@ -941,8 +805,8 @@
                   >
                     <td class="w-10 px-4 py-3">
                       <TableCheckbox
-                        checked={selectedArtifactIds.includes(artifact.id)}
-                        onchange={() => toggleSelectArtifact(artifact.id)}
+                        checked={artifactTable.isSelected(artifact.id)}
+                        onchange={() => artifactTable.toggleSelect(artifact.id)}
                         ariaLabel={`Select artifact ${artifact.filename}`}
                       />
                     </td>
@@ -1015,13 +879,13 @@
           </div>
 
           <TablePagination
-            currentPage={artifactCurrentPage}
-            pageSize={artifactPageSize}
-            totalItems={artifactTotalItems}
-            onPageChange={(p) => (artifactCurrentPage = p)}
-            onPageSizeChange={(s) => {
-              artifactPageSize = s;
-              artifactCurrentPage = 1;
+            currentPage={artifactTable.page}
+            pageSize={artifactTable.pageSize}
+            totalItems={artifactTable.totalItems}
+            onPageChange={(p) => (artifactTable.requestedPage = p)}
+            onPageSizeChange={(size) => {
+              artifactTable.pageSize = size;
+              artifactTable.requestedPage = 1;
             }}
           />
         {/if}
@@ -1082,11 +946,11 @@
   <BcfBulkEditModal
     isOpen={isTopicBulkEditModalOpen}
     projectId={selectedProjectId}
-    {selectedTopicGuids}
+    selectedTopicGuids={topicTable.selectedIdList}
     onClose={() => (isTopicBulkEditModalOpen = false)}
     onBulkUpdated={() => {
       loadBcfTopics();
-      selectedTopicGuids = [];
+      topicTable.clearSelection();
     }}
   />
 
@@ -1105,11 +969,11 @@
   <ConfirmModal
     bind:isOpen={isTopicBulkDeleteModalOpen}
     title="Delete Selected Topics"
-    message={`Are you sure you want to delete ${selectedTopicGuids.length} selected BCF topic(s)? This cannot be undone.`}
+    message={`Are you sure you want to delete ${topicTable.selectedCount} selected BCF topic(s)? This cannot be undone.`}
     confirmText="Delete Selected Topics"
     danger={true}
     onConfirm={confirmBulkDeleteTopics}
-    onCancel={() => (selectedTopicGuids = [])}
+    onCancel={() => topicTable.clearSelection()}
   />
 {/if}
 
@@ -1128,9 +992,9 @@
 <ConfirmModal
   bind:isOpen={isBulkDeleteArtifactsModalOpen}
   title="Delete Selected BCF Archives"
-  message={`Are you sure you want to delete ${selectedArtifactIds.length} selected BCF report archive(s)?`}
+  message={`Are you sure you want to delete ${artifactTable.selectedCount} selected BCF report archive(s)?`}
   confirmText="Delete Selected Archives"
   danger={true}
   onConfirm={confirmBulkDeleteArtifacts}
-  onCancel={() => (selectedArtifactIds = [])}
+  onCancel={() => artifactTable.clearSelection()}
 />
