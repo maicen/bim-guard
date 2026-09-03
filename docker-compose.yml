@@ -97,7 +97,8 @@ services:
     ports:
       - "${UNSTRUCTURED_LOCAL_PORT:-8001}:8000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthcheck || exit 1"]
+      # No curl in this image — use the Python that's already there.
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthcheck', timeout=5)\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
