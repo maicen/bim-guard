@@ -29,6 +29,8 @@
   import type { Project } from './lib/types';
 
   let activeView = 'dashboard';
+  // Navigation drawer state; only meaningful below the md breakpoint.
+  let isMobileNavOpen = false;
   let targetProjectId: number | null = null;
   let targetElementGuid: string | null = null;
   let targetBcfArtifactId: number | null = null;
@@ -148,6 +150,8 @@
   <Sidebar
     {activeView}
     onSelectView={handleSelectView}
+    mobileOpen={isMobileNavOpen}
+    onCloseMobile={() => (isMobileNavOpen = false)}
   />
 
   <!-- Main Content Column -->
@@ -159,10 +163,11 @@
       {apiOnline}
       {dbOk}
       {dbBackend}
+      onOpenMobileNav={() => (isMobileNavOpen = true)}
     />
 
     <!-- Viewport Container -->
-    <main id="main-content" tabindex="-1" class="flex-1 p-6 md:p-8 overflow-y-auto">
+    <main id="main-content" tabindex="-1" class="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto">
       <svelte:boundary>
       {#if activeView === 'dashboard'}
         <DashboardView

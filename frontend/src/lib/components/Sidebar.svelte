@@ -22,8 +22,18 @@
 
   export let activeView: string = "dashboard";
   export let onSelectView: (view: string) => void;
+  /** Drawer visibility below `md`. Above it the sidebar is always shown. */
+  export let mobileOpen: boolean = false;
+  export let onCloseMobile: () => void = () => {};
 
   let collapsed = false;
+
+  // On a phone the sidebar is a drawer over the content, so choosing a
+  // destination should dismiss it; on desktop it stays put.
+  function handleSelect(view: string) {
+    onSelectView(view);
+    onCloseMobile();
+  }
 
   const NAV_SECTIONS = [
     {
@@ -70,10 +80,24 @@
   ];
 </script>
 
+<!-- Scrim: only below md, and only while the drawer is open. -->
+{#if mobileOpen}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+    on:click={onCloseMobile}
+    aria-hidden="true"
+  ></div>
+{/if}
+
 <aside
-  class="h-screen sticky top-0 flex flex-col border-r border-slate-800 bg-slate-950/90 apple-blur z-40 transition-all duration-300 select-none {collapsed
-    ? 'w-16'
-    : 'w-64'}"
+  id="app-sidebar"
+  aria-label="Primary"
+  class="fixed inset-y-0 z-50 h-screen w-64 flex flex-col border-r border-slate-800 bg-slate-950/90 apple-blur select-none transition-[left] duration-300
+    md:sticky md:top-0 md:left-0 md:z-40 md:transition-all
+    {mobileOpen ? 'left-0' : '-left-64'}
+    {collapsed ? 'md:w-16' : 'md:w-64'}"
 >
   <!-- Brand Header -->
   <div
@@ -107,8 +131,17 @@
 
     <button
       type="button"
+      on:click={onCloseMobile}
+      class="text-slate-400 hover:text-slate-50 p-2 rounded-lg hover:bg-slate-900 transition-colors shrink-0 md:hidden"
+      aria-label="Close navigation"
+    >
+      <ChevronLeft class="w-5 h-5" />
+    </button>
+
+    <button
+      type="button"
       on:click={() => (collapsed = !collapsed)}
-      class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-900 transition-colors shrink-0"
+      class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-900 transition-colors shrink-0 hidden md:block"
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
     >
       {#if collapsed}
@@ -134,7 +167,7 @@
         {#each section.items as item}
           <button
             type="button"
-            on:click={() => onSelectView(item.id)}
+            on:click={() => handleSelect(item.id)}
             class="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-sm font-medium transition-all group relative {activeView ===
             item.id
               ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
@@ -167,7 +200,7 @@
     <!-- Settings Button -->
     <button
       type="button"
-      on:click={() => onSelectView("settings")}
+      on:click={() => handleSelect("settings")}
       class="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-sm font-medium transition-all group {activeView ===
       'settings'
         ? 'bg-accent text-white'
