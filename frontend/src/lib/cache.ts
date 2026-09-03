@@ -269,14 +269,13 @@ export class EntityCacheStore<TItem, TId extends string | number = number> imple
     const id = this.idExtractor(item);
     const current = this.listStore.getCached("__default__");
     if (current) {
+      // Rebuild by excluding every existing occurrence of this id (not just
+      // the first) before re-inserting it once — a naive "replace the first
+      // match" leaves any stale duplicate untouched, and the corruption never
+      // heals on subsequent updates.
       const idx = current.findIndex((i) => this.idExtractor(i) === id);
-      let nextList: TItem[];
-      if (idx >= 0) {
-        nextList = [...current];
-        nextList[idx] = item;
-      } else {
-        nextList = [item, ...current];
-      }
+      const rest = current.filter((i) => this.idExtractor(i) !== id);
+      const nextList = idx >= 0 ? [...rest.slice(0, idx), item, ...rest.slice(idx)] : [item, ...rest];
       this.listStore.set("__default__", nextList);
     }
   }

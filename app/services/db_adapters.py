@@ -413,7 +413,11 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 query = self._client.table(self._table_name).select("*")
                 if expr is not None:
                     query = self._apply_expr(query, expr)
-                return query.range(offset, offset + remaining - 1)
+                # Range-based pagination is only stable across multiple calls
+                # when the result set has a fixed order; without this, a
+                # concurrent write can shift a row between pages and the same
+                # row comes back twice (or a row gets skipped entirely).
+                return query.order(self._pk).range(offset, offset + remaining - 1)
 
             response = execute_with_retry(_build)
             rows = response.data or []
