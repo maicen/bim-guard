@@ -1,10 +1,12 @@
-"""Service layer for managing configured Unstructured parsing-engine instances.
+"""Service layer for managing configured document-parsing engine instances.
 
-Each row is one addressable Unstructured server — the local self-hosted
-Docker container and/or one or more hosted Platform API accounts — that
-document extraction (module1_doc_parser) can be pointed at by name. See
-app/modules/module1_doc_parser/document_extractor.py for how a resolved
-instance dict is turned into an UnstructuredExtractor.
+Each row is one addressable parsing engine — a local self-hosted Unstructured
+Docker container, one or more hosted Unstructured Platform accounts, and/or a
+hosted Docling Serve instance — that document extraction (module1_doc_parser)
+can be pointed at by name. The table/class predate Docling support (hence the
+"Unstructured" naming), but `kind` is the general engine-family discriminator.
+See app/modules/module1_doc_parser/document_extractor.py for how a resolved
+instance dict is turned into the matching extractor.
 """
 
 from __future__ import annotations
@@ -16,7 +18,10 @@ from app.services.db_adapters import DatabaseAdapter
 
 KIND_LOCAL = "local"
 KIND_HOSTED = "hosted"
-VALID_KINDS = {KIND_LOCAL, KIND_HOSTED}
+KIND_DOCLING = "docling"
+VALID_KINDS = {KIND_LOCAL, KIND_HOSTED, KIND_DOCLING}
+# Kinds that always talk to a remote account and therefore always need a key.
+KINDS_REQUIRING_API_KEY = {KIND_HOSTED, KIND_DOCLING}
 
 
 class UnstructuredInstancesService:
@@ -71,8 +76,8 @@ class UnstructuredInstancesService:
         clean_url = api_url.strip().rstrip("/")
         if not clean_url:
             raise ValueError("api_url is required.")
-        if clean_kind == KIND_HOSTED and not (api_key or "").strip():
-            raise ValueError("api_key is required for 'hosted' instances.")
+        if clean_kind in KINDS_REQUIRING_API_KEY and not (api_key or "").strip():
+            raise ValueError(f"api_key is required for '{clean_kind}' instances.")
         if self.get_by_name(clean_name):
             raise ValueError(f"An instance named '{clean_name}' already exists.")
 

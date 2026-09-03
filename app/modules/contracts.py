@@ -1090,15 +1090,21 @@ class ProjectImportFromRepoRequest(BaseModel):
 
 
 class UnstructuredInstanceCreateRequest(BaseModel):
-    """Payload for registering a new Unstructured parsing-engine instance."""
+    """Payload for registering a new document-parsing engine instance."""
 
-    name: str = Field(..., min_length=1, description="Unique display name, e.g. 'local', 'hosted-1'")
-    kind: Literal["local", "hosted"] = Field(
-        ..., description="'local' (self-hosted open-source Docker container) or 'hosted' (Unstructured Platform API)"
+    name: str = Field(..., min_length=1, description="Unique display name, e.g. 'local', 'hosted-1', 'docling'")
+    kind: Literal["local", "hosted", "docling"] = Field(
+        ...,
+        description=(
+            "'local' (self-hosted open-source Unstructured Docker container), "
+            "'hosted' (Unstructured Platform API), or 'docling' (hosted Docling Serve instance)"
+        ),
     )
-    api_url: str = Field(..., min_length=1, description="Base URL of the Unstructured server")
-    api_key: Optional[str] = Field(None, description="API key — required for 'hosted', ignored for 'local'")
-    strategy: Optional[str] = Field("auto", description="Partition strategy: auto, fast, hi_res, ocr_only")
+    api_url: str = Field(..., min_length=1, description="Base URL of the parsing engine server")
+    api_key: Optional[str] = Field(None, description="API key — required for 'hosted'/'docling', ignored for 'local'")
+    strategy: Optional[str] = Field(
+        "auto", description="Partition strategy (Unstructured only: auto, fast, hi_res, ocr_only); ignored for 'docling'"
+    )
     is_default: Optional[bool] = Field(False, description="Use this instance when none is explicitly selected")
     is_enabled: Optional[bool] = Field(True, description="Whether this instance is selectable")
     notes: Optional[str] = Field("", description="Optional free-text notes")

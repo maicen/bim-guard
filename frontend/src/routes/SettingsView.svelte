@@ -11,6 +11,7 @@
     Laptop,
     Server,
     Cloud,
+    Sparkles,
     Plus,
     Trash2,
     Loader2,
@@ -77,8 +78,8 @@
       enginesError = "Name and API URL are required.";
       return;
     }
-    if (newEngineKind === "hosted" && !newEngineKey.trim()) {
-      enginesError = "A hosted instance requires an API key.";
+    if ((newEngineKind === "hosted" || newEngineKind === "docling") && !newEngineKey.trim()) {
+      enginesError = `A ${newEngineKind} instance requires an API key.`;
       return;
     }
 
@@ -382,8 +383,9 @@
               bind:value={newEngineKind}
               class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
-              <option value="local">Local (self-hosted Docker container)</option>
+              <option value="local">Local (self-hosted Unstructured Docker container)</option>
               <option value="hosted">Hosted (Unstructured Platform API)</option>
+              <option value="docling">Docling (hosted Docling Serve instance)</option>
             </select>
           </div>
         </div>
@@ -399,7 +401,9 @@
             bind:value={newEngineUrl}
             placeholder={newEngineKind === "local"
               ? "http://localhost:8001"
-              : "https://api.unstructuredapp.io"}
+              : newEngineKind === "docling"
+                ? "https://api.aws-c1.dcls.saas.ibm.com/<instance-id>"
+                : "https://api.unstructuredapp.io"}
             class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
         </div>
@@ -407,32 +411,34 @@
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label for="engine-key" class="mb-1 block text-caption font-semibold text-slate-400">
-              API Key{newEngineKind === "hosted" ? "" : " (not required for local)"}
+              API Key{newEngineKind === "local" ? " (not required for local)" : ""}
             </label>
             <input
               id="engine-key"
               type="password"
               bind:value={newEngineKey}
-              placeholder={newEngineKind === "hosted" ? "sk-..." : "(optional)"}
+              placeholder={newEngineKind === "local" ? "(optional)" : "sk-..."}
               class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
           </div>
-          <div>
-            <label
-              for="engine-strategy"
-              class="mb-1 block text-caption font-semibold text-slate-400">Strategy</label
-            >
-            <select
-              id="engine-strategy"
-              bind:value={newEngineStrategy}
-              class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
-            >
-              <option value="auto">auto</option>
-              <option value="fast">fast</option>
-              <option value="hi_res">hi_res</option>
-              <option value="ocr_only">ocr_only</option>
-            </select>
-          </div>
+          {#if newEngineKind !== "docling"}
+            <div>
+              <label
+                for="engine-strategy"
+                class="mb-1 block text-caption font-semibold text-slate-400">Strategy</label
+              >
+              <select
+                id="engine-strategy"
+                bind:value={newEngineStrategy}
+                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              >
+                <option value="auto">auto</option>
+                <option value="fast">fast</option>
+                <option value="hi_res">hi_res</option>
+                <option value="ocr_only">ocr_only</option>
+              </select>
+            </div>
+          {/if}
         </div>
 
         <div>
@@ -491,6 +497,8 @@
               <div class="flex flex-wrap items-center gap-2">
                 {#if engine.kind === "local"}
                   <Server class="h-4 w-4 text-cyan-400" />
+                {:else if engine.kind === "docling"}
+                  <Sparkles class="h-4 w-4 text-violet-400" />
                 {:else}
                   <Cloud class="h-4 w-4 text-blue-400" />
                 {/if}

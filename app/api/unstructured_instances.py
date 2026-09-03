@@ -158,6 +158,13 @@ def test_instance(
             response.raise_for_status()
             return UnstructuredInstanceTestResponse(ok=True, detail=response.text.strip())
 
+        if kind == "docling":
+            from docling.service_client import DoclingServiceClient
+
+            with DoclingServiceClient(url=api_url, api_key=row.get("api_key") or "") as client:
+                health = client.health()
+            return UnstructuredInstanceTestResponse(ok=True, detail=str(health))
+
         from app.modules.module1_doc_parser.unstructured_extractor import UnstructuredExtractor
 
         extractor = UnstructuredExtractor(

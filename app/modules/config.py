@@ -71,6 +71,13 @@ UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
 # over the compose network.
 UNSTRUCTURED_LOCAL_URL = os.environ.get("UNSTRUCTURED_LOCAL_URL", "")
 
+# Hosted Docling Serve instance (https://developer.dcls.saas.ibm.com). A
+# second parsing-engine option alongside Unstructured — used only to seed
+# the `unstructured_instances` registry's "docling-hosted" row on first
+# boot; the registry is the source of truth afterwards.
+DOCLING_SERVICE_URL = os.environ.get("DOCLING_SERVICE_URL", "")
+DOCLING_API_KEY = os.environ.get("DOCLING_API_KEY", "")
+
 # ── Path B feature flags ─────────────────────────────────────────────────
 # Gate the MM-001 and XM-001 comparators independently. Both default OFF.
 #

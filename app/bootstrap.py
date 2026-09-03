@@ -291,40 +291,64 @@ def build_default_container() -> ApplicationContainer:
     )
 
     # Seed the registry from legacy env vars on first boot, so existing
-    # UNSTRUCTURED_API_KEY / UNSTRUCTURED_LOCAL_URL deployments keep working
-    # without manual setup. Once any instance exists the registry is the
-    # sole source of truth and these env vars are no longer consulted.
+    # UNSTRUCTURED_API_KEY / UNSTRUCTURED_LOCAL_URL / DOCLING_* deployments
+    # keep working without manual setup. Each named instance is seeded
+    # independently (checked by name, not "table is empty") so a later env
+    # var — e.g. DOCLING_API_KEY added after the Unstructured instances were
+    # already seeded on a prior boot — still gets picked up. Once seeded, an
+    # instance's fields are the database's to own; these env vars are only
+    # ever consulted to create a missing row, never to update an existing one.
     try:
-        if not unstructured_instances_service.list_instances():
-            from app.modules.config import (
-                UNSTRUCTURED_API_KEY,
-                UNSTRUCTURED_API_URL,
-                UNSTRUCTURED_LOCAL_URL,
-                UNSTRUCTURED_STRATEGY,
-            )
+        from app.modules.config import (
+            DOCLING_API_KEY,
+            DOCLING_SERVICE_URL,
+            UNSTRUCTURED_API_KEY,
+            UNSTRUCTURED_API_URL,
+            UNSTRUCTURED_LOCAL_URL,
+            UNSTRUCTURED_STRATEGY,
+        )
 
-            if UNSTRUCTURED_LOCAL_URL:
-                unstructured_instances_service.create_instance(
-                    name="local",
-                    kind="local",
-                    api_url=UNSTRUCTURED_LOCAL_URL,
-                    strategy=UNSTRUCTURED_STRATEGY,
-                    is_default=not UNSTRUCTURED_API_KEY,
-                    notes="Self-hosted Unstructured Docker container (seeded from UNSTRUCTURED_LOCAL_URL).",
-                )
-            if UNSTRUCTURED_API_KEY:
-                unstructured_instances_service.create_instance(
-                    name="hosted-default",
-                    kind="hosted",
-                    api_url=UNSTRUCTURED_API_URL or "https://api.unstructuredapp.io",
-                    api_key=UNSTRUCTURED_API_KEY,
-                    strategy=UNSTRUCTURED_STRATEGY,
-                    is_default=True,
-                    notes="Unstructured Platform API (seeded from UNSTRUCTURED_API_KEY).",
-                )
+        has_default = any(
+            row.get("is_default") for row in unstructured_instances_service.list_instances()
+        )
+
+        def _seed_if_missing(name: str, **kwargs) -> None:
+            nonlocal has_default
+            if unstructured_instances_service.get_by_name(name):
+                return
+            unstructured_instances_service.create_instance(
+                name=name, is_default=not has_default, **kwargs
+            )
+            has_default = True
+
+        if UNSTRUCTURED_LOCAL_URL:
+            _seed_if_missing(
+                "local",
+                kind="local",
+                api_url=UNSTRUCTURED_LOCAL_URL,
+                strategy=UNSTRUCTURED_STRATEGY,
+                notes="Self-hosted Unstructured Docker container (seeded from UNSTRUCTURED_LOCAL_URL).",
+            )
+        if UNSTRUCTURED_API_KEY:
+            _seed_if_missing(
+                "hosted-default",
+                kind="hosted",
+                api_url=UNSTRUCTURED_API_URL or "https://api.unstructuredapp.io",
+                api_key=UNSTRUCTURED_API_KEY,
+                strategy=UNSTRUCTURED_STRATEGY,
+                notes="Unstructured Platform API (seeded from UNSTRUCTURED_API_KEY).",
+            )
+        if DOCLING_SERVICE_URL and DOCLING_API_KEY:
+            _seed_if_missing(
+                "docling-hosted",
+                kind="docling",
+                api_url=DOCLING_SERVICE_URL,
+                api_key=DOCLING_API_KEY,
+                notes="Hosted Docling Serve instance (seeded from DOCLING_SERVICE_URL/DOCLING_API_KEY).",
+            )
     except Exception:
         logger.warning(
-            "Could not seed default Unstructured instances; continuing startup", exc_info=True
+            "Could not seed default parsing engine instances; continuing startup", exc_info=True
         )
 
     analysis_service = AnalysisService()
