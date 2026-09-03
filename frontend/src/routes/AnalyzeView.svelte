@@ -45,6 +45,8 @@
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import { toasts } from "../lib/toast.svelte";
+  import Modal from "../lib/components/Modal.svelte";
+  import SeverityBadge from "../lib/components/SeverityBadge.svelte";
 
   export let initialProjectId: number | null = null;
   export let activeCategory: "Piping" | "seismic" = "Piping";
@@ -1372,66 +1374,24 @@
   {@const isDq =
     inspectedIssue.mechanism === "data_quality" ||
     inspectedIssue.mechanism === "Data Quality"}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+  <Modal
+    isOpen={true}
+    title={inspectedIssue.title}
+    subtitle={`${inspectedIssue.id} · ${inspectedIssue.rule_id}`}
+    maxWidth="max-w-2xl"
+    onClose={() => (inspectedIssue = null)}
   >
-    <div
-      class="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-    >
-      <!-- Modal Header -->
-      <div
-        class="p-5 border-b border-slate-800 flex items-center justify-between"
-      >
-        <div class="flex items-center gap-2.5">
-          <span
-            class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-50 font-mono text-xs font-bold border border-slate-700"
-          >
-            {inspectedIssue.id}
-          </span>
-          <span class="text-sm font-bold text-slate-50"
-            >{inspectedIssue.rule_id}</span
-          >
-          {#if isDq}
-            <span
-              class="px-2 py-0.5 rounded text-micro font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700"
-            >
-              Data Quality
-            </span>
-          {:else}
-            <span
-              class="px-2 py-0.5 rounded text-micro font-semibold uppercase {inspectedIssue.band ===
-              'critical'
-                ? 'bg-red-950/80 text-red-400'
-                : inspectedIssue.band === 'high'
-                  ? 'bg-orange-950/80 text-orange-400'
-                  : inspectedIssue.band === 'medium'
-                    ? 'bg-yellow-950/80 text-yellow-400'
-                    : 'bg-emerald-950/80 text-emerald-400'}"
-            >
-              {inspectedIssue.band}
-            </span>
-          {/if}
-        </div>
-        <button
-          type="button"
-          on:click={() => (inspectedIssue = null)}
-          class="p-1 rounded-lg text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
-        >
-          <X class="w-5 h-5" />
-        </button>
-      </div>
+    {#snippet headerExtra()}
+      <SeverityBadge severity={isDq ? "data_quality" : inspectedIssue.band} />
+    {/snippet}
 
-      <!-- Modal Body -->
-      <div class="p-6 space-y-6 overflow-y-auto">
+    <div class="space-y-6">
         <!-- Title & Mechanism -->
-        <div>
-          <h3 class="text-base font-bold text-slate-50">{inspectedIssue.title}</h3>
-          <p class="text-xs text-slate-400 mt-1">
-            Mechanism: <strong class="text-slate-200"
-              >{inspectedIssue.mechanism}</strong
-            >
-          </p>
-        </div>
+        <!-- The title now lives in the dialog header, so only the mechanism
+             needs restating here. -->
+        <p class="text-xs text-slate-400">
+          Mechanism: <strong class="text-slate-200">{inspectedIssue.mechanism}</strong>
+        </p>
 
         <!-- Element Context Card -->
         <div
@@ -1548,37 +1508,33 @@
         {/if}
       </div>
 
-      <!-- Modal Footer -->
-      <div
-        class="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/40"
+    {#snippet footer()}
+      <button
+        type="button"
+        on:click={() => (inspectedIssue = null)}
+        class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
       >
+        Close
+      </button>
+
+      {#if selectedProjectId && inspectedIssue?.element_id}
         <button
           type="button"
-          on:click={() => (inspectedIssue = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
+          on:click={() => {
+            const elId = inspectedIssue?.element_id;
+            inspectedIssue = null;
+            if (selectedProjectId && elId) {
+              onSelectProjectForViewer(selectedProjectId, elId);
+            }
+          }}
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white transition-colors"
         >
-          Close
+          <ScanEye class="w-4 h-4" />
+          <span>Isolate in 3D Viewer</span>
         </button>
-
-        {#if selectedProjectId && inspectedIssue.element_id}
-          <button
-            type="button"
-            on:click={() => {
-              const elId = inspectedIssue?.element_id;
-              inspectedIssue = null;
-              if (selectedProjectId && elId) {
-                onSelectProjectForViewer(selectedProjectId, elId);
-              }
-            }}
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white transition-colors"
-          >
-            <ScanEye class="w-4 h-4" />
-            <span>Isolate in 3D Viewer</span>
-          </button>
-        {/if}
-      </div>
-    </div>
-  </div>
+      {/if}
+    {/snippet}
+  </Modal>
 {/if}
 
 <!-- IFC Upload Modal -->
