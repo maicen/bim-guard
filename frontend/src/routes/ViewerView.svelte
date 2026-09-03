@@ -1,31 +1,45 @@
 <script lang="ts">
+  import { untrack } from "svelte";
+  import { run } from "svelte/legacy";
+
   import { onMount } from "svelte";
   import { projectsApi } from "../lib/api";
   import type { Project, ProjectIfcFile } from "../lib/types";
   import IfcViewer from "../lib/components/IfcViewer.svelte";
   import { ScanEye, Layers } from "lucide-svelte";
 
-  export let initialProjectId: number | null = null;
-  export let initialElementGuid: string | null = null;
-  export let initialBcfArtifactId: number | null = null;
+  interface Props {
+    initialProjectId?: number | null;
+    initialElementGuid?: string | null;
+    initialBcfArtifactId?: number | null;
+  }
 
-  let projects: Project[] = [];
-  let selectedProjectId: number | null = initialProjectId;
-  let selectedElementGuid: string | null = initialElementGuid;
-  let selectedBcfArtifactId: number | null = initialBcfArtifactId;
+  let {
+    initialProjectId = null,
+    initialElementGuid = null,
+    initialBcfArtifactId = null,
+  }: Props = $props();
+
+  let projects: Project[] = $state([]);
+  // These `initial*` props seed local state once. The component is mounted
+  // inside App's view switch, so it remounts whenever the target changes;
+  // untrack states that the one-time read is deliberate.
+  let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
+  let selectedElementGuid: string | null = $state(untrack(() => initialElementGuid));
+  let selectedBcfArtifactId: number | null = $state(untrack(() => initialBcfArtifactId));
 
   // The project's attached models. A project predating project_ifc_files
   // reports its one model here too, with a null id, so this list is the single
   // shape the picker renders either side of that migration.
-  let ifcFiles: ProjectIfcFile[] = [];
-  let selectedFileId: number | null = null;
+  let ifcFiles: ProjectIfcFile[] = $state([]);
+  let selectedFileId: number | null = $state(null);
   let filesProjectId: number | null = null;
   // The viewport is held back until the list arrives. Loading the project's
   // primary first and the picked model a moment later would fetch two IFCs to
   // show one, and these files are large.
-  let filesReady = false;
+  let filesReady = $state(false);
 
-  $: selectedFile = ifcFiles.find((f) => f.id === selectedFileId) ?? ifcFiles[0] ?? null;
+  let selectedFile = $derived(ifcFiles.find((f) => f.id === selectedFileId) ?? ifcFiles[0] ?? null);
 
   async function loadIfcFiles(projectId: number) {
     // Guarded so the reactive statement below re-fetches on a project change
@@ -69,35 +83,36 @@
     loadProjects();
   });
 
-  $: if (selectedProjectId) {
-    loadIfcFiles(selectedProjectId);
-  }
+  run(() => {
+    if (selectedProjectId) {
+      loadIfcFiles(selectedProjectId);
+    }
+  });
 
-  $: if (initialProjectId) {
-    selectedProjectId = initialProjectId;
-  }
-  $: if (initialElementGuid !== undefined) {
-    selectedElementGuid = initialElementGuid;
-  }
-  $: if (initialBcfArtifactId !== undefined) {
-    selectedBcfArtifactId = initialBcfArtifactId;
-  }
+  run(() => {
+    if (initialProjectId) {
+      selectedProjectId = initialProjectId;
+    }
+  });
+  run(() => {
+    if (initialElementGuid !== undefined) {
+      selectedElementGuid = initialElementGuid;
+    }
+  });
+  run(() => {
+    if (initialBcfArtifactId !== undefined) {
+      selectedBcfArtifactId = initialBcfArtifactId;
+    }
+  });
 </script>
 
-<div class="space-y-6 mx-auto">
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="mx-auto space-y-6">
+  <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
     <div>
-      <div
-        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
-      >
-        Viewer
-      </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
-        3D OpenBIM Viewer
-      </h1>
-      <p class="text-xs sm:text-sm text-slate-400">
-        Spatial geometry inspection powered by ThatOpenCompany web-ifc and BCF
-        viewpoints.
+      <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Viewer</div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">3D OpenBIM Viewer</h1>
+      <p class="text-xs text-slate-400 sm:text-sm">
+        Spatial geometry inspection powered by ThatOpenCompany web-ifc and BCF viewpoints.
       </p>
     </div>
 
@@ -106,14 +121,14 @@
       <div class="flex items-center gap-3">
         <label
           for="viewer-project-select"
-          class="text-xs uppercase tracking-wider font-semibold text-slate-400"
+          class="text-xs font-semibold uppercase tracking-wider text-slate-400"
         >
           Project:
         </label>
         <select
           id="viewer-project-select"
           bind:value={selectedProjectId}
-          class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-50 focus:outline-none focus:border-accent"
+          class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
           {#each projects as p}
             <option value={p.id}>{p.name} (#{p.id})</option>
@@ -123,14 +138,14 @@
         {#if ifcFiles.length > 1}
           <label
             for="viewer-file-select"
-            class="text-xs uppercase tracking-wider font-semibold text-slate-400"
+            class="text-xs font-semibold uppercase tracking-wider text-slate-400"
           >
             Viewing:
           </label>
           <select
             id="viewer-file-select"
             bind:value={selectedFileId}
-            class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-50 focus:outline-none focus:border-accent max-w-[260px]"
+            class="max-w-[260px] rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
             {#each ifcFiles as file}
               <option value={file.id}>
@@ -147,23 +162,22 @@
 
   {#if ifcFiles.length > 1}
     <div
-      class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 flex items-center gap-2"
+      class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400"
     >
-      <Layers class="w-4 h-4 text-blue-400 shrink-0" />
+      <Layers class="h-4 w-4 shrink-0 text-blue-400" />
       <span>
-        This project carries {ifcFiles.length} models. Switching between them changes
-        what the viewport renders only — the analysis results already on screen are
-        left as they are.
+        This project carries {ifcFiles.length} models. Switching between them changes what the viewport
+        renders only — the analysis results already on screen are left as they are.
       </span>
     </div>
   {/if}
 
   {#if selectedElementGuid}
     <div
-      class="p-3 rounded-xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-300 flex items-center justify-between"
+      class="flex items-center justify-between rounded-xl border border-blue-800/60 bg-blue-950/40 p-3 text-xs text-blue-300"
     >
       <div class="flex items-center gap-2">
-        <ScanEye class="w-4 h-4 text-blue-400 shrink-0" />
+        <ScanEye class="h-4 w-4 shrink-0 text-blue-400" />
         <span
           >Focusing on violating element GUID: <strong class="font-mono"
             >{selectedElementGuid}</strong
@@ -172,8 +186,8 @@
       </div>
       <button
         type="button"
-        on:click={() => (selectedElementGuid = null)}
-        class="text-blue-400 hover:text-slate-50 underline text-caption"
+        onclick={() => (selectedElementGuid = null)}
+        class="text-caption text-blue-400 underline hover:text-slate-50"
       >
         Clear Selection
       </button>
@@ -182,11 +196,11 @@
 
   {#if projects.length === 0}
     <div
-      class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 flex items-center justify-between"
+      class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400"
     >
       <span
-        >No saved projects with IFC models found. You can upload an IFC model
-        under Projects or open a local IFC file directly in the viewport below.</span
+        >No saved projects with IFC models found. You can upload an IFC model under Projects or open
+        a local IFC file directly in the viewport below.</span
       >
     </div>
   {/if}

@@ -101,10 +101,7 @@ export class SWRStore<K, V> implements ISubscribable<V> {
   protected readonly listeners = new Set<Listener<V>>();
   public readonly ttlMs: number;
 
-  constructor(
-    storage: ICacheStorage<K, V> = new InMemoryCache<K, V>(),
-    ttlMs: number = 60_000,
-  ) {
+  constructor(storage: ICacheStorage<K, V> = new InMemoryCache<K, V>(), ttlMs: number = 60_000) {
     this.storage = storage;
     this.ttlMs = ttlMs;
   }
@@ -123,16 +120,12 @@ export class SWRStore<K, V> implements ISubscribable<V> {
       try {
         listener(data);
       } catch (err) {
-        console.error('Error in cache listener:', err);
+        console.error("Error in cache listener:", err);
       }
     });
   }
 
-  async execute(
-    key: K,
-    fetcher: () => Promise<V>,
-    options: SWROptions = {},
-  ): Promise<V> {
+  async execute(key: K, fetcher: () => Promise<V>, options: SWROptions = {}): Promise<V> {
     const now = Date.now();
     const cached = this.storage.get(key);
     const isFresh = this.storage.isFresh(key, this.ttlMs);
@@ -201,7 +194,9 @@ export class SWRStore<K, V> implements ISubscribable<V> {
  * Standardized Entity Cache Store for REST collections (SRP, OCP, DIP)
  * Encapsulates list caching, item caching by ID, mutation updates, and cross-view sync.
  */
-export class EntityCacheStore<TItem, TId extends string | number = number> implements ISubscribable<TItem[]> {
+export class EntityCacheStore<TItem, TId extends string | number = number> implements ISubscribable<
+  TItem[]
+> {
   private readonly listStore: SWRStore<string, TItem[]>;
   private readonly itemStore: SWRStore<TId, TItem>;
   private readonly idExtractor: (item: TItem) => TId;
@@ -216,7 +211,7 @@ export class EntityCacheStore<TItem, TId extends string | number = number> imple
     this.itemStore = new SWRStore<TId, TItem>(new InMemoryCache<TId, TItem>(), itemTtlMs);
   }
 
-  getCachedList(queryKey: string = '__default__'): TItem[] | undefined {
+  getCachedList(queryKey: string = "__default__"): TItem[] | undefined {
     return this.listStore.getCached(queryKey);
   }
 
@@ -226,7 +221,7 @@ export class EntityCacheStore<TItem, TId extends string | number = number> imple
 
   subscribe(listener: Listener<TItem[]>): Unsubscribe {
     const unsub = this.listStore.subscribe(listener);
-    const current = this.listStore.getCached('__default__');
+    const current = this.listStore.getCached("__default__");
     if (current) {
       listener(current);
     }
@@ -234,7 +229,7 @@ export class EntityCacheStore<TItem, TId extends string | number = number> imple
   }
 
   async fetchList(
-    queryKey: string = '__default__',
+    queryKey: string = "__default__",
     fetcher: () => Promise<TItem[]>,
     options: SWROptions = {},
   ): Promise<TItem[]> {
@@ -264,16 +259,16 @@ export class EntityCacheStore<TItem, TId extends string | number = number> imple
 
   remove(id: TId): void {
     this.itemStore.delete(id);
-    const current = this.listStore.getCached('__default__');
+    const current = this.listStore.getCached("__default__");
     if (current) {
       const updated = current.filter((item) => this.idExtractor(item) !== id);
-      this.listStore.set('__default__', updated);
+      this.listStore.set("__default__", updated);
     }
   }
 
   private updateInList(item: TItem): void {
     const id = this.idExtractor(item);
-    const current = this.listStore.getCached('__default__');
+    const current = this.listStore.getCached("__default__");
     if (current) {
       const idx = current.findIndex((i) => this.idExtractor(i) === id);
       let nextList: TItem[];
@@ -283,7 +278,7 @@ export class EntityCacheStore<TItem, TId extends string | number = number> imple
       } else {
         nextList = [item, ...current];
       }
-      this.listStore.set('__default__', nextList);
+      this.listStore.set("__default__", nextList);
     }
   }
 

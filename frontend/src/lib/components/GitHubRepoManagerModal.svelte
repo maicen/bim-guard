@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run, preventDefault } from "svelte/legacy";
+
   import { onMount } from "svelte";
   import {
     X,
@@ -15,22 +17,26 @@
   import type { GitHubRepo } from "../types";
   import ConfirmModal from "./ConfirmModal.svelte";
 
-  export let isOpen = false;
-  export let onClose: () => void = () => {};
-  export let onReposUpdated: () => void = () => {};
+  interface Props {
+    isOpen?: boolean;
+    onClose?: () => void;
+    onReposUpdated?: () => void;
+  }
 
-  let repos: GitHubRepo[] = [];
-  let isLoading = false;
-  let isSubmitting = false;
-  let error = "";
-  let successMsg = "";
+  let { isOpen = false, onClose = () => {}, onReposUpdated = () => {} }: Props = $props();
+
+  let repos: GitHubRepo[] = $state([]);
+  let isLoading = $state(false);
+  let isSubmitting = $state(false);
+  let error = $state("");
+  let successMsg = $state("");
 
   // Add Form state
-  let showAddForm = false;
-  let newUrl = "";
-  let newName = "";
-  let newBranch = "main";
-  let newDescription = "";
+  let showAddForm = $state(false);
+  let newUrl = $state("");
+  let newName = $state("");
+  let newBranch = $state("main");
+  let newDescription = $state("");
 
   async function loadRepos() {
     isLoading = true;
@@ -44,12 +50,14 @@
     }
   }
 
-  $: if (isOpen) {
-    loadRepos();
-    showAddForm = false;
-    error = "";
-    successMsg = "";
-  }
+  run(() => {
+    if (isOpen) {
+      loadRepos();
+      showAddForm = false;
+      error = "";
+      successMsg = "";
+    }
+  });
 
   async function handleAddRepo() {
     if (!newUrl.trim()) {
@@ -84,7 +92,7 @@
     }
   }
 
-  let repoPendingDelete: GitHubRepo | null = null;
+  let repoPendingDelete: GitHubRepo | null = $state(null);
 
   function promptDeleteRepo(repo: GitHubRepo) {
     repoPendingDelete = repo;
@@ -108,66 +116,83 @@
 </script>
 
 {#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-    <div class="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+  >
+    <div
+      class="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+    >
       <!-- Header -->
-      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/50">
+      <div
+        class="flex items-center justify-between border-b border-slate-800 bg-slate-950/50 px-6 py-4"
+      >
         <div class="flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-blue-950/60 border border-blue-800/50 text-blue-400">
-            <FolderGit2 class="w-5 h-5" />
+          <div class="rounded-xl border border-blue-800/50 bg-blue-950/60 p-2 text-blue-400">
+            <FolderGit2 class="h-5 w-5" />
           </div>
           <div>
             <h2 class="text-lg font-semibold text-slate-50">GitHub Project Storage Repositories</h2>
-            <p class="text-xs text-slate-400">Manage external GitHub repositories hosting OpenBIM IFC models.</p>
+            <p class="text-xs text-slate-400">
+              Manage external GitHub repositories hosting OpenBIM IFC models.
+            </p>
           </div>
         </div>
         <button
           type="button"
-          on:click={onClose}
-          class="p-2 rounded-xl text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
+          onclick={onClose}
+          class="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
-          <X class="w-5 h-5" />
+          <X class="h-5 w-5" />
         </button>
       </div>
 
       <!-- Content -->
-      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+      <div class="flex-1 space-y-4 overflow-y-auto p-6">
         {#if error}
-          <div class="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
-            <AlertCircle class="w-4 h-4 shrink-0" />
+          <div
+            class="flex items-center gap-2 rounded-xl border border-rose-800/80 bg-rose-950/60 p-3.5 text-xs text-rose-300"
+          >
+            <AlertCircle class="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         {/if}
 
         {#if successMsg}
-          <div class="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs flex items-center gap-2">
-            <Check class="w-4 h-4 shrink-0" />
+          <div
+            class="flex items-center gap-2 rounded-xl border border-emerald-800/80 bg-emerald-950/60 p-3.5 text-xs text-emerald-300"
+          >
+            <Check class="h-4 w-4 shrink-0" />
             <span>{successMsg}</span>
           </div>
         {/if}
 
         <!-- Control Bar -->
         <div class="flex items-center justify-between">
-          <div class="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <div class="text-xs font-semibold uppercase tracking-wider text-slate-300">
             Registered Repositories ({repos.length})
           </div>
           <button
             type="button"
-            on:click={() => (showAddForm = !showAddForm)}
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition-all"
+            onclick={() => (showAddForm = !showAddForm)}
+            class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-blue-500"
           >
-            <Plus class="w-4 h-4" />
+            <Plus class="h-4 w-4" />
             <span>Add GitHub Repository</span>
           </button>
         </div>
 
         <!-- Add Repo Form -->
         {#if showAddForm}
-          <form on:submit|preventDefault={handleAddRepo} class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Register New Repository</h3>
+          <form
+            onsubmit={preventDefault(handleAddRepo)}
+            class="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-4"
+          >
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">
+              Register New Repository
+            </h3>
 
             <div>
-              <label for="repo-url" class="block text-caption font-semibold text-slate-400 mb-1">
+              <label for="repo-url" class="mb-1 block text-caption font-semibold text-slate-400">
                 Repository URL <span class="text-rose-400">*</span>
               </label>
               <input
@@ -176,59 +201,66 @@
                 required
                 bind:value={newUrl}
                 placeholder="https://github.com/maicen/bimguard-test-models"
-                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label for="repo-name" class="block text-caption font-semibold text-slate-400 mb-1">Display Name (Optional)</label>
+                <label for="repo-name" class="mb-1 block text-caption font-semibold text-slate-400"
+                  >Display Name (Optional)</label
+                >
                 <input
                   id="repo-name"
                   type="text"
                   bind:value={newName}
                   placeholder="bimguard-test-models"
-                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label for="repo-branch" class="block text-caption font-semibold text-slate-400 mb-1">Git Branch</label>
+                <label
+                  for="repo-branch"
+                  class="mb-1 block text-caption font-semibold text-slate-400">Git Branch</label
+                >
                 <input
                   id="repo-branch"
                   type="text"
                   bind:value={newBranch}
                   placeholder="main"
-                  class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label for="repo-desc" class="block text-caption font-semibold text-slate-400 mb-1">Description (Optional)</label>
+              <label for="repo-desc" class="mb-1 block text-caption font-semibold text-slate-400"
+                >Description (Optional)</label
+              >
               <input
                 id="repo-desc"
                 type="text"
                 bind:value={newDescription}
                 placeholder="Repository containing OpenBIM test models..."
-                class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                on:click={() => (showAddForm = false)}
-                class="px-3 py-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-slate-50 text-xs transition-colors"
+                onclick={() => (showAddForm = false)}
+                class="rounded-xl border border-slate-800 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:text-slate-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                class="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all disabled:opacity-50"
+                class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition-all hover:bg-blue-500 disabled:opacity-50"
               >
                 {#if isSubmitting}
-                  <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 class="h-3.5 w-3.5 animate-spin" />
                   <span>Registering...</span>
                 {:else}
                   <span>Save Repository</span>
@@ -240,35 +272,46 @@
 
         <!-- Repository List -->
         {#if isLoading}
-          <div class="p-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-            <Loader2 class="w-4 h-4 animate-spin text-blue-400" />
+          <div
+            class="flex items-center justify-center gap-2 p-8 text-center text-xs text-slate-500"
+          >
+            <Loader2 class="h-4 w-4 animate-spin text-blue-400" />
             <span>Loading registered repositories...</span>
           </div>
         {:else if repos.length === 0}
-          <div class="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
+          <div
+            class="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs text-slate-500"
+          >
             No custom GitHub repositories registered yet.
           </div>
         {:else}
           <div class="space-y-2">
             {#each repos as repo}
-              <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 flex items-start justify-between gap-3 transition-colors">
+              <div
+                class="flex items-start justify-between gap-3 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5 transition-colors hover:border-slate-700"
+              >
                 <div class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-slate-50">{repo.owner}/{repo.name}</span>
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-micro font-mono text-slate-400">
-                      <GitBranch class="w-3 h-3 text-blue-400" />
+                    <span class="text-sm font-semibold text-slate-50">{repo.owner}/{repo.name}</span
+                    >
+                    <span
+                      class="inline-flex items-center gap-1 rounded-md border border-slate-800 bg-slate-900 px-2 py-0.5 font-mono text-micro text-slate-400"
+                    >
+                      <GitBranch class="h-3 w-3 text-blue-400" />
                       {repo.branch}
                     </span>
                     {#if repo.url.includes("maicen/bimguard-test-models")}
-                      <span class="px-2 py-0.5 rounded-md bg-blue-950/80 border border-blue-800/60 text-blue-300 text-micro font-semibold">
+                      <span
+                        class="rounded-md border border-blue-800/60 bg-blue-950/80 px-2 py-0.5 text-micro font-semibold text-blue-300"
+                      >
                         Default Test Repo
                       </span>
                     {/if}
                   </div>
                   {#if repo.description}
-                    <p class="text-xs text-slate-400 leading-relaxed">{repo.description}</p>
+                    <p class="text-xs leading-relaxed text-slate-400">{repo.description}</p>
                   {/if}
-                  <div class="text-caption text-slate-500 flex items-center gap-2 pt-0.5">
+                  <div class="flex items-center gap-2 pt-0.5 text-caption text-slate-500">
                     <a
                       href={repo.url}
                       target="_blank"
@@ -276,19 +319,19 @@
                       class="inline-flex items-center gap-1 text-blue-400 hover:underline"
                     >
                       <span>{repo.url}</span>
-                      <ExternalLink class="w-3 h-3" />
+                      <ExternalLink class="h-3 w-3" />
                     </a>
                   </div>
                 </div>
 
-                <div class="flex items-center gap-1.5 shrink-0">
+                <div class="flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
-                    on:click={() => promptDeleteRepo(repo)}
-                    class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                    onclick={() => promptDeleteRepo(repo)}
+                    class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                     title="Remove repository"
                   >
-                    <Trash2 class="w-4 h-4" />
+                    <Trash2 class="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -298,11 +341,13 @@
       </div>
 
       <!-- Footer -->
-      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end">
+      <div
+        class="flex items-center justify-end border-t border-slate-800 bg-slate-950/60 px-6 py-3"
+      >
         <button
           type="button"
-          on:click={onClose}
-          class="px-4 py-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
+          onclick={onClose}
+          class="rounded-xl border border-slate-800 bg-slate-900 px-4 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800"
         >
           Close
         </button>

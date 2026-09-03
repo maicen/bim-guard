@@ -6,13 +6,7 @@
  * single source of truth; the mapping is the one documented in DESIGN.md §10:
  * critical = rose, high = amber, medium = yellow, low = emerald.
  */
-export type Severity =
-  | "critical"
-  | "high"
-  | "medium"
-  | "low"
-  | "data_quality"
-  | "neutral";
+export type Severity = "critical" | "high" | "medium" | "low" | "data_quality" | "neutral";
 
 export interface SeverityStyle {
   /** Pill background, border and text, tuned for the inverting slate surfaces. */
@@ -67,5 +61,5 @@ export function normalizeSeverity(value: string | null | undefined): Severity {
 /** Human-readable label for a band. */
 export function severityLabel(value: string | null | undefined): string {
   const band = normalizeSeverity(value);
-  return band === "data_quality" ? "Data Quality" : (value || band);
+  return band === "data_quality" ? "Data Quality" : value || band;
 }

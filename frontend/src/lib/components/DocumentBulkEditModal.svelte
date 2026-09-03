@@ -1,31 +1,39 @@
 <script lang="ts">
-  import { SlidersHorizontal, AlertTriangle } from 'lucide-svelte';
-  import { documentsApi } from '../api';
-  import { DOCUMENT_TYPES } from '../types';
-  import type { DocumentType } from '../types';
-  import Modal from './Modal.svelte';
+  import { run } from "svelte/legacy";
 
-  export let isOpen: boolean = false;
-  export let selectedDocIds: number[] = [];
-  export let onClose: () => void;
-  export let onBulkUpdated: () => void;
+  import { SlidersHorizontal, AlertTriangle } from "lucide-svelte";
+  import { documentsApi } from "../api";
+  import { DOCUMENT_TYPES } from "../types";
+  import type { DocumentType } from "../types";
+  import Modal from "./Modal.svelte";
 
-  let docType: string = 'no_change';
-  let isSaving: boolean = false;
-  let errorMessage: string = '';
-
-  $: if (isOpen) {
-    docType = 'no_change';
-    errorMessage = '';
+  interface Props {
+    isOpen?: boolean;
+    selectedDocIds?: number[];
+    onClose: () => void;
+    onBulkUpdated: () => void;
   }
 
-  $: hasChanges = docType !== 'no_change';
+  let { isOpen = false, selectedDocIds = [], onClose, onBulkUpdated }: Props = $props();
+
+  let docType: string = $state("no_change");
+  let isSaving: boolean = $state(false);
+  let errorMessage: string = $state("");
+
+  run(() => {
+    if (isOpen) {
+      docType = "no_change";
+      errorMessage = "";
+    }
+  });
+
+  let hasChanges = $derived(docType !== "no_change");
 
   async function handleSave() {
     if (!selectedDocIds.length || !hasChanges) return;
 
     isSaving = true;
-    errorMessage = '';
+    errorMessage = "";
 
     try {
       for (const id of selectedDocIds) {
@@ -36,7 +44,7 @@
       onBulkUpdated();
       onClose();
     } catch (err: any) {
-      errorMessage = err.message || 'Failed to apply bulk update to documents.';
+      errorMessage = err.message || "Failed to apply bulk update to documents.";
     } finally {
       isSaving = false;
     }
@@ -52,14 +60,20 @@
   {onClose}
 >
   {#if errorMessage}
-    <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
-      <AlertTriangle class="w-4 h-4 shrink-0 text-rose-400" />
+    <div
+      class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
+    >
+      <AlertTriangle class="h-4 w-4 shrink-0 text-rose-400" />
       <span>{errorMessage}</span>
     </div>
   {/if}
 
-  <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 text-xs text-slate-400 leading-relaxed">
-    Select properties to update across all <strong class="text-slate-50">{selectedDocIds.length}</strong> selected documents.
+  <div
+    class="rounded-xl border border-slate-800/80 bg-slate-950 p-3.5 text-xs leading-relaxed text-slate-400"
+  >
+    Select properties to update across all <strong class="text-slate-50"
+      >{selectedDocIds.length}</strong
+    > selected documents.
   </div>
 
   <!-- Document Type -->
@@ -70,7 +84,7 @@
     <select
       id="bulk-doc-type"
       bind:value={docType}
-      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
     >
       <option value="no_change">-- Keep Current Type --</option>
       {#each DOCUMENT_TYPES as type}
@@ -82,18 +96,18 @@
   {#snippet footer()}
     <button
       type="button"
-      on:click={onClose}
-      class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-800 transition-colors"
+      onclick={onClose}
+      class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
     >
       Cancel
     </button>
     <button
       type="button"
       disabled={isSaving || !hasChanges}
-      on:click={handleSave}
-      class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+      onclick={handleSave}
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
     >
-      <span>{isSaving ? 'Applying Changes...' : `Update ${selectedDocIds.length} Documents`}</span>
+      <span>{isSaving ? "Applying Changes..." : `Update ${selectedDocIds.length} Documents`}</span>
     </button>
   {/snippet}
 </Modal>

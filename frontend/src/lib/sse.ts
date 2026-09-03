@@ -1,4 +1,4 @@
-import type { PipelineEvent, WorkflowStatus } from './types';
+import type { PipelineEvent, WorkflowStatus } from "./types";
 
 export interface SSESubscriptionOptions {
   onStatus?: (status: WorkflowStatus) => void;
@@ -10,27 +10,27 @@ export interface SSESubscriptionOptions {
 
 export function subscribeToPipelineEvents(
   projectId: number,
-  options: SSESubscriptionOptions = {}
+  options: SSESubscriptionOptions = {},
 ): () => void {
-  const API_BASE = import.meta.env.VITE_API_URL || '/api';
+  const API_BASE = import.meta.env.VITE_API_URL || "/api";
   const url = `${API_BASE}/events/${projectId}`;
   const es = new EventSource(url);
 
-  es.addEventListener('status', (e: MessageEvent) => {
+  es.addEventListener("status", (e: MessageEvent) => {
     try {
       const data: WorkflowStatus = JSON.parse(e.data);
       options.onStatus?.(data);
     } catch (err) {
-      console.error('Error parsing SSE status:', err);
+      console.error("Error parsing SSE status:", err);
     }
   });
 
-  es.addEventListener('pipeline_event', (e: MessageEvent) => {
+  es.addEventListener("pipeline_event", (e: MessageEvent) => {
     try {
       const data: PipelineEvent = JSON.parse(e.data);
       options.onEvent?.(data);
     } catch (err) {
-      console.error('Error parsing SSE pipeline_event:', err);
+      console.error("Error parsing SSE pipeline_event:", err);
     }
   });
 
@@ -51,4 +51,3 @@ export function subscribeToPipelineEvents(
     es.close();
   };
 }
-

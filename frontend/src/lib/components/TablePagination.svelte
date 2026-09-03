@@ -1,16 +1,27 @@
 <script lang="ts">
   import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-svelte";
 
-  export let currentPage: number = 1;
-  export let pageSize: number = 10;
-  export let totalItems: number = 0;
-  export let pageSizeOptions: number[] = [10, 25, 50, 100];
-  export let onPageChange: (page: number) => void;
-  export let onPageSizeChange: (size: number) => void;
+  interface Props {
+    currentPage?: number;
+    pageSize?: number;
+    totalItems?: number;
+    pageSizeOptions?: number[];
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+  }
 
-  $: totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  $: startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  $: endItem = Math.min(totalItems, currentPage * pageSize);
+  let {
+    currentPage = 1,
+    pageSize = 10,
+    totalItems = 0,
+    pageSizeOptions = [10, 25, 50, 100],
+    onPageChange,
+    onPageSizeChange,
+  }: Props = $props();
+
+  let totalPages = $derived(Math.max(1, Math.ceil(totalItems / pageSize)));
+  let startItem = $derived(totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1);
+  let endItem = $derived(Math.min(totalItems, currentPage * pageSize));
 
   function goToPage(page: number) {
     const validPage = Math.max(1, Math.min(page, totalPages));
@@ -27,10 +38,10 @@
 </script>
 
 <div
-  class="flex flex-col sm:flex-row items-center justify-between gap-4 py-3 px-4 border-t border-slate-800 bg-slate-950/40 text-xs text-slate-400 select-none rounded-b-2xl"
+  class="flex select-none flex-col items-center justify-between gap-4 rounded-b-2xl border-t border-slate-800 bg-slate-950/40 px-4 py-3 text-xs text-slate-400 sm:flex-row"
 >
   <!-- Range indicator & Page size selector -->
-  <div class="flex items-center gap-4 flex-wrap">
+  <div class="flex flex-wrap items-center gap-4">
     <span>
       Showing <strong class="text-slate-200">{startItem}</strong> to
       <strong class="text-slate-200">{endItem}</strong> of
@@ -41,8 +52,8 @@
       <span>Show</span>
       <select
         value={pageSize}
-        on:change={handlePageSizeChange}
-        class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+        onchange={handlePageSizeChange}
+        class="cursor-pointer rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
       >
         {#each pageSizeOptions as option}
           <option value={option}>{option}</option>
@@ -57,23 +68,23 @@
     <!-- First Page -->
     <button
       type="button"
-      on:click={() => goToPage(1)}
+      onclick={() => goToPage(1)}
       disabled={currentPage === 1}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
       title="First Page"
     >
-      <ChevronsLeft class="w-4 h-4" />
+      <ChevronsLeft class="h-4 w-4" />
     </button>
 
     <!-- Previous Page -->
     <button
       type="button"
-      on:click={() => goToPage(currentPage - 1)}
+      onclick={() => goToPage(currentPage - 1)}
       disabled={currentPage === 1}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
       title="Previous Page"
     >
-      <ChevronLeft class="w-4 h-4" />
+      <ChevronLeft class="h-4 w-4" />
     </button>
 
     <!-- Page Indicator -->
@@ -84,23 +95,23 @@
     <!-- Next Page -->
     <button
       type="button"
-      on:click={() => goToPage(currentPage + 1)}
+      onclick={() => goToPage(currentPage + 1)}
       disabled={currentPage === totalPages}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
       title="Next Page"
     >
-      <ChevronRight class="w-4 h-4" />
+      <ChevronRight class="h-4 w-4" />
     </button>
 
     <!-- Last Page -->
     <button
       type="button"
-      on:click={() => goToPage(totalPages)}
+      onclick={() => goToPage(totalPages)}
       disabled={currentPage === totalPages}
-      class="p-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
       title="Last Page"
     >
-      <ChevronsRight class="w-4 h-4" />
+      <ChevronsRight class="h-4 w-4" />
     </button>
   </div>
 </div>

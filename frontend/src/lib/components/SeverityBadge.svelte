@@ -2,12 +2,16 @@
   import { SEVERITY_STYLES, normalizeSeverity, severityLabel } from "../severity";
   import { cn } from "../utils/cn";
 
-  export let severity: string = "low";
-  export let size: "xs" | "sm" = "xs";
-  export let showDot: boolean = false;
+  interface Props {
+    severity?: string;
+    size?: "xs" | "sm";
+    showDot?: boolean;
+  }
 
-  $: style = SEVERITY_STYLES[normalizeSeverity(severity)];
-  $: label = severityLabel(severity);
+  let { severity = "low", size = "xs", showDot = false }: Props = $props();
+
+  let style = $derived(SEVERITY_STYLES[normalizeSeverity(severity)]);
+  let label = $derived(severityLabel(severity));
 </script>
 
 <span

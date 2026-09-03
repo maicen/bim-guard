@@ -54,16 +54,16 @@ import type {
   RuleSnapshot,
   RuleSnapshotCreatePayload,
   WorkflowStatus,
-} from './types';
+} from "./types";
 import {
   EntityCacheStore,
   InMemoryCache,
   SWRStore,
   type SWROptions,
   type Unsubscribe,
-} from './cache';
+} from "./cache";
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -76,12 +76,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
         errorDetail =
           detail
             .map((d: any) => {
-              const field = Array.isArray(d?.loc) ? d.loc.slice(1).join('.') : '';
+              const field = Array.isArray(d?.loc) ? d.loc.slice(1).join(".") : "";
               return field ? `${field}: ${d.msg}` : d?.msg || JSON.stringify(d);
             })
-            .join('; ') || errorDetail;
+            .join("; ") || errorDetail;
       } else if (detail) {
-        errorDetail = typeof detail === 'string' ? detail : JSON.stringify(detail);
+        errorDetail = typeof detail === "string" ? detail : JSON.stringify(detail);
       }
     } catch {
       // not json
@@ -113,13 +113,13 @@ function buildRulesFilterKey(filters?: {
   category?: RulesetCategory | string;
   keyword?: string;
 }): string {
-  if (!filters) return '__default__';
-  return `${filters.mechanism || ''}_${filters.ruleset_id || ''}_${filters.category || ''}_${filters.keyword || ''}`;
+  if (!filters) return "__default__";
+  return `${filters.mechanism || ""}_${filters.ruleset_id || ""}_${filters.category || ""}_${filters.keyword || ""}`;
 }
 
 export const projectsApi = {
   getCachedList(): ProjectListResponse | null {
-    const list = _projectsStore.getCachedList('__default__');
+    const list = _projectsStore.getCachedList("__default__");
     if (!list) return null;
     return {
       projects: list,
@@ -133,7 +133,7 @@ export const projectsApi = {
 
   async list(options: SWROptions = {}): Promise<ProjectListResponse> {
     const list = await _projectsStore.fetchList(
-      '__default__',
+      "__default__",
       async () => {
         const res = await fetch(`${API_BASE}/projects`);
         const data = await handleResponse<ProjectListResponse | Project[]>(res);
@@ -166,7 +166,7 @@ export const projectsApi = {
 
   async options(options: SWROptions = {}): Promise<ProjectOptions> {
     return _projectOptionsStore.execute(
-      '__options__',
+      "__options__",
       async () => {
         const res = await fetch(`${API_BASE}/projects/options`);
         return handleResponse<ProjectOptions>(res);
@@ -177,8 +177,8 @@ export const projectsApi = {
 
   async create(payload: ProjectCreatePayload): Promise<Project> {
     const res = await fetch(`${API_BASE}/projects`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const created = await handleResponse<Project>(res);
@@ -188,7 +188,7 @@ export const projectsApi = {
 
   async uploadWithIfc(formData: FormData): Promise<Project> {
     const res = await fetch(`${API_BASE}/projects/upload`, {
-      method: 'POST',
+      method: "POST",
       body: formData,
     });
     const created = await handleResponse<Project>(res);
@@ -198,8 +198,8 @@ export const projectsApi = {
 
   async update(id: number, payload: ProjectUpdatePayload): Promise<Project> {
     const res = await fetch(`${API_BASE}/projects/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const updated = await handleResponse<Project>(res);
@@ -209,7 +209,7 @@ export const projectsApi = {
 
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/projects/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     await handleResponse<void>(res);
     _projectsStore.remove(id);
@@ -217,8 +217,8 @@ export const projectsApi = {
 
   async bulkDelete(ids: number[]): Promise<ProjectBulkActionResponse> {
     const res = await fetch(`${API_BASE}/projects/bulk-delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_ids: ids }),
     });
     const result = await handleResponse<ProjectBulkActionResponse>(res);
@@ -228,8 +228,8 @@ export const projectsApi = {
 
   async bulkUpdate(payload: ProjectBulkUpdatePayload): Promise<ProjectBulkActionResponse> {
     const res = await fetch(`${API_BASE}/projects/bulk-update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const result = await handleResponse<ProjectBulkActionResponse>(res);
@@ -271,12 +271,12 @@ export const projectsApi = {
     roles: string[],
   ): Promise<ProjectIfcUploadResponse> {
     const form = new FormData();
-    files.forEach((file) => form.append('files', file));
-    form.append('primary_index', String(primaryIndex));
-    roles.forEach((role) => form.append('roles', role));
+    files.forEach((file) => form.append("files", file));
+    form.append("primary_index", String(primaryIndex));
+    roles.forEach((role) => form.append("roles", role));
 
     const res = await fetch(`${API_BASE}/projects/${projectId}/upload`, {
-      method: 'POST',
+      method: "POST",
       body: form,
     });
     // The primary is mirrored onto projects.ifc_file_path server-side, so a
@@ -299,7 +299,7 @@ export const rulesApi = {
   },
 
   getCachedFolders(category?: RulesetCategory | string): RuleFolder[] | null {
-    const key = category || '__default__';
+    const key = category || "__default__";
     const cached = _ruleFoldersStore.getCached(key);
     return cached || null;
   },
@@ -322,11 +322,11 @@ export const rulesApi = {
       key,
       async () => {
         const params = new URLSearchParams();
-        if (filters?.mechanism) params.set('mechanism', filters.mechanism);
-        if (filters?.ruleset_id) params.set('ruleset_id', filters.ruleset_id);
-        if (filters?.category) params.set('category', filters.category);
-        if (filters?.keyword) params.set('keyword', filters.keyword);
-        const query = params.toString() ? `?${params.toString()}` : '';
+        if (filters?.mechanism) params.set("mechanism", filters.mechanism);
+        if (filters?.ruleset_id) params.set("ruleset_id", filters.ruleset_id);
+        if (filters?.category) params.set("category", filters.category);
+        if (filters?.keyword) params.set("keyword", filters.keyword);
+        const query = params.toString() ? `?${params.toString()}` : "";
         const res = await fetch(`${API_BASE}/rules${query}`);
         return handleResponse<Rule[]>(res);
       },
@@ -338,8 +338,8 @@ export const rulesApi = {
     category?: RulesetCategory | string,
     options: SWROptions = {},
   ): Promise<RuleFolder[]> {
-    const key = category || '__default__';
-    const query = category ? `?category=${encodeURIComponent(category)}` : '';
+    const key = category || "__default__";
+    const query = category ? `?category=${encodeURIComponent(category)}` : "";
     return _ruleFoldersStore.execute(
       key,
       async () => {
@@ -352,8 +352,8 @@ export const rulesApi = {
 
   async createFolder(payload: RuleFolderCreatePayload): Promise<RuleFolder> {
     const res = await fetch(`${API_BASE}/rules/folders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const created = await handleResponse<RuleFolder>(res);
@@ -363,8 +363,8 @@ export const rulesApi = {
 
   async updateFolder(rulesetId: string, payload: RuleFolderUpdatePayload): Promise<RuleFolder> {
     const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const updated = await handleResponse<RuleFolder>(res);
@@ -372,20 +372,28 @@ export const rulesApi = {
     return updated;
   },
 
-  async deleteFolder(rulesetId: string): Promise<{ success: boolean; ruleset_id: string; deleted_rules: number }> {
+  async deleteFolder(
+    rulesetId: string,
+  ): Promise<{ success: boolean; ruleset_id: string; deleted_rules: number }> {
     const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
-    const result = await handleResponse<{ success: boolean; ruleset_id: string; deleted_rules: number }>(res);
+    const result = await handleResponse<{
+      success: boolean;
+      ruleset_id: string;
+      deleted_rules: number;
+    }>(res);
     _ruleFoldersStore.clear();
     _rulesStore.clear();
     return result;
   },
 
-  async bulkUpdateFolders(payload: RuleFolderBulkUpdatePayload): Promise<RuleFolderBulkActionResponse> {
+  async bulkUpdateFolders(
+    payload: RuleFolderBulkUpdatePayload,
+  ): Promise<RuleFolderBulkActionResponse> {
     const res = await fetch(`${API_BASE}/rules/folders/bulk-update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const result = await handleResponse<RuleFolderBulkActionResponse>(res);
@@ -396,8 +404,8 @@ export const rulesApi = {
 
   async bulkDeleteFolders(rulesetIds: string[]): Promise<RuleFolderBulkActionResponse> {
     const res = await fetch(`${API_BASE}/rules/folders/bulk-delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ruleset_ids: rulesetIds }),
     });
     const result = await handleResponse<RuleFolderBulkActionResponse>(res);
@@ -424,8 +432,8 @@ export const rulesApi = {
 
   async create(payload: Partial<Rule>): Promise<Rule> {
     const res = await fetch(`${API_BASE}/rules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const created = await handleResponse<Rule>(res);
@@ -436,8 +444,8 @@ export const rulesApi = {
 
   async update(id: number, payload: Partial<Rule>): Promise<Rule> {
     const res = await fetch(`${API_BASE}/rules/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const updated = await handleResponse<Rule>(res);
@@ -448,7 +456,7 @@ export const rulesApi = {
 
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/rules/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     await handleResponse<void>(res);
     _rulesStore.remove(id);
@@ -457,8 +465,8 @@ export const rulesApi = {
 
   async bulkUpdate(payload: RuleBulkUpdatePayload): Promise<RuleBulkActionResponse> {
     const res = await fetch(`${API_BASE}/rules/bulk-update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const result = await handleResponse<RuleBulkActionResponse>(res);
@@ -469,8 +477,8 @@ export const rulesApi = {
 
   async bulkDelete(ruleIds: number[]): Promise<RuleBulkActionResponse> {
     const res = await fetch(`${API_BASE}/rules/bulk-delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rule_ids: ruleIds }),
     });
     const result = await handleResponse<RuleBulkActionResponse>(res);
@@ -493,10 +501,10 @@ export const rulesApi = {
 
   async importIds(file: File, rulesetId: string): Promise<IdsImportResult> {
     const form = new FormData();
-    form.append('file', file);
-    form.append('ruleset_id', rulesetId);
+    form.append("file", file);
+    form.append("ruleset_id", rulesetId);
     const res = await fetch(`${API_BASE}/rules/import-ids`, {
-      method: 'POST',
+      method: "POST",
       body: form,
     });
     const result = await handleResponse<IdsImportResult>(res);
@@ -507,8 +515,8 @@ export const rulesApi = {
 
   async createSnapshot(payload: RuleSnapshotCreatePayload): Promise<RuleSnapshot> {
     const res = await fetch(`${API_BASE}/rules/snapshots`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     return handleResponse<RuleSnapshot>(res);
@@ -521,7 +529,7 @@ export const rulesApi = {
 
   async deleteSnapshot(snapshotId: number): Promise<void> {
     const res = await fetch(`${API_BASE}/rules/snapshots/${snapshotId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     if (!res.ok) {
       throw new Error(`Failed to delete snapshot ${snapshotId}`);
@@ -534,27 +542,35 @@ export const rulesApi = {
 };
 
 function engineQuery(engines?: string[]): string {
-  if (!engines) return '';
-  if (engines.length === 0) return '&engines=';
-  return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join('');
+  if (!engines) return "";
+  if (engines.length === 0) return "&engines=";
+  return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join("");
 }
 
 /** True when a rejection is an aborted fetch rather than a real failure. */
 export function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === 'AbortError';
+  return err instanceof DOMException && err.name === "AbortError";
 }
 
 export const analyzeApi = {
-  async uploadIfc(projectId: number, file: File): Promise<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }> {
+  async uploadIfc(
+    projectId: number,
+    file: File,
+  ): Promise<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }> {
     const form = new FormData();
-    form.append('project_id', projectId.toString());
-    form.append('ifc_file', file);
+    form.append("project_id", projectId.toString());
+    form.append("ifc_file", file);
 
     const res = await fetch(`${API_BASE}/analyze/upload`, {
-      method: 'POST',
+      method: "POST",
       body: form,
     });
-    return handleResponse<{ success: boolean; filename: string; size_bytes?: number; sha256?: string }>(res);
+    return handleResponse<{
+      success: boolean;
+      filename: string;
+      size_bytes?: number;
+      sha256?: string;
+    }>(res);
   },
 
   /**
@@ -564,18 +580,39 @@ export const analyzeApi = {
    * Cancel and to discard a stale response when the user switches project
    * mid-request, which would otherwise land on top of the newer selection.
    */
-  async run(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', background = false, useCache = true, engines?: string[], signal?: AbortSignal): Promise<AnalysisResult> {
+  async run(
+    projectId: number,
+    slug: "corrosion" | "seismic" = "corrosion",
+    background = false,
+    useCache = true,
+    engines?: string[],
+    signal?: AbortSignal,
+  ): Promise<AnalysisResult> {
     const res = await fetch(`${API_BASE}/analyze/run?background=${background}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId, slug, use_cache: useCache, engines: engines ?? null }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_id: projectId,
+        slug,
+        use_cache: useCache,
+        engines: engines ?? null,
+      }),
       signal,
     });
     return handleResponse<AnalysisResult>(res);
   },
 
-  async getResults(projectId: number, slug: 'corrosion' | 'seismic' = 'corrosion', useCache = true, engines?: string[], signal?: AbortSignal): Promise<AnalysisResult> {
-    const res = await fetch(`${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}`, { signal });
+  async getResults(
+    projectId: number,
+    slug: "corrosion" | "seismic" = "corrosion",
+    useCache = true,
+    engines?: string[],
+    signal?: AbortSignal,
+  ): Promise<AnalysisResult> {
+    const res = await fetch(
+      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}`,
+      { signal },
+    );
     return handleResponse<AnalysisResult>(res);
   },
 
@@ -584,7 +621,12 @@ export const analyzeApi = {
     return handleResponse<WorkflowStatus>(res);
   },
 
-  getExportUrl(projectId: number, slug: string, fmt: 'bcf' | 'csv' | 'json', engines?: string[]): string {
+  getExportUrl(
+    projectId: number,
+    slug: string,
+    fmt: "bcf" | "csv" | "json",
+    engines?: string[],
+  ): string {
     return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}`;
   },
 
@@ -596,13 +638,13 @@ export const analyzeApi = {
     return `${API_BASE}/analyze/bcf/latest/${projectId}`;
   },
 
-  async runArch(projectId: number, ruleFolder = ''): Promise<any> {
+  async runArch(projectId: number, ruleFolder = ""): Promise<any> {
     const form = new FormData();
-    form.append('project_id', projectId.toString());
-    if (ruleFolder) form.append('rule_folder', ruleFolder);
+    form.append("project_id", projectId.toString());
+    if (ruleFolder) form.append("rule_folder", ruleFolder);
 
     const res = await fetch(`${API_BASE}/analyze/arch`, {
-      method: 'POST',
+      method: "POST",
       body: form,
     });
     return handleResponse<any>(res);
@@ -615,7 +657,7 @@ export const analyzeApi = {
 
   async deleteBcfArtifact(artifactId: number): Promise<void> {
     const res = await fetch(`${API_BASE}/analyze/bcf/artifacts/${artifactId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     return handleResponse<void>(res);
   },
@@ -623,12 +665,12 @@ export const analyzeApi = {
 
 export const dashboardApi = {
   getCachedStats(): any | null {
-    return _dashboardStatsStore.getCached('__stats__') || null;
+    return _dashboardStatsStore.getCached("__stats__") || null;
   },
 
   async getStats(options: SWROptions = {}): Promise<any> {
     return _dashboardStatsStore.execute(
-      '__stats__',
+      "__stats__",
       async () => {
         const res = await fetch(`${API_BASE}/dashboard/stats`);
         return handleResponse<any>(res);
@@ -654,7 +696,7 @@ export const dashboardApi = {
 
 export const documentsApi = {
   getCachedList(): DocumentItem[] | null {
-    return _documentsStore.getCachedList('__default__') || null;
+    return _documentsStore.getCachedList("__default__") || null;
   },
 
   subscribe(listener: (docs: DocumentItem[]) => void): Unsubscribe {
@@ -663,7 +705,7 @@ export const documentsApi = {
 
   async list(options: SWROptions = {}): Promise<DocumentItem[]> {
     return _documentsStore.fetchList(
-      '__default__',
+      "__default__",
       async () => {
         const res = await fetch(`${API_BASE}/documents`);
         return handleResponse<DocumentItem[]>(res);
@@ -685,25 +727,25 @@ export const documentsApi = {
 
   async upload(
     file: File,
-    docType: string = 'Specification',
+    docType: string = "Specification",
     isoOptions?: {
       project_code?: string;
       originator?: string;
       suitability_code?: string;
       revision_code?: string;
-      parser?: 'auto' | 'unstructured' | 'light';
+      parser?: "auto" | "unstructured" | "light";
     },
   ): Promise<DocumentDetail> {
     const form = new FormData();
-    form.append('file', file);
-    form.append('doc_type', docType);
-    if (isoOptions?.project_code) form.append('project_code', isoOptions.project_code);
-    if (isoOptions?.originator) form.append('originator', isoOptions.originator);
-    if (isoOptions?.suitability_code) form.append('suitability_code', isoOptions.suitability_code);
-    if (isoOptions?.revision_code) form.append('revision_code', isoOptions.revision_code);
-    if (isoOptions?.parser) form.append('parser', isoOptions.parser);
+    form.append("file", file);
+    form.append("doc_type", docType);
+    if (isoOptions?.project_code) form.append("project_code", isoOptions.project_code);
+    if (isoOptions?.originator) form.append("originator", isoOptions.originator);
+    if (isoOptions?.suitability_code) form.append("suitability_code", isoOptions.suitability_code);
+    if (isoOptions?.revision_code) form.append("revision_code", isoOptions.revision_code);
+    if (isoOptions?.parser) form.append("parser", isoOptions.parser);
     const res = await fetch(`${API_BASE}/documents`, {
-      method: 'POST',
+      method: "POST",
       body: form,
     });
     const created = await handleResponse<DocumentDetail>(res);
@@ -713,7 +755,7 @@ export const documentsApi = {
       doc_type: created.doc_type || docType,
       file_path: created.file_path,
       upload_date: created.upload_date,
-      extracted_text_preview: created.extracted_text?.slice(0, 200) || '',
+      extracted_text_preview: created.extracted_text?.slice(0, 200) || "",
       char_count: created.char_count ?? created.extracted_text?.length ?? 0,
       project_code: created.project_code,
       originator: created.originator,
@@ -727,8 +769,8 @@ export const documentsApi = {
 
   async update(id: number, payload: DocumentUpdatePayload): Promise<DocumentDetail> {
     const res = await fetch(`${API_BASE}/documents/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const updated = await handleResponse<DocumentDetail>(res);
@@ -738,7 +780,7 @@ export const documentsApi = {
       doc_type: updated.doc_type || payload.doc_type,
       file_path: updated.file_path,
       upload_date: updated.upload_date,
-      extracted_text_preview: updated.extracted_text?.slice(0, 200) || '',
+      extracted_text_preview: updated.extracted_text?.slice(0, 200) || "",
       char_count: updated.char_count ?? updated.extracted_text?.length ?? 0,
     });
     _documentDetailStore.set(updated.id, updated);
@@ -747,7 +789,7 @@ export const documentsApi = {
 
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/documents/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     await handleResponse<void>(res);
     _documentsStore.remove(id);
@@ -768,8 +810,8 @@ export const settingsApi = {
 
   async update(settings: Record<string, string>): Promise<any> {
     const res = await fetch(`${API_BASE}/settings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
     });
     return handleResponse<any>(res);
@@ -784,8 +826,8 @@ export const lineageApi = {
 
   async enhance(projectId: number, token?: string): Promise<any> {
     const res = await fetch(`${API_BASE}/projects/${projectId}/enhance`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(token ? { token } : {}),
     });
     return handleResponse<any>(res);
@@ -793,13 +835,16 @@ export const lineageApi = {
 };
 
 export const ruleExtractionApi = {
-  async extract(file?: File, rawText?: string): Promise<{ rules: any[]; warnings: string[]; count: number }> {
+  async extract(
+    file?: File,
+    rawText?: string,
+  ): Promise<{ rules: any[]; warnings: string[]; count: number }> {
     const form = new FormData();
-    if (file) form.append('file', file);
-    if (rawText) form.append('raw_text', rawText);
+    if (file) form.append("file", file);
+    if (rawText) form.append("raw_text", rawText);
 
     const res = await fetch(`${API_BASE}/rules/extract`, {
-      method: 'POST',
+      method: "POST",
       body: form,
     });
     return handleResponse<any>(res);
@@ -807,8 +852,8 @@ export const ruleExtractionApi = {
 
   async bulkCreate(rules: any[]): Promise<any> {
     const res = await fetch(`${API_BASE}/rules/bulk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rules),
     });
     return handleResponse<any>(res);
@@ -816,7 +861,7 @@ export const ruleExtractionApi = {
 
   async seed(): Promise<any> {
     const res = await fetch(`${API_BASE}/rules/seed`, {
-      method: 'POST',
+      method: "POST",
     });
     return handleResponse<any>(res);
   },
@@ -829,8 +874,8 @@ export const ruleExtractionApi = {
 export const revitSyncApi = {
   async sync(payload: any): Promise<any> {
     const res = await fetch(`${API_BASE}/analyze/revit-sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     return handleResponse<any>(res);
@@ -864,8 +909,8 @@ export const githubReposApi = {
 
   async create(payload: GitHubRepoCreatePayload): Promise<GitHubRepo> {
     const res = await fetch(`${API_BASE}/repositories`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const created = await handleResponse<GitHubRepo>(res);
@@ -875,8 +920,8 @@ export const githubReposApi = {
 
   async update(id: number, payload: GitHubRepoUpdatePayload): Promise<GitHubRepo> {
     const res = await fetch(`${API_BASE}/repositories/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const updated = await handleResponse<GitHubRepo>(res);
@@ -886,7 +931,7 @@ export const githubReposApi = {
 
   async delete(id: number): Promise<void> {
     const res = await fetch(`${API_BASE}/repositories/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     await handleResponse<void>(res);
     _cachedReposList = null;
@@ -911,8 +956,8 @@ export const githubReposApi = {
 
   async importProject(repoId: number, payload: ProjectImportPayload): Promise<Project> {
     const res = await fetch(`${API_BASE}/repositories/${repoId}/import`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const created = await handleResponse<Project>(res);
@@ -941,19 +986,19 @@ export const cdeApi = {
     params?: { filter?: string; top?: number; skip?: number; orderby?: string },
   ): Promise<CDEDocumentItem[]> {
     const query = new URLSearchParams();
-    if (params?.filter) query.set('$filter', params.filter);
-    if (params?.top) query.set('$top', String(params.top));
-    if (params?.skip) query.set('$skip', String(params.skip));
-    if (params?.orderby) query.set('$orderby', params.orderby);
-    const qs = query.toString() ? `?${query.toString()}` : '';
+    if (params?.filter) query.set("$filter", params.filter);
+    if (params?.top) query.set("$top", String(params.top));
+    if (params?.skip) query.set("$skip", String(params.skip));
+    if (params?.orderby) query.set("$orderby", params.orderby);
+    const qs = query.toString() ? `?${query.toString()}` : "";
     const res = await fetch(`${API_BASE}/cde/v1/projects/${projectId}/documents${qs}`);
     return handleResponse<CDEDocumentItem[]>(res);
   },
 
   async syncDocuments(payload: CDESyncRequest): Promise<CDESyncResponse> {
     const res = await fetch(`${API_BASE}/cde/v1/projects/${payload.project_id}/documents/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     return handleResponse<CDESyncResponse>(res);
@@ -977,15 +1022,21 @@ export const bcfApi = {
 
   async listTopics(
     projectId: string | number,
-    filters?: { topic_status?: string; topic_type?: string; priority?: string; assigned_to?: string; cde_state?: string },
+    filters?: {
+      topic_status?: string;
+      topic_type?: string;
+      priority?: string;
+      assigned_to?: string;
+      cde_state?: string;
+    },
   ): Promise<BCFTopicResponse[]> {
     const query = new URLSearchParams();
-    if (filters?.topic_status) query.set('topic_status', filters.topic_status);
-    if (filters?.topic_type) query.set('topic_type', filters.topic_type);
-    if (filters?.priority) query.set('priority', filters.priority);
-    if (filters?.assigned_to) query.set('assigned_to', filters.assigned_to);
-    if (filters?.cde_state) query.set('cde_state', filters.cde_state);
-    const qs = query.toString() ? `?${query.toString()}` : '';
+    if (filters?.topic_status) query.set("topic_status", filters.topic_status);
+    if (filters?.topic_type) query.set("topic_type", filters.topic_type);
+    if (filters?.priority) query.set("priority", filters.priority);
+    if (filters?.assigned_to) query.set("assigned_to", filters.assigned_to);
+    if (filters?.cde_state) query.set("cde_state", filters.cde_state);
+    const qs = query.toString() ? `?${query.toString()}` : "";
     const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics${qs}`);
     return handleResponse<BCFTopicResponse[]>(res);
   },
@@ -995,10 +1046,13 @@ export const bcfApi = {
     return handleResponse<BCFTopicResponse>(res);
   },
 
-  async createTopic(projectId: string | number, payload: BCFTopicCreatePayload): Promise<BCFTopicResponse> {
+  async createTopic(
+    projectId: string | number,
+    payload: BCFTopicCreatePayload,
+  ): Promise<BCFTopicResponse> {
     const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     return handleResponse<BCFTopicResponse>(res);
@@ -1010,15 +1064,17 @@ export const bcfApi = {
     payload: BCFTopicUpdatePayload,
   ): Promise<BCFTopicResponse> {
     const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     return handleResponse<BCFTopicResponse>(res);
   },
 
   async listComments(projectId: string | number, topicGuid: string): Promise<BCFCommentResponse[]> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`);
+    const res = await fetch(
+      `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`,
+    );
     return handleResponse<BCFCommentResponse[]>(res);
   },
 
@@ -1027,16 +1083,24 @@ export const bcfApi = {
     topicGuid: string,
     payload: BCFCommentCreatePayload,
   ): Promise<BCFCommentResponse> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
     return handleResponse<BCFCommentResponse>(res);
   },
 
-  async listViewpoints(projectId: string | number, topicGuid: string): Promise<BCFViewpointResponse[]> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`);
+  async listViewpoints(
+    projectId: string | number,
+    topicGuid: string,
+  ): Promise<BCFViewpointResponse[]> {
+    const res = await fetch(
+      `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`,
+    );
     return handleResponse<BCFViewpointResponse[]>(res);
   },
 
@@ -1045,17 +1109,20 @@ export const bcfApi = {
     topicGuid: string,
     payload: BCFViewpointCreatePayload,
   ): Promise<BCFViewpointResponse> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
     return handleResponse<BCFViewpointResponse>(res);
   },
 
   async deleteTopic(projectId: string | number, topicGuid: string): Promise<void> {
     const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     return handleResponse<void>(res);
   },
@@ -1081,8 +1148,8 @@ export const namingConfigApi = {
   /** Write one project's naming setup. Absent fields keep their stored value. */
   async save(projectId: number, payload: NamingConfigPayload): Promise<NamingConfig> {
     const res = await fetch(`${API_BASE}/naming-config/projects/${projectId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     return handleResponse<NamingConfig>(res);
@@ -1091,7 +1158,7 @@ export const namingConfigApi = {
   /** Drop a project's saved setup, returning the defaults it falls back to. */
   async reset(projectId: number): Promise<NamingConfig> {
     const res = await fetch(`${API_BASE}/naming-config/projects/${projectId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     return handleResponse<NamingConfig>(res);
   },
@@ -1107,8 +1174,8 @@ export const namingConfigApi = {
     overrides: Record<string, string> = {},
   ): Promise<NamingPreview> {
     const res = await fetch(`${API_BASE}/naming-config/preview`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ config, overrides }),
     });
     return handleResponse<NamingPreview>(res);

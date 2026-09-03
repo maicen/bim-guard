@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-svelte';
+  import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-svelte";
 
   let {
-    type = 'info',
+    type = "info",
     title = null,
-    message = '',
+    message = "",
     dismissible = false,
     onDismiss = null,
   }: {
-    type?: 'error' | 'warning' | 'success' | 'info';
+    type?: "error" | "warning" | "success" | "info";
     title?: string | null;
     message?: string;
     dismissible?: boolean;
@@ -24,24 +24,24 @@
 
   const CONFIG = {
     error: {
-      bg: 'bg-rose-950/40 border-rose-800/80 text-rose-200',
+      bg: "bg-rose-950/40 border-rose-800/80 text-rose-200",
       icon: AlertCircle,
-      iconColor: 'text-rose-400',
+      iconColor: "text-rose-400",
     },
     warning: {
-      bg: 'bg-amber-950/40 border-amber-800/80 text-amber-200',
+      bg: "bg-amber-950/40 border-amber-800/80 text-amber-200",
       icon: AlertTriangle,
-      iconColor: 'text-amber-400',
+      iconColor: "text-amber-400",
     },
     success: {
-      bg: 'bg-emerald-950/40 border-emerald-800/80 text-emerald-200',
+      bg: "bg-emerald-950/40 border-emerald-800/80 text-emerald-200",
       icon: CheckCircle2,
-      iconColor: 'text-emerald-400',
+      iconColor: "text-emerald-400",
     },
     info: {
-      bg: 'bg-blue-950/40 border-blue-800/80 text-blue-200',
+      bg: "bg-blue-950/40 border-blue-800/80 text-blue-200",
       icon: Info,
-      iconColor: 'text-blue-400',
+      iconColor: "text-blue-400",
     },
   };
 
@@ -52,13 +52,13 @@
 {#if visible && message}
   <div
     role="alert"
-    class="p-4 rounded-2xl border flex items-start justify-between gap-3 text-xs leading-relaxed transition-all {conf.bg}"
+    class="flex items-start justify-between gap-3 rounded-2xl border p-4 text-xs leading-relaxed transition-all {conf.bg}"
   >
-    <div class="flex items-start gap-3 min-w-0">
-      <Icon class="w-4 h-4 shrink-0 mt-0.5 {conf.iconColor}" />
-      <div class="space-y-0.5 min-w-0">
+    <div class="flex min-w-0 items-start gap-3">
+      <Icon class="mt-0.5 h-4 w-4 shrink-0 {conf.iconColor}" />
+      <div class="min-w-0 space-y-0.5">
         {#if title}
-          <div class="font-bold text-slate-50 text-[13px] tracking-tight">
+          <div class="text-[13px] font-bold tracking-tight text-slate-50">
             {title}
           </div>
         {/if}
@@ -72,10 +72,10 @@
       <button
         type="button"
         onclick={handleDismiss}
-        class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-500/10 transition-colors shrink-0"
+        class="shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-500/10 hover:text-slate-50"
         title="Dismiss alert"
       >
-        <X class="w-3.5 h-3.5" />
+        <X class="h-3.5 w-3.5" />
       </button>
     {/if}
   </div>

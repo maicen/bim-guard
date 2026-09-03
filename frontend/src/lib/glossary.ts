@@ -92,13 +92,11 @@ export const SUITABILITY_CODES: Record<string, GlossaryEntry> = {
   },
   D3: {
     label: "Issued for contractor design",
-    description:
-      "Released to a contractor as the basis for their own contractor-designed portion.",
+    description: "Released to a contractor as the basis for their own contractor-designed portion.",
   },
   D4: {
     label: "Issued for manufacture",
-    description:
-      "Released for manufacture or procurement outside the delivery team.",
+    description: "Released for manufacture or procurement outside the delivery team.",
   },
   CR: {
     label: "As-constructed record",
@@ -265,7 +263,10 @@ export const MECHANISMS: Record<string, GlossaryEntry> = {
  * two-letter engine ids (`GC`, `CC`, …) used by the analysis engine selector.
  */
 export function describeMechanism(code: string | null | undefined): GlossaryEntry | null {
-  const key = (code || "").toUpperCase().trim().replace(/^BIMGUARD-/, "");
+  const key = (code || "")
+    .toUpperCase()
+    .trim()
+    .replace(/^BIMGUARD-/, "");
   if (!key) return null;
   if (MECHANISMS[key]) return MECHANISMS[key];
   if (MECHANISMS[`${key}-001`]) return MECHANISMS[`${key}-001`];

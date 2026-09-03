@@ -1,15 +1,20 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { rulesApi } from "../api";
   import type { IdsImportResult } from "../types";
 
-  export let defaultRulesetId = "";
-  export let onCancel: () => void;
-  export let onImported: (result: IdsImportResult) => void;
+  interface Props {
+    defaultRulesetId?: string;
+    onCancel: () => void;
+    onImported: (result: IdsImportResult) => void;
+  }
 
-  let importIdsFile: File | null = null;
-  let importIdsRulesetId = defaultRulesetId;
-  let isImportingIds = false;
-  let importIdsError = "";
+  let { defaultRulesetId = "", onCancel, onImported }: Props = $props();
+
+  let importIdsFile: File | null = $state(null);
+  let importIdsRulesetId = $state(untrack(() => defaultRulesetId));
+  let isImportingIds = $state(false);
+  let importIdsError = $state("");
 
   async function handleImportIds() {
     if (!importIdsFile || !importIdsRulesetId.trim()) {
@@ -31,7 +36,7 @@
 
 <div class="space-y-4">
   {#if importIdsError}
-    <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
       {importIdsError}
     </div>
   {/if}
@@ -44,8 +49,8 @@
       id="import-ids-file"
       type="file"
       accept=".ids,.xml"
-      on:change={(e) => (importIdsFile = (e.target as HTMLInputElement).files?.[0] || null)}
-      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-50 file:text-xs focus:outline-none focus:border-accent"
+      onchange={(e) => (importIdsFile = (e.target as HTMLInputElement).files?.[0] || null)}
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-1 file:text-xs file:text-slate-50 focus:border-accent focus:outline-none"
     />
   </div>
 
@@ -58,26 +63,26 @@
       type="text"
       bind:value={importIdsRulesetId}
       placeholder="e.g. IMPORTED-IDS or an existing folder name"
-      class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent font-mono"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
     />
     <p class="text-caption text-slate-500">
       Imported rules are saved under this folder and flagged for review (needs_review).
     </p>
   </div>
 
-  <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+  <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
     <button
       type="button"
-      on:click={onCancel}
-      class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50"
+      onclick={onCancel}
+      class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 hover:bg-slate-700"
     >
       Cancel
     </button>
     <button
       type="button"
       disabled={isImportingIds || !importIdsFile || !importIdsRulesetId.trim()}
-      on:click={handleImportIds}
-      class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+      onclick={handleImportIds}
+      class="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
     >
       <span>{isImportingIds ? "Importing..." : "Import Rules"}</span>
     </button>

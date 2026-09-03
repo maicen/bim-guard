@@ -3,13 +3,24 @@
   import ThemeToggle from "./ThemeToggle.svelte";
   import type { Project } from "../types";
 
-  export let activeView: string;
-  export let selectedProject: Project | null = null;
-  export let apiOnline: boolean = true;
-  export let dbOk: boolean = true;
-  export let dbBackend: string = "SUPABASE";
-  /** Opens the navigation drawer; only rendered below `md`. */
-  export let onOpenMobileNav: () => void = () => {};
+  interface Props {
+    activeView: string;
+    selectedProject?: Project | null;
+    apiOnline?: boolean;
+    dbOk?: boolean;
+    dbBackend?: string;
+    /** Opens the navigation drawer; only rendered below `md`. */
+    onOpenMobileNav?: () => void;
+  }
+
+  let {
+    activeView,
+    selectedProject = null,
+    apiOnline = true,
+    dbOk = true,
+    dbBackend = "SUPABASE",
+    onOpenMobileNav = () => {},
+  }: Props = $props();
 
   const TITLES: Record<string, { section: string; title: string }> = {
     dashboard: { section: "Platform", title: "Compliance Dashboard" },
@@ -30,33 +41,35 @@
     settings: { section: "System", title: "Application Settings" },
   };
 
-  $: headerInfo = TITLES[activeView] || {
-    section: "BIM Guard",
-    title: activeView,
-  };
+  let headerInfo = $derived(
+    TITLES[activeView] || {
+      section: "BIM Guard",
+      title: activeView,
+    },
+  );
 </script>
 
 <header
-  class="h-16 border-b border-slate-800 bg-slate-950/60 apple-blur sticky top-0 z-30 px-4 md:px-6 flex items-center justify-between gap-2"
+  class="apple-blur sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/60 px-4 md:px-6"
 >
   <!-- Breadcrumb -->
-  <div class="flex items-center gap-2 text-sm min-w-0">
+  <div class="flex min-w-0 items-center gap-2 text-sm">
     <button
       type="button"
-      on:click={onOpenMobileNav}
-      class="-ml-1 p-2 rounded-lg text-slate-400 hover:text-slate-50 hover:bg-slate-900 transition-colors md:hidden"
+      onclick={onOpenMobileNav}
+      class="-ml-1 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-50 md:hidden"
       aria-label="Open navigation"
       aria-controls="app-sidebar"
     >
-      <Menu class="w-5 h-5" />
+      <Menu class="h-5 w-5" />
     </button>
-    <span class="text-slate-500 font-medium hidden sm:inline">{headerInfo.section}</span>
-    <span class="text-slate-600 hidden sm:inline">/</span>
-    <span class="font-semibold text-slate-100 truncate">{headerInfo.title}</span>
+    <span class="hidden font-medium text-slate-500 sm:inline">{headerInfo.section}</span>
+    <span class="hidden text-slate-600 sm:inline">/</span>
+    <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
 
     {#if selectedProject}
       <span
-        class="ml-2 hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20"
+        class="ml-2 hidden items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-400 lg:inline-flex"
       >
         Project: {selectedProject.name}
       </span>
@@ -64,44 +77,42 @@
   </div>
 
   <!-- Actions & Status -->
-  <div class="flex items-center gap-2.5 shrink-0">
+  <div class="flex shrink-0 items-center gap-2.5">
     <!-- Compact combined health dot for narrow viewports -->
     <span
-      class="lg:hidden inline-flex items-center justify-center w-7 h-7 rounded-full border {apiOnline && dbOk
-        ? 'bg-emerald-950/40 border-emerald-800/60'
-        : 'bg-rose-950/40 border-rose-800/60'}"
-      title={`Gateway ${apiOnline ? 'active' : 'offline'} - DB ${dbBackend} ${dbOk ? 'connected' : 'degraded'}`}
+      class="inline-flex h-7 w-7 items-center justify-center rounded-full border lg:hidden {apiOnline &&
+      dbOk
+        ? 'border-emerald-800/60 bg-emerald-950/40'
+        : 'border-rose-800/60 bg-rose-950/40'}"
+      title={`Gateway ${apiOnline ? "active" : "offline"} - DB ${dbBackend} ${dbOk ? "connected" : "degraded"}`}
     >
-      <span
-        class="w-1.5 h-1.5 rounded-full {apiOnline && dbOk ? 'bg-emerald-400' : 'bg-rose-400'}"
+      <span class="h-1.5 w-1.5 rounded-full {apiOnline && dbOk ? 'bg-emerald-400' : 'bg-rose-400'}"
       ></span>
       <span class="sr-only"
-        >Gateway {apiOnline ? "active" : "offline"}, database {dbOk ? "connected" : "degraded"}</span
+        >Gateway {apiOnline ? "active" : "offline"}, database {dbOk
+          ? "connected"
+          : "degraded"}</span
       >
     </span>
 
     <!-- Health status -->
     <span
-      class="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border {apiOnline
-        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
-        : 'bg-rose-950/40 text-rose-400 border-rose-800/60'}"
+      class="hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium lg:inline-flex {apiOnline
+        ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
+        : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
     >
-      <span
-        class="w-1.5 h-1.5 rounded-full {apiOnline
-          ? 'bg-emerald-400'
-          : 'bg-rose-400'}"
-      ></span>
+      <span class="h-1.5 w-1.5 rounded-full {apiOnline ? 'bg-emerald-400' : 'bg-rose-400'}"></span>
       {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
     </span>
 
     <!-- DB Status indicator -->
     <span
-      class="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border {dbOk
-        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
-        : 'bg-rose-950/40 text-rose-400 border-rose-800/60'}"
+      class="hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium lg:inline-flex {dbOk
+        ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
+        : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
     >
       <span
-        class="w-1.5 h-1.5 rounded-full {dbOk
+        class="h-1.5 w-1.5 rounded-full {dbOk
           ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
           : 'bg-rose-400'}"
       ></span>
@@ -112,15 +123,14 @@
       href="/api/docs"
       target="_blank"
       rel="noopener noreferrer"
-      class="text-xs text-slate-400 hover:text-slate-50 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900/60 hidden md:flex items-center gap-1 transition-colors"
+      class="hidden items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:border-slate-700 hover:text-slate-50 md:flex"
       title="Open Swagger OpenAPI Documentation"
     >
       <span>API Docs</span>
-      <ExternalLink class="w-3 h-3" />
+      <ExternalLink class="h-3 w-3" />
     </a>
 
     <!-- Theme Toggle Button -->
     <ThemeToggle />
-
   </div>
 </header>

@@ -28,59 +28,87 @@
     documented accessibility contract.
 -->
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
+  import { onDestroy, tick, untrack } from "svelte";
   import type { ComponentType } from "svelte";
 
   type Side = "top" | "bottom" | "left" | "right";
   type Align = "start" | "center" | "end";
 
-  /** Preferred side of the trigger to render on. Flips when space is tight. */
-  export let side: Side = "top";
-  /** Alignment along the trigger's cross axis. */
-  export let align: Align = "center";
-  /** Gap in px between trigger and card. */
-  export let sideOffset: number = 8;
-  /** Delay before opening on hover (ms). */
-  export let openDelay: number = 180;
-  /** Grace period before closing (ms) — lets the pointer cross the gap. */
-  export let closeDelay: number = 120;
-  /** Tailwind width class for the card. */
-  export let width: string = "w-72";
-  /** Optional card heading. */
-  export let title: string = "";
-  /** Optional secondary line under the heading. */
-  export let subtitle: string = "";
-  /** Optional lucide icon rendered in the heading. */
-  export let icon: ComponentType | null = null;
-  /** Suppress the card entirely (e.g. nothing worth previewing). */
-  export let disabled: boolean = false;
-  /** Render the trigger as a real <button>, so it is keyboard reachable and
-   *  tappable. Turn off when the trigger already wraps its own interactive
-   *  control (a label, a link) — focus inside it still opens the card. */
-  export let focusable: boolean = true;
-  /** Draw the pointer arrow. */
-  export let showArrow: boolean = true;
-  /** Render the footer strip. A `slot="footer"` element must be a direct child
-   *  of this component, so it cannot be wrapped in `{#if}` at the call site —
-   *  callers gate an optional footer with this instead of an empty strip. */
-  export let showFooter: boolean = true;
-  /** Extra classes on the inline trigger wrapper. */
-  export let triggerClass: string = "";
-  /** Extra classes on the card body. */
-  export let contentClass: string = "";
+  interface Props {
+    /** Preferred side of the trigger to render on. Flips when space is tight. */
+    side?: Side;
+    /** Alignment along the trigger's cross axis. */
+    align?: Align;
+    /** Gap in px between trigger and card. */
+    sideOffset?: number;
+    /** Delay before opening on hover (ms). */
+    openDelay?: number;
+    /** Grace period before closing (ms) — lets the pointer cross the gap. */
+    closeDelay?: number;
+    /** Tailwind width class for the card. */
+    width?: string;
+    /** Optional card heading. */
+    title?: string;
+    /** Optional secondary line under the heading. */
+    subtitle?: string;
+    /** Optional lucide icon rendered in the heading. */
+    icon?: ComponentType | null;
+    /** Suppress the card entirely (e.g. nothing worth previewing). */
+    disabled?: boolean;
+    /** Render the trigger as a real <button>, so it is keyboard reachable and
+     *  tappable. Turn off when the trigger already wraps its own interactive
+     *  control (a label, a link) — focus inside it still opens the card. */
+    focusable?: boolean;
+    /** Draw the pointer arrow. */
+    showArrow?: boolean;
+    /** Render the footer strip. A `slot="footer"` element must be a direct child
+     *  of this component, so it cannot be wrapped in `{#if}` at the call site —
+     *  callers gate an optional footer with this instead of an empty strip. */
+    showFooter?: boolean;
+    /** Extra classes on the inline trigger wrapper. */
+    triggerClass?: string;
+    /** Extra classes on the card body. */
+    contentClass?: string;
+    trigger?: import("svelte").Snippet;
+    children?: import("svelte").Snippet;
+    footer?: import("svelte").Snippet;
+  }
 
-  let triggerEl: HTMLElement | null = null;
-  let popupEl: HTMLElement | null = null;
-  let open = false;
-  let placed = false;
-  let resolvedSide: Side = side;
-  let x = 0;
-  let y = 0;
-  let arrowX = 0;
-  let arrowY = 0;
+  let {
+    side = "top",
+    align = "center",
+    sideOffset = 8,
+    openDelay = 180,
+    closeDelay = 120,
+    width = "w-72",
+    title = "",
+    subtitle = "",
+    icon = null,
+    disabled = false,
+    focusable = true,
+    showArrow = true,
+    showFooter = true,
+    triggerClass = "",
+    contentClass = "",
+    trigger,
+    children,
+    footer,
+  }: Props = $props();
+
+  let triggerEl: HTMLElement | null = $state(null);
+  let popupEl: HTMLElement | null = $state(null);
+  let open = $state(false);
+  let placed = $state(false);
+  // `side` is only a preference: this holds the side actually used after the
+  // flip/clamp pass in position(), which re-reads the prop each time it runs.
+  let resolvedSide: Side = $state(untrack(() => side));
+  let x = $state(0);
+  let y = $state(0);
+  let arrowX = $state(0);
+  let arrowY = $state(0);
 
   let openTimer: ReturnType<typeof setTimeout> | null = null;
-  let closeTimer: ReturnType<typeof setTimeout> | null = null;
+  let closeTimer: ReturnType<typeof setTimeout> | null = $state(null);
   let uid = `hovercard-${Math.random().toString(36).slice(2, 9)}`;
 
   const OPPOSITE: Record<Side, Side> = {
@@ -222,32 +250,30 @@
     if (open) place();
   }
 
-  $: arrowStyle =
+  let arrowStyle = $derived(
     resolvedSide === "top"
       ? `left:${arrowX}px;bottom:-4px;`
       : resolvedSide === "bottom"
         ? `left:${arrowX}px;top:-4px;`
         : resolvedSide === "left"
           ? `top:${arrowY}px;right:-4px;`
-          : `top:${arrowY}px;left:-4px;`;
+          : `top:${arrowY}px;left:-4px;`,
+  );
 
-  $: arrowBorders =
+  let arrowBorders = $derived(
     resolvedSide === "top"
       ? "border-r border-b"
       : resolvedSide === "bottom"
         ? "border-l border-t"
         : resolvedSide === "left"
           ? "border-t border-r"
-          : "border-b border-l";
+          : "border-b border-l",
+  );
 
   onDestroy(clearTimers);
 </script>
 
-<svelte:window
-  on:keydown={handleKeydown}
-  on:resize={handleReflow}
-  on:scroll|capture={handleReflow}
-/>
+<svelte:window onkeydown={handleKeydown} onresize={handleReflow} onscrollcapture={handleReflow} />
 
 <!--
   A focusable trigger is a real <button>, not a span carrying tabindex: it is
@@ -263,26 +289,26 @@
     class="inline-flex text-left {triggerClass}"
     aria-describedby={open ? uid : undefined}
     aria-expanded={open}
-    on:mouseenter={scheduleOpen}
-    on:mouseleave={scheduleClose}
-    on:focusin={show}
-    on:focusout={scheduleClose}
-    on:click={toggle}
+    onmouseenter={scheduleOpen}
+    onmouseleave={scheduleClose}
+    onfocusin={show}
+    onfocusout={scheduleClose}
+    onclick={toggle}
   >
-    <slot name="trigger" />
+    {@render trigger?.()}
   </button>
 {:else}
   <span
     bind:this={triggerEl}
     class="inline-flex text-left {triggerClass}"
     aria-describedby={open ? uid : undefined}
-    on:mouseenter={scheduleOpen}
-    on:mouseleave={scheduleClose}
-    on:focusin={show}
-    on:focusout={scheduleClose}
+    onmouseenter={scheduleOpen}
+    onmouseleave={scheduleClose}
+    onfocusin={show}
+    onfocusout={scheduleClose}
     role="presentation"
   >
-    <slot name="trigger" />
+    {@render trigger?.()}
   </span>
 {/if}
 
@@ -294,48 +320,45 @@
     role="tooltip"
     style="position:fixed;left:{x}px;top:{y}px;"
     class="z-[60] {width} max-w-[calc(100vw-1rem)] transition-[opacity,transform] duration-150 ease-out {placed
-      ? 'opacity-100 translate-y-0 scale-100'
-      : 'opacity-0 translate-y-0.5 scale-[0.98]'}"
-    on:mouseenter={() => {
+      ? 'translate-y-0 scale-100 opacity-100'
+      : 'translate-y-0.5 scale-[0.98] opacity-0'}"
+    onmouseenter={() => {
       if (closeTimer) {
         clearTimeout(closeTimer);
         closeTimer = null;
       }
     }}
-    on:mouseleave={scheduleClose}
+    onmouseleave={scheduleClose}
   >
     <div
-      class="relative rounded-xl border border-slate-800 bg-slate-900/95 backdrop-blur-md shadow-2xl shadow-black/40 {contentClass}"
+      class="relative rounded-xl border border-slate-800 bg-slate-900/95 shadow-2xl shadow-black/40 backdrop-blur-md {contentClass}"
     >
       {#if showArrow}
         <span
           aria-hidden="true"
           style={arrowStyle}
-          class="absolute w-2 h-2 rotate-45 bg-slate-900 border-slate-800 {arrowBorders}"
+          class="absolute h-2 w-2 rotate-45 border-slate-800 bg-slate-900 {arrowBorders}"
         ></span>
       {/if}
 
       {#if title || icon || subtitle}
-        <div
-          class="flex items-start gap-2.5 px-3.5 pt-3 pb-2 border-b border-slate-800/80"
-        >
+        <div class="flex items-start gap-2.5 border-b border-slate-800/80 px-3.5 pb-2 pt-3">
           {#if icon}
+            {@const SvelteComponent = icon}
             <div
-              class="w-7 h-7 rounded-lg bg-blue-950/50 border border-blue-800/50 flex items-center justify-center text-accent shrink-0"
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-blue-800/50 bg-blue-950/50 text-accent"
             >
-              <svelte:component this={icon} class="w-3.5 h-3.5" />
+              <SvelteComponent class="h-3.5 w-3.5" />
             </div>
           {/if}
           <div class="min-w-0">
             {#if title}
-              <div
-                class="text-xs font-bold text-slate-100 tracking-tight break-words"
-              >
+              <div class="break-words text-xs font-bold tracking-tight text-slate-100">
                 {title}
               </div>
             {/if}
             {#if subtitle}
-              <div class="text-micro text-slate-400 mt-0.5 break-words">
+              <div class="mt-0.5 break-words text-micro text-slate-400">
                 {subtitle}
               </div>
             {/if}
@@ -344,14 +367,12 @@
       {/if}
 
       <div class="px-3.5 py-2.5 text-caption leading-relaxed text-slate-300">
-        <slot />
+        {@render children?.()}
       </div>
 
-      {#if $$slots.footer && showFooter}
-        <div
-          class="px-3.5 py-2 border-t border-slate-800/80 text-micro text-slate-400"
-        >
-          <slot name="footer" />
+      {#if footer && showFooter}
+        <div class="border-t border-slate-800/80 px-3.5 py-2 text-micro text-slate-400">
+          {@render footer?.()}
         </div>
       {/if}
     </div>

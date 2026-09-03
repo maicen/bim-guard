@@ -24,34 +24,43 @@
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
 
-  export let onSelectProjectForAudit: (projectId: number) => void;
-  export let onSelectProjectForViewer: (projectId: number) => void;
-  export let onOpenWizard: () => void;
-  export let onNavigate: (view: string) => void;
+  interface Props {
+    onSelectProjectForAudit: (projectId: number) => void;
+    onSelectProjectForViewer: (projectId: number) => void;
+    onOpenWizard: () => void;
+    onNavigate: (view: string) => void;
+  }
+
+  let { onSelectProjectForAudit, onSelectProjectForViewer, onOpenWizard, onNavigate }: Props =
+    $props();
 
   const cachedStats = dashboardApi.getCachedStats();
   const cachedProjects = projectsApi.getCachedList();
 
-  let stats: DashboardStats = cachedStats || {
-    total_projects: cachedProjects ? cachedProjects.total : 0,
-    total_documents: 0,
-    total_rules: 0,
-    issues_found: 0,
-    db_ok: true,
-    db_backend: "SUPABASE",
-  };
-  let recentProjects: Project[] = cachedProjects ? (cachedProjects.projects || []).slice(0, 5) : [];
+  let stats: DashboardStats = $state(
+    cachedStats || {
+      total_projects: cachedProjects ? cachedProjects.total : 0,
+      total_documents: 0,
+      total_rules: 0,
+      issues_found: 0,
+      db_ok: true,
+      db_backend: "SUPABASE",
+    },
+  );
+  let recentProjects: Project[] = $state(
+    cachedProjects ? (cachedProjects.projects || []).slice(0, 5) : [],
+  );
   let isLoading = !cachedStats && !cachedProjects;
   let isRefreshing = false;
   let unsubscribeProjects: (() => void) | null = null;
 
   // Modals for CRUD operations on recent projects
-  let isEditModalOpen = false;
-  let isDetailsModalOpen = false;
-  let isDeleteModalOpen = false;
-  let selectedProjectForEdit: Project | null = null;
-  let selectedProjectForDetails: Project | null = null;
-  let projectToDelete: { id: number; name: string } | null = null;
+  let isEditModalOpen = $state(false);
+  let isDetailsModalOpen = $state(false);
+  let isDeleteModalOpen = $state(false);
+  let selectedProjectForEdit: Project | null = $state(null);
+  let selectedProjectForDetails: Project | null = $state(null);
+  let projectToDelete: { id: number; name: string } | null = $state(null);
 
   function openEdit(project: Project) {
     selectedProjectForEdit = project;
@@ -126,151 +135,161 @@
   });
 </script>
 
-<div class="space-y-8 mx-auto">
+<div class="mx-auto space-y-8">
   <!-- Page Header -->
   <PageHeader
     category="Overview"
     title="Compliance Dashboard"
     subtitle="High-level OpenBIM metrics and project compliance readiness."
   >
-    <div slot="actions" class="flex items-center gap-3">
-      <!-- New Project CTA -->
-      <button
-        type="button"
-        on:click={onOpenWizard}
-        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
-      >
-        <Plus class="w-3.5 h-3.5" />
-        <span>New Project</span>
-      </button>
-    </div>
+    {#snippet actions()}
+      <div class="flex items-center gap-3">
+        <!-- New Project CTA -->
+        <button
+          type="button"
+          onclick={onOpenWizard}
+          class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+        >
+          <Plus class="h-3.5 w-3.5" />
+          <span>New Project</span>
+        </button>
+      </div>
+    {/snippet}
   </PageHeader>
 
   {#if !stats.db_ok}
     <div
-      class="p-4 rounded-2xl bg-amber-950/40 border border-amber-800 text-amber-300 text-xs flex items-center gap-2.5"
+      class="flex items-center gap-2.5 rounded-2xl border border-amber-800 bg-amber-950/40 p-4 text-xs text-amber-300"
     >
-      <AlertTriangle class="w-4 h-4 text-amber-400 shrink-0" />
+      <AlertTriangle class="h-4 w-4 shrink-0 text-amber-400" />
       <span
-        >Database connection is degraded. Showing fallback counters until
-        persistence connectivity is restored.</span
+        >Database connection is degraded. Showing fallback counters until persistence connectivity
+        is restored.</span
       >
     </div>
   {/if}
 
   <!-- Bento Stats Grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <!-- Total Projects -->
     <button
       type="button"
-      on:click={() => onNavigate("projects")}
-      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+      onclick={() => onNavigate("projects")}
+      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
+        <span
+          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
           >Total Projects</span
         >
-        <FolderOpen class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+        <FolderOpen class="h-4 w-4 text-blue-400 transition-transform group-hover:scale-110" />
       </div>
-      <div class="text-3xl font-bold text-slate-50 tracking-tight">
+      <div class="text-3xl font-bold tracking-tight text-slate-50">
         {stats.total_projects}
       </div>
-      <div class="text-xs text-slate-400 flex items-center justify-between">
+      <div class="flex items-center justify-between text-xs text-slate-400">
         <span>Active in project registry</span>
-        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-blue-400" />
+        <ArrowRight
+          class="h-3.5 w-3.5 -translate-x-1 text-blue-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+        />
       </div>
     </button>
 
     <!-- Documents -->
     <button
       type="button"
-      on:click={() => onNavigate("documents")}
-      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+      onclick={() => onNavigate("documents")}
+      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
+        <span
+          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
           >Documents</span
         >
-        <BookOpen class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+        <BookOpen class="h-4 w-4 text-emerald-400 transition-transform group-hover:scale-110" />
       </div>
-      <div class="text-3xl font-bold text-slate-50 tracking-tight">
+      <div class="text-3xl font-bold tracking-tight text-slate-50">
         {stats.total_documents}
       </div>
-      <div class="text-xs text-slate-400 flex items-center justify-between">
+      <div class="flex items-center justify-between text-xs text-slate-400">
         <span>Uploaded specifications</span>
-        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-emerald-400" />
+        <ArrowRight
+          class="h-3.5 w-3.5 -translate-x-1 text-emerald-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+        />
       </div>
     </button>
 
     <!-- Rules Defined -->
     <button
       type="button"
-      on:click={() => onNavigate("rules")}
-      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+      onclick={() => onNavigate("rules")}
+      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
+        <span
+          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
           >Rules Library</span
         >
-        <ListChecks class="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+        <ListChecks class="h-4 w-4 text-purple-400 transition-transform group-hover:scale-110" />
       </div>
-      <div class="text-3xl font-bold text-slate-50 tracking-tight">
+      <div class="text-3xl font-bold tracking-tight text-slate-50">
         {stats.total_rules}
       </div>
-      <div class="text-xs text-slate-400 flex items-center justify-between">
+      <div class="flex items-center justify-between text-xs text-slate-400">
         <span>Compliance rules active</span>
-        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-purple-400" />
+        <ArrowRight
+          class="h-3.5 w-3.5 -translate-x-1 text-purple-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+        />
       </div>
     </button>
 
     <!-- Issues Tracked -->
     <button
       type="button"
-      on:click={() => onNavigate("reports")}
-      class="w-full text-left p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/80 transition-all space-y-2 cursor-pointer group hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+      onclick={() => onNavigate("reports")}
+      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
     >
       <div class="flex items-center justify-between text-slate-400">
-        <span class="text-xs font-semibold uppercase tracking-wider group-hover:text-slate-300 transition-colors"
+        <span
+          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
           >Issues Identified</span
         >
-        <AlertTriangle class="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+        <AlertTriangle class="h-4 w-4 text-amber-400 transition-transform group-hover:scale-110" />
       </div>
-      <div class="text-3xl font-bold text-amber-400 tracking-tight">
+      <div class="text-3xl font-bold tracking-tight text-amber-400">
         {stats.issues_found}
       </div>
-      <div class="text-xs text-slate-400 flex items-center justify-between">
+      <div class="flex items-center justify-between text-xs text-slate-400">
         <span>Across current models</span>
-        <ArrowRight class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-amber-400" />
+        <ArrowRight
+          class="h-3.5 w-3.5 -translate-x-1 text-amber-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+        />
       </div>
     </button>
   </div>
 
   <!-- Recent Projects Table -->
-  <div
-    class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4"
-  >
+  <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-base font-bold text-slate-50 tracking-tight">
-          Recent Projects
-        </h2>
+        <h2 class="text-base font-bold tracking-tight text-slate-50">Recent Projects</h2>
         <p class="text-xs text-slate-400">
           Jump directly to 3D visualization or compliance analysis.
         </p>
       </div>
       <button
         type="button"
-        on:click={() => onNavigate("projects")}
-        class="text-xs font-semibold text-accent hover:text-blue-400 flex items-center gap-1"
+        onclick={() => onNavigate("projects")}
+        class="flex items-center gap-1 text-xs font-semibold text-accent hover:text-blue-400"
       >
         <span>View all</span>
-        <ArrowRight class="w-3.5 h-3.5" />
+        <ArrowRight class="h-3.5 w-3.5" />
       </button>
     </div>
 
     {#if recentProjects.length === 0}
       <div
-        class="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl"
+        class="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs text-slate-500"
       >
         No projects found. Click "New Project" to create your first project.
       </div>
@@ -278,102 +297,102 @@
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-300">
           <thead
-            class="border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
+            class="border-b border-slate-800 text-caption font-semibold uppercase tracking-wider text-slate-400"
           >
             <tr>
-              <th class="py-2.5 px-3">Name</th>
-              <th class="py-2.5 px-3">Domain</th>
-              <th class="py-2.5 px-3">Status</th>
-              <th class="py-2.5 px-3">Model</th>
-              <th class="py-2.5 px-3 text-right">Actions</th>
+              <th class="px-3 py-2.5">Name</th>
+              <th class="px-3 py-2.5">Domain</th>
+              <th class="px-3 py-2.5">Status</th>
+              <th class="px-3 py-2.5">Model</th>
+              <th class="px-3 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
             {#each recentProjects as project}
-              <tr class="hover:bg-slate-900/60 transition-colors">
-                <td class="py-3 px-3 font-semibold text-slate-50 truncate max-w-xs"
+              <tr class="transition-colors hover:bg-slate-900/60">
+                <td class="max-w-xs truncate px-3 py-3 font-semibold text-slate-50"
                   >{project.name}</td
                 >
-                <td class="py-3 px-3">
+                <td class="px-3 py-3">
                   <span
-                    class="inline-block px-2 py-0.5 rounded text-micro font-semibold font-mono {project.analysis_type ===
+                    class="inline-block rounded px-2 py-0.5 font-mono text-micro font-semibold {project.analysis_type ===
                     'Piping'
-                      ? 'bg-amber-950/60 border border-amber-800/50 text-amber-300'
+                      ? 'border border-amber-800/50 bg-amber-950/60 text-amber-300'
                       : project.analysis_type === 'Seismic'
-                      ? 'bg-purple-950/60 border border-purple-800/50 text-purple-300'
-                      : 'bg-blue-950/60 border border-blue-800/50 text-blue-300'}"
+                        ? 'border border-purple-800/50 bg-purple-950/60 text-purple-300'
+                        : 'border border-blue-800/50 bg-blue-950/60 text-blue-300'}"
                   >
                     {project.analysis_type}
                   </span>
                 </td>
-                <td class="py-3 px-3">
+                <td class="px-3 py-3">
                   <span
-                    class="px-2 py-0.5 rounded-full text-micro font-semibold {project.status ===
+                    class="rounded-full px-2 py-0.5 text-micro font-semibold {project.status ===
                     'Active'
-                      ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/60'
+                      ? 'border border-emerald-800/60 bg-emerald-950/50 text-emerald-400'
                       : 'bg-slate-800 text-slate-400'}"
                   >
                     {project.status}
                   </span>
                 </td>
-                <td class="py-3 px-3">
+                <td class="px-3 py-3">
                   {#if project.ifc_file_path}
                     <span
-                      class="inline-flex items-center gap-1 text-caption text-emerald-400 font-medium"
+                      class="inline-flex items-center gap-1 text-caption font-medium text-emerald-400"
                     >
-                      <CheckCircle2 class="w-3.5 h-3.5" />
+                      <CheckCircle2 class="h-3.5 w-3.5" />
                       <span>IFC Ready</span>
                     </span>
                   {:else}
                     <span class="text-caption text-slate-500">No Model</span>
                   {/if}
                 </td>
-                <td class="py-3 px-3 text-right">
+                <td class="px-3 py-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
-                      on:click={() => openDetails(project)}
-                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                      onclick={() => openDetails(project)}
+                      class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                       title="View project details"
                     >
-                      <Eye class="w-3.5 h-3.5" />
+                      <Eye class="h-3.5 w-3.5" />
                     </button>
 
                     {#if project.ifc_file_path}
                       <button
                         type="button"
-                        on:click={() => onSelectProjectForViewer(project.id)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                        onclick={() => onSelectProjectForViewer(project.id)}
+                        class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                         title="Open in 3D Viewer"
                       >
-                        <ScanEye class="w-3.5 h-3.5" />
+                        <ScanEye class="h-3.5 w-3.5" />
                       </button>
                     {/if}
 
                     <button
                       type="button"
-                      on:click={() => onSelectProjectForAudit(project.id)}
-                      class="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors"
+                      onclick={() => onSelectProjectForAudit(project.id)}
+                      class="rounded-lg bg-blue-600/20 px-2.5 py-1 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-600/30 hover:text-blue-300"
                     >
                       Audit
                     </button>
 
                     <button
                       type="button"
-                      on:click={() => openEdit(project)}
-                      class="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/30 transition-colors"
+                      onclick={() => openEdit(project)}
+                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400"
                       title="Edit project"
                     >
-                      <Pencil class="w-3.5 h-3.5" />
+                      <Pencil class="h-3.5 w-3.5" />
                     </button>
 
                     <button
                       type="button"
-                      on:click={() => promptDelete(project.id, project.name)}
-                      class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                      onclick={() => promptDelete(project.id, project.name)}
+                      class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                       title="Delete project"
                     >
-                      <Trash2 class="w-3.5 h-3.5" />
+                      <Trash2 class="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </td>
@@ -386,67 +405,60 @@
   </div>
 
   <!-- Workflow Quick Guides -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+  <div class="grid grid-cols-1 gap-4 pt-2 md:grid-cols-3">
     <button
       type="button"
-      on:click={() => onNavigate("extract")}
-      class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 text-left transition-all group"
+      onclick={() => onNavigate("extract")}
+      class="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left transition-all hover:border-slate-700"
     >
       <div
-        class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
+        class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400 transition-transform group-hover:scale-110"
       >
-        <Sparkles class="w-4 h-4" />
+        <Sparkles class="h-4 w-4" />
       </div>
-      <h3
-        class="text-sm font-semibold text-slate-50 group-hover:text-purple-300 transition-colors"
-      >
+      <h3 class="text-sm font-semibold text-slate-50 transition-colors group-hover:text-purple-300">
         Rule Extraction Studio
       </h3>
-      <p class="text-xs text-slate-400 mt-1">
-        Translate building code specifications into executable OpenBIM rules
-        using AI.
+      <p class="mt-1 text-xs text-slate-400">
+        Translate building code specifications into executable OpenBIM rules using AI.
       </p>
     </button>
 
     <button
       type="button"
-      on:click={() => onNavigate("viewer")}
-      class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 text-left transition-all group"
+      onclick={() => onNavigate("viewer")}
+      class="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left transition-all hover:border-slate-700"
     >
       <div
-        class="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
+        class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 transition-transform group-hover:scale-110"
       >
-        <ScanEye class="w-4 h-4" />
+        <ScanEye class="h-4 w-4" />
       </div>
-      <h3
-        class="text-sm font-semibold text-slate-50 group-hover:text-cyan-300 transition-colors"
-      >
+      <h3 class="text-sm font-semibold text-slate-50 transition-colors group-hover:text-cyan-300">
         OpenBIM 3D Viewer
       </h3>
-      <p class="text-xs text-slate-400 mt-1">
-        Inspect spatial geometry, component properties, and BCF viewpoint
-        bookmarks.
+      <p class="mt-1 text-xs text-slate-400">
+        Inspect spatial geometry, component properties, and BCF viewpoint bookmarks.
       </p>
     </button>
 
     <button
       type="button"
-      on:click={() => onNavigate("arch")}
-      class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 text-left transition-all group"
+      onclick={() => onNavigate("arch")}
+      class="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left transition-all hover:border-slate-700"
     >
       <div
-        class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
+        class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 transition-transform group-hover:scale-110"
       >
-        <Cpu class="w-4 h-4" />
+        <Cpu class="h-4 w-4" />
       </div>
       <h3
-        class="text-sm font-semibold text-slate-50 group-hover:text-emerald-300 transition-colors"
+        class="text-sm font-semibold text-slate-50 transition-colors group-hover:text-emerald-300"
       >
         Architectural Audit
       </h3>
-      <p class="text-xs text-slate-400 mt-1">
-        Check Ontario Building Code Part 9 daylight, fire, egress and clearance
-        compliance.
+      <p class="mt-1 text-xs text-slate-400">
+        Check Ontario Building Code Part 9 daylight, fire, egress and clearance compliance.
       </p>
     </button>
   </div>

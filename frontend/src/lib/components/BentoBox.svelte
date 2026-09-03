@@ -1,20 +1,35 @@
 <script lang="ts">
-  import type { ComponentType } from 'svelte';
+  import type { ComponentType } from "svelte";
 
-  export let title: string;
-  export let value: string | number | null = null;
-  export let description: string | null = null;
-  export let dark: boolean = false;
-  export let icon: ComponentType | null = null;
-  export let trend: string | null = null;
-  export let trendUp: boolean | null = null;
-  export let cls: string = '';
+  interface Props {
+    title: string;
+    value?: string | number | null;
+    description?: string | null;
+    dark?: boolean;
+    icon?: ComponentType | null;
+    trend?: string | null;
+    trendUp?: boolean | null;
+    cls?: string;
+    children?: import("svelte").Snippet;
+  }
+
+  let {
+    title,
+    value = null,
+    description = null,
+    dark = false,
+    icon = null,
+    trend = null,
+    trendUp = null,
+    cls = "",
+    children,
+  }: Props = $props();
 </script>
 
 <div
-  class="rounded-[1.75rem] border transition-all duration-300 hover:scale-[1.01] p-6 flex flex-col justify-between {dark
-    ? 'bg-slate-900/90 border-slate-700 text-slate-50 shadow-xl shadow-black/40'
-    : 'bg-slate-900/50 border-slate-800/80 text-slate-100'} {cls}"
+  class="flex flex-col justify-between rounded-[1.75rem] border p-6 transition-all duration-300 hover:scale-[1.01] {dark
+    ? 'border-slate-700 bg-slate-900/90 text-slate-50 shadow-xl shadow-black/40'
+    : 'border-slate-800/80 bg-slate-900/50 text-slate-100'} {cls}"
 >
   <div class="flex items-start justify-between gap-3">
     <div class="space-y-1.5">
@@ -22,22 +37,29 @@
         {title}
       </p>
       {#if value !== null}
-        <h3 class="text-3xl font-extrabold tracking-tight {dark ? 'text-slate-50' : 'text-slate-100'}">
+        <h3
+          class="text-3xl font-extrabold tracking-tight {dark ? 'text-slate-50' : 'text-slate-100'}"
+        >
           {value}
         </h3>
       {/if}
     </div>
 
     {#if icon}
-      <div class="w-10 h-10 rounded-2xl flex items-center justify-center {dark ? 'bg-white/10 text-white' : 'bg-slate-800 text-slate-400'} shrink-0">
-        <svelte:component this={icon} class="w-5 h-5" />
+      {@const SvelteComponent = icon}
+      <div
+        class="flex h-10 w-10 items-center justify-center rounded-2xl {dark
+          ? 'bg-white/10 text-white'
+          : 'bg-slate-800 text-slate-400'} shrink-0"
+      >
+        <SvelteComponent class="h-5 w-5" />
       </div>
     {/if}
   </div>
 
-  {#if $$slots.default}
+  {#if children}
     <div class="mt-4">
-      <slot />
+      {@render children?.()}
     </div>
   {/if}
 
@@ -45,17 +67,17 @@
     <div class="mt-4 flex items-center gap-2 text-xs">
       {#if trend}
         <span
-          class="font-semibold px-2 py-0.5 rounded-full {trendUp === true
-            ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-400'
+          class="rounded-full px-2 py-0.5 font-semibold {trendUp === true
+            ? 'border border-emerald-800 bg-emerald-950/80 text-emerald-400'
             : trendUp === false
-            ? 'bg-rose-950/80 border border-rose-800 text-rose-400'
-            : 'bg-slate-800 text-slate-300'}"
+              ? 'border border-rose-800 bg-rose-950/80 text-rose-400'
+              : 'bg-slate-800 text-slate-300'}"
         >
           {trend}
         </span>
       {/if}
       {#if description}
-        <p class="text-slate-400 truncate">
+        <p class="truncate text-slate-400">
           {description}
         </p>
       {/if}

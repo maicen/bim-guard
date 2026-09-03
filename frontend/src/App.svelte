@@ -1,52 +1,52 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
-  import Sidebar from './lib/components/Sidebar.svelte';
-  import TopHeader from './lib/components/TopHeader.svelte';
-  import ProjectWizardModal from './lib/components/ProjectWizardModal.svelte';
-  import Toaster from './lib/components/Toaster.svelte';
-  import { toasts } from './lib/toast.svelte';
+  import { onMount, tick } from "svelte";
+  import Sidebar from "./lib/components/Sidebar.svelte";
+  import TopHeader from "./lib/components/TopHeader.svelte";
+  import ProjectWizardModal from "./lib/components/ProjectWizardModal.svelte";
+  import Toaster from "./lib/components/Toaster.svelte";
+  import { toasts } from "./lib/toast.svelte";
 
   // Routes
-  import DashboardView from './routes/DashboardView.svelte';
-  import ProjectsView from './routes/ProjectsView.svelte';
-  import ViewerView from './routes/ViewerView.svelte';
-  import DocumentsView from './routes/DocumentsView.svelte';
-  import RuleExtractionView from './routes/RuleExtractionView.svelte';
-  import RulesView from './routes/RulesView.svelte';
-  import ManualRuleEditorView from './routes/ManualRuleEditorView.svelte';
-  import ArchAnalyzeView from './routes/ArchAnalyzeView.svelte';
-  import AnalyzeView from './routes/AnalyzeView.svelte';
-  import WorkflowView from './routes/WorkflowView.svelte';
-  import ReportsView from './routes/ReportsView.svelte';
-  import UserManualView from './routes/UserManualView.svelte';
-  import ModelingManualView from './routes/ModelingManualView.svelte';
-  import RevitSyncView from './routes/RevitSyncView.svelte';
-  import SettingsView from './routes/SettingsView.svelte';
+  import DashboardView from "./routes/DashboardView.svelte";
+  import ProjectsView from "./routes/ProjectsView.svelte";
+  import ViewerView from "./routes/ViewerView.svelte";
+  import DocumentsView from "./routes/DocumentsView.svelte";
+  import RuleExtractionView from "./routes/RuleExtractionView.svelte";
+  import RulesView from "./routes/RulesView.svelte";
+  import ManualRuleEditorView from "./routes/ManualRuleEditorView.svelte";
+  import ArchAnalyzeView from "./routes/ArchAnalyzeView.svelte";
+  import AnalyzeView from "./routes/AnalyzeView.svelte";
+  import WorkflowView from "./routes/WorkflowView.svelte";
+  import ReportsView from "./routes/ReportsView.svelte";
+  import UserManualView from "./routes/UserManualView.svelte";
+  import ModelingManualView from "./routes/ModelingManualView.svelte";
+  import RevitSyncView from "./routes/RevitSyncView.svelte";
+  import SettingsView from "./routes/SettingsView.svelte";
 
-  import { dashboardApi, projectsApi } from './lib/api';
-  import { viewForAnalysisDomain } from './lib/analysisDomain';
-  import { initTheme } from './lib/theme';
-  import type { Project } from './lib/types';
+  import { dashboardApi, projectsApi } from "./lib/api";
+  import { viewForAnalysisDomain } from "./lib/analysisDomain";
+  import { initTheme } from "./lib/theme";
+  import type { Project } from "./lib/types";
 
-  let activeView = 'dashboard';
+  let activeView = $state("dashboard");
   // Navigation drawer state; only meaningful below the md breakpoint.
-  let isMobileNavOpen = false;
-  let targetProjectId: number | null = null;
-  let targetElementGuid: string | null = null;
-  let targetBcfArtifactId: number | null = null;
-  let selectedProject: Project | null = null;
-  let isGlobalWizardOpen = false;
-  let documentsViewRef: DocumentsView;
+  let isMobileNavOpen = $state(false);
+  let targetProjectId: number | null = $state(null);
+  let targetElementGuid: string | null = $state(null);
+  let targetBcfArtifactId: number | null = $state(null);
+  let selectedProject: Project | null = $state(null);
+  let isGlobalWizardOpen = $state(false);
+  let documentsViewRef: DocumentsView = $state();
 
-  let dbOk = true;
-  let dbBackend = 'SUPABASE';
-  let apiOnline = true;
+  let dbOk = $state(true);
+  let dbBackend = $state("SUPABASE");
+  let apiOnline = $state(true);
 
   async function checkHealth() {
     try {
       const stats = await dashboardApi.getStats();
       dbOk = stats.db_ok;
-      dbBackend = stats.db_backend || 'SUPABASE';
+      dbBackend = stats.db_backend || "SUPABASE";
       apiOnline = true;
     } catch {
       // Deliberately quiet: the header's gateway/database chips are this
@@ -61,7 +61,7 @@
       selectedProject = await projectsApi.get(projectId);
     } catch (err) {
       selectedProject = null;
-      toasts.fromError(err, 'Could not load the selected project.');
+      toasts.fromError(err, "Could not load the selected project.");
     }
   }
 
@@ -97,14 +97,14 @@
     // "New Project" is an action, not a destination: it opens the wizard over
     // whatever is on screen. Changing activeView would leave the sidebar
     // highlighting a view that renders nothing once the modal is dismissed.
-    if (view === 'newproject') {
+    if (view === "newproject") {
       isGlobalWizardOpen = true;
       return;
     }
     // "New Rule Document Upload" mirrors that: land on the Documents view,
     // then open its upload modal once it's actually mounted.
-    if (view === 'newdocument') {
-      activeView = 'documents';
+    if (view === "newdocument") {
+      activeView = "documents";
       await tick();
       documentsViewRef?.openUploadModal();
       return;
@@ -115,15 +115,19 @@
   function handleSelectProjectForAudit(projectId: number) {
     targetProjectId = projectId;
     loadProjectDetails(projectId);
-    activeView = 'analyze';
+    activeView = "analyze";
   }
 
-  function handleSelectProjectForViewer(projectId: number, elementGuid?: string, bcfArtifactId?: number) {
+  function handleSelectProjectForViewer(
+    projectId: number,
+    elementGuid?: string,
+    bcfArtifactId?: number,
+  ) {
     targetProjectId = projectId;
     targetElementGuid = elementGuid || null;
     targetBcfArtifactId = bcfArtifactId || null;
     loadProjectDetails(projectId);
-    activeView = 'viewer';
+    activeView = "viewer";
   }
 
   // The wizard closes itself once the project is saved; this puts the new
@@ -140,12 +144,14 @@
 
 <a
   href="#main-content"
-  class="focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-xl focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
+  class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
 >
   Skip to main content
 </a>
 
-<div class="min-h-screen bg-slate-950 text-slate-100 flex font-sans antialiased selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-200">
+<div
+  class="flex min-h-screen bg-slate-950 font-sans text-slate-100 antialiased transition-colors duration-200 selection:bg-blue-500/30 selection:text-blue-200"
+>
   <!-- Apple-Style Sidebar -->
   <Sidebar
     {activeView}
@@ -155,7 +161,7 @@
   />
 
   <!-- Main Content Column -->
-  <div class="flex-1 flex flex-col min-w-0">
+  <div class="flex min-w-0 flex-1 flex-col">
     <!-- Top Header Bar -->
     <TopHeader
       {activeView}
@@ -167,80 +173,80 @@
     />
 
     <!-- Viewport Container -->
-    <main id="main-content" tabindex="-1" class="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto">
+    <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
       <svelte:boundary>
-      {#if activeView === 'dashboard'}
-        <DashboardView
-          onSelectProjectForAudit={handleSelectProjectForAudit}
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-          onOpenWizard={() => (isGlobalWizardOpen = true)}
-          onNavigate={handleSelectView}
-        />
-      {:else if activeView === 'projects'}
-        <ProjectsView
-          onSelectProjectForAudit={handleSelectProjectForAudit}
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
-      {:else if activeView === 'viewer'}
-        <ViewerView
-          initialProjectId={targetProjectId}
-          initialElementGuid={targetElementGuid}
-          initialBcfArtifactId={targetBcfArtifactId}
-        />
-      {:else if activeView === 'documents'}
-        <DocumentsView
-          bind:this={documentsViewRef}
-          onNavigateToManualRuleEditor={() => (activeView = 'manual-rule-editor')}
-        />
-      {:else if activeView === 'extract'}
-        <RuleExtractionView />
-      {:else if activeView === 'rules'}
-        <RulesView />
-      {:else if activeView === 'manual-rule-editor'}
-        <ManualRuleEditorView onBack={() => (activeView = 'rules')} />
-      {:else if activeView === 'arch'}
-        <ArchAnalyzeView initialProjectId={targetProjectId} />
-      {:else if activeView === 'piping'}
-        <!-- Keyed so moving between PIPING and SEISMIC remounts the view:
+        {#if activeView === "dashboard"}
+          <DashboardView
+            onSelectProjectForAudit={handleSelectProjectForAudit}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+            onOpenWizard={() => (isGlobalWizardOpen = true)}
+            onNavigate={handleSelectView}
+          />
+        {:else if activeView === "projects"}
+          <ProjectsView
+            onSelectProjectForAudit={handleSelectProjectForAudit}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
+        {:else if activeView === "viewer"}
+          <ViewerView
+            initialProjectId={targetProjectId}
+            initialElementGuid={targetElementGuid}
+            initialBcfArtifactId={targetBcfArtifactId}
+          />
+        {:else if activeView === "documents"}
+          <DocumentsView
+            bind:this={documentsViewRef}
+            onNavigateToManualRuleEditor={() => (activeView = "manual-rule-editor")}
+          />
+        {:else if activeView === "extract"}
+          <RuleExtractionView />
+        {:else if activeView === "rules"}
+          <RulesView />
+        {:else if activeView === "manual-rule-editor"}
+          <ManualRuleEditorView onBack={() => (activeView = "rules")} />
+        {:else if activeView === "arch"}
+          <ArchAnalyzeView initialProjectId={targetProjectId} />
+        {:else if activeView === "piping"}
+          <!-- Keyed so moving between PIPING and SEISMIC remounts the view:
              both routes share AnalyzeView, and without this the previous
              route's results and filters survive the switch. -->
-        {#key activeView}
+          {#key activeView}
+            <AnalyzeView
+              activeCategory="Piping"
+              initialProjectId={targetProjectId}
+              onSelectProjectForViewer={handleSelectProjectForViewer}
+            />
+          {/key}
+        {:else if activeView === "seismic"}
+          {#key activeView}
+            <AnalyzeView
+              activeCategory="seismic"
+              initialProjectId={targetProjectId}
+              onSelectProjectForViewer={handleSelectProjectForViewer}
+            />
+          {/key}
+        {:else if activeView === "analyze"}
           <AnalyzeView
             activeCategory="Piping"
             initialProjectId={targetProjectId}
             onSelectProjectForViewer={handleSelectProjectForViewer}
           />
-        {/key}
-      {:else if activeView === 'seismic'}
-        {#key activeView}
-          <AnalyzeView
-            activeCategory="seismic"
+        {:else if activeView === "workflow"}
+          <WorkflowView initialProjectId={targetProjectId} />
+        {:else if activeView === "reports"}
+          <ReportsView
             initialProjectId={targetProjectId}
             onSelectProjectForViewer={handleSelectProjectForViewer}
           />
-        {/key}
-      {:else if activeView === 'analyze'}
-        <AnalyzeView
-          activeCategory="Piping"
-          initialProjectId={targetProjectId}
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
-      {:else if activeView === 'workflow'}
-        <WorkflowView initialProjectId={targetProjectId} />
-      {:else if activeView === 'reports'}
-        <ReportsView
-          initialProjectId={targetProjectId}
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
-      {:else if activeView === 'user-manual'}
-        <UserManualView onNavigate={handleSelectView} />
-      {:else if activeView === 'modeling-manual'}
-        <ModelingManualView />
-      {:else if activeView === 'revit-sync'}
-        <RevitSyncView />
-      {:else if activeView === 'settings'}
-        <SettingsView />
-      {/if}
+        {:else if activeView === "user-manual"}
+          <UserManualView onNavigate={handleSelectView} />
+        {:else if activeView === "modeling-manual"}
+          <ModelingManualView />
+        {:else if activeView === "revit-sync"}
+          <RevitSyncView />
+        {:else if activeView === "settings"}
+          <SettingsView />
+        {/if}
         {#snippet failed(error, reset)}
           <div
             role="alert"
@@ -253,7 +259,7 @@
             <button
               type="button"
               onclick={reset}
-              class="bg-accent hover:bg-accent-hover rounded-xl px-4 py-2 text-xs font-semibold text-white"
+              class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent-hover"
             >
               Try again
             </button>
@@ -263,7 +269,9 @@
     </main>
 
     <!-- Clean Footer -->
-    <footer class="border-t border-slate-800/80 py-4 px-8 text-xs text-slate-500 bg-slate-950/40 flex items-center justify-between flex-wrap gap-4">
+    <footer
+      class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800/80 bg-slate-950/40 px-8 py-4 text-xs text-slate-500"
+    >
       <div>
         <span>BIM Guard OpenBIM Compliance Engine</span>
       </div>

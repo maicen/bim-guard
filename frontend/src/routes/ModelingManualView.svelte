@@ -69,45 +69,40 @@
   ];
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header -->
   <div>
-    <div
-      class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
-    >
-      Manuals
-    </div>
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
+    <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Manuals</div>
+    <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">
       3D Modeling Reference Manual
     </h1>
-    <p class="text-xs sm:text-sm text-slate-400">
-      OpenBIM modeling conventions to ensure IFC models pass automated
-      compliance rules.
+    <p class="text-xs text-slate-400 sm:text-sm">
+      OpenBIM modeling conventions to ensure IFC models pass automated compliance rules.
     </p>
   </div>
 
   <!-- Architectural 3D Model Checklist -->
-  <div class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
-    <h2 class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2">
-      <CheckCircle2 class="w-4 h-4 text-accent" />
+  <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
+      <CheckCircle2 class="h-4 w-4 text-accent" />
       <span>Architectural 3D Model Checklist</span>
     </h2>
-    <p class="text-caption text-slate-400 -mt-2">
-      Modeling mistakes that make an element invisible to checking entirely, or fail
-      a rule that has nothing to do with a real code issue &mdash; regardless of
-      whether its properties are filled in correctly. Check these before export.
+    <p class="-mt-2 text-caption text-slate-400">
+      Modeling mistakes that make an element invisible to checking entirely, or fail a rule that has
+      nothing to do with a real code issue &mdash; regardless of whether its properties are filled
+      in correctly. Check these before export.
     </p>
 
     {#each CHECKLISTS as group}
       <div class="space-y-2">
-        <div class="font-semibold text-xs text-slate-50">{group.domain}</div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="text-xs font-semibold text-slate-50">{group.domain}</div>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           {#each group.items as item}
-            <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex gap-3">
-              <CheckCircle2 class="w-4 h-4 text-accent shrink-0 mt-0.5" />
+            <div class="flex gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0 text-accent" />
               <div class="space-y-1">
-                <div class="font-semibold text-xs text-slate-50">{item.title}</div>
-                <p class="text-caption text-slate-400 leading-relaxed">{item.why}</p>
+                <div class="text-xs font-semibold text-slate-50">{item.title}</div>
+                <p class="text-caption leading-relaxed text-slate-400">{item.why}</p>
               </div>
             </div>
           {/each}
@@ -118,23 +113,17 @@
 
   <div class="space-y-6">
     {#each GUIDES as group}
-      <div
-        class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4"
-      >
-        <h2
-          class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2"
-        >
-          <Layers class="w-4 h-4 text-accent" />
+      <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+        <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
+          <Layers class="h-4 w-4 text-accent" />
           <span>{group.domain}</span>
         </h2>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
           {#each group.items as item}
-            <div
-              class="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2"
-            >
-              <div class="font-semibold text-xs text-slate-50">{item.element}</div>
-              <p class="text-caption text-slate-400 leading-relaxed">
+            <div class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <div class="text-xs font-semibold text-slate-50">{item.element}</div>
+              <p class="text-caption leading-relaxed text-slate-400">
                 {item.rules}
               </p>
             </div>

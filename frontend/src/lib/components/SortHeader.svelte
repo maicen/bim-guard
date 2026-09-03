@@ -1,32 +1,51 @@
 <script lang="ts">
   import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-svelte";
 
-  export let column: string;
-  export let sortField: string;
-  export let sortAsc: boolean = true;
-  export let onSort: (col: any) => void;
-  export let align: "left" | "center" | "right" = "left";
-  export let customClass: string = "py-3 px-4";
+  interface Props {
+    column: string;
+    sortField: string;
+    sortAsc?: boolean;
+    onSort: (col: any) => void;
+    align?: "left" | "center" | "right";
+    customClass?: string;
+    children?: import("svelte").Snippet;
+  }
+
+  let {
+    column,
+    sortField,
+    sortAsc = true,
+    onSort,
+    align = "left",
+    customClass = "py-3 px-4",
+    children,
+  }: Props = $props();
 </script>
 
 <th
-  class="{customClass} cursor-pointer hover:text-slate-50 transition-colors select-none group text-caption uppercase tracking-wider text-slate-400 font-semibold"
-  on:click={() => onSort(column)}
+  class="{customClass} group cursor-pointer select-none text-caption font-semibold uppercase tracking-wider text-slate-400 transition-colors hover:text-slate-50"
+  onclick={() => onSort(column)}
   role="columnheader"
   aria-sort={sortField === column ? (sortAsc ? "ascending" : "descending") : "none"}
 >
   <div
-    class="flex items-center gap-1 {align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}"
+    class="flex items-center gap-1 {align === 'center'
+      ? 'justify-center'
+      : align === 'right'
+        ? 'justify-end'
+        : 'justify-start'}"
   >
-    <span><slot /></span>
+    <span>{@render children?.()}</span>
     {#if sortField === column}
       {#if sortAsc}
-        <ArrowUp class="w-3 h-3 text-accent shrink-0" />
+        <ArrowUp class="h-3 w-3 shrink-0 text-accent" />
       {:else}
-        <ArrowDown class="w-3 h-3 text-accent shrink-0" />
+        <ArrowDown class="h-3 w-3 shrink-0 text-accent" />
       {/if}
     {:else}
-      <ArrowUpDown class="w-3 h-3 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" />
+      <ArrowUpDown
+        class="h-3 w-3 shrink-0 text-slate-600 transition-colors group-hover:text-slate-400"
+      />
     {/if}
   </div>
 </th>

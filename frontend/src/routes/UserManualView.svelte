@@ -12,7 +12,11 @@
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
 
-  export let onNavigate: (view: string) => void;
+  interface Props {
+    onNavigate: (view: string) => void;
+  }
+
+  let { onNavigate }: Props = $props();
 
   const STEPS = [
     {
@@ -41,8 +45,7 @@
       icon: BookOpen,
       description:
         "Upload specification PDFs, markdown design criteria, or building code standards to the document library. BIM Guard parses text and prepares chunks for rule extraction.",
-      result:
-        "Result: Specifications appear with extracted text previews and character counts.",
+      result: "Result: Specifications appear with extracted text previews and character counts.",
       actions: [{ label: "Manage Documents", view: "documents", primary: true }],
     },
     {
@@ -61,10 +64,11 @@
       icon: Cpu,
       description:
         "Execute multi-domain checks against the IFC geometry. Run architectural compliance for Ontario Building Code egress, daylight, and fire separations, or MEP checks for galvanic (GC-001), crevice (CC-001), and MIC (MC-001) piping corrosion and seismic clearances.",
-      result:
-        "Result: Non-compliant elements are tagged with risk bands, scores, and mitigations.",
-      actions: [{ label: "Run ARCH Audit", view: "arch", primary: true },
-        { label: "Run MEP & Piping", view: "analyze", primary: false }],
+      result: "Result: Non-compliant elements are tagged with risk bands, scores, and mitigations.",
+      actions: [
+        { label: "Run ARCH Audit", view: "arch", primary: true },
+        { label: "Run MEP & Piping", view: "analyze", primary: false },
+      ],
     },
     {
       step: 6,
@@ -72,14 +76,13 @@
       icon: FileText,
       description:
         "Export findings into BCF 2.1 archives for issue resolution in authoring tools (Revit, ArchiCAD, Navisworks), or download CSV and JSON reports summarizing remediation delays and cost impacts.",
-      result:
-        "Result: Project stakeholders receive industry-standard OpenBIM audit deliverables.",
+      result: "Result: Project stakeholders receive industry-standard OpenBIM audit deliverables.",
       actions: [{ label: "Reports & Exports", view: "reports", primary: true }],
     },
   ];
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header -->
   <PageHeader
     category="Documentation"
@@ -92,31 +95,29 @@
   <div class="space-y-4">
     {#each STEPS as s}
       <div
-        class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4 hover:border-slate-700 transition-all"
+        class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 transition-all hover:border-slate-700"
       >
         <div class="flex items-start gap-4">
           <div
-            class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 border border-blue-500/20"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-sm font-bold text-blue-400"
           >
             {s.step}
           </div>
-          <div class="space-y-1 flex-1">
-            <h2
-              class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2"
-            >
-              <svelte:component this={s.icon} class="w-4 h-4 text-accent" />
+          <div class="flex-1 space-y-1">
+            <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
+              <s.icon class="h-4 w-4 text-accent" />
               <span>{s.title}</span>
             </h2>
-            <p class="text-xs text-slate-300 leading-relaxed">
+            <p class="text-xs leading-relaxed text-slate-300">
               {s.description}
             </p>
           </div>
         </div>
 
         <div
-          class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs flex items-center gap-2 text-emerald-400"
+          class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-emerald-400"
         >
-          <CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
+          <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
           <span>{s.result}</span>
         </div>
 
@@ -124,13 +125,13 @@
           {#each s.actions as act}
             <button
               type="button"
-              on:click={() => onNavigate(act.view)}
-              class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all {act.primary
-                ? 'bg-accent hover:bg-accent-hover text-white shadow-sm'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50'}"
+              onclick={() => onNavigate(act.view)}
+              class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all {act.primary
+                ? 'bg-accent text-white shadow-sm hover:bg-accent-hover'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-slate-50'}"
             >
               <span>{act.label}</span>
-              <ArrowRight class="w-3 h-3" />
+              <ArrowRight class="h-3 w-3" />
             </button>
           {/each}
         </div>

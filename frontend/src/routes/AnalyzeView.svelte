@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { run } from "svelte/legacy";
+
+  import { onMount, untrack } from "svelte";
   import {
     Play,
     Download,
@@ -48,24 +50,31 @@
   import Modal from "../lib/components/Modal.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
 
-  export let initialProjectId: number | null = null;
-  export let activeCategory: "Piping" | "seismic" = "Piping";
-  export let onSelectProjectForViewer: (
-    projectId: number,
-    elementGuid?: string,
-    bcfArtifactId?: number,
-  ) => void;
+  interface Props {
+    initialProjectId?: number | null;
+    activeCategory?: "Piping" | "seismic";
+    onSelectProjectForViewer: (
+      projectId: number,
+      elementGuid?: string,
+      bcfArtifactId?: number,
+    ) => void;
+  }
 
-  let projects: Project[] = [];
-  let selectedProjectId: number | null = initialProjectId;
-  let selectedSlug: "corrosion" | "seismic" = "corrosion";
-  $: selectedSlug = activeCategory === "seismic" ? "seismic" : "corrosion";
-  let isRunning = false;
-  let error = "";
-  let result: AnalysisResult | null = null;
-  let analysisInputs: AnalysisInputItem[] = [];
+  let {
+    initialProjectId = null,
+    activeCategory = "Piping",
+    onSelectProjectForViewer,
+  }: Props = $props();
 
-  let categoryFolders: RuleFolder[] = [];
+  let projects: Project[] = $state([]);
+  let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
+  let selectedSlug: "corrosion" | "seismic" = $state("corrosion");
+  let isRunning = $state(false);
+  let error = $state("");
+  let result: AnalysisResult | null = $state(null);
+  let analysisInputs: AnalysisInputItem[] = $state([]);
+
+  let categoryFolders: RuleFolder[] = $state([]);
   let isFoldersLoading = false;
 
   async function loadCategoryFolders(cat: "Piping" | "seismic") {
@@ -74,20 +83,16 @@
       categoryFolders = await rulesApi.folders(cat);
     } catch (err) {
       categoryFolders = [];
-      toasts.fromError(err, 'Could not load rule folders for this category.');
+      toasts.fromError(err, "Could not load rule folders for this category.");
     } finally {
       isFoldersLoading = false;
     }
   }
 
-  $: {
-    loadCategoryFolders(activeCategory);
-  }
-
   // Options & Filters
-  let searchQuery = "";
-  let severityFilter = "all";
-  let mechanismFilter = "all";
+  let searchQuery = $state("");
+  let severityFilter = $state("all");
+  let mechanismFilter = $state("all");
 
   // Engine selector (PIPING only). SEISMIC runs the single Blue Halo kernel,
   // so a selector there would offer a choice of one.
@@ -98,62 +103,25 @@
     { id: "MM", label: "MM-001", title: "Material-media compatibility" },
     { id: "XM", label: "XM-001", title: "Cross-material compatibility" },
   ] as const;
-  let selectedEngines: string[] = PIPING_ENGINES.map((e) => e.id);
-
-  // Leaving the category resets the selector, so a narrowed PIPING view never
-  // silently hides findings after a route change.
-  $: if (activeCategory) selectedEngines = PIPING_ENGINES.map((e) => e.id);
-
-  // What the backend is asked to run. SEISMIC is a single kernel with nothing
-  // to select between, so it sends no selection at all.
-  $: requestedEngines =
-    activeCategory === "seismic" ? undefined : selectedEngines;
-
-  // A run with no engine selected assesses nothing, so the button is disabled
-  // rather than returning an empty audit that looks like a clean model.
-  $: engineSelectionEmpty =
-    activeCategory !== "seismic" && selectedEngines.length === 0;
+  let selectedEngines: string[] = $state(PIPING_ENGINES.map((e) => e.id));
 
   function toggleEngine(id: string) {
     selectedEngines = selectedEngines.includes(id)
       ? selectedEngines.filter((e) => e !== id)
       : [...selectedEngines, id];
   }
-  let showLowRisk = true;
-  let isUploadModalOpen = false;
-  let uploadFile: File | null = null;
-  let isUploading = false;
-  let uploadSuccessMsg = "";
-  let uploadErrorMsg = "";
+  let showLowRisk = $state(true);
+  let isUploadModalOpen = $state(false);
+  let uploadFile: File | null = $state(null);
+  let isUploading = $state(false);
+  let uploadSuccessMsg = $state("");
+  let uploadErrorMsg = $state("");
   let copiedGuid = "";
 
   // Inspection Drawer/Modal state
-  let inspectedIssue: AuditIssue | null = null;
+  let inspectedIssue: AuditIssue | null = $state(null);
 
-  $: relevantProjects = projects.filter((p) => {
-    if (activeCategory === "seismic") {
-      return (
-        p.analysis_type === "seismic" ||
-        p.analysis_type === "Seismic" ||
-        p.analysis_type === "Halo"
-      );
-    }
-    return (
-      p.analysis_type === "Piping" ||
-      p.analysis_type === "Piping (Corrosive)"
-    );
-  });
-  $: currentProject = relevantProjects.find((p) => p.id === selectedProjectId) || null;
-
-  let prevRelevantKey = "";
-  $: currentRelevantKey = `${activeCategory}_${relevantProjects.map((p) => p.id).join(",")}`;
-  $: if (relevantProjects.length > 0 && currentRelevantKey !== prevRelevantKey) {
-    prevRelevantKey = currentRelevantKey;
-    if (!selectedProjectId || !relevantProjects.some((p) => p.id === selectedProjectId)) {
-      selectedProjectId = relevantProjects[0].id;
-      handleProjectChange();
-    }
-  }
+  let prevRelevantKey = $state("");
 
   onMount(async () => {
     try {
@@ -167,10 +135,7 @@
             p.analysis_type === "Halo"
           );
         }
-        return (
-          p.analysis_type === "Piping" ||
-          p.analysis_type === "Piping (Corrosive)"
-        );
+        return p.analysis_type === "Piping" || p.analysis_type === "Piping (Corrosive)";
       });
       if (!selectedProjectId && relevant.length > 0) {
         selectedProjectId = relevant[0].id;
@@ -189,7 +154,7 @@
       analysisInputs = await projectsApi.getInputs(selectedProjectId);
     } catch (err) {
       analysisInputs = [];
-      toasts.fromError(err, 'Could not load the analysis inputs for this project.');
+      toasts.fromError(err, "Could not load the analysis inputs for this project.");
     }
   }
 
@@ -295,81 +260,12 @@
     }, 2000);
   }
 
-  $: filteredIssues = (result?.audit_issues || []).filter(
-    (issue: AuditIssue) => {
-      // Low risk filter (Note: data_quality issues are doctrine-exempt and ALWAYS shown)
-      if (
-        !showLowRisk &&
-        issue.band === "low" &&
-        issue.mechanism !== "data_quality" &&
-        issue.mechanism !== "Data Quality"
-      ) {
-        return false;
-      }
-
-      const matchesSearch =
-        searchQuery === "" ||
-        issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.rule_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.element_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.mechanism.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (issue.citations || []).some(
-          (c) =>
-            c.standard.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.clause.toLowerCase().includes(searchQuery.toLowerCase()),
-        );
-
-      const matchesSeverity =
-        severityFilter === "all" ||
-        (severityFilter === "data_quality"
-          ? issue.mechanism === "data_quality" ||
-            issue.mechanism === "Data Quality"
-          : issue.band === severityFilter &&
-            issue.mechanism !== "data_quality" &&
-            issue.mechanism !== "Data Quality");
-
-      const matchesMechanism =
-        mechanismFilter === "all" ||
-        (mechanismFilter === "data_quality"
-          ? issue.mechanism === "data_quality" ||
-            issue.mechanism === "Data Quality"
-          : issue.rule_id.startsWith(mechanismFilter) ||
-            issue.mechanism.includes(mechanismFilter));
-
-      // Engine selector, PIPING only. Data-quality findings are doctrine-exempt:
-      // they report what could not be assessed and belong to no single engine.
-      const isDataQuality =
-        issue.mechanism === "data_quality" || issue.mechanism === "Data Quality";
-      const matchesEngine =
-        activeCategory === "seismic" ||
-        isDataQuality ||
-        selectedEngines.some(
-          (id) =>
-            issue.rule_id.startsWith(id) || issue.mechanism.includes(id),
-        );
-
-      return (
-        matchesSearch && matchesSeverity && matchesMechanism && matchesEngine
-      );
-    },
-  );
-
-  // Data-quality findings are doctrine-exempt: they report what could not be
-  // assessed rather than a violation, so they are counted separately from the
-  // severity bands. Older payloads may omit the stat, hence the fallback.
-  $: dataQualityCount =
-    result?.issue_stats?.data_quality ??
-    (result?.audit_issues || []).filter(
-      (issue: AuditIssue) =>
-        issue.mechanism === "data_quality" || issue.mechanism === "Data Quality",
-    ).length;
-
   // Finding table multi-selection, sort, and pagination state
-  let selectedFindingIds: string[] = [];
-  let findingSortField: "band" | "rule_id" | "element_id" | "title" | "score" = "band";
-  let findingSortAsc = false;
-  let findingCurrentPage = 1;
-  let findingPageSize = 10;
+  let selectedFindingIds: string[] = $state([]);
+  let findingSortField: "band" | "rule_id" | "element_id" | "title" | "score" = $state("band");
+  let findingSortAsc = $state(false);
+  let findingCurrentPage = $state(1);
+  let findingPageSize = $state(10);
 
   const SEVERITY_WEIGHTS: Record<string, number> = {
     critical: 4,
@@ -378,33 +274,6 @@
     low: 1,
     data_quality: 0,
   };
-
-  $: sortedFilteredIssues = [...filteredIssues].sort((a, b) => {
-    let valA: any = a[findingSortField];
-    let valB: any = b[findingSortField];
-    if (findingSortField === "band") {
-      valA = SEVERITY_WEIGHTS[(a.band || "").toLowerCase()] ?? 0;
-      valB = SEVERITY_WEIGHTS[(b.band || "").toLowerCase()] ?? 0;
-    } else {
-      if (valA === undefined || valA === null) valA = "";
-      if (valB === undefined || valB === null) valB = "";
-      if (typeof valA === "string") valA = valA.toLowerCase();
-      if (typeof valB === "string") valB = valB.toLowerCase();
-    }
-    if (valA < valB) return findingSortAsc ? -1 : 1;
-    if (valA > valB) return findingSortAsc ? 1 : -1;
-    return 0;
-  });
-
-  $: findingTotalItems = sortedFilteredIssues.length;
-  $: paginatedIssues = sortedFilteredIssues.slice(
-    (findingCurrentPage - 1) * findingPageSize,
-    findingCurrentPage * findingPageSize,
-  );
-
-  $: allFilteredFindingsSelected =
-    sortedFilteredIssues.length > 0 &&
-    sortedFilteredIssues.every((i) => selectedFindingIds.includes(i.id));
 
   function toggleSelectAllFindings() {
     if (allFilteredFindingsSelected) {
@@ -434,7 +303,18 @@
   function exportFindingsToCsv() {
     const toExport = (result?.audit_issues || []).filter((i) => selectedFindingIds.includes(i.id));
     const target = toExport.length ? toExport : sortedFilteredIssues;
-    const headers = ["FindingID", "Severity", "Mechanism", "RuleID", "ElementGUID", "Title", "Description", "Score", "IntrusionDepthMM", "Mitigation"];
+    const headers = [
+      "FindingID",
+      "Severity",
+      "Mechanism",
+      "RuleID",
+      "ElementGUID",
+      "Title",
+      "Description",
+      "Score",
+      "IntrusionDepthMM",
+      "Mitigation",
+    ];
     const rows = target.map((i) => [
       `"${(i.id || "").replace(/"/g, '""')}"`,
       `"${(i.band || "").replace(/"/g, '""')}"`,
@@ -452,21 +332,155 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `compliance_findings_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `compliance_findings_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
+  run(() => {
+    selectedSlug = activeCategory === "seismic" ? "seismic" : "corrosion";
+  });
+  run(() => {
+    loadCategoryFolders(activeCategory);
+  });
+  // Leaving the category resets the selector, so a narrowed PIPING view never
+  // silently hides findings after a route change.
+  run(() => {
+    if (activeCategory) selectedEngines = PIPING_ENGINES.map((e) => e.id);
+  });
+  // What the backend is asked to run. SEISMIC is a single kernel with nothing
+  // to select between, so it sends no selection at all.
+  let requestedEngines = $derived(activeCategory === "seismic" ? undefined : selectedEngines);
+  // A run with no engine selected assesses nothing, so the button is disabled
+  // rather than returning an empty audit that looks like a clean model.
+  let engineSelectionEmpty = $derived(activeCategory !== "seismic" && selectedEngines.length === 0);
+  let relevantProjects = $derived(
+    projects.filter((p) => {
+      if (activeCategory === "seismic") {
+        return (
+          p.analysis_type === "seismic" ||
+          p.analysis_type === "Seismic" ||
+          p.analysis_type === "Halo"
+        );
+      }
+      return p.analysis_type === "Piping" || p.analysis_type === "Piping (Corrosive)";
+    }),
+  );
+  let currentRelevantKey = $derived(
+    `${activeCategory}_${relevantProjects.map((p) => p.id).join(",")}`,
+  );
+  run(() => {
+    if (relevantProjects.length > 0 && currentRelevantKey !== prevRelevantKey) {
+      prevRelevantKey = currentRelevantKey;
+      if (!selectedProjectId || !relevantProjects.some((p) => p.id === selectedProjectId)) {
+        selectedProjectId = relevantProjects[0].id;
+        handleProjectChange();
+      }
+    }
+  });
+  let currentProject = $derived(relevantProjects.find((p) => p.id === selectedProjectId) || null);
+  let filteredIssues = $derived(
+    (result?.audit_issues || []).filter((issue: AuditIssue) => {
+      // Low risk filter (Note: data_quality issues are doctrine-exempt and ALWAYS shown)
+      if (
+        !showLowRisk &&
+        issue.band === "low" &&
+        issue.mechanism !== "data_quality" &&
+        issue.mechanism !== "Data Quality"
+      ) {
+        return false;
+      }
+
+      const matchesSearch =
+        searchQuery === "" ||
+        issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        issue.rule_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        issue.element_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        issue.mechanism.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (issue.citations || []).some(
+          (c) =>
+            c.standard.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.clause.toLowerCase().includes(searchQuery.toLowerCase()),
+        );
+
+      const matchesSeverity =
+        severityFilter === "all" ||
+        (severityFilter === "data_quality"
+          ? issue.mechanism === "data_quality" || issue.mechanism === "Data Quality"
+          : issue.band === severityFilter &&
+            issue.mechanism !== "data_quality" &&
+            issue.mechanism !== "Data Quality");
+
+      const matchesMechanism =
+        mechanismFilter === "all" ||
+        (mechanismFilter === "data_quality"
+          ? issue.mechanism === "data_quality" || issue.mechanism === "Data Quality"
+          : issue.rule_id.startsWith(mechanismFilter) || issue.mechanism.includes(mechanismFilter));
+
+      // Engine selector, PIPING only. Data-quality findings are doctrine-exempt:
+      // they report what could not be assessed and belong to no single engine.
+      const isDataQuality =
+        issue.mechanism === "data_quality" || issue.mechanism === "Data Quality";
+      const matchesEngine =
+        activeCategory === "seismic" ||
+        isDataQuality ||
+        selectedEngines.some((id) => issue.rule_id.startsWith(id) || issue.mechanism.includes(id));
+
+      return matchesSearch && matchesSeverity && matchesMechanism && matchesEngine;
+    }),
+  );
+  // Data-quality findings are doctrine-exempt: they report what could not be
+  // assessed rather than a violation, so they are counted separately from the
+  // severity bands. Older payloads may omit the stat, hence the fallback.
+  let dataQualityCount = $derived(
+    result?.issue_stats?.data_quality ??
+      (result?.audit_issues || []).filter(
+        (issue: AuditIssue) =>
+          issue.mechanism === "data_quality" || issue.mechanism === "Data Quality",
+      ).length,
+  );
+  let sortedFilteredIssues = $derived(
+    [...filteredIssues].sort((a, b) => {
+      let valA: any = a[findingSortField];
+      let valB: any = b[findingSortField];
+      if (findingSortField === "band") {
+        valA = SEVERITY_WEIGHTS[(a.band || "").toLowerCase()] ?? 0;
+        valB = SEVERITY_WEIGHTS[(b.band || "").toLowerCase()] ?? 0;
+      } else {
+        if (valA === undefined || valA === null) valA = "";
+        if (valB === undefined || valB === null) valB = "";
+        if (typeof valA === "string") valA = valA.toLowerCase();
+        if (typeof valB === "string") valB = valB.toLowerCase();
+      }
+      if (valA < valB) return findingSortAsc ? -1 : 1;
+      if (valA > valB) return findingSortAsc ? 1 : -1;
+      return 0;
+    }),
+  );
+  let findingTotalItems = $derived(sortedFilteredIssues.length);
+  let paginatedIssues = $derived(
+    sortedFilteredIssues.slice(
+      (findingCurrentPage - 1) * findingPageSize,
+      findingCurrentPage * findingPageSize,
+    ),
+  );
+  let allFilteredFindingsSelected = $derived(
+    sortedFilteredIssues.length > 0 &&
+      sortedFilteredIssues.every((i) => selectedFindingIds.includes(i.id)),
+  );
 </script>
 
 <div class="space-y-6 pb-12">
   <!-- Top Navigation & Title Bar -->
   <div
-    class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-6"
+    class="flex flex-col justify-between gap-4 border-b border-slate-800/80 pb-6 lg:flex-row lg:items-center"
   >
     <div>
       <div
-        class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-accent mb-1"
+        class="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-accent"
       >
         <span>Analysis Gateway</span>
         <span>•</span>
@@ -477,7 +491,7 @@
         </span>
       </div>
       <h1
-        class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50 flex items-center gap-3 flex-wrap"
+        class="flex flex-wrap items-center gap-3 text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl"
       >
         <span
           >{activeCategory === "seismic"
@@ -485,46 +499,44 @@
             : "Piping System Corrosion Audit"}</span
         >
         <span
-          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono border {activeCategory ===
+          class="inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-xs font-semibold {activeCategory ===
           'seismic'
-            ? 'bg-purple-950/60 text-purple-300 border-purple-800/80 shadow-sm'
-            : 'bg-amber-950/60 text-amber-300 border-amber-800/80 shadow-sm'}"
+            ? 'border-purple-800/80 bg-purple-950/60 text-purple-300 shadow-sm'
+            : 'border-amber-800/80 bg-amber-950/60 text-amber-300 shadow-sm'}"
         >
           Category: {activeCategory}
         </span>
         {#if result?.cached}
           <span
-            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-caption font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/80 shadow-sm"
+            class="inline-flex items-center gap-1 rounded-full border border-blue-800/80 bg-blue-950/80 px-2.5 py-0.5 text-caption font-semibold text-blue-300 shadow-sm"
           >
-            <Sparkles class="w-3 h-3 text-blue-400" />
+            <Sparkles class="h-3 w-3 text-blue-400" />
             Cached SHA-256
           </span>
         {/if}
       </h1>
-      <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
+      <p class="mt-1 max-w-3xl text-xs text-slate-400 sm:text-sm">
         {#if activeCategory === "seismic"}
-          Execute verified Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN
-          4149) buffer volume and bracing audits.
+          Execute verified Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN 4149) buffer volume
+          and bracing audits.
         {:else}
-          Execute verified Galvanic (GC-001), Crevice (CC-001),
-          Microbiological (MC-001), Material-media (MM-001), and
-          Cross-material (XM-001) piping compliance audits.
+          Execute verified Galvanic (GC-001), Crevice (CC-001), Microbiological (MC-001),
+          Material-media (MM-001), and Cross-material (XM-001) piping compliance audits.
         {/if}
       </p>
 
       <!-- Active Rulesets within this category -->
       {#if categoryFolders.length > 0}
-        <div class="flex items-center gap-1.5 flex-wrap mt-3">
-          <span
-            class="text-micro font-bold uppercase tracking-wider text-slate-500"
+        <div class="mt-3 flex flex-wrap items-center gap-1.5">
+          <span class="text-micro font-bold uppercase tracking-wider text-slate-500"
             >Active Rulesets:</span
           >
           {#each categoryFolders as folder}
             <span
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-micro font-mono font-medium border {activeCategory ===
+              class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-micro font-medium {activeCategory ===
               'seismic'
-                ? 'bg-purple-950/40 border-purple-800/50 text-purple-300'
-                : 'bg-amber-950/40 border-amber-800/50 text-amber-300'}"
+                ? 'border-purple-800/50 bg-purple-950/40 text-purple-300'
+                : 'border-amber-800/50 bg-amber-950/40 text-amber-300'}"
               title={folder.description || folder.display_name}
             >
               <span>{folder.display_name}</span>
@@ -541,8 +553,8 @@
       <div class="relative">
         <select
           bind:value={selectedProjectId}
-          on:change={handleProjectChange}
-          class="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs font-medium text-slate-50 focus:outline-none focus:border-accent shadow-sm appearance-none pr-8 cursor-pointer"
+          onchange={handleProjectChange}
+          class="cursor-pointer appearance-none rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 pr-8 text-xs font-medium text-slate-50 shadow-sm focus:border-accent focus:outline-none"
         >
           {#if relevantProjects.length === 0}
             <option value={null}>No {activeCategory} projects found</option>
@@ -553,27 +565,25 @@
           {/if}
         </select>
         <ChevronRight
-          class="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none"
+          class="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rotate-90 text-slate-400"
         />
       </div>
 
       <!-- Run Action Button -->
       <button
         type="button"
-        disabled={isRunning ||
-          !currentProject?.ifc_file_path ||
-          engineSelectionEmpty}
+        disabled={isRunning || !currentProject?.ifc_file_path || engineSelectionEmpty}
         title={engineSelectionEmpty
           ? "Select at least one engine to run"
           : "Run the audit against the selected engines"}
-        on:click={() => handleRun(false)}
-        class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:pointer-events-none"
+        onclick={() => handleRun(false)}
+        class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50"
       >
         {#if isRunning}
-          <RefreshCw class="w-3.5 h-3.5 animate-spin" />
+          <RefreshCw class="h-3.5 w-3.5 animate-spin" />
           <span>Running Engine…</span>
         {:else}
-          <Play class="w-3.5 h-3.5 fill-current" />
+          <Play class="h-3.5 w-3.5 fill-current" />
           <span>Run Audit</span>
         {/if}
       </button>
@@ -581,8 +591,8 @@
       {#if isRunning}
         <button
           type="button"
-          on:click={handleCancelRun}
-          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-slate-50 transition-colors"
+          onclick={handleCancelRun}
+          class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
           title="Abandon the run in progress"
         >
           <span>Cancel</span>
@@ -592,14 +602,11 @@
       <!-- Engine Selector (PIPING only) -->
       {#if activeCategory !== "seismic"}
         <div
-          class="flex items-center gap-2 pl-1 border-l border-slate-800"
+          class="flex items-center gap-2 border-l border-slate-800 pl-1"
           role="group"
           aria-label="Corrosion engines"
         >
-          <span
-            class="text-micro font-bold uppercase tracking-wider text-slate-500"
-            >Engines</span
-          >
+          <span class="text-micro font-bold uppercase tracking-wider text-slate-500">Engines</span>
           {#each PIPING_ENGINES as engine}
             {@const info = describeMechanism(engine.label)}
             <!-- Deciding which engines to run is a real choice, and the
@@ -616,29 +623,32 @@
                 : "Excluded from this run"}
               showFooter={!!info?.reference}
             >
-              <label
-                slot="trigger"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-caption font-mono font-semibold border cursor-pointer select-none transition-colors {selectedEngines.includes(
-                  engine.id,
-                )
-                  ? 'bg-amber-950/60 text-amber-300 border-amber-800/80'
-                  : 'bg-slate-900/60 text-slate-500 border-slate-800 hover:text-slate-300'}"
-              >
-                <input
-                  type="checkbox"
-                  class="sr-only"
-                  checked={selectedEngines.includes(engine.id)}
-                  on:change={() => toggleEngine(engine.id)}
-                />
-                {#if selectedEngines.includes(engine.id)}
-                  <Check class="w-3 h-3" />
-                {/if}
-                <span>{engine.label}</span>
-              </label>
+              {#snippet trigger()}
+                <label
+                  class="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-caption font-semibold transition-colors {selectedEngines.includes(
+                    engine.id,
+                  )
+                    ? 'border-amber-800/80 bg-amber-950/60 text-amber-300'
+                    : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'}"
+                >
+                  <input
+                    type="checkbox"
+                    class="sr-only"
+                    checked={selectedEngines.includes(engine.id)}
+                    onchange={() => toggleEngine(engine.id)}
+                  />
+                  {#if selectedEngines.includes(engine.id)}
+                    <Check class="h-3 w-3" />
+                  {/if}
+                  <span>{engine.label}</span>
+                </label>
+              {/snippet}
 
               {info?.description || engine.title}
 
-              <span slot="footer" class="font-mono">{info?.reference}</span>
+              {#snippet footer()}
+                <span class="font-mono">{info?.reference}</span>
+              {/snippet}
             </HoverCard>
           {/each}
         </div>
@@ -648,14 +658,12 @@
       {#if result}
         <button
           type="button"
-          disabled={isRunning ||
-            !currentProject?.ifc_file_path ||
-            engineSelectionEmpty}
-          on:click={() => handleRun(true)}
+          disabled={isRunning || !currentProject?.ifc_file_path || engineSelectionEmpty}
+          onclick={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
-          class="p-2 rounded-full border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-50 transition-colors"
+          class="rounded-full border border-slate-800 bg-slate-900/80 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
-          <RefreshCw class="w-3.5 h-3.5 {isRunning ? 'animate-spin' : ''}" />
+          <RefreshCw class="h-3.5 w-3.5 {isRunning ? 'animate-spin' : ''}" />
         </button>
       {/if}
     </div>
@@ -663,30 +671,27 @@
 
   <!-- Project Readiness & Lineage Section (Session A / B) -->
   {#if currentProject}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <!-- Project Metadata Card -->
-      <div
-        class="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-3"
-      >
+      <div class="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
         <div class="flex items-center justify-between">
-          <span
-            class="text-xs uppercase font-bold tracking-wider text-slate-400"
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
             >Target Project</span
           >
           <span
-            class="px-2 py-0.5 rounded text-micro font-semibold uppercase {currentProject.status ===
+            class="rounded px-2 py-0.5 text-micro font-semibold uppercase {currentProject.status ===
             'Active'
-              ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
+              ? 'border border-emerald-800/60 bg-emerald-950/60 text-emerald-400'
               : 'bg-slate-800 text-slate-400'}"
           >
             {currentProject.status}
           </span>
         </div>
         <div>
-          <div class="text-sm font-bold text-slate-50 truncate">
+          <div class="truncate text-sm font-bold text-slate-50">
             {currentProject.name}
           </div>
-          <div class="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+          <div class="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
             <span>Jurisdiction: <strong>{currentProject.country}</strong></span>
             <span>•</span>
             <span>Type: <strong>{currentProject.analysis_type}</strong></span>
@@ -695,47 +700,42 @@
       </div>
 
       <!-- IFC Model Card & Lineage -->
-      <div
-        class="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-3"
-      >
+      <div class="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
         <div class="flex items-center justify-between">
-          <span
-            class="text-xs uppercase font-bold tracking-wider text-slate-400"
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
             >IFC Model Lineage</span
           >
           {#if currentProject.ifc_file_path}
             <span
-              class="px-2 py-0.5 rounded text-micro font-semibold uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800/60"
+              class="rounded border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold uppercase text-emerald-400"
             >
               Model Ready
             </span>
           {:else}
             <span
-              class="px-2 py-0.5 rounded text-micro font-semibold uppercase bg-amber-950/60 text-amber-400 border border-amber-800/60"
+              class="rounded border border-amber-800/60 bg-amber-950/60 px-2 py-0.5 text-micro font-semibold uppercase text-amber-400"
             >
               No Model Attached
             </span>
           {/if}
         </div>
         {#if currentProject.ifc_file_path}
-          <div class="text-xs space-y-1">
+          <div class="space-y-1 text-xs">
             <div
-              class="text-slate-300 font-mono text-caption truncate"
+              class="truncate font-mono text-caption text-slate-300"
               title={currentProject.ifc_file_path}
             >
               {currentProject.ifc_file_path.split("/").pop()}
             </div>
             {#if currentProject.ifc_md5_hash}
-              <div
-                class="text-slate-500 font-mono text-micro flex items-center gap-1.5"
-              >
+              <div class="flex items-center gap-1.5 font-mono text-micro text-slate-500">
                 <span>Digest: {currentProject.ifc_md5_hash.slice(0, 16)}…</span>
                 <button
                   type="button"
-                  on:click={() => copyText(currentProject?.ifc_md5_hash || "")}
+                  onclick={() => copyText(currentProject?.ifc_md5_hash || "")}
                   class="hover:text-slate-300"
                 >
-                  <Copy class="w-3 h-3" />
+                  <Copy class="h-3 w-3" />
                 </button>
               </div>
             {/if}
@@ -743,74 +743,73 @@
           <div class="flex items-center gap-2 pt-1">
             <button
               type="button"
-              on:click={() => onSelectProjectForViewer(currentProject.id)}
-              class="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-blue-400 transition-colors"
+              onclick={() => onSelectProjectForViewer(currentProject.id)}
+              class="inline-flex items-center gap-1 text-xs font-semibold text-accent transition-colors hover:text-blue-400"
             >
-              <ScanEye class="w-3.5 h-3.5" />
+              <ScanEye class="h-3.5 w-3.5" />
               <span>Open 3D Viewer</span>
             </button>
             <span class="text-slate-700">•</span>
             <button
               type="button"
-              on:click={() => (isUploadModalOpen = true)}
-              class="text-xs text-slate-400 hover:text-slate-50 transition-colors"
+              onclick={() => (isUploadModalOpen = true)}
+              class="text-xs text-slate-400 transition-colors hover:text-slate-50"
             >
               Replace Model
             </button>
           </div>
         {:else}
-          <div class="text-xs text-amber-300/80">
-            Attach an IFC model to run compliance checks.
-          </div>
+          <div class="text-xs text-amber-300/80">Attach an IFC model to run compliance checks.</div>
           <button
             type="button"
-            on:click={() => (isUploadModalOpen = true)}
+            onclick={() => (isUploadModalOpen = true)}
             class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300"
           >
-            <Upload class="w-3.5 h-3.5" />
+            <Upload class="h-3.5 w-3.5" />
             <span>Upload IFC Model</span>
           </button>
         {/if}
       </div>
 
       <!-- Analysis Inputs (Standards & Client Docs) -->
-      <div
-        class="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-3"
-      >
+      <div class="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
         <div class="flex items-center justify-between">
-          <span
-            class="text-xs uppercase font-bold tracking-wider text-slate-400"
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
             >Linked Standards &amp; Inputs</span
           >
-          <span class="text-xs font-mono font-bold text-slate-300"
+          <span class="font-mono text-xs font-bold text-slate-300"
             >{analysisInputs.length} linked</span
           >
         </div>
         {#if analysisInputs.length > 0}
-          <div class="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto pr-1">
+          <div class="flex max-h-16 flex-wrap gap-1.5 overflow-y-auto pr-1">
             {#each analysisInputs as inp}
               <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-micro font-medium {inp.kind ===
+                class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-micro font-medium {inp.kind ===
                 'standard'
-                  ? 'bg-indigo-950/60 text-indigo-300 border border-indigo-800/60'
-                  : 'bg-teal-950/60 text-teal-300 border border-teal-800/60'}"
+                  ? 'border border-indigo-800/60 bg-indigo-950/60 text-indigo-300'
+                  : 'border border-teal-800/60 bg-teal-950/60 text-teal-300'}"
               >
                 {inp.label}
               </span>
             {/each}
           </div>
         {:else}
-          <div class="text-xs text-slate-500">
-            Default regulatory rulepacks will be evaluated.
-          </div>
+          <div class="text-xs text-slate-500">Default regulatory rulepacks will be evaluated.</div>
         {/if}
-        <div class="pt-1 flex items-center gap-1.5 text-micro text-slate-400 border-t border-slate-800/60">
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/60 font-semibold">
-            <ShieldCheck class="w-3 h-3 text-blue-400" />
+        <div
+          class="flex items-center gap-1.5 border-t border-slate-800/60 pt-1 text-micro text-slate-400"
+        >
+          <span
+            class="inline-flex items-center gap-1 rounded border border-blue-800/60 bg-blue-950/60 px-1.5 py-0.5 font-semibold text-blue-300"
+          >
+            <ShieldCheck class="h-3 w-3 text-blue-400" />
             bSDD Verified
           </span>
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/60 font-semibold">
-            <CheckCircle2 class="w-3 h-3 text-amber-400" />
+          <span
+            class="inline-flex items-center gap-1 rounded border border-amber-800/60 bg-amber-950/60 px-1.5 py-0.5 font-semibold text-amber-300"
+          >
+            <CheckCircle2 class="h-3 w-3 text-amber-400" />
             IDS 1.0 Compliant
           </span>
         </div>
@@ -821,9 +820,9 @@
   <!-- Error Alerts -->
   {#if error}
     <div
-      class="p-4 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-3"
+      class="flex items-center gap-3 rounded-2xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300"
     >
-      <ShieldAlert class="w-5 h-5 text-rose-400 shrink-0" />
+      <ShieldAlert class="h-5 w-5 shrink-0 text-rose-400" />
       <div>
         <strong class="font-bold">Execution Error:</strong>
         {error}
@@ -841,573 +840,524 @@
        nothing. -->
   {#if result}
     <div
-      class="{isRunning ? 'opacity-40 pointer-events-none' : ''} transition-opacity duration-200"
+      class="{isRunning ? 'pointer-events-none opacity-40' : ''} transition-opacity duration-200"
     >
-    <!-- Demo Mode Notice -->
-    {#if result.compliance_is_demo}
-      <div
-        class="p-4 rounded-2xl bg-amber-950/40 border border-amber-800/70 text-amber-300 text-xs flex items-center gap-2.5"
-      >
-        <AlertTriangle class="w-4 h-4 text-amber-400 shrink-0" />
-        <span
-          ><strong>Demo Compliance Mode:</strong> Results are generated from demonstration
-          test cases.</span
+      <!-- Demo Mode Notice -->
+      {#if result.compliance_is_demo}
+        <div
+          class="flex items-center gap-2.5 rounded-2xl border border-amber-800/70 bg-amber-950/40 p-4 text-xs text-amber-300"
         >
-      </div>
-    {/if}
-
-    <!-- Data Quality Doctrine Notice -->
-    {#if dataQualityCount > 0}
-      <div
-        class="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/70 text-blue-200 text-xs flex items-start gap-3 shadow-sm"
-      >
-        <Info class="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-        <div>
-          <strong class="font-bold text-slate-50"
-            >White Box Data-Quality Doctrine:</strong
+          <AlertTriangle class="h-4 w-4 shrink-0 text-amber-400" />
+          <span
+            ><strong>Demo Compliance Mode:</strong> Results are generated from demonstration test cases.</span
           >
-          <span>
-            {dataQualityCount} unassessed service elements are explicitly reported
-            below as <strong>Data Quality</strong> findings (assigned to the BIM
-            Coordinator) rather than fabricating a false compliance pass.
+        </div>
+      {/if}
+
+      <!-- Data Quality Doctrine Notice -->
+      {#if dataQualityCount > 0}
+        <div
+          class="flex items-start gap-3 rounded-2xl border border-blue-800/70 bg-blue-950/40 p-4 text-xs text-blue-200 shadow-sm"
+        >
+          <Info class="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+          <div>
+            <strong class="font-bold text-slate-50">White Box Data-Quality Doctrine:</strong>
+            <span>
+              {dataQualityCount} unassessed service elements are explicitly reported below as
+              <strong>Data Quality</strong> findings (assigned to the BIM Coordinator) rather than fabricating
+              a false compliance pass.
+            </span>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Executive KPI Statistics Grid -->
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm">
+          <div class="text-caption font-semibold uppercase tracking-wider text-slate-400">
+            Total Findings
+          </div>
+          <div class="mt-1 text-2xl font-bold text-slate-50">
+            {result.issue_stats.total}
+          </div>
+          <div class="mt-0.5 text-micro text-slate-500">Non-compliant items</div>
+        </div>
+        <div class="rounded-2xl border border-red-900/40 bg-red-950/30 p-4 shadow-sm">
+          <div class="text-caption font-semibold uppercase tracking-wider text-red-300">
+            Critical
+          </div>
+          <div class="mt-1 text-2xl font-bold text-red-400">
+            {result.issue_stats.critical}
+          </div>
+          <div class="mt-0.5 text-micro text-red-400/60">Immediate intervention</div>
+        </div>
+        <div class="rounded-2xl border border-orange-900/40 bg-orange-950/30 p-4 shadow-sm">
+          <div class="text-caption font-semibold uppercase tracking-wider text-orange-300">
+            High Risk
+          </div>
+          <div class="mt-1 text-2xl font-bold text-orange-400">
+            {result.issue_stats.high}
+          </div>
+          <div class="mt-0.5 text-micro text-orange-400/60">Mandatory remediation</div>
+        </div>
+        <div class="rounded-2xl border border-yellow-900/40 bg-yellow-950/30 p-4 shadow-sm">
+          <div class="text-caption font-semibold uppercase tracking-wider text-yellow-300">
+            Medium Risk
+          </div>
+          <div class="mt-1 text-2xl font-bold text-yellow-400">
+            {result.issue_stats.medium}
+          </div>
+          <div class="mt-0.5 text-micro text-yellow-400/60">Recommended mitigation</div>
+        </div>
+        <div class="rounded-2xl border border-emerald-900/40 bg-emerald-950/30 p-4 shadow-sm">
+          <div class="text-caption font-semibold uppercase tracking-wider text-emerald-300">
+            Low Risk
+          </div>
+          <div class="mt-1 text-2xl font-bold text-emerald-400">
+            {result.issue_stats.low}
+          </div>
+          <div class="mt-0.5 text-micro text-emerald-400/60">Minor tolerance variance</div>
+        </div>
+        <div class="rounded-2xl border border-indigo-900/40 bg-indigo-950/30 p-4 shadow-sm">
+          <div class="text-caption font-semibold uppercase tracking-wider text-indigo-300">
+            Data Quality
+          </div>
+          <div class="mt-1 text-2xl font-bold text-indigo-300">
+            {dataQualityCount}
+          </div>
+          <div class="mt-0.5 text-micro text-indigo-300/60">Unassessed mechanisms</div>
+        </div>
+      </div>
+
+      <!-- Findings Table & Export Controls -->
+      <div class="space-y-5 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+        <!-- Toolbar Header -->
+        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
+              <span>Audit Findings</span>
+              <span class="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
+                {filteredIssues.length} of {result.audit_issues.length}
+              </span>
+            </h2>
+            <p class="mt-0.5 text-xs text-slate-400">
+              Component compliance verdicts, authoritative citations, and actionable engineering
+              mitigations.
+            </p>
+          </div>
+
+          <!-- Multi-Format Export Actions (Session E) -->
+          <div class="flex items-center gap-2">
+            {#if selectedProjectId}
+              <a
+                href={analyzeApi.getExportUrl(
+                  selectedProjectId,
+                  selectedSlug,
+                  "bcf",
+                  requestedEngines,
+                )}
+                class="inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
+                title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
+              >
+                <Download class="h-3.5 w-3.5" />
+                <span>Export BCF 2.1</span>
+              </a>
+              <a
+                href={analyzeApi.getExportUrl(
+                  selectedProjectId,
+                  selectedSlug,
+                  "csv",
+                  requestedEngines,
+                )}
+                class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                title="Download tabulated audit spreadsheet with lineage and citations"
+              >
+                <Download class="h-3.5 w-3.5" />
+                <span>CSV</span>
+              </a>
+              <a
+                href={analyzeApi.getExportUrl(
+                  selectedProjectId,
+                  selectedSlug,
+                  "json",
+                  requestedEngines,
+                )}
+                class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                title="Download structured machine-readable JSON analysis report"
+              >
+                <Download class="h-3.5 w-3.5" />
+                <span>JSON</span>
+              </a>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Filters & Search Bar -->
+        <div class="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-12">
+          <!-- Search Input -->
+          <div class="relative sm:col-span-6">
+            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              bind:value={searchQuery}
+              placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            />
+          </div>
+
+          <!-- Severity Filter -->
+          <div class="sm:col-span-3">
+            <select
+              bind:value={severityFilter}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            >
+              <option value="all">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="data_quality">Data Quality Only</option>
+            </select>
+          </div>
+
+          <!-- Mechanism Filter -->
+          <div class="sm:col-span-3">
+            <select
+              bind:value={mechanismFilter}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            >
+              <option value="all">All Mechanisms</option>
+              {#if selectedSlug === "corrosion"}
+                <option value="GC">GC-001 Galvanic</option>
+                <option value="CC">CC-001 Crevice</option>
+                <option value="MC">MC-001 Microbiological</option>
+                <option value="MM">MM-001 Material-media</option>
+                <option value="XM">XM-001 Cross-material</option>
+              {:else}
+                <option value="SB">SB-001 Seismic Halo</option>
+              {/if}
+              <option value="data_quality">Data Quality</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Low Risk Visibility Toggle -->
+        <div class="flex items-center justify-between px-1 text-xs text-slate-400">
+          <label class="flex cursor-pointer select-none items-center gap-2">
+            <input
+              type="checkbox"
+              bind:checked={showLowRisk}
+              class="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 text-accent focus:ring-0"
+            />
+            <span>Include Low Severity verdicts in list</span>
+          </label>
+          <span class="text-caption text-slate-500">
+            Showing {filteredIssues.length} items
           </span>
         </div>
-      </div>
-    {/if}
 
-    <!-- Executive KPI Statistics Grid -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <div
-        class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-sm"
-      >
-        <div
-          class="text-caption text-slate-400 font-semibold uppercase tracking-wider"
-        >
-          Total Findings
-        </div>
-        <div class="text-2xl font-bold text-slate-50 mt-1">
-          {result.issue_stats.total}
-        </div>
-        <div class="text-micro text-slate-500 mt-0.5">Non-compliant items</div>
-      </div>
-      <div
-        class="p-4 rounded-2xl bg-red-950/30 border border-red-900/40 shadow-sm"
-      >
-        <div
-          class="text-caption text-red-300 font-semibold uppercase tracking-wider"
-        >
-          Critical
-        </div>
-        <div class="text-2xl font-bold text-red-400 mt-1">
-          {result.issue_stats.critical}
-        </div>
-        <div class="text-micro text-red-400/60 mt-0.5">
-          Immediate intervention
-        </div>
-      </div>
-      <div
-        class="p-4 rounded-2xl bg-orange-950/30 border border-orange-900/40 shadow-sm"
-      >
-        <div
-          class="text-caption text-orange-300 font-semibold uppercase tracking-wider"
-        >
-          High Risk
-        </div>
-        <div class="text-2xl font-bold text-orange-400 mt-1">
-          {result.issue_stats.high}
-        </div>
-        <div class="text-micro text-orange-400/60 mt-0.5">
-          Mandatory remediation
-        </div>
-      </div>
-      <div
-        class="p-4 rounded-2xl bg-yellow-950/30 border border-yellow-900/40 shadow-sm"
-      >
-        <div
-          class="text-caption text-yellow-300 font-semibold uppercase tracking-wider"
-        >
-          Medium Risk
-        </div>
-        <div class="text-2xl font-bold text-yellow-400 mt-1">
-          {result.issue_stats.medium}
-        </div>
-        <div class="text-micro text-yellow-400/60 mt-0.5">
-          Recommended mitigation
-        </div>
-      </div>
-      <div
-        class="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-900/40 shadow-sm"
-      >
-        <div
-          class="text-caption text-emerald-300 font-semibold uppercase tracking-wider"
-        >
-          Low Risk
-        </div>
-        <div class="text-2xl font-bold text-emerald-400 mt-1">
-          {result.issue_stats.low}
-        </div>
-        <div class="text-micro text-emerald-400/60 mt-0.5">
-          Minor tolerance variance
-        </div>
-      </div>
-      <div
-        class="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-900/40 shadow-sm"
-      >
-        <div
-          class="text-caption text-indigo-300 font-semibold uppercase tracking-wider"
-        >
-          Data Quality
-        </div>
-        <div class="text-2xl font-bold text-indigo-300 mt-1">
-          {dataQualityCount}
-        </div>
-        <div class="text-micro text-indigo-300/60 mt-0.5">
-          Unassessed mechanisms
-        </div>
-      </div>
-    </div>
+        <!-- Bulk Actions Bar -->
+        <BulkActionBar
+          selectedCount={selectedFindingIds.length}
+          itemLabel="finding"
+          onClearSelection={() => (selectedFindingIds = [])}
+          onBulkExport={exportFindingsToCsv}
+          onBulkDelete={null}
+          onBulkEdit={null}
+        />
 
-    <!-- Findings Table & Export Controls -->
-    <div
-      class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-5"
-    >
-      <!-- Toolbar Header -->
-      <div
-        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-      >
-        <div>
-          <h2
-            class="text-base font-bold text-slate-50 tracking-tight flex items-center gap-2"
-          >
-            <span>Audit Findings</span>
-            <span
-              class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono"
-            >
-              {filteredIssues.length} of {result.audit_issues.length}
-            </span>
-          </h2>
-          <p class="text-xs text-slate-400 mt-0.5">
-            Component compliance verdicts, authoritative citations, and
-            actionable engineering mitigations.
-          </p>
-        </div>
+        <!-- Tabular Findings Table -->
+        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
+          {#if sortedFilteredIssues.length === 0}
+            <div class="p-12 text-center text-xs text-slate-500">
+              No compliance issues match your selected filters.
+            </div>
+          {:else}
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-300">
+                <thead
+                  class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                >
+                  <tr>
+                    <th class="w-10 px-4 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={allFilteredFindingsSelected}
+                        onchange={toggleSelectAllFindings}
+                        class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
+                        title="Select all findings"
+                      />
+                    </th>
+                    <th
+                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
+                      onclick={() => toggleFindingSort("band")}
+                    >
+                      <div class="flex items-center gap-1">
+                        <span>Severity</span>
+                        {#if findingSortField === "band"}
+                          {#if findingSortAsc}<ArrowUp
+                              class="h-3 w-3 text-accent"
+                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
+                        {:else}
+                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
+                        {/if}
+                      </div>
+                    </th>
+                    <th
+                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
+                      onclick={() => toggleFindingSort("rule_id")}
+                    >
+                      <div class="flex items-center gap-1">
+                        <span>Rule &amp; Mechanism</span>
+                        {#if findingSortField === "rule_id"}
+                          {#if findingSortAsc}<ArrowUp
+                              class="h-3 w-3 text-accent"
+                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
+                        {:else}
+                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
+                        {/if}
+                      </div>
+                    </th>
+                    <th
+                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
+                      onclick={() => toggleFindingSort("element_id")}
+                    >
+                      <div class="flex items-center gap-1">
+                        <span>Element GUID</span>
+                        {#if findingSortField === "element_id"}
+                          {#if findingSortAsc}<ArrowUp
+                              class="h-3 w-3 text-accent"
+                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
+                        {:else}
+                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
+                        {/if}
+                      </div>
+                    </th>
+                    <th
+                      class="cursor-pointer select-none px-4 py-3.5 transition-colors hover:text-slate-50"
+                      onclick={() => toggleFindingSort("title")}
+                    >
+                      <div class="flex items-center gap-1">
+                        <span>Finding &amp; Citations</span>
+                        {#if findingSortField === "title"}
+                          {#if findingSortAsc}<ArrowUp
+                              class="h-3 w-3 text-accent"
+                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
+                        {:else}
+                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
+                        {/if}
+                      </div>
+                    </th>
+                    <th
+                      class="cursor-pointer select-none px-4 py-3.5 text-center transition-colors hover:text-slate-50"
+                      onclick={() => toggleFindingSort("score")}
+                    >
+                      <div class="flex items-center justify-center gap-1">
+                        <span>Score / Clearance</span>
+                        {#if findingSortField === "score"}
+                          {#if findingSortAsc}<ArrowUp
+                              class="h-3 w-3 text-accent"
+                            />{:else}<ArrowDown class="h-3 w-3 text-accent" />{/if}
+                        {:else}
+                          <ArrowUpDown class="h-3 w-3 text-slate-600" />
+                        {/if}
+                      </div>
+                    </th>
+                    <th class="px-4 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                  {#each paginatedIssues as issue}
+                    {@const isDq =
+                      issue.mechanism === "data_quality" || issue.mechanism === "Data Quality"}
+                    <tr
+                      class="group transition-colors hover:bg-slate-900/60 {selectedFindingIds.includes(
+                        issue.id,
+                      )
+                        ? 'bg-blue-950/20'
+                        : ''}"
+                    >
+                      <!-- Row Checkbox -->
+                      <td class="w-10 px-4 py-3.5 align-top">
+                        <input
+                          type="checkbox"
+                          checked={selectedFindingIds.includes(issue.id)}
+                          onchange={() => toggleSelectFinding(issue.id)}
+                          class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
+                        />
+                      </td>
 
-        <!-- Multi-Format Export Actions (Session E) -->
-        <div class="flex items-center gap-2">
-          {#if selectedProjectId}
-            <a
-              href={analyzeApi.getExportUrl(
-                selectedProjectId,
-                selectedSlug,
-                "bcf",
-                requestedEngines,
-              )}
-              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm transition-all hover:scale-[1.02]"
-              title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
-            >
-              <Download class="w-3.5 h-3.5" />
-              <span>Export BCF 2.1</span>
-            </a>
-            <a
-              href={analyzeApi.getExportUrl(
-                selectedProjectId,
-                selectedSlug,
-                "csv",
-                requestedEngines,
-              )}
-              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
-              title="Download tabulated audit spreadsheet with lineage and citations"
-            >
-              <Download class="w-3.5 h-3.5" />
-              <span>CSV</span>
-            </a>
-            <a
-              href={analyzeApi.getExportUrl(
-                selectedProjectId,
-                selectedSlug,
-                "json",
-                requestedEngines,
-              )}
-              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
-              title="Download structured machine-readable JSON analysis report"
-            >
-              <Download class="w-3.5 h-3.5" />
-              <span>JSON</span>
-            </a>
+                      <!-- Severity Band Pill -->
+                      <td class="whitespace-nowrap px-4 py-3.5 align-top">
+                        {#if isDq}
+                          <span
+                            class="inline-block rounded-full border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-micro font-semibold uppercase text-slate-300"
+                          >
+                            Data Quality
+                          </span>
+                        {:else if issue.band === "critical"}
+                          <span
+                            class="inline-block rounded-full border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-sm"
+                          >
+                            Critical
+                          </span>
+                        {:else if issue.band === "high"}
+                          <span
+                            class="inline-block rounded-full border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-sm"
+                          >
+                            High
+                          </span>
+                        {:else if issue.band === "medium"}
+                          <span
+                            class="inline-block rounded-full border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-sm"
+                          >
+                            Medium
+                          </span>
+                        {:else}
+                          <span
+                            class="inline-block rounded-full border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-sm"
+                          >
+                            Low
+                          </span>
+                        {/if}
+                      </td>
+
+                      <!-- Rule & Mechanism -->
+                      <td class="px-4 py-3.5 align-top font-mono">
+                        <div class="text-xs font-bold text-slate-50">
+                          {issue.rule_id}
+                        </div>
+                        <div class="mt-0.5 text-micro text-slate-400">
+                          {issue.mechanism}
+                        </div>
+                      </td>
+
+                      <!-- Element GUID -->
+                      <td class="px-4 py-3.5 align-top">
+                        <div
+                          class="flex items-center gap-1.5 font-mono text-caption text-slate-300"
+                        >
+                          <span class="max-w-[140px] truncate" title={issue.element_id}
+                            >{issue.element_id}</span
+                          >
+                          <button
+                            type="button"
+                            onclick={() => copyText(issue.element_id)}
+                            class="text-slate-500 transition-colors hover:text-slate-50"
+                            title="Copy GUID"
+                          >
+                            <Copy class="h-3 w-3" />
+                          </button>
+                        </div>
+                        {#if issue.details?.ifc_type}
+                          <div class="mt-0.5 font-mono text-micro text-slate-500">
+                            {issue.details.ifc_type}
+                          </div>
+                        {/if}
+                      </td>
+
+                      <!-- Finding, Mitigation, & Citations -->
+                      <td class="max-w-md px-4 py-3.5 align-top">
+                        <div class="font-semibold text-slate-100">
+                          {issue.title}
+                        </div>
+                        {#if issue.mitigation}
+                          <div class="mt-1 line-clamp-2 text-caption text-slate-400">
+                            {issue.mitigation}
+                          </div>
+                        {/if}
+
+                        <!-- Real Citations -->
+                        {#if issue.citations && issue.citations.length > 0}
+                          <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                            {#each issue.citations as cit}
+                              <span
+                                class="inline-flex items-center gap-1 rounded border border-indigo-900/60 bg-slate-900 px-2 py-0.5 text-micro font-medium text-indigo-300"
+                                title={cit.reason}
+                              >
+                                <FileText class="h-2.5 w-2.5 opacity-70" />
+                                <span>{cit.standard} {cit.clause}</span>
+                              </span>
+                            {/each}
+                          </div>
+                        {/if}
+                      </td>
+
+                      <!-- Score or Clearance Depth -->
+                      <td class="px-4 py-3.5 text-center align-top font-mono">
+                        {#if isDq}
+                          <span class="text-caption text-slate-500">N/A</span>
+                        {:else if issue.score !== undefined && issue.score > 0}
+                          <div class="text-xs font-bold text-slate-50">
+                            {issue.score.toFixed(2)}
+                          </div>
+                          <div class="text-nano text-slate-500">Risk Score</div>
+                        {:else if issue.details?.intrusion_depth_mm !== undefined}
+                          <div class="text-xs font-bold text-red-400">
+                            {issue.details.intrusion_depth_mm} mm
+                          </div>
+                          <div class="text-nano text-slate-500">Clash Intrusion</div>
+                        {:else}
+                          <span class="text-caption text-slate-500">-</span>
+                        {/if}
+                      </td>
+
+                      <!-- Action Buttons -->
+                      <td class="space-x-1.5 whitespace-nowrap px-4 py-3.5 text-right align-top">
+                        <button
+                          type="button"
+                          onclick={() => (inspectedIssue = issue)}
+                          class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                        >
+                          <span>Details</span>
+                        </button>
+
+                        {#if selectedProjectId && issue.element_id}
+                          <button
+                            type="button"
+                            onclick={() =>
+                              onSelectProjectForViewer(selectedProjectId!, issue.element_id)}
+                            class="inline-flex items-center gap-1 rounded-lg bg-accent/20 px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/30 hover:text-blue-300"
+                          >
+                            <ScanEye class="h-3.5 w-3.5" />
+                            <span>3D</span>
+                          </button>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+
+            <TablePagination
+              currentPage={findingCurrentPage}
+              pageSize={findingPageSize}
+              totalItems={findingTotalItems}
+              onPageChange={(p) => (findingCurrentPage = p)}
+              onPageSizeChange={(s) => {
+                findingPageSize = s;
+                findingCurrentPage = 1;
+              }}
+            />
           {/if}
         </div>
       </div>
-
-      <!-- Filters & Search Bar -->
-      <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2">
-        <!-- Search Input -->
-        <div class="sm:col-span-6 relative">
-          <Search
-            class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
-          />
-          <input
-            type="text"
-            bind:value={searchQuery}
-            placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
-          />
-        </div>
-
-        <!-- Severity Filter -->
-        <div class="sm:col-span-3">
-          <select
-            bind:value={severityFilter}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
-          >
-            <option value="all">All Severities</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-            <option value="data_quality">Data Quality Only</option>
-          </select>
-        </div>
-
-        <!-- Mechanism Filter -->
-        <div class="sm:col-span-3">
-          <select
-            bind:value={mechanismFilter}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
-          >
-            <option value="all">All Mechanisms</option>
-            {#if selectedSlug === "corrosion"}
-              <option value="GC">GC-001 Galvanic</option>
-              <option value="CC">CC-001 Crevice</option>
-              <option value="MC">MC-001 Microbiological</option>
-              <option value="MM">MM-001 Material-media</option>
-              <option value="XM">XM-001 Cross-material</option>
-            {:else}
-              <option value="SB">SB-001 Seismic Halo</option>
-            {/if}
-            <option value="data_quality">Data Quality</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Low Risk Visibility Toggle -->
-      <div
-        class="flex items-center justify-between text-xs text-slate-400 px-1"
-      >
-        <label class="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            bind:checked={showLowRisk}
-            class="rounded border-slate-700 bg-slate-900 text-accent focus:ring-0 w-3.5 h-3.5"
-          />
-          <span>Include Low Severity verdicts in list</span>
-        </label>
-        <span class="text-caption text-slate-500">
-          Showing {filteredIssues.length} items
-        </span>
-      </div>
-
-      <!-- Bulk Actions Bar -->
-      <BulkActionBar
-        selectedCount={selectedFindingIds.length}
-        itemLabel="finding"
-        onClearSelection={() => (selectedFindingIds = [])}
-        onBulkExport={exportFindingsToCsv}
-        onBulkDelete={null}
-        onBulkEdit={null}
-      />
-
-      <!-- Tabular Findings Table -->
-      <div
-        class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/50"
-      >
-        {#if sortedFilteredIssues.length === 0}
-          <div class="p-12 text-center text-xs text-slate-500">
-            No compliance issues match your selected filters.
-          </div>
-        {:else}
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-300">
-              <thead
-                class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
-              >
-                <tr>
-                  <th class="py-3.5 px-4 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allFilteredFindingsSelected}
-                      on:change={toggleSelectAllFindings}
-                      class="rounded bg-slate-950 border-slate-700 text-accent focus:ring-accent cursor-pointer w-4 h-4"
-                      title="Select all findings"
-                    />
-                  </th>
-                  <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
-                    on:click={() => toggleFindingSort("band")}
-                  >
-                    <div class="flex items-center gap-1">
-                      <span>Severity</span>
-                      {#if findingSortField === "band"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
-                      {:else}
-                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
-                      {/if}
-                    </div>
-                  </th>
-                  <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
-                    on:click={() => toggleFindingSort("rule_id")}
-                  >
-                    <div class="flex items-center gap-1">
-                      <span>Rule &amp; Mechanism</span>
-                      {#if findingSortField === "rule_id"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
-                      {:else}
-                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
-                      {/if}
-                    </div>
-                  </th>
-                  <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
-                    on:click={() => toggleFindingSort("element_id")}
-                  >
-                    <div class="flex items-center gap-1">
-                      <span>Element GUID</span>
-                      {#if findingSortField === "element_id"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
-                      {:else}
-                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
-                      {/if}
-                    </div>
-                  </th>
-                  <th
-                    class="py-3.5 px-4 cursor-pointer hover:text-slate-50 transition-colors select-none"
-                    on:click={() => toggleFindingSort("title")}
-                  >
-                    <div class="flex items-center gap-1">
-                      <span>Finding &amp; Citations</span>
-                      {#if findingSortField === "title"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
-                      {:else}
-                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
-                      {/if}
-                    </div>
-                  </th>
-                  <th
-                    class="py-3.5 px-4 text-center cursor-pointer hover:text-slate-50 transition-colors select-none"
-                    on:click={() => toggleFindingSort("score")}
-                  >
-                    <div class="flex items-center justify-center gap-1">
-                      <span>Score / Clearance</span>
-                      {#if findingSortField === "score"}
-                        {#if findingSortAsc}<ArrowUp class="w-3 h-3 text-accent" />{:else}<ArrowDown class="w-3 h-3 text-accent" />{/if}
-                      {:else}
-                        <ArrowUpDown class="w-3 h-3 text-slate-600" />
-                      {/if}
-                    </div>
-                  </th>
-                  <th class="py-3.5 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800/60">
-                {#each paginatedIssues as issue}
-                  {@const isDq =
-                    issue.mechanism === "data_quality" ||
-                    issue.mechanism === "Data Quality"}
-                  <tr class="hover:bg-slate-900/60 transition-colors group {selectedFindingIds.includes(issue.id) ? 'bg-blue-950/20' : ''}">
-                    <!-- Row Checkbox -->
-                    <td class="py-3.5 px-4 align-top w-10">
-                      <input
-                        type="checkbox"
-                        checked={selectedFindingIds.includes(issue.id)}
-                        on:change={() => toggleSelectFinding(issue.id)}
-                        class="rounded bg-slate-950 border-slate-700 text-accent focus:ring-accent cursor-pointer w-4 h-4"
-                      />
-                    </td>
-
-                    <!-- Severity Band Pill -->
-                    <td class="py-3.5 px-4 align-top whitespace-nowrap">
-                      {#if isDq}
-                        <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700"
-                        >
-                          Data Quality
-                        </span>
-                      {:else if issue.band === "critical"}
-                        <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-red-950/80 text-red-400 border border-red-800/80 shadow-sm"
-                        >
-                          Critical
-                        </span>
-                      {:else if issue.band === "high"}
-                        <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-orange-950/80 text-orange-400 border border-orange-800/80 shadow-sm"
-                        >
-                          High
-                        </span>
-                      {:else if issue.band === "medium"}
-                        <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-yellow-950/80 text-yellow-400 border border-yellow-800/80 shadow-sm"
-                        >
-                          Medium
-                        </span>
-                      {:else}
-                        <span
-                          class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 shadow-sm"
-                        >
-                          Low
-                        </span>
-                      {/if}
-                    </td>
-
-                    <!-- Rule & Mechanism -->
-                    <td class="py-3.5 px-4 align-top font-mono">
-                      <div class="font-bold text-slate-50 text-xs">
-                        {issue.rule_id}
-                      </div>
-                      <div class="text-micro text-slate-400 mt-0.5">
-                        {issue.mechanism}
-                      </div>
-                    </td>
-
-                    <!-- Element GUID -->
-                    <td class="py-3.5 px-4 align-top">
-                      <div
-                        class="flex items-center gap-1.5 font-mono text-slate-300 text-caption"
-                      >
-                        <span
-                          class="truncate max-w-[140px]"
-                          title={issue.element_id}>{issue.element_id}</span
-                        >
-                        <button
-                          type="button"
-                          on:click={() => copyText(issue.element_id)}
-                          class="text-slate-500 hover:text-slate-50 transition-colors"
-                          title="Copy GUID"
-                        >
-                          <Copy class="w-3 h-3" />
-                        </button>
-                      </div>
-                      {#if issue.details?.ifc_type}
-                        <div
-                          class="text-micro text-slate-500 font-mono mt-0.5"
-                        >
-                          {issue.details.ifc_type}
-                        </div>
-                      {/if}
-                    </td>
-
-                    <!-- Finding, Mitigation, & Citations -->
-                    <td class="py-3.5 px-4 align-top max-w-md">
-                      <div class="font-semibold text-slate-100">
-                        {issue.title}
-                      </div>
-                      {#if issue.mitigation}
-                        <div
-                          class="text-caption text-slate-400 mt-1 line-clamp-2"
-                        >
-                          {issue.mitigation}
-                        </div>
-                      {/if}
-
-                      <!-- Real Citations -->
-                      {#if issue.citations && issue.citations.length > 0}
-                        <div class="flex flex-wrap items-center gap-1.5 mt-2">
-                          {#each issue.citations as cit}
-                            <span
-                              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-micro font-medium bg-slate-900 text-indigo-300 border border-indigo-900/60"
-                              title={cit.reason}
-                            >
-                              <FileText class="w-2.5 h-2.5 opacity-70" />
-                              <span>{cit.standard} {cit.clause}</span>
-                            </span>
-                          {/each}
-                        </div>
-                      {/if}
-                    </td>
-
-                    <!-- Score or Clearance Depth -->
-                    <td class="py-3.5 px-4 align-top text-center font-mono">
-                      {#if isDq}
-                        <span class="text-slate-500 text-caption">N/A</span>
-                      {:else if issue.score !== undefined && issue.score > 0}
-                        <div class="text-xs font-bold text-slate-50">
-                          {issue.score.toFixed(2)}
-                        </div>
-                        <div class="text-nano text-slate-500">Risk Score</div>
-                      {:else if issue.details?.intrusion_depth_mm !== undefined}
-                        <div class="text-xs font-bold text-red-400">
-                          {issue.details.intrusion_depth_mm} mm
-                        </div>
-                        <div class="text-nano text-slate-500">
-                          Clash Intrusion
-                        </div>
-                      {:else}
-                        <span class="text-slate-500 text-caption">-</span>
-                      {/if}
-                    </td>
-
-                    <!-- Action Buttons -->
-                    <td
-                      class="py-3.5 px-4 align-top text-right whitespace-nowrap space-x-1.5"
-                    >
-                      <button
-                        type="button"
-                        on:click={() => (inspectedIssue = issue)}
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 text-xs font-semibold transition-colors"
-                      >
-                        <span>Details</span>
-                      </button>
-
-                      {#if selectedProjectId && issue.element_id}
-                        <button
-                          type="button"
-                          on:click={() =>
-                            onSelectProjectForViewer(
-                              selectedProjectId!,
-                              issue.element_id,
-                            )}
-                          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent hover:text-blue-300 text-xs font-semibold transition-colors"
-                        >
-                          <ScanEye class="w-3.5 h-3.5" />
-                          <span>3D</span>
-                        </button>
-                      {/if}
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-
-          <TablePagination
-            currentPage={findingCurrentPage}
-            pageSize={findingPageSize}
-            totalItems={findingTotalItems}
-            onPageChange={(p) => (findingCurrentPage = p)}
-            onPageSizeChange={(s) => {
-              findingPageSize = s;
-              findingCurrentPage = 1;
-            }}
-          />
-        {/if}
-      </div>
-    </div>
     </div>
   {:else if !isRunning}
     <div
-      class="p-16 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl space-y-3"
+      class="space-y-3 rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
     >
       <div
-        class="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-400"
+        class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-400"
       >
-        <Compass class="w-6 h-6" />
+        <Compass class="h-6 w-6" />
       </div>
       <div>
         <div class="text-sm font-bold text-slate-50">No Analysis Run Loaded</div>
-        <div class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+        <div class="mx-auto mt-1 max-w-sm text-xs text-slate-400">
           Select an OpenBIM project above and click <strong>"Run Audit"</strong>
-          to compute compliance across corrosion engines or Blue Halo seismic clearance
-          envelopes.
+          to compute compliance across corrosion engines or Blue Halo seismic clearance envelopes.
         </div>
       </div>
     </div>
@@ -1417,8 +1367,7 @@
 <!-- Detailed Issue Inspection Modal / Drawer -->
 {#if inspectedIssue}
   {@const isDq =
-    inspectedIssue.mechanism === "data_quality" ||
-    inspectedIssue.mechanism === "Data Quality"}
+    inspectedIssue.mechanism === "data_quality" || inspectedIssue.mechanism === "Data Quality"}
   <Modal
     isOpen={true}
     title={inspectedIssue.title}
@@ -1431,133 +1380,115 @@
     {/snippet}
 
     <div class="space-y-6">
-        <!-- Title & Mechanism -->
-        <!-- The title now lives in the dialog header, so only the mechanism
+      <!-- Title & Mechanism -->
+      <!-- The title now lives in the dialog header, so only the mechanism
              needs restating here. -->
-        <p class="text-xs text-slate-400">
-          Mechanism: <strong class="text-slate-200">{inspectedIssue.mechanism}</strong>
-        </p>
+      <p class="text-xs text-slate-400">
+        Mechanism: <strong class="text-slate-200">{inspectedIssue.mechanism}</strong>
+      </p>
 
-        <!-- Element Context Card -->
-        <div
-          class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2"
-        >
-          <div
-            class="text-xs uppercase font-bold tracking-wider text-slate-400"
-          >
-            Target IFC Element
-          </div>
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span class="text-slate-500">GlobalId (GUID):</span>
-              <div
-                class="font-mono text-slate-200 flex items-center gap-1.5 mt-0.5"
+      <!-- Element Context Card -->
+      <div class="space-y-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-4">
+        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">
+          Target IFC Element
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <span class="text-slate-500">GlobalId (GUID):</span>
+            <div class="mt-0.5 flex items-center gap-1.5 font-mono text-slate-200">
+              <span class="truncate">{inspectedIssue.element_id}</span>
+              <button
+                type="button"
+                onclick={() => copyText(inspectedIssue?.element_id || "")}
+                class="text-slate-400 hover:text-slate-50"
               >
-                <span class="truncate">{inspectedIssue.element_id}</span>
-                <button
-                  type="button"
-                  on:click={() => copyText(inspectedIssue?.element_id || "")}
-                  class="text-slate-400 hover:text-slate-50"
-                >
-                  <Copy class="w-3 h-3" />
-                </button>
+                <Copy class="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+          {#if inspectedIssue.assignee_role}
+            <div>
+              <span class="text-slate-500">Assigned Resolution Role:</span>
+              <div class="mt-0.5 font-semibold text-slate-200">
+                {inspectedIssue.assignee_role}
               </div>
             </div>
-            {#if inspectedIssue.assignee_role}
-              <div>
-                <span class="text-slate-500">Assigned Resolution Role:</span>
-                <div class="font-semibold text-slate-200 mt-0.5">
-                  {inspectedIssue.assignee_role}
+          {/if}
+        </div>
+      </div>
+
+      <!-- Description & Mitigations -->
+      {#if inspectedIssue.description}
+        <div class="space-y-1">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Finding Description
+          </h4>
+          <p
+            class="rounded-xl border border-slate-800/60 bg-slate-950/40 p-3 text-xs text-slate-300"
+          >
+            {inspectedIssue.description}
+          </p>
+        </div>
+      {/if}
+
+      {#if inspectedIssue.mitigation}
+        <div class="space-y-1">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400">
+            Engineering Mitigation Guidance
+          </h4>
+          <p
+            class="rounded-xl border border-emerald-800/40 bg-emerald-950/30 p-3 text-xs text-emerald-200"
+          >
+            {inspectedIssue.mitigation}
+          </p>
+        </div>
+      {/if}
+
+      <!-- Standards Cited (White Box Audit Trail) -->
+      {#if inspectedIssue.citations && inspectedIssue.citations.length > 0}
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400">
+            White Box Audit Citations
+          </h4>
+          <div class="space-y-2">
+            {#each inspectedIssue.citations as cit}
+              <div class="rounded-xl border border-indigo-800/40 bg-indigo-950/20 p-3 text-xs">
+                <div class="flex items-center gap-1.5 font-bold text-indigo-300">
+                  <FileText class="h-3.5 w-3.5" />
+                  <span>{cit.standard} — {cit.clause}</span>
                 </div>
+                {#if cit.reason}
+                  <div class="mt-1 text-caption text-slate-300">
+                    {cit.reason}
+                  </div>
+                {/if}
               </div>
-            {/if}
+            {/each}
           </div>
         </div>
+      {/if}
 
-        <!-- Description & Mitigations -->
-        {#if inspectedIssue.description}
-          <div class="space-y-1">
-            <h4
-              class="text-xs uppercase font-bold tracking-wider text-slate-400"
-            >
-              Finding Description
-            </h4>
-            <p
-              class="text-xs text-slate-300 bg-slate-950/40 p-3 rounded-xl border border-slate-800/60"
-            >
-              {inspectedIssue.description}
-            </p>
-          </div>
-        {/if}
-
-        {#if inspectedIssue.mitigation}
-          <div class="space-y-1">
-            <h4
-              class="text-xs uppercase font-bold tracking-wider text-emerald-400"
-            >
-              Engineering Mitigation Guidance
-            </h4>
-            <p
-              class="text-xs text-emerald-200 bg-emerald-950/30 p-3 rounded-xl border border-emerald-800/40"
-            >
-              {inspectedIssue.mitigation}
-            </p>
-          </div>
-        {/if}
-
-        <!-- Standards Cited (White Box Audit Trail) -->
-        {#if inspectedIssue.citations && inspectedIssue.citations.length > 0}
-          <div class="space-y-2">
-            <h4
-              class="text-xs uppercase font-bold tracking-wider text-indigo-400"
-            >
-              White Box Audit Citations
-            </h4>
-            <div class="space-y-2">
-              {#each inspectedIssue.citations as cit}
-                <div
-                  class="p-3 rounded-xl bg-indigo-950/20 border border-indigo-800/40 text-xs"
-                >
-                  <div
-                    class="font-bold text-indigo-300 flex items-center gap-1.5"
-                  >
-                    <FileText class="w-3.5 h-3.5" />
-                    <span>{cit.standard} — {cit.clause}</span>
-                  </div>
-                  {#if cit.reason}
-                    <div class="text-caption text-slate-300 mt-1">
-                      {cit.reason}
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          </div>
-        {/if}
-
-        <!-- Raw Metadata Details -->
-        {#if inspectedIssue.details && Object.keys(inspectedIssue.details).length > 0}
-          <div class="space-y-1">
-            <h4
-              class="text-xs uppercase font-bold tracking-wider text-slate-400"
-            >
-              Metadata Parameters
-            </h4>
-            <pre
-              class="text-caption font-mono text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800 overflow-x-auto">{JSON.stringify(
-                inspectedIssue.details,
-                null,
-                2,
-              )}</pre>
-          </div>
-        {/if}
-      </div>
+      <!-- Raw Metadata Details -->
+      {#if inspectedIssue.details && Object.keys(inspectedIssue.details).length > 0}
+        <div class="space-y-1">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Metadata Parameters
+          </h4>
+          <pre
+            class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption text-slate-400">{JSON.stringify(
+              inspectedIssue.details,
+              null,
+              2,
+            )}</pre>
+        </div>
+      {/if}
+    </div>
 
     {#snippet footer()}
       <button
         type="button"
-        on:click={() => (inspectedIssue = null)}
-        class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
+        onclick={() => (inspectedIssue = null)}
+        class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
       >
         Close
       </button>
@@ -1565,16 +1496,16 @@
       {#if selectedProjectId && inspectedIssue?.element_id}
         <button
           type="button"
-          on:click={() => {
+          onclick={() => {
             const elId = inspectedIssue?.element_id;
             inspectedIssue = null;
             if (selectedProjectId && elId) {
               onSelectProjectForViewer(selectedProjectId, elId);
             }
           }}
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white transition-colors"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-hover"
         >
-          <ScanEye class="w-4 h-4" />
+          <ScanEye class="h-4 w-4" />
           <span>Isolate in 3D Viewer</span>
         </button>
       {/if}
@@ -1585,52 +1516,49 @@
 <!-- IFC Upload Modal -->
 {#if isUploadModalOpen}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm duration-200 animate-in fade-in"
   >
     <div
-      class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4"
+      class="w-full max-w-md space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
     >
       <div class="flex items-center justify-between">
         <h3 class="text-base font-bold text-slate-50">Upload IFC Model</h3>
         <button
           type="button"
-          on:click={() => (isUploadModalOpen = false)}
+          onclick={() => (isUploadModalOpen = false)}
           class="text-slate-400 hover:text-slate-50"
         >
-          <X class="w-5 h-5" />
+          <X class="h-5 w-5" />
         </button>
       </div>
 
       <p class="text-xs text-slate-400">
-        Attach or update the IFC model for <strong
-          >{currentProject?.name}</strong
-        > (Session A file lineage with SHA-256 digest).
+        Attach or update the IFC model for <strong>{currentProject?.name}</strong> (Session A file lineage
+        with SHA-256 digest).
       </p>
 
       <div
-        class="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center hover:border-slate-500 transition-colors"
+        class="rounded-2xl border-2 border-dashed border-slate-700 p-6 text-center transition-colors hover:border-slate-500"
       >
-        <Upload class="w-8 h-8 text-slate-400 mx-auto mb-2" />
+        <Upload class="mx-auto mb-2 h-8 w-8 text-slate-400" />
         <input
           type="file"
           accept=".ifc"
-          on:change={(e) => (uploadFile = e.currentTarget.files?.[0] || null)}
-          class="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-accent file:text-white hover:file:bg-accent-hover"
+          onchange={(e) => (uploadFile = e.currentTarget.files?.[0] || null)}
+          class="text-xs text-slate-300 file:mr-3 file:rounded-xl file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-accent-hover"
         />
       </div>
 
       {#if uploadSuccessMsg}
         <div
-          class="p-3 rounded-xl bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-xs"
+          class="rounded-xl border border-emerald-800 bg-emerald-950/50 p-3 text-xs text-emerald-300"
         >
           {uploadSuccessMsg}
         </div>
       {/if}
 
       {#if uploadErrorMsg}
-        <div
-          class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs"
-        >
+        <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
           {uploadErrorMsg}
         </div>
       {/if}
@@ -1638,19 +1566,19 @@
       <div class="flex items-center justify-end gap-2 pt-2">
         <button
           type="button"
-          on:click={() => (isUploadModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-slate-50"
+          onclick={() => (isUploadModalOpen = false)}
+          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 hover:text-slate-50"
         >
           Cancel
         </button>
         <button
           type="button"
           disabled={!uploadFile || isUploading}
-          on:click={handleUploadIfc}
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover disabled:opacity-50"
+          onclick={handleUploadIfc}
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
         >
           {#if isUploading}
-            <RefreshCw class="w-3.5 h-3.5 animate-spin" />
+            <RefreshCw class="h-3.5 w-3.5 animate-spin" />
             <span>Uploading…</span>
           {:else}
             <span>Confirm Upload</span>

@@ -1,54 +1,67 @@
 <script lang="ts">
   import { Search, RotateCw, X } from "lucide-svelte";
 
-  export let searchQuery: string = "";
-  export let searchPlaceholder: string = "Search items...";
-  export let isRefreshing: boolean = false;
-  export let onRefresh: (() => void) | null = null;
+  interface Props {
+    searchQuery?: string;
+    searchPlaceholder?: string;
+    isRefreshing?: boolean;
+    onRefresh?: (() => void) | null;
+    filters?: import("svelte").Snippet;
+    actions?: import("svelte").Snippet;
+  }
+
+  let {
+    searchQuery = $bindable(""),
+    searchPlaceholder = "Search items...",
+    isRefreshing = false,
+    onRefresh = null,
+    filters,
+    actions,
+  }: Props = $props();
 </script>
 
 <div
-  class="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-t-2xl bg-slate-900/60 border border-slate-800 border-b-0"
+  class="flex flex-col justify-between gap-3 rounded-t-2xl border border-b-0 border-slate-800 bg-slate-900/60 p-4 md:flex-row md:items-center"
 >
   <!-- Search Input Bar -->
-  <div class="relative flex-1 min-w-[14rem] max-w-md">
+  <div class="relative min-w-[14rem] max-w-md flex-1">
     <Search
-      class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+      class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
     />
     <input
       type="text"
       bind:value={searchQuery}
       placeholder={searchPlaceholder}
-      class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-8 text-xs text-slate-50 placeholder-slate-500 transition-colors focus:border-blue-500 focus:outline-none"
     />
     {#if searchQuery}
       <button
         type="button"
-        on:click={() => (searchQuery = "")}
-        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-50 p-0.5"
+        onclick={() => (searchQuery = "")}
+        class="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-50"
         title="Clear search"
       >
-        <X class="w-3.5 h-3.5" />
+        <X class="h-3.5 w-3.5" />
       </button>
     {/if}
   </div>
 
   <!-- Filters & Primary CTA slot -->
-  <div class="flex items-center gap-2.5 flex-wrap">
-    <slot name="filters" />
+  <div class="flex flex-wrap items-center gap-2.5">
+    {@render filters?.()}
 
     {#if onRefresh}
       <button
         type="button"
-        on:click={onRefresh}
+        onclick={onRefresh}
         disabled={isRefreshing}
-        class="p-2 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-50 disabled:opacity-50 transition-colors"
+        class="rounded-xl border border-slate-800 bg-slate-950 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:opacity-50"
         title="Refresh data"
       >
-        <RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />
+        <RotateCw class="h-4 w-4 {isRefreshing ? 'animate-spin' : ''}" />
       </button>
     {/if}
 
-    <slot name="actions" />
+    {@render actions?.()}
   </div>
 </div>

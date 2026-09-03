@@ -33,50 +33,56 @@
   import LoadingState from "../lib/components/LoadingState.svelte";
   import IdsImportForm from "../lib/components/IdsImportForm.svelte";
 
-  // Called when the "Manual" source tab is chosen — hand-typing a rule needs
-  // the full per-element-category editor, which lives on its own page rather
-  // than cramped inside this modal.
-  export let onNavigateToManualRuleEditor: () => void = () => {};
+  interface Props {
+    /**
+     * Called when the "Manual" source tab is chosen — hand-typing a rule needs
+     * the full per-element-category editor, which lives on its own page rather
+     * than cramped inside this modal.
+     */
+    onNavigateToManualRuleEditor?: () => void;
+  }
+
+  let { onNavigateToManualRuleEditor = () => {} }: Props = $props();
 
   const cachedDocs = documentsApi.getCachedList();
-  let documents: DocumentItem[] = cachedDocs || [];
-  let isLoading = !cachedDocs;
-  let isRefreshing = false;
-  let error = "";
-  let isDeleteModalOpen = false;
-  let isOpenCdeModalOpen = false;
-  let isBulkEditModalOpen = false;
-  let docToDelete: { id: number; filename: string } | null = null;
+  let documents: DocumentItem[] = $state(cachedDocs || []);
+  let isLoading = $state(!cachedDocs);
+  let isRefreshing = $state(false);
+  let error = $state("");
+  let isDeleteModalOpen = $state(false);
+  let isOpenCdeModalOpen = $state(false);
+  let isBulkEditModalOpen = $state(false);
+  let docToDelete: { id: number; filename: string } | null = $state(null);
   let unsubscribeDocs: (() => void) | null = null;
 
   // Edit modal state
-  let isEditModalOpen = false;
-  let docToEdit: DocumentItem | null = null;
-  let editFilename = "";
-  let editDocType = "Specification";
-  let editExtractedText = "";
-  let isSavingEdit = false;
-  let editError = "";
+  let isEditModalOpen = $state(false);
+  let docToEdit: DocumentItem | null = $state(null);
+  let editFilename = $state("");
+  let editDocType = $state("Specification");
+  let editExtractedText = $state("");
+  let isSavingEdit = $state(false);
+  let editError = $state("");
 
   // Upload modal state — three ways a rule source can enter the system,
   // sharing one modal: an uploaded document (parsed later in Rule Extraction
   // Studio), a buildingSMART IDS file, or a hand-typed rule (which routes to
   // the dedicated Manual Rule Editor page instead of rendering here).
-  let isUploadModalOpen = false;
-  let uploadTab: "document" | "ids" = "document";
+  let isUploadModalOpen = $state(false);
+  let uploadTab: "document" | "ids" = $state("document");
 
   // Called by the sidebar's "New Rule Document Upload" action once this view is mounted.
   export function openUploadModal(tab: "document" | "ids" = "document") {
     uploadTab = tab;
     isUploadModalOpen = true;
   }
-  let uploadFile: File | null = null;
-  let uploadDocType = "Specification";
-  let uploadParser: "auto" | "unstructured" | "light" = "auto";
-  let isUploading = false;
-  let uploadError = "";
+  let uploadFile: File | null = $state(null);
+  let uploadDocType = $state("Specification");
+  let uploadParser: "auto" | "unstructured" | "light" = $state("auto");
+  let isUploading = $state(false);
+  let uploadError = $state("");
 
-  let successMessage = "";
+  let successMessage = $state("");
 
   function flashSuccess(message: string) {
     successMessage = message;
@@ -98,19 +104,21 @@
   }
 
   // Text reader modal state
-  let selectedDoc: DocumentDetail | null = null;
+  let selectedDoc: DocumentDetail | null = $state(null);
   let isLoadingDocDetail = false;
 
   // Search, filter, sort, paginate and select — all owned by the shared state.
-  const table = createTableState<DocumentItem, number>({
-    rows: () => documents,
-    getId: (d) => d.id,
-    searchFields: (d) => [d.filename, d.extracted_text_preview],
-    filters: {
-      docType: (d, value) => (d.doc_type || "Specification") === value,
-    },
-    initialSort: { field: "id", asc: false },
-  });
+  const table = $state(
+    createTableState<DocumentItem, number>({
+      rows: () => documents,
+      getId: (d) => d.id,
+      searchFields: (d) => [d.filename, d.extracted_text_preview],
+      filters: {
+        docType: (d, value) => (d.doc_type || "Specification") === value,
+      },
+      initialSort: { field: "id", asc: false },
+    }),
+  );
 
   async function loadDocuments(force = false) {
     if (!documents.length) {
@@ -144,7 +152,7 @@
     }
   });
 
-  let isBulkDeleteModalOpen = false;
+  let isBulkDeleteModalOpen = $state(false);
 
   function exportSelectedToCsv() {
     const targetDocs = table.selectedCount ? table.selectedRows : table.sorted;
@@ -189,7 +197,9 @@
     isUploading = true;
     uploadError = "";
     try {
-      const created = await documentsApi.upload(uploadFile, uploadDocType, { parser: uploadParser });
+      const created = await documentsApi.upload(uploadFile, uploadDocType, {
+        parser: uploadParser,
+      });
       documents = [created, ...documents];
       isUploadModalOpen = false;
       uploadFile = null;
@@ -281,7 +291,7 @@
   }
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header -->
   <PageHeader
     category="Library"
@@ -289,51 +299,51 @@
     subtitle="Upload and manage building code standards, specifications, and project manuals."
     icon={BookOpen}
   >
-    <div slot="actions" class="flex items-center gap-2">
-      <button
-        type="button"
-        on:click={() => (isOpenCdeModalOpen = true)}
-        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 border border-blue-800/50 transition-colors"
-        title="Sync documents via buildingSMART OpenCDE API"
-      >
-        <FolderSync class="w-3.5 h-3.5" />
-        <span>OpenCDE Sync</span>
-      </button>
+    {#snippet actions()}
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          onclick={() => (isOpenCdeModalOpen = true)}
+          class="inline-flex items-center gap-1.5 rounded-full border border-blue-800/50 bg-blue-950/40 px-3.5 py-2 text-xs font-semibold text-blue-300 transition-colors hover:bg-blue-900/60"
+          title="Sync documents via buildingSMART OpenCDE API"
+        >
+          <FolderSync class="h-3.5 w-3.5" />
+          <span>OpenCDE Sync</span>
+        </button>
 
-      <button
-        type="button"
-        on:click={() => loadDocuments(true)}
-        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-slate-50 border border-slate-800 transition-colors"
-        title="Refresh document specifications"
-      >
-        <RotateCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
-        <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-      </button>
+        <button
+          type="button"
+          onclick={() => loadDocuments(true)}
+          class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          title="Refresh document specifications"
+        >
+          <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
+          <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+        </button>
 
-      <button
-        type="button"
-        on:click={() => openUploadModal()}
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02]"
-      >
-        <Upload class="w-3.5 h-3.5" />
-        <span>Upload Specification</span>
-      </button>
-    </div>
+        <button
+          type="button"
+          onclick={() => openUploadModal()}
+          class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+        >
+          <Upload class="h-3.5 w-3.5" />
+          <span>Upload Specification</span>
+        </button>
+      </div>
+    {/snippet}
   </PageHeader>
 
   {#if error}
-    <div
-      class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs"
-    >
+    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
       {error}
     </div>
   {/if}
 
   {#if successMessage}
     <div
-      class="p-4 rounded-xl bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2.5"
+      class="flex items-center gap-2.5 rounded-xl border border-emerald-800 bg-emerald-950/50 p-4 text-xs text-emerald-300"
     >
-      <CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0" />
+      <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
       <span>{successMessage}</span>
     </div>
   {/if}
@@ -349,27 +359,27 @@
   />
 
   <!-- Documents Table Container -->
-  <div
-    class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40"
-  >
+  <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
     <DataTableHeader
       bind:searchQuery={table.search}
       searchPlaceholder="Filter documents by file name or text..."
       {isRefreshing}
       onRefresh={() => loadDocuments(true)}
     >
-      <div slot="filters" class="flex items-center gap-1.5">
-        <select
-          bind:value={table.filters.docType}
-          aria-label="Filter by document type"
-          class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none focus:border-accent"
-        >
-          <option value="ALL">All Types</option>
-          {#each DOCUMENT_TYPES as type}
-            <option value={type}>{type}</option>
-          {/each}
-        </select>
-      </div>
+      {#snippet filters()}
+        <div class="flex items-center gap-1.5">
+          <select
+            bind:value={table.filters.docType}
+            aria-label="Filter by document type"
+            class="rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-2 text-xs text-slate-300 focus:border-accent focus:outline-none"
+          >
+            <option value="ALL">All Types</option>
+            {#each DOCUMENT_TYPES as type}
+              <option value={type}>{type}</option>
+            {/each}
+          </select>
+        </div>
+      {/snippet}
     </DataTableHeader>
 
     {#if isLoading}
@@ -387,96 +397,124 @@
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-300">
           <thead
-            class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
+            class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
           >
             <tr>
-              <th class="py-3 px-4 w-10">
+              <th class="w-10 px-4 py-3">
                 <TableCheckbox
                   checked={table.allFilteredSelected}
                   indeterminate={table.someFilteredSelected}
-                  on:change={() => table.toggleSelectAll()}
+                  onchange={() => table.toggleSelectAll()}
                   title="Select or deselect all visible documents"
                 />
               </th>
-              <SortHeader column="id" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+              <SortHeader
+                column="id"
+                sortField={table.sortField}
+                sortAsc={table.sortAsc}
+                onSort={(f) => table.toggleSort(f)}
+              >
                 ID
               </SortHeader>
-              <SortHeader column="filename" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+              <SortHeader
+                column="filename"
+                sortField={table.sortField}
+                sortAsc={table.sortAsc}
+                onSort={(f) => table.toggleSort(f)}
+              >
                 Document File
               </SortHeader>
-              <SortHeader column="doc_type" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+              <SortHeader
+                column="doc_type"
+                sortField={table.sortField}
+                sortAsc={table.sortAsc}
+                onSort={(f) => table.toggleSort(f)}
+              >
                 Type
               </SortHeader>
-              <th class="py-3 px-4">Extracted Text</th>
-              <SortHeader column="char_count" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+              <th class="px-4 py-3">Extracted Text</th>
+              <SortHeader
+                column="char_count"
+                sortField={table.sortField}
+                sortAsc={table.sortAsc}
+                onSort={(f) => table.toggleSort(f)}
+              >
                 Characters
               </SortHeader>
-              <SortHeader column="upload_date" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+              <SortHeader
+                column="upload_date"
+                sortField={table.sortField}
+                sortAsc={table.sortAsc}
+                onSort={(f) => table.toggleSort(f)}
+              >
                 Uploaded
               </SortHeader>
-              <th class="py-3 px-4 text-right">Actions</th>
+              <th class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
             {#each table.paginated as doc (doc.id)}
-              <tr class="hover:bg-slate-900/60 transition-colors {table.isSelected(doc.id) ? 'bg-blue-950/20' : ''}">
-                <td class="py-3 px-4 w-10">
+              <tr
+                class="transition-colors hover:bg-slate-900/60 {table.isSelected(doc.id)
+                  ? 'bg-blue-950/20'
+                  : ''}"
+              >
+                <td class="w-10 px-4 py-3">
                   <TableCheckbox
                     checked={table.isSelected(doc.id)}
-                    on:change={() => table.toggleSelect(doc.id)}
+                    onchange={() => table.toggleSelect(doc.id)}
                     ariaLabel={`Select document ${doc.filename}`}
                   />
                 </td>
-                <td class="py-3 px-4 font-mono text-slate-500">#{doc.id}</td>
-                <td class="py-3 px-4">
+                <td class="px-4 py-3 font-mono text-slate-500">#{doc.id}</td>
+                <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
-                    <FileText class="w-4 h-4 text-blue-400 shrink-0" />
-                    <span class="font-semibold text-slate-50 truncate max-w-xs"
-                      >{doc.filename}</span
+                    <FileText class="h-4 w-4 shrink-0 text-blue-400" />
+                    <span class="max-w-xs truncate font-semibold text-slate-50">{doc.filename}</span
                     >
                   </div>
                 </td>
-                <td class="py-3 px-4 whitespace-nowrap">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-caption font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
-                    {doc.doc_type || 'Specification'}
+                <td class="whitespace-nowrap px-4 py-3">
+                  <span
+                    class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-800 px-2 py-0.5 text-caption font-medium text-blue-300"
+                  >
+                    {doc.doc_type || "Specification"}
                   </span>
                 </td>
-                <td
-                  class="py-3 px-4 text-slate-400 text-caption max-w-sm truncate"
-                >
+                <td class="max-w-sm truncate px-4 py-3 text-caption text-slate-400">
                   {doc.extracted_text_preview || "No preview available"}
                 </td>
-                <td class="py-3 px-4 text-slate-400 text-xs font-mono">
+                <td class="px-4 py-3 font-mono text-xs text-slate-400">
                   {doc.char_count.toLocaleString()}
                 </td>
-                <td class="py-3 px-4 text-slate-500 whitespace-nowrap">
+                <td class="whitespace-nowrap px-4 py-3 text-slate-500">
                   {doc.upload_date ? doc.upload_date.substring(0, 10) : "-"}
                 </td>
-                <td class="py-3 px-4 text-right whitespace-nowrap">
+                <td class="whitespace-nowrap px-4 py-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
-                      on:click={() => openReader(doc.id)}
-                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                      onclick={() => openReader(doc.id)}
+                      class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                       title="Inspect extracted text"
                     >
-                      <Eye class="w-3.5 h-3.5" />
+                      <Eye class="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
-                      on:click={() => openEdit(doc)}
-                      class="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/30 transition-colors"
+                      onclick={() => openEdit(doc)}
+                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400"
                       title="Edit document"
                     >
-                      <Pencil class="w-3.5 h-3.5" />
+                      <Pencil class="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
-                      on:click={() => promptDelete(doc.id, doc.filename)}
-                      class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                      onclick={() => promptDelete(doc.id, doc.filename)}
+                      class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                       title="Delete document"
                     >
-                      <Trash2 class="w-3.5 h-3.5" />
+                      <Trash2 class="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </td>
@@ -502,61 +540,61 @@
 
 <!-- Add Rule Source Modal: a document upload, an IDS import, or a hand-typed rule -->
 {#if isUploadModalOpen}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-  >
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] flex flex-col"
+      class="flex max-h-[90vh] w-full max-w-2xl flex-col space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
     >
-      <div
-        class="flex items-center justify-between border-b border-slate-800 pb-3"
-      >
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-base font-bold text-slate-50">Add Rule Source</h2>
         <button
           type="button"
-          on:click={() => (isUploadModalOpen = false)}
-          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800"
+          onclick={() => (isUploadModalOpen = false)}
+          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
         >
-          <X class="w-5 h-5" />
+          <X class="h-5 w-5" />
         </button>
       </div>
 
       <!-- Source Tabs -->
-      <div class="flex items-center gap-1 p-1 rounded-xl bg-slate-950/60 border border-slate-800">
+      <div class="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-950/60 p-1">
         <button
           type="button"
-          on:click={() => (uploadTab = "document")}
-          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'document'
+          onclick={() => (uploadTab = "document")}
+          class="flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors {uploadTab ===
+          'document'
             ? 'bg-accent text-white shadow-sm'
-            : 'text-slate-400 hover:text-slate-50 hover:bg-slate-900'}"
+            : 'text-slate-400 hover:bg-slate-900 hover:text-slate-50'}"
         >
           PDF / Word / Excel / TXT
         </button>
         <button
           type="button"
-          on:click={() => (uploadTab = "ids")}
-          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors {uploadTab === 'ids'
+          onclick={() => (uploadTab = "ids")}
+          class="flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors {uploadTab ===
+          'ids'
             ? 'bg-accent text-white shadow-sm'
-            : 'text-slate-400 hover:text-slate-50 hover:bg-slate-900'}"
+            : 'text-slate-400 hover:bg-slate-900 hover:text-slate-50'}"
         >
           IDS XML File
         </button>
         <button
           type="button"
-          on:click={goToManualRuleEditor}
+          onclick={goToManualRuleEditor}
           title="Opens the Manual Rule Editor page, organized by building element category"
-          class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-900 transition-colors inline-flex items-center justify-center gap-1"
+          class="inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-50"
         >
           <span>Manual</span>
-          <ExternalLink class="w-3 h-3 opacity-60" />
+          <ExternalLink class="h-3 w-3 opacity-60" />
         </button>
       </div>
 
-      <div class="overflow-y-auto pr-1 flex-1">
+      <div class="flex-1 overflow-y-auto pr-1">
         {#if uploadTab === "document"}
           <div class="space-y-4">
             {#if uploadError}
-              <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+              <div
+                class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
+              >
                 {uploadError}
               </div>
             {/if}
@@ -568,7 +606,7 @@
               <select
                 id="upload-doc-type"
                 bind:value={uploadDocType}
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
               >
                 {#each DOCUMENT_TYPES as type}
                   <option value={type}>{type}</option>
@@ -586,29 +624,31 @@
               <select
                 id="upload-parser"
                 bind:value={uploadParser}
-                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
               >
                 <option value="auto">Auto (Unstructured API, falls back to local)</option>
-                <option value="unstructured">Unstructured API only (best quality, slower, uploads file)</option>
+                <option value="unstructured"
+                  >Unstructured API only (best quality, slower, uploads file)</option
+                >
                 <option value="light">Light local extraction only (instant, no upload)</option>
               </select>
             </div>
 
             <div
-              class="border-2 border-dashed border-slate-700 hover:border-accent transition-colors rounded-xl p-6 text-center bg-slate-950/40"
+              class="rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/40 p-6 text-center transition-colors hover:border-accent"
             >
-              <FileText class="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p class="text-xs text-slate-400 mb-3">
+              <FileText class="mx-auto mb-2 h-8 w-8 text-slate-400" />
+              <p class="mb-3 text-xs text-slate-400">
                 Upload PDF, Word, Excel, CSV, TXT, or Markdown specifications
               </p>
               <label
-                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-xs font-semibold cursor-pointer transition-colors"
+                class="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
               >
                 <span>Choose File</span>
                 <input
                   type="file"
                   accept=".pdf,.txt,.md,.markdown,.docx,.csv,.xlsx"
-                  on:change={(e) => {
+                  onchange={(e) => {
                     const target = e.target as HTMLInputElement;
                     if (target.files) uploadFile = target.files[0];
                   }}
@@ -618,25 +658,27 @@
             </div>
 
             {#if uploadFile}
-              <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                <span class="text-slate-50 font-medium truncate">{uploadFile.name}</span>
+              <div
+                class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs"
+              >
+                <span class="truncate font-medium text-slate-50">{uploadFile.name}</span>
                 <span class="text-slate-500">{(uploadFile.size / 1024).toFixed(1)} KB</span>
               </div>
             {/if}
 
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
               <button
                 type="button"
-                on:click={() => (isUploadModalOpen = false)}
-                class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50"
+                onclick={() => (isUploadModalOpen = false)}
+                class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 hover:bg-slate-700"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 disabled={!uploadFile || isUploading}
-                on:click={handleUpload}
-                class="px-5 py-2 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white disabled:opacity-50"
+                onclick={handleUpload}
+                class="rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
               >
                 {isUploading ? "Extracting Text..." : "Upload & Extract"}
               </button>
@@ -656,65 +698,63 @@
 
 <!-- Text Reader Modal -->
 {#if selectedDoc}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-  >
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+      class="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
     >
-      <div
-        class="px-6 py-4 border-b border-slate-800 flex items-center justify-between"
-      >
+      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
         <div>
           <div class="flex items-center gap-2">
-            <h2 class="text-base font-bold text-slate-50 tracking-tight">
+            <h2 class="text-base font-bold tracking-tight text-slate-50">
               {selectedDoc.filename}
             </h2>
             {#if selectedDoc.doc_type}
-              <span class="px-2 py-0.5 rounded-md text-caption font-medium bg-slate-800 text-blue-300 border border-slate-700/60">
+              <span
+                class="rounded-md border border-slate-700/60 bg-slate-800 px-2 py-0.5 text-caption font-medium text-blue-300"
+              >
                 {selectedDoc.doc_type}
               </span>
             {/if}
           </div>
-          <p class="text-xs text-slate-400 mt-0.5">
+          <p class="mt-0.5 text-xs text-slate-400">
             {selectedDoc.char_count.toLocaleString()} extracted characters
           </p>
         </div>
         <button
           type="button"
-          on:click={() => (selectedDoc = null)}
-          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800"
+          onclick={() => (selectedDoc = null)}
+          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
         >
-          <X class="w-5 h-5" />
+          <X class="h-5 w-5" />
         </button>
       </div>
 
       <div
-        class="p-6 overflow-y-auto flex-1 bg-slate-950/60 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed"
+        class="flex-1 overflow-y-auto whitespace-pre-wrap bg-slate-950/60 p-6 font-mono text-xs leading-relaxed text-slate-300"
       >
         {selectedDoc.extracted_text || "No extracted text found."}
       </div>
 
       <div
-        class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between"
+        class="flex items-center justify-between border-t border-slate-800 bg-slate-950 px-6 py-3"
       >
         <button
           type="button"
-          on:click={() => {
+          onclick={() => {
             const doc = documents.find((d) => d.id === selectedDoc!.id);
             selectedDoc = null;
             if (doc) openEdit(doc);
           }}
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-50 transition-colors hover:bg-slate-700"
         >
-          <Pencil class="w-3.5 h-3.5" />
+          <Pencil class="h-3.5 w-3.5" />
           <span>Edit Document</span>
         </button>
 
         <button
           type="button"
-          on:click={() => (selectedDoc = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50"
+          onclick={() => (selectedDoc = null)}
+          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 hover:bg-slate-700"
         >
           Close
         </button>
@@ -725,22 +765,18 @@
 
 <!-- Edit Document Modal -->
 {#if isEditModalOpen && docToEdit}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-  >
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
     >
       <!-- Header -->
-      <div
-        class="px-6 py-4 border-b border-slate-800 flex items-center justify-between"
-      >
+      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
         <div class="flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <Pencil class="w-5 h-5" />
+          <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
+            <Pencil class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold text-slate-50 tracking-tight">
+            <h2 class="text-base font-bold tracking-tight text-slate-50">
               Edit Document #{docToEdit.id}
             </h2>
             <p class="text-xs text-slate-400">
@@ -750,19 +786,17 @@
         </div>
         <button
           type="button"
-          on:click={() => (isEditModalOpen = false)}
-          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800"
+          onclick={() => (isEditModalOpen = false)}
+          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
         >
-          <X class="w-5 h-5" />
+          <X class="h-5 w-5" />
         </button>
       </div>
 
       <!-- Body Form -->
-      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+      <div class="flex-1 space-y-4 overflow-y-auto p-6">
         {#if editError}
-          <div
-            class="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs"
-          >
+          <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
             {editError}
           </div>
         {/if}
@@ -776,7 +810,7 @@
             type="text"
             bind:value={editFilename}
             placeholder="e.g. OBC_Part9_Specifications.pdf"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
         </div>
 
@@ -787,7 +821,7 @@
           <select
             id="edit-doc-type"
             bind:value={editDocType}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
             {#each DOCUMENT_TYPES as type}
               <option value={type}>{type}</option>
@@ -795,7 +829,7 @@
           </select>
         </div>
 
-        <div class="space-y-1.5 flex-1 flex flex-col">
+        <div class="flex flex-1 flex-col space-y-1.5">
           <label for="edit-doc-text" class="block text-xs font-semibold text-slate-300">
             Extracted Specification Text
           </label>
@@ -804,27 +838,27 @@
             rows="10"
             bind:value={editExtractedText}
             placeholder="Parsed specification clauses and text content..."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-accent leading-relaxed resize-y"
+            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs leading-relaxed text-slate-200 placeholder-slate-500 focus:border-accent focus:outline-none"
           ></textarea>
         </div>
       </div>
 
       <!-- Footer -->
       <div
-        class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2"
+        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950 px-6 py-3"
       >
         <button
           type="button"
-          on:click={() => (isEditModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50 hover:bg-slate-800"
+          onclick={() => (isEditModalOpen = false)}
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-50"
         >
           Cancel
         </button>
         <button
           type="button"
           disabled={isSavingEdit || !editFilename.trim()}
-          on:click={handleSaveEdit}
-          class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+          onclick={handleSaveEdit}
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <span>{isSavingEdit ? "Saving..." : "Save Changes"}</span>
         </button>
@@ -868,4 +902,3 @@
     table.clearSelection();
   }}
 />
-

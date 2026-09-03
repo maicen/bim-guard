@@ -42,54 +42,60 @@
   import { normalizeAnalysisDomain } from "../lib/analysisDomain";
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
 
-  export let onSelectProjectForAudit: (projectId: number) => void;
-  export let onSelectProjectForViewer: (projectId: number) => void;
+  interface Props {
+    onSelectProjectForAudit: (projectId: number) => void;
+    onSelectProjectForViewer: (projectId: number) => void;
+  }
+
+  let { onSelectProjectForAudit, onSelectProjectForViewer }: Props = $props();
 
   // Initialize immediately from synchronous client cache for 0ms render time
   const initialCache = projectsApi.getCachedList();
   let projects: Project[] = initialCache ? initialCache.projects || [] : [];
-  let isLoading = !initialCache;
-  let isRefreshing = false;
-  let error = "";
+  let isLoading = $state(!initialCache);
+  let isRefreshing = $state(false);
+  let error = $state("");
   let unsubscribe: (() => void) | null = null;
 
   // Storage Source selector state
-  let selectedSource = "supabase"; // 'supabase' or 'repo:<id>'
-  let repos: GitHubRepo[] = [];
-  let isRepoLoading = false;
-  let activeRepoStructure: GitHubRepoStructure | null = null;
-  let repoCategoryFilter = "all";
-  let importingPath = "";
+  let selectedSource = $state("supabase"); // 'supabase' or 'repo:<id>'
+  let repos: GitHubRepo[] = $state([]);
+  let isRepoLoading = $state(false);
+  let activeRepoStructure: GitHubRepoStructure | null = $state(null);
+  let repoCategoryFilter = $state("all");
+  let importingPath = $state("");
 
   // Search, filter, sort, paginate and select — all owned by the shared state.
   // The domain filter reuses normalizeAnalysisDomain rather than restating the
   // legacy alias list ("Architectural", "Piping (Corrosive)", "Halo", ...).
-  const table = createTableState<Project, number>({
-    rows: () => projects || [],
-    getId: (p) => p.id,
-    searchFields: (p) => [p.name, p.description],
-    filters: {
-      status: (p, value) => p.status === value,
-      domain: (p, value) =>
-        p.analysis_type === value || normalizeAnalysisDomain(p.analysis_type) === value,
-    },
-    initialSort: { field: "id", asc: true },
-  });
+  const table = $state(
+    createTableState<Project, number>({
+      rows: () => projects || [],
+      getId: (p) => p.id,
+      searchFields: (p) => [p.name, p.description],
+      filters: {
+        status: (p, value) => p.status === value,
+        domain: (p, value) =>
+          p.analysis_type === value || normalizeAnalysisDomain(p.analysis_type) === value,
+      },
+      initialSort: { field: "id", asc: true },
+    }),
+  );
 
   // Modals state
-  let isEditModalOpen = false;
-  let isDetailsModalOpen = false;
-  let isEnhancementsOpen = false;
-  let isDeleteModalOpen = false;
-  let isRepoManagerOpen = false;
-  let selectedProjectForEdit: Project | null = null;
-  let selectedProjectForDetails: Project | null = null;
-  let selectedProjectForEnhance: Project | null = null;
-  let projectToDelete: { id: number; name: string } | null = null;
+  let isEditModalOpen = $state(false);
+  let isDetailsModalOpen = $state(false);
+  let isEnhancementsOpen = $state(false);
+  let isDeleteModalOpen = $state(false);
+  let isRepoManagerOpen = $state(false);
+  let selectedProjectForEdit: Project | null = $state(null);
+  let selectedProjectForDetails: Project | null = $state(null);
+  let selectedProjectForEnhance: Project | null = $state(null);
+  let projectToDelete: { id: number; name: string } | null = $state(null);
 
   // Bulk selection state
-  let isBulkEditModalOpen = false;
-  let isBulkDeleteModalOpen = false;
+  let isBulkEditModalOpen = $state(false);
+  let isBulkDeleteModalOpen = $state(false);
 
   // Data loading. The view paints instantly from the synchronous client cache
   // above; these refresh it and keep it in sync with mutations made elsewhere.
@@ -160,14 +166,16 @@
     }
   });
 
-  $: filteredRepoItems = (activeRepoStructure?.items || []).filter((item) => {
-    const matchesSearch =
-      table.search === "" ||
-      item.name.toLowerCase().includes(table.search.toLowerCase()) ||
-      item.path.toLowerCase().includes(table.search.toLowerCase());
-    const matchesCategory = repoCategoryFilter === "all" || item.category === repoCategoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+  let filteredRepoItems = $derived(
+    (activeRepoStructure?.items || []).filter((item) => {
+      const matchesSearch =
+        table.search === "" ||
+        item.name.toLowerCase().includes(table.search.toLowerCase()) ||
+        item.path.toLowerCase().includes(table.search.toLowerCase());
+      const matchesCategory = repoCategoryFilter === "all" || item.category === repoCategoryFilter;
+      return matchesSearch && matchesCategory;
+    }),
+  );
 
   function getImportedProject(item: GitHubRepoItem): Project | undefined {
     return projects.find((p) => {
@@ -273,7 +281,7 @@
   }
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header & Storage Source Control -->
   <!-- Header & Storage Source Control -->
   <PageHeader
@@ -282,71 +290,76 @@
     subtitle="Manage OpenBIM models, analysis scopes, and project storage sources."
     icon={Box}
   >
-    <div slot="actions" class="flex flex-wrap items-center gap-2.5 bg-slate-900/90 border border-slate-800 p-2 rounded-2xl">
-      <div class="flex items-center gap-2 px-2">
-        {#if selectedSource === 'supabase'}
-          <Database class="w-4 h-4 text-emerald-400" />
-        {:else}
-          <FolderGit2 class="w-4 h-4 text-blue-400" />
+    {#snippet actions()}
+      <div
+        class="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-2"
+      >
+        <div class="flex items-center gap-2 px-2">
+          {#if selectedSource === "supabase"}
+            <Database class="h-4 w-4 text-emerald-400" />
+          {:else}
+            <FolderGit2 class="h-4 w-4 text-blue-400" />
+          {/if}
+          <span class="whitespace-nowrap text-xs font-semibold text-slate-300">Storage Source:</span
+          >
+        </div>
+
+        <select
+          bind:value={selectedSource}
+          onchange={handleSourceChange}
+          class="max-w-[240px] truncate rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-50 focus:border-blue-500 focus:outline-none"
+        >
+          <option value="supabase">Supabase Database (Main Registry)</option>
+          {#if repos.length > 0}
+            <optgroup label="GitHub Repositories">
+              {#each repos as repo}
+                <option value={`repo:${repo.id}`}>
+                  {repo.owner}/{repo.name} ({repo.branch})
+                </option>
+              {/each}
+            </optgroup>
+          {/if}
+        </select>
+
+        <button
+          type="button"
+          onclick={() => (isRepoManagerOpen = true)}
+          class="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+          title="Manage GitHub Repositories (Add, Edit, Delete)"
+        >
+          <Plus class="h-3.5 w-3.5 text-blue-400" />
+          <span>Manage Repos</span>
+        </button>
+
+        {#if selectedSource === "supabase"}
+          <button
+            type="button"
+            onclick={() => loadProjects(true)}
+            class="rounded-xl border border-slate-800 bg-slate-950 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+            title="Refresh project registry"
+          >
+            <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
+          </button>
+        {:else if selectedSource.startsWith("repo:")}
+          <button
+            type="button"
+            onclick={() => {
+              const repoId = parseInt(selectedSource.split(":")[1], 10);
+              loadSelectedRepoStructure(repoId, true);
+            }}
+            class="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+            title="Re-sync GitHub repository models & manifest"
+          >
+            <RotateCw class="h-3.5 w-3.5 {isRepoLoading ? 'animate-spin text-blue-400' : ''}" />
+            <span>Sync Repo</span>
+          </button>
         {/if}
-        <span class="text-xs font-semibold text-slate-300 whitespace-nowrap">Storage Source:</span>
       </div>
-
-      <select
-        bind:value={selectedSource}
-        on:change={handleSourceChange}
-        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-50 focus:outline-none focus:border-blue-500 max-w-[240px] truncate"
-      >
-        <option value="supabase">Supabase Database (Main Registry)</option>
-        {#if repos.length > 0}
-          <optgroup label="GitHub Repositories">
-            {#each repos as repo}
-              <option value={`repo:${repo.id}`}>
-                {repo.owner}/{repo.name} ({repo.branch})
-              </option>
-            {/each}
-          </optgroup>
-        {/if}
-      </select>
-
-      <button
-        type="button"
-        on:click={() => (isRepoManagerOpen = true)}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-semibold transition-colors"
-        title="Manage GitHub Repositories (Add, Edit, Delete)"
-      >
-        <Plus class="w-3.5 h-3.5 text-blue-400" />
-        <span>Manage Repos</span>
-      </button>
-
-      {#if selectedSource === 'supabase'}
-        <button
-          type="button"
-          on:click={() => loadProjects(true)}
-          class="p-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-50 transition-colors"
-          title="Refresh project registry"
-        >
-          <RotateCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
-        </button>
-      {:else if selectedSource.startsWith('repo:')}
-        <button
-          type="button"
-          on:click={() => {
-            const repoId = parseInt(selectedSource.split(":")[1], 10);
-            loadSelectedRepoStructure(repoId, true);
-          }}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-semibold transition-colors"
-          title="Re-sync GitHub repository models & manifest"
-        >
-          <RotateCw class="w-3.5 h-3.5 {isRepoLoading ? 'animate-spin text-blue-400' : ''}" />
-          <span>Sync Repo</span>
-        </button>
-      {/if}
-    </div>
+    {/snippet}
   </PageHeader>
 
   {#if error}
-    <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
       {error}
     </div>
   {/if}
@@ -354,21 +367,23 @@
   <!-- VIEW 1: SUPABASE INTERNAL DATABASE PROJECTS (MAIN REGISTRY) -->
   {#if selectedSource === "supabase"}
     <!-- Filters and Search Bar -->
-    <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row items-center gap-3">
-      <div class="relative flex-1 w-full">
-        <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+    <div
+      class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:flex-row"
+    >
+      <div class="relative w-full flex-1">
+        <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
           bind:value={table.search}
           placeholder="Filter projects by name or description..."
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
         />
       </div>
 
-      <div class="flex items-center gap-2 w-full md:w-auto">
+      <div class="flex w-full items-center gap-2 md:w-auto">
         <select
           bind:value={table.filters.status}
-          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
           <option value="all">All Statuses</option>
           <option value="Active">Active</option>
@@ -378,7 +393,7 @@
 
         <select
           bind:value={table.filters.domain}
-          class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
           <option value="all">All Domains</option>
           <option value="Arch">Arch</option>
@@ -398,7 +413,7 @@
     />
 
     <!-- Projects Table -->
-    <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
+    <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
       {#if isLoading}
         <LoadingState message="Loading project registry..." />
       {:else if table.totalItems === 0}
@@ -415,151 +430,185 @@
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-300">
-            <thead class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold">
+            <thead
+              class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+            >
               <tr>
-                <th class="py-3 px-4 w-10">
+                <th class="w-10 px-4 py-3">
                   <TableCheckbox
                     checked={table.allFilteredSelected}
                     indeterminate={table.someFilteredSelected}
-                    on:change={() => table.toggleSelectAll()}
+                    onchange={() => table.toggleSelectAll()}
                     title="Select or deselect all visible projects"
                   />
                 </th>
-                <SortHeader column="name" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+                <SortHeader
+                  column="name"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                >
                   Project Name
                 </SortHeader>
-                <SortHeader column="status" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+                <SortHeader
+                  column="status"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                >
                   Status
                 </SortHeader>
-                <th class="py-3 px-4">IFC Model</th>
-                <SortHeader column="analysis_type" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+                <th class="px-4 py-3">IFC Model</th>
+                <SortHeader
+                  column="analysis_type"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                >
                   Analysis Domain
                 </SortHeader>
-                <SortHeader column="jurisdiction" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+                <SortHeader
+                  column="jurisdiction"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                >
                   Jurisdiction
                 </SortHeader>
-                <SortHeader column="created_at" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)}>
+                <SortHeader
+                  column="created_at"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                >
                   Created
                 </SortHeader>
-                <th class="py-3 px-4 text-right">Actions</th>
+                <th class="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
               {#each table.paginated as project (project.id)}
-                <tr class="hover:bg-slate-900/60 transition-colors {table.isSelected(project.id) ? 'bg-blue-950/20' : ''}">
-                  <td class="py-3 px-4 w-10">
+                <tr
+                  class="transition-colors hover:bg-slate-900/60 {table.isSelected(project.id)
+                    ? 'bg-blue-950/20'
+                    : ''}"
+                >
+                  <td class="w-10 px-4 py-3">
                     <TableCheckbox
                       checked={table.isSelected(project.id)}
-                      on:change={() => table.toggleSelect(project.id)}
+                      onchange={() => table.toggleSelect(project.id)}
                       ariaLabel={`Select project ${project.name}`}
                     />
                   </td>
-                  <td class="py-3 px-4 font-semibold text-slate-50">
+                  <td class="px-4 py-3 font-semibold text-slate-50">
                     <div class="flex flex-col">
                       <span class="text-sm">{project.name}</span>
                       {#if project.description}
-                        <span class="text-caption text-slate-400 font-normal truncate max-w-sm">
+                        <span class="max-w-sm truncate text-caption font-normal text-slate-400">
                           {project.description}
                         </span>
                       {/if}
                     </div>
                   </td>
-                  <td class="py-3 px-4">
+                  <td class="px-4 py-3">
                     <span
-                      class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold border {project.status ===
+                      class="inline-block rounded-full border px-2.5 py-0.5 text-micro font-semibold {project.status ===
                       'Active'
-                        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60'
+                        ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
                         : project.status === 'Archived'
-                        ? 'bg-slate-800 text-slate-400 border-slate-700'
-                        : 'bg-amber-950/40 text-amber-400 border-amber-800/60'}"
+                          ? 'border-slate-700 bg-slate-800 text-slate-400'
+                          : 'border-amber-800/60 bg-amber-950/40 text-amber-400'}"
                     >
                       {project.status}
                     </span>
                   </td>
-                  <td class="py-3 px-4">
+                  <td class="px-4 py-3">
                     {#if project.ifc_file_path}
-                      <div class="flex items-center gap-1.5 text-emerald-400 font-medium">
-                        <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-                        <span class="text-caption truncate max-w-[120px]" title={project.ifc_file_path}>Attached</span>
+                      <div class="flex items-center gap-1.5 font-medium text-emerald-400">
+                        <CheckCircle2 class="h-4 w-4 text-emerald-400" />
+                        <span
+                          class="max-w-[120px] truncate text-caption"
+                          title={project.ifc_file_path}>Attached</span
+                        >
                       </div>
                     {:else}
                       <div class="flex items-center gap-1.5 text-slate-500">
-                        <XCircle class="w-4 h-4" />
+                        <XCircle class="h-4 w-4" />
                         <span class="text-caption">None</span>
                       </div>
                     {/if}
                   </td>
-                  <td class="py-3 px-4">
+                  <td class="px-4 py-3">
                     <span
-                      class="inline-block px-2 py-0.5 rounded text-micro font-semibold font-mono {project.analysis_type ===
+                      class="inline-block rounded px-2 py-0.5 font-mono text-micro font-semibold {project.analysis_type ===
                       'Piping'
-                        ? 'bg-amber-950/60 border border-amber-800/50 text-amber-300'
+                        ? 'border border-amber-800/50 bg-amber-950/60 text-amber-300'
                         : project.analysis_type === 'Seismic'
-                        ? 'bg-purple-950/60 border border-purple-800/50 text-purple-300'
-                        : 'bg-blue-950/60 border border-blue-800/50 text-blue-300'}"
+                          ? 'border border-purple-800/50 bg-purple-950/60 text-purple-300'
+                          : 'border border-blue-800/50 bg-blue-950/60 text-blue-300'}"
                     >
                       {project.analysis_type}
                     </span>
                   </td>
-                  <td class="py-3 px-4 text-slate-400">{project.country}</td>
-                  <td class="py-3 px-4 text-slate-500 whitespace-nowrap">
+                  <td class="px-4 py-3 text-slate-400">{project.country}</td>
+                  <td class="whitespace-nowrap px-4 py-3 text-slate-500">
                     {project.created_at ? project.created_at.substring(0, 10) : "-"}
                   </td>
-                  <td class="py-3 px-4 text-right whitespace-nowrap">
+                  <td class="whitespace-nowrap px-4 py-3 text-right">
                     <div class="flex items-center justify-end gap-1.5">
                       <button
                         type="button"
-                        on:click={() => openDetails(project)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                        onclick={() => openDetails(project)}
+                        class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                         title="View project details"
                       >
-                        <Eye class="w-3.5 h-3.5" />
+                        <Eye class="h-3.5 w-3.5" />
                       </button>
 
                       {#if project.ifc_file_path}
                         <button
                           type="button"
-                          on:click={() => onSelectProjectForViewer(project.id)}
-                          class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                          onclick={() => onSelectProjectForViewer(project.id)}
+                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                           title="Open in 3D Viewer"
                         >
-                          <ScanEye class="w-3.5 h-3.5" />
+                          <ScanEye class="h-3.5 w-3.5" />
                         </button>
 
                         <button
                           type="button"
-                          on:click={() => openEnhancements(project)}
-                          class="p-1.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 border border-purple-800/40 transition-colors"
+                          onclick={() => openEnhancements(project)}
+                          class="rounded-lg border border-purple-800/40 bg-purple-950/40 p-1.5 text-purple-300 transition-colors hover:bg-purple-900/60"
                           title="Model Quality Improvements (Lineage)"
                         >
-                          <Sparkles class="w-3.5 h-3.5" />
+                          <Sparkles class="h-3.5 w-3.5" />
                         </button>
                       {/if}
 
                       <button
                         type="button"
-                        on:click={() => onSelectProjectForAudit(project.id)}
-                        class="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors"
+                        onclick={() => onSelectProjectForAudit(project.id)}
+                        class="rounded-lg bg-blue-600/20 px-2.5 py-1 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-600/30 hover:text-blue-300"
                       >
                         Audit
                       </button>
 
                       <button
                         type="button"
-                        on:click={() => openEdit(project)}
-                        class="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/30 transition-colors"
+                        onclick={() => openEdit(project)}
+                        class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400"
                         title="Edit project"
                       >
-                        <Pencil class="w-3.5 h-3.5" />
+                        <Pencil class="h-3.5 w-3.5" />
                       </button>
 
                       <button
                         type="button"
-                        on:click={() => promptDelete(project.id, project.name)}
-                        class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                        onclick={() => promptDelete(project.id, project.name)}
+                        class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                         title="Delete project"
                       >
-                        <Trash2 class="w-3.5 h-3.5" />
+                        <Trash2 class="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>
@@ -587,27 +636,38 @@
   {#if selectedSource.startsWith("repo:")}
     <div class="space-y-4">
       {#if isRepoLoading}
-        <div class="p-12 text-center text-xs text-slate-400 border border-slate-800 rounded-2xl bg-slate-900/40 flex items-center justify-center gap-2">
-          <Loader2 class="w-4 h-4 animate-spin text-blue-400" />
+        <div
+          class="flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center text-xs text-slate-400"
+        >
+          <Loader2 class="h-4 w-4 animate-spin text-blue-400" />
           <span>Reading GitHub repository structure & OpenBIM models tree...</span>
         </div>
       {:else if activeRepoStructure}
         <!-- Repo Banner -->
-        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div
+          class="flex flex-col items-start justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:flex-row md:items-center"
+        >
           <div class="space-y-1">
             <div class="flex items-center gap-2">
-              <FolderGit2 class="w-5 h-5 text-blue-400" />
+              <FolderGit2 class="h-5 w-5 text-blue-400" />
               <h2 class="text-lg font-bold text-slate-50">
                 {activeRepoStructure.owner}/{activeRepoStructure.name}
               </h2>
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-caption text-slate-400">
-                <GitBranch class="w-3 h-3 text-blue-400" />
+              <span
+                class="inline-flex items-center gap-1 rounded border border-slate-800 bg-slate-950 px-2 py-0.5 font-mono text-caption text-slate-400"
+              >
+                <GitBranch class="h-3 w-3 text-blue-400" />
                 {activeRepoStructure.branch}
               </span>
             </div>
             <p class="text-xs text-slate-400">
-              Discovered <span class="text-blue-400 font-semibold">{activeRepoStructure.models_count}</span> OpenBIM models across
-              <span class="text-slate-300 font-semibold">{activeRepoStructure.categories.length}</span> category folders.
+              Discovered <span class="font-semibold text-blue-400"
+                >{activeRepoStructure.models_count}</span
+              >
+              OpenBIM models across
+              <span class="font-semibold text-slate-300"
+                >{activeRepoStructure.categories.length}</span
+              > category folders.
             </p>
           </div>
 
@@ -616,31 +676,33 @@
               href={activeRepoStructure.url}
               target="_blank"
               rel="noopener noreferrer"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-blue-400 text-xs font-semibold transition-colors"
+              class="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-blue-400 transition-colors hover:bg-slate-800"
             >
               <span>GitHub Repo</span>
-              <ExternalLink class="w-3.5 h-3.5" />
+              <ExternalLink class="h-3.5 w-3.5" />
             </a>
           </div>
         </div>
 
         <!-- Filter Bar -->
-        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row items-center gap-3">
-          <div class="relative flex-1 w-full">
-            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <div
+          class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:flex-row"
+        >
+          <div class="relative w-full flex-1">
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               bind:value={table.search}
               placeholder="Search repository IFC models by filename or path..."
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           {#if activeRepoStructure.categories.length > 0}
-            <div class="flex items-center gap-2 w-full md:w-auto">
+            <div class="flex w-full items-center gap-2 md:w-auto">
               <select
                 bind:value={repoCategoryFilter}
-                class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-blue-500"
+                class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
               >
                 <option value="all">All Category Folders</option>
                 {#each activeRepoStructure.categories as cat}
@@ -652,7 +714,7 @@
         </div>
 
         <!-- Repo Models Table -->
-        <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
           {#if filteredRepoItems.length === 0}
             <div class="p-12 text-center text-xs text-slate-500">
               No OpenBIM models found matching your search or category filter.
@@ -660,70 +722,77 @@
           {:else}
             <div class="overflow-x-auto">
               <table class="w-full text-left text-xs text-slate-300">
-                <thead class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold">
+                <thead
+                  class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                >
                   <tr>
-                    <th class="py-3 px-4">IFC Model Name</th>
-                    <th class="py-3 px-4">Repository Path</th>
-                    <th class="py-3 px-4">Category</th>
-                    <th class="py-3 px-4">Size</th>
-                    <th class="py-3 px-4 text-right">Actions</th>
+                    <th class="px-4 py-3">IFC Model Name</th>
+                    <th class="px-4 py-3">Repository Path</th>
+                    <th class="px-4 py-3">Category</th>
+                    <th class="px-4 py-3">Size</th>
+                    <th class="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
                   {#each filteredRepoItems as item}
                     {@const importedProject = getImportedProject(item)}
-                    <tr class="hover:bg-slate-900/60 transition-colors">
-                      <td class="py-3 px-4 font-semibold text-slate-50">
+                    <tr class="transition-colors hover:bg-slate-900/60">
+                      <td class="px-4 py-3 font-semibold text-slate-50">
                         <div class="flex items-center gap-2">
-                          <Box class="w-4 h-4 text-blue-400 shrink-0" />
+                          <Box class="h-4 w-4 shrink-0 text-blue-400" />
                           <span class="text-sm">{item.name}</span>
                         </div>
                       </td>
-                      <td class="py-3 px-4 text-slate-400 font-mono text-caption truncate max-w-xs" title={item.path}>
+                      <td
+                        class="max-w-xs truncate px-4 py-3 font-mono text-caption text-slate-400"
+                        title={item.path}
+                      >
                         {item.path}
                       </td>
-                      <td class="py-3 px-4">
-                        <span class="inline-block px-2 py-0.5 rounded text-micro font-semibold font-mono uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                      <td class="px-4 py-3">
+                        <span
+                          class="inline-block rounded border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-micro font-semibold uppercase text-slate-300"
+                        >
                           {item.category}
                         </span>
                       </td>
-                      <td class="py-3 px-4 text-slate-400 whitespace-nowrap">
+                      <td class="whitespace-nowrap px-4 py-3 text-slate-400">
                         {formatBytes(item.size)}
                       </td>
-                      <td class="py-3 px-4 text-right whitespace-nowrap">
+                      <td class="whitespace-nowrap px-4 py-3 text-right">
                         <div class="flex items-center justify-end gap-2">
                           <a
                             href={item.download_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                            class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                             title="Direct download raw IFC"
                           >
-                            <Download class="w-3.5 h-3.5" />
+                            <Download class="h-3.5 w-3.5" />
                           </a>
 
                           {#if importedProject}
                             <button
                               type="button"
-                              on:click={() => handleViewInMainRegistry(importedProject)}
-                              class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900/90 border border-emerald-800/80 text-emerald-300 text-xs font-semibold transition-all shadow-sm"
+                              onclick={() => handleViewInMainRegistry(importedProject)}
+                              class="flex items-center gap-1.5 rounded-lg border border-emerald-800/80 bg-emerald-950/70 px-3 py-1 text-xs font-semibold text-emerald-300 shadow-sm transition-all hover:bg-emerald-900/90"
                               title="Model is already imported into Main Registry. Click to view in Main Registry."
                             >
-                              <Eye class="w-3.5 h-3.5 text-emerald-400" />
+                              <Eye class="h-3.5 w-3.5 text-emerald-400" />
                               <span>View in Main Registry</span>
                             </button>
                           {:else}
                             <button
                               type="button"
-                              on:click={() => handleImportRepoModel(item)}
+                              onclick={() => handleImportRepoModel(item)}
                               disabled={importingPath === item.path}
-                              class="flex items-center gap-1 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all disabled:opacity-50"
+                              class="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-blue-500 disabled:opacity-50"
                             >
                               {#if importingPath === item.path}
-                                <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                                <Loader2 class="h-3.5 w-3.5 animate-spin" />
                                 <span>Importing...</span>
                               {:else}
-                                <Import class="w-3.5 h-3.5" />
+                                <Import class="h-3.5 w-3.5" />
                                 <span>Import to Main Registry & Audit</span>
                               {/if}
                             </button>

@@ -32,11 +32,11 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
 
-  let documents: DocumentItem[] = [];
-  let selectedDocId: number | null = null;
-  let rawText = "";
-  let selectedModel = "gemini-2.5-flash";
-  let viewingDraftRule: ExtractedRule | null = null;
+  let documents: DocumentItem[] = $state([]);
+  let selectedDocId: number | null = $state(null);
+  let rawText = $state("");
+  let selectedModel = $state("gemini-2.5-flash");
+  let viewingDraftRule: ExtractedRule | null = $state(null);
 
   function addManualDraftRule() {
     const newRule: ExtractedRule = {
@@ -55,29 +55,31 @@
   function removeDraftRule(index: number) {
     extractedRules = extractedRules.filter((_, i) => i !== index);
   }
-  let isExtracting = false;
-  let isSaving = false;
-  let error = "";
-  let successMessage = "";
+  let isExtracting = $state(false);
+  let isSaving = $state(false);
+  let error = $state("");
+  let successMessage = $state("");
 
-  let extractedRules: ExtractedRule[] = [];
+  let extractedRules: ExtractedRule[] = $state([]);
   let extractionWarnings: string[] = [];
-  let formRulesetId = "EXTRACTED-STANDARDS";
+  let formRulesetId = $state("EXTRACTED-STANDARDS");
 
   // Search, Filter, Sort & Pagination for Draft Rules
-  let draftSearchQuery = "";
-  let draftSeverityFilter = "ALL";
-  let draftSortField: "rule_id" | "description" | "property_set" | "property_name" | "operator" | "severity" = "rule_id";
-  let draftSortAsc = true;
-  let draftCurrentPage = 1;
-  let draftPageSize = 10;
+  let draftSearchQuery = $state("");
+  let draftSeverityFilter = $state("ALL");
+  let draftSortField:
+    "rule_id" | "description" | "property_set" | "property_name" | "operator" | "severity" =
+    $state("rule_id");
+  let draftSortAsc = $state(true);
+  let draftCurrentPage = $state(1);
+  let draftPageSize = $state(10);
 
   // Bulk Edit Modal for Draft Rules
-  let isDraftBulkEditModalOpen = false;
-  let bulkDraftSeverity = "no_change";
-  let bulkDraftPset = "";
-  let bulkDraftOperator = "no_change";
-  let isDraftBulkDeleteModalOpen = false;
+  let isDraftBulkEditModalOpen = $state(false);
+  let bulkDraftSeverity = $state("no_change");
+  let bulkDraftPset = $state("");
+  let bulkDraftOperator = $state("no_change");
+  let isDraftBulkDeleteModalOpen = $state(false);
 
   const LLM_MODELS = [
     { id: "gemini-2.5-flash", name: "Google Gemini 2.5 Flash (Recommended)" },
@@ -111,9 +113,7 @@
       }
 
       if (!textToExtract.trim()) {
-        throw new Error(
-          "Please select a specification document or paste text to extract rules.",
-        );
+        throw new Error("Please select a specification document or paste text to extract rules.");
       }
 
       const res = await ruleExtractionApi.extract(undefined, textToExtract);
@@ -124,8 +124,7 @@
       extractionWarnings = res.warnings || [];
 
       if (extractedRules.length === 0) {
-        error =
-          "No valid OpenBIM rules could be parsed from the provided text.";
+        error = "No valid OpenBIM rules could be parsed from the provided text.";
       }
     } catch (err: any) {
       error = err.message || "Rule extraction failed.";
@@ -134,42 +133,46 @@
     }
   }
 
-  $: selectedDraftCount = extractedRules.filter((r) => r.selected).length;
+  let selectedDraftCount = $derived(extractedRules.filter((r) => r.selected).length);
 
-  $: filteredDraftRules = extractedRules
-    .filter((r) => {
-      const matchesSearch =
-        !draftSearchQuery ||
-        (r.rule_id || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
-        (r.description || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
-        (r.property_name || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
-        (r.property_set || "").toLowerCase().includes(draftSearchQuery.toLowerCase());
-      const matchesSeverity =
-        draftSeverityFilter === "ALL" ||
-        (r.severity || "Medium").toLowerCase() === draftSeverityFilter.toLowerCase();
-      return matchesSearch && matchesSeverity;
-    })
-    .sort((a, b) => {
-      let valA: any = a[draftSortField];
-      let valB: any = b[draftSortField];
-      if (valA === undefined || valA === null) valA = "";
-      if (valB === undefined || valB === null) valB = "";
-      if (typeof valA === "string") valA = valA.toLowerCase();
-      if (typeof valB === "string") valB = valB.toLowerCase();
-      if (valA < valB) return draftSortAsc ? -1 : 1;
-      if (valA > valB) return draftSortAsc ? 1 : -1;
-      return 0;
-    });
-
-  $: draftTotalItems = filteredDraftRules.length;
-  $: paginatedDraftRules = filteredDraftRules.slice(
-    (draftCurrentPage - 1) * draftPageSize,
-    draftCurrentPage * draftPageSize,
+  let filteredDraftRules = $derived(
+    extractedRules
+      .filter((r) => {
+        const matchesSearch =
+          !draftSearchQuery ||
+          (r.rule_id || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
+          (r.description || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
+          (r.property_name || "").toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
+          (r.property_set || "").toLowerCase().includes(draftSearchQuery.toLowerCase());
+        const matchesSeverity =
+          draftSeverityFilter === "ALL" ||
+          (r.severity || "Medium").toLowerCase() === draftSeverityFilter.toLowerCase();
+        return matchesSearch && matchesSeverity;
+      })
+      .sort((a, b) => {
+        let valA: any = a[draftSortField];
+        let valB: any = b[draftSortField];
+        if (valA === undefined || valA === null) valA = "";
+        if (valB === undefined || valB === null) valB = "";
+        if (typeof valA === "string") valA = valA.toLowerCase();
+        if (typeof valB === "string") valB = valB.toLowerCase();
+        if (valA < valB) return draftSortAsc ? -1 : 1;
+        if (valA > valB) return draftSortAsc ? 1 : -1;
+        return 0;
+      }),
   );
 
-  $: allFilteredDraftsSelected =
-    filteredDraftRules.length > 0 &&
-    filteredDraftRules.every((r) => r.selected);
+  let draftTotalItems = $derived(filteredDraftRules.length);
+  let paginatedDraftRules = $derived(
+    filteredDraftRules.slice(
+      (draftCurrentPage - 1) * draftPageSize,
+      draftCurrentPage * draftPageSize,
+    ),
+  );
+
+  let allFilteredDraftsSelected = $derived(
+    filteredDraftRules.length > 0 && filteredDraftRules.every((r) => r.selected),
+  );
 
   function toggleSelectAllDrafts() {
     const targetState = !allFilteredDraftsSelected;
@@ -179,7 +182,9 @@
     extractedRules = [...extractedRules];
   }
 
-  function toggleDraftSort(field: "rule_id" | "description" | "property_set" | "property_name" | "operator" | "severity") {
+  function toggleDraftSort(
+    field: "rule_id" | "description" | "property_set" | "property_name" | "operator" | "severity",
+  ) {
     if (draftSortField === field) {
       draftSortAsc = !draftSortAsc;
     } else {
@@ -212,7 +217,15 @@
   function exportDraftRulesToCsv() {
     const toExport = extractedRules.filter((r) => r.selected);
     const target = toExport.length ? toExport : filteredDraftRules;
-    const headers = ["RuleID", "Description", "PropertySet", "PropertyName", "Operator", "CheckValue", "Severity"];
+    const headers = [
+      "RuleID",
+      "Description",
+      "PropertySet",
+      "PropertyName",
+      "Operator",
+      "CheckValue",
+      "Severity",
+    ];
     const rows = target.map((r) => [
       `"${(r.rule_id || "").replace(/"/g, '""')}"`,
       `"${(r.description || "").replace(/"/g, '""')}"`,
@@ -227,7 +240,10 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `extracted_rules_draft_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `extracted_rules_draft_${new Date().toISOString().substring(0, 10)}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -274,7 +290,7 @@
   }
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header -->
   <PageHeader
     category="AI Engineering Tools"
@@ -285,27 +301,25 @@
 
   {#if error}
     <div
-      class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-2"
+      class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300"
     >
-      <AlertCircle class="w-4 h-4 shrink-0" />
+      <AlertCircle class="h-4 w-4 shrink-0" />
       <span>{error}</span>
     </div>
   {/if}
 
   {#if successMessage}
     <div
-      class="p-4 rounded-xl bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2"
+      class="flex items-center gap-2 rounded-xl border border-emerald-800 bg-emerald-950/50 p-4 text-xs text-emerald-300"
     >
-      <CheckCircle2 class="w-4 h-4 shrink-0" />
+      <CheckCircle2 class="h-4 w-4 shrink-0" />
       <span>{successMessage}</span>
     </div>
   {/if}
 
   <!-- Configuration & Input Section -->
-  <div
-    class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-6"
-  >
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <!-- Document Source Selector -->
       <div class="space-y-2">
         <label
@@ -317,13 +331,11 @@
         <select
           id="rule-doc-source"
           bind:value={selectedDocId}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
           <option value={null}>-- Select from Document Library --</option>
           {#each documents as doc}
-            <option value={doc.id}
-              >{doc.filename} ({doc.doc_type || "Spec"})</option
-            >
+            <option value={doc.id}>{doc.filename} ({doc.doc_type || "Spec"})</option>
           {/each}
         </select>
       </div>
@@ -339,7 +351,7 @@
         <select
           id="rule-ai-model"
           bind:value={selectedModel}
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-50 focus:outline-none focus:border-accent"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
           {#each LLM_MODELS as model}
             <option value={model.id}>{model.name}</option>
@@ -362,7 +374,7 @@
           bind:value={rawText}
           rows="6"
           placeholder="e.g. Section 3.4.1: Exterior exit doors shall have a minimum clear width of 900 mm and fire protection rating of not less than 45 minutes..."
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent font-mono leading-relaxed"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs leading-relaxed text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
         ></textarea>
       </div>
     {/if}
@@ -371,10 +383,10 @@
       <button
         type="button"
         disabled={isExtracting}
-        on:click={handleExtract}
-        class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-semibold bg-accent hover:bg-accent-hover text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
+        onclick={handleExtract}
+        class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >
-        <Sparkles class="w-4 h-4" />
+        <Sparkles class="h-4 w-4" />
         <span>{isExtracting ? "Extracting Rules via AI..." : "Extract Compliance Rules"}</span>
       </button>
     </div>
@@ -383,9 +395,9 @@
   <!-- Extraction Results Review -->
   {#if extractedRules.length > 0}
     <div class="space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h2 class="text-lg font-bold text-slate-50 tracking-tight">
+          <h2 class="text-lg font-bold tracking-tight text-slate-50">
             Extracted Rules Review ({extractedRules.length} rules identified)
           </h2>
           <p class="text-xs text-slate-400">
@@ -393,58 +405,62 @@
           </p>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex flex-wrap items-center gap-2">
           <div class="flex flex-col">
             <label
               for="extraction-ruleset"
-              class="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-0.5"
+              class="mb-0.5 text-micro font-semibold uppercase tracking-wider text-slate-400"
               >Rule Folder</label
             >
             <input
               id="extraction-ruleset"
               type="text"
               bind:value={formRulesetId}
-              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-50 focus:outline-none focus:border-accent w-44"
+              class="w-44 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
             />
           </div>
 
           <button
             type="button"
-            on:click={addManualDraftRule}
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-all"
+            onclick={addManualDraftRule}
+            class="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-all hover:bg-slate-700"
           >
-            <Plus class="w-3.5 h-3.5" />
+            <Plus class="h-3.5 w-3.5" />
             <span>Add Rule</span>
           </button>
 
           <button
             type="button"
             disabled={isSaving || selectedDraftCount === 0}
-            on:click={handleSaveSelected}
-            class="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 transition-all disabled:opacity-50"
+            onclick={handleSaveSelected}
+            class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
           >
-            <Save class="w-3.5 h-3.5" />
-            <span>{isSaving ? "Saving..." : `Save Selected (${selectedDraftCount}) to Library`}</span>
+            <Save class="h-3.5 w-3.5" />
+            <span
+              >{isSaving ? "Saving..." : `Save Selected (${selectedDraftCount}) to Library`}</span
+            >
           </button>
         </div>
       </div>
 
       <!-- Filter Toolbar -->
-      <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/90 flex flex-col md:flex-row items-center gap-3">
-        <div class="relative flex-1 w-full">
-          <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+      <div
+        class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 md:flex-row"
+      >
+        <div class="relative w-full flex-1">
+          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             bind:value={draftSearchQuery}
             placeholder="Search draft rules by reference, description, property..."
-            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
+            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
         </div>
 
-        <div class="flex items-center gap-2 w-full md:w-auto">
+        <div class="flex w-full items-center gap-2 md:w-auto">
           <select
             bind:value={draftSeverityFilter}
-            class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
             <option value="ALL">All Severities</option>
             <option value="Critical">Critical</option>
@@ -468,92 +484,130 @@
       />
 
       <!-- Table Container -->
-      <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
+      <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-300">
             <thead
-              class="bg-slate-950 border-b border-slate-800 text-caption uppercase tracking-wider text-slate-400 font-semibold"
+              class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
             >
               <tr>
-                <th class="py-3 px-3 w-10 text-center">
+                <th class="w-10 px-3 py-3 text-center">
                   <TableCheckbox
                     checked={allFilteredDraftsSelected}
-                    on:change={toggleSelectAllDrafts}
+                    onchange={toggleSelectAllDrafts}
                     title="Select all draft rules"
                   />
                 </th>
-                <SortHeader column="rule_id" sortField={draftSortField} sortAsc={draftSortAsc} onSort={toggleDraftSort} customClass="py-3 px-3">
+                <SortHeader
+                  column="rule_id"
+                  sortField={draftSortField}
+                  sortAsc={draftSortAsc}
+                  onSort={toggleDraftSort}
+                  customClass="py-3 px-3"
+                >
                   Rule Ref
                 </SortHeader>
-                <SortHeader column="description" sortField={draftSortField} sortAsc={draftSortAsc} onSort={toggleDraftSort} customClass="py-3 px-3">
+                <SortHeader
+                  column="description"
+                  sortField={draftSortField}
+                  sortAsc={draftSortAsc}
+                  onSort={toggleDraftSort}
+                  customClass="py-3 px-3"
+                >
                   Description
                 </SortHeader>
-                <SortHeader column="property_set" sortField={draftSortField} sortAsc={draftSortAsc} onSort={toggleDraftSort} customClass="py-3 px-3">
+                <SortHeader
+                  column="property_set"
+                  sortField={draftSortField}
+                  sortAsc={draftSortAsc}
+                  onSort={toggleDraftSort}
+                  customClass="py-3 px-3"
+                >
                   Property Set
                 </SortHeader>
-                <SortHeader column="property_name" sortField={draftSortField} sortAsc={draftSortAsc} onSort={toggleDraftSort} customClass="py-3 px-3">
+                <SortHeader
+                  column="property_name"
+                  sortField={draftSortField}
+                  sortAsc={draftSortAsc}
+                  onSort={toggleDraftSort}
+                  customClass="py-3 px-3"
+                >
                   Property
                 </SortHeader>
-                <SortHeader column="operator" sortField={draftSortField} sortAsc={draftSortAsc} onSort={toggleDraftSort} customClass="py-3 px-3">
+                <SortHeader
+                  column="operator"
+                  sortField={draftSortField}
+                  sortAsc={draftSortAsc}
+                  onSort={toggleDraftSort}
+                  customClass="py-3 px-3"
+                >
                   Op
                 </SortHeader>
-                <th class="py-3 px-3">Target Value</th>
-                <SortHeader column="severity" sortField={draftSortField} sortAsc={draftSortAsc} onSort={toggleDraftSort} customClass="py-3 px-3">
+                <th class="px-3 py-3">Target Value</th>
+                <SortHeader
+                  column="severity"
+                  sortField={draftSortField}
+                  sortAsc={draftSortAsc}
+                  onSort={toggleDraftSort}
+                  customClass="py-3 px-3"
+                >
                   Severity
                 </SortHeader>
-                <th class="py-3 px-3 text-right">Actions</th>
+                <th class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
               {#each paginatedDraftRules as rule, i}
-                <tr class="hover:bg-slate-900/60 transition-colors {rule.selected ? 'bg-blue-950/20' : ''}">
-                  <td class="py-3 px-3 text-center">
+                <tr
+                  class="transition-colors hover:bg-slate-900/60 {rule.selected
+                    ? 'bg-blue-950/20'
+                    : ''}"
+                >
+                  <td class="px-3 py-3 text-center">
                     <TableCheckbox
                       bind:checked={rule.selected}
                       ariaLabel={`Select rule ${rule.rule_id}`}
                     />
                   </td>
-                  <td class="py-3 px-3 font-mono font-bold text-slate-50">
+                  <td class="px-3 py-3 font-mono font-bold text-slate-50">
                     <input
                       type="text"
                       bind:value={rule.rule_id}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs font-mono font-bold text-slate-50 focus:outline-none w-24"
+                      class="w-24 border-b border-transparent bg-transparent font-mono text-xs font-bold text-slate-50 hover:border-slate-700 focus:border-accent focus:outline-none"
                     />
                   </td>
-                  <td class="py-3 px-3">
+                  <td class="px-3 py-3">
                     <input
                       type="text"
                       bind:value={rule.description}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs text-slate-300 focus:outline-none w-full min-w-[200px]"
+                      class="w-full min-w-[200px] border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-none"
                     />
                   </td>
-                  <td class="py-3 px-3 text-slate-400 font-mono">
+                  <td class="px-3 py-3 font-mono text-slate-400">
                     <input
                       type="text"
                       bind:value={rule.property_set}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs text-slate-400 focus:outline-none w-28"
+                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-400 hover:border-slate-700 focus:border-accent focus:outline-none"
                     />
                   </td>
-                  <td class="py-3 px-3 text-slate-300 font-mono">
+                  <td class="px-3 py-3 font-mono text-slate-300">
                     <input
                       type="text"
                       bind:value={rule.property_name}
-                      class="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-accent text-xs text-slate-300 focus:outline-none w-28"
+                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-none"
                     />
                   </td>
-                  <td class="py-3 px-3 text-slate-400 font-mono">
+                  <td class="px-3 py-3 font-mono text-slate-400">
                     {rule.operator || "=="}
                   </td>
-                  <td class="py-3 px-3 font-mono text-cyan-300">
+                  <td class="px-3 py-3 font-mono text-cyan-300">
                     {rule.check_value ||
-                      (rule.value_min
-                        ? `[${rule.value_min}..${rule.value_max}]`
-                        : "-")}
+                      (rule.value_min ? `[${rule.value_min}..${rule.value_max}]` : "-")}
                   </td>
-                  <td class="py-3 px-3">
+                  <td class="px-3 py-3">
                     <select
                       bind:value={rule.severity}
-                      class="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-micro font-semibold text-slate-50 focus:outline-none"
+                      class="rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-micro font-semibold text-slate-50 focus:outline-none"
                     >
                       <option value="Critical">Critical</option>
                       <option value="High">High</option>
@@ -561,23 +615,23 @@
                       <option value="Low">Low</option>
                     </select>
                   </td>
-                  <td class="py-3 px-3 text-right whitespace-nowrap">
+                  <td class="whitespace-nowrap px-3 py-3 text-right">
                     <div class="flex items-center justify-end gap-1">
                       <button
                         type="button"
-                        on:click={() => (viewingDraftRule = rule)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                        onclick={() => (viewingDraftRule = rule)}
+                        class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                         title="Inspect draft details"
                       >
-                        <Eye class="w-3.5 h-3.5" />
+                        <Eye class="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
-                        on:click={() => removeDraftRule(i)}
-                        class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                        onclick={() => removeDraftRule(i)}
+                        class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                         title="Remove draft rule"
                       >
-                        <Trash2 class="w-3.5 h-3.5" />
+                        <Trash2 class="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>
@@ -604,44 +658,65 @@
 
 <!-- Inspect Draft Rule Modal -->
 {#if viewingDraftRule}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+    <div
+      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+    >
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
-          <FileText class="w-4 h-4 text-accent" />
-          <h3 class="text-sm font-bold text-slate-50 font-mono">{viewingDraftRule.rule_id || 'Draft Rule'}</h3>
+          <FileText class="h-4 w-4 text-accent" />
+          <h3 class="font-mono text-sm font-bold text-slate-50">
+            {viewingDraftRule.rule_id || "Draft Rule"}
+          </h3>
         </div>
         <button
           type="button"
-          on:click={() => (viewingDraftRule = null)}
-          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          onclick={() => (viewingDraftRule = null)}
+          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
-          <X class="w-4 h-4" />
+          <X class="h-4 w-4" />
         </button>
       </div>
 
       <div class="space-y-3 text-xs">
         <div>
-          <span class="text-slate-400 font-semibold block mb-1">Description</span>
-          <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-slate-200">
-            {viewingDraftRule.description || 'No description'}
+          <span class="mb-1 block font-semibold text-slate-400">Description</span>
+          <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-slate-200">
+            {viewingDraftRule.description || "No description"}
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 text-caption font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
-          <div><span class="text-slate-500">Pset:</span> <span class="text-slate-300">{viewingDraftRule.property_set || '—'}</span></div>
-          <div><span class="text-slate-500">Property:</span> <span class="text-slate-300">{viewingDraftRule.property_name || '—'}</span></div>
-          <div><span class="text-slate-500">Operator:</span> <span class="text-cyan-300">{viewingDraftRule.operator || '=='}</span></div>
-          <div><span class="text-slate-500">Target Value:</span> <span class="text-emerald-300">{viewingDraftRule.check_value || '—'}</span></div>
-          <div><span class="text-slate-500">Severity:</span> <span class="text-amber-400 font-semibold">{viewingDraftRule.severity}</span></div>
+        <div
+          class="grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption"
+        >
+          <div>
+            <span class="text-slate-500">Pset:</span>
+            <span class="text-slate-300">{viewingDraftRule.property_set || "—"}</span>
+          </div>
+          <div>
+            <span class="text-slate-500">Property:</span>
+            <span class="text-slate-300">{viewingDraftRule.property_name || "—"}</span>
+          </div>
+          <div>
+            <span class="text-slate-500">Operator:</span>
+            <span class="text-cyan-300">{viewingDraftRule.operator || "=="}</span>
+          </div>
+          <div>
+            <span class="text-slate-500">Target Value:</span>
+            <span class="text-emerald-300">{viewingDraftRule.check_value || "—"}</span>
+          </div>
+          <div>
+            <span class="text-slate-500">Severity:</span>
+            <span class="font-semibold text-amber-400">{viewingDraftRule.severity}</span>
+          </div>
         </div>
       </div>
 
       <div class="flex justify-end pt-2">
         <button
           type="button"
-          on:click={() => (viewingDraftRule = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
+          onclick={() => (viewingDraftRule = null)}
+          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
         >
           Close
         </button>
@@ -652,29 +727,35 @@
 
 <!-- Bulk Edit Modal for Draft Rules -->
 {#if isDraftBulkEditModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+    <div
+      class="w-full max-w-md space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+    >
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
-          <SlidersHorizontal class="w-4 h-4 text-blue-400" />
-          <h3 class="text-sm font-bold text-slate-50">Bulk Edit Draft Rules ({selectedDraftCount} selected)</h3>
+          <SlidersHorizontal class="h-4 w-4 text-blue-400" />
+          <h3 class="text-sm font-bold text-slate-50">
+            Bulk Edit Draft Rules ({selectedDraftCount} selected)
+          </h3>
         </div>
         <button
           type="button"
-          on:click={() => (isDraftBulkEditModalOpen = false)}
-          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          onclick={() => (isDraftBulkEditModalOpen = false)}
+          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
-          <X class="w-4 h-4" />
+          <X class="h-4 w-4" />
         </button>
       </div>
 
       <div class="space-y-3 text-xs">
         <div class="space-y-1">
-          <label for="bulk-draft-severity" class="block font-semibold text-slate-300">Severity</label>
+          <label for="bulk-draft-severity" class="block font-semibold text-slate-300"
+            >Severity</label
+          >
           <select
             id="bulk-draft-severity"
             bind:value={bulkDraftSeverity}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-50 focus:outline-none focus:border-accent"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-none"
           >
             <option value="no_change">-- Keep Current Severity --</option>
             <option value="Critical">Critical</option>
@@ -685,13 +766,15 @@
         </div>
 
         <div class="space-y-1">
-          <label for="bulk-draft-pset" class="block font-semibold text-slate-300">Property Set</label>
+          <label for="bulk-draft-pset" class="block font-semibold text-slate-300"
+            >Property Set</label
+          >
           <input
             id="bulk-draft-pset"
             type="text"
             bind:value={bulkDraftPset}
             placeholder="Leave empty to keep current"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-50 placeholder-slate-600 focus:outline-none focus:border-accent"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-none"
           />
         </div>
 
@@ -700,7 +783,7 @@
           <select
             id="bulk-draft-op"
             bind:value={bulkDraftOperator}
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-50 focus:outline-none focus:border-accent"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-none"
           >
             <option value="no_change">-- Keep Current Operator --</option>
             <option value="==">== (Equals)</option>
@@ -715,18 +798,18 @@
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+      <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
         <button
           type="button"
-          on:click={() => (isDraftBulkEditModalOpen = false)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-50"
+          onclick={() => (isDraftBulkEditModalOpen = false)}
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-50"
         >
           Cancel
         </button>
         <button
           type="button"
-          on:click={applyDraftBulkEdit}
-          class="px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white"
+          onclick={applyDraftBulkEdit}
+          class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover"
         >
           Apply Changes
         </button>

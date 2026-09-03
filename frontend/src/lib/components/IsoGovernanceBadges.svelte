@@ -1,16 +1,16 @@
 <script lang="ts">
   import { FileCheck2, GitBranch, Workflow } from "lucide-svelte";
   import HoverCard from "./HoverCard.svelte";
-  import {
-    describeCdeState,
-    describeRevision,
-    describeSuitability,
-  } from "../glossary";
+  import { describeCdeState, describeRevision, describeSuitability } from "../glossary";
 
-  export let suitability: string = "S0";
-  export let revision: string = "P01.01";
-  export let cdeState: string = "WIP";
-  export let size: "xs" | "sm" = "xs";
+  interface Props {
+    suitability?: string;
+    revision?: string;
+    cdeState?: string;
+    size?: "xs" | "sm";
+  }
+
+  let { suitability = "S0", revision = "P01.01", cdeState = "WIP", size = "xs" }: Props = $props();
 
   function getCdeColor(state: string) {
     switch ((state || "").toUpperCase()) {
@@ -27,21 +27,17 @@
 
   // The badges are three-character codes in a dense table cell. The hover card
   // carries the meaning so the cell stays scannable but never cryptic.
-  $: suitabilityCode = suitability || "S0";
-  $: revisionCode = revision || "P01.01";
-  $: cdeCode = cdeState || "WIP";
-  $: suitabilityInfo = describeSuitability(suitabilityCode);
-  $: revisionInfo = describeRevision(revisionCode);
-  $: cdeInfo = describeCdeState(cdeCode);
+  let suitabilityCode = $derived(suitability || "S0");
+  let revisionCode = $derived(revision || "P01.01");
+  let cdeCode = $derived(cdeState || "WIP");
+  let suitabilityInfo = $derived(describeSuitability(suitabilityCode));
+  let revisionInfo = $derived(describeRevision(revisionCode));
+  let cdeInfo = $derived(describeCdeState(cdeCode));
 
   const CDE_ORDER = ["WIP", "SHARED", "PUBLISHED", "ARCHIVED"];
 </script>
 
-<div
-  class="flex items-center gap-1.5 font-mono {size === 'xs'
-    ? 'text-micro'
-    : 'text-xs'}"
->
+<div class="flex items-center gap-1.5 font-mono {size === 'xs' ? 'text-micro' : 'text-xs'}">
   <HoverCard
     side="top"
     align="start"
@@ -50,18 +46,21 @@
     title="{suitabilityCode} — {suitabilityInfo.label}"
     subtitle="ISO 19650 suitability status"
   >
-    <span
-      slot="trigger"
-      class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 font-semibold border border-slate-700/60 shadow-sm cursor-help"
-    >
-      {suitabilityCode}
-    </span>
+    {#snippet trigger()}
+      <span
+        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-amber-400 shadow-sm"
+      >
+        {suitabilityCode}
+      </span>
+    {/snippet}
 
     {suitabilityInfo.description}
 
-    <span slot="footer" class="font-mono">
-      {suitabilityInfo.reference || "BS EN ISO 19650-2"}
-    </span>
+    {#snippet footer()}
+      <span class="font-mono">
+        {suitabilityInfo.reference || "BS EN ISO 19650-2"}
+      </span>
+    {/snippet}
   </HoverCard>
 
   <HoverCard
@@ -72,18 +71,21 @@
     title="{revisionCode} — {revisionInfo.label}"
     subtitle="ISO 19650 revision code"
   >
-    <span
-      slot="trigger"
-      class="px-1.5 py-0.5 rounded bg-slate-800 text-blue-400 font-semibold border border-slate-700/60 shadow-sm cursor-help"
-    >
-      {revisionCode}
-    </span>
+    {#snippet trigger()}
+      <span
+        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-blue-400 shadow-sm"
+      >
+        {revisionCode}
+      </span>
+    {/snippet}
 
     {revisionInfo.description}
 
-    <span slot="footer" class="font-mono">
-      {revisionInfo.reference || "BS EN ISO 19650-2"}
-    </span>
+    {#snippet footer()}
+      <span class="font-mono">
+        {revisionInfo.reference || "BS EN ISO 19650-2"}
+      </span>
+    {/snippet}
   </HoverCard>
 
   <HoverCard
@@ -94,29 +96,29 @@
     title="{cdeCode} — {cdeInfo.label}"
     subtitle="Common data environment state"
   >
-    <span
-      slot="trigger"
-      class="px-1.5 py-0.5 rounded font-semibold border shadow-sm cursor-help {getCdeColor(
-        cdeCode,
-      )}"
-    >
-      {cdeCode}
-    </span>
+    {#snippet trigger()}
+      <span
+        class="cursor-help rounded border px-1.5 py-0.5 font-semibold shadow-sm {getCdeColor(
+          cdeCode,
+        )}"
+      >
+        {cdeCode}
+      </span>
+    {/snippet}
 
     <p>{cdeInfo.description}</p>
 
     <!-- The state alone does not show how far along the container is; the
          ladder does, which is the question a reviewer actually has. -->
-    <div class="flex items-center gap-1 mt-2 font-mono text-nano">
+    <div class="mt-2 flex items-center gap-1 font-mono text-nano">
       {#each CDE_ORDER as state, i}
         {#if i > 0}
           <span class="text-slate-600">→</span>
         {/if}
         <span
-          class="px-1.5 py-0.5 rounded border {state ===
-          cdeCode.toUpperCase()
-            ? 'bg-accent/15 border-accent/50 text-accent font-bold'
-            : 'bg-slate-800/60 border-slate-700/50 text-slate-500'}"
+          class="rounded border px-1.5 py-0.5 {state === cdeCode.toUpperCase()
+            ? 'border-accent/50 bg-accent/15 font-bold text-accent'
+            : 'border-slate-700/50 bg-slate-800/60 text-slate-500'}"
         >
           {state}
         </span>

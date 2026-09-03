@@ -1,14 +1,18 @@
 <script lang="ts">
-  export let message: string = "Loading...";
-  export let subMessage: string = "";
+  interface Props {
+    message?: string;
+    subMessage?: string;
+  }
+
+  let { message = "Loading...", subMessage = "" }: Props = $props();
 </script>
 
-<div class="p-12 text-center text-xs text-slate-400 space-y-2 animate-in fade-in duration-200">
+<div class="space-y-2 p-12 text-center text-xs text-slate-400 duration-200 animate-in fade-in">
   <div
-    class="animate-spin w-6 h-6 border-2 border-accent border-t-transparent rounded-full mx-auto"
+    class="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent"
   ></div>
   <div class="font-medium text-slate-300">{message}</div>
   {#if subMessage}
-    <div class="text-caption text-slate-500 font-mono">{subMessage}</div>
+    <div class="font-mono text-caption text-slate-500">{subMessage}</div>
   {/if}
 </div>

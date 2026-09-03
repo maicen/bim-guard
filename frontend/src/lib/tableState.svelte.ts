@@ -103,8 +103,9 @@ export class TableState<T, Id extends RowId = RowId> {
     const custom = this.#options.comparators?.[field];
     const direction = this.sortAsc ? 1 : -1;
     // Copy first: sorting `filtered` in place would mutate a derived value.
-    return [...this.filtered].sort((a, b) =>
-      direction * (custom ? custom(a, b) : defaultCompare((a as any)[field], (b as any)[field])),
+    return [...this.filtered].sort(
+      (a, b) =>
+        direction * (custom ? custom(a, b) : defaultCompare((a as any)[field], (b as any)[field])),
     );
   });
 
@@ -162,7 +163,9 @@ export class TableState<T, Id extends RowId = RowId> {
   }
 
   /** The selected rows, in the current sort order. */
-  selectedRows = $derived(this.sorted.filter((row) => this.selectedIds.has(this.#options.getId(row))));
+  selectedRows = $derived(
+    this.sorted.filter((row) => this.selectedIds.has(this.#options.getId(row))),
+  );
 
   // --- sorting / paging ---------------------------------------------------
 

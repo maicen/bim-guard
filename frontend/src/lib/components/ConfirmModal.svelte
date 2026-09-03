@@ -54,12 +54,12 @@
     aria-labelledby={titleId}
     aria-describedby={bodyId}
     tabindex="-1"
-    class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
     onclick={(e) => e.target === e.currentTarget && handleCancel()}
     {@attach dialog(handleCancel)}
   >
     <div
-      class="animate-scale-up w-full max-w-md space-y-5 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-md animate-scale-up space-y-5 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
     >
       <div class="flex items-start gap-3.5">
         {#if danger}
@@ -97,7 +97,7 @@
             "h-9 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-50",
             danger
               ? "bg-rose-600 text-white shadow-lg shadow-rose-950/50 hover:bg-rose-500"
-              : "bg-accent hover:bg-accent-hover text-white shadow-lg shadow-blue-950/50",
+              : "bg-accent text-white shadow-lg shadow-blue-950/50 hover:bg-accent-hover",
           )}
         >
           {isSubmitting ? "Processing..." : confirmText}

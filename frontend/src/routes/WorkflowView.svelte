@@ -1,21 +1,22 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    Workflow,
-    Activity,
-    CheckCircle2,
-    Clock,
-    AlertCircle,
-  } from "lucide-svelte";
+  import { onMount, untrack } from "svelte";
+  import { Workflow, Activity, CheckCircle2, Clock, AlertCircle } from "lucide-svelte";
   import { projectsApi } from "../lib/api";
   import type { Project } from "../lib/types";
   import PipelineProgress from "../lib/components/PipelineProgress.svelte";
   import { toasts } from "../lib/toast.svelte";
 
-  export let initialProjectId: number | null = null;
+  interface Props {
+    initialProjectId?: number | null;
+  }
 
-  let projects: Project[] = [];
-  let selectedProjectId: number | null = initialProjectId;
+  let { initialProjectId = null }: Props = $props();
+
+  let projects: Project[] = $state([]);
+  // These `initial*` props seed local state once. The component is mounted
+  // inside App's view switch, so it remounts whenever the target changes;
+  // untrack states that the one-time read is deliberate.
+  let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   let isLoading = false;
 
   onMount(async () => {
@@ -27,26 +28,22 @@
       }
     } catch (err) {
       // Without this the user just gets an empty project picker and no reason.
-      toasts.fromError(err, 'Could not load the project list.');
+      toasts.fromError(err, "Could not load the project list.");
     }
   });
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
     <div>
-      <div
-        class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1"
-      >
-        Workflow
-      </div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50">
+      <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Workflow</div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">
         Live Pipeline Tracker
       </h1>
-      <p class="text-xs sm:text-sm text-slate-400">
-        Monitor real-time engine execution, stage transitions, and performance
-        metrics via Server-Sent Events (SSE).
+      <p class="text-xs text-slate-400 sm:text-sm">
+        Monitor real-time engine execution, stage transitions, and performance metrics via
+        Server-Sent Events (SSE).
       </p>
     </div>
 
@@ -54,7 +51,7 @@
     <div class="flex items-center gap-2">
       <select
         bind:value={selectedProjectId}
-        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+        class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
       >
         {#each projects as p}
           <option value={p.id}>{p.name}</option>
@@ -64,22 +61,14 @@
   </div>
 
   {#if selectedProjectId}
-    <div
-      class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6"
-    >
-      <div
-        class="flex items-center justify-between border-b border-slate-800 pb-4"
-      >
+    <div class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
         <div class="flex items-center gap-2">
-          <Activity class="w-5 h-5 text-emerald-400 animate-pulse" />
-          <h2 class="text-base font-bold text-slate-50 tracking-tight">
-            Active Engine Pipeline
-          </h2>
+          <Activity class="h-5 w-5 animate-pulse text-emerald-400" />
+          <h2 class="text-base font-bold tracking-tight text-slate-50">Active Engine Pipeline</h2>
         </div>
         <div class="text-xs text-slate-400">
-          Listening to <code class="font-mono text-slate-300"
-            >/api/events/{selectedProjectId}</code
-          >
+          Listening to <code class="font-mono text-slate-300">/api/events/{selectedProjectId}</code>
         </div>
       </div>
 
@@ -87,7 +76,7 @@
     </div>
   {:else}
     <div
-      class="p-16 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl"
+      class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
     >
       Select a project to inspect its live pipeline events.
     </div>

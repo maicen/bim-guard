@@ -6,20 +6,20 @@
  * ('Architectural', 'Piping (Corrosive)', 'Halo'), and a project must open the
  * view for the domain it was actually created with.
  */
-import type { AnalysisDomain } from './types';
+import type { AnalysisDomain } from "./types";
 
 const ALIASES: Record<AnalysisDomain, string[]> = {
-  Arch: ['arch', 'architectural', 'architecture'],
-  Piping: ['piping', 'piping (corrosive)', 'corrosion'],
-  seismic: ['seismic', 'halo', 'piping (seismic)', 'blue halo'],
+  Arch: ["arch", "architectural", "architecture"],
+  Piping: ["piping", "piping (corrosive)", "corrosion"],
+  seismic: ["seismic", "halo", "piping (seismic)", "blue halo"],
 };
 
 /** Collapse a stored or legacy analysis_type onto one of the three domains. */
 export function normalizeAnalysisDomain(
   analysisType: string | null | undefined,
-  fallback: AnalysisDomain = 'Arch',
+  fallback: AnalysisDomain = "Arch",
 ): AnalysisDomain {
-  const value = (analysisType || '').trim().toLowerCase();
+  const value = (analysisType || "").trim().toLowerCase();
   if (!value) return fallback;
   for (const [domain, aliases] of Object.entries(ALIASES) as [AnalysisDomain, string[]][]) {
     if (aliases.includes(value)) return domain;
@@ -30,11 +30,11 @@ export function normalizeAnalysisDomain(
 /** The App view id that runs the analysis for a project's domain. */
 export function viewForAnalysisDomain(analysisType: string | null | undefined): string {
   switch (normalizeAnalysisDomain(analysisType)) {
-    case 'Piping':
-      return 'piping';
-    case 'seismic':
-      return 'seismic';
+    case "Piping":
+      return "piping";
+    case "seismic":
+      return "seismic";
     default:
-      return 'arch';
+      return "arch";
   }
 }

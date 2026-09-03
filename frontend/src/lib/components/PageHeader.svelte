@@ -1,41 +1,61 @@
 <script lang="ts">
-  import type { ComponentType } from "svelte";
+  import type { Component, ComponentType, Snippet } from "svelte";
 
-  export let category: string = "";
-  export let title: string = "";
-  export let subtitle: string = "";
-  export let icon: ComponentType | null = null;
+  let {
+    category = "",
+    title = "",
+    subtitle = "",
+    icon = null,
+    categoryExtra,
+    badge,
+    actions,
+  }: {
+    category?: string;
+    title?: string;
+    subtitle?: string;
+    /** lucide-svelte still ships legacy ComponentType icons, so accept either. */
+    icon?: Component<any> | ComponentType<any> | null;
+    categoryExtra?: Snippet;
+    badge?: Snippet;
+    actions?: Snippet;
+  } = $props();
+
+  const Icon = $derived(icon);
 </script>
 
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
   <div>
     {#if category}
-      <div class="text-xs font-bold uppercase tracking-widest text-accent mb-1 flex items-center gap-1.5">
+      <div
+        class="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-accent"
+      >
         <span>{category}</span>
-        <slot name="category-extra" />
+        {@render categoryExtra?.()}
       </div>
     {/if}
 
-    <div class="flex items-center gap-3 flex-wrap">
-      {#if icon}
-        <svelte:component this={icon} class="w-6 h-6 text-accent shrink-0" />
+    <div class="flex flex-wrap items-center gap-3">
+      {#if Icon}
+        <Icon class="h-6 w-6 shrink-0 text-accent" />
       {/if}
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50 flex items-center gap-2.5">
+      <h1
+        class="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl"
+      >
         <span>{title}</span>
-        <slot name="badge" />
+        {@render badge?.()}
       </h1>
     </div>
 
     {#if subtitle}
-      <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl leading-relaxed">
+      <p class="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400 sm:text-sm">
         {subtitle}
       </p>
     {/if}
   </div>
 
-  {#if $$slots.actions}
-    <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
-      <slot name="actions" />
+  {#if actions}
+    <div class="flex shrink-0 flex-wrap items-center gap-2.5">
+      {@render actions()}
     </div>
   {/if}
 </div>

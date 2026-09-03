@@ -1,35 +1,36 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
+  import type { Attachment } from "svelte/attachments";
 
-  export let checked: boolean = false;
-  export let indeterminate: boolean = false;
-  export let disabled: boolean = false;
-  export let title: string = "";
-  export let ariaLabel: string = "Select row";
+  let {
+    checked = $bindable(false),
+    indeterminate = false,
+    disabled = false,
+    title = "",
+    ariaLabel = "Select row",
+    onchange,
+  }: {
+    checked?: boolean;
+    indeterminate?: boolean;
+    disabled?: boolean;
+    title?: string;
+    ariaLabel?: string;
+    /** Fires after the box is toggled. */
+    onchange?: (event: Event) => void;
+  } = $props();
 
-  const dispatch = createEventDispatcher<{ change: Event }>();
-
-  function handleChange(e: Event) {
-    dispatch("change", e);
-  }
-
-  function setIndeterminate(node: HTMLInputElement, isIndet: boolean) {
-    node.indeterminate = isIndet;
-    return {
-      update(val: boolean) {
-        node.indeterminate = val;
-      },
-    };
-  }
+  // `indeterminate` has no HTML attribute, so it has to be set on the element.
+  const trackIndeterminate: Attachment<HTMLInputElement> = (node) => {
+    node.indeterminate = indeterminate;
+  };
 </script>
 
 <input
   type="checkbox"
   bind:checked
-  use:setIndeterminate={indeterminate}
   {disabled}
   {title}
   aria-label={ariaLabel}
-  on:change={handleChange}
-  class="rounded bg-slate-950 border-slate-700 text-accent focus:ring-accent cursor-pointer w-4 h-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+  onchange={(event) => onchange?.(event)}
+  {@attach trackIndeterminate}
+  class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent transition-all focus:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
 />

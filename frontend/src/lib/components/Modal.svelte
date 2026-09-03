@@ -21,13 +21,7 @@
     subtitle?: string;
     icon?: Component<any> | ComponentType<any> | null;
     maxWidth?:
-      | "max-w-sm"
-      | "max-w-md"
-      | "max-w-lg"
-      | "max-w-xl"
-      | "max-w-2xl"
-      | "max-w-3xl"
-      | "max-w-4xl";
+      "max-w-sm" | "max-w-md" | "max-w-lg" | "max-w-xl" | "max-w-2xl" | "max-w-3xl" | "max-w-4xl";
     /** Dismiss when the backdrop itself is clicked. */
     closeOnBackdrop?: boolean;
     onClose: () => void;
@@ -52,7 +46,7 @@
        Escape, which the `dialog` attachment handles. -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
-    class="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md duration-200"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md duration-200 animate-in fade-in"
     role="dialog"
     aria-modal="true"
     aria-labelledby={titleId}
@@ -62,7 +56,7 @@
   >
     <div
       class={cn(
-        "animate-in zoom-in-95 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl duration-200",
+        "flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl duration-200 animate-in zoom-in-95",
         maxWidth,
       )}
     >
@@ -72,7 +66,7 @@
         <div class="flex min-w-0 items-center gap-3">
           {#if Icon}
             <div
-              class="text-accent flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-800/60 bg-blue-950/60"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-800/60 bg-blue-950/60 text-accent"
             >
               <Icon class="h-4 w-4" />
             </div>

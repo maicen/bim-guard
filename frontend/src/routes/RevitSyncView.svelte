@@ -22,11 +22,7 @@
     FileText,
   } from "lucide-svelte";
   import { revitSyncApi } from "../lib/api";
-  import type {
-    RevitSyncRequest,
-    RevitSyncResponse,
-    RevitRuleResult,
-  } from "../lib/types";
+  import type { RevitSyncRequest, RevitSyncResponse, RevitRuleResult } from "../lib/types";
   import Badge from "../lib/components/Badge.svelte";
   import BentoBox from "../lib/components/BentoBox.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
@@ -37,10 +33,10 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
-  let copied = false;
-  let isSendingTest = false;
-  let testResponse: RevitSyncResponse | null = null;
-  let testError: string | null = null;
+  let copied = $state(false);
+  let isSendingTest = $state(false);
+  let testResponse: RevitSyncResponse | null = $state(null);
+  let testError: string | null = $state(null);
 
   // The sync response carries no unique key — rule_ref repeats across targets
   // and properties — so rows get a stable index-based id when they arrive.
@@ -48,17 +44,19 @@
   let indexedResults: IndexedRuleResult[] = [];
 
   // Search, filter, sort, paginate and select — all owned by the shared state.
-  const table = createTableState<IndexedRuleResult, number>({
-    rows: () => indexedResults,
-    getId: (r) => r.rowId,
-    searchFields: (r) => [r.rule_ref, r.rule_desc, r.target, r.property_name],
-    filters: {
-      status: (r, value) => (r.status || "").toUpperCase() === value.toUpperCase(),
-    },
-    initialSort: { field: "fail_count", asc: false },
-  });
+  const table = $state(
+    createTableState<IndexedRuleResult, number>({
+      rows: () => indexedResults,
+      getId: (r) => r.rowId,
+      searchFields: (r) => [r.rule_ref, r.rule_desc, r.target, r.property_name],
+      filters: {
+        status: (r, value) => (r.status || "").toUpperCase() === value.toUpperCase(),
+      },
+      initialSort: { field: "fail_count", asc: false },
+    }),
+  );
 
-  let viewingRule: IndexedRuleResult | null = null;
+  let viewingRule: IndexedRuleResult | null = $state(null);
 
   const endpointUrl =
     typeof window !== "undefined"
@@ -176,7 +174,16 @@ print(response.read())
 
   function exportResultsToCsv() {
     const target = table.selectedCount ? table.selectedRows : table.sorted;
-    const headers = ["RuleReference", "Description", "Target", "Property", "Status", "PassCount", "FailCount", "MissingCount"];
+    const headers = [
+      "RuleReference",
+      "Description",
+      "Target",
+      "Property",
+      "Status",
+      "PassCount",
+      "FailCount",
+      "MissingCount",
+    ];
     const rows = target.map((r) => [
       `"${(r.rule_ref || "").replace(/"/g, '""')}"`,
       `"${(r.rule_desc || "").replace(/"/g, '""')}"`,
@@ -192,14 +199,17 @@ print(response.read())
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `revit_sync_results_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `revit_sync_results_${new Date().toISOString().substring(0, 10)}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header -->
   <PageHeader
     category="Live Native Integrations"
@@ -209,25 +219,24 @@ print(response.read())
   />
 
   <!-- Bento Grid Overview -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
     <BentoBox title="Instant Evaluation" cls="md:col-span-1">
-      <p class="text-xs text-slate-400 leading-relaxed mb-4">
-        Push elements from active views or entire Revit project models directly
-        to BIM Guard without exporting IFC files.
+      <p class="mb-4 text-xs leading-relaxed text-slate-400">
+        Push elements from active views or entire Revit project models directly to BIM Guard without
+        exporting IFC files.
       </p>
-      <div class="flex items-center gap-2 text-xs text-emerald-400 font-medium">
-        <CheckCircle2 class="w-4 h-4" />
+      <div class="flex items-center gap-2 text-xs font-medium text-emerald-400">
+        <CheckCircle2 class="h-4 w-4" />
         <span>Sub-second Rule Execution</span>
       </div>
     </BentoBox>
 
     <BentoBox title="Gateway Endpoint" cls="md:col-span-2">
-      <p class="text-xs text-slate-400 mb-2">
-        HTTP POST target receiving JSON element collections from Revit
-        extensions:
+      <p class="mb-2 text-xs text-slate-400">
+        HTTP POST target receiving JSON element collections from Revit extensions:
       </p>
       <div
-        class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-blue-400 select-all overflow-x-auto"
+        class="flex select-all items-center justify-between overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-blue-400"
       >
         <span>POST {endpointUrl}</span>
       </div>
@@ -235,33 +244,29 @@ print(response.read())
   </div>
 
   <!-- pyRevit Snippet Section -->
-  <div
-    class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4"
-  >
-    <div
-      class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-    >
+  <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+    <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
       <div>
-        <h2 class="text-base font-bold text-slate-50 tracking-tight">
+        <h2 class="text-base font-bold tracking-tight text-slate-50">
           pyRevit / IronPython Push Script
         </h2>
         <p class="text-xs text-slate-400">
-          Embed this script inside your pyRevit ribbon pushbutton to audit
-          selected categories in one click.
+          Embed this script inside your pyRevit ribbon pushbutton to audit selected categories in
+          one click.
         </p>
       </div>
 
       <div class="flex items-center gap-2">
         <button
           type="button"
-          on:click={copyScript}
-          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-50 text-xs font-semibold border border-slate-700 transition-colors"
+          onclick={copyScript}
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
         >
           {#if copied}
-            <Check class="w-3.5 h-3.5 text-emerald-400" />
+            <Check class="h-3.5 w-3.5 text-emerald-400" />
             <span class="text-emerald-400">Copied!</span>
           {:else}
-            <Copy class="w-3.5 h-3.5" />
+            <Copy class="h-3.5 w-3.5" />
             <span>Copy Script</span>
           {/if}
         </button>
@@ -269,45 +274,39 @@ print(response.read())
         <button
           type="button"
           disabled={isSendingTest}
-          on:click={runSimulation}
-          class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+          onclick={runSimulation}
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover disabled:opacity-50"
         >
-          <Send class="w-3.5 h-3.5" />
+          <Send class="h-3.5 w-3.5" />
           <span>{isSendingTest ? "Auditing Payload..." : "Simulate Push"}</span>
         </button>
       </div>
     </div>
 
     <!-- Code Block -->
-    <div
-      class="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950"
-    >
+    <div class="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
       <pre
-        class="p-4 text-xs font-mono text-slate-300 overflow-x-auto leading-relaxed max-h-72">{pyRevitScript}</pre>
+        class="max-h-72 overflow-x-auto p-4 font-mono text-xs leading-relaxed text-slate-300">{pyRevitScript}</pre>
     </div>
   </div>
 
   <!-- Test Simulation Results -->
   {#if testError}
     <div
-      class="p-4 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-start gap-2.5"
+      class="flex items-start gap-2.5 rounded-2xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300"
     >
-      <AlertTriangle class="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+      <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
       <div>{testError}</div>
     </div>
   {/if}
 
   {#if testResponse}
-    <div
-      class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6"
-    >
+    <div class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
       <div
-        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4"
+        class="flex flex-col justify-between gap-4 border-b border-slate-800 pb-4 sm:flex-row sm:items-center"
       >
         <div>
-          <div
-            class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1"
-          >
+          <div class="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-400">
             Sync Results Received
           </div>
           <h2 class="text-lg font-bold text-slate-50">
@@ -321,44 +320,40 @@ print(response.read())
 
         <div class="flex items-center gap-3">
           <div
-            class="flex items-center gap-1.5 text-xs font-bold text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700"
+            class="flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-300"
           >
             <span
-              >Pass: {testResponse.results.reduce(
-                (acc, r) => acc + (r.pass_count || 0),
-                0,
-              )}</span
+              >Pass: {testResponse.results.reduce((acc, r) => acc + (r.pass_count || 0), 0)}</span
             >
           </div>
           <div
-            class="flex items-center gap-1.5 text-xs font-bold text-rose-400 bg-rose-950/80 px-3 py-1.5 rounded-full border border-rose-800"
+            class="flex items-center gap-1.5 rounded-full border border-rose-800 bg-rose-950/80 px-3 py-1.5 text-xs font-bold text-rose-400"
           >
             <span
-              >Fail: {testResponse.results.reduce(
-                (acc, r) => acc + (r.fail_count || 0),
-                0,
-              )}</span
+              >Fail: {testResponse.results.reduce((acc, r) => acc + (r.fail_count || 0), 0)}</span
             >
           </div>
         </div>
       </div>
 
       <!-- Search & Filter Toolbar -->
-      <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/90 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div class="relative flex-1 w-full">
-          <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+      <div
+        class="flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 sm:flex-row"
+      >
+        <div class="relative w-full flex-1">
+          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             bind:value={table.search}
             placeholder="Search rules by reference, target, property..."
-            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
+            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
         </div>
 
-        <div class="flex items-center gap-2 w-full sm:w-auto">
+        <div class="flex w-full items-center gap-2 sm:w-auto">
           <select
             bind:value={table.filters.status}
-            class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
             <option value="ALL">All Verdicts</option>
             <option value="PASS">PASS Only</option>
@@ -378,38 +373,68 @@ print(response.read())
       />
 
       <!-- Results Table -->
-      <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/50">
+      <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs border-collapse">
+          <table class="w-full border-collapse text-left text-xs">
             <thead>
               <tr
-                class="border-b border-slate-800 bg-slate-950/80 text-slate-400 uppercase text-micro tracking-wider font-semibold"
+                class="border-b border-slate-800 bg-slate-950/80 text-micro font-semibold uppercase tracking-wider text-slate-400"
               >
-                <th class="py-3 px-3 w-10">
+                <th class="w-10 px-3 py-3">
                   <TableCheckbox
                     checked={table.allFilteredSelected}
                     indeterminate={table.someFilteredSelected}
-                    on:change={() => table.toggleSelectAll()}
+                    onchange={() => table.toggleSelectAll()}
                     title="Select all results"
                   />
                 </th>
-                <SortHeader column="rule_ref" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
+                <SortHeader
+                  column="rule_ref"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                  customClass="py-3 px-3"
+                >
                   Rule Reference
                 </SortHeader>
-                <SortHeader column="target" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
+                <SortHeader
+                  column="target"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                  customClass="py-3 px-3"
+                >
                   Target
                 </SortHeader>
-                <SortHeader column="property_name" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
+                <SortHeader
+                  column="property_name"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                  customClass="py-3 px-3"
+                >
                   Property
                 </SortHeader>
-                <SortHeader column="status" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
+                <SortHeader
+                  column="status"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                  customClass="py-3 px-3"
+                >
                   Status
                 </SortHeader>
-                <SortHeader column="fail_count" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
+                <SortHeader
+                  column="fail_count"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}
+                  customClass="py-3 px-3"
+                >
                   Pass / Fail / Missing
                 </SortHeader>
-                <th class="py-3 px-3">Violations</th>
-                <th class="py-3 px-3 text-right">Actions</th>
+                <th class="px-3 py-3">Violations</th>
+                <th class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
@@ -421,31 +446,33 @@ print(response.read())
                 </tr>
               {:else}
                 {#each table.paginated as rule (rule.rowId)}
-                  <tr class="hover:bg-slate-800/30 transition-colors {table.isSelected(rule.rowId) ? 'bg-blue-950/20' : ''}">
-                    <td class="py-3 px-3 w-10">
+                  <tr
+                    class="transition-colors hover:bg-slate-800/30 {table.isSelected(rule.rowId)
+                      ? 'bg-blue-950/20'
+                      : ''}"
+                  >
+                    <td class="w-10 px-3 py-3">
                       <TableCheckbox
                         checked={table.isSelected(rule.rowId)}
-                        on:change={() => table.toggleSelect(rule.rowId)}
+                        onchange={() => table.toggleSelect(rule.rowId)}
                         ariaLabel={`Select rule ${rule.rule_ref}`}
                       />
                     </td>
-                    <td class="py-3 px-3 font-semibold text-slate-50 font-mono">
+                    <td class="px-3 py-3 font-mono font-semibold text-slate-50">
                       {rule.rule_ref || "Custom Rule"}
                       {#if rule.rule_desc}
-                        <div
-                          class="text-caption text-slate-400 font-sans font-normal mt-0.5"
-                        >
+                        <div class="mt-0.5 font-sans text-caption font-normal text-slate-400">
                           {rule.rule_desc}
                         </div>
                       {/if}
                     </td>
-                    <td class="py-3 px-3 font-mono text-slate-300">
+                    <td class="px-3 py-3 font-mono text-slate-300">
                       {rule.target || "—"}
                     </td>
-                    <td class="py-3 px-3 text-slate-300 font-mono">
+                    <td class="px-3 py-3 font-mono text-slate-300">
                       {rule.property_name || "—"}
                     </td>
-                    <td class="py-3 px-3">
+                    <td class="px-3 py-3">
                       <Badge
                         variant={rule.status === "PASS"
                           ? "low"
@@ -456,23 +483,19 @@ print(response.read())
                         {rule.status || "UNKNOWN"}
                       </Badge>
                     </td>
-                    <td class="py-3 px-3 font-mono">
-                      <span class="text-emerald-400 font-semibold"
-                        >{rule.pass_count || 0}</span
-                      >
+                    <td class="px-3 py-3 font-mono">
+                      <span class="font-semibold text-emerald-400">{rule.pass_count || 0}</span>
                       /
-                      <span class="text-rose-400 font-semibold"
-                        >{rule.fail_count || 0}</span
-                      >
+                      <span class="font-semibold text-rose-400">{rule.fail_count || 0}</span>
                       /
                       <span class="text-slate-400">{rule.missing_count || 0}</span>
                     </td>
-                    <td class="py-3 px-3 max-w-xs">
+                    <td class="max-w-xs px-3 py-3">
                       {#if rule.failures && rule.failures.length > 0}
                         <div class="space-y-1">
                           {#each rule.failures as f}
                             <div
-                              class="text-caption text-rose-300 font-mono truncate"
+                              class="truncate font-mono text-caption text-rose-300"
                               title={f.reason || f.guid}
                             >
                               • {f.reason || f.guid}
@@ -483,14 +506,14 @@ print(response.read())
                         <span class="text-slate-500">—</span>
                       {/if}
                     </td>
-                    <td class="py-3 px-3 text-right whitespace-nowrap">
+                    <td class="whitespace-nowrap px-3 py-3 text-right">
                       <button
                         type="button"
-                        on:click={() => (viewingRule = rule)}
-                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                        onclick={() => (viewingRule = rule)}
+                        class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                         title="Inspect rule result details"
                       >
-                        <Eye class="w-3.5 h-3.5" />
+                        <Eye class="h-3.5 w-3.5" />
                       </button>
                     </td>
                   </tr>
@@ -517,45 +540,75 @@ print(response.read())
 
 <!-- Rule Inspection Modal -->
 {#if viewingRule}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+    <div
+      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+    >
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
-          <FileText class="w-4 h-4 text-accent" />
-          <h3 class="text-sm font-bold text-slate-50 font-mono">{viewingRule.rule_ref || 'Rule Result'}</h3>
+          <FileText class="h-4 w-4 text-accent" />
+          <h3 class="font-mono text-sm font-bold text-slate-50">
+            {viewingRule.rule_ref || "Rule Result"}
+          </h3>
         </div>
         <button
           type="button"
-          on:click={() => (viewingRule = null)}
-          class="text-slate-400 hover:text-slate-50 p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          onclick={() => (viewingRule = null)}
+          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
-          <X class="w-4 h-4" />
+          <X class="h-4 w-4" />
         </button>
       </div>
 
       <div class="space-y-3 text-xs">
         <div>
-          <span class="text-slate-400 font-semibold block mb-1">Description</span>
-          <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-slate-200">
-            {viewingRule.rule_desc || 'No description provided'}
+          <span class="mb-1 block font-semibold text-slate-400">Description</span>
+          <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-slate-200">
+            {viewingRule.rule_desc || "No description provided"}
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 text-caption font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
-          <div><span class="text-slate-500">Target:</span> <span class="text-slate-300">{viewingRule.target || '—'}</span></div>
-          <div><span class="text-slate-500">Property:</span> <span class="text-slate-300">{viewingRule.property_name || '—'}</span></div>
-          <div><span class="text-slate-500">Verdict:</span> <span class="font-bold {viewingRule.status === 'PASS' ? 'text-emerald-400' : 'text-rose-400'}">{viewingRule.status}</span></div>
-          <div><span class="text-slate-500">Pass / Fail:</span> <span class="text-slate-300">{viewingRule.pass_count || 0} / {viewingRule.fail_count || 0}</span></div>
+        <div
+          class="grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption"
+        >
+          <div>
+            <span class="text-slate-500">Target:</span>
+            <span class="text-slate-300">{viewingRule.target || "—"}</span>
+          </div>
+          <div>
+            <span class="text-slate-500">Property:</span>
+            <span class="text-slate-300">{viewingRule.property_name || "—"}</span>
+          </div>
+          <div>
+            <span class="text-slate-500">Verdict:</span>
+            <span
+              class="font-bold {viewingRule.status === 'PASS'
+                ? 'text-emerald-400'
+                : 'text-rose-400'}">{viewingRule.status}</span
+            >
+          </div>
+          <div>
+            <span class="text-slate-500">Pass / Fail:</span>
+            <span class="text-slate-300"
+              >{viewingRule.pass_count || 0} / {viewingRule.fail_count || 0}</span
+            >
+          </div>
         </div>
 
         {#if viewingRule.failures && viewingRule.failures.length > 0}
           <div>
-            <span class="text-slate-400 font-semibold block mb-1">Non-Compliant Element Instances ({viewingRule.failures.length})</span>
-            <div class="max-h-48 overflow-y-auto space-y-1.5 p-2 bg-slate-950 rounded-xl border border-slate-800">
+            <span class="mb-1 block font-semibold text-slate-400"
+              >Non-Compliant Element Instances ({viewingRule.failures.length})</span
+            >
+            <div
+              class="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2"
+            >
               {#each viewingRule.failures as f}
-                <div class="p-2 bg-rose-950/20 border border-rose-900/40 rounded-lg text-rose-300 font-mono text-caption">
+                <div
+                  class="rounded-lg border border-rose-900/40 bg-rose-950/20 p-2 font-mono text-caption text-rose-300"
+                >
                   <div class="font-bold">{f.guid}</div>
-                  {#if f.reason}<div class="text-slate-400 text-micro mt-0.5">{f.reason}</div>{/if}
+                  {#if f.reason}<div class="mt-0.5 text-micro text-slate-400">{f.reason}</div>{/if}
                 </div>
               {/each}
             </div>
@@ -563,11 +616,11 @@ print(response.read())
         {/if}
       </div>
 
-      <div class="flex justify-end pt-2 border-t border-slate-800">
+      <div class="flex justify-end border-t border-slate-800 pt-2">
         <button
           type="button"
-          on:click={() => (viewingRule = null)}
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-50 transition-colors"
+          onclick={() => (viewingRule = null)}
+          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
         >
           Close
         </button>

@@ -34,7 +34,7 @@
       role={toast.variant === "error" ? "alert" : "status"}
       aria-live={toast.variant === "error" ? "assertive" : "polite"}
       class={cn(
-        "animate-in fade-in slide-in-from-bottom-2 pointer-events-auto flex items-start gap-3 rounded-xl border p-3 shadow-2xl backdrop-blur-md duration-200",
+        "pointer-events-auto flex items-start gap-3 rounded-xl border p-3 shadow-2xl backdrop-blur-md duration-200 animate-in fade-in slide-in-from-bottom-2",
         STYLES[toast.variant],
       )}
     >
@@ -43,7 +43,7 @@
         {#if toast.title}
           <p class="text-xs font-bold tracking-tight">{toast.title}</p>
         {/if}
-        <p class="text-xs leading-relaxed break-words">{toast.message}</p>
+        <p class="break-words text-xs leading-relaxed">{toast.message}</p>
       </div>
       <button
         type="button"

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import {
     FileText,
     Download,
@@ -41,66 +41,69 @@
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
 
-  export let initialProjectId: number | null = null;
-  export let onSelectProjectForViewer:
-    | ((projectId: number, elementGuid?: string, bcfArtifactId?: number) => void)
-    | undefined = undefined;
+  interface Props {
+    initialProjectId?: number | null;
+    onSelectProjectForViewer?:
+      ((projectId: number, elementGuid?: string, bcfArtifactId?: number) => void) | undefined;
+  }
 
-  let projects: Project[] = [];
-  let selectedProjectId: number | null = initialProjectId;
+  let { initialProjectId = null, onSelectProjectForViewer = undefined }: Props = $props();
+
+  let projects: Project[] = $state([]);
+  let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   let result: AnalysisResult | null = null;
   let isLoading = false;
-  let error = "";
+  let error = $state("");
 
   // ARCH BCF Artifacts
-  let bcfArtifacts: BcfArtifact[] = [];
-  let isBcfLoading = false;
-  let filterToSelectedProject = false;
-  let selectedArtifactIds: number[] = [];
-  let isDeleteArtifactModalOpen = false;
-  let artifactToDelete: BcfArtifact | null = null;
-  let isBulkDeleteArtifactsModalOpen = false;
+  let bcfArtifacts: BcfArtifact[] = $state([]);
+  let isBcfLoading = $state(false);
+  let filterToSelectedProject = $state(false);
+  let selectedArtifactIds: number[] = $state([]);
+  let isDeleteArtifactModalOpen = $state(false);
+  let artifactToDelete: BcfArtifact | null = $state(null);
+  let isBulkDeleteArtifactsModalOpen = $state(false);
 
   // Artifact search, filter & sort
-  let artifactSearchQuery = "";
-  let artifactSortField: "id" | "filename" | "issue_count" | "byte_size" | "created_at" = "id";
-  let artifactSortAsc = false;
-  let artifactCurrentPage = 1;
-  let artifactPageSize = 10;
+  let artifactSearchQuery = $state("");
+  let artifactSortField: "id" | "filename" | "issue_count" | "byte_size" | "created_at" =
+    $state("id");
+  let artifactSortAsc = $state(false);
+  let artifactCurrentPage = $state(1);
+  let artifactPageSize = $state(10);
 
   // Live BCF REST Topics
-  let bcfTopics: BCFTopicResponse[] = [];
-  let isTopicsLoading = false;
-  let activeTab: "live_bcf" | "artifacts" = "live_bcf";
-  let selectedTopicGuids: string[] = [];
+  let bcfTopics: BCFTopicResponse[] = $state([]);
+  let isTopicsLoading = $state(false);
+  let activeTab: "live_bcf" | "artifacts" = $state("live_bcf");
+  let selectedTopicGuids: string[] = $state([]);
 
   // Topic search, filter & sort
-  let topicSearchQuery = "";
-  let topicStatusFilter = "ALL";
-  let topicPriorityFilter = "ALL";
-  let topicCdeFilter = "ALL";
-  let topicSortField: "title" | "guid" | "topic_status" | "priority" | "cde_state" | "creation_date" = "creation_date";
-  let topicSortAsc = false;
-  let topicCurrentPage = 1;
-  let topicPageSize = 10;
+  let topicSearchQuery = $state("");
+  let topicStatusFilter = $state("ALL");
+  let topicPriorityFilter = $state("ALL");
+  let topicCdeFilter = $state("ALL");
+  let topicSortField:
+    "title" | "guid" | "topic_status" | "priority" | "cde_state" | "creation_date" =
+    $state("creation_date");
+  let topicSortAsc = $state(false);
+  let topicCurrentPage = $state(1);
+  let topicPageSize = $state(10);
 
   // Topic Modals State
-  let isTopicCreateModalOpen = false;
-  let isTopicEditModalOpen = false;
-  let topicToEdit: BCFTopicResponse | null = null;
-  let isTopicDetailsModalOpen = false;
-  let topicToView: BCFTopicResponse | null = null;
-  let isTopicDeleteModalOpen = false;
-  let topicToDelete: BCFTopicResponse | null = null;
-  let isTopicBulkEditModalOpen = false;
-  let isTopicBulkDeleteModalOpen = false;
+  let isTopicCreateModalOpen = $state(false);
+  let isTopicEditModalOpen = $state(false);
+  let topicToEdit: BCFTopicResponse | null = $state(null);
+  let isTopicDetailsModalOpen = $state(false);
+  let topicToView: BCFTopicResponse | null = $state(null);
+  let isTopicDeleteModalOpen = $state(false);
+  let topicToDelete: BCFTopicResponse | null = $state(null);
+  let isTopicBulkEditModalOpen = $state(false);
+  let isTopicBulkDeleteModalOpen = $state(false);
 
   onMount(async () => {
     try {
-      const [data] = await Promise.all([
-        projectsApi.list(),
-        loadBcfArtifacts(),
-      ]);
+      const [data] = await Promise.all([projectsApi.list(), loadBcfArtifacts()]);
       projects = data.projects || [];
       if (!selectedProjectId && projects.length > 0) {
         selectedProjectId = projects[0].id;
@@ -151,44 +154,6 @@
     }
   }
 
-  $: currentProject = projects.find((p) => p.id === selectedProjectId);
-
-  // --- TOPIC COMPUTATIONS & SELECTION ---
-  $: filteredTopics = (bcfTopics || [])
-    .filter((t) => {
-      const matchesSearch =
-        !topicSearchQuery ||
-        (t.title || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
-        (t.guid || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
-        (t.description || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
-        (t.assigned_to || "").toLowerCase().includes(topicSearchQuery.toLowerCase());
-      const matchesStatus = topicStatusFilter === "ALL" || (t.topic_status || "Open") === topicStatusFilter;
-      const matchesPriority = topicPriorityFilter === "ALL" || (t.priority || "Normal") === topicPriorityFilter;
-      const matchesCde = topicCdeFilter === "ALL" || (t.cde_state || "WIP") === topicCdeFilter;
-      return matchesSearch && matchesStatus && matchesPriority && matchesCde;
-    })
-    .sort((a, b) => {
-      let valA: any = a[topicSortField];
-      let valB: any = b[topicSortField];
-      if (valA === undefined || valA === null) valA = "";
-      if (valB === undefined || valB === null) valB = "";
-      if (typeof valA === "string") valA = valA.toLowerCase();
-      if (typeof valB === "string") valB = valB.toLowerCase();
-      if (valA < valB) return topicSortAsc ? -1 : 1;
-      if (valA > valB) return topicSortAsc ? 1 : -1;
-      return 0;
-    });
-
-  $: topicTotalItems = filteredTopics.length;
-  $: paginatedTopics = filteredTopics.slice(
-    (topicCurrentPage - 1) * topicPageSize,
-    topicCurrentPage * topicPageSize,
-  );
-
-  $: allFilteredTopicsSelected =
-    filteredTopics.length > 0 &&
-    filteredTopics.every((t) => selectedTopicGuids.includes(t.guid));
-
   function toggleSelectAllTopics() {
     if (allFilteredTopicsSelected) {
       selectedTopicGuids = [];
@@ -205,7 +170,9 @@
     }
   }
 
-  function toggleTopicSort(field: "title" | "guid" | "topic_status" | "priority" | "cde_state" | "creation_date") {
+  function toggleTopicSort(
+    field: "title" | "guid" | "topic_status" | "priority" | "cde_state" | "creation_date",
+  ) {
     if (topicSortField === field) {
       topicSortAsc = !topicSortAsc;
     } else {
@@ -217,7 +184,18 @@
   function exportTopicsToCsv() {
     const topicsToExport = bcfTopics.filter((t) => selectedTopicGuids.includes(t.guid));
     const target = topicsToExport.length ? topicsToExport : filteredTopics;
-    const headers = ["GUID", "Title", "Type", "Status", "Priority", "CDEState", "Suitability", "Revision", "Assignee", "Created"];
+    const headers = [
+      "GUID",
+      "Title",
+      "Type",
+      "Status",
+      "Priority",
+      "CDEState",
+      "Suitability",
+      "Revision",
+      "Assignee",
+      "Created",
+    ];
     const rows = target.map((t) => [
       t.guid,
       `"${(t.title || "").replace(/"/g, '""')}"`,
@@ -235,7 +213,10 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `bcf_topics_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `bcf_topics_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -280,41 +261,6 @@
     }
   }
 
-  // --- ARTIFACTS COMPUTATIONS & SELECTION ---
-  $: displayedBcfArtifacts = (filterToSelectedProject && selectedProjectId
-    ? bcfArtifacts.filter((a) => a.project_id === selectedProjectId)
-    : bcfArtifacts
-  )
-    .filter((a) => {
-      const projName = getProjectName(a.project_id);
-      return (
-        !artifactSearchQuery ||
-        (a.filename || "").toLowerCase().includes(artifactSearchQuery.toLowerCase()) ||
-        projName.toLowerCase().includes(artifactSearchQuery.toLowerCase())
-      );
-    })
-    .sort((a, b) => {
-      let valA: any = a[artifactSortField];
-      let valB: any = b[artifactSortField];
-      if (valA === undefined || valA === null) valA = "";
-      if (valB === undefined || valB === null) valB = "";
-      if (typeof valA === "string") valA = valA.toLowerCase();
-      if (typeof valB === "string") valB = valB.toLowerCase();
-      if (valA < valB) return artifactSortAsc ? -1 : 1;
-      if (valA > valB) return artifactSortAsc ? 1 : -1;
-      return 0;
-    });
-
-  $: artifactTotalItems = displayedBcfArtifacts.length;
-  $: paginatedArtifacts = displayedBcfArtifacts.slice(
-    (artifactCurrentPage - 1) * artifactPageSize,
-    artifactCurrentPage * artifactPageSize,
-  );
-
-  $: allFilteredArtifactsSelected =
-    displayedBcfArtifacts.length > 0 &&
-    displayedBcfArtifacts.every((a) => selectedArtifactIds.includes(a.id));
-
   function toggleSelectAllArtifacts() {
     if (allFilteredArtifactsSelected) {
       selectedArtifactIds = [];
@@ -331,7 +277,9 @@
     }
   }
 
-  function toggleArtifactSort(field: "id" | "filename" | "issue_count" | "byte_size" | "created_at") {
+  function toggleArtifactSort(
+    field: "id" | "filename" | "issue_count" | "byte_size" | "created_at",
+  ) {
     if (artifactSortField === field) {
       artifactSortAsc = !artifactSortAsc;
     } else {
@@ -344,7 +292,15 @@
     const target = selectedArtifactIds.length
       ? bcfArtifacts.filter((a) => selectedArtifactIds.includes(a.id))
       : displayedBcfArtifacts;
-    const headers = ["ID", "ProjectID", "ProjectName", "Filename", "Issues", "ByteSize", "CreatedAt"];
+    const headers = [
+      "ID",
+      "ProjectID",
+      "ProjectName",
+      "Filename",
+      "Issues",
+      "ByteSize",
+      "CreatedAt",
+    ];
     const rows = target.map((a) => [
       a.id,
       a.project_id,
@@ -359,7 +315,10 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `bcf_artifacts_export_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `bcf_artifacts_export_${new Date().toISOString().substring(0, 10)}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -420,9 +379,83 @@
       return dateStr;
     }
   }
+  let currentProject = $derived(projects.find((p) => p.id === selectedProjectId));
+  // --- TOPIC COMPUTATIONS & SELECTION ---
+  let filteredTopics = $derived(
+    (bcfTopics || [])
+      .filter((t) => {
+        const matchesSearch =
+          !topicSearchQuery ||
+          (t.title || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
+          (t.guid || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
+          (t.description || "").toLowerCase().includes(topicSearchQuery.toLowerCase()) ||
+          (t.assigned_to || "").toLowerCase().includes(topicSearchQuery.toLowerCase());
+        const matchesStatus =
+          topicStatusFilter === "ALL" || (t.topic_status || "Open") === topicStatusFilter;
+        const matchesPriority =
+          topicPriorityFilter === "ALL" || (t.priority || "Normal") === topicPriorityFilter;
+        const matchesCde = topicCdeFilter === "ALL" || (t.cde_state || "WIP") === topicCdeFilter;
+        return matchesSearch && matchesStatus && matchesPriority && matchesCde;
+      })
+      .sort((a, b) => {
+        let valA: any = a[topicSortField];
+        let valB: any = b[topicSortField];
+        if (valA === undefined || valA === null) valA = "";
+        if (valB === undefined || valB === null) valB = "";
+        if (typeof valA === "string") valA = valA.toLowerCase();
+        if (typeof valB === "string") valB = valB.toLowerCase();
+        if (valA < valB) return topicSortAsc ? -1 : 1;
+        if (valA > valB) return topicSortAsc ? 1 : -1;
+        return 0;
+      }),
+  );
+  let topicTotalItems = $derived(filteredTopics.length);
+  let paginatedTopics = $derived(
+    filteredTopics.slice((topicCurrentPage - 1) * topicPageSize, topicCurrentPage * topicPageSize),
+  );
+  let allFilteredTopicsSelected = $derived(
+    filteredTopics.length > 0 && filteredTopics.every((t) => selectedTopicGuids.includes(t.guid)),
+  );
+  // --- ARTIFACTS COMPUTATIONS & SELECTION ---
+  let displayedBcfArtifacts = $derived(
+    (filterToSelectedProject && selectedProjectId
+      ? bcfArtifacts.filter((a) => a.project_id === selectedProjectId)
+      : bcfArtifacts
+    )
+      .filter((a) => {
+        const projName = getProjectName(a.project_id);
+        return (
+          !artifactSearchQuery ||
+          (a.filename || "").toLowerCase().includes(artifactSearchQuery.toLowerCase()) ||
+          projName.toLowerCase().includes(artifactSearchQuery.toLowerCase())
+        );
+      })
+      .sort((a, b) => {
+        let valA: any = a[artifactSortField];
+        let valB: any = b[artifactSortField];
+        if (valA === undefined || valA === null) valA = "";
+        if (valB === undefined || valB === null) valB = "";
+        if (typeof valA === "string") valA = valA.toLowerCase();
+        if (typeof valB === "string") valB = valB.toLowerCase();
+        if (valA < valB) return artifactSortAsc ? -1 : 1;
+        if (valA > valB) return artifactSortAsc ? 1 : -1;
+        return 0;
+      }),
+  );
+  let artifactTotalItems = $derived(displayedBcfArtifacts.length);
+  let paginatedArtifacts = $derived(
+    displayedBcfArtifacts.slice(
+      (artifactCurrentPage - 1) * artifactPageSize,
+      artifactCurrentPage * artifactPageSize,
+    ),
+  );
+  let allFilteredArtifactsSelected = $derived(
+    displayedBcfArtifacts.length > 0 &&
+      displayedBcfArtifacts.every((a) => selectedArtifactIds.includes(a.id)),
+  );
 </script>
 
-<div class="space-y-6 mx-auto">
+<div class="mx-auto space-y-6">
   <!-- Header -->
   <PageHeader
     category="Reports"
@@ -430,62 +463,63 @@
     subtitle="Generate, track, and download OpenBIM compliance audit deliverables in BCF 2.1, CSV, and JSON."
     icon={FolderArchive}
   >
-    <div slot="actions" class="flex items-center gap-2">
-      <select
-        bind:value={selectedProjectId}
-        on:change={() => {
-          loadReport();
-          loadBcfTopics();
-        }}
-        class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
-      >
-        {#each projects as p}
-          <option value={p.id}>{p.name}</option>
-        {/each}
-      </select>
-    </div>
+    {#snippet actions()}
+      <div class="flex items-center gap-2">
+        <select
+          bind:value={selectedProjectId}
+          onchange={() => {
+            loadReport();
+            loadBcfTopics();
+          }}
+          class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+        >
+          {#each projects as p}
+            <option value={p.id}>{p.name}</option>
+          {/each}
+        </select>
+      </div>
+    {/snippet}
   </PageHeader>
 
   {#if error}
-    <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
+    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
       {error}
     </div>
   {/if}
 
   {#if selectedProjectId}
     <!-- ═══ BCF Deliverables & Live Topics Hub ═══ -->
-    <div
-      class="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4"
-    >
-      <div
-        class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-      >
+    <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+      <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <div class="flex items-center gap-2">
-            <FolderArchive class="w-4 h-4 text-blue-400" />
-            <h2 class="text-base font-bold text-slate-50 tracking-tight">
+            <FolderArchive class="h-4 w-4 text-blue-400" />
+            <h2 class="text-base font-bold tracking-tight text-slate-50">
               buildingSMART BCF Collaboration Hub
             </h2>
             <span
-              class="px-2 py-0.5 rounded-full text-micro font-semibold bg-slate-800 text-slate-300 border border-slate-700"
+              class="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold text-slate-300"
             >
-              {activeTab === 'live_bcf' ? `${bcfTopics.length} Live Topics` : `${bcfArtifacts.length} Artifacts`}
+              {activeTab === "live_bcf"
+                ? `${bcfTopics.length} Live Topics`
+                : `${bcfArtifacts.length} Artifacts`}
             </span>
           </div>
-          <p class="text-xs text-slate-400 mt-1">
-            Bidirectional BCF REST API v2.1/v3.0 live topics exchange and persisted BCF zip deliverables with ISO 19650 governance tags.
+          <p class="mt-1 text-xs text-slate-400">
+            Bidirectional BCF REST API v2.1/v3.0 live topics exchange and persisted BCF zip
+            deliverables with ISO 19650 governance tags.
           </p>
         </div>
 
         <!-- Tab & Action Controls -->
-        <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+        <div class="flex shrink-0 flex-wrap items-center gap-2.5">
           <div
-            class="flex items-center rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs"
+            class="flex items-center rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs"
           >
             <button
               type="button"
-              on:click={() => (activeTab = "live_bcf")}
-              class="px-3 py-1 rounded-lg font-medium transition-colors {activeTab === 'live_bcf'
+              onclick={() => (activeTab = "live_bcf")}
+              class="rounded-lg px-3 py-1 font-medium transition-colors {activeTab === 'live_bcf'
                 ? 'bg-blue-600 text-white'
                 : 'text-slate-400 hover:text-slate-50'}"
             >
@@ -493,8 +527,8 @@
             </button>
             <button
               type="button"
-              on:click={() => (activeTab = "artifacts")}
-              class="px-3 py-1 rounded-lg font-medium transition-colors {activeTab === 'artifacts'
+              onclick={() => (activeTab = "artifacts")}
+              class="rounded-lg px-3 py-1 font-medium transition-colors {activeTab === 'artifacts'
                 ? 'bg-slate-800 text-slate-50'
                 : 'text-slate-400 hover:text-slate-50'}"
             >
@@ -505,26 +539,26 @@
           {#if activeTab === "live_bcf"}
             <button
               type="button"
-              on:click={() => (isTopicCreateModalOpen = true)}
-              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition-colors"
+              onclick={() => (isTopicCreateModalOpen = true)}
+              class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-500"
             >
-              <Plus class="w-3.5 h-3.5" />
+              <Plus class="h-3.5 w-3.5" />
               <span>Create Topic</span>
             </button>
           {/if}
 
           <button
             type="button"
-            on:click={() => {
-              if (activeTab === 'live_bcf') loadBcfTopics();
+            onclick={() => {
+              if (activeTab === "live_bcf") loadBcfTopics();
               else loadBcfArtifacts();
             }}
             disabled={isTopicsLoading || isBcfLoading}
-            class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 border border-slate-700 transition-colors disabled:opacity-50"
+            class="rounded-xl border border-slate-700 bg-slate-800 p-2 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50 disabled:opacity-50"
             title="Refresh Deliverables"
           >
             <RefreshCw
-              class="w-3.5 h-3.5 {isTopicsLoading || isBcfLoading ? 'animate-spin' : ''}"
+              class="h-3.5 w-3.5 {isTopicsLoading || isBcfLoading ? 'animate-spin' : ''}"
             />
           </button>
         </div>
@@ -534,21 +568,23 @@
         <!-- ── TAB 1: LIVE BCF 2.1 TOPICS ── -->
 
         <!-- Filters & Search Toolbar -->
-        <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/90 flex flex-col md:flex-row items-center gap-3">
-          <div class="relative flex-1 w-full">
-            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <div
+          class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 md:flex-row"
+        >
+          <div class="relative w-full flex-1">
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               bind:value={topicSearchQuery}
               placeholder="Search topics by title, GUID, assignee, or description..."
-              class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
+              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
           </div>
 
-          <div class="flex items-center gap-2 w-full md:w-auto flex-wrap">
+          <div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
             <select
               bind:value={topicStatusFilter}
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="ALL">All Statuses</option>
               <option value="Open">Open</option>
@@ -559,7 +595,7 @@
 
             <select
               bind:value={topicPriorityFilter}
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="ALL">All Priorities</option>
               <option value="Critical">Critical</option>
@@ -570,7 +606,7 @@
 
             <select
               bind:value={topicCdeFilter}
-              class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="ALL">All CDE States</option>
               <option value="WIP">WIP</option>
@@ -592,15 +628,25 @@
         />
 
         {#if isTopicsLoading && bcfTopics.length === 0}
-          <LoadingState message={`Querying /api/bcf/v2.1/projects/${selectedProjectId}/topics...`} />
+          <LoadingState
+            message={`Querying /api/bcf/v2.1/projects/${selectedProjectId}/topics...`}
+          />
         {:else if filteredTopics.length === 0}
           <div class="p-6">
             <EmptyState
               title={`No BCF topics match your criteria for ${currentProject?.name || "this project"}`}
               description="Create a topic or adjust filters to coordinate model findings."
-              actionLabel={topicSearchQuery || topicStatusFilter !== 'ALL' || topicPriorityFilter !== 'ALL' ? "Reset Filters" : "+ Create BCF Topic"}
+              actionLabel={topicSearchQuery ||
+              topicStatusFilter !== "ALL" ||
+              topicPriorityFilter !== "ALL"
+                ? "Reset Filters"
+                : "+ Create BCF Topic"}
               onAction={() => {
-                if (topicSearchQuery || topicStatusFilter !== 'ALL' || topicPriorityFilter !== 'ALL') {
+                if (
+                  topicSearchQuery ||
+                  topicStatusFilter !== "ALL" ||
+                  topicPriorityFilter !== "ALL"
+                ) {
                   topicSearchQuery = "";
                   topicStatusFilter = "ALL";
                   topicPriorityFilter = "ALL";
@@ -613,101 +659,132 @@
           </div>
         {:else}
           <div class="overflow-x-auto rounded-xl border border-slate-800/80">
-            <table class="w-full text-left text-xs border-collapse">
+            <table class="w-full border-collapse text-left text-xs">
               <thead>
                 <tr
-                  class="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-semibold uppercase tracking-wider text-micro"
+                  class="border-b border-slate-800 bg-slate-950/60 text-micro font-semibold uppercase tracking-wider text-slate-400"
                 >
-                  <th class="py-3 px-4 w-10">
+                  <th class="w-10 px-4 py-3">
                     <TableCheckbox
                       checked={allFilteredTopicsSelected}
-                      on:change={toggleSelectAllTopics}
+                      onchange={toggleSelectAllTopics}
                       title="Select all topics"
                     />
                   </th>
-                  <SortHeader column="guid" sortField={topicSortField} sortAsc={topicSortAsc} onSort={toggleTopicSort}>
+                  <SortHeader
+                    column="guid"
+                    sortField={topicSortField}
+                    sortAsc={topicSortAsc}
+                    onSort={toggleTopicSort}
+                  >
                     Topic GUID
                   </SortHeader>
-                  <SortHeader column="title" sortField={topicSortField} sortAsc={topicSortAsc} onSort={toggleTopicSort}>
+                  <SortHeader
+                    column="title"
+                    sortField={topicSortField}
+                    sortAsc={topicSortAsc}
+                    onSort={toggleTopicSort}
+                  >
                     Title & Type
                   </SortHeader>
-                  <SortHeader column="topic_status" sortField={topicSortField} sortAsc={topicSortAsc} onSort={toggleTopicSort}>
+                  <SortHeader
+                    column="topic_status"
+                    sortField={topicSortField}
+                    sortAsc={topicSortAsc}
+                    onSort={toggleTopicSort}
+                  >
                     Status & Priority
                   </SortHeader>
-                  <SortHeader column="cde_state" sortField={topicSortField} sortAsc={topicSortAsc} onSort={toggleTopicSort}>
+                  <SortHeader
+                    column="cde_state"
+                    sortField={topicSortField}
+                    sortAsc={topicSortAsc}
+                    onSort={toggleTopicSort}
+                  >
                     ISO 19650 Governance
                   </SortHeader>
-                  <th class="py-3 px-4">Elements</th>
-                  <th class="py-3 px-4">Viewpoints</th>
-                  <th class="py-3 px-4 text-right">Actions</th>
+                  <th class="px-4 py-3">Elements</th>
+                  <th class="px-4 py-3">Viewpoints</th>
+                  <th class="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
                 {#each paginatedTopics as topic}
-                  <tr class="hover:bg-slate-900/60 transition-colors {selectedTopicGuids.includes(topic.guid) ? 'bg-blue-950/20' : ''}">
-                    <td class="py-3 px-4 w-10">
+                  <tr
+                    class="transition-colors hover:bg-slate-900/60 {selectedTopicGuids.includes(
+                      topic.guid,
+                    )
+                      ? 'bg-blue-950/20'
+                      : ''}"
+                  >
+                    <td class="w-10 px-4 py-3">
                       <TableCheckbox
                         checked={selectedTopicGuids.includes(topic.guid)}
-                        on:change={() => toggleSelectTopic(topic.guid)}
+                        onchange={() => toggleSelectTopic(topic.guid)}
                         ariaLabel={`Select topic ${topic.title}`}
                       />
                     </td>
-                    <td class="py-3 px-4 font-mono text-caption text-slate-400">
+                    <td class="px-4 py-3 font-mono text-caption text-slate-400">
                       {topic.guid.substring(0, 8)}...
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="px-4 py-3">
                       <div class="font-medium text-slate-50">{topic.title}</div>
-                      <div class="text-micro text-slate-400">{topic.topic_type || 'Clash / Compliance'}</div>
+                      <div class="text-micro text-slate-400">
+                        {topic.topic_type || "Clash / Compliance"}
+                      </div>
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="px-4 py-3">
                       <div class="flex items-center gap-1.5">
-                        <SeverityBadge severity={topic.topic_status || 'Open'} />
-                        <span class="text-micro text-slate-400 font-medium">
-                          {topic.priority || 'Normal'}
+                        <SeverityBadge severity={topic.topic_status || "Open"} />
+                        <span class="text-micro font-medium text-slate-400">
+                          {topic.priority || "Normal"}
                         </span>
                       </div>
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="px-4 py-3">
                       <IsoGovernanceBadges
-                        suitability={topic.suitability_code || 'S0'}
-                        revision={topic.revision_code || 'P01.01'}
-                        cdeState={topic.cde_state || 'WIP'}
+                        suitability={topic.suitability_code || "S0"}
+                        revision={topic.revision_code || "P01.01"}
+                        cdeState={topic.cde_state || "WIP"}
                       />
                     </td>
-                    <td class="py-3 px-4 font-mono text-slate-300">
-                      {topic.component_guids ? topic.component_guids.length : 0} GUID{topic.component_guids?.length === 1 ? '' : 's'}
+                    <td class="px-4 py-3 font-mono text-slate-300">
+                      {topic.component_guids ? topic.component_guids.length : 0} GUID{topic
+                        .component_guids?.length === 1
+                        ? ""
+                        : "s"}
                     </td>
-                    <td class="py-3 px-4">
-                      <span class="inline-flex items-center gap-1 text-slate-300 text-caption">
-                        <Camera class="w-3 h-3 text-blue-400" />
+                    <td class="px-4 py-3">
+                      <span class="inline-flex items-center gap-1 text-caption text-slate-300">
+                        <Camera class="h-3 w-3 text-blue-400" />
                         <span>{topic.viewpoints_count || 1}</span>
                       </span>
                     </td>
-                    <td class="py-3 px-4 text-right whitespace-nowrap">
+                    <td class="whitespace-nowrap px-4 py-3 text-right">
                       <div class="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          on:click={() => openTopicDetails(topic)}
-                          class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-50 transition-colors"
+                          onclick={() => openTopicDetails(topic)}
+                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                           title="View topic discussion & viewpoints"
                         >
-                          <Eye class="w-3.5 h-3.5" />
+                          <Eye class="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
-                          on:click={() => openTopicEdit(topic)}
-                          class="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/30 transition-colors"
+                          onclick={() => openTopicEdit(topic)}
+                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400"
                           title="Edit topic"
                         >
-                          <Pencil class="w-3.5 h-3.5" />
+                          <Pencil class="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
-                          on:click={() => promptDeleteTopic(topic)}
-                          class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                          onclick={() => promptDeleteTopic(topic)}
+                          class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                           title="Delete topic"
                         >
-                          <Trash2 class="w-3.5 h-3.5" />
+                          <Trash2 class="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -728,28 +805,31 @@
             }}
           />
         {/if}
-
       {:else}
         <!-- ── TAB 2: ARCHIVED BCF ZIP ARTIFACTS ── -->
 
         <!-- Filters & Project Filter Toolbar -->
-        <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/90 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div class="relative flex-1 w-full">
-            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <div
+          class="flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 sm:flex-row"
+        >
+          <div class="relative w-full flex-1">
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               bind:value={artifactSearchQuery}
               placeholder="Filter BCF archives by filename or project..."
-              class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
+              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
           </div>
 
           {#if selectedProjectId}
-            <div class="flex items-center rounded-xl bg-slate-900 p-1 border border-slate-800 text-xs">
+            <div
+              class="flex items-center rounded-xl border border-slate-800 bg-slate-900 p-1 text-xs"
+            >
               <button
                 type="button"
-                on:click={() => (filterToSelectedProject = false)}
-                class="px-2.5 py-1 rounded-lg font-medium transition-colors {!filterToSelectedProject
+                onclick={() => (filterToSelectedProject = false)}
+                class="rounded-lg px-2.5 py-1 font-medium transition-colors {!filterToSelectedProject
                   ? 'bg-slate-800 text-slate-50'
                   : 'text-slate-400 hover:text-slate-50'}"
               >
@@ -757,8 +837,8 @@
               </button>
               <button
                 type="button"
-                on:click={() => (filterToSelectedProject = true)}
-                class="px-2.5 py-1 rounded-lg font-medium transition-colors {filterToSelectedProject
+                onclick={() => (filterToSelectedProject = true)}
+                class="rounded-lg px-2.5 py-1 font-medium transition-colors {filterToSelectedProject
                   ? 'bg-blue-600 text-white'
                   : 'text-slate-400 hover:text-slate-50'}"
               >
@@ -780,13 +860,13 @@
         {#if isBcfLoading && bcfArtifacts.length === 0}
           <div class="p-12 text-center text-xs text-slate-400">
             <div
-              class="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"
+              class="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"
             ></div>
             Loading BCF artifacts…
           </div>
         {:else if displayedBcfArtifacts.length === 0}
           <div
-            class="p-12 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl"
+            class="rounded-xl border border-dashed border-slate-800 p-12 text-center text-xs text-slate-500"
           >
             {filterToSelectedProject
               ? `No BCF reports found for ${currentProject?.name || "this project"}. Run an ARCH Compliance Audit to generate one.`
@@ -794,109 +874,137 @@
           </div>
         {:else}
           <div class="overflow-x-auto rounded-xl border border-slate-800/80">
-            <table class="w-full text-left text-xs border-collapse">
+            <table class="w-full border-collapse text-left text-xs">
               <thead>
                 <tr
-                  class="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-semibold uppercase tracking-wider text-micro"
+                  class="border-b border-slate-800 bg-slate-950/60 text-micro font-semibold uppercase tracking-wider text-slate-400"
                 >
-                  <th class="py-3 px-4 w-10">
+                  <th class="w-10 px-4 py-3">
                     <TableCheckbox
                       checked={allFilteredArtifactsSelected}
-                      on:change={toggleSelectAllArtifacts}
+                      onchange={toggleSelectAllArtifacts}
                       title="Select all BCF artifacts"
                     />
                   </th>
-                  <SortHeader column="id" sortField={artifactSortField} sortAsc={artifactSortAsc} onSort={toggleArtifactSort}>
+                  <SortHeader
+                    column="id"
+                    sortField={artifactSortField}
+                    sortAsc={artifactSortAsc}
+                    onSort={toggleArtifactSort}
+                  >
                     ID
                   </SortHeader>
-                  <th class="py-3 px-4">Project</th>
-                  <SortHeader column="filename" sortField={artifactSortField} sortAsc={artifactSortAsc} onSort={toggleArtifactSort}>
+                  <th class="px-4 py-3">Project</th>
+                  <SortHeader
+                    column="filename"
+                    sortField={artifactSortField}
+                    sortAsc={artifactSortAsc}
+                    onSort={toggleArtifactSort}
+                  >
                     Artifact / Filename
                   </SortHeader>
-                  <SortHeader column="issue_count" sortField={artifactSortField} sortAsc={artifactSortAsc} onSort={toggleArtifactSort}>
+                  <SortHeader
+                    column="issue_count"
+                    sortField={artifactSortField}
+                    sortAsc={artifactSortAsc}
+                    onSort={toggleArtifactSort}
+                  >
                     Issues
                   </SortHeader>
-                  <SortHeader column="byte_size" sortField={artifactSortField} sortAsc={artifactSortAsc} onSort={toggleArtifactSort}>
+                  <SortHeader
+                    column="byte_size"
+                    sortField={artifactSortField}
+                    sortAsc={artifactSortAsc}
+                    onSort={toggleArtifactSort}
+                  >
                     Size
                   </SortHeader>
-                  <SortHeader column="created_at" sortField={artifactSortField} sortAsc={artifactSortAsc} onSort={toggleArtifactSort}>
+                  <SortHeader
+                    column="created_at"
+                    sortField={artifactSortField}
+                    sortAsc={artifactSortAsc}
+                    onSort={toggleArtifactSort}
+                  >
                     Date
                   </SortHeader>
-                  <th class="py-3 px-4 text-right">Actions</th>
+                  <th class="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
                 {#each paginatedArtifacts as artifact}
-                  <tr class="hover:bg-slate-900/60 transition-colors {selectedArtifactIds.includes(artifact.id) ? 'bg-blue-950/20' : ''}">
-                    <td class="py-3 px-4 w-10">
+                  <tr
+                    class="transition-colors hover:bg-slate-900/60 {selectedArtifactIds.includes(
+                      artifact.id,
+                    )
+                      ? 'bg-blue-950/20'
+                      : ''}"
+                  >
+                    <td class="w-10 px-4 py-3">
                       <TableCheckbox
                         checked={selectedArtifactIds.includes(artifact.id)}
-                        on:change={() => toggleSelectArtifact(artifact.id)}
+                        onchange={() => toggleSelectArtifact(artifact.id)}
                         ariaLabel={`Select artifact ${artifact.filename}`}
                       />
                     </td>
-                    <td class="py-3 px-4 font-mono text-slate-500">#{artifact.id}</td>
-                    <td class="py-3 px-4 font-medium text-slate-50">
+                    <td class="px-4 py-3 font-mono text-slate-500">#{artifact.id}</td>
+                    <td class="px-4 py-3 font-medium text-slate-50">
                       {getProjectName(artifact.project_id)}
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="px-4 py-3">
                       <div
-                        class="font-mono text-slate-300 truncate max-w-xs"
+                        class="max-w-xs truncate font-mono text-slate-300"
                         title={artifact.filename}
                       >
                         {artifact.filename}
                       </div>
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="px-4 py-3">
                       <span
-                        class="inline-block px-2.5 py-0.5 rounded-full text-micro font-semibold border {artifact.issue_count > 0
-                          ? 'bg-rose-950/60 text-rose-300 border-rose-800'
-                          : 'bg-emerald-950/60 text-emerald-300 border-emerald-800'}"
+                        class="inline-block rounded-full border px-2.5 py-0.5 text-micro font-semibold {artifact.issue_count >
+                        0
+                          ? 'border-rose-800 bg-rose-950/60 text-rose-300'
+                          : 'border-emerald-800 bg-emerald-950/60 text-emerald-300'}"
                       >
                         {artifact.issue_count} issue{artifact.issue_count === 1 ? "" : "s"}
                       </span>
                     </td>
-                    <td class="py-3 px-4 font-mono text-slate-400">
+                    <td class="px-4 py-3 font-mono text-slate-400">
                       {formatBytes(artifact.byte_size)}
                     </td>
-                    <td class="py-3 px-4 text-slate-400 whitespace-nowrap">
+                    <td class="whitespace-nowrap px-4 py-3 text-slate-400">
                       {formatDate(artifact.created_at)}
                     </td>
-                    <td class="py-3 px-4 text-right">
+                    <td class="px-4 py-3 text-right">
                       <div class="inline-flex items-center justify-end gap-1.5">
                         {#if onSelectProjectForViewer}
                           <button
                             type="button"
-                            on:click={() =>
+                            onclick={() =>
                               onSelectProjectForViewer &&
-                              onSelectProjectForViewer(
-                                artifact.project_id,
-                                undefined,
-                                artifact.id
-                              )}
-                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 border border-emerald-800 transition-colors"
+                              onSelectProjectForViewer(artifact.project_id, undefined, artifact.id)}
+                            class="inline-flex items-center gap-1 rounded-lg border border-emerald-800 bg-emerald-900/40 px-2.5 py-1 text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-800/60"
                             title="Open 3D Viewer with this BCF Report"
                           >
-                            <ScanEye class="w-3.5 h-3.5" />
+                            <ScanEye class="h-3.5 w-3.5" />
                             View 3D
                           </button>
                         {/if}
                         <a
                           href={analyzeApi.getBcfArtifactUrl(artifact.id)}
                           download
-                          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 transition-colors"
+                          class="inline-flex items-center gap-1 rounded-lg border border-blue-500/30 bg-blue-600/20 px-2.5 py-1 text-xs font-semibold text-blue-300 transition-colors hover:bg-blue-600/30"
                           title="Download BCF 2.1 Zip"
                         >
-                          <Download class="w-3.5 h-3.5" />
+                          <Download class="h-3.5 w-3.5" />
                           Zip
                         </a>
                         <button
                           type="button"
-                          on:click={() => promptDeleteArtifact(artifact)}
-                          class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
+                          onclick={() => promptDeleteArtifact(artifact)}
+                          class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                           title="Delete BCF archive"
                         >
-                          <Trash2 class="w-3.5 h-3.5" />
+                          <Trash2 class="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -921,7 +1029,7 @@
     </div>
   {:else}
     <div
-      class="p-16 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl"
+      class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
     >
       Select a project to generate and export compliance audit deliverables.
     </div>

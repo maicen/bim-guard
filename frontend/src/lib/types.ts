@@ -2,13 +2,26 @@
  * Type contracts corresponding directly to backend Pydantic models in app/modules/contracts.py
  */
 
-export const CDE_STATE_CHOICES = ['WIP', 'SHARED', 'PUBLISHED', 'ARCHIVED'] as const;
+export const CDE_STATE_CHOICES = ["WIP", "SHARED", "PUBLISHED", "ARCHIVED"] as const;
 export type CDEState = (typeof CDE_STATE_CHOICES)[number];
 
 export const SUITABILITY_CODES = [
-  'S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7',
-  'D1', 'D2', 'D3', 'D4',
-  'A1', 'A2', 'B1', 'CR'
+  "S0",
+  "S1",
+  "S2",
+  "S3",
+  "S4",
+  "S5",
+  "S6",
+  "S7",
+  "D1",
+  "D2",
+  "D3",
+  "D4",
+  "A1",
+  "A2",
+  "B1",
+  "CR",
 ] as const;
 export type SuitabilityCode = (typeof SUITABILITY_CODES)[number];
 
@@ -33,7 +46,7 @@ export interface ISO19650Metadata {
  * ('Architectural', 'Piping (Corrosive)', 'Halo') collapse onto these via
  * `normalizeAnalysisDomain` in ./analysisDomain.ts.
  */
-export type AnalysisDomain = 'Arch' | 'Piping' | 'seismic';
+export type AnalysisDomain = "Arch" | "Piping" | "seismic";
 
 export interface Project {
   id: number;
@@ -69,7 +82,7 @@ export interface Project {
  * Discipline/role an attached IFC model carries.
  * Restriced to primary or context in the project setup wizard.
  */
-export const IFC_FILE_ROLES = ['primary', 'context'] as const;
+export const IFC_FILE_ROLES = ["primary", "context"] as const;
 
 export type IfcFileRole = (typeof IFC_FILE_ROLES)[number];
 
@@ -196,7 +209,7 @@ export interface ProjectBulkActionResponse {
   affected_ids: number[];
 }
 
-export const DOCUMENT_TYPES = ['Code', 'Specification', 'Manual'] as const;
+export const DOCUMENT_TYPES = ["Code", "Specification", "Manual"] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
@@ -251,7 +264,7 @@ export interface DocumentUpdatePayload {
   cde_state?: CDEState;
 }
 
-export type RulesetCategory = 'Arch' | 'Piping' | 'seismic';
+export type RulesetCategory = "Arch" | "Piping" | "seismic";
 
 export interface Rule {
   id: number;
@@ -338,7 +351,7 @@ export interface RuleFolderBulkActionResponse {
   deleted_rules_count: number;
 }
 
-export type RuleSnapshotSourceMode = 'pdf' | 'ids' | 'manual' | 'mixed';
+export type RuleSnapshotSourceMode = "pdf" | "ids" | "manual" | "mixed";
 
 export interface RuleSnapshot {
   id: number;
@@ -378,7 +391,7 @@ export interface AuditIssue {
   element_id: string;
   rule_id: string;
   title: string;
-  band: 'critical' | 'high' | 'medium' | 'low';
+  band: "critical" | "high" | "medium" | "low";
   score: number;
   mechanism: string;
   description: string;
@@ -398,7 +411,7 @@ export interface IssueStats {
 }
 
 export interface AnalysisInputItem {
-  kind: 'standard' | 'document';
+  kind: "standard" | "document";
   id: string;
   label: string;
   detail: string;
@@ -433,7 +446,7 @@ export interface StageRecord {
 export interface EngineRun {
   code: string;
   label: string;
-  status: 'pending' | 'running' | 'complete' | 'failed' | 'not_implemented';
+  status: "pending" | "running" | "complete" | "failed" | "not_implemented";
   current_stage?: number | null;
   stage_name?: string | null;
   progress_percent: number;
@@ -451,7 +464,8 @@ export interface WorkflowStatus {
 }
 
 export interface PipelineEvent {
-  event_type: 'stage_transition' | 'metric_increment' | 'engine_complete' | 'engine_failed' | string;
+  event_type:
+    "stage_transition" | "metric_increment" | "engine_complete" | "engine_failed" | string;
   source_module: string;
   project_id: number;
   payload: Record<string, any>;
@@ -504,7 +518,6 @@ export interface BcfArtifact {
   created_at?: string;
 }
 
-
 export interface ExtractedRule {
   rule_id: string;
   description: string;
@@ -533,7 +546,7 @@ export interface RuleElementResult {
   storey?: string;
   space?: string;
   actual?: any;
-  status?: string;  // PASS, FAIL, MISSING
+  status?: string; // PASS, FAIL, MISSING
   reason?: string;
   position_mm?: number[];
 }
@@ -549,7 +562,7 @@ export interface RuleComplianceResult {
   value_min?: number;
   value_max?: number;
   unit?: string;
-  status?: string;  // PASS, FAIL, MISSING_DATA, NO_ELEMENTS
+  status?: string; // PASS, FAIL, MISSING_DATA, NO_ELEMENTS
   pass_count?: number;
   fail_count?: number;
   missing_count?: number;
@@ -767,7 +780,7 @@ export interface BSDDValidationViolation {
   field_checked: string;
   expected_constraint: string;
   actual_value?: any;
-  severity: 'error' | 'warning' | 'info' | string;
+  severity: "error" | "warning" | "info" | string;
   message: string;
   dictionary_uri?: string | null;
 }
@@ -792,7 +805,7 @@ export interface BSDDClassSearchResponse {
 // 2. OpenCDE Types
 export interface CDEVersionItem {
   version: string;
-  api_type: 'foundation' | 'documents' | 'bcf' | string;
+  api_type: "foundation" | "documents" | "bcf" | string;
   detailed_version?: string | null;
 }
 
@@ -846,8 +859,8 @@ export interface CDESyncResponse {
 // 3. IFC Pre-Flight Validation Types
 export interface IFCValidationIssue {
   rule_code: string;
-  stage: 'syntax' | 'schema' | 'gherkin_rules' | string;
-  severity: 'fatal' | 'error' | 'warning' | 'info' | string;
+  stage: "syntax" | "schema" | "gherkin_rules" | string;
+  severity: "fatal" | "error" | "warning" | "info" | string;
   message: string;
   line_number?: number | null;
   entity_id?: string | null;
@@ -1068,7 +1081,9 @@ export interface NamingConfig {
 }
 
 /** Fields to write. Mirrors NamingConfigUpdateContract; every field optional. */
-export type NamingConfigPayload = Partial<Omit<NamingConfig, 'project_id' | 'is_configured' | 'updated_at'>>;
+export type NamingConfigPayload = Partial<
+  Omit<NamingConfig, "project_id" | "is_configured" | "updated_at">
+>;
 
 /** A rendered sample name. Mirrors NamingPreviewResponseContract. */
 export interface NamingPreview {

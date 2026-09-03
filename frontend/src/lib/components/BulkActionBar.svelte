@@ -1,22 +1,33 @@
 <script lang="ts">
   import { CheckSquare, Trash2, Pencil, Download, X } from "lucide-svelte";
 
-  export let selectedCount: number = 0;
-  export let itemLabel: string = "item";
-  export let onClearSelection: () => void;
-  export let onBulkDelete: (() => void) | null = null;
-  export let onBulkEdit: (() => void) | null = null;
-  export let onBulkExport: (() => void) | null = null;
+  interface Props {
+    selectedCount?: number;
+    itemLabel?: string;
+    onClearSelection: () => void;
+    onBulkDelete?: (() => void) | null;
+    onBulkEdit?: (() => void) | null;
+    onBulkExport?: (() => void) | null;
+  }
+
+  let {
+    selectedCount = 0,
+    itemLabel = "item",
+    onClearSelection,
+    onBulkDelete = null,
+    onBulkEdit = null,
+    onBulkExport = null,
+  }: Props = $props();
 </script>
 
 {#if selectedCount > 0}
   <div
-    class="flex items-center justify-between gap-4 px-4 py-2.5 rounded-xl bg-blue-950/80 border border-blue-800/80 text-xs text-blue-200 apple-blur shadow-lg shadow-blue-950/40 animate-in fade-in slide-in-from-top-2 duration-200"
+    class="apple-blur flex items-center justify-between gap-4 rounded-xl border border-blue-800/80 bg-blue-950/80 px-4 py-2.5 text-xs text-blue-200 shadow-lg shadow-blue-950/40 duration-200 animate-in fade-in slide-in-from-top-2"
   >
     <div class="flex items-center gap-2.5 font-medium">
-      <CheckSquare class="w-4 h-4 text-blue-400 shrink-0" />
+      <CheckSquare class="h-4 w-4 shrink-0 text-blue-400" />
       <span>
-        <strong class="text-slate-50 font-bold">{selectedCount}</strong>
+        <strong class="font-bold text-slate-50">{selectedCount}</strong>
         {itemLabel}{selectedCount === 1 ? "" : "s"} selected
       </span>
     </div>
@@ -25,10 +36,10 @@
       {#if onBulkEdit}
         <button
           type="button"
-          on:click={onBulkEdit}
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 font-semibold transition-all"
+          onclick={onBulkEdit}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-600/30 px-3 py-1.5 font-semibold text-blue-200 transition-all hover:bg-blue-600/50"
         >
-          <Pencil class="w-3.5 h-3.5" />
+          <Pencil class="h-3.5 w-3.5" />
           <span>Edit</span>
         </button>
       {/if}
@@ -36,10 +47,10 @@
       {#if onBulkExport}
         <button
           type="button"
-          on:click={onBulkExport}
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold transition-all"
+          onclick={onBulkExport}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-semibold text-slate-200 transition-all hover:bg-slate-700"
         >
-          <Download class="w-3.5 h-3.5" />
+          <Download class="h-3.5 w-3.5" />
           <span>Export</span>
         </button>
       {/if}
@@ -47,23 +58,23 @@
       {#if onBulkDelete}
         <button
           type="button"
-          on:click={onBulkDelete}
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/30 hover:bg-rose-600/50 text-rose-200 border border-rose-500/40 font-semibold transition-all"
+          onclick={onBulkDelete}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-600/30 px-3 py-1.5 font-semibold text-rose-200 transition-all hover:bg-rose-600/50"
         >
-          <Trash2 class="w-3.5 h-3.5" />
+          <Trash2 class="h-3.5 w-3.5" />
           <span>Delete</span>
         </button>
       {/if}
 
-      <div class="h-4 w-px bg-blue-800/80 mx-1"></div>
+      <div class="mx-1 h-4 w-px bg-blue-800/80"></div>
 
       <button
         type="button"
-        on:click={onClearSelection}
-        class="p-1 rounded-lg hover:bg-blue-900/60 text-blue-300 hover:text-slate-50 transition-colors"
+        onclick={onClearSelection}
+        class="rounded-lg p-1 text-blue-300 transition-colors hover:bg-blue-900/60 hover:text-slate-50"
         title="Clear selection"
       >
-        <X class="w-4 h-4" />
+        <X class="h-4 w-4" />
       </button>
     </div>
   </div>
