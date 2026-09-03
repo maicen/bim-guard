@@ -392,7 +392,7 @@ class RuleService:
         """Return a single rule by primary key."""
         return self._rules.get(rule_id)
 
-    def create_rule(
+    def _build_rule_row(
         self,
         reference: str = "",
         rule_type: str = "numeric_comparison",
@@ -432,8 +432,8 @@ class RuleService:
         rule_category: str = "property_check",
         category: str = "",
         rule_id: str = "",
-    ):
-        """Insert a rule row into the rules table."""
+    ) -> dict:
+        """Build a rule row dict (no I/O) shared by single and bulk create paths."""
         ref = (rule_id or reference or "").strip()
         now = now_iso_utc()
         norm_cat = self.normalize_category(category, default="") or self.infer_category(
@@ -443,50 +443,87 @@ class RuleService:
                 "target_ifc_class": target_ifc_class,
             }
         )
-        saved = self._rules.insert(
-            {
-                "reference": ref,
-                "rule_type": rule_type.strip() or "numeric_comparison",
-                "description": description.strip(),
-                "target_ifc_class": target_ifc_class.strip(),
-                "parameters": self._norm_json(parameters),
-                "source_text": source_text or "",
-                "property_set": property_set or "",
-                "property_name": property_name or "",
-                "fallback_property": fallback_property or "",
-                "operator": operator or "",
-                "check_value": json.dumps(check_value),
-                "value_min": json.dumps(value_min),
-                "value_max": json.dumps(value_max),
-                "value_min_property": value_min_property or "",
-                "value_max_property": value_max_property or "",
-                "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
-                "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
-                "compare_property": compare_property or "",
-                "name_pattern": name_pattern or "",
-                "uniqueness_scope": uniqueness_scope or "",
-                "unit": unit or "",
-                "applies_when": json.dumps(applies_when or {}),
-                "severity": severity or "mandatory",
-                "keyword": keyword or "",
-                "compliance_type": compliance_type or "",
-                "exceptions": json.dumps(exceptions or []),
-                "related_refs": json.dumps(related_refs or []),
-                "overridden_by": overridden_by or "",
-                "confidence": str(confidence) if confidence is not None else "",
-                "extraction_method": extraction_method or "manual",
-                "needs_review": int(needs_review),
-                "mechanism": mechanism or "",
-                "ruleset_id": self.normalize_ruleset_id(ruleset_id),
-                "rule_category": rule_category or "property_check",
-                "category": norm_cat,
-                "created_at": now,
-                "updated_at": now,
-            }
+        return {
+            "reference": ref,
+            "rule_type": rule_type.strip() or "numeric_comparison",
+            "description": description.strip(),
+            "target_ifc_class": target_ifc_class.strip(),
+            "parameters": self._norm_json(parameters),
+            "source_text": source_text or "",
+            "property_set": property_set or "",
+            "property_name": property_name or "",
+            "fallback_property": fallback_property or "",
+            "operator": operator or "",
+            "check_value": json.dumps(check_value),
+            "value_min": json.dumps(value_min),
+            "value_max": json.dumps(value_max),
+            "value_min_property": value_min_property or "",
+            "value_max_property": value_max_property or "",
+            "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
+            "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
+            "compare_property": compare_property or "",
+            "name_pattern": name_pattern or "",
+            "uniqueness_scope": uniqueness_scope or "",
+            "unit": unit or "",
+            "applies_when": json.dumps(applies_when or {}),
+            "severity": severity or "mandatory",
+            "keyword": keyword or "",
+            "compliance_type": compliance_type or "",
+            "exceptions": json.dumps(exceptions or []),
+            "related_refs": json.dumps(related_refs or []),
+            "overridden_by": overridden_by or "",
+            "confidence": str(confidence) if confidence is not None else "",
+            "extraction_method": extraction_method or "manual",
+            "needs_review": int(needs_review),
+            "mechanism": mechanism or "",
+            "ruleset_id": self.normalize_ruleset_id(ruleset_id),
+            "rule_category": rule_category or "property_check",
+            "category": norm_cat,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    def create_rule(self, **kwargs) -> dict:
+        """Insert a single rule row into the rules table."""
+        row = self._build_rule_row(**kwargs)
+        saved = self._rules.insert(row)
+        self._ensure_folder(
+            kwargs.get("ruleset_id", ""),
+            mechanism_scope=kwargs.get("mechanism", ""),
+            category=row["category"],
         )
-        self._ensure_folder(ruleset_id, mechanism_scope=mechanism, category=norm_cat)
         invalidate_cache("bimguard:rules")
         return saved
+
+    def create_rules_bulk(self, rules: list[dict]) -> list[dict]:
+        """Insert many rule rows in a single round-trip instead of one insert per rule.
+
+        Used by bulk-import flows (IDS import, extraction review, CSV/API batch
+        creation) that previously called create_rule() in a loop — each call did
+        its own INSERT plus a full "bimguard:rules" cache invalidation, which
+        multiplied into tens of thousands of extra DB round-trips under load.
+        """
+        if not rules:
+            return []
+
+        rows = [self._build_rule_row(**kwargs) for kwargs in rules]
+
+        seen_rulesets: set[str] = set()
+        for kwargs, row in zip(rules, rows):
+            ruleset_id = kwargs.get("ruleset_id", "")
+            normalized = self.normalize_ruleset_id(ruleset_id)
+            if not normalized or normalized in seen_rulesets:
+                continue
+            seen_rulesets.add(normalized)
+            self._ensure_folder(
+                ruleset_id,
+                mechanism_scope=kwargs.get("mechanism", ""),
+                category=row["category"],
+            )
+
+        saved = self._rules.insert_many(rows)
+        invalidate_cache("bimguard:rules")
+        return saved or rows
 
 
     def update_rule(

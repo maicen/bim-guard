@@ -17,7 +17,7 @@ from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 from cachetools import TTLCache
 
-DEFAULT_MAXSIZE = 1000
+DEFAULT_MAXSIZE = 10000
 DEFAULT_TTL = 86400  # 24 hours
 
 

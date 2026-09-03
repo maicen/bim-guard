@@ -208,31 +208,42 @@ async def import_ids_rules(
             detail="No importable rules found in IDS file.",
         )
 
-    created_count = 0
-    for row in rows:
-        try:
-            service.create_rule(
-                reference=row.get("reference", ""),
-                rule_type=row.get("rule_type", "numeric_comparison"),
-                description=row.get("description", ""),
-                target_ifc_class=row.get("target_ifc_class", ""),
-                source_text=row.get("source_text", ""),
-                property_set=row.get("property_set", ""),
-                property_name=row.get("property_name", ""),
-                operator=row.get("operator", "="),
-                check_value=row.get("check_value"),
-                value_min=row.get("value_min"),
-                value_max=row.get("value_max"),
-                mechanism=row.get("mechanism", "CODE"),
-                ruleset_id=ruleset_id,
-                rule_category=row.get("rule_category", "property_check"),
-                severity=row.get("severity", "mandatory"),
-                extraction_method="ids_import",
-                needs_review=True,
-            )
-            created_count += 1
-        except Exception as exc:
-            logger.warning("Could not import IDS rule %s: %s", row.get("reference"), exc)
+    kwargs_list = [
+        dict(
+            reference=row.get("reference", ""),
+            rule_type=row.get("rule_type", "numeric_comparison"),
+            description=row.get("description", ""),
+            target_ifc_class=row.get("target_ifc_class", ""),
+            source_text=row.get("source_text", ""),
+            property_set=row.get("property_set", ""),
+            property_name=row.get("property_name", ""),
+            operator=row.get("operator", "="),
+            check_value=row.get("check_value"),
+            value_min=row.get("value_min"),
+            value_max=row.get("value_max"),
+            mechanism=row.get("mechanism", "CODE"),
+            ruleset_id=ruleset_id,
+            rule_category=row.get("rule_category", "property_check"),
+            severity=row.get("severity", "mandatory"),
+            extraction_method="ids_import",
+            needs_review=True,
+        )
+        for row in rows
+    ]
+
+    try:
+        created_count = len(service.create_rules_bulk(kwargs_list))
+    except Exception as exc:
+        # Batch insert failed outright (e.g. one bad row) — fall back to
+        # inserting rules individually so valid rows still get saved.
+        logger.warning("Bulk IDS import insert failed (%s); falling back to per-rule insert", exc)
+        created_count = 0
+        for row, kwargs in zip(rows, kwargs_list):
+            try:
+                service.create_rule(**kwargs)
+                created_count += 1
+            except Exception as row_exc:
+                logger.warning("Could not import IDS rule %s: %s", row.get("reference"), row_exc)
 
     return IdsImportResponse(
         success=True,
@@ -717,32 +728,43 @@ def bulk_create_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
 ) -> dict:
     """Save a batch of extracted rules into the library."""
-    created_count = 0
-    for payload in rules:
-        try:
-            service.create_rule(
-                rule_id=payload.rule_id,
-                description=payload.description or "",
-                source_text="",
-                target_ifc_class=payload.target_ifc_class or "",
-                property_set=payload.property_set or "",
-                property_name=payload.property_name or "",
-                operator=payload.operator or "==",
-                check_value=payload.check_value,
-                value_min=payload.value_min,
-                value_max=payload.value_max,
-                unit=payload.unit or "",
-                severity=payload.severity,
-                mechanism=payload.mechanism or "CODE",
-                ruleset_id=payload.ruleset_id,
-                rule_category=payload.rule_category or "property_check",
-                confidence=payload.confidence or "1.0",
-                extraction_method=payload.extraction_method or "ai_extracted",
-                needs_review=payload.needs_review,
-            )
-            created_count += 1
-        except Exception as exc:
-            logger.warning("Could not bulk create rule %s: %s", payload.rule_id, exc)
+    kwargs_list = [
+        dict(
+            rule_id=payload.rule_id,
+            description=payload.description or "",
+            source_text="",
+            target_ifc_class=payload.target_ifc_class or "",
+            property_set=payload.property_set or "",
+            property_name=payload.property_name or "",
+            operator=payload.operator or "==",
+            check_value=payload.check_value,
+            value_min=payload.value_min,
+            value_max=payload.value_max,
+            unit=payload.unit or "",
+            severity=payload.severity,
+            mechanism=payload.mechanism or "CODE",
+            ruleset_id=payload.ruleset_id,
+            rule_category=payload.rule_category or "property_check",
+            confidence=payload.confidence or "1.0",
+            extraction_method=payload.extraction_method or "ai_extracted",
+            needs_review=payload.needs_review,
+        )
+        for payload in rules
+    ]
+
+    try:
+        created_count = len(service.create_rules_bulk(kwargs_list))
+    except Exception as exc:
+        # Batch insert failed outright (e.g. one bad row) — fall back to
+        # inserting rules individually so valid rows still get saved.
+        logger.warning("Bulk rule insert failed (%s); falling back to per-rule insert", exc)
+        created_count = 0
+        for payload, kwargs in zip(rules, kwargs_list):
+            try:
+                service.create_rule(**kwargs)
+                created_count += 1
+            except Exception as row_exc:
+                logger.warning("Could not bulk create rule %s: %s", payload.rule_id, row_exc)
 
     return {
         "success": True,

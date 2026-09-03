@@ -92,6 +92,10 @@ class DatabaseAdapter(abc.ABC):
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert row into repository."""
 
+    def insert_many(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Insert multiple rows. Default: one insert per row; adapters may override."""
+        return [self.insert(payload) for payload in payloads]
+
     @abc.abstractmethod
     def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
         """Update row by primary key."""
@@ -279,6 +283,33 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 )
                 rows = response.data or []
                 return rows[0] if rows else retry_payload
+            raise
+
+    def insert_many(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Insert multiple rows in as few PostgREST round-trips as possible.
+
+        Batches into chunks (rather than one INSERT per row) so bulk-import
+        flows don't turn into hundreds/thousands of individual DB calls.
+        """
+        if not payloads:
+            return []
+        if self._use_memory_fallback:
+            return [self.insert(payload) for payload in payloads]
+
+        chunk_size = 500
+        inserted: list[dict[str, Any]] = []
+        try:
+            for start in range(0, len(payloads), chunk_size):
+                chunk = payloads[start : start + chunk_size]
+                response = execute_with_retry(
+                    lambda chunk=chunk: self._client.table(self._table_name).insert(chunk)
+                )
+                inserted.extend(response.data or [])
+            return inserted
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._use_memory_fallback = True
+                return [self.insert(payload) for payload in payloads]
             raise
 
     def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
