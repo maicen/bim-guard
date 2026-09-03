@@ -14,7 +14,6 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import get_bsdd_client
-from app.logging_config import get_logger
 from app.modules.contracts import (
     BSDDClassItem,
     BSDDClassSearchResponse,
@@ -22,8 +21,6 @@ from app.modules.contracts import (
     BSDDPropertySearchResponse,
 )
 from app.services.bsdd_client import BSDDClient
-
-logger = get_logger(__name__)
 
 router = APIRouter()
 
