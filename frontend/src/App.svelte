@@ -20,6 +20,7 @@
   import ReportsView from "./routes/ReportsView.svelte";
   import UserManualView from "./routes/UserManualView.svelte";
   import ModelingManualView from "./routes/ModelingManualView.svelte";
+  import BsddWikiView from "./routes/BsddWikiView.svelte";
   import RevitSyncView from "./routes/RevitSyncView.svelte";
   import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
   import SettingsView from "./routes/SettingsView.svelte";
@@ -243,6 +244,8 @@
           <UserManualView onNavigate={handleSelectView} />
         {:else if activeView === "modeling-manual"}
           <ModelingManualView />
+        {:else if activeView === "bsdd-wiki"}
+          <BsddWikiView />
         {:else if activeView === "revit-sync"}
           <RevitSyncView />
         {:else if activeView === "ifc-export-setting"}

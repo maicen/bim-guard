@@ -342,6 +342,9 @@ class BSDDClient:
                 # ({uri, name, code}) -- there is no flat `parentClassCode` key,
                 # so reading that always returned None.
                 parent_class_code=(api_data.get("parentClassReference") or {}).get("code"),
+                child_class_codes=[
+                    c.get("code") for c in api_data.get("childClassReferences", []) if c.get("code")
+                ],
                 related_ifc_entities=api_data.get("relatedIfcEntities", []),
                 properties=props,
                 # Almost every real IFC class carries `definition`, essentially
@@ -552,7 +555,7 @@ class BSDDClient:
     def validate_element_semantics(
         self,
         element: dict[str, Any] | Any,
-        dictionary_uri: str = "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3",
+        dictionary_uri: str = "https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3",
     ) -> BSDDValidationResult:
         """Validate element property sets, properties, and material definitions against bSDD dictionary schema."""
         guid = str(
@@ -575,7 +578,7 @@ class BSDDClient:
         bsdd_class = self.get_class(dictionary_uri, element_type)
         if not bsdd_class:
             # Try generic IFC fallback
-            bsdd_class = self.get_class("https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3", element_type)
+            bsdd_class = self.get_class("https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3", element_type)
 
         violations: list[BSDDValidationViolation] = []
         total_checks = 0

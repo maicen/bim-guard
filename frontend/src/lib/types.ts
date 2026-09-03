@@ -826,6 +826,7 @@ export interface BSDDClassItem {
   name: string;
   dictionary_uri: string;
   parent_class_code?: string | null;
+  child_class_codes?: string[];
   related_ifc_entities: string[];
   properties: BSDDPropertyItem[];
   /** What the class actually means -- bSDD's `definition`; classes essentially never carry `description`. */
@@ -876,6 +877,26 @@ export interface BSDDPropertySearchResponse {
   query: string;
   total: number;
   properties: BSDDPropertyItem[];
+}
+
+/** Lightweight row for browsing the local bSDD ontology cache (the wiki's class tree). */
+export interface BSDDOntologyClassSummary {
+  uri: string;
+  code: string;
+  name: string;
+  parent_class_uri: string | null;
+}
+
+/** Full property detail from the local ontology, plus which classes carry it. */
+export interface BSDDOntologyPropertyDetail {
+  uri: string;
+  code: string;
+  name: string;
+  data_type: string | null;
+  units: string[];
+  definition: string | null;
+  description: string | null;
+  used_by_classes: { uri: string; code: string; name: string }[];
 }
 
 // 2. OpenCDE Types

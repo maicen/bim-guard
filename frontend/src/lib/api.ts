@@ -12,6 +12,8 @@ import type {
   BSDDClassItem,
   BSDDClassSearchResponse,
   BSDDDictionaryItem,
+  BSDDOntologyClassSummary,
+  BSDDOntologyPropertyDetail,
   BSDDPropertySearchResponse,
   CDEDocumentItem,
   CDESyncRequest,
@@ -65,6 +67,7 @@ import {
   type SWROptions,
   type Unsubscribe,
 } from "./cache";
+import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
@@ -1246,6 +1249,13 @@ export const namingConfigApi = {
  * clients in this file this one does no caching -- each call is a plain
  * round trip.
  */
+// bSDD class/property definitions are reference data that barely ever
+// changes -- worth caching on the user's own machine (not just the backend's
+// local ontology) so a repeat hover or search never re-hits the network at
+// all. 30 days: long enough that a normal session never expires it, short
+// enough that a bSDD revision eventually reaches the client anyway.
+const BSDD_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const bsddApi = {
   /** Classification standards a project can be coded against (Uniclass, OmniClass, IFC, ...). */
   async listDictionaries(): Promise<BSDDDictionaryItem[]> {
@@ -1255,24 +1265,72 @@ export const bsddApi = {
 
   /** Search bSDD classes (element/classification codes) matching free text. */
   async searchClasses(query: string, dictionaryUri?: string): Promise<BSDDClassSearchResponse> {
+    const cacheKey = `bsdd:classes:search:${query}:${dictionaryUri || ""}`;
+    const cached = getPersistentCache<BSDDClassSearchResponse>(cacheKey, BSDD_CACHE_TTL_MS);
+    if (cached) return cached;
     const params = new URLSearchParams({ q: query });
     if (dictionaryUri) params.set('dictionary_uri', dictionaryUri);
     const res = await fetch(`${API_BASE}/bsdd/classes/search?${params.toString()}`);
-    return handleResponse<BSDDClassSearchResponse>(res);
+    const result = await handleResponse<BSDDClassSearchResponse>(res);
+    setPersistentCache(cacheKey, result);
+    return result;
   },
 
   /** Search bSDD properties (property set + name pairs) matching free text. */
   async searchProperties(query: string, dictionaryUri?: string): Promise<BSDDPropertySearchResponse> {
+    const cacheKey = `bsdd:properties:search:${query}:${dictionaryUri || ""}`;
+    const cached = getPersistentCache<BSDDPropertySearchResponse>(cacheKey, BSDD_CACHE_TTL_MS);
+    if (cached) return cached;
     const params = new URLSearchParams({ q: query });
     if (dictionaryUri) params.set('dictionary_uri', dictionaryUri);
     const res = await fetch(`${API_BASE}/bsdd/properties/search?${params.toString()}`);
-    return handleResponse<BSDDPropertySearchResponse>(res);
+    const result = await handleResponse<BSDDPropertySearchResponse>(res);
+    setPersistentCache(cacheKey, result);
+    return result;
   },
 
   /** Fetch one bSDD class definition with its standardized properties. */
   async getClass(classCode: string, dictionaryUri?: string): Promise<BSDDClassItem> {
+    const cacheKey = `bsdd:class:${classCode}:${dictionaryUri || ""}`;
+    const cached = getPersistentCache<BSDDClassItem>(cacheKey, BSDD_CACHE_TTL_MS);
+    if (cached) return cached;
     const params = dictionaryUri ? `?dictionary_uri=${encodeURIComponent(dictionaryUri)}` : '';
     const res = await fetch(`${API_BASE}/bsdd/classes/${encodeURIComponent(classCode)}${params}`);
-    return handleResponse<BSDDClassItem>(res);
+    const result = await handleResponse<BSDDClassItem>(res);
+    setPersistentCache(cacheKey, result);
+    return result;
+  },
+
+  /** Every class in the local ontology cache -- backs the bSDD Wiki's browsable tree. */
+  async listOntologyClasses(): Promise<BSDDOntologyClassSummary[]> {
+    const cacheKey = "bsdd:ontology:classes";
+    const cached = getPersistentCache<BSDDOntologyClassSummary[]>(cacheKey, BSDD_CACHE_TTL_MS);
+    if (cached) return cached;
+    const res = await fetch(`${API_BASE}/bsdd/ontology/classes`);
+    const result = await handleResponse<BSDDOntologyClassSummary[]>(res);
+    setPersistentCache(cacheKey, result);
+    return result;
+  },
+
+  /** Full class detail from the local ontology, by its full bSDD URI. */
+  async getOntologyClass(uri: string): Promise<BSDDClassItem> {
+    const cacheKey = `bsdd:ontology:class:${uri}`;
+    const cached = getPersistentCache<BSDDClassItem>(cacheKey, BSDD_CACHE_TTL_MS);
+    if (cached) return cached;
+    const res = await fetch(`${API_BASE}/bsdd/ontology/class?uri=${encodeURIComponent(uri)}`);
+    const result = await handleResponse<BSDDClassItem>(res);
+    setPersistentCache(cacheKey, result);
+    return result;
+  },
+
+  /** Full property detail from the local ontology, by its full bSDD URI, plus classes using it. */
+  async getOntologyProperty(uri: string): Promise<BSDDOntologyPropertyDetail> {
+    const cacheKey = `bsdd:ontology:property:${uri}`;
+    const cached = getPersistentCache<BSDDOntologyPropertyDetail>(cacheKey, BSDD_CACHE_TTL_MS);
+    if (cached) return cached;
+    const res = await fetch(`${API_BASE}/bsdd/ontology/property?uri=${encodeURIComponent(uri)}`);
+    const result = await handleResponse<BSDDOntologyPropertyDetail>(res);
+    setPersistentCache(cacheKey, result);
+    return result;
   },
 };

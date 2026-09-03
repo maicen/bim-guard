@@ -19,6 +19,7 @@
     RefreshCw,
     Compass,
     Download,
+    BookText,
   } from "lucide-svelte";
 
   interface Props {
@@ -86,6 +87,7 @@
       items: [
         { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
         { id: "modeling-manual", label: "Modeling Manual", icon: Box },
+        { id: "bsdd-wiki", label: "bSDD Wiki", icon: BookText },
       ],
     },
   ];

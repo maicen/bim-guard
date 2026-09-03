@@ -1209,6 +1209,7 @@ class BSDDClassItem(BaseModel):
     name: str = Field(..., description="Human-readable class name")
     dictionary_uri: str = Field(..., description="URI of the parent dictionary")
     parent_class_code: Optional[str] = Field(None, description="Parent class code if hierarchical")
+    child_class_codes: list[str] = Field(default_factory=list, description="Codes of direct subtypes of this class")
     related_ifc_entities: list[str] = Field(default_factory=list, description="Associated IFC entity types")
     properties: list[BSDDPropertyItem] = Field(default_factory=list, description="Properties defined on this class")
     definition: Optional[str] = Field(
