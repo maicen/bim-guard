@@ -130,7 +130,7 @@
           bind:value={selectedProjectId}
           class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each projects as p}
+          {#each projects as p (p.id)}
             <option value={p.id}>{p.name} (#{p.id})</option>
           {/each}
         </select>
@@ -147,7 +147,7 @@
             bind:value={selectedFileId}
             class="max-w-[260px] rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
-            {#each ifcFiles as file}
+            {#each ifcFiles as file (file.id)}
               <option value={file.id}>
                 {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
                   ? " (primary)"

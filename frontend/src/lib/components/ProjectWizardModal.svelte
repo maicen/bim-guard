@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteSet } from "svelte/reactivity";
   import { run, preventDefault } from "svelte/legacy";
 
   import { onMount } from "svelte";
@@ -86,8 +87,8 @@
 
   // Available Documents and standards for Step 5
   let documents: DocumentItem[] = $state([]);
-  let selectedDocIds: Set<number> = $state(new Set());
-  let selectedStandardIds: Set<string> = $state(new Set());
+  const selectedDocIds = new SvelteSet<number>();
+  const selectedStandardIds = new SvelteSet<string>();
 
   // Reference lists served by /api/projects/options, so the country and
   // building-type lists live in app/constants.py alone and cannot drift.
@@ -284,7 +285,6 @@
     } else {
       selectedDocIds.add(id);
     }
-    selectedDocIds = new Set(selectedDocIds);
   }
 
   function toggleStandard(id: string) {
@@ -293,7 +293,6 @@
     } else {
       selectedStandardIds.add(id);
     }
-    selectedStandardIds = new Set(selectedStandardIds);
   }
 
   function goToStep(stepNum: number) {
@@ -404,8 +403,8 @@
     projectSizeSqm = "";
     buildingsCount = "";
     floorsCount = "";
-    selectedDocIds = new Set();
-    selectedStandardIds = new Set();
+    selectedDocIds.clear();
+    selectedStandardIds.clear();
     errorMessage = "";
     onClose();
   }
@@ -436,7 +435,7 @@
         aria-label="Project setup steps"
         class="flex items-center justify-between border-b border-slate-800/80 bg-slate-950/40 px-6 py-3"
       >
-        {#each STEPS as step, idx}
+        {#each STEPS as step, idx (step)}
           <div class="flex items-center gap-2 {idx < STEPS.length - 1 ? 'flex-1' : ''}">
             <button
               type="button"
@@ -553,7 +552,7 @@
                 class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
               >
                 {#if options.countries.length}
-                  {#each options.countries as c}
+                  {#each options.countries as c (c)}
                     <option value={c}>{c}</option>
                   {/each}
                 {:else}
@@ -579,7 +578,7 @@
                 Project Type
               </span>
               <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {#each options.project_types as type}
+                {#each options.project_types as type (type)}
                   <button
                     type="button"
                     onclick={() => (projectType = projectType === type ? "" : type)}
@@ -656,7 +655,6 @@
         {:else if currentStep === 2}
           <!-- Step 2: IFC Upload -->
           <div class="space-y-4">
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               role="region"
               aria-label="IFC model drop zone"
@@ -744,7 +742,7 @@
                       }}
                       class="shrink-0 rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-caption text-slate-50 focus:border-accent focus:outline-none"
                     >
-                      {#each IFC_FILE_ROLES as roleOption}
+                      {#each IFC_FILE_ROLES as roleOption (roleOption)}
                         <option value={roleOption}>{roleOption}</option>
                       {/each}
                     </select>
@@ -816,7 +814,7 @@
                   class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
                 >
                   <option value="">Not specified</option>
-                  {#each buildingCodesForJurisdiction as code}
+                  {#each buildingCodesForJurisdiction as code (code.id)}
                     <option value={code.id}>{code.name}</option>
                   {/each}
                 </select>
@@ -867,7 +865,7 @@
               </div>
             {:else}
               <div class="max-h-56 space-y-2 overflow-y-auto">
-                {#each documents as doc}
+                {#each documents as doc (doc.id)}
                   <button
                     type="button"
                     onclick={() => toggleDocument(doc.id)}
@@ -932,7 +930,7 @@
                 </div>
               {:else}
                 <div class="max-h-44 space-y-2 overflow-y-auto">
-                  {#each standardsForDomain as standard}
+                  {#each standardsForDomain as standard (standard.id)}
                     <button
                       type="button"
                       onclick={() => toggleStandard(standard.id)}

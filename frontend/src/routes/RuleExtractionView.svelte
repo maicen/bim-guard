@@ -289,7 +289,7 @@
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
           <option value={null}>-- Select from Document Library --</option>
-          {#each documents as doc}
+          {#each documents as doc (doc.id)}
             <option value={doc.id}>{doc.filename} ({doc.doc_type || "Spec"})</option>
           {/each}
         </select>
@@ -308,7 +308,7 @@
           bind:value={selectedModel}
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each LLM_MODELS as model}
+          {#each LLM_MODELS as model (model.id)}
             <option value={model.id}>{model.name}</option>
           {/each}
         </select>

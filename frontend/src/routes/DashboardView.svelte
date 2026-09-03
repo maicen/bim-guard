@@ -308,7 +308,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
-            {#each recentProjects as project}
+            {#each recentProjects as project (project.id)}
               <tr class="transition-colors hover:bg-slate-900/60">
                 <td class="max-w-xs truncate px-3 py-3 font-semibold text-slate-50"
                   >{project.name}</td

@@ -153,6 +153,9 @@
   // alongside the model. Relies on App.svelte's existing /viewer deep-link
   // handler (applyDeepLinkFromLocation), which reads these same query params.
   function openViewerInNewTab(projectId: number, elementGuid?: string, bcfArtifactId?: number) {
+    // A one-shot builder for a URL string, never read reactively, so the
+    // plain built-in is correct here.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const params = new URLSearchParams();
     params.set("project_id", String(projectId));
     if (elementGuid) params.set("element_guid", elementGuid);
@@ -447,7 +450,7 @@
       {#if relevantProjects.length === 0}
         <option value={null}>No Arch projects found</option>
       {:else}
-        {#each relevantProjects as project}
+        {#each relevantProjects as project (project.id)}
           <option value={project.id}>{project.name}</option>
         {/each}
       {/if}
@@ -534,7 +537,7 @@
           class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none disabled:opacity-60"
         >
           <option value="">{isFoldersLoading ? "Loading folders…" : "All Rules"}</option>
-          {#each ruleFolders as folder}
+          {#each ruleFolders as folder (folder)}
             <option value={folder.ruleset_id}>{folder.display_name}</option>
           {/each}
         </select>
@@ -664,7 +667,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      {#each buildingSummary.storeys as s}
+                      {#each buildingSummary.storeys as s (s.name)}
                         {@const ri = buildingSummary.rooms_per_storey?.[s.name]}
                         {@const hMm = floorHeightMap[s.name]}
                         <tr class="border-b border-slate-800/60 last:border-0">
@@ -699,7 +702,7 @@
               <div>
                 <h3 class="mb-2 text-xs font-semibold text-slate-300">Elements Found</h3>
                 <div class="flex flex-wrap gap-2">
-                  {#each Object.entries(buildingSummary.element_counts).sort( ([a], [b]) => (ELEM_LABELS[a] || a).localeCompare(ELEM_LABELS[b] || b) ) as [k, v]}
+                  {#each Object.entries(buildingSummary.element_counts).sort( ([a], [b]) => (ELEM_LABELS[a] || a).localeCompare(ELEM_LABELS[b] || b) ) as [k, v] (k)}
                     <span
                       class="inline-block rounded-full border border-blue-800/60 bg-blue-950/60 px-2.5 py-1 text-xs font-medium text-blue-300"
                     >
@@ -715,7 +718,7 @@
               <div>
                 <h3 class="mb-2 text-xs font-semibold text-slate-300">Plumbing Fixtures</h3>
                 <div class="flex flex-wrap gap-2">
-                  {#each Object.entries(buildingSummary.fixture_counts).sort() as [k, v]}
+                  {#each Object.entries(buildingSummary.fixture_counts).sort() as [k, v] (k)}
                     <span
                       class="inline-block rounded-full border border-cyan-800/60 bg-cyan-950/60 px-2.5 py-1 text-xs font-medium text-cyan-300"
                     >
@@ -731,7 +734,7 @@
               <div>
                 <h3 class="mb-2 text-xs font-semibold text-slate-300">Fire / CO Alarms</h3>
                 <div class="flex flex-wrap gap-2">
-                  {#each Object.entries(buildingSummary.alarm_counts).sort() as [k, v]}
+                  {#each Object.entries(buildingSummary.alarm_counts).sort() as [k, v] (k)}
                     <span
                       class="inline-block rounded-full border border-rose-800/60 bg-rose-950/60 px-2.5 py-1 text-xs font-medium text-rose-300"
                     >
@@ -753,7 +756,7 @@
                       storey
                     </p>
                   {/if}
-                  {#each buildingSummary.unnamed_elements || [] as u}
+                  {#each buildingSummary.unnamed_elements || [] as u (u)}
                     <p class="text-xs text-amber-300">
                       ⚠ {u.count}
                       {ELEM_LABELS[u.type] || u.type} element(s) missing Name property
@@ -768,7 +771,7 @@
     {/if}
 
     <!-- ═══ Domain cards ═══ -->
-    {#each DOMAIN_CARDS as domain}
+    {#each DOMAIN_CARDS as domain (domain.key)}
       {@const rules = getDomainRules(domain.targets)}
       {@const badge = domainBadge(rules)}
       {@const isOpen = openDomains[domain.key] || false}
@@ -849,7 +852,7 @@
                           </tr></thead
                         >
                         <tbody>
-                          {#each exitResults as r}
+                          {#each exitResults as r (r)}
                             <tr class="border-b border-slate-800/60 last:border-0">
                               <td class="px-3 py-2 text-xs text-slate-50">{r.storey}</td>
                               <td class="px-3 py-2 text-center font-mono text-xs text-slate-300"
@@ -916,7 +919,7 @@
                           </tr></thead
                         >
                         <tbody>
-                          {#each [...travel].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r}
+                          {#each [...travel].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
                             <tr class="border-b border-slate-800/60 last:border-0">
                               <td class="px-3 py-2 text-xs text-slate-400"
                                 >{r.storey_name || "—"}</td
@@ -981,7 +984,7 @@
           {#if isOpen && Object.keys(fc).length}
             <div class="px-4 pb-5">
               <div class="flex flex-wrap gap-2">
-                {#each Object.entries(fc).sort() as [k, v]}
+                {#each Object.entries(fc).sort() as [k, v] (k)}
                   <span
                     class="inline-block rounded-full border border-cyan-800/60 bg-cyan-950/60 px-2.5 py-1 text-xs font-medium text-cyan-300"
                     >{k}: {v}</span
@@ -1056,7 +1059,7 @@
                     </tr></thead
                   >
                   <tbody>
-                    {#each [...gResults].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r}
+                    {#each [...gResults].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
                       <tr class="border-b border-slate-800/60 last:border-0">
                         <td class="px-3 py-2 text-xs font-semibold text-slate-50"
                           >{r.element_type}</td
@@ -1181,7 +1184,7 @@
                             </tr></thead
                           >
                           <tbody>
-                            {#each [...daylight].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r}
+                            {#each [...daylight].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
                               <tr class="border-b border-slate-800/60 last:border-0">
                                 <td class="px-3 py-2 text-xs text-slate-400"
                                   >{r.storey_name || "—"}</td
@@ -1253,7 +1256,7 @@
                             </tr></thead
                           >
                           <tbody>
-                            {#each [...fireSep].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r}
+                            {#each [...fireSep].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
                               {@const spaces =
                                 (r.adjacent_spaces || []).slice(0, 2).join(", ") +
                                 (r.adjacent_spaces?.length > 2
@@ -1307,7 +1310,7 @@
                     </button>
                     {#if openSections["alarms"]}
                       <div class="flex flex-wrap gap-2">
-                        {#each Object.entries(buildingSummary.alarm_counts).sort() as [k, v]}
+                        {#each Object.entries(buildingSummary.alarm_counts).sort() as [k, v] (k)}
                           <span
                             class="inline-block rounded-full border border-rose-800/60 bg-rose-950/60 px-2.5 py-1 text-xs font-medium text-rose-300"
                             >{k}: {v}</span
@@ -1325,7 +1328,7 @@
                   No applicable checks found in the rule library for this category.
                 </p>
               {:else}
-                {#each activeRules as rule}
+                {#each activeRules as rule (rule)}
                   {@const rKey = `${domain.key}-${rule.rule_ref || rule.property_name}`}
                   {@const rStatus = rule.status || ""}
                   {@const failC = rule.fail_count || 0}
@@ -1389,7 +1392,7 @@
                             </tr></thead
                           >
                           <tbody>
-                            {#each sortedEls.slice(0, 50) as el}
+                            {#each sortedEls.slice(0, 50) as el (el.guid)}
                               {@const elStatus = el.status || ""}
                               {@const actualTxt =
                                 fmtVal(el.actual) +

@@ -111,7 +111,7 @@
     <!-- The state alone does not show how far along the container is; the
          ladder does, which is the question a reviewer actually has. -->
     <div class="mt-2 flex items-center gap-1 font-mono text-nano">
-      {#each CDE_ORDER as state, i}
+      {#each CDE_ORDER as state, i (state)}
         {#if i > 0}
           <span class="text-slate-600">→</span>
         {/if}

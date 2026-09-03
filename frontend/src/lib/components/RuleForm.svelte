@@ -60,7 +60,8 @@
   let formDescription = $state(seed?.description || "");
   let formMechanism = $state(seed?.mechanism || "CODE");
   let formRulesetId = $state(seed?.ruleset_id || seedRulesetId);
-  let formCategory = seed?.rule_category || "property_check";
+  // Carried through from the edited rule; not user-editable in this form.
+  const formCategory = seed?.rule_category || "property_check";
   let formDomainCategory: RulesetCategory = $state(
     (seed?.category as RulesetCategory) || seedCategory,
   );
@@ -96,8 +97,8 @@
     formValueInputUnit = "mm";
   }
 
-  let formValueMin = seed?.value_min || "";
-  let formValueMax = seed?.value_max || "";
+  const formValueMin = seed?.value_min || "";
+  const formValueMax = seed?.value_max || "";
   let formValueMinProperty = $state(seed?.value_min_property || "");
   let formValueMaxProperty = $state(seed?.value_max_property || "");
   let formValueMinOffset = $state(
@@ -349,7 +350,7 @@
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
           <option value="" disabled>Choose a property…</option>
-          {#each propertySuggestions as prop}
+          {#each propertySuggestions as prop (prop.name)}
             <option value={prop.name}>{prop.label}</option>
           {/each}
         </select>

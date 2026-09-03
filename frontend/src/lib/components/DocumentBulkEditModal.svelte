@@ -87,7 +87,7 @@
       class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
     >
       <option value="no_change">-- Keep Current Type --</option>
-      {#each DOCUMENT_TYPES as type}
+      {#each DOCUMENT_TYPES as type (type)}
         <option value={type}>{type}</option>
       {/each}
     </select>

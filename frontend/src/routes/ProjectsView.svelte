@@ -312,7 +312,7 @@
           <option value="supabase">Supabase Database (Main Registry)</option>
           {#if repos.length > 0}
             <optgroup label="GitHub Repositories">
-              {#each repos as repo}
+              {#each repos as repo (repo.id)}
                 <option value={`repo:${repo.id}`}>
                   {repo.owner}/{repo.name} ({repo.branch})
                 </option>
@@ -705,7 +705,7 @@
                 class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
               >
                 <option value="all">All Category Folders</option>
-                {#each activeRepoStructure.categories as cat}
+                {#each activeRepoStructure.categories as cat (cat)}
                   <option value={cat}>{cat}</option>
                 {/each}
               </select>
@@ -734,7 +734,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
-                  {#each filteredRepoItems as item}
+                  {#each filteredRepoItems as item (item.path)}
                     {@const importedProject = getImportedProject(item)}
                     <tr class="transition-colors hover:bg-slate-900/60">
                       <td class="px-4 py-3 font-semibold text-slate-50">

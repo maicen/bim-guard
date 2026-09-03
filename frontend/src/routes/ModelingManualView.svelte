@@ -93,11 +93,11 @@
       in correctly. Check these before export.
     </p>
 
-    {#each CHECKLISTS as group}
+    {#each CHECKLISTS as group (group)}
       <div class="space-y-2">
         <div class="text-xs font-semibold text-slate-50">{group.domain}</div>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {#each group.items as item}
+          {#each group.items as item (item)}
             <div class="flex gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
               <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0 text-accent" />
               <div class="space-y-1">
@@ -112,7 +112,7 @@
   </div>
 
   <div class="space-y-6">
-    {#each GUIDES as group}
+    {#each GUIDES as group (group)}
       <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
         <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
           <Layers class="h-4 w-4 text-accent" />
@@ -120,7 +120,7 @@
         </h2>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {#each group.items as item}
+          {#each group.items as item (item)}
             <div class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
               <div class="text-xs font-semibold text-slate-50">{item.element}</div>
               <p class="text-caption leading-relaxed text-slate-400">

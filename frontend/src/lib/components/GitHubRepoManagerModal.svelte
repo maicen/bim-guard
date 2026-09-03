@@ -286,7 +286,7 @@
           </div>
         {:else}
           <div class="space-y-2">
-            {#each repos as repo}
+            {#each repos as repo (repo.id)}
               <div
                 class="flex items-start justify-between gap-3 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5 transition-colors hover:border-slate-700"
               >

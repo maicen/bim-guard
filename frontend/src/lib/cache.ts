@@ -126,7 +126,6 @@ export class SWRStore<K, V> implements ISubscribable<V> {
   }
 
   async execute(key: K, fetcher: () => Promise<V>, options: SWROptions = {}): Promise<V> {
-    const now = Date.now();
     const cached = this.storage.get(key);
     const isFresh = this.storage.isFresh(key, this.ttlMs);
 

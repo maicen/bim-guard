@@ -169,7 +169,7 @@
 
   <!-- Six Stage Visual Timeline -->
   <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-    {#each STAGES as stage}
+    {#each STAGES as stage (stage.name)}
       {@const isDone = avgProgress >= (stage.num / 6) * 100}
       {@const isCurrent =
         avgProgress > ((stage.num - 1) / 6) * 100 && avgProgress < (stage.num / 6) * 100}
@@ -208,7 +208,7 @@
         <span class="font-mono text-micro text-slate-500">Phase 6–9 Pipeline Engines</span>
       </div>
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {#each Object.entries(currentStatus.engines) as [code, engine]}
+        {#each Object.entries(currentStatus.engines) as [code, engine] (code)}
           <div
             class="flex flex-col justify-between gap-2.5 rounded-xl border border-slate-800 bg-slate-950/50 p-3.5 transition-colors hover:border-slate-700"
           >

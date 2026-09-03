@@ -465,7 +465,7 @@
           <span class="text-micro font-bold uppercase tracking-wider text-slate-500"
             >Active Rulesets:</span
           >
-          {#each categoryFolders as folder}
+          {#each categoryFolders as folder (folder)}
             <span
               class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-micro font-medium {activeCategory ===
               'seismic'
@@ -493,7 +493,7 @@
           {#if relevantProjects.length === 0}
             <option value={null}>No {activeCategory} projects found</option>
           {:else}
-            {#each relevantProjects as p}
+            {#each relevantProjects as p (p.id)}
               <option value={p.id}>{p.name} ({p.country})</option>
             {/each}
           {/if}
@@ -541,7 +541,7 @@
           aria-label="Corrosion engines"
         >
           <span class="text-micro font-bold uppercase tracking-wider text-slate-500">Engines</span>
-          {#each PIPING_ENGINES as engine}
+          {#each PIPING_ENGINES as engine (engine.id)}
             {@const info = describeMechanism(engine.label)}
             <!-- Deciding which engines to run is a real choice, and the
                  five codes alone do not support it. The card says what each
@@ -717,7 +717,7 @@
         </div>
         {#if analysisInputs.length > 0}
           <div class="flex max-h-16 flex-wrap gap-1.5 overflow-y-auto pr-1">
-            {#each analysisInputs as inp}
+            {#each analysisInputs as inp (inp)}
               <span
                 class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-micro font-medium {inp.kind ===
                 'standard'
@@ -1176,7 +1176,7 @@
                         <!-- Real Citations -->
                         {#if issue.citations && issue.citations.length > 0}
                           <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                            {#each issue.citations as cit}
+                            {#each issue.citations as cit (cit)}
                               <span
                                 class="inline-flex items-center gap-1 rounded border border-indigo-900/60 bg-slate-900 px-2 py-0.5 text-micro font-medium text-indigo-300"
                                 title={cit.reason}
@@ -1357,7 +1357,7 @@
             White Box Audit Citations
           </h4>
           <div class="space-y-2">
-            {#each inspectedIssue.citations as cit}
+            {#each inspectedIssue.citations as cit (cit)}
               <div class="rounded-xl border border-indigo-800/40 bg-indigo-950/20 p-3 text-xs">
                 <div class="flex items-center gap-1.5 font-bold text-indigo-300">
                   <FileText class="h-3.5 w-3.5" />

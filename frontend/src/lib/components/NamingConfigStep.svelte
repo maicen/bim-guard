@@ -137,7 +137,7 @@
 
   <!-- Tabs -->
   <div class="flex flex-wrap gap-1 border-b border-slate-800 pb-2">
-    {#each TABS as tab}
+    {#each TABS as tab (tab.id)}
       <button
         type="button"
         onclick={() => (activeTab = tab.id)}
@@ -187,7 +187,7 @@
           bind:value={config.type_code}
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each [...(catalog?.codes?.types ?? []), ...(config.type_codes ?? [])] as t}
+          {#each [...(catalog?.codes?.types ?? []), ...(config.type_codes ?? [])] as t (t)}
             <option value={t.code}>{t.code} — {t.label}</option>
           {/each}
         </select>
@@ -204,7 +204,7 @@
           bind:value={config.suitability}
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each selectableStatuses as s}
+          {#each selectableStatuses as s (s)}
             <option value={s.code}>{s.code} — {s.label}</option>
           {/each}
         </select>
@@ -233,7 +233,7 @@
           bind:value={config.date_format}
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each catalog?.date_formats ?? ["YYMMDD"] as f}
+          {#each catalog?.date_formats ?? ["YYMMDD"] as f (f)}
             <option value={f}>{f}</option>
           {/each}
         </select>
@@ -247,7 +247,7 @@
           bind:value={config.separator}
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each catalog?.separators ?? ["_"] as sep}
+          {#each catalog?.separators ?? ["_"] as sep (sep)}
             <option value={sep}>{sep}</option>
           {/each}
         </select>
@@ -294,7 +294,7 @@
           </p>
         {:else}
           <div class="flex flex-wrap gap-1.5">
-            {#each selected as code}
+            {#each selected as code (code)}
               <span
                 class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 py-1 pl-2.5 pr-1.5 text-caption text-slate-50"
               >
@@ -322,7 +322,7 @@
           <p class="text-caption text-slate-500">Every code in the library is already active.</p>
         {:else}
           <div class="flex flex-wrap gap-1.5">
-            {#each available as code}
+            {#each available as code (code)}
               <button
                 type="button"
                 onclick={() => addCode(code)}
@@ -386,7 +386,7 @@
         tab.
       </p>
       <div class="divide-y divide-slate-800 rounded-xl border border-slate-800">
-        {#each catalog?.cde_statuses ?? [] as s}
+        {#each catalog?.cde_statuses ?? [] as s (s)}
           <div class="flex items-center gap-3 px-3 py-2">
             <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background-color: {s.colour}"
             ></span>
@@ -401,7 +401,7 @@
     </div>
   {:else if activeTab === "convention"}
     <div class="space-y-2">
-      {#each conventions as convention}
+      {#each conventions as convention (convention.id)}
         <button
           type="button"
           onclick={() => (config = { ...config, active_convention: convention.id })}

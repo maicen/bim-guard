@@ -31,22 +31,23 @@ export default ts.config(
       // rules in favour of that. `valid-compile` re-reports those warnings here
       // so lint and typecheck agree, and `no-unused-svelte-ignore` stops stale
       // suppressions hiding real ones.
-      'svelte/valid-compile': 'warn',
-      'svelte/no-unused-svelte-ignore': 'warn',
+      // The baseline is clean, so these are errors rather than warnings — a
+      // warning nobody has to clear is a warning everyone learns to scroll past.
+      'svelte/valid-compile': 'error',
+      'svelte/no-unused-svelte-ignore': 'error',
 
       // Correctness.
-      'svelte/require-each-key': 'warn',
+      'svelte/require-each-key': 'error',
       'svelte/valid-each-key': 'error',
-      'svelte/no-dom-manipulating': 'warn',
-      'svelte/no-at-html-tags': 'warn',
+      'svelte/no-dom-manipulating': 'error',
+      'svelte/no-at-html-tags': 'error',
       'svelte/no-target-blank': 'error',
       'svelte/button-has-type': 'warn',
 
-      // Runes-migration ratchet (Phase 4). These flag the legacy store and
-      // reactivity idioms that the migration replaces.
-      'svelte/prefer-svelte-reactivity': 'warn',
-      'svelte/require-store-reactive-access': 'warn',
-      'svelte/prefer-const': 'warn',
+      // Keeps the codebase on runes idiom now that the migration has landed.
+      'svelte/prefer-svelte-reactivity': 'error',
+      'svelte/require-store-reactive-access': 'error',
+      'svelte/prefer-const': 'error',
 
       // Noise reduction on a codebase that has never been linted.
       '@typescript-eslint/no-explicit-any': 'off',

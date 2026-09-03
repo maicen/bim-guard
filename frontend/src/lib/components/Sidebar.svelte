@@ -89,8 +89,6 @@
 
 <!-- Scrim: only below md, and only while the drawer is open. -->
 {#if mobileOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
     onclick={onCloseMobile}
@@ -157,7 +155,7 @@
 
   <!-- Nav Groups -->
   <div class="flex-1 space-y-4 overflow-y-auto px-2 py-3">
-    {#each NAV_SECTIONS as section}
+    {#each NAV_SECTIONS as section (section)}
       <div class="space-y-1">
         {#if !collapsed}
           <div class="px-2.5 py-1 text-caption font-bold uppercase tracking-wider text-slate-500">
@@ -165,7 +163,7 @@
           </div>
         {/if}
 
-        {#each section.items as item}
+        {#each section.items as item (item.id)}
           <button
             type="button"
             onclick={() => handleSelect(item.id)}

@@ -200,7 +200,7 @@
       </div>
     {:else}
       <div class="space-y-4">
-        {#each settings as item}
+        {#each settings as item (item.key)}
           <div class="space-y-1.5 border-b border-slate-800/80 pb-4 last:border-b-0">
             <div class="flex items-center justify-between">
               <label for={`setting-${item.key}`} class="font-mono text-xs font-bold text-slate-50"

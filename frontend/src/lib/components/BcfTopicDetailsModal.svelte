@@ -77,7 +77,10 @@
       await navigator.clipboard.writeText(text);
       copiedGuid = true;
       setTimeout(() => (copiedGuid = false), 2000);
-    } catch {}
+    } catch {
+      // Clipboard access can be denied; tell the user rather than appearing to succeed.
+      toasts.error("Could not copy to the clipboard.");
+    }
   }
 
   function formatDate(d?: string | null) {
@@ -175,7 +178,7 @@
           >Linked IFC Elements ({topic.component_guids.length})</span
         >
         <div class="flex flex-wrap gap-1.5">
-          {#each topic.component_guids as guid}
+          {#each topic.component_guids as guid (guid)}
             <div
               class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 font-mono text-caption text-cyan-300"
             >
@@ -211,7 +214,7 @@
           <span>3D Camera Viewpoints ({viewpoints.length})</span>
         </span>
         <div class="grid grid-cols-2 gap-2">
-          {#each viewpoints as vp}
+          {#each viewpoints as vp (vp)}
             <div class="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs">
               <div class="font-mono text-micro text-slate-400">Viewpoint #{vp.index}</div>
               {#if vp.snapshot_url}
@@ -248,7 +251,7 @@
         </div>
       {:else}
         <div class="max-h-48 space-y-2 overflow-y-auto pr-1">
-          {#each comments as c}
+          {#each comments as c (c)}
             <div class="space-y-1 rounded-xl border border-slate-800/80 bg-slate-950 p-3 text-xs">
               <div class="flex items-center justify-between text-micro text-slate-500">
                 <span class="font-semibold text-slate-300">{c.author || "Anonymous"}</span>

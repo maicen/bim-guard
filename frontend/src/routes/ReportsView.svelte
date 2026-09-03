@@ -346,7 +346,7 @@
           }}
           class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each projects as p}
+          {#each projects as p (p.id)}
             <option value={p.id}>{p.name}</option>
           {/each}
         </select>

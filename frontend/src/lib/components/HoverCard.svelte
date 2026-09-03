@@ -109,7 +109,7 @@
 
   let openTimer: ReturnType<typeof setTimeout> | null = null;
   let closeTimer: ReturnType<typeof setTimeout> | null = $state(null);
-  let uid = `hovercard-${Math.random().toString(36).slice(2, 9)}`;
+  const uid = `hovercard-${Math.random().toString(36).slice(2, 9)}`;
 
   const OPPOSITE: Record<Side, Side> = {
     top: "bottom",

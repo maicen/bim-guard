@@ -298,7 +298,7 @@
                 bind:value={cdeState}
                 class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
               >
-                {#each CDE_STATE_CHOICES as state}
+                {#each CDE_STATE_CHOICES as state (state)}
                   <option value={state}>{state}</option>
                 {/each}
               </select>
@@ -313,7 +313,7 @@
                 bind:value={suitabilityCode}
                 class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
               >
-                {#each SUITABILITY_CODES as code}
+                {#each SUITABILITY_CODES as code (code)}
                   <option value={code}>{code}</option>
                 {/each}
               </select>

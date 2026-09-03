@@ -198,7 +198,9 @@
           sidebarWidth = parsed;
         }
       }
-    } catch {}
+    } catch {
+      // A blocked or corrupt store just means the default sidebar width.
+    }
 
     unsubscribeRules = rulesApi.subscribe((updatedRules) => {
       rules = updatedRules;
@@ -633,7 +635,9 @@
       isDraggingDivider = false;
       try {
         localStorage.setItem("bimguard_rules_sidebar_width", String(sidebarWidth));
-      } catch {}
+      } catch {
+        // Sidebar width is a convenience; a blocked or full store is not worth reporting.
+      }
     }
   }
 
@@ -642,12 +646,16 @@
       sidebarWidth = Math.max(sidebarWidth - 16, 180);
       try {
         localStorage.setItem("bimguard_rules_sidebar_width", String(sidebarWidth));
-      } catch {}
+      } catch {
+        // Sidebar width is a convenience; a blocked or full store is not worth reporting.
+      }
     } else if (event.key === "ArrowRight") {
       sidebarWidth = Math.min(sidebarWidth + 16, 550);
       try {
         localStorage.setItem("bimguard_rules_sidebar_width", String(sidebarWidth));
-      } catch {}
+      } catch {
+        // Sidebar width is a convenience; a blocked or full store is not worth reporting.
+      }
     }
   }
 </script>
@@ -844,7 +852,7 @@
       <!-- Folder tree sidebar -->
       <div
         class="flex w-full shrink-0 flex-col space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:w-auto md:rounded-r-none"
-        style="width: 100%; max-width: 100%;"
+        style="max-width: 100%;"
         style:width={typeof window !== "undefined" && window.innerWidth >= 768
           ? `${sidebarWidth}px`
           : "100%"}
@@ -934,7 +942,7 @@
             <span class="text-micro opacity-75">{rules.length}</span>
           </button>
 
-          {#each filteredFolders as folder}
+          {#each filteredFolders as folder (folder)}
             <div
               class="group/folder relative flex items-center justify-between rounded-xl text-xs font-medium transition-colors {selectedFolderId ===
               folder.ruleset_id
@@ -1955,7 +1963,7 @@
             class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
             <option value="__keep__">— Keep current folder —</option>
-            {#each folders as f}
+            {#each folders as f (f)}
               <option value={f.ruleset_id}>{f.display_name} ({f.ruleset_id})</option>
             {/each}
           </select>

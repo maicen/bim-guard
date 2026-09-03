@@ -88,7 +88,7 @@
   {/if}
 
   <div class="space-y-3">
-    {#each ARCH_DOMAINS as domain}
+    {#each ARCH_DOMAINS as domain (domain.key)}
       {@const domIcon = DOMAIN_ICONS[domain.key] || Layers}
 
       {@const SvelteComponent = domIcon}
@@ -117,7 +117,7 @@
           </div>
         {:else}
           <div class="space-y-2">
-            {#each domain.targets as target}
+            {#each domain.targets as target (target)}
               <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/40">
                 <div class="flex items-center justify-between p-3">
                   <div class="flex items-center gap-2">

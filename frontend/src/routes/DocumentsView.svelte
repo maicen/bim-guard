@@ -374,7 +374,7 @@
             class="rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-2 text-xs text-slate-300 focus:border-accent focus:outline-none"
           >
             <option value="ALL">All Types</option>
-            {#each DOCUMENT_TYPES as type}
+            {#each DOCUMENT_TYPES as type (type)}
               <option value={type}>{type}</option>
             {/each}
           </select>
@@ -608,7 +608,7 @@
                 bind:value={uploadDocType}
                 class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
               >
-                {#each DOCUMENT_TYPES as type}
+                {#each DOCUMENT_TYPES as type (type)}
                   <option value={type}>{type}</option>
                 {/each}
               </select>
@@ -823,7 +823,7 @@
             bind:value={editDocType}
             class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
-            {#each DOCUMENT_TYPES as type}
+            {#each DOCUMENT_TYPES as type (type)}
               <option value={type}>{type}</option>
             {/each}
           </select>

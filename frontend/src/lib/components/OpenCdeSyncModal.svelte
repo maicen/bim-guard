@@ -206,7 +206,7 @@
               bind:value={selectedProjectId}
               class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
             >
-              {#each projects as p}
+              {#each projects as p (p.id)}
                 <option value={p.id}>{p.name} (ISO: {p.cde_state || "WIP"})</option>
               {/each}
             </select>

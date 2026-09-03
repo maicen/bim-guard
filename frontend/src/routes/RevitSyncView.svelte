@@ -493,7 +493,7 @@ print(response.read())
                     <td class="max-w-xs px-3 py-3">
                       {#if rule.failures && rule.failures.length > 0}
                         <div class="space-y-1">
-                          {#each rule.failures as f}
+                          {#each rule.failures as f (f.guid)}
                             <div
                               class="truncate font-mono text-caption text-rose-300"
                               title={f.reason || f.guid}
@@ -603,7 +603,7 @@ print(response.read())
             <div
               class="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2"
             >
-              {#each viewingRule.failures as f}
+              {#each viewingRule.failures as f (f.guid)}
                 <div
                   class="rounded-lg border border-rose-900/40 bg-rose-950/20 p-2 font-mono text-caption text-rose-300"
                 >

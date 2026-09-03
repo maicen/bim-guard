@@ -17,7 +17,6 @@
   // inside App's view switch, so it remounts whenever the target changes;
   // untrack states that the one-time read is deliberate.
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
-  let isLoading = false;
 
   onMount(async () => {
     try {
@@ -53,7 +52,7 @@
         bind:value={selectedProjectId}
         class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
       >
-        {#each projects as p}
+        {#each projects as p (p.id)}
           <option value={p.id}>{p.name}</option>
         {/each}
       </select>

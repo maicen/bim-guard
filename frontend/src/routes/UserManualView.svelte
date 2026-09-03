@@ -93,7 +93,7 @@
 
   <!-- Steps List -->
   <div class="space-y-4">
-    {#each STEPS as s}
+    {#each STEPS as s (s)}
       <div
         class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 transition-all hover:border-slate-700"
       >
@@ -122,7 +122,7 @@
         </div>
 
         <div class="flex items-center gap-2 pt-1">
-          {#each s.actions as act}
+          {#each s.actions as act (act)}
             <button
               type="button"
               onclick={() => onNavigate(act.view)}

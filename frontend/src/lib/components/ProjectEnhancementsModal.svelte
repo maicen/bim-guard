@@ -171,7 +171,7 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-800/60">
-                    {#each history as row}
+                    {#each history as row (row.id)}
                       <tr class="transition-colors hover:bg-slate-900/50">
                         <td class="px-4 py-3 font-mono text-slate-400">v{row.source_version}</td>
                         <td class="px-4 py-3 font-mono font-semibold text-purple-300"
