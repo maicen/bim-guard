@@ -3,6 +3,7 @@
   import { bcfApi } from '../api';
   import type { BCFTopicResponse, BCFCommentResponse, BCFViewpointResponse } from '../types';
   import Modal from './Modal.svelte';
+  import { toasts } from '../toast.svelte';
   import IsoGovernanceBadges from './IsoGovernanceBadges.svelte';
   import SeverityBadge from './SeverityBadge.svelte';
 
@@ -48,7 +49,7 @@
       comments = [...comments, created];
       newCommentText = '';
     } catch (err: any) {
-      alert(`Failed to add comment: ${err.message}`);
+      toasts.error(err.message || 'Unknown error', 'Failed to add comment');
     } finally {
       isSubmittingComment = false;
     }

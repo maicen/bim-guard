@@ -10,6 +10,7 @@
   import { projectsApi } from "../lib/api";
   import type { Project } from "../lib/types";
   import PipelineProgress from "../lib/components/PipelineProgress.svelte";
+  import { toasts } from "../lib/toast.svelte";
 
   export let initialProjectId: number | null = null;
 
@@ -24,8 +25,9 @@
       if (!selectedProjectId && projects.length > 0) {
         selectedProjectId = projects[0].id;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      // Without this the user just gets an empty project picker and no reason.
+      toasts.fromError(err, 'Could not load the project list.');
     }
   });
 </script>

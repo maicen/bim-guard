@@ -19,6 +19,7 @@
   import { DOCUMENT_TYPES } from "../lib/types";
   import type { DocumentItem, DocumentDetail, DocumentType, IdsImportResult } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import { toasts } from "../lib/toast.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
@@ -269,7 +270,7 @@
     try {
       selectedDoc = await documentsApi.get(id);
     } catch (err: any) {
-      alert(`Could not load document text: ${err.message}`);
+      toasts.error(err.message || "Unknown error", "Could not load document text");
     } finally {
       isLoadingDocDetail = false;
     }

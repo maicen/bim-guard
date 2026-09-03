@@ -3,6 +3,8 @@
   import Sidebar from './lib/components/Sidebar.svelte';
   import TopHeader from './lib/components/TopHeader.svelte';
   import ProjectWizardModal from './lib/components/ProjectWizardModal.svelte';
+  import Toaster from './lib/components/Toaster.svelte';
+  import { toasts } from './lib/toast.svelte';
 
   // Routes
   import DashboardView from './routes/DashboardView.svelte';
@@ -45,6 +47,8 @@
       dbBackend = stats.db_backend || 'SUPABASE';
       apiOnline = true;
     } catch {
+      // Deliberately quiet: the header's gateway/database chips are this
+      // check's UI, and it re-runs every 20s. A toast per poll would be noise.
       apiOnline = false;
       dbOk = false;
     }
@@ -53,8 +57,9 @@
   async function loadProjectDetails(projectId: number) {
     try {
       selectedProject = await projectsApi.get(projectId);
-    } catch {
+    } catch (err) {
       selectedProject = null;
+      toasts.fromError(err, 'Could not load the selected project.');
     }
   }
 
@@ -131,6 +136,13 @@
   }
 </script>
 
+<a
+  href="#main-content"
+  class="focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-xl focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
+>
+  Skip to main content
+</a>
+
 <div class="min-h-screen bg-slate-950 text-slate-100 flex font-sans antialiased selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-200">
   <!-- Apple-Style Sidebar -->
   <Sidebar
@@ -150,7 +162,8 @@
     />
 
     <!-- Viewport Container -->
-    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+    <main id="main-content" tabindex="-1" class="flex-1 p-6 md:p-8 overflow-y-auto">
+      <svelte:boundary>
       {#if activeView === 'dashboard'}
         <DashboardView
           onSelectProjectForAudit={handleSelectProjectForAudit}
@@ -223,6 +236,25 @@
       {:else if activeView === 'settings'}
         <SettingsView />
       {/if}
+        {#snippet failed(error, reset)}
+          <div
+            role="alert"
+            class="mx-auto mt-10 max-w-lg space-y-4 rounded-xl border border-rose-800/80 bg-rose-950/40 p-6 text-center"
+          >
+            <h2 class="text-base font-bold text-rose-200">This view failed to render</h2>
+            <p class="text-xs leading-relaxed text-rose-300/90">
+              {error instanceof Error ? error.message : String(error)}
+            </p>
+            <button
+              type="button"
+              onclick={reset}
+              class="bg-accent hover:bg-accent-hover rounded-xl px-4 py-2 text-xs font-semibold text-white"
+            >
+              Try again
+            </button>
+          </div>
+        {/snippet}
+      </svelte:boundary>
     </main>
 
     <!-- Clean Footer -->
@@ -236,6 +268,8 @@
     </footer>
   </div>
 </div>
+
+<Toaster />
 
 <!-- Global Wizard Modal (can be triggered from anywhere) -->
 <ProjectWizardModal

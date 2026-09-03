@@ -13,6 +13,7 @@
   } from "lucide-svelte";
   import { githubReposApi } from "../api";
   import type { GitHubRepo } from "../types";
+  import ConfirmModal from "./ConfirmModal.svelte";
 
   export let isOpen = false;
   export let onClose: () => void = () => {};
@@ -83,8 +84,15 @@
     }
   }
 
-  async function handleDeleteRepo(repo: GitHubRepo) {
-    if (!confirm(`Remove repository '${repo.owner}/${repo.name}' from storage options?`)) return;
+  let repoPendingDelete: GitHubRepo | null = null;
+
+  function promptDeleteRepo(repo: GitHubRepo) {
+    repoPendingDelete = repo;
+  }
+
+  async function handleDeleteRepo() {
+    const repo = repoPendingDelete;
+    if (!repo) return;
 
     try {
       await githubReposApi.delete(repo.id);
@@ -93,6 +101,8 @@
       onReposUpdated();
     } catch (err: any) {
       error = err.message || "Could not delete repository.";
+    } finally {
+      repoPendingDelete = null;
     }
   }
 </script>
@@ -274,7 +284,7 @@
                 <div class="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
-                    on:click={() => handleDeleteRepo(repo)}
+                    on:click={() => promptDeleteRepo(repo)}
                     class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
                     title="Remove repository"
                   >
@@ -300,3 +310,13 @@
     </div>
   </div>
 {/if}
+
+<ConfirmModal
+  isOpen={repoPendingDelete !== null}
+  title="Remove Repository"
+  message={`Remove repository '${repoPendingDelete?.owner ?? ""}/${repoPendingDelete?.name ?? ""}' from storage options? Imported projects are not affected.`}
+  confirmText="Remove Repository"
+  danger={true}
+  onConfirm={handleDeleteRepo}
+  onCancel={() => (repoPendingDelete = null)}
+/>

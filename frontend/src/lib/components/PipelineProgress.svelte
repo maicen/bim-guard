@@ -37,7 +37,8 @@
     try {
       internalStatus = await analyzeApi.getStatus(projectId);
     } catch {
-      // ignore
+      // Polled every 3s as an SSE fallback; a transient miss is recovered by
+      // the next tick, and the stream indicator already shows the degraded state.
     }
   }
 
@@ -66,6 +67,8 @@
         },
       });
     } catch {
+      // EventSource could not be opened; the poller below keeps the view live
+      // and `isStreaming` drives the "reconnecting" indicator.
       isStreaming = false;
     }
 

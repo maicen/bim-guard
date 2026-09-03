@@ -44,6 +44,7 @@
   import PipelineProgress from "../lib/components/PipelineProgress.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import { toasts } from "../lib/toast.svelte";
 
   export let initialProjectId: number | null = null;
   export let activeCategory: "Piping" | "seismic" = "Piping";
@@ -69,8 +70,9 @@
     isFoldersLoading = true;
     try {
       categoryFolders = await rulesApi.folders(cat);
-    } catch {
+    } catch (err) {
       categoryFolders = [];
+      toasts.fromError(err, 'Could not load rule folders for this category.');
     } finally {
       isFoldersLoading = false;
     }
@@ -183,8 +185,9 @@
     if (!selectedProjectId) return;
     try {
       analysisInputs = await projectsApi.getInputs(selectedProjectId);
-    } catch {
+    } catch (err) {
       analysisInputs = [];
+      toasts.fromError(err, 'Could not load the analysis inputs for this project.');
     }
   }
 
@@ -198,6 +201,8 @@
         requestedEngines,
       );
     } catch {
+      // A miss here is the normal "no analysis has been run yet" case, not a
+      // failure, so it stays quiet; handleRun surfaces real run errors.
       result = null;
     }
   }

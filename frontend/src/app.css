@@ -28,6 +28,7 @@ html.dark {
   --border-dark: #334155;
   --color-accent: 0 113 227;        /* #0071e3 - the one chromatic accent */
   --color-accent-hover: 0 119 237;  /* #0077ed */
+  --focus-ring: #0071e3;            /* resolved accent, for plain-CSS use */
 
   /* Retained for the handful of plain-CSS rules below that cannot use a
      Tailwind utility; component markup must use the `accent` token instead. */
@@ -60,6 +61,7 @@ html:not(.dark) {
 
   --color-accent: 0 102 204;        /* #0066cc - AA on white (DESIGN.md link blue) */
   --color-accent-hover: 0 113 227;  /* #0071e3 */
+  --focus-ring: #0066cc;
   --bimguard-blue: #0066cc;
   --bimguard-blue-hover: #0071e3;
 }
@@ -71,6 +73,31 @@ h1, h2, h3, h4, h5, h6 {
 
 code, kbd, samp, pre {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* =========================================================================
+   KEYBOARD FOCUS
+   =========================================================================
+   156 elements carry `focus:outline-none` and only two had a replacement, so
+   keyboard focus was invisible across most of the app. This restores a single
+   consistent ring for keyboard users only (`:focus-visible` does not fire on
+   mouse clicks).
+
+   `html:root :focus-visible` outranks Tailwind's `.focus\:outline-none:focus`
+   and is declared after `@tailwind utilities`, so it wins without !important. */
+html:root :focus-visible {
+  outline-width: 2px;
+  outline-style: solid;
+  outline-color: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Inputs already signal focus with an accent border; an outline on top of that
+   reads as a double ring, so tighten it against the field edge instead. */
+html:root input:focus-visible,
+html:root select:focus-visible,
+html:root textarea:focus-visible {
+  outline-offset: 0;
 }
 
 /* Respect the OS "reduce motion" setting: keep state changes visible, drop the
