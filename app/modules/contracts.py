@@ -1193,7 +1193,12 @@ class BSDDPropertyItem(BaseModel):
     data_type: Optional[str] = Field(None, description="IFC or XSD data type (e.g. IfcLabel, IfcReal, IfcBoolean)")
     units: Optional[str] = Field(None, description="Physical units (e.g. mm, m/s, degC)")
     allowed_values: list[str] = Field(default_factory=list, description="List of allowed enumeration values if restricted")
-    description: Optional[str] = Field(None, description="Property description from bSDD")
+    definition: Optional[str] = Field(
+        None, description="What the property actually means (bSDD's `definition` field -- most bSDD properties carry this, not `description`)"
+    )
+    description: Optional[str] = Field(
+        None, description="Supplementary note from bSDD, when distinct from `definition` -- often an implementation/technical remark rather than the meaning itself"
+    )
 
 
 class BSDDClassItem(BaseModel):
@@ -1206,7 +1211,10 @@ class BSDDClassItem(BaseModel):
     parent_class_code: Optional[str] = Field(None, description="Parent class code if hierarchical")
     related_ifc_entities: list[str] = Field(default_factory=list, description="Associated IFC entity types")
     properties: list[BSDDPropertyItem] = Field(default_factory=list, description="Properties defined on this class")
-    description: Optional[str] = Field(None, description="Class description")
+    definition: Optional[str] = Field(
+        None, description="What the class actually means (bSDD classes carry `definition`, essentially never `description`)"
+    )
+    description: Optional[str] = Field(None, description="Supplementary note from bSDD, when distinct from `definition`")
 
 
 class BSDDDictionaryItem(BaseModel):

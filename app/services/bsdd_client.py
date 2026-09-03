@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -328,7 +329,8 @@ class BSDDClient:
                         data_type=p.get("dataType"),
                         units=self._first_unit(p),
                         allowed_values=self._allowed_value_strings(p.get("allowedValues", [])),
-                        description=p.get("description"),
+                        definition=self._clean_bsdd_text(p.get("definition")),
+                        description=self._distinct_note(p.get("description"), p.get("definition")),
                     )
                 )
             class_item = BSDDClassItem(
@@ -336,10 +338,18 @@ class BSDDClient:
                 code=api_data.get("code", class_code),
                 name=api_data.get("name", class_code),
                 dictionary_uri=api_data.get("dictionaryUri", dictionary_uri),
-                parent_class_code=api_data.get("parentClassCode"),
+                # ClassContract.v1 nests the parent under `parentClassReference`
+                # ({uri, name, code}) -- there is no flat `parentClassCode` key,
+                # so reading that always returned None.
+                parent_class_code=(api_data.get("parentClassReference") or {}).get("code"),
                 related_ifc_entities=api_data.get("relatedIfcEntities", []),
                 properties=props,
-                description=api_data.get("description"),
+                # Almost every real IFC class carries `definition`, essentially
+                # never `description` -- verified live against
+                # identifier.buildingsmart.org for IfcDoor, IfcWindow,
+                # IfcStairFlight, IfcBuiltElement (all definition-only).
+                definition=self._clean_bsdd_text(api_data.get("definition")),
+                description=self._distinct_note(api_data.get("description"), api_data.get("definition")),
             )
             self._cache[cache_key] = class_item
             return class_item
@@ -361,6 +371,37 @@ class BSDDClient:
             return class_item
 
         return None
+
+    @staticmethod
+    def _clean_bsdd_text(text: str | None) -> str | None:
+        """Strip bSDD's `[[Term]]` wiki cross-reference markup down to plain text.
+
+        bSDD definitions cross-link other terms in the same dictionary this
+        way (e.g. OverallHeight's definition references `[[IfcOpeningElement]]`)
+        -- there is no in-app page for those terms to link to, so left as-is
+        the raw double brackets read as broken formatting rather than a link.
+        """
+        if not text:
+            return text
+        return re.sub(r"\[\[([^\[\]]+)\]\]", r"\1", text)
+
+    @classmethod
+    def _distinct_note(cls, description: str | None, definition: str | None) -> str | None:
+        """Keep `description` only when it says something `definition` doesn't.
+
+        bSDD's `description` is frequently a verbatim copy of `definition`
+        (when both are set) or, per the live RiserHeight/OverallHeight
+        examples, an implementation aside about the bSDD *schema* itself
+        ("this property takes IfcPositiveLengthMeasure...") rather than
+        what the property means -- worth surfacing as a secondary note, but
+        only when it actually adds something beyond the primary definition.
+        """
+        cleaned = cls._clean_bsdd_text(description)
+        if not cleaned:
+            return None
+        if definition and cleaned.strip() == cls._clean_bsdd_text(definition).strip():
+            return None
+        return cleaned
 
     def search_classes(self, query: str, dictionary_uri: str | None = None, limit: int = 10) -> BSDDClassSearchResponse:
         """Search bSDD classes matching a text query."""
@@ -434,7 +475,8 @@ class BSDDClient:
                 data_type=api_data.get("dataType"),
                 units=self._first_unit(api_data),
                 allowed_values=self._allowed_value_strings(api_data.get("allowedValues", [])),
-                description=api_data.get("description") or api_data.get("definition"),
+                definition=self._clean_bsdd_text(api_data.get("definition")),
+                description=self._distinct_note(api_data.get("description"), api_data.get("definition")),
             )
             self._cache[cache_key] = item
             return item

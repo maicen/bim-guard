@@ -114,7 +114,10 @@
       </p>
     {:else if classDetail}
       <div class="space-y-2">
-        <p>{classDetail.description || "No description available."}</p>
+        <p>{classDetail.definition || classDetail.description || "No definition available."}</p>
+        {#if classDetail.definition && classDetail.description}
+          <p class="text-micro italic text-slate-500">Note: {classDetail.description}</p>
+        {/if}
         {#if classDetail.parent_class_code}
           <p class="text-micro text-slate-500">
             Extends <span class="font-mono text-slate-300">{classDetail.parent_class_code}</span>
@@ -136,7 +139,10 @@
       </div>
     {:else if propDetail}
       <div class="space-y-2">
-        <p>{propDetail.description || "No description available."}</p>
+        <p>{propDetail.definition || propDetail.description || "No definition available."}</p>
+        {#if propDetail.definition && propDetail.description}
+          <p class="text-micro italic text-slate-500">Note: {propDetail.description}</p>
+        {/if}
         <dl class="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-micro">
           {#if propDetail.data_type}
             <dt class="uppercase tracking-wider text-slate-500">Type</dt>

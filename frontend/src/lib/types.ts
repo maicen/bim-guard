@@ -814,6 +814,9 @@ export interface BSDDPropertyItem {
   data_type?: string | null;
   units?: string | null;
   allowed_values: string[];
+  /** What the property actually means -- bSDD's `definition`, present on nearly every property. */
+  definition?: string | null;
+  /** Supplementary note from bSDD, only set when distinct from `definition`. */
   description?: string | null;
 }
 
@@ -825,6 +828,9 @@ export interface BSDDClassItem {
   parent_class_code?: string | null;
   related_ifc_entities: string[];
   properties: BSDDPropertyItem[];
+  /** What the class actually means -- bSDD's `definition`; classes essentially never carry `description`. */
+  definition?: string | null;
+  /** Supplementary note from bSDD, only set when distinct from `definition`. */
   description?: string | null;
 }
 
