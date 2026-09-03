@@ -181,10 +181,7 @@
       {:else if activeView === 'manual-rule-editor'}
         <ManualRuleEditorView onBack={() => (activeView = 'rules')} />
       {:else if activeView === 'arch'}
-        <ArchAnalyzeView
-          initialProjectId={targetProjectId}
-          onSelectProjectForViewer={handleSelectProjectForViewer}
-        />
+        <ArchAnalyzeView initialProjectId={targetProjectId} />
       {:else if activeView === 'piping'}
         <!-- Keyed so moving between PIPING and SEISMIC remounts the view:
              both routes share AnalyzeView, and without this the previous
