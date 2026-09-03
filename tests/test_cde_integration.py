@@ -1,10 +1,35 @@
 """Tests for OpenCDE Foundation and Documents REST API."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture
+def cde_test_project():
+    """Create a project for the test and delete it afterward.
+
+    These tests exercise the real projects API/DB, so without teardown every
+    run left an orphaned "OpenCDE ..." project behind.
+    """
+
+    def _create(name: str, country: str, analysis_type: str) -> int:
+        resp = client.post(
+            "/api/projects",
+            json={"name": name, "country": country, "analysis_type": analysis_type},
+        )
+        assert resp.status_code == 201
+        project_id = resp.json()["id"]
+        created_ids.append(project_id)
+        return project_id
+
+    created_ids: list[int] = []
+    yield _create
+    for project_id in created_ids:
+        client.delete(f"/api/projects/{project_id}")
 
 
 def test_opencde_versions_discovery():
@@ -40,11 +65,9 @@ def test_opencde_auth_config_and_token():
     assert token_data["token_type"] == "Bearer"
 
 
-def test_opencde_project_documents_list_and_etags():
+def test_opencde_project_documents_list_and_etags(cde_test_project):
     # First create a test project to query
-    proj_resp = client.post("/api/projects", json={"name": "OpenCDE Test Hospital", "country": "GB", "analysis_type": "Piping"})
-    assert proj_resp.status_code == 201
-    proj_id = proj_resp.json()["id"]
+    proj_id = cde_test_project("OpenCDE Test Hospital", "GB", "Piping")
 
     # Query OpenCDE documents
     response = client.get(f"/api/cde/v1/projects/{proj_id}/documents")
@@ -60,10 +83,8 @@ def test_opencde_project_documents_list_and_etags():
     assert cached_response.status_code == 304
 
 
-def test_opencde_documents_sync():
-    proj_resp = client.post("/api/projects", json={"name": "OpenCDE Sync Project", "country": "US", "analysis_type": "Arch"})
-    assert proj_resp.status_code == 201
-    proj_id = proj_resp.json()["id"]
+def test_opencde_documents_sync(cde_test_project):
+    proj_id = cde_test_project("OpenCDE Sync Project", "US", "Arch")
 
     payload = {
         "cde_server_url": "https://cde.autodesk.com/acc/v1",
