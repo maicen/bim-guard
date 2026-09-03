@@ -20,9 +20,11 @@ frontend/.vite/
 # IDE / tooling
 .vscode/
 .claude/
+.antigravity/
 .gemini/
 .Jules/
 .playwright-mcp/
+.github/
 
 # Secrets — never bake into image
 .env
