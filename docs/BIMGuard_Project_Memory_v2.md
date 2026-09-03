@@ -109,7 +109,7 @@ Three defects are recorded because each exposed a class of weakness rather than 
 
 *Rule-pack validation.* Loaders accepted invalid packs and failed later with misleading errors. They now validate on read and raise with the offending file path.
 
-**Sprint 3 — evaluation infrastructure and hardening.** Three scoring harnesses replaced subjective assessment with measured accuracy: `score_module1b.py` across the annotator's five capabilities; `score_module3_extraction.py`, which runs the real PDF through the real extraction primitives and scores against hand-annotated ground truth; and `eval_harness.py`, an LLM-as-judge scoring generated rules on three dimensions with historical tracking. A nine-check pre-flight driver (`scripts/validate_repo.py`) gates the repository across tests, imports, feature flags, adapter, orchestrator, lint, wiring, known blockers and secrets. `check_flags` exercises all four flag combinations; `check_blockers` registers known defects as strict expected-failures, so fixing one turns the suite red and forces the registry to be updated. The performance benchmark harness was built here after early drafts of this memory were found to contain figures that could not be reproduced.
+**Sprint 3 — evaluation infrastructure and hardening.** Three scoring harnesses replaced subjective assessment with measured accuracy: `score_nlp_annotation.py` across the annotator's five capabilities; `score_rule_extraction.py`, which runs the real PDF through the real extraction primitives and scores against hand-annotated ground truth; and `eval_harness.py`, an LLM-as-judge scoring generated rules on three dimensions with historical tracking. A nine-check pre-flight driver (`scripts/validate_repo.py`) gates the repository across tests, imports, feature flags, adapter, orchestrator, lint, wiring, known blockers and secrets. `check_flags` exercises all four flag combinations; `check_blockers` registers known defects as strict expected-failures, so fixing one turns the suite red and forces the registry to be updated. The performance benchmark harness was built here after early drafts of this memory were found to contain figures that could not be reproduced.
 
 ## 6. Results and Evaluation
 
@@ -121,9 +121,9 @@ A distinction is drawn throughout between **software verification** — the syst
 
 *Ground truth.* A hand-annotated answer key covers building code Part 9, Sections 9.8.2–9.8.4.7 (stairs, ramps, handrails and guards) — 7,909 characters of source text yielding **29 GOLD_RULES**, each specifying reference clause, IFC target class, property name, operator, value, unit and applicability condition, plus **5 EXCLUDED_CLAUSES**. The excluded set is the methodologically important half: these are clauses that are definitional, occupant-load-dependent or table-lookup-based and therefore *not* reducible to a single checkable threshold. A correct pipeline must skip them. Extracting a fabricated numeric rule from one is a hallucination, not a recall win, and is scored separately.
 
-*Design.* `score_module3_extraction.py` runs the real PDF through the real primitives in two parts. Part A is free structural diagnostics: heading detection on the text the live upload path actually stores versus the Docling markdown path; chunk preparation replicating the production pipeline; SKIP-leakage analysis, asking whether the confidence scorer discards gold-bearing text before the LLM ever sees it; table-pipeline coverage; and a regex-baseline recall/precision figure. Part B scores `LiteLLMRuleExtractor` per field against gold. The sentence classifier is separately evaluated on a held-out CODE-ACCORD split; `score_module1b.py` scores the annotator's five capabilities.
+*Design.* `score_rule_extraction.py` runs the real PDF through the real primitives in two parts. Part A is free structural diagnostics: heading detection on the text the live upload path actually stores versus the Docling markdown path; chunk preparation replicating the production pipeline; SKIP-leakage analysis, asking whether the confidence scorer discards gold-bearing text before the LLM ever sees it; table-pipeline coverage; and a regex-baseline recall/precision figure. Part B scores `LiteLLMRuleExtractor` per field against gold. The sentence classifier is separately evaluated on a held-out CODE-ACCORD split; `score_nlp_annotation.py` scores the annotator's five capabilities.
 
-⟦INSERT — TABLE 1⟧ *Run `uv run python score_module3_extraction.py` and `score_module1b.py` and populate:*
+⟦INSERT — TABLE 1⟧ *Run `uv run python score_rule_extraction.py` and `score_nlp_annotation.py` and populate:*
 
 | Stage | Metric | Regex baseline | LLM extractor |
 |---|---|---|---|
@@ -272,7 +272,7 @@ Zhou, P., & El-Gohary, N. (2017). Ontology-based automated information extractio
 
 **Appendix A — Repository.** `maicen/bim-guard`. 45,640 lines of Python outside the virtual environment; 311 test functions across 18 modules; nine-check pre-flight driver at `scripts/validate_repo.py`.
 
-**Appendix B — Extraction ground truth.** `eval_gold_code_9_8_stairs.py`: source text, 29 GOLD_RULES with IFC bindings, 5 EXCLUDED_CLAUSES with exclusion rationale. Harnesses: `score_module3_extraction.py`, `score_module1b.py`, `app/modules/tests/eval_harness.py`.
+**Appendix B — Extraction ground truth.** `eval_gold_code_9_8_stairs.py`: source text, 29 GOLD_RULES with IFC bindings, 5 EXCLUDED_CLAUSES with exclusion rationale. Harnesses: `score_rule_extraction.py`, `score_nlp_annotation.py`, `app/modules/tests/eval_harness.py`.
 
 **Appendix C — Ruleset specifications.** Composite formulas, band boundaries, input catalogues and standards mappings for GC-001, CC-001, MC-001, MM-001, XM-001; seeded code rulesets `BUILDING-CODE-PART9` and `BUILDING-CODE-PART9-EXT`; `CODE_TO_IFC_MAP` bindings.
 

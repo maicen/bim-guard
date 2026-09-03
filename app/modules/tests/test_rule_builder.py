@@ -1,18 +1,18 @@
 """
-tests/test_module3.py
+tests/test_rule_builder.py
 ----------------------
 Unit tests for Module 3 — RuleGenerator (validation/enrichment path), RuleStore,
 rule schema validation, and edge cases.
 
-Run with: pytest tests/test_module3.py -v
+Run with: pytest tests/test_rule_builder.py -v
 
 Test groups:
   - RuleStore:           basic CRUD, get_all_rules, clear
   - RuleGenerator:       enrichment, validation, save_batch
   - Schema validation:   field checks against the rich schema
   - LLM (RuleConverter): calls the real LLM — skip if no API key
-    Run:  pytest tests/test_module3.py -m llm -v
-    Skip: pytest tests/test_module3.py -m "not llm" -v
+    Run:  pytest tests/test_rule_builder.py -m llm -v
+    Skip: pytest tests/test_rule_builder.py -m "not llm" -v
 """
 
 import os
@@ -415,7 +415,7 @@ class TestRuleConverterLLM:
     """
     Tests that call the real LLM (RuleConverter → GPT-4o).
     Requires GEMINI_API_KEY environment variable.
-    Run with:  pytest tests/test_module3.py -m llm -v
+    Run with:  pytest tests/test_rule_builder.py -m llm -v
     """
 
     @pytest.fixture

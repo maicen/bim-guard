@@ -4,13 +4,13 @@
 
 ```bash
 # Run fast unit tests only (no LLM, no PDFs)
-pytest tests/test_module1.py -v -m "not slow"
+pytest tests/test_document_parsing.py -v -m "not slow"
 
 # Run Module 3 deterministic tests only
-pytest tests/test_module3.py -v -m "not llm"
+pytest tests/test_rule_builder.py -v -m "not llm"
 
 # Run LLM-dependent tests (Module 3 rule generation)
-pytest tests/test_module3.py -v -m llm
+pytest tests/test_rule_builder.py -v -m llm
 
 # Run integration tests (needs fixtures + LLM)
 pytest tests/test_integration.py -v -m integration
@@ -29,8 +29,8 @@ python -m tests.eval_harness --report
 ```
 tests/
 ├── conftest.py              # Shared fixtures, marker registration
-├── test_module1.py          # Module 1 unit tests (chunker, filter, tables, PDF parsing)
-├── test_module3.py          # Module 3 unit tests (rule generation, schema, LLM path)
+├── test_document_parsing.py          # Module 1 unit tests (chunker, filter, tables, PDF parsing)
+├── test_rule_builder.py          # Module 3 unit tests (rule generation, schema, LLM path)
 ├── test_integration.py      # End-to-end pipeline: PDF → rules
 ├── test_compliance.py       # (your existing file — unchanged)
 ├── eval_harness.py          # LLM-as-judge accuracy scoring tool

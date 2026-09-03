@@ -1,7 +1,7 @@
 """
 Tests for the Path A <-> Issue adapter (F4).
 
-The adapter is the only module that knows both Module4 shapes, so F6's
+The adapter is the only module that knows both comparator shapes, so F6's
 orchestrator wiring leans on it entirely. These tests pin the contract
 described in docs/integration_plan_mm_xm.md section 9 (assertions A1-A7)
 before anything downstream depends on it.

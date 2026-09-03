@@ -68,7 +68,7 @@ class NLPAnnotator:
                   - 'annotation' key added to each paragraph dict
                   - 'filtered_text' enriched with [NLP PRE-ANALYSIS] preamble
         """
-        print("[Module1b] Running NLP annotation...")
+        print("[NLPAnnotator] Running NLP annotation...")
         total_paras = 0
 
         annotated_chunks = []
@@ -100,7 +100,7 @@ class NLPAnnotator:
                 'filtered_text':     enriched_text,
             })
 
-        print(f"[Module1b] Annotated {total_paras} paragraphs across {len(chunks)} sections.")
+        print(f"[NLPAnnotator] Annotated {total_paras} paragraphs across {len(chunks)} sections.")
         return annotated_chunks
 
     # ── Private ───────────────────────────────────────────────────────────────

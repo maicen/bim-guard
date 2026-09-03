@@ -1,12 +1,12 @@
 """
 app/modules/comparator/issue_adapter.py
 
-The only module that knows both Module4 shapes.
+The only module that knows both comparator shapes.
 
 Path A (`compliance_runner.run_compliance_checks()`) returns one flat dict per
 element carrying three mechanisms at once. Path B (`material_media.compare()`,
 `cross_material.compare()`) returns `list[Issue]` — the declared data contract
-between Module4 and Module5 (`issue_schema.py`).
+between comparator and reporter (`issue_schema.py`).
 
 This adapter lifts Path A dicts into Issues so both paths speak one language,
 and projects Issues back onto the per-element dict spine so the existing

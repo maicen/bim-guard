@@ -1,10 +1,10 @@
 """
-tests/test_module1.py
+tests/test_document_parsing.py
 ----------------------
 Unit tests for Module 1 — SectionChunker, KeywordFilter, TableRuleBuilder,
 UnstructuredExtractor (PDF parsing), and regression snapshots.
 
-Run with: pytest tests/test_module1.py -v
+Run with: pytest tests/test_document_parsing.py -v
 
 SETUP:
   Place 1-3 real OBC PDF pages in tests/fixtures/
@@ -394,8 +394,8 @@ def unstructured_extractor():
 class TestUnstructuredExtractor:
     """
     Tests that run against real PDFs via the Unstructured hosted API.
-    Run with:  pytest tests/test_module1.py -m slow -v
-    Skip with: pytest tests/test_module1.py -m "not slow"
+    Run with:  pytest tests/test_document_parsing.py -m slow -v
+    Skip with: pytest tests/test_document_parsing.py -m "not slow"
     """
 
     @_skip_if_missing_pdf(SAMPLE_PDF)

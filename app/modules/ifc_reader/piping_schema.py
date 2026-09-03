@@ -4,16 +4,16 @@ app/modules/piping_schema.py
 Data contract for piping compliance checking in BIM Guard.
 
 This module defines the canonical structure of piping elements passed between
-Module2 (IFC reader, owned by Sam) and Module4 (comparators, owned by the
-piping compliance team). Every piping-related element exiting Module2 must
-conform to PipingElement. Every piping comparator in Module4 consumes
+ifc_reader (IFC reader) and comparator (comparators, owned by the
+piping compliance team). Every piping-related element exiting ifc_reader must
+conform to PipingElement. Every piping comparator consumes
 list[PipingElement].
 
 OWNERSHIP
     - PipingElement schema: defined here, evolved by PR to this file.
-    - Module2 producer (Sam): extracts from IFC via ifcopenshell, normalises
+    - ifc_reader producer: extracts from IFC via ifcopenshell, normalises
       materials, classifies environment, emits list[PipingElement].
-    - Module4 consumers (piping compliance team): galvanic, crevice,
+    - comparator consumers: galvanic, crevice,
       clearance, centre-to-centre, seismic reservation — each takes
       list[PipingElement] plus a RulePack and returns list[Issue].
 
@@ -29,7 +29,7 @@ UNITS — SI THROUGHOUT
 COORDINATES
     World coordinates from the IFC file, via ifcopenshell, with Z up and
     units converted to metres. If the IFC uses different length units,
-    Module2 converts before populating this schema.
+    ifc_reader converts before populating this schema.
 
 NULLABILITY POLICY
     Fields are Optional where the underlying IFC data is frequently missing.
@@ -58,7 +58,7 @@ SCHEMA_VERSION = "1.0.0"
 # ---------------------------------------------------------------------------
 # Canonical material keys
 # ---------------------------------------------------------------------------
-# Module2 normalises any IFC material string to one of these keys. If a
+# ifc_reader normalises any IFC material string to one of these keys. If a
 # material cannot be identified confidently, use "Unknown" and add a note
 # to extraction_warnings. The corrosion rule packs key off these strings,
 # so they must match exactly (case-sensitive).

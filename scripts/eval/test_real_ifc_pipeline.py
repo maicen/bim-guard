@@ -3,7 +3,7 @@ test_real_ifc_pipeline.py
 ------------------------------------------------
 Blue Halo — Phase 5 Part B: end-to-end pipeline test against a real IFC file.
 
-Mirrors score_module3_extraction.py / validate_blue_halo.py in style (plain
+Mirrors score_rule_extraction.py / validate_blue_halo.py in style (plain
 script, print()-based, no pytest). Unlike validate_blue_halo.py — which
 feeds the algorithm hand-built mock dataclasses — this script drives the
 FULL stack through ifcopenshell:

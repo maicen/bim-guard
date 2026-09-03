@@ -1,5 +1,8 @@
 """Deck D — Integrated Overview (24 slides)."""
-from build_fmp_decks import *  # noqa: F403
+try:
+    from build_fmp_decks import *  # noqa: F403
+except ImportError:
+    from scripts.build.build_fmp_decks import *  # noqa: F403
 
 def build():
     p = new_deck()

@@ -1,11 +1,11 @@
 """
-score_module3_extraction.py
+score_rule_extraction.py
 ------------------------------------------------
 Phase-1 eval harness for Module 3 rule extraction accuracy, scored against
 eval_gold_code_9_8_stairs.py (hand-annotated ground truth for CODE 9.8.2-9.8.4.7,
 data/uploads/..._pdf_stairs_mock.pdf).
 
-Mirrors score_module1b.py's style (plain script, print()-based, no pytest).
+Mirrors score_nlp_annotation.py's style (plain script, print()-based, no pytest).
 
 Runs the REAL PDF through the REAL extraction primitives — not a hand-typed
 stand-in — so results reflect what actually happens today, not a best case.
@@ -34,7 +34,7 @@ stand-in — so results reflect what actually happens today, not a best case.
     score a hosted model instead (the live app default is "gpt-4o-mini").
 
 Usage:
-    uv run python score_module3_extraction.py
+    uv run python score_rule_extraction.py
 """
 
 import asyncio
@@ -46,7 +46,10 @@ import sys
 import urllib.error
 import urllib.request
 
-from eval_gold_code_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
+try:
+    from eval_gold_code_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
+except ImportError:
+    from scripts.eval.eval_gold_code_9_8_stairs import EXCLUDED_CLAUSES, GOLD_RULES
 
 sys.path.insert(0, "app/modules")
 
@@ -137,7 +140,7 @@ def _score(label: str, extracted: list[dict]):
 
 def prepare_sendable_chunks(text: str) -> list[dict]:
     """Replicates rule_extraction_service.py's steps 3-7 (deterministic part,
-    BERT/Module1b omitted — no fine-tuned model on disk / annotation-only)."""
+    BERT/NLPAnnotator omitted — no fine-tuned model on disk / annotation-only)."""
     code_chunks = SectionChunker().chunk(text)
     if code_chunks:
         chunks_to_process = code_chunks
@@ -297,7 +300,7 @@ async def part_b(sendable: list[dict]):
         print(f"     To run this part:")
         print(f"       ollama serve")
         print(f"       ollama pull {tag}")
-        print(f"       uv run python score_module3_extraction.py")
+        print(f"       uv run python score_rule_extraction.py")
         return
     if tag not in served:
         print(f"\n     SKIPPED — Ollama is up at {OLLAMA_BASE_URL} but does not serve {tag!r}.")

@@ -3,7 +3,7 @@ ifc_reader/iso19650_check.py
 ------------------------------------
 Whole-model ISO 19650 information-management checks.
 
-Distinct from the building-code/life-safety checks elsewhere in module2:
+Distinct from the building-code/life-safety checks elsewhere in ifc_reader:
 this file checks CDE governance (container naming, suitability/revision
 codes, GUID traceability, CDE-state consistency, export provenance), not
 physical building performance.

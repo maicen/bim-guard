@@ -136,7 +136,7 @@ def test_geometry_value_dispatcher_uses_millimetres(unit, L, W, H, to_mm):
 
 @pytest.mark.parametrize("unit,L,W,H,to_mm", CASES)
 def test_unit_scale_keeps_model_unit_to_mm_meaning(unit, L, W, H, to_mm):
-    """Module2 scales storey elevations with _unit_scale; it must stay model→mm."""
+    """IFCReader scales storey elevations with _unit_scale; it must stay model→mm."""
     f, _ = _build_model(unit, L, W, H)
     ex = IFCGeometryExtractor(f)
 

@@ -13,7 +13,7 @@ Drives every stage of the pipeline over each model in
       ->  Phase 4  BCF 2.1 export
       ->  aggregate
 
-Mirrors score_module3_extraction.py / test_real_ifc_pipeline.py in style
+Mirrors score_rule_extraction.py / test_real_ifc_pipeline.py in style
 (plain script, print()-based, no pytest).
 
 DESIGN NOTES

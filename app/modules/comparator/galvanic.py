@@ -9,11 +9,11 @@ threshold for their environment class, weighted by anode-to-cathode
 area ratio and environment severity.
 
 This module is the port of the original bimguard_corrosion_engine.py
-into the Module4 comparator architecture. The logic is unchanged; only
+into the comparator architecture. The logic is unchanged; only
 the input/output contracts are adapted to the repo's schema.
 
 INPUT
-    elements   — list[PipingElement] from Module2
+    elements   — list[PipingElement] from ifc_reader
     rule_pack  — dict loaded from the Supabase rules table (or a JSON file
                  during development). Expected keys documented below.
 

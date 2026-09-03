@@ -57,12 +57,7 @@ def reset_in_memory_cache():
 # the F-series (producer overload, issue adapter, band casing, MM/XM wiring).
 BASELINE_COMMIT = "4edba3a"
 
-KNOWN_IMPORT_FAILURES: dict[str, str] = {
-    "app.modules.document_parsing.tfidf_analyzer": (
-        "needs scikit-learn from the optional ml-pipeline group "
-        "(uv sync --group ml-pipeline)"
-    ),
-}
+KNOWN_IMPORT_FAILURES: dict[str, str] = {}
 
 IMPORT_REGRESSIONS: dict[str, str] = {}
 

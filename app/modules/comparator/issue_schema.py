@@ -1,10 +1,10 @@
 """
 app/modules/issue_schema.py
 
-Data contract between Module4 (comparators) and Module5 (reporter).
+Data contract between comparator and reporter.
 
 An Issue represents a single compliance finding — one element that fails
-one rule. Comparators in Module4 produce list[Issue]. Module5 consumes
+one rule. Comparators produce list[Issue]. Reporter consumes
 list[Issue] to produce BCF 2.1 output, dashboard summaries, and PDF reports.
 
 The Issue schema is deliberately mechanism-agnostic. Every compliance
@@ -53,7 +53,7 @@ class Issue:
     """
     A single compliance finding.
 
-    Produced by a Module4 comparator, consumed by Module5 and the UI.
+    Produced by comparator, consumed by reporter and the UI.
     """
 
     # --- Identity ---

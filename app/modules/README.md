@@ -110,8 +110,8 @@ OUT
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/pdf_stairs_mock.pdf
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_compliance.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_integration.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_module1.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_module3.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_document_parsing.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_rule_builder.py
 
 app/modules/
 │
@@ -170,8 +170,8 @@ app/modules/
 │   └── cost_model.py            — configurable cost/duration model
 │
 └── tests/
-    ├── test_module1.py
-    ├── test_module3.py
+    ├── test_document_parsing.py
+    ├── test_rule_builder.py
     ├── test_compliance.py
     ├── test_integration.py
     ├── conftest.py

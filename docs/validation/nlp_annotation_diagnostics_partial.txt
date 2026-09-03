@@ -139,4 +139,4 @@ Source PDF: data/uploads/46efcdde558c44d29ec1c366a0911265_pdf_stairs_mock.pdf
      SKIPPED — no OPENAI_API_KEY/GEMINI_API_KEY in the environment.
      Live app default model is 'gpt-4o-mini'. To run this part:
        set OPENAI_API_KEY=sk-...   (PowerShell: $env:OPENAI_API_KEY = 'sk-...')
-       uv run python score_module3_extraction.py
+       uv run python score_rule_extraction.py

@@ -8,7 +8,10 @@ nothing that could have produced them. The ruleset itself is preserved in
 full as the designed specification, with implementation status stated on
 every slide that would otherwise imply a measurement.
 """
-from build_fmp_decks import *  # noqa: F403
+try:
+    from build_fmp_decks import *  # noqa: F403
+except ImportError:
+    from scripts.build.build_fmp_decks import *  # noqa: F403
 
 def build():
     p = new_deck()

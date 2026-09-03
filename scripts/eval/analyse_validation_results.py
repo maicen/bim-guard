@@ -95,16 +95,28 @@ from app.modules.comparator.compliance_runner import (  # noqa: E402
     run_galvanic_compliance_check,
     run_mic_compliance_check,
 )
-from test_all_38_models import (  # noqa: E402
-    BRACE_VARIANT,
-    ENGINE_NAMES,
-    MEP_CLASSES,
-    STRUCTURAL_CLASSES,
-    _EngineElement,
-    _SpatialGrid,
-    _median,
-    world_bboxes_mm,
-)
+try:
+    from test_all_38_models import (  # noqa: E402
+        BRACE_VARIANT,
+        ENGINE_NAMES,
+        MEP_CLASSES,
+        STRUCTURAL_CLASSES,
+        _EngineElement,
+        _SpatialGrid,
+        _median,
+        world_bboxes_mm,
+    )
+except ImportError:
+    from scripts.eval.test_all_38_models import (  # noqa: E402
+        BRACE_VARIANT,
+        ENGINE_NAMES,
+        MEP_CLASSES,
+        STRUCTURAL_CLASSES,
+        _EngineElement,
+        _SpatialGrid,
+        _median,
+        world_bboxes_mm,
+    )
 
 RESULT_DIR = Path("data/validation_results")
 BCF_DIR = Path("data/validation_bcf")

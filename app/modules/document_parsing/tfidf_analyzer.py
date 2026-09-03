@@ -30,7 +30,13 @@ OR import and call:
     analyzer.print_report(new_keywords)
 """
 
-from sklearn.feature_extraction.text import TfidfVectorizer
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+    TfidfVectorizer = None
+
 import numpy as np
 import re
 
@@ -183,6 +189,12 @@ class TFIDFAnalyzer:
                     suggestion  (str):  recommended group to add it to
                 }
         """
+        if not _SKLEARN_AVAILABLE:
+            raise ImportError(
+                "scikit-learn is required for TFIDFAnalyzer. "
+                "Install with 'uv sync --group ml-pipeline'."
+            )
+
         rule_texts, non_rule_texts = self._label_paragraphs(filtered_chunks)
 
         if not rule_texts:

@@ -193,7 +193,7 @@ Owner: Osama.
       (`app/modules/ifc_reader/__init__.py`): a string value is coerced with
       `float()` before the numeric-type check, so a non-numeric string (e.g.
       `FireRating`) still passes through untouched. Covered by
-      `tests/test_module2_property_resolution.py::TestNumericStringUnitConversion`.
+      `tests/test_ifc_property_resolution.py::TestNumericStringUnitConversion`.
 - [ ] Log a warning when a length-typed or length-named property is found but skipped
       by unit conversion, so silent misreporting is visible in the run log.
 - [ ] Surface the `_get_length_unit_scale_mm` fallback-to-1.0 path as an explicit model
@@ -235,7 +235,7 @@ Owner: Osama.
       `app/modules/ifc_reader/__init__.py`'s `_LENGTH_DIRECT_ATTRS` and the same
       typo in `ifc_geometry.py`'s `_GEOMETRY_PROPERTY_MAP` (the header comment on
       `_LENGTH_DIRECT_ATTRS` explicitly requires the two stay in sync). Covered by
-      `tests/test_module2_property_resolution.py::TestRequiredHeadroomTypo`.
+      `tests/test_ifc_property_resolution.py::TestRequiredHeadroomTypo`.
 
 Owner: unassigned.
 

@@ -41,11 +41,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pptx import Presentation
-from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
-from pptx.util import Inches, Pt
+try:
+    from pptx import Presentation
+    from pptx.dml.color import RGBColor
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+    from pptx.util import Inches, Pt
+    _PPTX_AVAILABLE = True
+except ImportError:
+    _PPTX_AVAILABLE = False
+    Presentation = None
+    RGBColor = lambda *a: None
+
+    class _MockEnum:
+        def __getattr__(self, name):
+            return 0
+
+    MSO_SHAPE = _MockEnum()
+    PP_ALIGN = _MockEnum()
+    MSO_ANCHOR = _MockEnum()
+    Inches = lambda x: x
+    Pt = lambda x: x
 
 OUT_DIR = Path("docs/Presentation-2026-May")
 TEMPLATE = OUT_DIR / "BIMGUARD_AI_FMP_Presentation.pptx"

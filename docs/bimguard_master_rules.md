@@ -6022,8 +6022,8 @@ OUT
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/pdf_stairs_mock.pdf
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_compliance.py
 /c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_integration.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_module1.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_module3.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_document_parsing.py
+/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_rule_builder.py
 
 app/modules/
 │
@@ -6082,8 +6082,8 @@ app/modules/
 │   └── cost_model.py            — configurable cost/duration model
 │
 └── tests/
-    ├── test_module1.py
-    ├── test_module3.py
+    ├── test_document_parsing.py
+    ├── test_rule_builder.py
     ├── test_compliance.py
     ├── test_integration.py
     ├── conftest.py
@@ -9273,7 +9273,7 @@ class NLPAnnotator:
                   - 'annotation' key added to each paragraph dict
                   - 'filtered_text' enriched with [NLP PRE-ANALYSIS] preamble
         """
-        print("[Module1b] Running NLP annotation...")
+        print("[NLPAnnotator] Running NLP annotation...")
         total_paras = 0
 
         annotated_chunks = []
@@ -9305,7 +9305,7 @@ class NLPAnnotator:
                 'filtered_text':     enriched_text,
             })
 
-        print(f"[Module1b] Annotated {total_paras} paragraphs across {len(chunks)} sections.")
+        print(f"[NLPAnnotator] Annotated {total_paras} paragraphs across {len(chunks)} sections.")
         return annotated_chunks
 
     # ── Private ───────────────────────────────────────────────────────────────
@@ -16980,16 +16980,16 @@ app/modules/piping_schema.py
 Data contract for piping compliance checking in BIM Guard.
 
 This module defines the canonical structure of piping elements passed between
-Module2 (IFC reader, owned by Sam) and Module4 (comparators, owned by the
-piping compliance team). Every piping-related element exiting Module2 must
-conform to PipingElement. Every piping comparator in Module4 consumes
+ifc_reader (IFC reader) and comparator (comparators, owned by the
+piping compliance team). Every piping-related element exiting ifc_reader must
+conform to PipingElement. Every piping comparator consumes
 list[PipingElement].
 
 OWNERSHIP
     - PipingElement schema: defined here, evolved by PR to this file.
-    - Module2 producer (Sam): extracts from IFC via ifcopenshell, normalises
+    - ifc_reader producer: extracts from IFC via ifcopenshell, normalises
       materials, classifies environment, emits list[PipingElement].
-    - Module4 consumers (piping compliance team): galvanic, crevice,
+    - comparator consumers: galvanic, crevice,
       clearance, centre-to-centre, seismic reservation — each takes
       list[PipingElement] plus a RulePack and returns list[Issue].
 
@@ -17005,7 +17005,7 @@ UNITS — SI THROUGHOUT
 COORDINATES
     World coordinates from the IFC file, via ifcopenshell, with Z up and
     units converted to metres. If the IFC uses different length units,
-    Module2 converts before populating this schema.
+    ifc_reader converts before populating this schema.
 
 NULLABILITY POLICY
     Fields are Optional where the underlying IFC data is frequently missing.
@@ -17034,7 +17034,7 @@ SCHEMA_VERSION = "1.0.0"
 # ---------------------------------------------------------------------------
 # Canonical material keys
 # ---------------------------------------------------------------------------
-# Module2 normalises any IFC material string to one of these keys. If a
+# ifc_reader normalises any IFC material string to one of these keys. If a
 # material cannot be identified confidently, use "Unknown" and add a note
 # to extraction_warnings. The corrosion rule packs key off these strings,
 # so they must match exactly (case-sensitive).
@@ -23443,11 +23443,11 @@ threshold for their environment class, weighted by anode-to-cathode
 area ratio and environment severity.
 
 This module is the port of the original bimguard_corrosion_engine.py
-into the Module4 comparator architecture. The logic is unchanged; only
+into the comparator architecture. The logic is unchanged; only
 the input/output contracts are adapted to the repo's schema.
 
 INPUT
-    elements   — list[PipingElement] from Module2
+    elements   — list[PipingElement] from ifc_reader
     rule_pack  — dict loaded from the Supabase rules table (or a JSON file
                  during development). Expected keys documented below.
 
@@ -23966,12 +23966,12 @@ if __name__ == "__main__":
 """
 app/modules/comparator/issue_adapter.py
 
-The only module that knows both Module4 shapes.
+The only module that knows both comparator shapes.
 
 Path A (`compliance_runner.run_compliance_checks()`) returns one flat dict per
 element carrying three mechanisms at once. Path B (`material_media.compare()`,
 `cross_material.compare()`) returns `list[Issue]` — the declared data contract
-between Module4 and Module5 (`issue_schema.py`).
+between comparator and reporter (`issue_schema.py`).
 
 This adapter lifts Path A dicts into Issues so both paths speak one language,
 and projects Issues back onto the per-element dict spine so the existing
@@ -24304,10 +24304,10 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
 """
 app/modules/issue_schema.py
 
-Data contract between Module4 (comparators) and Module5 (reporter).
+Data contract between comparator and reporter.
 
 An Issue represents a single compliance finding — one element that fails
-one rule. Comparators in Module4 produce list[Issue]. Module5 consumes
+one rule. Comparators produce list[Issue]. Reporter consumes
 list[Issue] to produce BCF 2.1 output, dashboard summaries, and PDF reports.
 
 The Issue schema is deliberately mechanism-agnostic. Every compliance
@@ -24356,7 +24356,7 @@ class Issue:
     """
     A single compliance finding.
 
-    Produced by a Module4 comparator, consumed by Module5 and the UI.
+    Produced by comparator, consumed by reporter and the UI.
     """
 
     # --- Identity ---
@@ -30626,16 +30626,16 @@ of not less than 0.35 m2 with no dimension less than 380 mm.
 
 ---
 
-### app/modules/tests/test_module1.py
+### app/modules/tests/test_document_parsing.py
 
 ```python
 """
-tests/test_module1.py
+tests/test_document_parsing.py
 ----------------------
 Unit tests for Module 1 — SectionChunker, KeywordFilter, TableRuleBuilder,
 DoclingExtractor (PDF parsing), and regression snapshots.
 
-Run with: pytest tests/test_module1.py -v
+Run with: pytest tests/test_document_parsing.py -v
 
 SETUP:
   Place 1-3 real OBC PDF pages in tests/fixtures/
@@ -31021,8 +31021,8 @@ def docling_extractor():
 class TestDoclingExtractor:
     """
     Tests that run against real PDFs.
-    Run with:  pytest tests/test_module1.py -m slow -v
-    Skip with: pytest tests/test_module1.py -m "not slow"
+    Run with:  pytest tests/test_document_parsing.py -m slow -v
+    Skip with: pytest tests/test_document_parsing.py -m "not slow"
     """
 
     @_skip_if_missing_pdf(SAMPLE_PDF)
@@ -31127,24 +31127,24 @@ Guards shall not be less than 900 mm in height.
 
 ---
 
-### app/modules/tests/test_module3.py
+### app/modules/tests/test_rule_builder.py
 
 ```python
 """
-tests/test_module3.py
+tests/test_rule_builder.py
 ----------------------
 Unit tests for Module 3 — RuleGenerator (validation/enrichment path), RuleStore,
 rule schema validation, and edge cases.
 
-Run with: pytest tests/test_module3.py -v
+Run with: pytest tests/test_rule_builder.py -v
 
 Test groups:
   - RuleStore:           basic CRUD, get_all_rules, clear
   - RuleGenerator:       enrichment, validation, save_batch
   - Schema validation:   field checks against the rich schema
   - LLM (RuleConverter): calls the real LLM — skip if no API key
-    Run:  pytest tests/test_module3.py -m llm -v
-    Skip: pytest tests/test_module3.py -m "not llm" -v
+    Run:  pytest tests/test_rule_builder.py -m llm -v
+    Skip: pytest tests/test_rule_builder.py -m "not llm" -v
 """
 
 import os
@@ -31548,7 +31548,7 @@ class TestRuleConverterLLM:
     """
     Tests that call the real LLM (RuleConverter → GPT-4o).
     Requires GEMINI_API_KEY environment variable.
-    Run with:  pytest tests/test_module3.py -m llm -v
+    Run with:  pytest tests/test_rule_builder.py -m llm -v
     """
 
     @pytest.fixture
@@ -31659,13 +31659,13 @@ class TestRuleConverterLLM:
 
 ```bash
 # Run fast unit tests only (no LLM, no PDFs)
-pytest tests/test_module1.py -v -m "not slow"
+pytest tests/test_document_parsing.py -v -m "not slow"
 
 # Run Module 3 deterministic tests only
-pytest tests/test_module3.py -v -m "not llm"
+pytest tests/test_rule_builder.py -v -m "not llm"
 
 # Run LLM-dependent tests (Module 3 rule generation)
-pytest tests/test_module3.py -v -m llm
+pytest tests/test_rule_builder.py -v -m llm
 
 # Run integration tests (needs fixtures + LLM)
 pytest tests/test_integration.py -v -m integration
@@ -31684,8 +31684,8 @@ python -m tests.eval_harness --report
 ```
 tests/
 ├── conftest.py              # Shared fixtures, marker registration
-├── test_module1.py          # Module 1 unit tests (chunker, filter, tables, PDF parsing)
-├── test_module3.py          # Module 3 unit tests (rule generation, schema, LLM path)
+├── test_document_parsing.py          # Module 1 unit tests (chunker, filter, tables, PDF parsing)
+├── test_rule_builder.py          # Module 3 unit tests (rule generation, schema, LLM path)
 ├── test_integration.py      # End-to-end pipeline: PDF → rules
 ├── test_compliance.py       # (your existing file — unchanged)
 ├── eval_harness.py          # LLM-as-judge accuracy scoring tool
@@ -63320,7 +63320,7 @@ binding design constraint on F6, not a cleanup item — read it before wiring th
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | Merge Path B into Path A dicts, or lift Path A into Issues? | **Lift Path A into Issues.** `Issue` is the declared "data contract between Module4 and Module5" (`issue_schema.py:4`) and already carries citations, assignee and workflow state that the dicts cannot express. Adapting the other direction would flatten MM/XM citations away — the audit trail the white-box claim rests on. |
+| D1 | Merge Path B into Path A dicts, or lift Path A into Issues? | **Lift Path A into Issues.** `Issue` is the declared "data contract between comparator and reporter" (`issue_schema.py:4`) and already carries citations, assignee and workflow state that the dicts cannot express. Adapting the other direction would flatten MM/XM citations away — the audit trail the white-box claim rests on. |
 | D2 | Then how does the existing UI keep working? | Add a **projection** back to the dict shape for the current card (section 4.2). The card keeps its keys; nothing in `analyze.py` breaks on day one. |
 | D3 | One Issue per couple (XM) or two? | **Already settled in the engine — do not change it.** `cross_material._finding()` emits one Issue with `element_id = anode.id` and both GUIDs in `metadata` (`anode_id`, `cathode_id`). The anode is the element that corrodes, so it is the right subject. The work is to make the UI and BCF surface *both* ends; the data is already there. |
 | D4 | Do MM/XM contribute to `overall_band`? | **Not initially.** Keep `overall_band` as the GC/CC/MC composite it is today and add a separate `path_b_band`. Folding a DRAFT pack into the headline band changes existing numbers with no way to tell which engine moved them. Revisit once XM-001 is approved. |
@@ -64308,7 +64308,7 @@ Module 5 provides two distinct outputs, consumed differently by Components 2 and
 
 ### 1.2.7 Software and environment
 
-Python 3.12, managed with `uv`. Application: FastHTML + MonsterUI (server-rendered UI + HTMX), with a full supporting application shell beyond the three compliance components — project management (`projects.py`/`projects_service.py`: create/edit/delete, MD5-hashed IFC upload) and document management (`library.py`/`documents_service.py`: MD5-based upload de-duplication, no versioning) — both genuinely wired and functional. Data: Supabase (Postgres + object storage) is the backend for both data and file storage, with a transparent local cache for remote Supabase Storage objects (`data/cache/supabase-storage/`, `object_storage.py`) so files can be parsed/served locally without re-downloading on every request. Production hosting is Render.com (`render.yaml`: single Docker web service, starter plan, autoDeploy from the repository) — there is no separate managed database container in either deployment config, since Supabase is an external hosted dependency. AI/ML: Docling, spaCy, scikit-learn (TF-IDF), `litellm`; a `transformers`-based BERT classifier is implemented but not active in production. Note on default LLM model: `docker-compose.yml`/`render.yaml` set `BIM_GUARD_RULE_MODEL=gemini/gemini-2.0-flash` for the deployed environment, distinct from `config.py`'s `gpt-4o-mini` default used by the CLI path (§1.2.2) — the two rule-extraction implementations do not currently share a default model, a further argument for reconciling them (§1.4.6). BIM: IfcOpenShell. Testing: a real pytest suite exists (`app/modules/tests/`, 57 test functions across `test_module1.py`, `test_module3.py`, `test_compliance.py`, `test_integration.py`) with genuine `@pytest.mark.slow`/`llm`/`integration` markers (not yet registered in `pyproject.toml`); one file (`test_compliance.py`) targets a REST API shape that predates the current FastHTML architecture and needs rewriting. A custom LLM-as-judge evaluation harness (`eval_harness.py`) also exists (§1.2.8). Containerisation: a working multi-stage `Dockerfile` exists at the repo root, orchestrated locally by `docker-compose.yml`. **Continuous integration is not yet implemented** — no `.github/workflows/` directory exists, so the test suite runs manually only. An in-browser IFC 3D viewer (`app/routes/viewer.py`, `static/js/ifc-viewer.js`) supports visual issue inspection — corrected from an earlier draft, which repeated an inaccurate claim from `CLAUDE.md` that it uses `@thatopen/fragments`/`@thatopen/components`; the real, verified stack is **three.js r160 + `web-ifc-three@0.0.126` + `web-ifc@0.0.68`**, loaded from CDN, with orbit controls and automatic camera-fit to the loaded model.
+Python 3.12, managed with `uv`. Application: FastHTML + MonsterUI (server-rendered UI + HTMX), with a full supporting application shell beyond the three compliance components — project management (`projects.py`/`projects_service.py`: create/edit/delete, MD5-hashed IFC upload) and document management (`library.py`/`documents_service.py`: MD5-based upload de-duplication, no versioning) — both genuinely wired and functional. Data: Supabase (Postgres + object storage) is the backend for both data and file storage, with a transparent local cache for remote Supabase Storage objects (`data/cache/supabase-storage/`, `object_storage.py`) so files can be parsed/served locally without re-downloading on every request. Production hosting is Render.com (`render.yaml`: single Docker web service, starter plan, autoDeploy from the repository) — there is no separate managed database container in either deployment config, since Supabase is an external hosted dependency. AI/ML: Docling, spaCy, scikit-learn (TF-IDF), `litellm`; a `transformers`-based BERT classifier is implemented but not active in production. Note on default LLM model: `docker-compose.yml`/`render.yaml` set `BIM_GUARD_RULE_MODEL=gemini/gemini-2.0-flash` for the deployed environment, distinct from `config.py`'s `gpt-4o-mini` default used by the CLI path (§1.2.2) — the two rule-extraction implementations do not currently share a default model, a further argument for reconciling them (§1.4.6). BIM: IfcOpenShell. Testing: a real pytest suite exists (`app/modules/tests/`, 57 test functions across `test_document_parsing.py`, `test_rule_builder.py`, `test_compliance.py`, `test_integration.py`) with genuine `@pytest.mark.slow`/`llm`/`integration` markers (not yet registered in `pyproject.toml`); one file (`test_compliance.py`) targets a REST API shape that predates the current FastHTML architecture and needs rewriting. A custom LLM-as-judge evaluation harness (`eval_harness.py`) also exists (§1.2.8). Containerisation: a working multi-stage `Dockerfile` exists at the repo root, orchestrated locally by `docker-compose.yml`. **Continuous integration is not yet implemented** — no `.github/workflows/` directory exists, so the test suite runs manually only. An in-browser IFC 3D viewer (`app/routes/viewer.py`, `static/js/ifc-viewer.js`) supports visual issue inspection — corrected from an earlier draft, which repeated an inaccurate claim from `CLAUDE.md` that it uses `@thatopen/fragments`/`@thatopen/components`; the real, verified stack is **three.js r160 + `web-ifc-three@0.0.126` + `web-ifc@0.0.68`**, loaded from CDN, with orbit controls and automatic camera-fit to the loaded model.
 
 ### 1.2.8 Data analysis and validation metrics, per component
 

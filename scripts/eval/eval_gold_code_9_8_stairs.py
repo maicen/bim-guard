@@ -7,7 +7,7 @@ code_seed_rules.py's stair entries were originally derived from, extended here
 to cover the WHOLE section (table rows, relative-bound tread rules, tolerances,
 winders, spiral stairs) rather than just the ~10 clauses seeded so far.
 
-Used by score_module3_extraction.py to measure rule-extraction accuracy
+Used by score_rule_extraction.py to measure rule-extraction accuracy
 against a known-correct answer key instead of eyeballing output.
 
 Field names match the LiteLLMRuleExtractor / RuleConverter schema
@@ -314,7 +314,7 @@ EXCLUDED_CLAUSES = [
     ("9.8.2.2.(1)", "Defines HOW to measure clear height, not a requirement itself"),
     ("9.8.3.1", "Enumerates permitted stair shapes (straight/curved/spiral) — classification, not a numeric bound"),
     ("9.8.4.6.(1)(a)/(b)", "Tread leading-edge reduction limits — no canonical IFC property "
-                            "for 'leading edge reduction' exists in module2's alias table"),
+                            "for 'leading edge reduction' exists in ifc_reader's alias table"),
     ("9.8.4.7.(1)", "Requires weatherproofing 'protected from ice and snow' — not numeric/checkable via IFC properties"),
 ]
 
