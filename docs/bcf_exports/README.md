@@ -7,6 +7,21 @@ Solibri, Archicad, BlenderBIM and BIMcollab expect on import.
 
 Archives are generated output and are not tracked in git; only this README is.
 
+## Engine demo archives
+
+The corrosion engines' standalone demos also write here, via the same
+`module5_reporter.bcf_generator` the services exporter shares:
+
+| Archive | Written by |
+| ------- | ---------- |
+| `GC-001_validation_demo.bcfzip` | `python -m app.engines.bimguard_corrosion_engine` |
+| `CC-001_validation_demo.bcfzip` | `python -m app.engines.bimguard_crevice_engine` |
+| `MC-001_validation_demo.bcfzip` | `python -m app.engines.bimguard_mic_engine` |
+
+`uv run python scripts/regenerate_demo_bcf.py` reruns all three and validates
+every archive against the BCF 2.1 schemas vendored under `tests/schemas/bcf21/`.
+The matching asset-register CSVs land in `docs/validation/data/`.
+
 ```python
 from app.services.bcf_exporter import BCFExporter
 
