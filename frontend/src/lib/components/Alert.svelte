@@ -1,13 +1,21 @@
 <script lang="ts">
   import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-svelte';
 
-  export let type: 'error' | 'warning' | 'success' | 'info' = 'info';
-  export let title: string | null = null;
-  export let message: string = '';
-  export let dismissible: boolean = false;
-  export let onDismiss: (() => void) | null = null;
+  let {
+    type = 'info',
+    title = null,
+    message = '',
+    dismissible = false,
+    onDismiss = null,
+  }: {
+    type?: 'error' | 'warning' | 'success' | 'info';
+    title?: string | null;
+    message?: string;
+    dismissible?: boolean;
+    onDismiss?: (() => void) | null;
+  } = $props();
 
-  let visible = true;
+  let visible = $state(true);
 
   function handleDismiss() {
     visible = false;
@@ -37,7 +45,8 @@
     },
   };
 
-  $: conf = CONFIG[type] || CONFIG.info;
+  let conf = $derived(CONFIG[type] || CONFIG.info);
+  let Icon = $derived(conf.icon);
 </script>
 
 {#if visible && message}
@@ -46,7 +55,7 @@
     class="p-4 rounded-2xl border flex items-start justify-between gap-3 text-xs leading-relaxed transition-all {conf.bg}"
   >
     <div class="flex items-start gap-3 min-w-0">
-      <svelte:component this={conf.icon} class="w-4 h-4 shrink-0 mt-0.5 {conf.iconColor}" />
+      <Icon class="w-4 h-4 shrink-0 mt-0.5 {conf.iconColor}" />
       <div class="space-y-0.5 min-w-0">
         {#if title}
           <div class="font-bold text-white text-[13px] tracking-tight">
@@ -62,7 +71,7 @@
     {#if dismissible}
       <button
         type="button"
-        on:click={handleDismiss}
+        onclick={handleDismiss}
         class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors shrink-0"
         title="Dismiss alert"
       >
