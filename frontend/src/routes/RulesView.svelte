@@ -45,6 +45,7 @@
   import IdsImportForm from "../lib/components/IdsImportForm.svelte";
   import HoverCard from "../lib/components/HoverCard.svelte";
   import { describeMechanism } from "../lib/glossary";
+  import { createTableState } from "../lib/tableState.svelte";
 
   // Top-level tab: Rules catalog vs saved Rule Configuration Snapshots
   let activeMainTab: "rules" | "snapshots" = $state("rules");
@@ -53,13 +54,13 @@
   let snapshots: RuleSnapshot[] = $state([]);
   let isLoadingSnapshots = $state(false);
   let snapshotsError = $state("");
-  let snapshotSearchQuery = $state("");
-  let snapshotSortField: "name" | "source_ruleset_id" | "category" | "rule_count" | "created_at" =
-    $state("created_at");
-  let snapshotSortAsc = $state(false);
-  let snapshotCurrentPage = $state(1);
-  let snapshotPageSize = $state(10);
-  let selectedSnapshotIds: Set<number> = $state(new Set());
+  // Second table on this view: rule-configuration snapshots.
+  const snapshotTable = createTableState<RuleSnapshot, number>({
+    rows: () => snapshots,
+    getId: (s) => s.id,
+    searchFields: (s) => [s.name, s.source_ruleset_id, s.notes],
+    initialSort: { field: "created_at", asc: false },
+  });
   let snapshotToDelete: RuleSnapshot | null = $state(null);
   let isBulkDeleteSnapshotsModalOpen = $state(false);
 
@@ -90,7 +91,6 @@
   let unsubscribeRules: (() => void) | null = null;
 
   // Filter state
-  let searchQuery = $state("");
   let selectedFolderId: string | null = $state(null);
   let selectedMechanism: string = $state("all");
   let selectedCategory: RulesetCategory | "all" = $state("all");
@@ -227,64 +227,36 @@
     }),
   );
 
-  let filteredRules = $derived(
-    rules.filter((r) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        (r.rule_id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.property_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.compare_property || "").toLowerCase().includes(searchQuery.toLowerCase());
+  // Search, filter, sort, paginate and select for the rules table.
+  //
+  // The folder selection and the needs-review toggle scope which rules the table
+  // is looking at at all, so they shape the row source; the mechanism and
+  // category dropdowns are the table's own filters.
+  // `selectedFolderId`, `selectedMechanism`, `selectedCategory` and
+  // `filterNeedsReview` also drive the folder tree, the category tabs and the
+  // new-rule defaults, so they stay owned by the view and scope the row source
+  // here rather than being duplicated into the table's own filter map.
+  const table = createTableState<Rule, number>({
+    rows: () =>
+      rules.filter(
+        (r) =>
+          (!selectedFolderId || r.ruleset_id === selectedFolderId) &&
+          (!filterNeedsReview || r.needs_review === 1) &&
+          (selectedMechanism === "all" || r.mechanism === selectedMechanism) &&
+          (selectedCategory === "all" ||
+            (r.category || "").toLowerCase() === selectedCategory.toLowerCase()),
+      ),
+    getId: (r) => r.id,
+    searchFields: (r) => [r.rule_id, r.description, r.property_name, r.compare_property],
+    initialSort: { field: "rule_id", asc: true },
+  });
 
-      const matchesFolder = !selectedFolderId || r.ruleset_id === selectedFolderId;
-
-      const matchesMechanism = selectedMechanism === "all" || r.mechanism === selectedMechanism;
-
-      const matchesCategory =
-        selectedCategory === "all" ||
-        (r.category || "").toLowerCase() === selectedCategory.toLowerCase();
-
-      const matchesReview = !filterNeedsReview || r.needs_review === 1;
-
-      return matchesSearch && matchesFolder && matchesMechanism && matchesCategory && matchesReview;
-    }),
-  );
-
-  let selectedRuleIds: number[] = $state([]);
   let isBulkDeleteModalOpen = $state(false);
-
-  let currentPage = $state(1);
-  let pageSize = $state(10);
-
-  let totalItems = $derived(filteredRules.length);
-  let paginatedRules = $derived(
-    filteredRules.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-  );
-
-  let allFilteredSelected = $derived(
-    filteredRules.length > 0 && filteredRules.every((r) => selectedRuleIds.includes(r.id)),
-  );
-
-  function toggleSelectAll() {
-    if (allFilteredSelected) {
-      selectedRuleIds = [];
-    } else {
-      selectedRuleIds = filteredRules.map((r) => r.id);
-    }
-  }
-
-  function toggleSelectRule(id: number) {
-    if (selectedRuleIds.includes(id)) {
-      selectedRuleIds = selectedRuleIds.filter((rId) => rId !== id);
-    } else {
-      selectedRuleIds = [...selectedRuleIds, id];
-    }
-  }
 
   // ── Bulk Rules Handlers ───────────────────────────────────────────────────
 
   function openBulkEditRulesModal() {
-    if (!selectedRuleIds.length) return;
+    if (!table.selectedCount) return;
     bulkRuleRulesetId = "__keep__";
     bulkRuleCategory = "__keep__";
     bulkRuleMechanism = "__keep__";
@@ -295,11 +267,11 @@
   }
 
   async function handleBulkUpdateRules() {
-    if (!selectedRuleIds.length) return;
+    if (!table.selectedCount) return;
     isBulkUpdatingRules = true;
     bulkRulesModalError = "";
     try {
-      const payload: any = { rule_ids: selectedRuleIds };
+      const payload: any = { rule_ids: table.selectedIdList };
       if (bulkRuleRulesetId !== "__keep__") payload.ruleset_id = bulkRuleRulesetId;
       if (bulkRuleCategory !== "__keep__") payload.category = bulkRuleCategory;
       if (bulkRuleMechanism !== "__keep__") payload.mechanism = bulkRuleMechanism;
@@ -310,7 +282,7 @@
       const res = await rulesApi.bulkUpdate(payload);
       successMessage = `Successfully updated ${res.success_count} rule(s).`;
       isBulkEditRulesModalOpen = false;
-      selectedRuleIds = [];
+      table.clearSelection();
       await loadData(true);
       setTimeout(() => (successMessage = ""), 4000);
     } catch (err: any) {
@@ -321,11 +293,11 @@
   }
 
   async function confirmBulkDelete() {
-    if (!selectedRuleIds.length) return;
+    if (!table.selectedCount) return;
     try {
-      const res = await rulesApi.bulkDelete(selectedRuleIds);
-      rules = rules.filter((r) => !selectedRuleIds.includes(r.id));
-      selectedRuleIds = [];
+      const res = await rulesApi.bulkDelete(table.selectedIdList);
+      rules = rules.filter((r) => !table.selectedIds.has(r.id));
+      table.clearSelection();
       isBulkDeleteModalOpen = false;
       successMessage = `Successfully deleted ${res.success_count} rule(s).`;
       await loadData(true);
@@ -403,15 +375,6 @@
       isBulkDeletingFolders = false;
     }
   }
-
-  run(() => {
-    searchQuery;
-    selectedFolderId;
-    selectedMechanism;
-    selectedCategory;
-    filterNeedsReview;
-    currentPage = 1;
-  });
 
   async function handleSeedRules() {
     try {
@@ -496,8 +459,7 @@
       .deleteSnapshot(id)
       .then(() => {
         snapshots = snapshots.filter((s) => s.id !== id);
-        selectedSnapshotIds.delete(id);
-        selectedSnapshotIds = selectedSnapshotIds;
+        snapshotTable.selectedIds.delete(id);
       })
       .catch((err: any) => {
         snapshotsError = err.message || "Failed to delete snapshot.";
@@ -508,7 +470,7 @@
   }
 
   async function confirmBulkDeleteSnapshots() {
-    const ids = Array.from(selectedSnapshotIds);
+    const ids = snapshotTable.selectedIdList;
     for (const id of ids) {
       try {
         await rulesApi.deleteSnapshot(id);
@@ -516,70 +478,10 @@
         snapshotsError = err.message || `Failed to delete snapshot ${id}.`;
       }
     }
-    snapshots = snapshots.filter((s) => !selectedSnapshotIds.has(s.id));
-    selectedSnapshotIds = new Set();
+    snapshots = snapshots.filter((s) => !snapshotTable.selectedIds.has(s.id));
+    snapshotTable.clearSelection();
     isBulkDeleteSnapshotsModalOpen = false;
   }
-
-  function toggleSnapshotSelection(id: number) {
-    if (selectedSnapshotIds.has(id)) {
-      selectedSnapshotIds.delete(id);
-    } else {
-      selectedSnapshotIds.add(id);
-    }
-    selectedSnapshotIds = selectedSnapshotIds;
-  }
-
-  function toggleAllSnapshotsSelection() {
-    if (selectedSnapshotIds.size === paginatedSnapshots.length && paginatedSnapshots.length > 0) {
-      selectedSnapshotIds = new Set();
-    } else {
-      selectedSnapshotIds = new Set(paginatedSnapshots.map((s) => s.id));
-    }
-  }
-
-  function handleSnapshotSort(col: string) {
-    if (snapshotSortField === col) {
-      snapshotSortAsc = !snapshotSortAsc;
-    } else {
-      snapshotSortField = col as typeof snapshotSortField;
-      snapshotSortAsc = true;
-    }
-  }
-
-  let filteredSnapshots = $derived(
-    snapshots.filter((s) => {
-      if (!snapshotSearchQuery.trim()) return true;
-      const q = snapshotSearchQuery.toLowerCase();
-      return (
-        s.name.toLowerCase().includes(q) ||
-        s.source_ruleset_id.toLowerCase().includes(q) ||
-        (s.notes || "").toLowerCase().includes(q)
-      );
-    }),
-  );
-
-  let sortedSnapshots = $derived(
-    [...filteredSnapshots].sort((a, b) => {
-      const av = a[snapshotSortField];
-      const bv = b[snapshotSortField];
-      const cmp =
-        typeof av === "number" && typeof bv === "number"
-          ? av - bv
-          : String(av ?? "").localeCompare(String(bv ?? ""));
-      return snapshotSortAsc ? cmp : -cmp;
-    }),
-  );
-
-  let snapshotTotalPages = $derived(
-    Math.max(1, Math.ceil(sortedSnapshots.length / snapshotPageSize)),
-  );
-  let paginatedSnapshots = $derived(
-    sortedSnapshots.slice(
-      (snapshotCurrentPage - 1) * snapshotPageSize,
-      snapshotCurrentPage * snapshotPageSize,
-    ),
-  );
 
   function openCreateModal() {
     editingRule = null;
@@ -1156,7 +1058,7 @@
             <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              bind:value={searchQuery}
+              bind:value={table.search}
               placeholder="Search rules by ID, description, property..."
               class="w-full rounded-xl border border-slate-800 bg-slate-950 py-1.5 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
@@ -1188,9 +1090,9 @@
 
         <!-- Bulk Operations Bar -->
         <BulkActionBar
-          selectedCount={selectedRuleIds.length}
+          selectedCount={table.selectedCount}
           itemLabel="rule"
-          onClearSelection={() => (selectedRuleIds = [])}
+          onClearSelection={() => table.clearSelection()}
           onBulkEdit={openBulkEditRulesModal}
           onBulkDelete={() => (isBulkDeleteModalOpen = true)}
         />
@@ -1199,7 +1101,7 @@
         <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
           {#if isLoading}
             <div class="p-12 text-center text-xs text-slate-400">Loading compliance rules...</div>
-          {:else if filteredRules.length === 0}
+          {:else if table.totalItems === 0}
             <div class="space-y-2 p-12 text-center text-xs text-slate-500">
               <p>No rules found for this folder or filter criteria.</p>
             </div>
@@ -1213,36 +1115,75 @@
                     <th class="w-10 px-4 py-3">
                       <input
                         type="checkbox"
-                        checked={allFilteredSelected}
-                        onchange={toggleSelectAll}
+                        checked={table.allFilteredSelected}
+                        indeterminate={table.someFilteredSelected}
+                        onchange={() => table.toggleSelectAll()}
                         class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
                         title="Select or deselect all visible rules"
                       />
                     </th>
-                    <th class="px-4 py-3">Rule Ref</th>
-                    <th class="px-4 py-3">Category</th>
-                    <th class="px-4 py-3">Mechanism</th>
-                    <th class="px-4 py-3">Target Property</th>
+                    <SortHeader
+                      column="rule_id"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3"
+                    >
+                      Rule Ref
+                    </SortHeader>
+                    <SortHeader
+                      column="category"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3"
+                    >
+                      Category
+                    </SortHeader>
+                    <SortHeader
+                      column="mechanism"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3"
+                    >
+                      Mechanism
+                    </SortHeader>
+                    <SortHeader
+                      column="property_name"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3"
+                    >
+                      Target Property
+                    </SortHeader>
                     <th class="px-4 py-3">Condition</th>
-                    <th class="px-4 py-3">Severity</th>
+                    <SortHeader
+                      column="severity"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3"
+                    >
+                      Severity
+                    </SortHeader>
                     <th class="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
-                  {#each paginatedRules as rule}
+                  {#each table.paginated as rule (rule.id)}
                     {@const mech = describeMechanism(rule.mechanism || "CODE")}
                     <tr
-                      class="transition-colors hover:bg-slate-900/60 {selectedRuleIds.includes(
-                        rule.id,
-                      )
+                      class="transition-colors hover:bg-slate-900/60 {table.isSelected(rule.id)
                         ? 'bg-blue-950/20'
                         : ''}"
                     >
                       <td class="w-10 px-4 py-3">
                         <input
                           type="checkbox"
-                          checked={selectedRuleIds.includes(rule.id)}
-                          onchange={() => toggleSelectRule(rule.id)}
+                          checked={table.isSelected(rule.id)}
+                          onchange={() => table.toggleSelect(rule.id)}
                           class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
                         />
                       </td>
@@ -1438,13 +1379,13 @@
             </div>
 
             <TablePagination
-              {currentPage}
-              {pageSize}
-              {totalItems}
-              onPageChange={(p) => (currentPage = p)}
-              onPageSizeChange={(s) => {
-                pageSize = s;
-                currentPage = 1;
+              currentPage={table.page}
+              pageSize={table.pageSize}
+              totalItems={table.totalItems}
+              onPageChange={(p) => (table.requestedPage = p)}
+              onPageSizeChange={(size) => {
+                table.pageSize = size;
+                table.requestedPage = 1;
               }}
             />
           {/if}
@@ -1465,7 +1406,7 @@
           <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            bind:value={snapshotSearchQuery}
+            bind:value={snapshotTable.search}
             placeholder="Search snapshots by name, source folder, or notes..."
             class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-3.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
@@ -1473,15 +1414,15 @@
       </div>
 
       <BulkActionBar
-        selectedCount={selectedSnapshotIds.size}
+        selectedCount={snapshotTable.selectedCount}
         itemLabel="snapshot"
-        onClearSelection={() => (selectedSnapshotIds = new Set())}
+        onClearSelection={() => snapshotTable.clearSelection()}
         onBulkDelete={() => (isBulkDeleteSnapshotsModalOpen = true)}
       />
 
       {#if isLoadingSnapshots}
         <LoadingState message="Loading snapshots..." />
-      {:else if sortedSnapshots.length === 0}
+      {:else if snapshotTable.totalItems === 0}
         <EmptyState
           title="No snapshots saved yet"
           description="Save a rule folder's current configuration as a named snapshot to download it as a structured PDF later, or to keep a durable record independent of future edits."
@@ -1494,25 +1435,23 @@
               <tr class="border-b border-slate-800">
                 <th class="w-10 px-4 py-3">
                   <TableCheckbox
-                    checked={selectedSnapshotIds.size === paginatedSnapshots.length &&
-                      paginatedSnapshots.length > 0}
-                    indeterminate={selectedSnapshotIds.size > 0 &&
-                      selectedSnapshotIds.size < paginatedSnapshots.length}
-                    onchange={toggleAllSnapshotsSelection}
+                    checked={snapshotTable.allFilteredSelected}
+                    indeterminate={snapshotTable.someFilteredSelected}
+                    onchange={() => snapshotTable.toggleSelectAll()}
                     ariaLabel="Select all snapshots"
                   />
                 </th>
                 <SortHeader
                   column="name"
-                  sortField={snapshotSortField}
-                  sortAsc={snapshotSortAsc}
-                  onSort={handleSnapshotSort}>Name</SortHeader
+                  sortField={snapshotTable.sortField}
+                  sortAsc={snapshotTable.sortAsc}
+                  onSort={(f) => snapshotTable.toggleSort(f)}>Name</SortHeader
                 >
                 <SortHeader
                   column="source_ruleset_id"
-                  sortField={snapshotSortField}
-                  sortAsc={snapshotSortAsc}
-                  onSort={handleSnapshotSort}>Source Folder</SortHeader
+                  sortField={snapshotTable.sortField}
+                  sortAsc={snapshotTable.sortAsc}
+                  onSort={(f) => snapshotTable.toggleSort(f)}>Source Folder</SortHeader
                 >
                 <th
                   class="px-4 py-3 text-left text-caption font-semibold uppercase tracking-wider text-slate-400"
@@ -1520,22 +1459,22 @@
                 >
                 <SortHeader
                   column="category"
-                  sortField={snapshotSortField}
-                  sortAsc={snapshotSortAsc}
-                  onSort={handleSnapshotSort}>Category</SortHeader
+                  sortField={snapshotTable.sortField}
+                  sortAsc={snapshotTable.sortAsc}
+                  onSort={(f) => snapshotTable.toggleSort(f)}>Category</SortHeader
                 >
                 <SortHeader
                   column="rule_count"
-                  sortField={snapshotSortField}
-                  sortAsc={snapshotSortAsc}
-                  onSort={handleSnapshotSort}
+                  sortField={snapshotTable.sortField}
+                  sortAsc={snapshotTable.sortAsc}
+                  onSort={(f) => snapshotTable.toggleSort(f)}
                   align="center">Rules</SortHeader
                 >
                 <SortHeader
                   column="created_at"
-                  sortField={snapshotSortField}
-                  sortAsc={snapshotSortAsc}
-                  onSort={handleSnapshotSort}>Saved</SortHeader
+                  sortField={snapshotTable.sortField}
+                  sortAsc={snapshotTable.sortAsc}
+                  onSort={(f) => snapshotTable.toggleSort(f)}>Saved</SortHeader
                 >
                 <th
                   class="px-4 py-3 text-right text-caption font-semibold uppercase tracking-wider text-slate-400"
@@ -1544,12 +1483,12 @@
               </tr>
             </thead>
             <tbody>
-              {#each paginatedSnapshots as snap (snap.id)}
+              {#each snapshotTable.paginated as snap (snap.id)}
                 <tr class="border-b border-slate-800/60 transition-colors hover:bg-slate-800/30">
                   <td class="px-4 py-3">
                     <TableCheckbox
-                      checked={selectedSnapshotIds.has(snap.id)}
-                      onchange={() => toggleSnapshotSelection(snap.id)}
+                      checked={snapshotTable.isSelected(snap.id)}
+                      onchange={() => snapshotTable.toggleSelect(snap.id)}
                       ariaLabel={`Select snapshot ${snap.name}`}
                     />
                   </td>
@@ -1593,13 +1532,13 @@
         </div>
 
         <TablePagination
-          currentPage={snapshotCurrentPage}
-          pageSize={snapshotPageSize}
-          totalItems={sortedSnapshots.length}
-          onPageChange={(p) => (snapshotCurrentPage = p)}
-          onPageSizeChange={(s) => {
-            snapshotPageSize = s;
-            snapshotCurrentPage = 1;
+          currentPage={snapshotTable.page}
+          pageSize={snapshotTable.pageSize}
+          totalItems={snapshotTable.totalItems}
+          onPageChange={(p) => (snapshotTable.requestedPage = p)}
+          onPageSizeChange={(size) => {
+            snapshotTable.pageSize = size;
+            snapshotTable.requestedPage = 1;
           }}
         />
       {/if}
@@ -1802,11 +1741,11 @@
 <ConfirmModal
   bind:isOpen={isBulkDeleteModalOpen}
   title="Delete Selected Compliance Rules"
-  message={`Are you sure you want to delete ${selectedRuleIds.length} selected compliance rule(s)? This action cannot be undone.`}
+  message={`Are you sure you want to delete ${table.selectedCount} selected compliance rule(s)? This action cannot be undone.`}
   confirmText="Delete Selected Rules"
   danger={true}
   onConfirm={confirmBulkDelete}
-  onCancel={() => (selectedRuleIds = [])}
+  onCancel={() => table.clearSelection()}
 />
 
 <!-- Create / Edit Ruleset Folder Modal -->
@@ -1985,7 +1924,7 @@
           </div>
           <div>
             <h2 class="text-base font-bold tracking-tight text-slate-50">
-              Bulk Edit {selectedRuleIds.length} Rules
+              Bulk Edit {table.selectedCount} Rules
             </h2>
             <p class="text-xs text-slate-400">Apply batch changes to selected compliance rules</p>
           </div>
@@ -2109,9 +2048,7 @@
           onclick={handleBulkUpdateRules}
           class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
         >
-          <span
-            >{isBulkUpdatingRules ? "Updating..." : `Update ${selectedRuleIds.length} Rules`}</span
-          >
+          <span>{isBulkUpdatingRules ? "Updating..." : `Update ${table.selectedCount} Rules`}</span>
         </button>
       </div>
     </div>
@@ -2375,7 +2312,7 @@
 <ConfirmModal
   bind:isOpen={isBulkDeleteSnapshotsModalOpen}
   title="Delete Selected Snapshots"
-  message={`Are you sure you want to delete ${selectedSnapshotIds.size} selected snapshot(s)? This cannot be undone.`}
+  message={`Are you sure you want to delete ${snapshotTable.selectedCount} selected snapshot(s)? This cannot be undone.`}
   confirmText="Delete Snapshots"
   danger={true}
   onConfirm={confirmBulkDeleteSnapshots}
