@@ -30,6 +30,11 @@ import type {
   NamingConfig,
   NamingConfigPayload,
   NamingPreview,
+  ParsingEngineInstance,
+  ParsingEngineInstanceCreatePayload,
+  ParsingEngineInstanceTestResult,
+  ParsingEngineInstanceUpdatePayload,
+  ParsingEngineKind,
   Project,
   ProjectBulkActionResponse,
   ProjectBulkUpdatePayload,
@@ -51,10 +56,6 @@ import type {
   RulesetCategory,
   RuleSnapshot,
   RuleSnapshotCreatePayload,
-  UnstructuredInstance,
-  UnstructuredInstanceCreatePayload,
-  UnstructuredInstanceTestResult,
-  UnstructuredInstanceUpdatePayload,
   WorkflowStatus,
 } from "./types";
 import {
@@ -736,7 +737,7 @@ export const documentsApi = {
       suitability_code?: string;
       revision_code?: string;
       parser?: "auto" | "unstructured" | "light";
-      unstructured_instance?: string;
+      engine_instance?: string;
     },
   ): Promise<DocumentDetail> {
     const form = new FormData();
@@ -747,8 +748,7 @@ export const documentsApi = {
     if (isoOptions?.suitability_code) form.append("suitability_code", isoOptions.suitability_code);
     if (isoOptions?.revision_code) form.append("revision_code", isoOptions.revision_code);
     if (isoOptions?.parser) form.append("parser", isoOptions.parser);
-    if (isoOptions?.unstructured_instance)
-      form.append("unstructured_instance", isoOptions.unstructured_instance);
+    if (isoOptions?.engine_instance) form.append("engine_instance", isoOptions.engine_instance);
     const res = await fetch(`${API_BASE}/documents`, {
       method: "POST",
       body: form,
@@ -972,31 +972,38 @@ export const githubReposApi = {
 };
 
 // =============================================================================
-// Unstructured Parsing Engines API Client
+// Parsing Engines API Client
 // =============================================================================
 
 export const parsingEnginesApi = {
-  async list(): Promise<UnstructuredInstance[]> {
-    const res = await fetch(`${API_BASE}/parsing-engines`);
-    return handleResponse<UnstructuredInstance[]>(res);
+  /** Registered engine kinds (drivers) — drives the Settings UI's kind
+   * selector so a new backend driver appears with no frontend change. */
+  async kinds(): Promise<ParsingEngineKind[]> {
+    const res = await fetch(`${API_BASE}/parsing-engines/kinds`);
+    return handleResponse<ParsingEngineKind[]>(res);
   },
 
-  async create(payload: UnstructuredInstanceCreatePayload): Promise<UnstructuredInstance> {
+  async list(): Promise<ParsingEngineInstance[]> {
+    const res = await fetch(`${API_BASE}/parsing-engines`);
+    return handleResponse<ParsingEngineInstance[]>(res);
+  },
+
+  async create(payload: ParsingEngineInstanceCreatePayload): Promise<ParsingEngineInstance> {
     const res = await fetch(`${API_BASE}/parsing-engines`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    return handleResponse<UnstructuredInstance>(res);
+    return handleResponse<ParsingEngineInstance>(res);
   },
 
-  async update(id: number, payload: UnstructuredInstanceUpdatePayload): Promise<UnstructuredInstance> {
+  async update(id: number, payload: ParsingEngineInstanceUpdatePayload): Promise<ParsingEngineInstance> {
     const res = await fetch(`${API_BASE}/parsing-engines/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    return handleResponse<UnstructuredInstance>(res);
+    return handleResponse<ParsingEngineInstance>(res);
   },
 
   async delete(id: number): Promise<void> {
@@ -1006,11 +1013,11 @@ export const parsingEnginesApi = {
     await handleResponse<void>(res);
   },
 
-  async test(id: number): Promise<UnstructuredInstanceTestResult> {
+  async test(id: number): Promise<ParsingEngineInstanceTestResult> {
     const res = await fetch(`${API_BASE}/parsing-engines/${id}/test`, {
       method: "POST",
     });
-    return handleResponse<UnstructuredInstanceTestResult>(res);
+    return handleResponse<ParsingEngineInstanceTestResult>(res);
   },
 };
 

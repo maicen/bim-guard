@@ -1085,36 +1085,43 @@ class ProjectImportFromRepoRequest(BaseModel):
 
 
 # ==============================================================================
-# Unstructured Parsing Engine Instance Contracts
+# Parsing Engine Instance Contracts
 # ==============================================================================
+#
+# `kind` is deliberately a plain `str`, not a Literal enumerating known
+# values: the set of valid kinds is owned by ParsingEngineRegistry
+# (app/modules/module1_doc_parser/engines), which can grow without touching
+# this contract. ParsingEngineInstancesService validates a submitted kind
+# against the registry at request time; GET /api/parsing-engines/kinds
+# (ParsingEngineKindResponse) is the discoverable source of truth for what's
+# currently valid, and is what the Settings UI renders its kind selector from.
 
 
-class UnstructuredInstanceCreateRequest(BaseModel):
+class ParsingEngineInstanceCreateRequest(BaseModel):
     """Payload for registering a new document-parsing engine instance."""
 
     name: str = Field(..., min_length=1, description="Unique display name, e.g. 'local', 'hosted-1', 'docling'")
-    kind: Literal["local", "hosted", "docling", "docling-local"] = Field(
-        ...,
-        description=(
-            "'local' (self-hosted open-source Unstructured Docker container), "
-            "'hosted' (Unstructured Platform API), 'docling' (hosted Docling Serve instance), "
-            "or 'docling-local' (self-hosted docling-serve Docker container)"
-        ),
+    kind: str = Field(
+        ..., min_length=1, description="A registered engine kind — see GET /api/parsing-engines/kinds"
     )
     api_url: str = Field(..., min_length=1, description="Base URL of the parsing engine server")
     api_key: Optional[str] = Field(
-        None, description="API key — required for 'hosted'/'docling', ignored for 'local'/'docling-local'"
+        None, description="API key — required for kinds where GET /api/parsing-engines/kinds reports requires_api_key"
     )
     strategy: Optional[str] = Field(
-        "auto", description="Partition strategy (Unstructured only: auto, fast, hi_res, ocr_only); ignored for 'docling'"
+        "auto",
+        description="Partition strategy (only meaningful for kinds where supports_strategy is true, e.g. auto, fast, hi_res, ocr_only)",
     )
     is_default: Optional[bool] = Field(False, description="Use this instance when none is explicitly selected")
     is_enabled: Optional[bool] = Field(True, description="Whether this instance is selectable")
     notes: Optional[str] = Field("", description="Optional free-text notes")
 
 
-class UnstructuredInstanceUpdateRequest(BaseModel):
-    """Payload for updating an existing Unstructured parsing-engine instance."""
+class ParsingEngineInstanceUpdateRequest(BaseModel):
+    """Payload for updating an existing parsing-engine instance.
+
+    `kind` cannot be changed after creation — register a new instance instead.
+    """
 
     name: Optional[str] = Field(None, description="Updated display name")
     api_url: Optional[str] = Field(None, description="Updated server URL")
@@ -1125,8 +1132,8 @@ class UnstructuredInstanceUpdateRequest(BaseModel):
     notes: Optional[str] = Field(None, description="Updated notes")
 
 
-class UnstructuredInstanceResponse(BaseModel):
-    """Response contract for a registered Unstructured parsing-engine instance.
+class ParsingEngineInstanceResponse(BaseModel):
+    """Response contract for a registered parsing-engine instance.
 
     The stored api_key is never echoed back — only whether one is set.
     """
@@ -1144,11 +1151,27 @@ class UnstructuredInstanceResponse(BaseModel):
     updated_at: Optional[str] = None
 
 
-class UnstructuredInstanceTestResponse(BaseModel):
+class ParsingEngineInstanceTestResponse(BaseModel):
     """Result of a connectivity check against a configured instance."""
 
     ok: bool
     detail: str = ""
+
+
+class ParsingEngineKindResponse(BaseModel):
+    """Metadata for one registered parsing-engine kind (a ParsingEngineDriver).
+
+    Drives the Settings UI's kind selector — a new backend driver shows up
+    there automatically, with no frontend changes.
+    """
+
+    kind: str
+    family: str
+    display_name: str
+    description: str = ""
+    requires_api_key: bool = False
+    supports_strategy: bool = False
+    url_placeholder: str = ""
 
 
 # ==============================================================================

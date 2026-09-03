@@ -35,8 +35,8 @@ services:
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://localhost:11434}
 
       # ── Document Parsing — Unstructured ──────────────────────────────────────
-      # Only consulted to seed the unstructured_instances registry on first
-      # boot (Settings > Parsing Engines is the source of truth afterwards).
+      # Only consulted to seed the parsing_engine_instances registry on
+      # first boot (Settings > Parsing Engines is the source of truth afterwards).
       - UNSTRUCTURED_API_KEY=${UNSTRUCTURED_API_KEY:-}
       - UNSTRUCTURED_API_URL=${UNSTRUCTURED_API_URL:-}
       - UNSTRUCTURED_STRATEGY=${UNSTRUCTURED_STRATEGY:-auto}

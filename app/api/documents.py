@@ -15,7 +15,7 @@ from fastapi import (
 )
 from fastapi.concurrency import run_in_threadpool
 
-from app.api.dependencies import get_documents_service, get_unstructured_instances_service
+from app.api.dependencies import get_documents_service, get_parsing_engine_instances_service
 from app.logging_config import get_logger
 from app.modules.contracts import (
     DocumentDetailResponse,
@@ -26,8 +26,8 @@ from app.modules.contracts import (
     RuleExtractionDraftListResponse,
 )
 from app.services.documents_service import DocumentService
+from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.rule_extraction_service import RuleExtractionService
-from app.services.unstructured_instances_service import UnstructuredInstancesService
 from app.utils import md5_hex, safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
@@ -124,23 +124,23 @@ async def upload_document(
     suitability_code: Annotated[str, Form()] = "S0",
     revision_code: Annotated[str, Form()] = "P01.01",
     parser: Annotated[str, Form()] = "auto",
-    unstructured_instance: Annotated[str, Form()] = "",
+    engine_instance: Annotated[str, Form()] = "",
     service: Annotated[DocumentService, Depends(get_documents_service)] = None,
     instances_service: Annotated[
-        UnstructuredInstancesService, Depends(get_unstructured_instances_service)
+        ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)
     ] = None,
 ) -> DocumentDetailResponse:
     """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and extract text.
 
-    `parser` selects the extraction engine: "auto" (Unstructured, falling
-    back to a light local extractor), "unstructured" (force Unstructured —
-    a hosted job takes several to tens of seconds per document; a local
-    container responds in one synchronous call), or "light" (force the
-    local extractor — pypdf/python-docx/openpyxl/csv, no upload, no API
-    key, effectively instant).
+    `parser` selects the extraction engine: "auto" (the configured parsing
+    engine, falling back to a light local extractor), "unstructured" (force
+    the configured engine — a hosted job takes several to tens of seconds
+    per document; a local container or Docling responds in one synchronous
+    call), or "light" (force the local extractor — pypdf/python-docx/
+    openpyxl/csv, no upload, no API key, effectively instant).
 
-    `unstructured_instance` optionally names one of the configured parsing
-    engines (see GET /api/parsing-engines) — local container, or a specific
+    `engine_instance` optionally names one of the configured parsing engines
+    (see GET /api/parsing-engines) — a local container, or a specific
     hosted account. When omitted, the registry's default instance is used.
     """
     if service is None:
@@ -148,16 +148,16 @@ async def upload_document(
     if instances_service is None:
         from app.bootstrap import get_container
 
-        instances_service = get_container().unstructured_instances_service
+        instances_service = get_container().parsing_engine_instances_service
 
     resolved_instance = None
-    clean_instance_name = (unstructured_instance or "").strip()
+    clean_instance_name = (engine_instance or "").strip()
     if clean_instance_name:
         resolved_instance = instances_service.get_by_name(clean_instance_name)
         if not resolved_instance:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unstructured instance '{clean_instance_name}' is not configured.",
+                detail=f"Parsing engine instance '{clean_instance_name}' is not configured.",
             )
     else:
         resolved_instance = instances_service.get_default()

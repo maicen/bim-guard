@@ -11,6 +11,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.logging_config import get_logger
+from app.modules.module1_doc_parser.engines.docling_driver import (
+    DoclingHostedDriver,
+    DoclingLocalDriver,
+)
+from app.modules.module1_doc_parser.engines.unstructured_driver import (
+    UnstructuredHostedDriver,
+    UnstructuredLocalDriver,
+)
 from app.modules.module4_comparator.engine_registry import (
     RuleEngineRegistry,
     register_default_engines,
@@ -28,6 +36,7 @@ from app.services.naming_config_service import (
     NamingConfigService,
 )
 from app.services.object_storage import ObjectStorage
+from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.persistence import PersistenceService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
@@ -44,7 +53,6 @@ from app.services.static_data_service import (
     _STATIC_ASSET_SCHEMA,
     StaticDataService,
 )
-from app.services.unstructured_instances_service import UnstructuredInstancesService
 
 logger = get_logger(__name__)
 
@@ -65,7 +73,7 @@ class ApplicationContainer:
     settings_repo: DatabaseAdapter
     github_repos_repo: DatabaseAdapter
     naming_config_repo: DatabaseAdapter
-    unstructured_instances_repo: DatabaseAdapter
+    parsing_engine_instances_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
@@ -74,7 +82,7 @@ class ApplicationContainer:
     settings_service: SettingsService
     github_repo_service: GitHubRepoService
     naming_config_service: NamingConfigService
-    unstructured_instances_service: UnstructuredInstancesService
+    parsing_engine_instances_service: ParsingEngineInstancesService
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
@@ -218,8 +226,8 @@ def build_default_container() -> ApplicationContainer:
         _NAMING_CONFIG_SCHEMA,
     )
 
-    unstructured_instances_repo = PersistenceService.get_table(
-        "unstructured_instances",
+    parsing_engine_instances_repo = PersistenceService.get_table(
+        "parsing_engine_instances",
         {
             "id": int,
             "name": str,
@@ -286,8 +294,8 @@ def build_default_container() -> ApplicationContainer:
         naming_repo=naming_config_repo,
     )
 
-    unstructured_instances_service = UnstructuredInstancesService(
-        instances_repo=unstructured_instances_repo,
+    parsing_engine_instances_service = ParsingEngineInstancesService(
+        instances_repo=parsing_engine_instances_repo,
     )
 
     # Seed the registry from legacy env vars on first boot, so existing
@@ -310,14 +318,14 @@ def build_default_container() -> ApplicationContainer:
         )
 
         has_default = any(
-            row.get("is_default") for row in unstructured_instances_service.list_instances()
+            row.get("is_default") for row in parsing_engine_instances_service.list_instances()
         )
 
         def _seed_if_missing(name: str, **kwargs) -> None:
             nonlocal has_default
-            if unstructured_instances_service.get_by_name(name):
+            if parsing_engine_instances_service.get_by_name(name):
                 return
-            unstructured_instances_service.create_instance(
+            parsing_engine_instances_service.create_instance(
                 name=name, is_default=not has_default, **kwargs
             )
             has_default = True
@@ -325,7 +333,7 @@ def build_default_container() -> ApplicationContainer:
         if UNSTRUCTURED_LOCAL_URL:
             _seed_if_missing(
                 "local",
-                kind="local",
+                kind=UnstructuredLocalDriver.kind,
                 api_url=UNSTRUCTURED_LOCAL_URL,
                 strategy=UNSTRUCTURED_STRATEGY,
                 notes="Self-hosted Unstructured Docker container (seeded from UNSTRUCTURED_LOCAL_URL).",
@@ -333,7 +341,7 @@ def build_default_container() -> ApplicationContainer:
         if UNSTRUCTURED_API_KEY:
             _seed_if_missing(
                 "hosted-default",
-                kind="hosted",
+                kind=UnstructuredHostedDriver.kind,
                 api_url=UNSTRUCTURED_API_URL or "https://api.unstructuredapp.io",
                 api_key=UNSTRUCTURED_API_KEY,
                 strategy=UNSTRUCTURED_STRATEGY,
@@ -342,7 +350,7 @@ def build_default_container() -> ApplicationContainer:
         if DOCLING_SERVICE_URL and DOCLING_API_KEY:
             _seed_if_missing(
                 "docling-hosted",
-                kind="docling",
+                kind=DoclingHostedDriver.kind,
                 api_url=DOCLING_SERVICE_URL,
                 api_key=DOCLING_API_KEY,
                 notes="Hosted Docling Serve instance (seeded from DOCLING_SERVICE_URL/DOCLING_API_KEY).",
@@ -350,7 +358,7 @@ def build_default_container() -> ApplicationContainer:
         if DOCLING_LOCAL_URL:
             _seed_if_missing(
                 "docling-local",
-                kind="docling-local",
+                kind=DoclingLocalDriver.kind,
                 api_url=DOCLING_LOCAL_URL,
                 notes="Self-hosted docling-serve Docker container (seeded from DOCLING_LOCAL_URL).",
             )
@@ -388,7 +396,7 @@ def build_default_container() -> ApplicationContainer:
         settings_repo=settings_repo,
         github_repos_repo=github_repos_repo,
         naming_config_repo=naming_config_repo,
-        unstructured_instances_repo=unstructured_instances_repo,
+        parsing_engine_instances_repo=parsing_engine_instances_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
@@ -397,7 +405,7 @@ def build_default_container() -> ApplicationContainer:
         settings_service=settings_service,
         github_repo_service=github_repo_service,
         naming_config_service=naming_config_service,
-        unstructured_instances_service=unstructured_instances_service,
+        parsing_engine_instances_service=parsing_engine_instances_service,
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,

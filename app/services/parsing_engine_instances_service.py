@@ -1,12 +1,14 @@
 """Service layer for managing configured document-parsing engine instances.
 
-Each row is one addressable parsing engine — a local self-hosted Unstructured
-Docker container, one or more hosted Unstructured Platform accounts, and/or a
-hosted Docling Serve instance — that document extraction (module1_doc_parser)
-can be pointed at by name. The table/class predate Docling support (hence the
-"Unstructured" naming), but `kind` is the general engine-family discriminator.
+Each row names one addressable parsing engine — which "kind" (a registered
+ParsingEngineDriver — see app/modules/module1_doc_parser/engines) it is, and
+its connection details. This service owns persistence, uniqueness, and
+single-default enforcement only; it validates a `kind` by asking
+ParsingEngineRegistry whether it's registered, and asks the matching driver
+whether an API key is required — it never hardcodes the set of valid kinds
+itself, so a new engine kind never requires editing this file (Open/Closed).
 See app/modules/module1_doc_parser/document_extractor.py for how a resolved
-instance dict is turned into the matching extractor.
+instance dict is turned into an extractor via the same registry.
 """
 
 from __future__ import annotations
@@ -14,19 +16,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from app.modules.module1_doc_parser.engines import ParsingEngineRegistry
 from app.services.db_adapters import DatabaseAdapter
 
-KIND_LOCAL = "local"
-KIND_HOSTED = "hosted"
-KIND_DOCLING = "docling"
-KIND_DOCLING_LOCAL = "docling-local"
-VALID_KINDS = {KIND_LOCAL, KIND_HOSTED, KIND_DOCLING, KIND_DOCLING_LOCAL}
-# Kinds that always talk to a remote account and therefore always need a key.
-KINDS_REQUIRING_API_KEY = {KIND_HOSTED, KIND_DOCLING}
 
-
-class UnstructuredInstancesService:
-    """Domain service for CRUD and default-selection of Unstructured instances."""
+class ParsingEngineInstancesService:
+    """Domain service for CRUD and default-selection of parsing-engine instances."""
 
     def __init__(self, instances_repo: DatabaseAdapter):
         self._repo = instances_repo
@@ -67,17 +62,16 @@ class UnstructuredInstancesService:
         is_enabled: bool = True,
         notes: str = "",
     ) -> dict[str, Any]:
-        """Register a new Unstructured parsing-engine instance."""
+        """Register a new parsing-engine instance."""
         clean_name = name.strip()
         if not clean_name:
             raise ValueError("Instance name is required.")
         clean_kind = kind.strip().lower()
-        if clean_kind not in VALID_KINDS:
-            raise ValueError(f"kind must be one of {sorted(VALID_KINDS)}.")
+        driver = self._require_driver(clean_kind)
         clean_url = api_url.strip().rstrip("/")
         if not clean_url:
             raise ValueError("api_url is required.")
-        if clean_kind in KINDS_REQUIRING_API_KEY and not (api_key or "").strip():
+        if driver.requires_api_key and not (api_key or "").strip():
             raise ValueError(f"api_key is required for '{clean_kind}' instances.")
         if self.get_by_name(clean_name):
             raise ValueError(f"An instance named '{clean_name}' already exists.")
@@ -112,7 +106,12 @@ class UnstructuredInstancesService:
         is_enabled: Optional[bool] = None,
         notes: Optional[str] = None,
     ) -> dict[str, Any] | None:
-        """Update metadata for an existing configured instance."""
+        """Update metadata for an existing configured instance.
+
+        `kind` is intentionally not updatable — it identifies which driver
+        built the instance and is immutable after creation; register a new
+        instance instead of repurposing one.
+        """
         existing = self.get_instance(instance_id)
         if not existing:
             return None
@@ -153,11 +152,19 @@ class UnstructuredInstancesService:
         """Delete a configured instance by primary key."""
         self._repo.delete(instance_id)
 
+    @staticmethod
+    def _require_driver(kind: str):
+        try:
+            return ParsingEngineRegistry.get(kind)
+        except ValueError:
+            valid = sorted(ParsingEngineRegistry.valid_kinds())
+            raise ValueError(f"kind must be one of {valid}.") from None
+
     def _clear_all_defaults(self) -> None:
         """Unset is_default on every row so a single new default can be set.
 
         Cleared before the new default is written (not in the same call) so
-        the database's `unstructured_instances_single_default` partial
+        the database's `parsing_engine_instances_single_default` partial
         unique index never sees two rows with is_default=true at once.
         """
         for row in self.list_instances():

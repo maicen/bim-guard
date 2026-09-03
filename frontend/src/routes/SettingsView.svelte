@@ -11,7 +11,6 @@
     Laptop,
     Server,
     Cloud,
-    Sparkles,
     Plus,
     Trash2,
     Loader2,
@@ -22,8 +21,9 @@
   import { themeMode, setTheme, type ThemeMode } from "../lib/theme";
   import type {
     SettingItem,
-    UnstructuredInstance,
-    UnstructuredInstanceKind,
+    ParsingEngineInstance,
+    ParsingEngineKind,
+    ParsingEngineKindId,
   } from "../lib/types";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -36,21 +36,53 @@
   let error = $state("");
   let successMessage = $state("");
 
-  // ── Parsing Engines (Unstructured instances) ────────────────────────────
-  let engines: UnstructuredInstance[] = $state([]);
+  // ── Parsing Engines ──────────────────────────────────────────────────────
+  // `kinds` is fetched from the backend's ParsingEngineRegistry — the "Kind"
+  // selector and its per-kind field behavior (needs an API key? does
+  // "strategy" apply?) are driven entirely by that data, so a new backend
+  // driver shows up here automatically with no frontend change.
+  let engines: ParsingEngineInstance[] = $state([]);
+  let engineKinds: ParsingEngineKind[] = $state([]);
   let enginesLoading = $state(true);
   let enginesError = $state("");
   let showAddEngineForm = $state(false);
   let isSavingEngine = $state(false);
   let newEngineName = $state("");
-  let newEngineKind: UnstructuredInstanceKind = $state("local");
+  let newEngineKind: ParsingEngineKindId = $state("");
   let newEngineUrl = $state("");
   let newEngineKey = $state("");
   let newEngineStrategy = $state("auto");
   let newEngineNotes = $state("");
-  let enginePendingDelete: UnstructuredInstance | null = $state(null);
+  let enginePendingDelete: ParsingEngineInstance | null = $state(null);
   let testingEngineId: number | null = $state(null);
   let testResults: Record<number, { ok: boolean; detail: string }> = $state({});
+
+  let selectedKindInfo = $derived(engineKinds.find((k) => k.kind === newEngineKind) ?? null);
+
+  // Accent color by engine family — purely cosmetic grouping in the list
+  // view. A family not in this map (a future backend outside Unstructured
+  // and Docling) still renders correctly via `default`, just without a
+  // distinct color.
+  const FAMILY_ACCENT: Record<string, string> = {
+    unstructured: "text-cyan-400",
+    docling: "text-violet-400",
+    default: "text-blue-400",
+  };
+
+  function kindInfo(kind: ParsingEngineKindId): ParsingEngineKind | null {
+    return engineKinds.find((k) => k.kind === kind) ?? null;
+  }
+
+  async function loadEngineKinds() {
+    try {
+      engineKinds = await parsingEnginesApi.kinds();
+      if (!newEngineKind && engineKinds.length > 0) {
+        newEngineKind = engineKinds[0].kind;
+      }
+    } catch (err: any) {
+      enginesError = err.message || "Failed to load parsing engine kinds.";
+    }
+  }
 
   async function loadEngines() {
     enginesLoading = true;
@@ -66,7 +98,7 @@
 
   function resetEngineForm() {
     newEngineName = "";
-    newEngineKind = "local";
+    newEngineKind = engineKinds[0]?.kind ?? "";
     newEngineUrl = "";
     newEngineKey = "";
     newEngineStrategy = "auto";
@@ -74,12 +106,12 @@
   }
 
   async function handleAddEngine() {
-    if (!newEngineName.trim() || !newEngineUrl.trim()) {
-      enginesError = "Name and API URL are required.";
+    if (!newEngineName.trim() || !newEngineUrl.trim() || !newEngineKind) {
+      enginesError = "Name, kind, and API URL are required.";
       return;
     }
-    if ((newEngineKind === "hosted" || newEngineKind === "docling") && !newEngineKey.trim()) {
-      enginesError = `A ${newEngineKind} instance requires an API key.`;
+    if (selectedKindInfo?.requires_api_key && !newEngineKey.trim()) {
+      enginesError = `A ${selectedKindInfo.display_name} instance requires an API key.`;
       return;
     }
 
@@ -105,7 +137,7 @@
     }
   }
 
-  async function handleSetDefault(engine: UnstructuredInstance) {
+  async function handleSetDefault(engine: ParsingEngineInstance) {
     try {
       await parsingEnginesApi.update(engine.id, { is_default: true });
       await loadEngines();
@@ -114,7 +146,7 @@
     }
   }
 
-  async function handleToggleEnabled(engine: UnstructuredInstance) {
+  async function handleToggleEnabled(engine: ParsingEngineInstance) {
     try {
       await parsingEnginesApi.update(engine.id, { is_enabled: !engine.is_enabled });
       await loadEngines();
@@ -123,7 +155,7 @@
     }
   }
 
-  async function handleTestEngine(engine: UnstructuredInstance) {
+  async function handleTestEngine(engine: ParsingEngineInstance) {
     testingEngineId = engine.id;
     try {
       testResults = { ...testResults, [engine.id]: await parsingEnginesApi.test(engine.id) };
@@ -137,7 +169,7 @@
     }
   }
 
-  function promptDeleteEngine(engine: UnstructuredInstance) {
+  function promptDeleteEngine(engine: ParsingEngineInstance) {
     enginePendingDelete = engine;
   }
 
@@ -165,6 +197,7 @@
     } finally {
       isLoading = false;
     }
+    loadEngineKinds();
     loadEngines();
   });
 
@@ -324,9 +357,9 @@
       <div>
         <h2 class="text-base font-bold tracking-tight text-slate-50">Parsing Engines</h2>
         <p class="text-xs text-slate-400">
-          Configure the Unstructured document-parsing engines available to document upload — a
-          local self-hosted container, one or more hosted Platform accounts, or both. The default
-          instance is used when an upload doesn't name one explicitly.
+          Configure the document-parsing engines available to document upload — local self-hosted
+          containers, hosted accounts, or a mix. The default instance is used when an upload
+          doesn't name one explicitly.
         </p>
       </div>
       <button
@@ -383,11 +416,13 @@
               bind:value={newEngineKind}
               class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
-              <option value="local">Local (self-hosted Unstructured Docker container)</option>
-              <option value="hosted">Hosted (Unstructured Platform API)</option>
-              <option value="docling">Docling (hosted Docling Serve instance)</option>
-              <option value="docling-local">Docling Local (self-hosted docling-serve container)</option>
+              {#each engineKinds as kindOption (kindOption.kind)}
+                <option value={kindOption.kind}>{kindOption.display_name}</option>
+              {/each}
             </select>
+            {#if selectedKindInfo?.description}
+              <p class="mt-1 text-caption text-slate-500">{selectedKindInfo.description}</p>
+            {/if}
           </div>
         </div>
 
@@ -400,13 +435,7 @@
             type="text"
             required
             bind:value={newEngineUrl}
-            placeholder={newEngineKind === "local"
-              ? "http://localhost:8001"
-              : newEngineKind === "docling-local"
-                ? "http://localhost:5001"
-                : newEngineKind === "docling"
-                  ? "https://api.aws-c1.dcls.saas.ibm.com/<instance-id>"
-                  : "https://api.unstructuredapp.io"}
+            placeholder={selectedKindInfo?.url_placeholder || "https://..."}
             class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
         </div>
@@ -414,21 +443,17 @@
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label for="engine-key" class="mb-1 block text-caption font-semibold text-slate-400">
-              API Key{newEngineKind === "local" || newEngineKind === "docling-local"
-                ? " (not required)"
-                : ""}
+              API Key{selectedKindInfo?.requires_api_key ? "" : " (not required)"}
             </label>
             <input
               id="engine-key"
               type="password"
               bind:value={newEngineKey}
-              placeholder={newEngineKind === "local" || newEngineKind === "docling-local"
-                ? "(optional)"
-                : "sk-..."}
+              placeholder={selectedKindInfo?.requires_api_key ? "sk-..." : "(optional)"}
               class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
           </div>
-          {#if newEngineKind !== "docling" && newEngineKind !== "docling-local"}
+          {#if selectedKindInfo?.supports_strategy}
             <div>
               <label
                 for="engine-strategy"
@@ -497,19 +522,17 @@
     {:else}
       <div class="space-y-2">
         {#each engines as engine (engine.id)}
+          {@const info = kindInfo(engine.kind)}
+          {@const accent = FAMILY_ACCENT[info?.family ?? ""] ?? FAMILY_ACCENT.default}
           <div
             class="flex flex-col gap-2 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5 transition-colors hover:border-slate-700 sm:flex-row sm:items-start sm:justify-between"
           >
             <div class="space-y-1">
               <div class="flex flex-wrap items-center gap-2">
-                {#if engine.kind === "local"}
-                  <Server class="h-4 w-4 text-cyan-400" />
-                {:else if engine.kind === "docling-local"}
-                  <Server class="h-4 w-4 text-violet-400" />
-                {:else if engine.kind === "docling"}
-                  <Sparkles class="h-4 w-4 text-violet-400" />
+                {#if info?.requires_api_key}
+                  <Cloud class="h-4 w-4 {accent}" />
                 {:else}
-                  <Cloud class="h-4 w-4 text-blue-400" />
+                  <Server class="h-4 w-4 {accent}" />
                 {/if}
                 <span class="text-sm font-semibold text-slate-50">{engine.name}</span>
                 <span

@@ -183,11 +183,12 @@ class DocumentService:
     ) -> str:
         """Extract text from raw uploaded file bytes via the document parser module.
 
-        parser: "auto" (Unstructured, falling back to the light local
-        extractor), "unstructured" (force Unstructured), or "light" (force
-        the local extractor). `instance` optionally selects which configured
-        Unstructured engine to use (local container, or which hosted
-        account) — see module1_doc_parser/document_extractor.py.
+        parser: "auto" (the configured parsing engine, falling back to the
+        light local extractor), "unstructured" (force the configured
+        engine), or "light" (force the local extractor). `instance`
+        optionally selects which configured parsing engine to use (a local
+        container, or which hosted account) — see
+        module1_doc_parser/document_extractor.py.
         """
         from app.modules.module1_doc_parser.document_extractor import extract_document_text
 

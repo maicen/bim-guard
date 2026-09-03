@@ -63,7 +63,7 @@ UNSTRUCTURED_API_URL = os.environ.get("UNSTRUCTURED_API_URL", "")
 UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
 # Base URL of a self-hosted / local open-source unstructured-api container
 # (see docker-compose.yml's `unstructured-api` service, profile "unstructured").
-# Used only to seed the `unstructured_instances` registry on first boot —
+# Used only to seed the `parsing_engine_instances` registry on first boot —
 # once instances exist in the database, they are the source of truth and
 # these env vars are no longer read. e.g. http://localhost:8001 for a host
 # process talking to the container's published port, or
@@ -73,7 +73,7 @@ UNSTRUCTURED_LOCAL_URL = os.environ.get("UNSTRUCTURED_LOCAL_URL", "")
 
 # Hosted Docling Serve instance (https://developer.dcls.saas.ibm.com). A
 # second parsing-engine option alongside Unstructured — used only to seed
-# the `unstructured_instances` registry's "docling-hosted" row on first
+# the `parsing_engine_instances` registry's "docling-hosted" row on first
 # boot; the registry is the source of truth afterwards.
 DOCLING_SERVICE_URL = os.environ.get("DOCLING_SERVICE_URL", "")
 DOCLING_API_KEY = os.environ.get("DOCLING_API_KEY", "")

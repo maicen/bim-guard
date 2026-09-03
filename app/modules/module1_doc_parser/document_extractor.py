@@ -5,30 +5,27 @@ Unified document-text extraction entry point used by both the web upload
 flow (documents_service.py) and the CLI/enhanced pipelines (orchestrator.py,
 enhanced_orchestrator.py).
 
-Four engine families, selected via an "instance" dict's `kind`:
-  - UnstructuredExtractor, kind "hosted" — Unstructured's Workflow/Jobs API.
-    Best quality (layout-aware text + real tables), but uploads the file,
-    needs an API key, and takes several-to-tens of seconds per document
-    (it's an async job under the hood, not a synchronous call).
-  - UnstructuredExtractor, kind "local" — a self-hosted open-source
-    unstructured-api Docker container's synchronous partition endpoint.
-  - DoclingExtractor, kind "docling" — a hosted Docling Serve instance
-    (e.g. https://developer.dcls.saas.ibm.com), synchronous convert() call.
-  - DoclingExtractor, kind "docling-local" — a self-hosted docling-serve
-    Docker container (https://github.com/docling-project/docling-serve),
-    same synchronous convert() call, no API key by default.
-  - LightExtractor (fallback) — plain per-format readers (pypdf, python-docx,
-    openpyxl, csv), no upload, no API key, no tables, effectively instant.
+Structured extraction is pluggable: any number of engine "kinds" (Unstructured
+local/hosted, Docling hosted/local, and whatever gets added later) can be
+selected via an "instance" dict's `kind`, dispatched through
+ParsingEngineRegistry (app/modules/module1_doc_parser/engines) rather than a
+hardcoded per-kind chain here — this module only knows the *shape* of an
+engine (ParsingEngine: extract_bytes(content, filename) -> (text, tables)),
+never a concrete extractor class. See engines/base.py for the abstraction and
+engines/unstructured_driver.py / engines/docling_driver.py for the currently
+registered kinds. LightExtractor (fallback) is the one hardcoded engine —
+plain per-format readers (pypdf, python-docx, openpyxl, csv), no upload, no
+API key, no tables, effectively instant, and always available regardless of
+what's configured.
 
 An "instance" is an optional dict describing which structured-extraction
-engine to use — {name, kind ("local"|"hosted"|"docling"|"docling-local"),
-api_url, api_key, strategy} — as returned by UnstructuredInstancesService
-(app/services/unstructured_instances_service.py, which despite its name now
-registers Docling instances too). Callers with access to that service
-(documents_service.py) resolve an instance name (or the configured default)
-before calling in; callers that don't pass one fall back to the legacy
-env-var-only hosted Unstructured configuration (UNSTRUCTURED_API_KEY /
-_API_URL / _STRATEGY), preserving old behavior.
+engine to use — {name, kind, api_url, api_key, strategy} — as returned by
+ParsingEngineInstancesService (app/services/parsing_engine_instances_service.py).
+Callers with access to that service (documents_service.py) resolve an
+instance name (or the configured default) before calling in; callers that
+don't pass one fall back to the legacy env-var-only hosted Unstructured
+configuration (UNSTRUCTURED_API_KEY / _API_URL / _STRATEGY), preserving old
+behavior.
 
 Usage:
     from module1_doc_parser.document_extractor import extract_document_text
@@ -50,30 +47,21 @@ VALID_PARSERS = {PARSER_AUTO, PARSER_UNSTRUCTURED, PARSER_LIGHT}
 
 
 def _build_extractor(instance: dict | None):
-    """Instantiate the extractor matching an instance's kind (or the legacy hosted default)."""
+    """Build the ParsingEngine matching an instance's kind (or the legacy hosted default).
+
+    Dispatch goes through ParsingEngineRegistry — adding a new engine kind
+    never means adding a branch here.
+    """
+    from app.modules.module1_doc_parser.engines import ParsingEngineRegistry
+
     kind = (instance or {}).get("kind") or "hosted"
-
-    if kind in ("docling", "docling-local"):
-        from app.modules.module1_doc_parser.docling_extractor import DoclingExtractor
-
-        return DoclingExtractor(
-            api_key=instance.get("api_key") or None,
-            api_url=instance.get("api_url") or None,
-            kind=kind,
-            name=instance.get("name"),
-        )
-
-    from app.modules.module1_doc_parser.unstructured_extractor import UnstructuredExtractor
-
-    if instance:
-        return UnstructuredExtractor(
-            api_key=instance.get("api_key") or None,
-            api_url=instance.get("api_url") or None,
-            strategy=instance.get("strategy") or None,
-            kind=kind,
-            name=instance.get("name"),
-        )
-    return UnstructuredExtractor()
+    driver = ParsingEngineRegistry.get(kind)
+    return driver.build(
+        api_key=(instance or {}).get("api_key") or "",
+        api_url=(instance or {}).get("api_url") or "",
+        strategy=(instance or {}).get("strategy") or "",
+        name=(instance or {}).get("name") or driver.kind,
+    )
 
 
 def extract_document_text(

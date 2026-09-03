@@ -22,7 +22,7 @@
     DocumentDetail,
     DocumentType,
     IdsImportResult,
-    UnstructuredInstance,
+    ParsingEngineInstance,
   } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { toasts } from "../lib/toast.svelte";
@@ -86,7 +86,7 @@
   let uploadDocType = $state("Specification");
   let uploadParser: "auto" | "unstructured" | "light" = $state("auto");
   let uploadInstance = $state("");
-  let parsingEngines: UnstructuredInstance[] = $state([]);
+  let parsingEngines: ParsingEngineInstance[] = $state([]);
   let isUploading = $state(false);
   let uploadError = $state("");
 
@@ -217,7 +217,7 @@
     try {
       const created = await documentsApi.upload(uploadFile, uploadDocType, {
         parser: uploadParser,
-        unstructured_instance: uploadParser === "light" ? undefined : uploadInstance || undefined,
+        engine_instance: uploadParser === "light" ? undefined : uploadInstance || undefined,
       });
       documents = [created, ...documents];
       isUploadModalOpen = false;

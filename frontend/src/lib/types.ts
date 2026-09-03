@@ -743,12 +743,29 @@ export interface ProjectImportPayload {
   analysis_type?: string;
 }
 
-export type UnstructuredInstanceKind = "local" | "hosted" | "docling" | "docling-local";
+// `kind` is a plain string, not a fixed union: the set of valid kinds is
+// owned by the backend's ParsingEngineRegistry and discovered at runtime via
+// parsingEnginesApi.kinds() (GET /api/parsing-engines/kinds) — see
+// ParsingEngineKind below. A new backend driver needs no frontend type change.
+export type ParsingEngineKindId = string;
 
-export interface UnstructuredInstance {
+// Metadata for one registered parsing-engine kind — drives the Settings UI's
+// kind selector and its per-kind field visibility (requires_api_key,
+// supports_strategy) instead of hardcoding those per kind string.
+export interface ParsingEngineKind {
+  kind: ParsingEngineKindId;
+  family: string;
+  display_name: string;
+  description: string;
+  requires_api_key: boolean;
+  supports_strategy: boolean;
+  url_placeholder: string;
+}
+
+export interface ParsingEngineInstance {
   id: number;
   name: string;
-  kind: UnstructuredInstanceKind;
+  kind: ParsingEngineKindId;
   api_url: string;
   has_api_key: boolean;
   strategy: string;
@@ -759,9 +776,9 @@ export interface UnstructuredInstance {
   updated_at?: string | null;
 }
 
-export interface UnstructuredInstanceCreatePayload {
+export interface ParsingEngineInstanceCreatePayload {
   name: string;
-  kind: UnstructuredInstanceKind;
+  kind: ParsingEngineKindId;
   api_url: string;
   api_key?: string;
   strategy?: string;
@@ -770,7 +787,7 @@ export interface UnstructuredInstanceCreatePayload {
   notes?: string;
 }
 
-export interface UnstructuredInstanceUpdatePayload {
+export interface ParsingEngineInstanceUpdatePayload {
   name?: string;
   api_url?: string;
   api_key?: string;
@@ -780,7 +797,7 @@ export interface UnstructuredInstanceUpdatePayload {
   notes?: string;
 }
 
-export interface UnstructuredInstanceTestResult {
+export interface ParsingEngineInstanceTestResult {
   ok: boolean;
   detail: string;
 }

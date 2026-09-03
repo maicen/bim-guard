@@ -9,12 +9,12 @@ from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.naming_config_service import NamingConfigService
+from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
 from app.services.projects_service import ProjectsService
 from app.services.rules_service import RuleService
 from app.services.settings_service import SettingsService
-from app.services.unstructured_instances_service import UnstructuredInstancesService
 
 
 def get_projects_service() -> ProjectsService:
@@ -73,6 +73,6 @@ def get_digital_inspector_service() -> DigitalInspectorService:
     return get_container().digital_inspector_service
 
 
-def get_unstructured_instances_service() -> UnstructuredInstancesService:
-    """Return the configured UnstructuredInstancesService instance."""
-    return get_container().unstructured_instances_service
+def get_parsing_engine_instances_service() -> ParsingEngineInstancesService:
+    """Return the configured ParsingEngineInstancesService instance."""
+    return get_container().parsing_engine_instances_service
