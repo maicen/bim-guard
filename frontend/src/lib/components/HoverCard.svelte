@@ -55,6 +55,9 @@
     icon?: ComponentType | null;
     /** Suppress the card entirely (e.g. nothing worth previewing). */
     disabled?: boolean;
+    /** Fired the moment the card starts opening — for callers that lazily
+     *  fetch the preview content instead of holding it upfront. */
+    onOpen?: () => void;
     /** Render the trigger as a real <button>, so it is keyboard reachable and
      *  tappable. Turn off when the trigger already wraps its own interactive
      *  control (a label, a link) — focus inside it still opens the card. */
@@ -90,6 +93,7 @@
     showFooter = true,
     triggerClass = "",
     contentClass = "",
+    onOpen,
     trigger,
     children,
     footer,
@@ -139,6 +143,7 @@
     if (disabled || open) return;
     open = true;
     placed = false;
+    onOpen?.();
     await tick();
     place();
     placed = true;

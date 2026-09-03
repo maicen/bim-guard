@@ -44,6 +44,7 @@
   import RuleForm from "../lib/components/RuleForm.svelte";
   import IdsImportForm from "../lib/components/IdsImportForm.svelte";
   import HoverCard from "../lib/components/HoverCard.svelte";
+  import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { describeMechanism } from "../lib/glossary";
   import { createTableState } from "../lib/tableState.svelte";
 
@@ -1297,10 +1298,22 @@
                         {/if}
                       </td>
                       <td class="px-4 py-3 font-mono text-caption text-slate-300">
-                        <div>{rule.property_name || "-"}</div>
+                        <div>
+                          <BsddBadge
+                            kind="property"
+                            value={rule.property_name}
+                            propertySet={rule.property_set}
+                            fallback="-"
+                          />
+                        </div>
                         <div class="text-micro text-slate-500">
                           {rule.property_set || "Pset_Compliance"}
                         </div>
+                        {#if rule.target_ifc_class}
+                          <div class="mt-0.5 text-micro">
+                            <BsddBadge kind="class" value={rule.target_ifc_class} side="bottom" />
+                          </div>
+                        {/if}
                       </td>
                       <td class="px-4 py-3 font-mono text-cyan-300">
                         {#if rule.operator === "field_consistency"}

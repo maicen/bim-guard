@@ -5,6 +5,7 @@
   import type { BSDDClassItem, BSDDPropertyItem, Rule, RulesetCategory } from "../types";
   import type { IfcPropertySuggestion } from "../archDomains";
   import BsddAutocomplete from "./BsddAutocomplete.svelte";
+  import BsddBadge from "./BsddBadge.svelte";
 
   interface Props {
     editingRule?: Rule | null;
@@ -307,7 +308,7 @@
       <div
         class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 font-mono text-xs text-slate-300"
       >
-        {lockedTargetIfcClass}
+        <BsddBadge kind="class" value={lockedTargetIfcClass} />
       </div>
       <p class="mt-1 text-caption text-slate-500">
         Every rule added here targets this element type.

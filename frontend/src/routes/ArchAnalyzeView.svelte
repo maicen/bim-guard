@@ -25,6 +25,7 @@
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, lineageApi, rulesApi } from "../lib/api";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
+  import BsddBadge from "../lib/components/BsddBadge.svelte";
   import type {
     Project,
     ArchAnalysisResult,
@@ -1377,6 +1378,14 @@
                           return (order[a.status ?? ""] ?? 3) - (order[b.status ?? ""] ?? 3);
                         },
                       )}
+                      {#if rule.property_name}
+                        <div
+                          class="flex items-center gap-1.5 border-t border-slate-800/60 px-3.5 py-1.5 text-micro text-slate-500"
+                        >
+                          Checks
+                          <BsddBadge kind="property" value={rule.property_name} class="font-mono text-slate-300" />
+                        </div>
+                      {/if}
                       <div class="max-h-64 overflow-auto border-t border-slate-800/60">
                         <table class="w-full text-xs">
                           <thead
