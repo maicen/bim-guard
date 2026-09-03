@@ -59,6 +59,13 @@
   let selectedFolder = $state(""); // '' = All
   let isFoldersLoading = $state(false);
 
+  // Which top-level page is showing: the full compliance audit, or the
+  // ISO 19650 check drilldown. Both read the same `result` — ISO 19650
+  // checks run inside the same backend pipeline as the full audit, there is
+  // no separate lightweight endpoint, so switching tabs after a run doesn't
+  // require re-running.
+  let activeView: "compliance" | "iso" = $state("compliance");
+
   // Enhanced model gate
   let hasEnhancedModel: boolean | null = $state(null);
   let isCheckingEnhancement = $state(false);
@@ -469,8 +476,117 @@
         class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
       />
     </div>
+
+    <!-- Compliance Audit / ISO 19650 Check tabs -->
+    <div class="flex shrink-0 items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/40 p-1">
+      <button
+        type="button"
+        onclick={() => (activeView = "compliance")}
+        class="rounded-lg px-3 py-1.5 text-xs font-bold transition-colors {activeView === 'compliance'
+          ? 'bg-accent text-white'
+          : 'text-slate-400 hover:text-white'}"
+      >
+        Compliance Audit
+      </button>
+      <button
+        type="button"
+        onclick={() => (activeView = "iso")}
+        class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors {activeView ===
+        'iso'
+          ? 'bg-accent text-white'
+          : 'text-slate-400 hover:text-white'}"
+      >
+        <FileCheck class="h-3.5 w-3.5" />
+        ISO Check
+      </button>
+    </div>
   </div>
 
+  {#if activeView !== "compliance"}
+    <!-- ═══ ISO 19650 Check page ═══ -->
+    <div class="flex flex-wrap items-center justify-center gap-2.5">
+      <button
+        type="button"
+        disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
+        onclick={handleRunClick}
+        class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+      >
+        <Play class="h-4 w-4" />
+        {isRunning ? "Checking…" : isCheckingEnhancement ? "Checking model…" : "Run ISO Check"}
+      </button>
+    </div>
+
+    {#if error}
+      <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
+        {error}
+      </div>
+    {/if}
+
+    {#if result}
+      {@const isoResults = ((result.iso_checks || {}).results || []) as IsoCheckResult[]}
+      {@const isoFailed = isoResults.filter((r) => !r.passes)}
+      {#if isoResults.length === 0}
+        <div class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500">
+          No ISO 19650 check results on this run — re-run the audit to compute them.
+        </div>
+      {:else}
+        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div class="flex items-center justify-between border-b border-slate-800 p-4">
+            <div class="flex items-center gap-3">
+              <FileCheck class="h-4 w-4 text-slate-300" />
+              <h3 class="text-sm font-bold text-slate-50">ISO 19650 Compliance</h3>
+            </div>
+            <span
+              class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {isoFailed.length ===
+              0
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                : isoFailed.some((r) => r.severity === 'critical')
+                  ? 'bg-rose-950/80 text-rose-300 border-rose-800'
+                  : 'bg-amber-950/80 text-amber-300 border-amber-800'}"
+            >
+              {isoFailed.length === 0 ? "All pass" : `${isoFailed.length} issue(s)`}
+            </span>
+          </div>
+          <div class="max-h-[32rem] overflow-auto">
+            <table class="w-full text-xs">
+              <thead
+                ><tr class="bg-slate-800/80">
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">Check</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">Severity</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">Message</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">Status</th>
+                </tr></thead
+              >
+              <tbody>
+                {#each [...isoResults].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r.check)}
+                  <tr class="border-b border-slate-800/60 last:border-0">
+                    <td class="px-3 py-2 text-xs font-semibold text-slate-50">{r.check}</td>
+                    <td
+                      class="px-3 py-2 text-xs font-mono {r.severity === 'critical'
+                        ? 'text-rose-400'
+                        : r.severity === 'error'
+                          ? 'text-amber-400'
+                          : 'text-slate-400'}">{r.severity}</td
+                    >
+                    <td class="px-3 py-2 text-xs text-slate-300">{r.message}</td>
+                    <td
+                      class="px-3 py-2 text-xs font-semibold {r.passes
+                        ? 'text-emerald-400'
+                        : 'text-rose-400'}">{r.passes ? "✓ Pass" : "✗ Fail"}</td
+                    >
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {/if}
+    {:else if !isRunning}
+      <div class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500">
+        Select a project and click "Run ISO Check" to inspect ISO 19650 compliance.
+      </div>
+    {/if}
+  {:else}
   <!-- ═══ Ruleset Folder Selector ═══ -->
   {#if selectedProjectId}
     <div
@@ -509,7 +625,7 @@
   {/if}
 
   <!-- ═══ Run Analysis Bar ═══ -->
-  <div class="flex flex-wrap items-center gap-2.5">
+  <div class="flex flex-wrap items-center justify-center gap-2.5">
     {#if result && selectedProjectId}
       <button
         type="button"
@@ -538,10 +654,10 @@
       type="button"
       disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
       onclick={handleRunClick}
-      class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
     >
-      <Play class="h-3.5 w-3.5" />
-      {isRunning ? "Auditing…" : isCheckingEnhancement ? "Checking model…" : "Run ARCH Audit"}
+      <Play class="h-4 w-4" />
+      {isRunning ? "Auditing…" : isCheckingEnhancement ? "Checking model…" : "Run Compliance Test"}
     </button>
   </div>
 
@@ -1605,8 +1721,9 @@
     <div
       class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
     >
-      Select a project and click "Run ARCH Audit" to inspect building code compliance.
+      Select a project and click "Run Compliance Test" to inspect building code compliance.
     </div>
+  {/if}
   {/if}
 </div>
 
