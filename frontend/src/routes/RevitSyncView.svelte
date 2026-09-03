@@ -35,21 +35,30 @@
   import SortHeader from "../lib/components/SortHeader.svelte";
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
+  import { createTableState } from "../lib/tableState.svelte";
 
   let copied = false;
   let isSendingTest = false;
   let testResponse: RevitSyncResponse | null = null;
   let testError: string | null = null;
 
-  // Search, Filter, Selection, Sorting & Pagination for Sync Results
-  let searchQuery = "";
-  let statusFilter = "ALL";
-  let selectedRuleRefs: string[] = [];
-  let sortField: "rule_ref" | "target" | "property_name" | "status" | "fail_count" = "fail_count";
-  let sortAsc = false;
-  let currentPage = 1;
-  let pageSize = 10;
-  let viewingRule: RevitRuleResult | null = null;
+  // The sync response carries no unique key — rule_ref repeats across targets
+  // and properties — so rows get a stable index-based id when they arrive.
+  type IndexedRuleResult = RevitRuleResult & { rowId: number };
+  let indexedResults: IndexedRuleResult[] = [];
+
+  // Search, filter, sort, paginate and select — all owned by the shared state.
+  const table = createTableState<IndexedRuleResult>({
+    rows: () => indexedResults,
+    getId: (r) => r.rowId,
+    searchFields: (r) => [r.rule_ref, r.rule_desc, r.target, r.property_name],
+    filters: {
+      status: (r, value) => (r.status || "").toUpperCase() === value.toUpperCase(),
+    },
+    initialSort: { field: "fail_count", asc: false },
+  });
+
+  let viewingRule: IndexedRuleResult | null = null;
 
   const endpointUrl =
     typeof window !== "undefined"
@@ -151,11 +160,13 @@ print(response.read())
     isSendingTest = true;
     testError = null;
     testResponse = null;
-    selectedRuleRefs = [];
-    currentPage = 1;
+    indexedResults = [];
+    table.clearSelection();
+    table.requestedPage = 1;
 
     try {
       testResponse = await revitSyncApi.sync(samplePayload);
+      indexedResults = (testResponse.results || []).map((r, i) => ({ ...r, rowId: i }));
     } catch (err: any) {
       testError = err.message || "Failed to communicate with Revit Sync Gateway.";
     } finally {
@@ -163,70 +174,8 @@ print(response.read())
     }
   }
 
-  $: filteredResults = (testResponse?.results || [])
-    .filter((r) => {
-      const matchesSearch =
-        !searchQuery ||
-        (r.rule_ref || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.rule_desc || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.target || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.property_name || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus =
-        statusFilter === "ALL" || (r.status || "").toUpperCase() === statusFilter.toUpperCase();
-      return matchesSearch && matchesStatus;
-    })
-    .sort((a, b) => {
-      let valA: any = a[sortField];
-      let valB: any = b[sortField];
-      if (valA === undefined || valA === null) valA = "";
-      if (valB === undefined || valB === null) valB = "";
-      if (typeof valA === "string") valA = valA.toLowerCase();
-      if (typeof valB === "string") valB = valB.toLowerCase();
-      if (valA < valB) return sortAsc ? -1 : 1;
-      if (valA > valB) return sortAsc ? 1 : -1;
-      return 0;
-    });
-
-  $: totalItems = filteredResults.length;
-  $: paginatedResults = filteredResults.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
-
-  $: allFilteredSelected =
-    filteredResults.length > 0 &&
-    filteredResults.every((r) => selectedRuleRefs.includes(r.rule_ref));
-
-  function toggleSelectAll() {
-    if (allFilteredSelected) {
-      selectedRuleRefs = [];
-    } else {
-      selectedRuleRefs = filteredResults.map((r) => r.rule_ref);
-    }
-  }
-
-  function toggleSelectRule(ruleRef: string) {
-    if (selectedRuleRefs.includes(ruleRef)) {
-      selectedRuleRefs = selectedRuleRefs.filter((r) => r !== ruleRef);
-    } else {
-      selectedRuleRefs = [...selectedRuleRefs, ruleRef];
-    }
-  }
-
-  function toggleSort(field: "rule_ref" | "target" | "property_name" | "status" | "fail_count") {
-    if (sortField === field) {
-      sortAsc = !sortAsc;
-    } else {
-      sortField = field;
-      sortAsc = true;
-    }
-  }
-
   function exportResultsToCsv() {
-    const toExport = (testResponse?.results || []).filter((r) =>
-      selectedRuleRefs.includes(r.rule_ref),
-    );
-    const target = toExport.length ? toExport : filteredResults;
+    const target = table.selectedCount ? table.selectedRows : table.sorted;
     const headers = ["RuleReference", "Description", "Target", "Property", "Status", "PassCount", "FailCount", "MissingCount"];
     const rows = target.map((r) => [
       `"${(r.rule_ref || "").replace(/"/g, '""')}"`,
@@ -400,7 +349,7 @@ print(response.read())
           <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            bind:value={searchQuery}
+            bind:value={table.search}
             placeholder="Search rules by reference, target, property..."
             class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-accent"
           />
@@ -408,7 +357,7 @@ print(response.read())
 
         <div class="flex items-center gap-2 w-full sm:w-auto">
           <select
-            bind:value={statusFilter}
+            bind:value={table.filters.status}
             class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-50 focus:outline-none focus:border-accent"
           >
             <option value="ALL">All Verdicts</option>
@@ -420,9 +369,9 @@ print(response.read())
 
       <!-- Bulk Action Bar -->
       <BulkActionBar
-        selectedCount={selectedRuleRefs.length}
+        selectedCount={table.selectedCount}
         itemLabel="rule result"
-        onClearSelection={() => (selectedRuleRefs = [])}
+        onClearSelection={() => table.clearSelection()}
         onBulkExport={exportResultsToCsv}
         onBulkDelete={null}
         onBulkEdit={null}
@@ -438,24 +387,25 @@ print(response.read())
               >
                 <th class="py-3 px-3 w-10">
                   <TableCheckbox
-                    checked={allFilteredSelected}
-                    on:change={toggleSelectAll}
+                    checked={table.allFilteredSelected}
+                    indeterminate={table.someFilteredSelected}
+                    on:change={() => table.toggleSelectAll()}
                     title="Select all results"
                   />
                 </th>
-                <SortHeader column="rule_ref" {sortField} {sortAsc} onSort={toggleSort} customClass="py-3 px-3">
+                <SortHeader column="rule_ref" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
                   Rule Reference
                 </SortHeader>
-                <SortHeader column="target" {sortField} {sortAsc} onSort={toggleSort} customClass="py-3 px-3">
+                <SortHeader column="target" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
                   Target
                 </SortHeader>
-                <SortHeader column="property_name" {sortField} {sortAsc} onSort={toggleSort} customClass="py-3 px-3">
+                <SortHeader column="property_name" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
                   Property
                 </SortHeader>
-                <SortHeader column="status" {sortField} {sortAsc} onSort={toggleSort} customClass="py-3 px-3">
+                <SortHeader column="status" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
                   Status
                 </SortHeader>
-                <SortHeader column="fail_count" {sortField} {sortAsc} onSort={toggleSort} customClass="py-3 px-3">
+                <SortHeader column="fail_count" sortField={table.sortField} sortAsc={table.sortAsc} onSort={(f) => table.toggleSort(f)} customClass="py-3 px-3">
                   Pass / Fail / Missing
                 </SortHeader>
                 <th class="py-3 px-3">Violations</th>
@@ -463,19 +413,19 @@ print(response.read())
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
-              {#if paginatedResults.length === 0}
+              {#if table.paginated.length === 0}
                 <tr>
                   <td colspan="8" class="p-8 text-center text-xs text-slate-500">
                     No sync results match your filter criteria.
                   </td>
                 </tr>
               {:else}
-                {#each paginatedResults as rule}
-                  <tr class="hover:bg-slate-800/30 transition-colors {selectedRuleRefs.includes(rule.rule_ref) ? 'bg-blue-950/20' : ''}">
+                {#each table.paginated as rule (rule.rowId)}
+                  <tr class="hover:bg-slate-800/30 transition-colors {table.isSelected(rule.rowId) ? 'bg-blue-950/20' : ''}">
                     <td class="py-3 px-3 w-10">
                       <TableCheckbox
-                        checked={selectedRuleRefs.includes(rule.rule_ref)}
-                        on:change={() => toggleSelectRule(rule.rule_ref)}
+                        checked={table.isSelected(rule.rowId)}
+                        on:change={() => table.toggleSelect(rule.rowId)}
                         ariaLabel={`Select rule ${rule.rule_ref}`}
                       />
                     </td>
@@ -551,13 +501,13 @@ print(response.read())
         </div>
 
         <TablePagination
-          {currentPage}
-          {pageSize}
-          {totalItems}
-          onPageChange={(p) => (currentPage = p)}
-          onPageSizeChange={(s) => {
-            pageSize = s;
-            currentPage = 1;
+          currentPage={table.page}
+          pageSize={table.pageSize}
+          totalItems={table.totalItems}
+          onPageChange={(p) => (table.requestedPage = p)}
+          onPageSizeChange={(size) => {
+            table.pageSize = size;
+            table.requestedPage = 1;
           }}
         />
       </div>
