@@ -1,370 +1,224 @@
-# Design System Inspiration of BIMGuard
+# BIMGuard Design System
+
+BIMGuard is a dense, data-first OpenBIM compliance tool: long tables of findings,
+multi-step wizards, live pipeline telemetry, and a 3D viewport. It is **not** a
+marketing site, and this document describes what is actually built rather than an
+aspirational look. Where a rule below conflicts with the code, the code is the
+bug — except where a section explicitly marks itself as inspiration.
 
 ## Sources
 
-- [Components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui) _(visual reference implemented in Svelte 5 Tailwind components)_
-- [This Design](https://raw.githubusercontent.com/VoltAgent/awesome-design-md/refs/heads/main/design-md/apple/DESIGN.md)
+The visual language draws on Apple's product pages (single accent, tight
+tracking, restrained shadow) and on shadcn/basecoat component structure, adapted
+for information density:
+
+- [Apple DESIGN.md](https://raw.githubusercontent.com/VoltAgent/awesome-design-md/refs/heads/main/design-md/apple/DESIGN.md) — the template this document was derived from
+- [shadcn/ui components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui)
+- [basecoat css](https://github.com/hunvreus/basecoat/tree/main/src/css) / [js](https://github.com/hunvreus/basecoat/tree/main/src/js)
 - [What is DESIGN.md?](https://stitch.withgoogle.com/docs/design-md/overview)
-- [Svelte Frontend](frontend/README.md)
-- [basecoat/src/js](https://github.com/hunvreus/basecoat/tree/main/src/js)
-- [basecoat/src/css](https://github.com/hunvreus/basecoat/tree/main/src/css)
+- [Svelte frontend README](frontend/README.md)
 
-## 1. Visual Theme & Atmosphere
+**Deliberate divergences from the Apple template**, because a compliance audit
+tool is not a product showcase:
 
-BIMGuard's website is a masterclass in controlled drama — vast expanses of pure black and near-white serve as cinematic backdrops for products that are photographed as if they were sculptures in a gallery. The design philosophy is reductive to its core: every pixel exists in service of the product, and the interface itself retreats until it becomes invisible. This is not minimalism as aesthetic preference; it is minimalism as reverence for the object.
-
-The typography anchors everything. San Francisco (SF Pro Display for large sizes, SF Pro Text for body) is BIMGuard's proprietary typeface, engineered with optical sizing that automatically adjusts letterforms depending on point size. At display sizes (56px), weight 600 with a tight line-height of 1.07 and subtle negative letter-spacing (-0.28px) creates headlines that feel machined rather than typeset — precise, confident, and unapologetically direct. At body sizes (17px), the tracking loosens slightly (-0.374px) and line-height opens to 1.47, creating a reading rhythm that is comfortable without ever feeling slack.
-
-The color story is starkly binary. Product sections alternate between pure black (`#000000`) backgrounds with white text and light gray (`#f5f5f7`) backgrounds with near-black text (`#1d1d1f`). This creates a cinematic pacing — dark sections feel immersive and premium, light sections feel open and informational. The only chromatic accent is BIMGuard Blue (`#0071e3`), reserved exclusively for interactive elements: links, buttons, and focus states. This singular accent color in a sea of neutrals gives every clickable element unmistakable visibility.
-
-**Key Characteristics:**
-
-- SF Pro Display/Text with optical sizing — letterforms adapt automatically to size context
-- Binary light/dark section rhythm: black (`#000000`) alternating with light gray (`#f5f5f7`)
-- Single accent color: BIMGuard Blue (`#0071e3`) reserved exclusively for interactive elements
-- Product-as-hero photography on solid color fields — no gradients, no textures, no distractions
-- Extremely tight headline line-heights (1.07-1.14) creating compressed, billboard-like impact
-- Full-width section layout with centered content — the viewport IS the canvas
-- Pill-shaped CTAs (980px radius) creating soft, approachable action buttons
-- Generous whitespace between sections allowing each product moment to breathe
-
-## 2. Color Palette & Roles
-
-### Primary
-
-- **Pure Black** (`#000000`): Hero section backgrounds, immersive product showcases. The darkest canvas for the brightest products.
-- **Light Gray** (`#f5f5f7`): Alternate section backgrounds, informational areas. Not white — the slight blue-gray tint prevents sterility.
-- **Near Black** (`#1d1d1f`): Primary text on light backgrounds, dark button fills. Slightly warmer than pure black for comfortable reading.
-
-### Interactive
-
-- **BIMGuard Blue** (`#0071e3`): `--sk-focus-color`, primary CTA backgrounds, focus rings. The ONLY chromatic color in the interface.
-- **Link Blue** (`#0066cc`): `--sk-body-link-color`, inline text links. Slightly darker than BIMGuard Blue for text-level readability.
-- **Bright Blue** (`#2997ff`): Links on dark backgrounds. Higher luminance for contrast on black sections.
-
-### Text
-
-- **White** (`#ffffff`): Text on dark backgrounds, button text on blue/dark CTAs.
-- **Near Black** (`#1d1d1f`): Primary body text on light backgrounds.
-- **Black 80%** (`rgba(0, 0, 0, 0.8)`): Secondary text, nav items on light backgrounds. Slightly softened.
-- **Black 48%** (`rgba(0, 0, 0, 0.48)`): Tertiary text, disabled states, carousel controls.
-
-### Surface & Dark Variants
-
-- **Dark Surface 1** (`#272729`): Card backgrounds in dark sections.
-- **Dark Surface 2** (`#262628`): Subtle surface variation in dark contexts.
-- **Dark Surface 3** (`#28282a`): Elevated cards on dark backgrounds.
-- **Dark Surface 4** (`#2a2a2d`): Highest dark surface elevation.
-- **Dark Surface 5** (`#242426`): Deepest dark surface tone.
-
-### Button States
-
-- **Button Active** (`#ededf2`): Active/pressed state for light buttons.
-- **Button Default Light** (`#fafafc`): Search/filter button backgrounds.
-- **Overlay** (`rgba(210, 210, 215, 0.64)`): Media control scrims, overlays.
-- **White 32%** (`rgba(255, 255, 255, 0.32)`): Hover state on dark modal close buttons.
-
-### Shadows
-
-- **Card Shadow** (`rgba(0, 0, 0, 0.22) 3px 5px 30px 0px`): Soft, diffused elevation for product cards. Offset and wide blur create a natural, photographic shadow.
-
-## 3. Typography Rules
-
-### Font Family
-
-- **Display**: `SF Pro Display`, with fallbacks: `SF Pro Icons, Helvetica Neue, Helvetica, Arial, sans-serif`
-- **Body**: `SF Pro Text`, with fallbacks: `SF Pro Icons, Helvetica Neue, Helvetica, Arial, sans-serif`
-- SF Pro Display is used at 20px and above; SF Pro Text is optimized for 19px and below.
-
-### Hierarchy
-
-| Role | Font | Size | Weight | Line Height | Letter Spacing | Notes |
-|------|------|------|--------|-------------|----------------|-------|
-| Display Hero | SF Pro Display | 56px (3.50rem) | 600 | 1.07 (tight) | -0.28px | Product launch headlines, maximum impact |
-| Section Heading | SF Pro Display | 40px (2.50rem) | 600 | 1.10 (tight) | normal | Feature section titles |
-| Tile Heading | SF Pro Display | 28px (1.75rem) | 400 | 1.14 (tight) | 0.196px | Product tile headlines |
-| Card Title | SF Pro Display | 21px (1.31rem) | 700 | 1.19 (tight) | 0.231px | Bold card headings |
-| Sub-heading | SF Pro Display | 21px (1.31rem) | 400 | 1.19 (tight) | 0.231px | Regular card headings |
-| Nav Heading | SF Pro Text | 34px (2.13rem) | 600 | 1.47 | -0.374px | Large navigation headings |
-| Sub-nav | SF Pro Text | 24px (1.50rem) | 300 | 1.50 | normal | Light sub-navigation text |
-| Body | SF Pro Text | 17px (1.06rem) | 400 | 1.47 | -0.374px | Standard reading text |
-| Body Emphasis | SF Pro Text | 17px (1.06rem) | 600 | 1.24 (tight) | -0.374px | Emphasized body text, labels |
-| Button Large | SF Pro Text | 18px (1.13rem) | 300 | 1.00 (tight) | normal | Large button text, light weight |
-| Button | SF Pro Text | 17px (1.06rem) | 400 | 2.41 (relaxed) | normal | Standard button text |
-| Link | SF Pro Text | 14px (0.88rem) | 400 | 1.43 | -0.224px | Body links, "Learn more" |
-| Caption | SF Pro Text | 14px (0.88rem) | 400 | 1.29 (tight) | -0.224px | Secondary text, descriptions |
-| Caption Bold | SF Pro Text | 14px (0.88rem) | 600 | 1.29 (tight) | -0.224px | Emphasized captions |
-| Micro | SF Pro Text | 12px (0.75rem) | 400 | 1.33 | -0.12px | Fine print, footnotes |
-| Micro Bold | SF Pro Text | 12px (0.75rem) | 600 | 1.33 | -0.12px | Bold fine print |
-| Nano | SF Pro Text | 10px (0.63rem) | 400 | 1.47 | -0.08px | Legal text, smallest size |
-
-### Principles
-
-- **Optical sizing as philosophy**: SF Pro automatically switches between Display and Text optical sizes. Display versions have wider letter spacing and thinner strokes optimized for large sizes; Text versions are tighter and sturdier for small sizes. This means the font literally changes its DNA based on context.
-- **Weight restraint**: The scale spans 300 (light) to 700 (bold) but most text lives at 400 (regular) and 600 (semibold). Weight 300 appears only on large decorative text. Weight 700 is rare, used only for bold card titles.
-- **Negative tracking at all sizes**: Unlike most systems that only track headlines, BIMGuard applies subtle negative letter-spacing even at body sizes (-0.374px at 17px, -0.224px at 14px, -0.12px at 12px). This creates universally tight, efficient text.
-- **Extreme line-height range**: Headlines compress to 1.07 while body text opens to 1.47, and some button contexts stretch to 2.41. This dramatic range creates clear visual hierarchy through rhythm alone.
-
-## 4. Component Stylings
-
-### Buttons
-
-**Primary Blue (CTA)**
-
-- Background: `#0071e3` (BIMGuard Blue)
-- Text: `#ffffff`
-- Padding: 8px 15px
-- Radius: 8px
-- Border: 1px solid transparent
-- Font: SF Pro Text, 17px, weight 400
-- Hover: background brightens slightly
-- Active: `#ededf2` background shift
-- Focus: `2px solid var(--sk-focus-color, #0071E3)` outline
-- Use: Primary call-to-action ("Buy", "Shop iPhone")
-
-**Primary Dark**
-
-- Background: `#1d1d1f`
-- Text: `#ffffff`
-- Padding: 8px 15px
-- Radius: 8px
-- Font: SF Pro Text, 17px, weight 400
-- Use: Secondary CTA, dark variant
-
-**Pill Link (Learn More / Shop)**
-
-- Background: transparent
-- Text: `#0066cc` (light bg) or `#2997ff` (dark bg)
-- Radius: 980px (full pill)
-- Border: 1px solid `#0066cc`
-- Font: SF Pro Text, 14px-17px
-- Hover: underline decoration
-- Use: "Learn more" and "Shop" links — the signature BIMGuard inline CTA
-
-**Filter / Search Button**
-
-- Background: `#fafafc`
-- Text: `rgba(0, 0, 0, 0.8)`
-- Padding: 0px 14px
-- Radius: 11px
-- Border: 3px solid `rgba(0, 0, 0, 0.04)`
-- Focus: `2px solid var(--sk-focus-color, #0071E3)` outline
-- Use: Search bars, filter controls
-
-**Media Control**
-
-- Background: `rgba(210, 210, 215, 0.64)`
-- Text: `rgba(0, 0, 0, 0.48)`
-- Radius: 50% (circular)
-- Active: scale(0.9), background shifts
-- Focus: `2px solid var(--sk-focus-color, #0071e3)` outline, white bg, black text
-- Use: Play/pause, carousel arrows
-
-### Cards & Containers
-
-- Background: `#f5f5f7` (light) or `#272729`-`#2a2a2d` (dark)
-- Border: none (borders are rare in BIMGuard's system)
-- Radius: 5px-8px
-- Shadow: `rgba(0, 0, 0, 0.22) 3px 5px 30px 0px` for elevated product cards
-- Content: centered, generous padding
-- Hover: no standard hover state — cards are static, links within them are interactive
-
-### Navigation
-
-- Background: `rgba(0, 0, 0, 0.8)` (translucent dark) with `backdrop-filter: saturate(180%) blur(20px)`
-- Height: 48px (compact)
-- Text: `#ffffff` at 12px, weight 400
-- Active: underline on hover
-- Logo: BIMGuard logomark (SVG) centered or left-aligned, 17x48px viewport
-- Mobile: collapses to hamburger with full-screen overlay menu
-- The nav floats above content, maintaining its dark translucent glass regardless of section background
-
-### Image Treatment
-
-- Products on solid-color fields (black or white) — no backgrounds, no context, just the object
-- Full-bleed section images that span the entire viewport width
-- Product photography at extremely high resolution with subtle shadows
-- Lifestyle images confined to rounded-corner containers (12px+ radius)
-
-### Distinctive Components
-
-**Product Hero Module**
-
-- Full-viewport-width section with solid background (black or `#f5f5f7`)
-- Product name as the primary headline (SF Pro Display, 56px, weight 600)
-- One-line descriptor below in lighter weight
-- Two pill CTAs side by side: "Learn more" (outline) and "Buy" / "Shop" (filled)
-
-**Product Grid Tile**
-
-- Square or near-square card on contrasting background
-- Product image dominating 60-70% of the tile
-- Product name + one-line description below
-- "Learn more" and "Shop" link pair at bottom
-
-**Feature Comparison Strip**
-
-- Horizontal scroll of product variants
-- Each variant as a vertical card with image, name, and key specs
-- Minimal chrome — the products speak for themselves
-
-## 5. Layout Principles
-
-### Spacing System
-
-- Base unit: 8px
-- Scale: 2px, 4px, 5px, 6px, 7px, 8px, 9px, 10px, 11px, 14px, 15px, 17px, 20px, 24px
-- Notable characteristic: the scale is dense at small sizes (2-11px) with granular 1px increments, then jumps in larger steps. This allows precise micro-adjustments for typography and icon alignment.
-
-### Grid & Container
-
-- Max content width: approximately 980px (the recurring "980px radius" in pill buttons echoes this width)
-- Hero: full-viewport-width sections with centered content block
-- Product grids: 2-3 column layouts within centered container
-- Single-column for hero moments — one product, one message, full attention
-- No visible grid lines or gutters — spacing creates implied structure
-
-### Whitespace Philosophy
-
-- **Cinematic breathing room**: Each product section occupies a full viewport height (or close to it). The whitespace between products is not empty — it is the pause between scenes in a film.
-- **Vertical rhythm through color blocks**: Rather than using spacing alone to separate sections, BIMGuard uses alternating background colors (black, `#f5f5f7`, white). Each color change signals a new "scene."
-- **Compression within, expansion between**: Text blocks are tightly set (negative letter-spacing, tight line-heights) while the space surrounding them is vast. This creates a tension between density and openness.
-
-### Border Radius Scale
-
-- Micro (5px): Small containers, link tags
-- Standard (8px): Buttons, product cards, image containers
-- Comfortable (11px): Search inputs, filter buttons
-- Large (12px): Feature panels, lifestyle image containers
-- Full Pill (980px): CTA links ("Learn more", "Shop"), navigation pills
-- Circle (50%): Media controls (play/pause, arrows)
-
-## 6. Depth & Elevation
-
-| Level | Treatment | Use |
-|-------|-----------|-----|
-| Flat (Level 0) | No shadow, solid background | Standard content sections, text blocks |
-| Navigation Glass | `backdrop-filter: saturate(180%) blur(20px)` on `rgba(0,0,0,0.8)` | Sticky navigation bar — the glass effect |
-| Subtle Lift (Level 1) | `rgba(0, 0, 0, 0.22) 3px 5px 30px 0px` | Product cards, floating elements |
-| Media Control | `rgba(210, 210, 215, 0.64)` background with scale transforms | Play/pause buttons, carousel controls |
-| Focus (Accessibility) | `2px solid #0071e3` outline | Keyboard focus on all interactive elements |
-
-**Shadow Philosophy**: BIMGuard uses shadow extremely sparingly. The primary shadow (`3px 5px 30px` with 0.22 opacity) is soft, wide, and offset — mimicking a diffused studio light casting a natural shadow beneath a physical object. This reinforces the "product as physical sculpture" metaphor. Most elements have NO shadow at all; elevation comes from background color contrast (dark card on darker background, or light card on slightly different gray).
-
-### Decorative Depth
-
-- Navigation glass: the translucent, blurred navigation bar is the most recognizable depth element, creating a sense of floating UI above scrolling content
-- Section color transitions: depth is implied by the alternation between black and light gray sections rather than by shadows
-- Product photography shadows: the products themselves cast shadows in their photography, so the UI doesn't need to add synthetic ones
+| Apple rule | BIMGuard | Why |
+| --- | --- | --- |
+| No borders on cards | Borders on every card (`border-slate-800`) | Dense grids need explicit boundaries; contrast alone cannot separate 40 stacked rows |
+| 980px pill CTAs | 8–12px radius buttons | Pills read as marketing; rectangular controls sit correctly in toolbars |
+| ~980px max content width | Full viewport width | Tables need every pixel |
+| Black ↔ light-gray section rhythm | One continuous canvas | There are no "sections" — there are views |
+| SF Pro optical sizing | Inter at one optical size | SF Pro does not exist off macOS; the app runs on Windows and Linux |
+
+## 1. Theme architecture (authoritative)
+
+**One palette, inverted.** `frontend/tailwind.config.js` maps the `slate` scale
+onto CSS custom properties, and `frontend/src/app.css` defines those properties
+twice — once for dark, once for light, with the ramp reversed:
+
+```css
+:root, html.dark   { --color-slate-950: 2 6 23;      --color-slate-50: 248 250 252; }
+html.light         { --color-slate-950: 248 250 252; --color-slate-50: 2 6 23;      }
+```
+
+Consequences to internalise before writing markup:
+
+- **Never write a `dark:` variant.** `bg-slate-900` is a near-black card in dark
+  mode and a white card in light mode, automatically.
+- **`text-slate-50` is "primary text".** Near-white in dark mode, near-black in
+  light mode. Use it for headings, labels and input values.
+- **`text-white` means "always white"** and is reserved for text sitting on a
+  solid coloured control (an accent button, a rose delete button, a gradient
+  badge). Using it for ordinary text produces white-on-white in light mode.
+- Semantic ramp: `slate-950` canvas → `slate-900` card → `slate-800` border →
+  `slate-700` interactive border/hover → `slate-500/400` metadata → `slate-300`
+  body → `slate-50` primary text.
+
+Theme state lives in `frontend/src/lib/theme.ts` (`light | dark | system`,
+persisted at `localStorage['bimguard_theme']`, default dark) with a blocking
+FOUC-prevention script in `index.html`.
+
+## 2. Colour
+
+### The single accent
+
+`--color-accent` / `--color-accent-hover`, exposed as the Tailwind `accent`
+colour. Use `bg-accent`, `text-accent`, `border-accent`, `ring-accent`,
+`hover:bg-accent-hover`. **Never type the hex.**
+
+| Theme | Accent | Hover |
+| --- | --- | --- |
+| Dark | `#0071e3` | `#0077ed` |
+| Light | `#0066cc` (AA on white) | `#0071e3` |
+
+The accent is reserved for interactive elements — primary buttons, focus rings,
+active nav, links, selected states. It is not a decorative colour.
+
+### Severity banding
+
+Defined once in `frontend/src/lib/severity.ts` and consumed by `<SeverityBadge>`
+and `<Badge>`. Do not restate these anywhere else:
+
+| Band | Hue | Meaning |
+| --- | --- | --- |
+| `critical` | rose | Must be resolved before the model progresses |
+| `high` | amber | Significant compliance risk |
+| `medium` | yellow | Should be reviewed |
+| `low` | emerald | Tolerable / passing |
+| `data_quality` | indigo | Doctrine-exempt: could not be assessed, not a violation |
+| `neutral` | slate | No band |
+
+Status colours for pipeline state (`complete`, `running`, `pending`, `failed`)
+live in `<Badge>`.
+
+Outside the accent and these bands, colour is not a design tool here.
+
+## 3. Typography
+
+**Inter** for UI, **JetBrains Mono** for code, GUIDs, hashes and file paths.
+Both are loaded in `index.html`; the stacks in `app.css` must keep naming them.
+
+Negative tracking applies at every size (`-0.015em` body, `-0.025em` headings).
+
+| Token | Size | Use |
+| --- | --- | --- |
+| `text-nano` | 9px | Dense table metadata, unit suffixes |
+| `text-micro` | 10px | Badges, chips, table cell metadata |
+| `text-caption` | 11px | Labels, secondary table text, toolbar buttons |
+| `text-xs` | 12px | Default body text in tables and modals |
+| `text-sm` | 14px | Nav items, form inputs |
+| `text-base` | 16px | Section headings |
+| `text-lg`–`text-3xl` | 18–30px | Page titles, stat values |
+
+The sub-12px steps exist because this is a data tool; do not invent more with
+`text-[Npx]`. Weights: 400 and 600 carry almost everything; 700 for stat values.
+Never 800/900.
+
+## 4. Components
+
+Compose from `frontend/src/lib/components/` — see §12. General rules:
+
+- **Buttons.** Primary: `bg-accent text-white`, `rounded-xl`, `px-3.5 py-2`,
+  `text-caption font-semibold`. Secondary: `bg-slate-950 border border-slate-800
+  text-slate-200 hover:bg-slate-800`. Destructive: `bg-rose-600 text-white`.
+  Every button needs a `type` and a disabled state.
+- **Inputs.** `w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5
+  py-2.5 text-xs text-slate-50 focus:border-accent`. Always paired with a
+  `<label for>`.
+- **Cards.** `bg-slate-900/60 border border-slate-800 rounded-xl`. Borders stay,
+  contrary to the Apple template.
+- **Glass.** `.apple-blur` (`saturate(180%) blur(20px)`) on sticky headers and
+  the sidebar only.
+
+## 5. Layout
+
+- 8px base unit; Tailwind's default spacing scale is already on it.
+- Radius: `rounded-sm` 5px, `rounded`/`rounded-md` 8px, `rounded-lg` 11px,
+  `rounded-xl`/`rounded-2xl` 12px. `rounded-full` for pills, dots and avatars.
+  **Nothing rectangular exceeds 12px.**
+- Content fills the viewport. Tables scroll horizontally inside
+  `overflow-x-auto`; the page body never scrolls sideways.
+
+## 6. Depth & motion
+
+Elevation comes from background contrast plus a hairline border, not shadow.
+Shadow is reserved for floating layers: modals, dropdowns, the bulk action bar.
+
+| Level | Treatment |
+| --- | --- |
+| Flat | Solid surface, no shadow — the default |
+| Card | `border border-slate-800` |
+| Glass | `.apple-blur` on sticky nav/header |
+| Floating | `shadow-2xl` on modals and popovers |
+| Focus | `2px` accent ring on **every** interactive element |
+
+Motion is functional: `animate-in fade-in`, `zoom-in-95`, `duration-200` for
+entrances (via `tailwindcss-animate`), `animate-spin` for pending work. All of it
+is disabled under `prefers-reduced-motion`, which `app.css` honours globally.
 
 ## 7. Do's and Don'ts
 
 ### Do
 
-- Use SF Pro Display at 20px+ and SF Pro Text below 20px — respect the optical sizing boundary
-- Apply negative letter-spacing at all text sizes (not just headlines) — BIMGuard tracks tight universally
-- Use BIMGuard Blue (`#0071e3`) ONLY for interactive elements — it must be the singular accent
-- Alternate between black and light gray (`#f5f5f7`) section backgrounds for cinematic rhythm
-- Use 980px pill radius for CTA links — the signature BIMGuard link shape
-- Keep product imagery on solid-color fields with no competing visual elements
-- Use the translucent dark glass (`rgba(0,0,0,0.8)` + blur) for sticky navigation
-- Compress headline line-heights to 1.07-1.14 — BIMGuard headlines are famously tight
+- Use `accent` tokens for every interactive element — it is the only chromatic accent
+- Use `text-slate-50` for primary text; reserve `text-white` for coloured controls
+- Let the slate inversion do the theming; add no `dark:` variants
+- Give every interactive element a visible `:focus-visible` ring
+- Compose from `lib/components/` before writing new markup
+- Keep negative tracking at all sizes
+- Put wide content in `overflow-x-auto`
+- Give every `{#each}` a key
 
 ### Don't
 
-- Don't introduce additional accent colors — the entire chromatic budget is spent on blue
-- Don't use heavy shadows or multiple shadow layers — BIMGuard's shadow system is one soft diffused shadow or nothing
-- Don't use borders on cards or containers — BIMGuard almost never uses visible borders (except on specific buttons)
-- Don't apply wide letter-spacing to SF Pro — it is designed to run tight at every size
-- Don't use weight 800 or 900 — the maximum is 700 (bold), and even that is rare
-- Don't add textures, patterns, or gradients to backgrounds — solid colors only
-- Don't make the navigation opaque — the glass blur effect is essential to the BIMGuard UI identity
-- Don't center-align body text — BIMGuard body copy is left-aligned; only headlines center
-- Don't use rounded corners larger than 12px on rectangular elements (980px is for pills only)
+- Don't type a hex colour in a component — use the token
+- Don't add `text-[Npx]` — the ramp already goes down to 9px
+- Don't introduce accent colours beyond the accent and the severity bands
+- Don't use radius above 12px on rectangles
+- Don't use `!important` to fix a theme problem — fix the token
+- Don't use weight 800 or 900
+- Don't add textures, patterns or decorative gradients
+- Don't hand-roll a modal, table, badge or empty state that `lib/components/` already provides
+- Don't call `fetch` from a component — go through `lib/api.ts`
 
-## 8. Responsive Behavior
+## 8. Responsive behaviour
 
-### Breakpoints
+Tailwind's default breakpoints: `sm` 640, `md` 768, `lg` 1024, `xl` 1280,
+`2xl` 1536.
 
-| Name | Width | Key Changes |
-|------|-------|-------------|
-| Small Mobile | <360px | Minimum supported, single column |
-| Mobile | 360-480px | Standard mobile layout |
-| Mobile Large | 480-640px | Wider single column, larger images |
-| Tablet Small | 640-834px | 2-column product grids begin |
-| Tablet | 834-1024px | Full tablet layout, expanded nav |
-| Desktop Small | 1024-1070px | Standard desktop layout begins |
-| Desktop | 1070-1440px | Full layout, max content width |
-| Large Desktop | >1440px | Centered with generous margins |
+| Range | Behaviour |
+| --- | --- |
+| <768px | Sidebar collapses to an off-canvas drawer behind a hamburger; single-column forms; tables scroll horizontally |
+| 768–1024px | Sidebar collapsible to icons; two-column forms |
+| >1024px | Full sidebar, multi-column layouts |
 
-### Touch Targets
+Touch targets are at least 44×44px below `md`. Navigation links are 48px tall.
+The 3D viewport must not claim a fixed height taller than the viewport.
 
-- Primary CTAs: 8px 15px padding creating ~44px touch height
-- Navigation links: 48px height with adequate spacing
-- Media controls: 50% radius circular buttons, minimum 44x44px
-- "Learn more" pills: generous padding for comfortable tapping
+## 9. Agent guide
 
-### Collapsing Strategy
+### Quick reference
 
-- Hero headlines: 56px Display → 40px → 28px on mobile, maintaining tight line-height proportionally
-- Product grids: 3-column → 2-column → single column stacked
-- Navigation: full horizontal nav → compact mobile menu (hamburger)
-- Product hero modules: full-bleed maintained at all sizes, text scales down
-- Section backgrounds: maintain full-width color blocks at all breakpoints — the cinematic rhythm never breaks
-- Image sizing: products scale proportionally, never crop — the product silhouette is sacred
+- Interactive: `bg-accent` / `text-accent` / `ring-accent`
+- Canvas `bg-slate-950`, card `bg-slate-900`, border `border-slate-800`
+- Primary text `text-slate-50`, body `text-slate-300`, metadata `text-slate-400`
+- Severity: import from `lib/severity.ts`, never restate
+- Class composition: `cn()` from `lib/utils/cn.ts`
 
-### Image Behavior
+### Before writing a component, ask
 
-- Product photography maintains aspect ratio at all breakpoints
-- Hero product images scale down but stay centered
-- Full-bleed section backgrounds persist at every size
-- Lifestyle images may crop on mobile but maintain their rounded corners
-- Lazy loading for below-fold product images
-
-## 9. Agent Prompt Guide
-
-### Quick Color Reference
-
-- Primary CTA: BIMGuard Blue (`#0071e3`)
-- Page background (light): `#f5f5f7`
-- Page background (dark): `#000000`
-- Heading text (light): `#1d1d1f`
-- Heading text (dark): `#ffffff`
-- Body text: `rgba(0, 0, 0, 0.8)` on light, `#ffffff` on dark
-- Link (light bg): `#0066cc`
-- Link (dark bg): `#2997ff`
-- Focus ring: `#0071e3`
-- Card shadow: `rgba(0, 0, 0, 0.22) 3px 5px 30px 0px`
-
-### Example Component Prompts
-
-- "Create a hero section on black background. Headline at 56px SF Pro Display weight 600, line-height 1.07, letter-spacing -0.28px, color white. One-line subtitle at 21px SF Pro Display weight 400, line-height 1.19, color white. Two pill CTAs: 'Learn more' (transparent bg, white text, 1px solid white border, 980px radius) and 'Buy' (BIMGuard Blue #0071e3 bg, white text, 8px radius, 8px 15px padding)."
-- "Design a product card: #f5f5f7 background, 8px border-radius, no border, no shadow. Product image top 60% of card on solid background. Title at 28px SF Pro Display weight 400, letter-spacing 0.196px, line-height 1.14. Description at 14px SF Pro Text weight 400, color rgba(0,0,0,0.8). 'Learn more' and 'Shop' links in #0066cc at 14px."
-- "Build the BIMGuard navigation: sticky, 48px height, background rgba(0,0,0,0.8) with backdrop-filter: saturate(180%) blur(20px). Links at 12px SF Pro Text weight 400, white text. BIMGuard logo left, links centered, search and bag icons right."
-- "Create an alternating section layout: first section black bg with white text and centered product image, second section #f5f5f7 bg with #1d1d1f text. Each section near full-viewport height with 56px headline and two pill CTAs below."
-- "Design a 'Learn more' link: text #0066cc on light bg or #2997ff on dark bg, 14px SF Pro Text, underline on hover. After the text, include a right-arrow chevron character (>). Wrap in a container with 980px border-radius for pill shape when used as a standalone CTA."
-
-### Iteration Guide
-
-1. Every interactive element gets BIMGuard Blue (`#0071e3`) — no other accent colors
-2. Section backgrounds alternate: black for immersive moments, `#f5f5f7` for informational moments
-3. Typography optical sizing: SF Pro Display at 20px+, SF Pro Text below — never mix
-4. Negative letter-spacing at all sizes: -0.28px at 56px, -0.374px at 17px, -0.224px at 14px, -0.12px at 12px
-5. The navigation glass effect (translucent dark + blur) is non-negotiable — it defines the BIMGuard web experience
-6. Products always appear on solid color fields — never on gradients, textures, or lifestyle backgrounds in hero modules
-7. Shadow is rare and always soft: `3px 5px 30px 0.22 opacity` or nothing at all
-8. Pill CTAs use 980px radius — this creates the signature BIMGuard rounded-rectangle-that-looks-like-a-capsule shape
+1. Does `lib/components/` already have it? (§12)
+2. Is every colour a token — no hex, no `text-[Npx]`?
+3. Does it read correctly in **both** themes? Any `text-white` on a slate surface is a bug.
+4. Is it keyboard-reachable, with a visible focus ring and a label?
+5. If it is a table, does it meet §11 in full?
+6. Does it work at 375px wide?
 
 ## 10. Decoupled Svelte SPA Component System
 
 The standalone frontend (`frontend/src/`) translates these design principles into modern Svelte 5 + Tailwind CSS components:
 
-- **Surface Treatment**: Dark glassmorphic headers (`bg-slate-900/80 backdrop-blur-md`), elevated dark cards (`bg-slate-900/60 border-slate-800`), and deep canvas backgrounds (`bg-slate-950`).
-- **Accent Rhythm**: Emerald (`#10b981`) and BIMGuard Blue interactive states, with dedicated risk banding for compliance findings:
-  - Critical: `rose-500`
-  - High: `amber-500`
-  - Medium: `yellow-400`
-  - Low / Tolerable: `emerald-500`
+- **Surface Treatment**: Glassmorphic headers (`bg-slate-900/80 backdrop-blur-md`), elevated cards (`bg-slate-900/60 border-slate-800`), and the deep canvas background (`bg-slate-950`) — each inverting with the theme per §1.
+- **Accent Rhythm**: The single `accent` token for interactive states, with dedicated risk banding for compliance findings drawn from `lib/severity.ts` (§2).
 - **Real-Time Instrumentation**: The `PipelineProgress` component features animated SSE stream status pings, stage step meters, and dynamic metrics chips reflecting the active physics engines.
 - **3D OpenBIM Viewport**: Enclosed viewport canvas (`IfcViewer.svelte`) featuring dark frame styling and model isolation.
 
@@ -372,12 +226,12 @@ The standalone frontend (`frontend/src/`) translates these design principles int
 
 Every data table across the application (Projects, Documents, Reports & BCF, Rules Catalog, Extracted Rules, Findings & Issues, Revit Sync) must follow these strict UX design rules:
 
-- **Multiple Selection**: Per-row checkboxes (`w-4 h-4 rounded bg-slate-950 border-slate-700 text-[#0071e3]`), header master checkbox with indeterminate and selected states, and selected row highlights (`bg-blue-950/20`).
+- **Multiple Selection**: Per-row checkboxes (`w-4 h-4 rounded bg-slate-950 border-slate-700 text-accent`), header master checkbox with indeterminate and selected states, and selected row highlights (`bg-blue-950/20`).
 - **Bulk Action Bar**: Sticky/floating `BulkActionBar.svelte` displaying the selected item count, quick clear button, bulk edit modal launcher, bulk delete launcher, and export buttons.
 - **Table Pagination**: Uniform `TablePagination.svelte` at the footer of every table showing the current page, page size options (10, 25, 50, 100), item range (`Showing 1 to 10 of 42`), and navigation controls.
 - **Search & Multi-Attribute Filters**: Filter toolbar placed above tables with a search input (`Search` icon) and categorized dropdown filters.
 - **Column Sorting**: Interactive header buttons with ascending/descending arrow indicators.
-- **CRUD Modals & Confirmations**: High-polish dark modals for creation, editing, inspecting full details, and deleting with explicit confirmation dialogs.
+- **CRUD Modals & Confirmations**: Modals for creation, editing, inspecting full details, and deleting with explicit confirmation dialogs.
 
 ## 12. Reusable UI Component Building Blocks
 
@@ -393,5 +247,3 @@ To maintain cohesive design patterns and avoid duplicate markup, all UI views mu
 - **`<LoadingState.svelte>`**: Spinner loading container with configurable message and sub-message.
 - **`<SeverityBadge.svelte>`**: Universal pill badge for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
 - **`<IsoGovernanceBadges.svelte>`**: Standard ISO 19650 metadata tags (Suitability `S0`–`S7`, Revision `P01.01`, CDE State `WIP`/`SHARED`/`PUBLISHED`/`ARCHIVED`).
-
-
