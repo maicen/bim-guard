@@ -638,6 +638,15 @@ export interface GarageResult {
   passes: boolean;
 }
 
+/** One ISO 19650 whole-model check result. Mirrors iso19650_check.py's per-check dict. */
+export interface IsoCheckResult {
+  check: string;
+  severity: "critical" | "error" | "warning" | string;
+  passes: boolean;
+  message: string;
+  details?: Record<string, any>;
+}
+
 export interface ArchAnalysisResult {
   project_id: number;
   project_name: string;
@@ -650,6 +659,7 @@ export interface ArchAnalysisResult {
   building_summary?: BuildingSummary;
   spatial_checks?: Record<string, any>;
   egress_checks?: Record<string, any>;
+  iso_checks?: Record<string, any>;
   rule_compliance?: RuleComplianceResult[];
   rule_folder?: string;
   ifc_element_count?: number;

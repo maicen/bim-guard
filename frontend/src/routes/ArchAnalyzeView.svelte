@@ -22,6 +22,7 @@
     FolderOpen,
     CheckCircle2,
     Save,
+    FileCheck,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, lineageApi, rulesApi } from "../lib/api";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
@@ -37,6 +38,7 @@
     DaylightResult,
     FireSeparationResult,
     GarageResult,
+    IsoCheckResult,
     RuleFolder,
   } from "../lib/types";
 
@@ -291,6 +293,7 @@
       category: "fire",
     },
     { key: "garage", label: "Garage / Carport", targets: [], category: "garage" },
+    { key: "iso19650", label: "ISO 19650 Compliance", targets: [], category: "iso19650" },
   ];
 
   function getDomainRules(targets: string[]): RuleComplianceResult[] {
@@ -327,6 +330,9 @@
     if ([...exitResults, ...travel].some((x: any) => !x.passes)) openDomains["egress"] = true;
     const fireSep = (r.spatial_checks || {}).fire_separation || [];
     if (fireSep.some((x: any) => !x.passes)) openDomains["fire"] = true;
+    const isoResults: IsoCheckResult[] = (r.iso_checks || {}).results || [];
+    if (isoResults.some((x) => !x.passes && (x.severity === "critical" || x.severity === "error")))
+      openDomains["iso19650"] = true;
   }
 
   function toggleDomain(key: string) {
@@ -1096,6 +1102,87 @@
                         <td class="px-3 py-2 font-mono text-xs text-slate-400"
                           >≥ {r.required_min} min</td
                         >
+                        <td
+                          class="px-3 py-2 text-xs font-semibold {r.passes
+                            ? 'text-emerald-400'
+                            : 'text-rose-400'}">{r.passes ? "✓ Pass" : "✗ Fail"}</td
+                        >
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {/if}
+        </div>
+      {:else if domain.key === "iso19650"}
+        <!-- ISO 19650 whole-model compliance -->
+        {@const isoResults = ((result.iso_checks || {}).results || []) as IsoCheckResult[]}
+        {@const isoFailed = isoResults.filter((r) => !r.passes)}
+        {@const isoCritical = isoFailed.filter((r) => r.severity === "critical").length}
+        {@const isoOther = isoFailed.length - isoCritical}
+        {@const isoBadge = !isoResults.length
+          ? { label: "N/A", cls: "bg-slate-800 text-slate-400 border-slate-700" }
+          : isoCritical > 0
+            ? {
+                label: `${isoCritical} critical issue(s)`,
+                cls: "bg-rose-950/80 text-rose-300 border-rose-800",
+              }
+            : isoOther > 0
+              ? {
+                  label: `${isoOther} issue(s)`,
+                  cls: "bg-amber-950/80 text-amber-300 border-amber-800",
+                }
+              : { label: "All pass", cls: "bg-emerald-950/80 text-emerald-300 border-emerald-800" }}
+
+        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/30"
+            onclick={() => toggleDomain(domain.key)}
+          >
+            <div class="flex items-center gap-3">
+              <FileCheck class="h-4 w-4 text-slate-300" />
+              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <span
+                class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {isoBadge.cls}"
+                >{isoBadge.label}</span
+              >
+            </div>
+            {#if isOpen}<ChevronDown class="h-4 w-4 text-slate-400" />{:else}<ChevronRight
+                class="h-4 w-4 text-slate-400"
+              />{/if}
+          </button>
+          {#if isOpen && isoResults.length}
+            <div class="px-4 pb-5">
+              <div class="max-h-64 overflow-auto rounded-lg border border-slate-800">
+                <table class="w-full text-xs">
+                  <thead
+                    ><tr class="bg-slate-800/80">
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">Check</th>
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                        >Severity</th
+                      >
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                        >Message</th
+                      >
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                        >Status</th
+                      >
+                    </tr></thead
+                  >
+                  <tbody>
+                    {#each [...isoResults].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r.check)}
+                      <tr class="border-b border-slate-800/60 last:border-0">
+                        <td class="px-3 py-2 text-xs font-semibold text-slate-50">{r.check}</td>
+                        <td
+                          class="px-3 py-2 text-xs font-mono {r.severity === 'critical'
+                            ? 'text-rose-400'
+                            : r.severity === 'error'
+                              ? 'text-amber-400'
+                              : 'text-slate-400'}">{r.severity}</td
+                        >
+                        <td class="px-3 py-2 text-xs text-slate-300">{r.message}</td>
                         <td
                           class="px-3 py-2 text-xs font-semibold {r.passes
                             ? 'text-emerald-400'
