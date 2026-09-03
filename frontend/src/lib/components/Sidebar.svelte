@@ -158,7 +158,9 @@
     {#each NAV_SECTIONS as section (section)}
       <div class="space-y-1">
         {#if !collapsed}
-          <div class="px-2.5 py-1 text-caption font-bold uppercase tracking-wider text-slate-500">
+          <div
+            class="rounded-lg bg-slate-800/60 px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-slate-400"
+          >
             {section.title}
           </div>
         {/if}

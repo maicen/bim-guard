@@ -6,7 +6,7 @@
   import { projectsApi } from "../lib/api";
   import type { Project, ProjectIfcFile } from "../lib/types";
   import IfcViewer from "../lib/components/IfcViewer.svelte";
-  import { ScanEye, Layers } from "lucide-svelte";
+  import { ScanEye, Layers, Building2, ChevronDown } from "lucide-svelte";
 
   interface Props {
     initialProjectId?: number | null;
@@ -107,45 +107,48 @@
 </script>
 
 <div class="mx-auto space-y-6">
-  <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-    <div>
-      <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Viewer</div>
-      <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">3D OpenBIM Viewer</h1>
-      <p class="text-xs text-slate-400 sm:text-sm">
-        Spatial geometry inspection powered by ThatOpenCompany web-ifc and BCF viewpoints.
-      </p>
-    </div>
+  <div>
+    <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Viewer</div>
+    <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">3D OpenBIM Viewer</h1>
+    <p class="text-xs text-slate-400 sm:text-sm">
+      Spatial geometry inspection powered by ThatOpenCompany web-ifc and BCF viewpoints.
+    </p>
+  </div>
 
-    <!-- Project dropdown -->
-    {#if projects.length > 0}
-      <div class="flex items-center gap-3">
-        <label
-          for="viewer-project-select"
-          class="text-xs font-semibold uppercase tracking-wider text-slate-400"
-        >
-          Project:
-        </label>
+  <!-- ═══ Project Selector ═══ -->
+  {#if projects.length > 0}
+    <div
+      class="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-slate-900/50 p-4 sm:flex-row sm:items-center"
+    >
+      <div class="flex shrink-0 items-center gap-2">
+        <Building2 class="h-4 w-4 text-accent" />
+        <span class="text-xs font-bold text-slate-300">Project</span>
+      </div>
+      <div class="relative flex-1 sm:max-w-xs">
         <select
           id="viewer-project-select"
           bind:value={selectedProjectId}
-          class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
         >
           {#each projects as p (p.id)}
             <option value={p.id}>{p.name} (#{p.id})</option>
           {/each}
         </select>
+        <ChevronDown
+          class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+        />
+      </div>
 
-        {#if ifcFiles.length > 1}
-          <label
-            for="viewer-file-select"
-            class="text-xs font-semibold uppercase tracking-wider text-slate-400"
-          >
-            Viewing:
-          </label>
+      {#if ifcFiles.length > 1}
+        <div class="flex shrink-0 items-center gap-2 sm:border-l sm:border-slate-800 sm:pl-3">
+          <Layers class="h-4 w-4 text-accent" />
+          <span class="text-xs font-bold text-slate-300">Viewing</span>
+        </div>
+        <div class="relative flex-1 sm:max-w-[260px]">
           <select
             id="viewer-file-select"
             bind:value={selectedFileId}
-            class="max-w-[260px] rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
           >
             {#each ifcFiles as file (file.id)}
               <option value={file.id}>
@@ -155,10 +158,13 @@
               </option>
             {/each}
           </select>
-        {/if}
-      </div>
-    {/if}
-  </div>
+          <ChevronDown
+            class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+          />
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if ifcFiles.length > 1}
     <div
