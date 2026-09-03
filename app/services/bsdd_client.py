@@ -421,7 +421,7 @@ class BSDDClient:
             return []
 
         matches = self.search_classes(query, dictionary_uri)
-        candidate_classes = list(matches.classes)
+        candidate_classes = list(matches.classes)[:10]
 
         # Live class search results carry no nested properties (bSDD's
         # TextSearch endpoint returns bare class refs) — fetch each match's
