@@ -240,6 +240,11 @@ def derive_flight_steps(bands: list[dict]) -> dict:
     if len(bands) < 2:
         return {
             "tread_count": len(bands),
+            # None (undetermined), not 0: fewer than 2 tread bands means we
+            # genuinely don't know how many risers this flight has, matching
+            # every other field below -- a determinate 0 would be read as
+            # "no risers", a claim about the model this result never made.
+            "riser_count": None,
             "goings_mm": [],
             "risers_mm": [],
             "min_going_mm": None,
@@ -261,6 +266,11 @@ def derive_flight_steps(bands: list[dict]) -> dict:
 
     return {
         "tread_count": len(bands),
+        # Mid-flight risers only (len(bands) - 1), same high-confidence scope
+        # as risers_mm/goings_mm -- see the docstring above for why the two
+        # boundary risers (floor-to-first-tread, last-tread-to-landing)
+        # aren't counted here.
+        "riser_count": len(bands) - 1,
         "goings_mm": goings,
         "risers_mm": risers,
         "min_going_mm": round(min(goings), 1),
@@ -456,6 +466,10 @@ def analyze_stair_flight(
 
     bottom_z = geometry_extractor.get_bottom_z_mm(flight)
     top_z = geometry_extractor.get_top_z_mm(flight)
+    if bottom_z is not None:
+        result["start_elevation_mm"] = round(bottom_z, 1)
+    if top_z is not None:
+        result["end_elevation_mm"] = round(top_z, 1)
     if bottom_z is not None and top_z is not None:
         result["total_rise_mm"] = round(top_z - bottom_z, 1)
 
@@ -673,7 +687,7 @@ def analyze_landing(slab, geometry_extractor) -> dict:
         result["warnings"].append("numpy or geometry extractor unavailable")
         return result
 
-    verts, _faces = geometry_extractor._get_mesh_mm(slab)
+    verts, faces = geometry_extractor._get_mesh_mm(slab)
     if verts is None or verts.shape[0] < 3:
         result["warnings"].append("no resolvable geometry for this landing")
         return result
@@ -699,9 +713,19 @@ def analyze_landing(slab, geometry_extractor) -> dict:
     if top_z is not None:
         result["elevation_mm"] = top_z
 
-    slope = geometry_extractor.get_slope_deg(slab)
-    if slope is not None:
-        result["slope_deg"] = slope
+    # Walking-surface slope, NOT geometry_extractor.get_slope_deg(): that
+    # generic Tier 1 method divides the WHOLE element's bounding-box Z-extent
+    # by its horizontal extent, which for a landing reads its own THICKNESS
+    # as slope -- a perfectly flat 200mm-thick slab over a 1200mm footprint
+    # would report ~9.5 degrees. Isolating the top (upward-facing) surface
+    # first, the same way analyze_stair_flight isolates tread tops, measures
+    # the walking surface's own tilt instead.
+    top_pts = _face_up_points(verts, faces)
+    if top_pts is not None and top_pts.shape[0] >= 2:
+        top_run, _top_lateral, top_z = project_local(top_pts, origin, u, v)
+        run_extent = float(top_run.max() - top_run.min())
+        z_extent = float(top_z.max() - top_z.min())
+        result["slope_deg"] = round(math.degrees(math.atan2(z_extent, run_extent)), 2) if run_extent > 0 else 0.0
 
     return result
 
@@ -815,6 +839,10 @@ def analyze_railing(railing, geometry_extractor, floor_z_mm: float | None = None
     intervals = face_run_intervals(verts, faces, origin, u, v)
     segments, gaps = merge_run_intervals(intervals)
     result["continuous_segments"] = len(segments) if segments else (1 if run.size else 0)
+    # 0.0, not None, when there are no gaps: continuity was actually
+    # evaluated (matching continuous_segments' own convention just above),
+    # so "no gap found" is a real determinate answer, not a missing one.
+    result["max_gap_length_mm"] = round(max(hi - lo for lo, hi in gaps), 1) if gaps else 0.0
     if gaps:
         result["gap_locations_mm"] = gaps
 

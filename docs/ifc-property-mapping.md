@@ -183,13 +183,20 @@ rule's `unit` column states mm/deg) and it resolves automatically once
 | `MinClearStairWidth` | IfcStairFlight | Narrowest point along the flight, sampled in bands (not a single whole-footprint average) |
 | `OpenRiserDetected` | IfcStairFlight | Whether any tread-to-tread transition lacks a bridging riser face |
 | `TotalFlightRise` / `TotalFlightRun` / `FlightPitch` / `FlightSlopedLength` | IfcStairFlight | Whole-flight geometry |
+| `FlightStartElevation` / `FlightEndElevation` | IfcStairFlight | Raw bottom/top elevation of the flight (not just the rise between them) |
 | `NumberOfTreadsDetected` | IfcStairFlight | Tread count from geometry, independent of any authored `NumberOfTreads` |
+| `NumberOfRisersDetected` | IfcStairFlight | Mid-flight riser count (`NumberOfTreadsDetected - 1`) — same high-confidence scope as `RiserHeights` below, so it excludes the two boundary risers against the floor/landing |
+| `RiserHeights` / `TreadDepths` | IfcStairFlight | The full per-step list (every individual riser height / going), not just min/max/difference — usable with `exists`/`documented`, not a numeric threshold operator, since a list isn't a number to compare |
 | `StairRiserHeightDifference` / `StairTreadDepthDifference` | IfcStairFlight, IfcStair | Same as above but pooled across **every flight of the same stairway** — most codes require uniformity stairway-wide, not just per flight |
 | `StairFlightCount` | IfcStairFlight, IfcStair | Number of flights making up the stairway |
 | `LandingClearWidth` / `LandingClearLength` / `LandingClearArea` | IfcSlab (LANDING) | Clear plan dimensions from the landing's own footprint mesh |
+| `LandingElevation` | IfcSlab (LANDING) | Top-of-slab elevation |
+| `LandingSlope` | IfcSlab (LANDING) | Walking-surface tilt, measured from the isolated top face only — **not** the whole element's bounding-box rise/run, which would read the slab's own thickness as slope (a flat 200mm-thick slab over a 1200mm footprint would misreport ~9.5°) |
 | `HandrailMinHeight` / `HandrailMaxHeight` / `HandrailHeightVariation` | IfcRailing | Top-of-rail height above the floor, sampled along its length |
 | `HandrailPathLength` | IfcRailing | Straight-line run-axis approximation (undercounts a curved/winder rail — see warnings) |
 | `HandrailContinuousSegments` | IfcRailing | 1 for an unbroken rail, >1 if a real gap (not just tessellation sparsity) is detected |
+| `HandrailGapLocations` | IfcRailing | Raw `(start_mm, end_mm)` list of every real break in the rail — usable with `exists`/`documented` |
+| `HandrailMaxGapLength` | IfcRailing | Length of the single worst break — `0.0` (not missing) when the rail is fully continuous, since continuity was actually evaluated |
 | `HandrailMinBottomElevation` | IfcRailing | Underside elevation — useful for a bottom-gap/guard check |
 | `HandrailProfileLateral` / `HandrailProfileVertical` | IfcRailing | Coarse cross-section dimensions near mid-run |
 | `BottomClearGap` | IfcRailing | Median bottom elevation across run-bands minus `floor_z_mm` — the *typical* gap under the bottom rail, robust to a few floor-touching posts pulling a plain minimum down to ~0 |

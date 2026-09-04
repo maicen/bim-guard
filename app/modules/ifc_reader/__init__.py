@@ -362,6 +362,15 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     "flightpitch": "pitch_deg",
     "flightslopedlength": "sloped_length_mm",
     "numberoftreadsdetected": "tread_count",
+    "numberofrisersdetected": "riser_count",
+    "flightstartelevation": "start_elevation_mm",
+    "flightendelevation": "end_elevation_mm",
+    # Raw per-step lists (not just the min/max/difference above) -- for a
+    # rule that wants to see or report every individual value, via `exists`/
+    # `documented` rather than a numeric threshold (a list isn't itself a
+    # number to compare).
+    "riserheights": "risers_mm",
+    "treaddepths": "goings_mm",
     # Whole-stairway (every flight of the same IfcStair pooled together) --
     # codes require riser/tread uniformity across the WHOLE stairway, not
     # just within one flight.
@@ -374,6 +383,8 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     "landingclearwidth": "clear_width_mm",
     "landingclearlength": "clear_length_mm",
     "landingcleararea": "clear_area_mm2",
+    "landingelevation": "elevation_mm",
+    "landingslope": "slope_deg",
     # Handrail / guard (IfcRailing).
     "handrailminheight": "min_height_mm",
     "handrailmaxheight": "max_height_mm",
@@ -383,6 +394,8 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     "handrailminbottomelevation": "min_bottom_elevation_mm",
     "handrailprofilelateral": "profile_lateral_mm",
     "handrailprofilevertical": "profile_vertical_mm",
+    "handrailgaplocations": "gap_locations_mm",
+    "handrailmaxgaplength": "max_gap_length_mm",
     "bottomcleargap": "bottom_clear_gap_mm",
     # Guard opening / baluster spacing -- guard-type IfcRailing only (see
     # ifc_stair.analyze_railing's is_guard_like gate). MaxOpening is the
@@ -2820,6 +2833,12 @@ class IFCReader:
             value = (context.get(nested_key) or {}).get(field)
         else:
             value = context.get(spec)
+        # An empty list (risers_mm/goings_mm when fewer than 2 tread bands
+        # were detected) is the same "could not answer" case as None, not a
+        # determinate empty result -- otherwise `exists` would read "no
+        # risers were detected" as "RiserHeights exists".
+        if isinstance(value, (list, tuple)) and len(value) == 0:
+            value = None
         if value is None:
             return None, {}
         return value, {"warnings": context.get("warnings") or []}

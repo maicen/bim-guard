@@ -112,6 +112,7 @@ class TestDeriveFlightSteps:
         bands = st.cluster_step_bands(run, z)
         steps = st.derive_flight_steps(bands)
         assert steps["tread_count"] == 4
+        assert steps["riser_count"] == 3
         assert steps["riser_difference_mm"] == 0.0
         assert steps["going_difference_mm"] == 0.0
         assert steps["min_riser_mm"] == pytest.approx(175.0, abs=0.5)
@@ -132,6 +133,7 @@ class TestDeriveFlightSteps:
         bands = [{"z_mean": 175.0, "run_min": 0.0, "run_max": 280.0}]
         steps = st.derive_flight_steps(bands)
         assert steps["tread_count"] == 1
+        assert steps["riser_count"] is None
         assert steps["goings_mm"] == []
         assert steps["min_riser_mm"] is None
 
@@ -543,9 +545,16 @@ def _tessellated_representation(model, body, triangles):
 
 
 def _box_triangles(x0, x1, y0, y1, z0, z1):
-    """12 triangles (2 per face) for an axis-aligned box -- winding is not
-    significant here since neither landing nor railing analysis filters by
-    face normal, only the vertex cloud matters."""
+    """12 triangles (2 per face) for an axis-aligned box, with each face
+    wound to give a genuinely OUTWARD-pointing normal (bottom -Z, top +Z,
+    y0 -Y, y1 +Y, x0 -X, x1 +X). This matters since _face_up_points (used
+    by analyze_landing's slope measurement) selects faces by their normal's
+    Z-component -- an earlier version of this helper left three faces
+    inward-wound, which a flat landing's "top" face alone should have
+    isolated to z-constant points (slope 0) instead picked up the bottom
+    face too (whose normal was accidentally also +Z), reading the box's
+    own THICKNESS as slope. Caught by test_clear_dimensions_match_footprint
+    asserting slope_deg == 0 on a flat slab and getting ~5.7 degrees back."""
     corners = {
         (0, 0, 0): (x0, y0, z0), (1, 0, 0): (x1, y0, z0),
         (1, 1, 0): (x1, y1, z0), (0, 1, 0): (x0, y1, z0),
@@ -553,12 +562,12 @@ def _box_triangles(x0, x1, y0, y1, z0, z1):
         (1, 1, 1): (x1, y1, z1), (0, 1, 1): (x0, y1, z1),
     }
     faces = [
-        [(0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)],  # bottom
-        [(0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)],  # top
-        [(0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)],  # y0 side
-        [(0, 1, 0), (1, 1, 0), (1, 1, 1), (0, 1, 1)],  # y1 side
-        [(0, 0, 0), (0, 1, 0), (0, 1, 1), (0, 0, 1)],  # x0 side
-        [(1, 0, 0), (1, 1, 0), (1, 1, 1), (1, 0, 1)],  # x1 side
+        [(0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)],  # bottom (-Z)
+        [(0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)],  # top (+Z)
+        [(0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)],  # y0 side (-Y)
+        [(0, 1, 0), (0, 1, 1), (1, 1, 1), (1, 1, 0)],  # y1 side (+Y)
+        [(0, 0, 0), (0, 0, 1), (0, 1, 1), (0, 1, 0)],  # x0 side (-X)
+        [(1, 0, 0), (1, 1, 0), (1, 1, 1), (1, 0, 1)],  # x1 side (+X)
     ]
     triangles = []
     for quad in faces:
@@ -607,6 +616,7 @@ class TestAnalyzeLanding:
         assert analysis["clear_length_mm"] == pytest.approx(2000.0, abs=5.0)
         assert analysis["elevation_mm"] == pytest.approx(200.0, abs=1.0)
         assert analysis["clear_area_mm2"] == pytest.approx(2000.0 * 1200.0, rel=0.02)
+        assert analysis["slope_deg"] == pytest.approx(0.0, abs=1.0)
 
 
 class TestAnalyzeRailing:
@@ -658,6 +668,26 @@ class TestAnalyzeRailing:
         analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
         assert analysis["continuous_segments"] == 2
         assert analysis.get("gap_locations_mm")
+        assert analysis["max_gap_length_mm"] == pytest.approx(400.0, abs=5.0)
+
+    def test_no_gap_reports_zero_length_not_missing(self):
+        from ifcopenshell.api import run
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, body, storey = _base_model()
+        triangles = _box_triangles(0.0, 2000.0, 0.0, 40.0, 880.0, 920.0)
+        rep = _tessellated_representation(model, body, triangles)
+        railing = run(
+            "root.create_entity", model, ifc_class="IfcRailing", name="Rail Continuous",
+            predefined_type="HANDRAIL",
+        )
+        run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+        run("geometry.assign_representation", model, product=railing, representation=rep)
+        run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+        analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
+        assert analysis["max_gap_length_mm"] == 0.0
+        assert "gap_locations_mm" not in analysis
 
     def test_guardrail_carries_the_not_yet_computed_warning(self):
         from ifcopenshell.api import run
@@ -873,6 +903,32 @@ class TestEndToEndThroughIFCReader:
         element = results["TEST-5"]["all_elements"][0]
         assert not element["data_quality_warnings"]
 
+    def test_newly_wired_quick_fix_properties_resolve(self, model_path):
+        """FlightStartElevation, NumberOfRisersDetected -- computed since the
+        first stair-engine commit, only wired to a queryable property name
+        just now. Prove they reach a real verdict, not just the raw
+        analysis dict."""
+        rule_elevation = {
+            "rule_id": 8,
+            "reference": "TEST-8",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "FlightStartElevation",
+            "operator": "<=",
+            "check_value": 10.0,  # the model's flight starts at z~0
+            "unit": "mm",
+        }
+        rule_riser_count = {
+            "rule_id": 9,
+            "reference": "TEST-9",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "NumberOfRisersDetected",
+            "operator": "==",
+            "check_value": N_TREADS - 1,
+        }
+        results = self._evaluate(model_path, [rule_elevation, rule_riser_count])
+        assert results["TEST-8"]["status"] == "PASS"
+        assert results["TEST-9"]["status"] == "PASS"
+
     def test_guard_max_opening_resolves_through_the_full_pipeline(self, tmp_path_factory):
         """GuardMaxOpening is a brand new derived property (baluster/opening
         analysis) -- prove it reaches a real rule verdict through
@@ -943,6 +999,16 @@ class TestAgainstModel:
 
     def test_total_rise_matches_top_minus_bottom(self, analysis):
         assert analysis["total_rise_mm"] == pytest.approx(N_TREADS * RISER_MM, abs=1.0)
+
+    def test_start_and_end_elevation_are_reported(self, analysis):
+        assert analysis["start_elevation_mm"] == pytest.approx(0.0, abs=1.0)
+        assert analysis["end_elevation_mm"] == pytest.approx(N_TREADS * RISER_MM, abs=1.0)
+        assert analysis["end_elevation_mm"] - analysis["start_elevation_mm"] == pytest.approx(
+            analysis["total_rise_mm"], abs=0.1
+        )
+
+    def test_riser_count_matches_uniform_series(self, analysis):
+        assert analysis["riser_count"] == N_TREADS - 1
 
     def test_min_clear_width_matches_flight_width(self, analysis):
         assert analysis["min_clear_width_mm"] == pytest.approx(WIDTH_MM, abs=5.0)
