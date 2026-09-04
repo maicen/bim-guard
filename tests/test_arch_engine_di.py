@@ -99,9 +99,32 @@ def test_seed_architectural_code_rules():
     assert count_second_run == 0
 
 
+def _rule_service_with_rows(rows: list[dict]) -> RuleService:
+    """Build a RuleService backed by an in-memory MockTableAdapter seeded with
+    *rows*. list_by_ruleset() is @cache_db_query-decorated against a GLOBAL
+    process-wide cache keyed only on the ruleset_id argument (not on which
+    RuleService/mock instance is asking) -- callers MUST clear_cache() first
+    or a stale result from a differently-seeded mock in an earlier test will
+    be returned instead of this one's."""
+    from app.services.cache import clear_cache
+
+    clear_cache()
+    mock_rules = MockTableAdapter(rows)
+    mock_folders = MockTableAdapter()
+    return RuleService(rules_repo=mock_rules, folders_repo=mock_folders)
+
+
 def test_egress_analysis_engine_implements_rule_evaluator():
-    """Verify EgressAnalysisEngine conforms to RuleEvaluator protocol and handles records."""
-    engine = EgressAnalysisEngine()
+    """Verify EgressAnalysisEngine conforms to RuleEvaluator protocol and
+    handles records, given BUILDING-CODE-PART9 rules explicitly configured
+    for both thresholds it checks (9.9.10.1 travel distance, 9.9.4.1 min
+    exits) -- there is no hardcoded fallback to rely on any more, so the
+    DB state a PASS/FAIL verdict depends on must be seeded here."""
+    rules_svc = _rule_service_with_rows([
+        {"id": 1, "reference": "CODE 9.9.10.1", "check_value": 25.0},
+        {"id": 2, "reference": "CODE 9.9.4.1", "check_value": 1},
+    ])
+    engine = EgressAnalysisEngine(rules_service=rules_svc)
     assert isinstance(engine, RuleEvaluator)
     assert engine.rule_type == "ARCH-EGRESS-001"
 
@@ -162,9 +185,48 @@ def test_egress_analysis_engine_implements_rule_evaluator():
     assert res_exit_fail.band == "High"
 
 
+def test_egress_analysis_engine_not_assessed_when_unconfigured():
+    """With no BUILDING-CODE-PART9 rule for either 9.9.10.1 or 9.9.4.1, the
+    engine must report NOT_ASSESSED rather than falling back to a hardcoded
+    residential default (25m travel distance, 1 min exit) -- that fallback
+    was removed on purpose so a check only ever reflects what's actually
+    configured."""
+    rules_svc = _rule_service_with_rows([])  # nothing seeded
+    engine = EgressAnalysisEngine(rules_service=rules_svc)
+
+    res_travel = engine.evaluate({
+        "space_guid": "SP-099",
+        "space_name": "Any Room",
+        "storey_name": "Level 1",
+        "travel_distance_m": 999.0,  # would FAIL any real default -- must not silently pass or fail
+        "nearest_exit": "Front Door",
+        "no_path": False,
+    })
+    assert res_travel.status == "NOT_ASSESSED"
+    assert res_travel.details["passes"] is None
+    assert res_travel.details["required_max_m"] is None
+
+    res_exits = engine.evaluate({
+        "guid": "STOREY-9",
+        "storey_name": "Ninth Floor",
+        "exit_count": 0,  # would FAIL any real default -- must not silently pass or fail
+    })
+    assert res_exits.status == "NOT_ASSESSED"
+    assert res_exits.details["passes"] is None
+    assert res_exits.details["required_min"] is None
+
+
 def test_spatial_daylight_engine_implements_rule_evaluator():
-    """Verify SpatialDaylightEngine conforms to RuleEvaluator protocol and handles records."""
-    engine = SpatialDaylightEngine()
+    """Verify SpatialDaylightEngine conforms to RuleEvaluator protocol and
+    handles records, given BUILDING-CODE-PART9 rules explicitly configured
+    for both thresholds it checks (9.7.2.3 daylight ratio, 9.10.9/IfcWall
+    fire rating) -- there is no hardcoded fallback to rely on any more, so
+    the DB state a PASS/FAIL verdict depends on must be seeded here."""
+    rules_svc = _rule_service_with_rows([
+        {"id": 3, "reference": "CODE 9.7.2.3", "check_value": 0.10, "unit": "ratio"},
+        {"id": 4, "reference": "CODE 9.10.9", "check_value": 45.0, "target_ifc_class": "IfcWall"},
+    ])
+    engine = SpatialDaylightEngine(rules_service=rules_svc)
     assert isinstance(engine, RuleEvaluator)
     assert engine.rule_type == "ARCH-SPATIAL-001"
 
@@ -222,6 +284,49 @@ def test_spatial_daylight_engine_implements_rule_evaluator():
     })
     assert res_fire_missing.status == "FAIL"
     assert res_fire_missing.band == "High"
+
+
+def test_spatial_daylight_engine_not_assessed_when_unconfigured():
+    """With no BUILDING-CODE-PART9 rule for either 9.7.2.3 or 9.10.9/IfcWall,
+    the engine must report NOT_ASSESSED rather than falling back to a
+    hardcoded residential default (0.10 daylight ratio, 45 min fire rating)
+    -- that fallback was removed on purpose. A wall with NO rating declared
+    at all still FAILs regardless, since that's a data-completeness problem
+    independent of what threshold is configured."""
+    rules_svc = _rule_service_with_rows([])  # nothing seeded
+    engine = SpatialDaylightEngine(rules_service=rules_svc)
+
+    res_daylight = engine.evaluate({
+        "space_guid": "SP-77",
+        "space_name": "Any Room",
+        "floor_area_m2": 20.0,
+        "total_window_area_m2": 0.1,  # would FAIL any real default -- must not silently pass or fail
+    })
+    assert res_daylight.status == "NOT_ASSESSED"
+    assert res_daylight.details["passes"] is None
+    assert res_daylight.details["required_ratio"] is None
+
+    res_fire_numeric = engine.evaluate({
+        "wall_guid": "WALL-077",
+        "wall_name": "Any Wall",
+        "adjacent_spaces": [],
+        "fire_rating_min": 5.0,  # would FAIL any real default -- must not silently pass or fail
+        "missing_rating": False,
+    })
+    assert res_fire_numeric.status == "NOT_ASSESSED"
+    assert res_fire_numeric.details["passes"] is None
+    assert res_fire_numeric.details["required_min"] is None
+
+    # A wall with no rating declared at all is still a real failure --
+    # unrelated to whether a threshold is configured.
+    res_fire_missing = engine.evaluate({
+        "wall_guid": "WALL-078",
+        "wall_name": "Undeclared Wall",
+        "adjacent_spaces": [],
+        "fire_rating_min": None,
+        "missing_rating": True,
+    })
+    assert res_fire_missing.status == "FAIL"
 
 
 def test_registry_registers_architectural_engines():

@@ -22,11 +22,6 @@ from app.services.rules_service import RuleService
 
 logger = get_logger(__name__)
 
-DEFAULT_MAX_TRAVEL_DISTANCE_M = 25.0
-DEFAULT_MIN_EXITS_PER_STOREY = 1
-DEFAULT_MIN_DAYLIGHT_RATIO = 0.10
-DEFAULT_MIN_FIRE_RATING_MIN = 45.0
-
 
 class EgressAnalysisEngine(RuleEvaluator):
     """Egress travel distance and exit count evaluation engine conforming to RuleEvaluator."""
@@ -36,8 +31,13 @@ class EgressAnalysisEngine(RuleEvaluator):
         self.rule_type = "ARCH-EGRESS-001"
         self._rules_service = rules_service
 
-    def _get_max_travel_distance(self) -> float:
-        """Resolve maximum permissible travel distance from DB rules or fallback."""
+    def _get_max_travel_distance(self) -> float | None:
+        """Resolve maximum permissible travel distance from DB rules.
+
+        None means no BUILDING-CODE-PART9 rule is configured for reference
+        9.9.10.1 -- evaluate() must treat that as NOT_ASSESSED, not silently
+        check against a residential-default distance.
+        """
         try:
             svc = self._rules_service or RuleService()
             for r in svc.list_by_ruleset("BUILDING-CODE-PART9"):
@@ -47,10 +47,15 @@ class EgressAnalysisEngine(RuleEvaluator):
                         return float(val)
         except Exception:
             pass
-        return DEFAULT_MAX_TRAVEL_DISTANCE_M
+        return None
 
-    def _get_min_exits_per_floor(self) -> int:
-        """Resolve minimum required exits per storey from DB rules or fallback."""
+    def _get_min_exits_per_floor(self) -> int | None:
+        """Resolve minimum required exits per storey from DB rules.
+
+        None means no BUILDING-CODE-PART9 rule is configured for reference
+        9.9.4.1 -- evaluate() must treat that as NOT_ASSESSED, not silently
+        check against a residential-default count.
+        """
         try:
             svc = self._rules_service or RuleService()
             for r in svc.list_by_ruleset("BUILDING-CODE-PART9"):
@@ -60,7 +65,7 @@ class EgressAnalysisEngine(RuleEvaluator):
                         return int(float(val))
         except Exception:
             pass
-        return DEFAULT_MIN_EXITS_PER_STOREY
+        return None
 
     def evaluate(
         self,
@@ -80,6 +85,23 @@ class EgressAnalysisEngine(RuleEvaluator):
         # Check if evaluating an exit count record
         if "exit_count" in data:
             count = int(data.get("exit_count", 0))
+            if min_exits is None:
+                return RuleEvaluationResult(
+                    rule_type=self.rule_type,
+                    band=None,
+                    score=0.0,
+                    details={
+                        "check_type": "exit_count",
+                        "storey": storey_name,
+                        "exit_count": count,
+                        "required_min": None,
+                        "passes": None,
+                        "code_reference": "CODE 9.9.4.1",
+                    },
+                    status="NOT_ASSESSED",
+                    element_id=guid,
+                    action="No rule was found for minimum exits per storey",
+                )
             passes = count >= min_exits
             band = "Low" if passes else "High"
             score = 0.0 if passes else 0.8
@@ -105,7 +127,27 @@ class EgressAnalysisEngine(RuleEvaluator):
         travel_m = data.get("travel_distance_m")
         no_path = bool(data.get("no_path", False)) or travel_m is None
 
-        if no_path:
+        if max_dist is None:
+            return RuleEvaluationResult(
+                rule_type=self.rule_type,
+                band=None,
+                score=0.0,
+                details={
+                    "check_type": "travel_distance",
+                    "space_name": space_name,
+                    "storey": storey_name,
+                    "travel_distance_m": travel_m,
+                    "required_max_m": None,
+                    "nearest_exit": data.get("nearest_exit"),
+                    "no_path": no_path,
+                    "passes": None,
+                    "code_reference": "CODE 9.9.10.1",
+                },
+                status="NOT_ASSESSED",
+                element_id=guid,
+                action="No rule was found for maximum egress travel distance",
+            )
+        elif no_path:
             passes = False
             band = "Critical"
             score = 1.0
@@ -154,8 +196,13 @@ class SpatialDaylightEngine(RuleEvaluator):
         self.rule_type = "ARCH-SPATIAL-001"
         self._rules_service = rules_service
 
-    def _get_min_daylight_ratio(self) -> float:
-        """Resolve minimum daylight ratio from DB rules or fallback."""
+    def _get_min_daylight_ratio(self) -> float | None:
+        """Resolve minimum daylight ratio from DB rules.
+
+        None means no BUILDING-CODE-PART9 rule is configured for reference
+        9.7.2.3 -- evaluate() must treat that as NOT_ASSESSED, not silently
+        check against a residential-default ratio.
+        """
         try:
             svc = self._rules_service or RuleService()
             for r in svc.list_by_ruleset("BUILDING-CODE-PART9"):
@@ -168,10 +215,15 @@ class SpatialDaylightEngine(RuleEvaluator):
                         return float(val)
         except Exception:
             pass
-        return DEFAULT_MIN_DAYLIGHT_RATIO
+        return None
 
-    def _get_min_fire_rating(self) -> float:
-        """Resolve party-wall fire separation rating from DB rules or fallback."""
+    def _get_min_fire_rating(self) -> float | None:
+        """Resolve party-wall fire separation rating from DB rules.
+
+        None means no BUILDING-CODE-PART9 rule is configured for reference
+        9.10.9 on IfcWall -- evaluate() must treat that as NOT_ASSESSED, not
+        silently check against a residential-default rating.
+        """
         try:
             svc = self._rules_service or RuleService()
             for r in svc.list_by_ruleset("BUILDING-CODE-PART9"):
@@ -181,7 +233,7 @@ class SpatialDaylightEngine(RuleEvaluator):
                         return float(val)
         except Exception:
             pass
-        return DEFAULT_MIN_FIRE_RATING_MIN
+        return None
 
     def evaluate(
         self,
@@ -208,6 +260,12 @@ class SpatialDaylightEngine(RuleEvaluator):
                 score = 0.75
                 status = "FAIL"
                 action = "Declare FireRating property on party wall"
+            elif min_fire is None:
+                passes = None
+                band = None
+                score = 0.0
+                status = "NOT_ASSESSED"
+                action = "No rule was found for party-wall fire rating"
             else:
                 rating_val = float(numeric_rating)
                 passes = rating_val >= min_fire
@@ -242,17 +300,25 @@ class SpatialDaylightEngine(RuleEvaluator):
         window_area = float(data.get("total_window_area_m2") or 0.0)
 
         ratio = (window_area / floor_area) if floor_area > 0 else float(data.get("daylight_ratio") or 0.0)
-        passes = ratio >= min_ratio
-        if passes:
-            band = "Low"
-            score = 0.1
-            status = "PASS"
-            action = "Compliant"
+
+        if min_ratio is None:
+            passes = None
+            band = None
+            score = 0.0
+            status = "NOT_ASSESSED"
+            action = "No rule was found for daylight ratio"
         else:
-            band = "Medium"
-            score = round(min(1.0, 0.4 + (min_ratio - ratio) * 5), 3)
-            status = "FAIL"
-            action = f"Daylight ratio ({ratio:.3f}) below required minimum 1/{int(round(1 / min_ratio))} ({min_ratio:.2f})"
+            passes = ratio >= min_ratio
+            if passes:
+                band = "Low"
+                score = 0.1
+                status = "PASS"
+                action = "Compliant"
+            else:
+                band = "Medium"
+                score = round(min(1.0, 0.4 + (min_ratio - ratio) * 5), 3)
+                status = "FAIL"
+                action = f"Daylight ratio ({ratio:.3f}) below required minimum 1/{int(round(1 / min_ratio))} ({min_ratio:.2f})"
 
         return RuleEvaluationResult(
             rule_type=self.rule_type,

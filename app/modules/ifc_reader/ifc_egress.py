@@ -44,9 +44,10 @@ except ImportError:
     _GEOMETRY_AVAILABLE = False
 
 
-# Default residential limits when no ruleset-specific override exists.
-CODE_MAX_TRAVEL_DISTANCE_M = 25.0
-CODE_MIN_EXITS_PER_FLOOR = 1
+# No hardcoded fallback limits here by design: a rule not configured in
+# BUILDING-CODE-PART9 means this check has nothing to verify against, not
+# that some residential default silently applies. See check_exit_count()
+# and check_egress_travel_distance() below.
 
 # Space-name keywords for classifying habitable vs non-habitable rooms.
 # Habitable rooms are those travel-distance limits apply to.
@@ -276,6 +277,12 @@ def check_exit_count(ifc_file, min_exits: int | None = None) -> dict:
 
     Does NOT require IfcRelSpaceBoundary data.
 
+    ``min_exits`` comes from an explicit argument, else a BUILDING-CODE-PART9
+    rule for reference 9.9.4.1. If neither supplies one, the raw exit counts
+    are still returned (they are real data, independent of any threshold),
+    but ``results`` is empty -- there is no configured limit to verify them
+    against, so no PASS/FAIL verdict is fabricated.
+
     Returns:
         {
           total_exterior_doors : int,
@@ -296,7 +303,6 @@ def check_exit_count(ifc_file, min_exits: int | None = None) -> dict:
                         break
         except Exception:
             pass
-    required_min = min_exits if min_exits is not None else CODE_MIN_EXITS_PER_FLOOR
 
     if ifc_file is None:
         return {
@@ -322,15 +328,20 @@ def check_exit_count(ifc_file, min_exits: int | None = None) -> dict:
     total = sum(exits_per_storey.values())
 
     results = []
-    for storey, count in sorted(exits_per_storey.items()):
-        passes = count >= required_min
-        results.append({
-            "code_ref": "CODE 9.9.4.1",
-            "storey": storey,
-            "exit_count": count,
-            "required_min": required_min,
-            "passes": passes,
-        })
+    if min_exits is None:
+        warnings.append(
+            "No rule was found for minimum exits per storey -- exit-count "
+            "verdicts not evaluated. Raw exit counts below are still accurate."
+        )
+    else:
+        for storey, count in sorted(exits_per_storey.items()):
+            results.append({
+                "code_ref": "CODE 9.9.4.1",
+                "storey": storey,
+                "exit_count": count,
+                "required_min": min_exits,
+                "passes": count >= min_exits,
+            })
 
     if total == 0:
         warnings.append(
@@ -357,6 +368,13 @@ def check_egress_travel_distance(
 
     Uses Dijkstra shortest-path on the space-connectivity graph.
 
+    ``max_distance_m`` comes from an explicit argument, else a
+    BUILDING-CODE-PART9 rule for reference 9.9.10.1. If neither supplies
+    one, this returns an empty list -- there is no configured limit to
+    measure spaces against, matching how this function already handles
+    every other unmet precondition below (no graph, no exits) rather than
+    fabricating a residential-default verdict.
+
     Returns one result dict per habitable space.
     """
     if not _NX_AVAILABLE:
@@ -374,7 +392,9 @@ def check_egress_travel_distance(
                         break
         except Exception:
             pass
-    required_max_m = max_distance_m if max_distance_m is not None else CODE_MAX_TRAVEL_DISTANCE_M
+    if max_distance_m is None:
+        return []
+    required_max_m = max_distance_m
 
     G = egress_graph.graph
     if G is None or G.number_of_nodes() == 0:

@@ -1899,18 +1899,22 @@ class IFCReader:
     def _get_code_warning_context(self) -> dict:
         """Return DB-backed references/limits used in Tier 2/3 warning text.
 
-        Falls back to current hardcoded defaults whenever DB access fails or
-        when matching rules are unavailable.
+        Numeric thresholds (daylight_ratio, fire_min, travel_max) stay None
+        when no matching BUILDING-CODE-PART9 rule exists -- callers must
+        treat None as "no threshold configured" and skip the corresponding
+        check rather than substitute a hardcoded number. Text labels/units
+        keep generic placeholders since they only affect wording, never a
+        pass/fail verdict.
         """
         context = {
             "daylight_ref": "applicable code rule",
-            "daylight_ratio": 0.1,
+            "daylight_ratio": None,
             "fire_exists_ref": "applicable code rule",
             "fire_ref": "applicable code rule",
-            "fire_min": 45.0,
+            "fire_min": None,
             "fire_unit": "min",
             "travel_ref": "applicable code rule",
-            "travel_max": 25.0,
+            "travel_max": None,
             "travel_unit": "m",
         }
 
@@ -2311,22 +2315,13 @@ class IFCReader:
         rule_ctx = self._get_code_warning_context()
 
         daylight_ref = str(rule_ctx.get("daylight_ref") or "applicable code rule")
-        daylight_ratio = self._as_float(rule_ctx.get("daylight_ratio")) or 0.1
-        if daylight_ratio > 0:
-            daylight_ratio_label = f"1/{int(round(1 / daylight_ratio))}"
-        else:
-            daylight_ratio_label = "1/10"
+        daylight_ratio = self._as_float(rule_ctx.get("daylight_ratio"))
 
         fire_exists_ref = str(
             rule_ctx.get("fire_exists_ref") or "applicable code rule"
         )
         fire_ref = str(rule_ctx.get("fire_ref") or "applicable code rule")
         fire_min = self._as_float(rule_ctx.get("fire_min"))
-        fire_min_label = (
-            f"{int(fire_min)}"
-            if isinstance(fire_min, float) and fire_min.is_integer()
-            else str(fire_min or 45)
-        )
         fire_unit = str(rule_ctx.get("fire_unit") or "min")
 
         daylight = check_daylight_ratios(adj, min_ratio=daylight_ratio)
@@ -2334,25 +2329,38 @@ class IFCReader:
         garage_sep = check_garage_separation(adj)
         space_connection = check_door_space_connection(adj, self.ifc_file)
 
-        daylight_fails = sum(1 for r in daylight if not r["passes"])
-        fire_fails = sum(1 for r in fire_sep if not r["passes"])
-        fire_missing = sum(1 for r in fire_sep if r["missing_rating"])
+        if daylight_ratio is None:
+            warnings.append(
+                "No rule was found for daylight ratio -- daylight check not evaluated."
+            )
+        else:
+            daylight_ratio_label = f"1/{int(round(1 / daylight_ratio))}" if daylight_ratio > 0 else "0"
+            daylight_fails = sum(1 for r in daylight if not r["passes"])
+            if daylight_fails:
+                warnings.append(
+                    f"{daylight_fails} room(s) do not meet the {daylight_ref} "
+                    f"{daylight_ratio_label} daylight ratio requirement."
+                )
 
-        if daylight_fails:
+        if fire_min is None:
             warnings.append(
-                f"{daylight_fails} room(s) do not meet the {daylight_ref} "
-                f"{daylight_ratio_label} daylight ratio requirement."
+                "No rule was found for party-wall fire rating -- "
+                "fire-separation check not evaluated."
             )
-        if fire_missing:
-            warnings.append(
-                f"{fire_missing} party wall(s) have no FireRating declared "
-                f"({fire_exists_ref}; {fire_ref} requires >= {fire_min_label} {fire_unit})."
-            )
-        if fire_fails and not fire_missing:
-            warnings.append(
-                f"{fire_fails} party wall(s) have FireRating below "
-                f"{fire_min_label} {fire_unit} ({fire_ref})."
-            )
+        else:
+            fire_min_label = f"{int(fire_min)}" if fire_min.is_integer() else str(fire_min)
+            fire_fails = sum(1 for r in fire_sep if not r["passes"])
+            fire_missing = sum(1 for r in fire_sep if r["missing_rating"])
+            if fire_missing:
+                warnings.append(
+                    f"{fire_missing} party wall(s) have no FireRating declared "
+                    f"({fire_exists_ref}; {fire_ref} requires >= {fire_min_label} {fire_unit})."
+                )
+            if fire_fails and not fire_missing:
+                warnings.append(
+                    f"{fire_fails} party wall(s) have FireRating below "
+                    f"{fire_min_label} {fire_unit} ({fire_ref})."
+                )
 
         return {
             "has_boundaries": adj.has_boundaries,
@@ -2383,11 +2391,6 @@ class IFCReader:
         rule_ctx = self._get_code_warning_context()
         travel_ref = str(rule_ctx.get("travel_ref") or "applicable code rule")
         travel_max = self._as_float(rule_ctx.get("travel_max"))
-        travel_max_label = (
-            f"{int(travel_max)}"
-            if isinstance(travel_max, float) and travel_max.is_integer()
-            else str(travel_max or 25)
-        )
         travel_unit = str(rule_ctx.get("travel_unit") or "m")
 
         # Exit count always runs (doesn't need boundary data)
@@ -2422,12 +2425,19 @@ class IFCReader:
                     "Re-export the model with Space Boundaries enabled."
                 )
 
-        td_fails = sum(1 for r in travel_distance if not r["passes"])
-        if td_fails:
+        if travel_max is None:
             warnings.append(
-                f"{td_fails} habitable space(s) exceed the {travel_ref} "
-                f"maximum travel distance of {travel_max_label} {travel_unit}."
+                "No rule was found for maximum egress travel distance -- "
+                "travel-distance check not evaluated."
             )
+        else:
+            travel_max_label = f"{int(travel_max)}" if travel_max.is_integer() else str(travel_max)
+            td_fails = sum(1 for r in travel_distance if not r["passes"])
+            if td_fails:
+                warnings.append(
+                    f"{td_fails} habitable space(s) exceed the {travel_ref} "
+                    f"maximum travel distance of {travel_max_label} {travel_unit}."
+                )
 
         return {
             "exit_count": exit_count,

@@ -301,6 +301,13 @@ def check_daylight_ratios(
     """
     Evaluate daylight ratio: every habitable room should have window area >= min_ratio floor area.
 
+    ``min_ratio`` comes from an explicit argument, else a BUILDING-CODE-PART9
+    rule (9.7.2.3 / DaylightRatio / a ratio-unit 9.7.2.* rule). If neither
+    supplies one, this returns an empty list -- no configured ratio means
+    nothing to verify rooms against, matching how a missing boundary
+    precondition is already handled above rather than silently checking
+    against a residential-default ratio.
+
     Returns one result dict per IfcSpace that has floor area data.
     Spaces with no floor area are skipped (cannot evaluate).
     """
@@ -322,7 +329,9 @@ def check_daylight_ratios(
                         break
         except Exception:
             pass
-    required_ratio = min_ratio if min_ratio is not None else 0.10
+    if min_ratio is None:
+        return []
+    required_ratio = min_ratio
 
     results = []
 
@@ -397,7 +406,14 @@ def check_fire_separation(
     min_rating_min: float | None = None,
 ) -> list[dict]:
     """
-    Evaluate party-wall fire separation (default threshold: FireRating >= min_rating_min min).
+    Evaluate party-wall fire separation against FireRating >= min_rating_min.
+
+    ``min_rating_min`` comes from an explicit argument, else a
+    BUILDING-CODE-PART9 rule for reference 9.10.9 on IfcWall. If neither
+    supplies one, this returns an empty list -- no configured minimum means
+    nothing to verify walls against, matching how a missing boundary
+    precondition is already handled above rather than silently checking
+    against a residential-default rating.
 
     Returns one result dict per party wall found.
     Walls with no FireRating declared are flagged as missing data.
@@ -417,7 +433,9 @@ def check_fire_separation(
                         break
         except Exception:
             pass
-    required_min = min_rating_min if min_rating_min is not None else 45.0
+    if min_rating_min is None:
+        return []
+    required_min = min_rating_min
 
     results = []
 
