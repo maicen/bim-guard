@@ -555,6 +555,28 @@ def _assess_network(elements: list, spec: MechanismSpec, allocator: IssueIdAlloc
     return [], f"{spec.code} is not a network mechanism"
 
 
+def _provenance(element: ServiceElement) -> dict[str, str]:
+    """Report where this element's material and environment actually came from.
+
+    GC-001, CC-001 and MC-001 are decided by ``material_a`` and
+    ``location_tag``, and neither is guaranteed to be a reading: an IFC with no
+    material yields ``"Unknown"``, and a space name matching no
+    ``SPACE_TO_ENV`` keyword yields the module's indoor default. Both then look
+    identical to values read off the model by the time an engine scores them.
+
+    Every finding carries this block so a reviewer can see whether a Critical
+    band rests on the building or on an assumption — the same question
+    ``assumed_nominal_diameter_m`` already answers for MC-001's diameter, asked
+    of the two inputs that matter most.
+    """
+    return {
+        "material_source": element.material_source,
+        "material_confidence": element.material_confidence,
+        "environment_source": element.environment_source,
+        "environment_confidence": element.environment_confidence,
+    }
+
+
 def _data_quality_issue(
     element: ServiceElement,
     spec: MechanismSpec,
@@ -588,6 +610,9 @@ def _data_quality_issue(
             "reason": reason,
             "ifc_type": element.ifc_type,
             "material_a": element.material_a,
+            # Often the explanation for the absence: an engine that could not
+            # resolve a material usually could not because none was read.
+            **_provenance(element),
         },
         citations=[],
     )
@@ -657,6 +682,7 @@ def _finding_issue(
             "ifc_type": element.ifc_type,
             # Recorded so a reviewer can see which inputs were assumed rather
             # than read from the model.
+            **_provenance(element),
             **(
                 {"assumed_nominal_diameter_m": ASSUMED_NOMINAL_DIAMETER_M}
                 if spec is MIC

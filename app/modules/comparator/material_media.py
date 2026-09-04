@@ -29,7 +29,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
-from app.modules.ifc_reader.piping_producer import media_for_system
+from app.modules.ifc_reader.piping_producer import element_provenance, media_for_system
 from app.modules.ifc_reader.piping_schema import (
     CANONICAL_MATERIALS,
     EnvironmentClass,
@@ -200,6 +200,10 @@ def _data_quality(
             "material": getattr(element, "material", None) or "Unknown",
             "system": getattr(getattr(element, "system", None), "value", None),
             "environment_class": _environment_key(element),
+            # Frequently the explanation for the absence: a pairing that could
+            # not be looked up usually could not because one of these inputs
+            # was never read.
+            **element_provenance(element),
         },
         citations=[
             {
@@ -384,7 +388,13 @@ def _assess(
             "kinetics_guard_applied": guard_applied,
             "predicted_lifespan_years": cell.get("years"),
             "failure_mechanism": cell.get("mech"),
+            # The rule pack's confidence in this material/medium cell. Distinct
+            # from the *_confidence keys below, which are about the inputs the
+            # cell was looked up with, not about the cell.
             "confidence": cell.get("conf"),
+            # Whether the material, environment and temperature this was scored
+            # on were read from the model, inferred, or defaulted.
+            **element_provenance(element),
         },
         citations=citations,
     )

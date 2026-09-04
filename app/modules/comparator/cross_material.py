@@ -34,7 +34,10 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
-from app.modules.ifc_reader.piping_producer import CONNECTIVITY_SOURCE_KEY
+from app.modules.ifc_reader.piping_producer import (
+    CONNECTIVITY_SOURCE_KEY,
+    element_provenance,
+)
 from app.modules.ifc_reader.piping_schema import (
     EnvironmentClass,
     JointType,
@@ -416,6 +419,9 @@ def _data_quality(
         "check": check,
         "material": element.material,
         "environment_class": _environment_key(element),
+        # XM-001 reads no temperature, so naming a temperature source here
+        # would imply one was consulted.
+        **element_provenance(element, include_temperature=False),
     }
     payload.update(metadata or {})
     return make_issue(
@@ -525,6 +531,14 @@ def _couple_issue(
             "mitigation_factor": mitigation_factor,
             "raw_score_exact": raw,
             "composite_score_exact": composite,
+            # Both ends, separately. A couple is two materials in two possibly
+            # different environments, and one end read from the model while the
+            # other was defaulted is a real and common case that a single
+            # merged provenance would hide. The governing environment is the
+            # harsher of the two -- see _pair_environment -- so which end
+            # supplied it is visible from the pair rather than restated.
+            **element_provenance(anode, prefix="anode_", include_temperature=False),
+            **element_provenance(cathode, prefix="cathode_", include_temperature=False),
         },
         citations=[
             {

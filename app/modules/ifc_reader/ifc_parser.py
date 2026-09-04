@@ -14,6 +14,41 @@ import ifcopenshell.guid
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
 
+# ---------------------------------------------------------------------------
+# Provenance vocabulary
+#
+# Shared with piping_producer's ENVIRONMENT_SOURCE_*/MATERIAL_SOURCE_* strings
+# where the two producers mean the same thing, so one reviewer-facing
+# vocabulary describes both the ServiceElement path (GC/CC/MC) and the
+# PipingElement path (MM/XM) rather than two that have to be learned apart.
+# ---------------------------------------------------------------------------
+
+#: An IFC material was read and mapped onto a known BIMGUARD material key.
+MATERIAL_SOURCE_IFC = "ifc_metadata"
+#: An IFC material was read but matches no known key, so it was passed through
+#: as free text. The engines will not resolve it, which is a data-quality fact
+#: about the model and must not read as a confident material.
+MATERIAL_SOURCE_UNMAPPED = "ifc_metadata_unmapped"
+#: The IFC carried no material at all.
+MATERIAL_SOURCE_ABSENT = "absent"
+#: The element was authored by the demo generator, not read from a model.
+SOURCE_SYNTHETIC = "synthetic_fixture"
+
+#: The environment class came from matching a space or storey name.
+ENVIRONMENT_SOURCE_SPATIAL = "inferred from spatial names"
+#: Nothing matched, so DEFAULT_ENVIRONMENT was assumed.
+ENVIRONMENT_SOURCE_DEFAULT = "default_indoor"
+
+CONFIDENCE_HIGH = "high"
+CONFIDENCE_MEDIUM = "medium"
+CONFIDENCE_LOW = "low"
+#: There is no value to have confidence in.
+CONFIDENCE_NONE = "none"
+
+#: What classify_environment_from_space assumes when no keyword matches. Named
+#: because ENVIRONMENT_SOURCE_DEFAULT exists to mark exactly this value.
+DEFAULT_ENVIRONMENT = "interior_dry"
+
 
 @dataclass
 class ServiceElement:
@@ -34,6 +69,24 @@ class ServiceElement:
     position: tuple  # (x, y, z) in metres
     length_m: float
     notes: str = ""
+
+    # --- Provenance -------------------------------------------------------
+    # material_a and location_tag are the two inputs that decide a GC-001,
+    # CC-001 or MC-001 verdict, and neither is always read from the model:
+    # an IFC carrying no material yields "Unknown", and a space name matching
+    # no SPACE_TO_ENV keyword yields DEFAULT_ENVIRONMENT. Without these four
+    # fields the finding built from them cannot say which happened, so a
+    # reviewer cannot tell an assessment of the building from an assessment
+    # of this module's defaults. Defaults below describe an element built
+    # without going through the resolvers.
+    #: MATERIAL_SOURCE_* — read from IFC metadata, read but unmapped, or absent.
+    material_source: str = MATERIAL_SOURCE_ABSENT
+    #: CONFIDENCE_* — how far material_a may be trusted as a reading.
+    material_confidence: str = CONFIDENCE_NONE
+    #: ENVIRONMENT_SOURCE_* — inferred from spatial names, or the indoor default.
+    environment_source: str = ENVIRONMENT_SOURCE_DEFAULT
+    #: CONFIDENCE_* — how far location_tag may be trusted as a reading.
+    environment_confidence: str = CONFIDENCE_LOW
 
 
 # Mapping from IFC type to plain English service category
@@ -110,6 +163,41 @@ def get_material_name(element, ifc_model) -> str:
 
 def normalise_material_name(raw: str) -> str:
     """Map free-text material names from IFC to BIMGUARD AI material keys."""
+    return resolve_material_name(raw)[0]
+
+
+def resolve_material_name(raw: str) -> tuple[str, str, str]:
+    """Map an IFC material string to a key, and say where the key came from.
+
+    :func:`normalise_material_name` answers only "what material", which cannot
+    distinguish a grade read off the model from free text that matched nothing
+    and was passed through unchanged. Both reach the engines as a string; only
+    one is a reading.
+
+    Args:
+        raw: The material name as the IFC carried it, or ``"Unknown"`` when
+            :func:`get_material_name` found none.
+
+    Returns:
+        ``(material_key, source, confidence)`` — source is one of the
+        ``MATERIAL_SOURCE_*`` constants, confidence one of ``CONFIDENCE_*``.
+    """
+    text = (raw or "").strip()
+    if not text or text.lower() == "unknown":
+        return "Unknown", MATERIAL_SOURCE_ABSENT, CONFIDENCE_NONE
+
+    key = _match_material_key(text)
+    if key is not None:
+        return key, MATERIAL_SOURCE_IFC, CONFIDENCE_HIGH
+
+    # Passed through as free text. The value is genuinely from the IFC, so the
+    # source says so, but no engine will resolve it and the confidence must not
+    # claim otherwise.
+    return text.replace(" ", "_")[:30], MATERIAL_SOURCE_UNMAPPED, CONFIDENCE_LOW
+
+
+def _match_material_key(raw: str) -> Optional[str]:
+    """Return the BIMGUARD material key ``raw`` names, or ``None`` for no match."""
     r = raw.lower().strip()
     if "316" in r or "1.4401" in r:
         return "SS_316_passive"
@@ -137,17 +225,37 @@ def normalise_material_name(raw: str) -> str:
         return "Zinc"
     if "lead" in r:
         return "Lead"
-    # Default — flag as unknown but don't crash
-    return raw.replace(" ", "_")[:30]
+    # No match. The caller decides what to do with the raw string; returning it
+    # from here would make an unmapped material indistinguishable from a
+    # recognised one, which is the distinction this split exists to keep.
+    return None
 
 
 def classify_environment_from_space(space_name: str, floor: str) -> str:
     """Infer environment class from space name and floor tag."""
+    return resolve_environment_from_space(space_name, floor)[0]
+
+
+def resolve_environment_from_space(space_name: str, floor: str) -> tuple[str, str, str]:
+    """Infer an environment class, and say whether it was inferred or assumed.
+
+    The two outcomes are not comparable evidence. A keyword match means the
+    model named a space this module recognises; the fallback means it named
+    nothing recognisable and :data:`DEFAULT_ENVIRONMENT` was assumed. Both
+    arrive at the engines as ``zone_category``, where the difference is no
+    longer visible — hence the source.
+
+    Returns:
+        ``(environment_class, source, confidence)`` — source is one of the
+        ``ENVIRONMENT_SOURCE_*`` constants, confidence one of ``CONFIDENCE_*``.
+    """
     combined = (space_name + " " + floor).lower()
     for keyword, env in SPACE_TO_ENV.items():
         if keyword in combined:
-            return env
-    return "interior_dry"
+            # Medium, not high: a name matched a keyword, which is weaker
+            # evidence than an IFC property stating the class outright.
+            return env, ENVIRONMENT_SOURCE_SPATIAL, CONFIDENCE_MEDIUM
+    return DEFAULT_ENVIRONMENT, ENVIRONMENT_SOURCE_DEFAULT, CONFIDENCE_LOW
 
 
 def get_element_position(element, ifc_model) -> tuple:
@@ -214,7 +322,7 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                     continue
                 seen_guids.add(guid)
             mat_a_raw = get_material_name(el, model)
-            mat_a = normalise_material_name(mat_a_raw)
+            mat_a, mat_a_source, mat_a_confidence = resolve_material_name(mat_a_raw)
             mat_b = None  # Second material (e.g. bracket material) — extend via Pset
 
             floor = get_floor_name(el, model)
@@ -225,7 +333,9 @@ def parse_ifc_model(model) -> list[ServiceElement]:
             for rel in getattr(el, "ContainedInStructure", []):
                 space_name = getattr(rel.RelatingStructure, "Name", "") or ""
 
-            env = classify_environment_from_space(space_name + " " + (el.Name or ""), floor)
+            env, env_source, env_confidence = resolve_environment_from_space(
+                space_name + " " + (el.Name or ""), floor
+            )
             joint = IFC_TO_JOINT.get(ifc_type, "JT-005")
             pos = get_element_position(el, model)
 
@@ -249,6 +359,10 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                     cathode_area_m2=cathode_area,
                     position=pos,
                     length_m=1.0,
+                    material_source=mat_a_source,
+                    material_confidence=mat_a_confidence,
+                    environment_source=env_source,
+                    environment_confidence=env_confidence,
                 )
             )
 
@@ -644,6 +758,14 @@ def generate_synthetic_elements(n: int = 25) -> list[ServiceElement]:
                 cathode_area_m2=ca,
                 position=pos,
                 length_m=round(random.uniform(0.5, 8.0), 1),
+                # Authored here, not read from a model. The value is exactly
+                # what the scenario declares, so the confidence is high; the
+                # source is what stops a demo finding from being mistaken for
+                # an assessment of a real building.
+                material_source=SOURCE_SYNTHETIC,
+                material_confidence=CONFIDENCE_HIGH,
+                environment_source=SOURCE_SYNTHETIC,
+                environment_confidence=CONFIDENCE_HIGH,
             )
         )
     return elements
