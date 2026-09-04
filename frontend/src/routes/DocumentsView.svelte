@@ -4,6 +4,7 @@
     BookOpen,
     Plus,
     Upload,
+    CloudDownload,
     Trash2,
     FileText,
     Eye,
@@ -38,6 +39,8 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import IdsImportForm from "../lib/components/IdsImportForm.svelte";
+  import DocumentViewer from "../lib/components/DocumentViewer.svelte";
+  import GoogleDriveImportModal from "../lib/components/GoogleDriveImportModal.svelte";
 
   interface Props {
     /**
@@ -76,6 +79,7 @@
   // the dedicated Manual Rule Editor page instead of rendering here).
   let isUploadModalOpen = $state(false);
   let uploadTab: "document" | "ids" = $state("document");
+  let isDriveImportModalOpen = $state(false);
 
   // Called by the sidebar's "New Rule Document Upload" action once this view is mounted.
   export function openUploadModal(tab: "document" | "ids" = "document") {
@@ -111,6 +115,16 @@
   function goToManualRuleEditor() {
     isUploadModalOpen = false;
     onNavigateToManualRuleEditor();
+  }
+
+  function handleDriveImportComplete(successCount: number, failCount: number) {
+    isDriveImportModalOpen = false;
+    loadDocuments(true);
+    if (successCount && !failCount) {
+      flashSuccess(`Imported ${successCount} document${successCount === 1 ? "" : "s"} from Google Drive.`);
+    } else if (successCount && failCount) {
+      flashSuccess(`Imported ${successCount} of ${successCount + failCount} Google Drive links — see errors for the rest.`);
+    }
   }
 
   function handleIdsImportedFromUpload(res: IdsImportResult) {
@@ -343,6 +357,16 @@
 
         <button
           type="button"
+          onclick={() => (isDriveImportModalOpen = true)}
+          class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          title="Import documents from Google Drive share links"
+        >
+          <CloudDownload class="h-3.5 w-3.5" />
+          <span>Import from Drive</span>
+        </button>
+
+        <button
+          type="button"
           onclick={() => openUploadModal()}
           class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
         >
@@ -516,7 +540,7 @@
                       type="button"
                       onclick={() => openReader(doc.id)}
                       class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
-                      title="Inspect extracted text"
+                      title="Preview document"
                     >
                       <Eye class="h-3.5 w-3.5" />
                     </button>
@@ -741,11 +765,18 @@
   </div>
 {/if}
 
-<!-- Text Reader Modal -->
+{#if isDriveImportModalOpen}
+  <GoogleDriveImportModal
+    onClose={() => (isDriveImportModalOpen = false)}
+    onComplete={handleDriveImportComplete}
+  />
+{/if}
+
+<!-- Document Viewer Modal -->
 {#if selectedDoc}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
     >
       <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
         <div>
@@ -774,10 +805,8 @@
         </button>
       </div>
 
-      <div
-        class="flex-1 overflow-y-auto whitespace-pre-wrap bg-slate-950/60 p-6 font-mono text-xs leading-relaxed text-slate-300"
-      >
-        {selectedDoc.extracted_text || "No extracted text found."}
+      <div class="flex-1 overflow-hidden">
+        <DocumentViewer documentId={selectedDoc.id} />
       </div>
 
       <div

@@ -23,6 +23,7 @@
     Upload,
     Camera,
     FileText,
+    BookOpen,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
   import type {
@@ -32,6 +33,7 @@
     RuleSnapshot,
     RuleSnapshotSourceMode,
     IdsImportResult,
+    RuleSourceResponse,
   } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
@@ -44,12 +46,27 @@
   import RuleForm from "../lib/components/RuleForm.svelte";
   import IdsImportForm from "../lib/components/IdsImportForm.svelte";
   import HoverCard from "../lib/components/HoverCard.svelte";
+  import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { describeMechanism } from "../lib/glossary";
   import { createTableState } from "../lib/tableState.svelte";
 
   // Top-level tab: Rules catalog vs saved Rule Configuration Snapshots
   let activeMainTab: "rules" | "snapshots" = $state("rules");
+
+  // Rule-source annotation: which rule's source document is being viewed, and
+  // the resolved page/snippet to jump to and highlight within it.
+  let viewingSource: RuleSourceResponse | null = $state(null);
+  let sourceViewError = $state("");
+
+  async function viewRuleSource(ruleId: number) {
+    sourceViewError = "";
+    try {
+      viewingSource = await rulesApi.getSource(ruleId);
+    } catch (err: any) {
+      sourceViewError = err?.message || "Could not resolve this rule's source document.";
+    }
+  }
 
   // Snapshots tab state
   let snapshots: RuleSnapshot[] = $state([]);
@@ -1209,7 +1226,7 @@
                           title={rule.rule_id || `Rule #${rule.id}`}
                           subtitle={rule.ruleset_id || undefined}
                           triggerClass="max-w-full"
-                          showFooter={!!rule.source_text}
+                          showFooter={!!rule.source_text || !!rule.source_document_id}
                         >
                           {#snippet trigger()}
                             <span class="block min-w-0 cursor-help text-left">
@@ -1246,9 +1263,23 @@
                           </div>
 
                           {#snippet footer()}
-                            <span class="break-words italic">
-                              “{rule.source_text}”
-                            </span>
+                            <div class="space-y-1.5">
+                              {#if rule.source_text}
+                                <span class="block break-words italic">
+                                  “{rule.source_text}”
+                                </span>
+                              {/if}
+                              {#if rule.source_document_id}
+                                <button
+                                  type="button"
+                                  onclick={() => viewRuleSource(rule.id)}
+                                  class="inline-flex items-center gap-1 font-semibold text-accent hover:underline"
+                                >
+                                  <BookOpen class="h-3 w-3" />
+                                  <span>View source in document</span>
+                                </button>
+                              {/if}
+                            </div>
                           {/snippet}
                         </HoverCard>
                       </td>
@@ -2339,3 +2370,46 @@
   onConfirm={confirmBulkDeleteSnapshots}
   onCancel={() => (isBulkDeleteSnapshotsModalOpen = false)}
 />
+
+<!-- Rule Source Annotation Modal: jumps to and highlights the page/snippet a rule was traced back to -->
+{#if viewingSource}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+    <div
+      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+    >
+      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <div>
+          <h2 class="text-base font-bold tracking-tight text-slate-50">{viewingSource.filename}</h2>
+          {#if viewingSource.page_number}
+            <p class="mt-0.5 text-xs text-slate-400">Page {viewingSource.page_number}</p>
+          {/if}
+        </div>
+        <button
+          type="button"
+          onclick={() => (viewingSource = null)}
+          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+        >
+          <X class="h-5 w-5" />
+        </button>
+      </div>
+      <div class="flex-1 overflow-hidden">
+        <DocumentViewer
+          documentId={viewingSource.document_id}
+          page={viewingSource.page_number}
+          highlightText={viewingSource.snippet}
+        />
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if sourceViewError}
+  <div class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-red-800/60 bg-red-950/90 px-4 py-3 text-xs text-red-200 shadow-2xl">
+    <div class="flex items-start justify-between gap-3">
+      <span>{sourceViewError}</span>
+      <button type="button" onclick={() => (sourceViewError = "")} class="shrink-0 text-red-300 hover:text-red-100">
+        <X class="h-3.5 w-3.5" />
+      </button>
+    </div>
+  </div>
+{/if}

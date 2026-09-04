@@ -268,6 +268,28 @@ export interface DocumentUpdatePayload {
   cde_state?: CDEState;
 }
 
+export interface GoogleDriveImportPayload {
+  urls: string[];
+  doc_type?: string;
+  project_code?: string;
+  originator?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  parser?: "auto" | "unstructured" | "light";
+  engine_instance?: string;
+}
+
+export interface GoogleDriveImportResult {
+  url: string;
+  ok: boolean;
+  document?: DocumentDetail | null;
+  error?: string | null;
+}
+
+export interface GoogleDriveImportResponse {
+  results: GoogleDriveImportResult[];
+}
+
 export type RulesetCategory = "Arch" | "Piping" | "seismic";
 
 export interface Rule {
@@ -275,6 +297,7 @@ export interface Rule {
   rule_id?: string;
   description?: string;
   source_text?: string;
+  source_document_id?: number | null;
   mechanism?: string;
   ruleset_id?: string;
   rule_category?: string;
@@ -301,6 +324,13 @@ export interface Rule {
   needs_review?: number;
   created_at?: string | null;
   updated_at?: string | null;
+}
+
+export interface RuleSourceResponse {
+  document_id: number;
+  filename: string;
+  page_number?: number | null;
+  snippet: string;
 }
 
 export interface RuleFolder {

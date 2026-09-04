@@ -27,6 +27,8 @@ import type {
   GitHubRepoCreatePayload,
   GitHubRepoStructure,
   GitHubRepoUpdatePayload,
+  GoogleDriveImportPayload,
+  GoogleDriveImportResponse,
   IdsImportResult,
   NamingCatalog,
   NamingConfig,
@@ -58,6 +60,7 @@ import type {
   RulesetCategory,
   RuleSnapshot,
   RuleSnapshotCreatePayload,
+  RuleSourceResponse,
   WorkflowStatus,
 } from "./types";
 import {
@@ -436,6 +439,11 @@ export const rulesApi = {
     );
   },
 
+  async getSource(id: number): Promise<RuleSourceResponse> {
+    const res = await fetch(`${API_BASE}/rules/${id}/source`);
+    return handleResponse<RuleSourceResponse>(res);
+  },
+
   async create(payload: Partial<Rule>): Promise<Rule> {
     const res = await fetch(`${API_BASE}/rules`, {
       method: "POST",
@@ -802,6 +810,39 @@ export const documentsApi = {
     await handleResponse<void>(res);
     _documentsStore.remove(id);
     _documentDetailStore.delete(id);
+  },
+
+  getFileUrl(id: number): string {
+    return `${API_BASE}/documents/${id}/file`;
+  },
+
+  async importFromGoogleDrive(payload: GoogleDriveImportPayload): Promise<GoogleDriveImportResponse> {
+    const res = await fetch(`${API_BASE}/documents/import/google-drive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await handleResponse<GoogleDriveImportResponse>(res);
+    for (const item of result.results) {
+      if (item.ok && item.document) {
+        _documentsStore.addOrUpdate({
+          id: item.document.id,
+          filename: item.document.filename,
+          doc_type: item.document.doc_type,
+          file_path: item.document.file_path,
+          upload_date: item.document.upload_date,
+          extracted_text_preview: item.document.extracted_text?.slice(0, 200) || "",
+          char_count: item.document.char_count ?? item.document.extracted_text?.length ?? 0,
+          project_code: item.document.project_code,
+          originator: item.document.originator,
+          suitability_code: item.document.suitability_code,
+          revision_code: item.document.revision_code,
+          cde_state: item.document.cde_state,
+        });
+        _documentDetailStore.set(item.document.id, item.document);
+      }
+    }
+    return result;
   },
 
   invalidateCache() {
