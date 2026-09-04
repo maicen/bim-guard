@@ -197,3 +197,16 @@ rule's `unit` column states mm/deg) and it resolves automatically once
 silently guessed: winder/curved-flight per-position tread depth (inner /
 walking-line / outer) is not yet computed; guard baluster/post spacing and
 the configurable sphere-passing test are not yet computed.
+
+Both are actually *detected*, not just documented — every affected element's
+own analysis carries a warning at runtime:
+
+- A flight whose tread-band centroids drift more than 75mm laterally along
+  its run (`tread_lateral_drift_mm`) is marked `winder_suspected: true` and
+  gets a warning that its `MinTreadDepth`/`MaxTreadDepth` don't represent
+  true per-position tread depth. A straight-but-wide stair is not flagged —
+  the check is an absolute drift threshold, not a ratio against width.
+- Any `IfcRailing` whose `PredefinedType` isn't `HANDRAIL` (including unset)
+  carries a warning that baluster spacing and the sphere-passing test aren't
+  computed for it, alongside whatever height/continuity properties *do*
+  resolve.

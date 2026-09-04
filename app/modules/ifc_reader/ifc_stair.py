@@ -31,13 +31,20 @@ flight/landing/railing, and caches the results by GlobalId so
 through the same Pass-0 resolver shortcut ``ifc_seismic``/``ifc_supports``
 already use -- see ``_STAIR_DERIVED_PROPERTIES`` in ``ifc_reader/__init__.py``.
 
-Known v1 limitations (deliberately out of scope, not silently wrong):
+Known v1 limitations (deliberately out of scope, not silently wrong -- each
+one below is actually detected and named in the affected element's own
+``warnings`` list at runtime, not just documented here):
   * Winder/curved flights: total turning angle and rise/run still resolve,
     but per-winder tread depth at inner/walking-line/outer edges is not yet
-    computed -- ``warnings`` on the result names this explicitly.
-  * Guards: baluster/post spacing and the configurable sphere-passing test
+    computed. Detected via each tread band's lateral centroid drift (see
+    ``analyze_stair_flight``'s curvature check) -- a straight flight's tread
+    centroids stay put; a winder's rotate with it.
+  * Guards (IfcRailing with PredefinedType GUARDRAIL/BALUSTRADE/FENCE, or
+    unset): baluster/post spacing and the configurable sphere-passing test
     are not yet computed. Height, continuity and profile-thickness checks
-    (shared with handrails) already work for guards today.
+    (shared with handrails) already work for guards today; every guard's
+    analysis carries a warning noting the gap, so it rides along with
+    whatever DOES resolve for that element.
   * Handrail/guard path length is a straight-line run-axis approximation.
     For a curved rail this undercounts the true swept length; a warning is
     attached whenever the mesh's lateral spread suggests real curvature.
@@ -94,6 +101,17 @@ DEFAULT_RUN_BAND_MM = 100.0
 #: discontinuous handrail) rather than ordinary sampling sparsity.
 DEFAULT_GAP_MM = 150.0
 
+#: A flight whose detected tread bands drift laterally by more than this (mm)
+#: from the first tread to the last is read as having real plan curvature
+#: (winder or curved stair), not just ordinary width. A straight flight's
+#: tread centroids sit at essentially the same lateral position throughout
+#: (a few mm of noise at most); a winder's rotate with the walking line, and
+#: even a modest winder run typically drifts hundreds of mm. Deliberately an
+#: ABSOLUTE threshold, not a ratio against the flight's width or run: a wide
+#: straight stair has plenty of lateral spread from its width alone, which a
+#: ratio-based check would misread as curvature.
+DEFAULT_CURVATURE_DRIFT_MM = 75.0
+
 
 # ── Layer 1: pure numpy algorithms (no ifcopenshell) ──────────────────────────
 
@@ -144,13 +162,19 @@ def project_local(points_xyz, origin, u, v):
     return run, lateral, z
 
 
-def cluster_step_bands(run, z, z_gap_mm: float = DEFAULT_TREAD_Z_GAP_MM) -> list[dict]:
+def cluster_step_bands(
+    run, z, lateral=None, z_gap_mm: float = DEFAULT_TREAD_Z_GAP_MM
+) -> list[dict]:
     """Group (run, z) points into step bands -- one band per detected tread top.
 
     Points are sorted by Z and split wherever a gap exceeds *z_gap_mm*.
     Within a band (one physical tread's worth of top-face points, which all
     sit at very nearly the same Z), reports the run extent (``run_min``,
     ``run_max`` -- the tread's own horizontal footprint) and the mean Z.
+    When *lateral* is supplied (same length as *run*/*z*), each band also
+    reports ``lateral_mean`` -- the tread's centroid across the flight's
+    width, which a straight flight holds constant and a winder does not
+    (see ``analyze_stair_flight``'s curvature check).
 
     Bands are returned sorted by ``run_min`` ascending, i.e. in walking
     order from the bottom of the flight to the top -- NOT by Z, because nosing
@@ -161,12 +185,14 @@ def cluster_step_bands(run, z, z_gap_mm: float = DEFAULT_TREAD_Z_GAP_MM) -> list
     """
     run = np.asarray(run, dtype=float)
     z = np.asarray(z, dtype=float)
+    lateral_arr = np.asarray(lateral, dtype=float) if lateral is not None else None
     if run.size == 0:
         return []
 
     order = np.argsort(z)
     z_sorted = z[order]
     run_sorted = run[order]
+    lateral_sorted = lateral_arr[order] if lateral_arr is not None else None
 
     bands: list[dict] = []
     start = 0
@@ -174,14 +200,15 @@ def cluster_step_bands(run, z, z_gap_mm: float = DEFAULT_TREAD_Z_GAP_MM) -> list
         if i == len(z_sorted) or (z_sorted[i] - z_sorted[i - 1]) > z_gap_mm:
             seg_run = run_sorted[start:i]
             seg_z = z_sorted[start:i]
-            bands.append(
-                {
-                    "z_mean": float(seg_z.mean()),
-                    "run_min": float(seg_run.min()),
-                    "run_max": float(seg_run.max()),
-                    "point_count": int(seg_run.size),
-                }
-            )
+            band = {
+                "z_mean": float(seg_z.mean()),
+                "run_min": float(seg_run.min()),
+                "run_max": float(seg_run.max()),
+                "point_count": int(seg_run.size),
+            }
+            if lateral_sorted is not None:
+                band["lateral_mean"] = float(lateral_sorted[start:i].mean())
+            bands.append(band)
             start = i
 
     bands.sort(key=lambda b: b["run_min"])
@@ -449,8 +476,8 @@ def analyze_stair_flight(
         result["open_riser"] = None
         return result
 
-    top_run, _, top_z = project_local(top_pts, origin, u, v)
-    bands = cluster_step_bands(top_run, top_z, z_gap_mm=z_gap_mm)
+    top_run, top_lateral, top_z = project_local(top_pts, origin, u, v)
+    bands = cluster_step_bands(top_run, top_z, lateral=top_lateral, z_gap_mm=z_gap_mm)
     steps = derive_flight_steps(bands)
     result.update(steps)
     result["tread_top_elevations_mm"] = [round(b["z_mean"], 1) for b in bands]
@@ -459,6 +486,27 @@ def analyze_stair_flight(
         result["warnings"].append(
             "fewer than 2 tread-top bands detected -- riser/tread series unavailable"
         )
+
+    # Curvature check: a straight flight's tread centroids sit at (almost)
+    # the same lateral position from the first tread to the last; a winder
+    # or curved-plan flight's rotate with the walking line. This is an
+    # ABSOLUTE-drift check, not a ratio against width -- see
+    # DEFAULT_CURVATURE_DRIFT_MM for why a ratio would false-positive on
+    # any ordinary wide-but-straight stair.
+    lateral_means = [b["lateral_mean"] for b in bands if "lateral_mean" in b]
+    if len(lateral_means) >= 2:
+        lateral_drift = max(lateral_means) - min(lateral_means)
+        result["tread_lateral_drift_mm"] = round(lateral_drift, 1)
+        if lateral_drift > DEFAULT_CURVATURE_DRIFT_MM:
+            result["winder_suspected"] = True
+            result["warnings"].append(
+                f"tread centroids drift {lateral_drift:.0f}mm laterally along this "
+                "flight's run, suggesting real plan curvature (winder or curved "
+                "stair) -- MinTreadDepth/MaxTreadDepth are measured along a single "
+                "straight walking-direction axis and do NOT represent true "
+                "per-position (inner/walking-line/outer) tread depth for a "
+                "winder; a dedicated winder analysis is not yet implemented"
+            )
 
     # Open-riser detection: for each tread-to-tread transition, does the
     # mesh carry a near-vertical FACE bridging the lower tread's elevation
@@ -575,6 +623,27 @@ def analyze_railing(railing, geometry_extractor, floor_z_mm: float | None = None
     reported.
     """
     result: dict[str, Any] = {"guid": getattr(railing, "GlobalId", None), "warnings": []}
+
+    # Guard-type elements (anything other than a plain HANDRAIL, including an
+    # unset/NOTDEFINED PredefinedType -- safer to flag a possibly-a-guard
+    # element than to assume it is a handrail with nothing missing) get a
+    # warning noting the checks this module does not yet compute for them.
+    # Attached here, up front, so it rides along in EVERY property this
+    # element resolves (height, continuity, ...) rather than only appearing
+    # if a rule happens to ask for baluster spacing by name -- which would
+    # otherwise just look like an ordinary missing property, no different
+    # from a genuinely unauthored one.
+    predefined_type = str(getattr(railing, "PredefinedType", None) or "").upper()
+    result["predefined_type"] = predefined_type or None
+    if predefined_type != "HANDRAIL":
+        result["warnings"].append(
+            f"PredefinedType={predefined_type or 'unset'} -- guard/balustrade "
+            "baluster/post spacing and the configurable sphere-passing "
+            "opening test are not yet computed by this engine (v1 "
+            "limitation); height, continuity and profile-thickness checks "
+            "above are still valid"
+        )
+
     if not (_NP_AVAILABLE and geometry_extractor):
         result["warnings"].append("numpy or geometry extractor unavailable")
         return result

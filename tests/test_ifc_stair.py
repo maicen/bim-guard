@@ -87,6 +87,21 @@ class TestClusterStepBands:
     def test_empty_input_returns_empty_list(self):
         assert st.cluster_step_bands(np.array([]), np.array([])) == []
 
+    def test_lateral_mean_reported_when_lateral_supplied(self):
+        run = np.array([0.0, 0.0, 300.0, 300.0])
+        z = np.array([175.0, 175.0, 350.0, 350.0])
+        lateral = np.array([0.0, 900.0, 100.0, 1000.0])
+        bands = st.cluster_step_bands(run, z, lateral=lateral, z_gap_mm=40.0)
+        assert len(bands) == 2
+        assert bands[0]["lateral_mean"] == pytest.approx(450.0)
+        assert bands[1]["lateral_mean"] == pytest.approx(550.0)
+
+    def test_lateral_mean_absent_when_not_supplied(self):
+        run = np.array([0.0, 300.0])
+        z = np.array([175.0, 350.0])
+        bands = st.cluster_step_bands(run, z, z_gap_mm=40.0)
+        assert "lateral_mean" not in bands[0]
+
 
 # ── Riser/going derivation ──────────────────────────────────────────────────
 
@@ -327,6 +342,91 @@ def _build_stair_model_variant(include_risers: bool):
     return model, flight
 
 
+def _build_winder_like_model(lateral_shift_per_tread: float):
+    """Same shape as ``_build_stair_model``, but each tread's lateral (Y)
+    range is shifted by *lateral_shift_per_tread* mm relative to the last --
+    a stand-in for a winder's rotating walking line, sufficient to exercise
+    the drift DETECTOR without modelling true winder/spiral geometry (a
+    bigger task deferred to v2 -- see the module docstring)."""
+    from ifcopenshell.api import run
+
+    model = ifcopenshell.file(schema="IFC4")
+    run("root.create_entity", model, ifc_class="IfcProject", name="Stair")
+    run("unit.assign_unit", model, length={"is_metric": True, "raw": "MILLIMETERS"})
+    ctx = run("context.add_context", model, context_type="Model")
+    body = run(
+        "context.add_context", model, context_type="Model",
+        context_identifier="Body", target_view="MODEL_VIEW", parent=ctx,
+    )
+    site = run("root.create_entity", model, ifc_class="IfcSite", name="Site")
+    building = run("root.create_entity", model, ifc_class="IfcBuilding", name="B")
+    storey = run("root.create_entity", model, ifc_class="IfcBuildingStorey", name="L1")
+    run("aggregate.assign_object", model, products=[site], relating_object=model.by_type("IfcProject")[0])
+    run("aggregate.assign_object", model, products=[building], relating_object=site)
+    run("aggregate.assign_object", model, products=[storey], relating_object=building)
+
+    triangles: list[list[tuple[float, float, float]]] = []
+    for i in range(N_TREADS):
+        z = (i + 1) * RISER_MM
+        x0, x1 = i * GOING_MM, i * GOING_MM + GOING_MM
+        y_shift = i * lateral_shift_per_tread
+        triangles += _tread_quad_triangles(x0, x1, y_shift, y_shift + WIDTH_MM, z)
+        triangles += _riser_quad_triangles(x0, z - RISER_MM, z, y_shift, y_shift + WIDTH_MM)
+
+    coord_list: list[tuple[float, float, float]] = []
+    coord_index: list[tuple[int, int, int]] = []
+    for tri in triangles:
+        base = len(coord_list)
+        coord_list.extend(tri)
+        coord_index.append((base + 1, base + 2, base + 3))
+
+    points = model.create_entity("IfcCartesianPointList3D", CoordList=coord_list)
+    mesh = model.create_entity("IfcTriangulatedFaceSet", Coordinates=points, CoordIndex=coord_index)
+    rep = model.create_entity(
+        "IfcShapeRepresentation", ContextOfItems=body, RepresentationIdentifier="Body",
+        RepresentationType="Tessellation", Items=[mesh],
+    )
+    flight = run("root.create_entity", model, ifc_class="IfcStairFlight", name="Flight 1")
+    run("spatial.assign_container", model, products=[flight], relating_structure=storey)
+    run("geometry.assign_representation", model, product=flight, representation=rep)
+    run("geometry.edit_object_placement", model, product=flight, matrix=np.eye(4), is_si=False)
+    return model, flight
+
+
+class TestCurvatureDetection:
+    def test_straight_flight_is_not_flagged(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, flight = _build_winder_like_model(lateral_shift_per_tread=0.0)
+        analysis = st.analyze_stair_flight(flight, IFCGeometryExtractor(model))
+        assert analysis.get("winder_suspected") is not True
+        assert not any("curvature" in w or "winder" in w for w in analysis["warnings"])
+
+    def test_drifting_treads_are_flagged(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        # 40mm lateral shift per tread x 5 gaps between 6 treads = 200mm
+        # total drift -- well above DEFAULT_CURVATURE_DRIFT_MM (75mm).
+        model, flight = _build_winder_like_model(lateral_shift_per_tread=40.0)
+        analysis = st.analyze_stair_flight(flight, IFCGeometryExtractor(model))
+        assert analysis["winder_suspected"] is True
+        assert any("curvature" in w or "winder" in w for w in analysis["warnings"])
+        # Not pinned to an exact value -- PCA re-centres/rotates its axes
+        # once the footprint itself is skewed by the shift, so the drift
+        # doesn't come out as a clean 40mm x 5 gaps. What matters is that
+        # it's clearly and substantially above the 75mm threshold.
+        assert analysis["tread_lateral_drift_mm"] > 150.0
+
+    def test_small_drift_below_threshold_is_not_flagged(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        # 5mm/tread x 5 gaps = 25mm total -- real-world noise territory,
+        # well under the 75mm threshold.
+        model, flight = _build_winder_like_model(lateral_shift_per_tread=5.0)
+        analysis = st.analyze_stair_flight(flight, IFCGeometryExtractor(model))
+        assert analysis.get("winder_suspected") is not True
+
+
 class TestOpenRiserDetection:
     def test_closed_riser_stair_is_not_flagged(self):
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
@@ -459,6 +559,8 @@ class TestAnalyzeRailing:
         assert analysis["min_height_mm"] == pytest.approx(920.0, abs=5.0)
         assert analysis["min_bottom_elevation_mm"] == pytest.approx(880.0, abs=5.0)
         assert analysis["continuous_segments"] == 1
+        # A plain HANDRAIL gets no "guard checks not computed" caveat.
+        assert not any("baluster" in w for w in analysis["warnings"])
 
     def test_gap_in_rail_produces_two_segments(self):
         from ifcopenshell.api import run
@@ -480,6 +582,44 @@ class TestAnalyzeRailing:
         analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
         assert analysis["continuous_segments"] == 2
         assert analysis.get("gap_locations_mm")
+
+    def test_guardrail_carries_the_not_yet_computed_warning(self):
+        from ifcopenshell.api import run
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, body, storey = _base_model()
+        triangles = _box_triangles(0.0, 2000.0, 0.0, 40.0, 900.0, 1100.0)
+        rep = _tessellated_representation(model, body, triangles)
+        railing = run(
+            "root.create_entity", model, ifc_class="IfcRailing", name="Guard 1",
+            predefined_type="GUARDRAIL",
+        )
+        run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+        run("geometry.assign_representation", model, product=railing, representation=rep)
+        run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+        analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
+        assert analysis["predefined_type"] == "GUARDRAIL"
+        assert any("baluster" in w for w in analysis["warnings"])
+        # The caveat doesn't block ordinary checks from still resolving.
+        assert analysis.get("max_height_mm") is None  # no floor_z_mm supplied here
+        assert analysis["max_top_elevation_mm"] == pytest.approx(1100.0, abs=5.0)
+
+    def test_unset_predefined_type_is_treated_as_possibly_a_guard(self):
+        from ifcopenshell.api import run
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, body, storey = _base_model()
+        triangles = _box_triangles(0.0, 2000.0, 0.0, 40.0, 900.0, 1100.0)
+        rep = _tessellated_representation(model, body, triangles)
+        # No predefined_type given -- defaults to NOTDEFINED/unset.
+        railing = run("root.create_entity", model, ifc_class="IfcRailing", name="Rail 3")
+        run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+        run("geometry.assign_representation", model, product=railing, representation=rep)
+        run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+        analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
+        assert any("baluster" in w for w in analysis["warnings"])
 
 
 class TestEndToEndThroughIFCReader:
