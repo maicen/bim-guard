@@ -22,6 +22,7 @@ import type {
   CDEVersionsResponse,
   DocumentDetail,
   DocumentItem,
+  DocumentSectionsResponse,
   DocumentUpdatePayload,
   GitHubRepo,
   GitHubRepoCreatePayload,
@@ -814,6 +815,11 @@ export const documentsApi = {
 
   getFileUrl(id: number): string {
     return `${API_BASE}/documents/${id}/file`;
+  },
+
+  async getSections(id: number): Promise<DocumentSectionsResponse> {
+    const res = await fetch(`${API_BASE}/documents/${id}/sections`);
+    return handleResponse<DocumentSectionsResponse>(res);
   },
 
   async importFromGoogleDrive(payload: GoogleDriveImportPayload): Promise<GoogleDriveImportResponse> {

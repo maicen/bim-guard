@@ -13,6 +13,36 @@ logger = get_logger(__name__)
 
 _TRACKER_CODE = "LLAMA-INGEST"
 
+# Comfortably under the LLM provider's ~1MB single-request part limit, so a
+# document with no detected section headings (one giant chunk) or a single
+# oversized section still reaches the provider instead of failing with
+# "Part exceeded maximum size of 1024KB".
+_MAX_CHUNK_CHARS = 400_000
+
+
+def _split_oversized(text: str, max_chars: int = _MAX_CHUNK_CHARS) -> list[str]:
+    """Split text too large for one LLM request into paragraph-bounded pieces."""
+    if len(text) <= max_chars:
+        return [text]
+
+    pieces: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for paragraph in text.split("\n\n"):
+        piece_len = len(paragraph) + 2
+        if current and current_len + piece_len > max_chars:
+            pieces.append("\n\n".join(current))
+            current, current_len = [], 0
+        if piece_len > max_chars:
+            for i in range(0, len(paragraph), max_chars):
+                pieces.append(paragraph[i : i + max_chars])
+            continue
+        current.append(paragraph)
+        current_len += piece_len
+    if current:
+        pieces.append("\n\n".join(current))
+    return pieces
+
 
 class RuleExtractionProvider(Protocol):
     """Protocol used by RuleExtractionService (Dependency Inversion)."""
@@ -61,12 +91,13 @@ class RuleExtractionService:
             chunk_text = chunk.get("text", "").strip()
             if not chunk_text:
                 continue
-            chunk_rules = await self._provider.extract_rules_from_text(
-                chunk_text,
-                chunk_index=idx,
-                total_chunks=total,
-            )
-            extracted_rules.extend(chunk_rules)
+            for sub_text in _split_oversized(chunk_text):
+                chunk_rules = await self._provider.extract_rules_from_text(
+                    sub_text,
+                    chunk_index=idx,
+                    total_chunks=total,
+                )
+                extracted_rules.extend(chunk_rules)
 
         rules = self._deduplicate(extracted_rules)
         logger.info(

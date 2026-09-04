@@ -257,6 +257,18 @@ export interface DocumentDetail {
   cde_state?: CDEState;
 }
 
+export interface DocumentSection {
+  section_number?: string | null;
+  section_name?: string | null;
+  text: string;
+  char_count: number;
+}
+
+export interface DocumentSectionsResponse {
+  document_id: number;
+  sections: DocumentSection[];
+}
+
 export interface DocumentUpdatePayload {
   filename?: string;
   doc_type?: string | null;

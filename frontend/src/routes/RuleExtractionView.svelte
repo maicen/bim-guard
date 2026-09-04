@@ -22,7 +22,7 @@
     Download,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi } from "../lib/api";
-  import type { DocumentItem, ExtractedRule } from "../lib/types";
+  import type { DocumentItem, DocumentSection, ExtractedRule } from "../lib/types";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -39,6 +39,56 @@
   let rawText = $state("");
   let selectedModel = $state("gemini-2.5-flash");
   let viewingDraftRule: ExtractedRule | null = $state(null);
+
+  // Sections/paragraphs detected in the selected document, so extraction can be
+  // scoped to a chosen clause rather than blindly sent as one document-sized
+  // request (which can exceed the LLM provider's per-request size limit).
+  let docSections: DocumentSection[] = $state([]);
+  let selectedSectionKeys: Set<string> = $state(new Set());
+  let isLoadingSections = $state(false);
+
+  function sectionKey(section: DocumentSection, index: number): string {
+    return `${section.section_number ?? ""}::${index}`;
+  }
+
+  function toggleSection(key: string) {
+    const next = new Set(selectedSectionKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selectedSectionKeys = next;
+  }
+
+  function selectAllSections() {
+    selectedSectionKeys = new Set(docSections.map((s, i) => sectionKey(s, i)));
+  }
+
+  function clearSectionSelection() {
+    selectedSectionKeys = new Set();
+  }
+
+  $effect(() => {
+    const docId = selectedDocId;
+    docSections = [];
+    selectedSectionKeys = new Set();
+    if (!docId) return;
+
+    isLoadingSections = true;
+    documentsApi
+      .getSections(docId)
+      .then((res) => {
+        if (selectedDocId !== docId) return; // selection changed while in flight
+        docSections = res.sections;
+        // Default to nothing selected when sections were detected, so the
+        // extraction is deliberately scoped; whole-document extraction
+        // remains available below when no sections are detected at all.
+      })
+      .catch(() => {
+        if (selectedDocId === docId) docSections = [];
+      })
+      .finally(() => {
+        if (selectedDocId === docId) isLoadingSections = false;
+      });
+  });
 
   function addManualDraftRule() {
     const newRule: DraftRule = {
@@ -120,8 +170,27 @@
     try {
       let textToExtract = rawText;
       if (selectedDocId) {
-        const doc = await documentsApi.get(selectedDocId);
-        textToExtract = doc.extracted_text;
+        if (docSections.length > 0) {
+          if (selectedSectionKeys.size === 0) {
+            throw new Error(
+              "Select at least one section or paragraph to extract rules from.",
+            );
+          }
+          textToExtract = docSections
+            .filter((s, i) => selectedSectionKeys.has(sectionKey(s, i)))
+            .map((s) => s.text)
+            .join("\n\n");
+        } else if (!isLoadingSections) {
+          // No sections could be detected for this document — rather than
+          // silently sending the whole document (which can exceed the LLM
+          // provider's request-size limit), require a manually pasted excerpt.
+          if (!rawText.trim()) {
+            throw new Error(
+              "No sections were detected in this document. Paste the specific clause or paragraph to extract rules from.",
+            );
+          }
+          textToExtract = rawText;
+        }
       }
 
       if (!textToExtract.trim()) {
@@ -316,14 +385,62 @@
       </div>
     </div>
 
+    <!-- Section/Paragraph Scope Picker -->
+    {#if selectedDocId && isLoadingSections}
+      <p class="text-xs text-slate-400">Detecting sections…</p>
+    {:else if selectedDocId && docSections.length > 0}
+      <div
+        role="group"
+        aria-labelledby="rule-section-scope-label"
+        class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <span id="rule-section-scope-label" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+            Which Section / Paragraph Should Rules Be Extracted From?
+          </span>
+          <div class="flex shrink-0 items-center gap-3 text-micro font-semibold text-accent">
+            <button type="button" onclick={selectAllSections} class="hover:underline">
+              Select all
+            </button>
+            <button type="button" onclick={clearSectionSelection} class="hover:underline">
+              Clear
+            </button>
+          </div>
+        </div>
+        <p class="text-micro text-slate-500">
+          {docSections.length} section{docSections.length === 1 ? "" : "s"} detected. Pick one or more
+          to scope the extraction — large documents can't be sent to the AI in one request.
+        </p>
+        <div class="max-h-64 space-y-1 overflow-y-auto pr-1">
+          {#each docSections as section, i (sectionKey(section, i))}
+            {@const key = sectionKey(section, i)}
+            <label
+              class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-900"
+            >
+              <TableCheckbox
+                checked={selectedSectionKeys.has(key)}
+                onchange={() => toggleSection(key)}
+                ariaLabel={`Select section ${section.section_number || i + 1}`}
+              />
+              <span class="font-mono text-slate-500">{section.section_number || "—"}</span>
+              <span class="flex-1 truncate">{section.section_name || "Untitled section"}</span>
+              <span class="shrink-0 text-slate-600">{section.char_count.toLocaleString()} chars</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <!-- Raw Text Input (Fallback / Custom Snippet) -->
-    {#if !selectedDocId}
+    {#if !selectedDocId || (!isLoadingSections && docSections.length === 0)}
       <div class="space-y-2">
         <label
           for="rule-raw-text"
           class="block text-xs font-bold uppercase tracking-wider text-slate-400"
         >
-          Or Paste Building Code / Specification Clauses Directly:
+          {selectedDocId
+            ? "No Sections Detected — Paste the Clause or Paragraph to Extract Rules From:"
+            : "Or Paste Building Code / Specification Clauses Directly:"}
         </label>
         <textarea
           id="rule-raw-text"

@@ -464,6 +464,22 @@ class DocumentIngestResponse(BaseModel):
     deontic_statement_count: int = 0
 
 
+class DocumentSection(BaseModel):
+    """One heading-delimited section/paragraph, offered as an extraction-scope choice."""
+
+    section_number: Optional[str] = Field(default=None, description="Detected clause/section number, e.g. '9.8.2'")
+    section_name: Optional[str] = Field(default=None, description="Heading text for the section")
+    text: str = Field(..., description="Full text of the section, for scoped rule extraction")
+    char_count: int = 0
+
+
+class DocumentSectionsResponse(BaseModel):
+    """Sections detected in a document, for choosing an extraction scope."""
+
+    document_id: int
+    sections: list[DocumentSection] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Rule & Ruleset Contracts
 # ---------------------------------------------------------------------------

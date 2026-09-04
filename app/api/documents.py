@@ -23,6 +23,8 @@ from app.modules.contracts import (
     DocumentDetailResponse,
     DocumentIngestResponse,
     DocumentResponse,
+    DocumentSection,
+    DocumentSectionsResponse,
     DocumentUpdateRequest,
     GoogleDriveImportRequest,
     GoogleDriveImportResponse,
@@ -30,6 +32,7 @@ from app.modules.contracts import (
     RuleExtractionDraft,
     RuleExtractionDraftListResponse,
 )
+from app.modules.document_parsing.section_chunker import SectionChunker
 from app.services.documents_service import DocumentService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.rule_extraction_service import RuleExtractionService
@@ -378,6 +381,40 @@ def update_document(
         revision_code=updated.get("revision_code", "P01.01"),
         cde_state=updated.get("cde_state") or "WIP",
     )
+
+
+@router.get(
+    "/{document_id}/sections",
+    response_model=DocumentSectionsResponse,
+    summary="List heading-delimited sections/paragraphs, for scoping rule extraction",
+)
+def get_document_sections(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> DocumentSectionsResponse:
+    """Split a document's extracted text into sections for scoped rule extraction.
+
+    Returns no sections when the text has no detectable headings (e.g. a single
+    undifferentiated block) — the caller should fall back to a manual excerpt.
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    text = doc.get("extracted_text") or ""
+    chunks = SectionChunker().chunk(text) if text.strip() else []
+    sections = [
+        DocumentSection(
+            section_number=chunk.get("section_number"),
+            section_name=chunk.get("section_name"),
+            text=chunk.get("text", ""),
+            char_count=chunk.get("char_count", 0),
+        )
+        for chunk in chunks
+    ]
+    return DocumentSectionsResponse(document_id=document_id, sections=sections)
 
 
 @router.post(
