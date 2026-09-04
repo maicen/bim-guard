@@ -310,7 +310,11 @@ class PipingElement:
 
     # --- Environment (required for corrosion comparators) ---
     environment_class: EnvironmentClass = EnvironmentClass.UNCLASSIFIED
-    environment_source: Optional[str] = None  # "space_metadata" / "zone" / "manual"
+    #: piping_producer.ENVIRONMENT_SOURCE_* — read from an IFC property,
+    #: inferred from spatial names, or the indoor default. None = unclassified.
+    environment_source: Optional[str] = None
+    #: "high" (IFC property) / "medium" (spatial names) / "low" (default).
+    environment_confidence: Optional[str] = None
 
     # --- Joints (for crevice and clearance) ---
     joint_type: Optional[JointType] = None

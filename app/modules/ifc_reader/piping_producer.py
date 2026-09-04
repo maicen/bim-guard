@@ -35,6 +35,7 @@ DESIGN NOTES
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Optional
 
 import ifcopenshell
@@ -597,6 +598,126 @@ def classify_environment(*hints: Optional[str]) -> EnvironmentClass:
         if all(needle in combined for needle in needles):
             return environment
     return EnvironmentClass.UNCLASSIFIED
+
+
+# ---------------------------------------------------------------------------
+# Environment provenance and the indoor default
+# ---------------------------------------------------------------------------
+# Three tiers, mirroring material resolution: read from the file, inferred
+# from spatial names, or defaulted. EnvironmentClass describes the ATMOSPHERE
+# around the pipe (rooftop, coastal, pool hall, indoor), not the fluid inside
+# it — the media axis is media_for_system(). It is therefore never derived
+# from the piping system: "potable water" says nothing about the room.
+#
+# MEP discipline models carry no atmospheric metadata (most have no IfcSpace
+# at all and their storey names are floor ids), so without a default nearly
+# every element stayed UNCLASSIFIED and MM-001 raised a data-quality issue on
+# each. T1_indoor_damp is the safe indoor default: the mildest class that
+# still assumes occasional condensation, scored 0.20 in the MM-001 pack's
+# environment_severity table (the CC-001 ladder). A default is not a
+# measurement, so it is tagged low confidence and warned on, and a caller can
+# switch it off (environment_default=False) for a reading of the file alone.
+
+ENVIRONMENT_SOURCE_IFC = "ifc_property"
+ENVIRONMENT_SOURCE_SPATIAL = "inferred from spatial names"
+ENVIRONMENT_SOURCE_DEFAULT = "default_indoor"
+
+#: Confidence per source. A default is an assumption, not a reading.
+ENVIRONMENT_CONFIDENCE = {
+    ENVIRONMENT_SOURCE_IFC: "high",
+    ENVIRONMENT_SOURCE_SPATIAL: "medium",
+    ENVIRONMENT_SOURCE_DEFAULT: "low",
+}
+
+DEFAULT_ENVIRONMENT_CLASS = EnvironmentClass.T1_INDOOR_DAMP
+
+#: Property names an authoring tool may use to state the atmosphere class.
+ENVIRONMENT_PROPERTY_KEYS = (
+    "EnvironmentClass",
+    "EnvironmentalClass",
+    "CorrosivityCategory",
+    "AtmosphericEnvironment",
+)
+
+ENVIRONMENT_DEFAULTED_WARNING = (
+    f"environment defaulted to {DEFAULT_ENVIRONMENT_CLASS.value}: no atmospheric "
+    "metadata in model (low confidence)"
+)
+ENVIRONMENT_UNCLASSIFIED_WARNING = "environment class could not be inferred from spatial names"
+
+#: Bare EN ISO 15329 codes onto the enum. Note the enum keys T3-T5 on
+#: chemistry (chloride / marine / industrial), not on wetting position.
+_ENVIRONMENT_CODES = {
+    "T0": EnvironmentClass.T0_DRY,
+    "T1": EnvironmentClass.T1_INDOOR_DAMP,
+    "T2": EnvironmentClass.T2_HUMID,
+    "T3": EnvironmentClass.T3_CHLORIDE,
+    "T4": EnvironmentClass.T4_MARINE,
+    "T5": EnvironmentClass.T5_INDUSTRIAL,
+}
+
+
+def parse_environment_class(raw: Optional[str]) -> Optional[EnvironmentClass]:
+    """Parse an explicit environment class from IFC property text.
+
+    Accepts the enum value ("T1_indoor_damp"), the member name
+    ("T1_INDOOR_DAMP"), the bare EN ISO 15329 code ("T1") or a code with a
+    descriptor ("T3 chloride"). Returns None for anything else, including
+    "unclassified": a property that says "unknown" is not a classification.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return None
+    key = re.sub(r"[\s\-]+", "_", text).lower()
+    for member in EnvironmentClass:
+        if member is EnvironmentClass.UNCLASSIFIED:
+            continue
+        if key in (member.value.lower(), member.name.lower()):
+            return member
+    code = key[:2].upper()
+    if code in _ENVIRONMENT_CODES and (len(key) == 2 or not key[2].isalnum()):
+        return _ENVIRONMENT_CODES[code]
+    return None
+
+
+def resolve_environment(
+    properties: dict,
+    *hints: Optional[str],
+    allow_default: bool = True,
+) -> tuple[EnvironmentClass, Optional[str], Optional[str], Optional[str]]:
+    """Resolve an element's environment class with provenance.
+
+    Args:
+        properties: The element's flattened Pset values.
+        *hints: Space, storey and system names for classify_environment.
+        allow_default: Apply DEFAULT_ENVIRONMENT_CLASS when nothing else
+            resolves. False leaves the element UNCLASSIFIED, as before.
+
+    Returns:
+        ``(environment_class, source, confidence, warning)``. Precedence: an
+        explicit property (high) beats spatial-name inference (medium) beats
+        the indoor default (low, with a warning). With the default disabled
+        an unresolved element returns UNCLASSIFIED, None, None and a warning.
+    """
+    explicit = parse_environment_class(_first_text(properties, *ENVIRONMENT_PROPERTY_KEYS))
+    if explicit is not None:
+        source = ENVIRONMENT_SOURCE_IFC
+        return explicit, source, ENVIRONMENT_CONFIDENCE[source], None
+
+    inferred = classify_environment(*hints)
+    if inferred is not EnvironmentClass.UNCLASSIFIED:
+        source = ENVIRONMENT_SOURCE_SPATIAL
+        return inferred, source, ENVIRONMENT_CONFIDENCE[source], None
+
+    if allow_default:
+        source = ENVIRONMENT_SOURCE_DEFAULT
+        return (
+            DEFAULT_ENVIRONMENT_CLASS,
+            source,
+            ENVIRONMENT_CONFIDENCE[source],
+            ENVIRONMENT_DEFAULTED_WARNING,
+        )
+    return EnvironmentClass.UNCLASSIFIED, None, None, ENVIRONMENT_UNCLASSIFIED_WARNING
 
 
 # ---------------------------------------------------------------------------
@@ -1486,6 +1607,7 @@ def _build_element(
     entity: Any,
     unit_scale: float,
     material_inference: bool = True,
+    environment_default: bool = True,
 ) -> Optional[PipingElement]:
     """Convert one IFC entity to a PipingElement, or None if unusable.
 
@@ -1495,6 +1617,9 @@ def _build_element(
         unit_scale: Factor converting model length units to metres.
         material_inference: Allow the system-type material fallback. Set
             False for a reading of the file alone.
+        environment_default: Apply the T1 indoor default when neither an IFC
+            property nor spatial names classify the environment. Set False
+            to leave such elements UNCLASSIFIED.
     """
     global_id = _safe_str(getattr(entity, "GlobalId", None))
     if not global_id:
@@ -1547,9 +1672,17 @@ def _build_element(
 
     level_id, level_name = _storey(entity)
     space_id, space_name = _space(entity)
-    environment_class = classify_environment(space_name, level_name, system_name)
-    if environment_class is EnvironmentClass.UNCLASSIFIED:
-        warnings.append("environment class could not be inferred from spatial names")
+    environment_class, environment_source, environment_confidence, environment_warning = (
+        resolve_environment(
+            properties, space_name, level_name, system_name, allow_default=environment_default
+        )
+    )
+    if environment_warning:
+        warnings.append(environment_warning)
+    if environment_source == ENVIRONMENT_SOURCE_DEFAULT:
+        logger.debug("environment defaulted: %s -> %s [low]", global_id, environment_class.value)
+    elif environment_source == ENVIRONMENT_SOURCE_IFC:
+        logger.debug("environment from IFC: %s -> %s", global_id, environment_class.value)
 
     centroid = _centroid(entity, unit_scale)
     centerline, bbox = _geometry(entity, unit_scale)
@@ -1590,7 +1723,8 @@ def _build_element(
             properties, "DesignPressure", "WorkingPressure", "PressureRating"
         ),
         environment_class=environment_class,
-        environment_source="inferred from spatial names",
+        environment_source=environment_source,
+        environment_confidence=environment_confidence,
         joint_type=joint_type,
         properties=properties,
         extraction_warnings=warnings,
@@ -1604,6 +1738,7 @@ def produce_piping_elements_from_model(
     adjacency_tolerance_m: float = 0.05,
     geometric_adjacency: bool = False,
     material_inference: bool = True,
+    environment_default: bool = True,
 ) -> list[PipingElement]:
     """Emit the canonical PipingElement list from an already-open IFC model.
 
@@ -1627,6 +1762,11 @@ def produce_piping_elements_from_model(
             file carries no material. Defaults True; inferred values are
             tagged MATERIAL_SOURCE_KEY and warned on. Set False for a
             reading of the file alone.
+        environment_default: Apply DEFAULT_ENVIRONMENT_CLASS (T1 indoor
+            damp) to elements neither an IFC property nor spatial names can
+            classify. Defaults True; defaulted values carry
+            environment_source == ENVIRONMENT_SOURCE_DEFAULT, low confidence
+            and a warning. Set False to keep them UNCLASSIFIED.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1653,7 +1793,9 @@ def produce_piping_elements_from_model(
                 # by_type returns subtypes too, so the same entity can be
                 # yielded under both its own class and a supertype.
                 continue
-            element = _build_element(model, entity, unit_scale, material_inference)
+            element = _build_element(
+                model, entity, unit_scale, material_inference, environment_default
+            )
             if element is None:
                 continue
             seen.add(global_id)
@@ -1661,6 +1803,7 @@ def produce_piping_elements_from_model(
 
     _build_adjacency(model, elements, adjacency_tolerance_m, geometric_adjacency)
     _log_material_coverage(elements)
+    _log_environment_coverage(elements)
     return elements
 
 
@@ -1703,12 +1846,52 @@ def _log_material_coverage(elements: list[PipingElement]) -> None:
     )
 
 
+def environment_coverage(elements: list[PipingElement]) -> dict[str, int]:
+    """Count how each element's environment class was resolved.
+
+    Returns:
+        Counts keyed "total", "from_ifc", "spatial", "defaulted",
+        "unclassified". The split is the point: a defaulted class is an
+        assumption, and a headline coverage that merged it with readings
+        would let the assumption pass for a measurement.
+    """
+    counts = {"total": 0, "from_ifc": 0, "spatial": 0, "defaulted": 0, "unclassified": 0}
+    for element in elements:
+        counts["total"] += 1
+        if element.environment_class is EnvironmentClass.UNCLASSIFIED:
+            counts["unclassified"] += 1
+        elif element.environment_source == ENVIRONMENT_SOURCE_IFC:
+            counts["from_ifc"] += 1
+        elif element.environment_source == ENVIRONMENT_SOURCE_DEFAULT:
+            counts["defaulted"] += 1
+        else:
+            counts["spatial"] += 1
+    return counts
+
+
+def _log_environment_coverage(elements: list[PipingElement]) -> None:
+    """Emit one environment-coverage line per model (per-element detail is DEBUG)."""
+    if not elements:
+        return
+    counts = environment_coverage(elements)
+    total = counts["total"]
+    classified = total - counts["unclassified"]
+    logger.info(
+        "Environment coverage: %d/%d (%.1f%%) - %d from IFC, %d from spatial names, "
+        "%d defaulted to %s (low confidence), %d unclassified",
+        classified, total, 100.0 * classified / total,
+        counts["from_ifc"], counts["spatial"], counts["defaulted"],
+        DEFAULT_ENVIRONMENT_CLASS.value, counts["unclassified"],
+    )
+
+
 def produce_piping_elements(
     ifc_path: str,
     *,
     adjacency_tolerance_m: float = 0.05,
     geometric_adjacency: bool = False,
     material_inference: bool = True,
+    environment_default: bool = True,
 ) -> list[PipingElement]:
     """Read an IFC file and emit the canonical PipingElement list.
 
@@ -1744,6 +1927,7 @@ def produce_piping_elements(
         adjacency_tolerance_m=adjacency_tolerance_m,
         geometric_adjacency=geometric_adjacency,
         material_inference=material_inference,
+        environment_default=environment_default,
     )
 
 
@@ -1759,12 +1943,11 @@ def summarise(elements: list[PipingElement]) -> str:
     adjacencies = sum(len(e.joined_to) for e in elements) // 2
     unknown_material = sum(1 for e in elements if e.material == "Unknown")
     unknown_system = sum(1 for e in elements if e.system is PipingSystem.UNKNOWN)
-    unclassified_env = sum(
-        1 for e in elements if e.environment_class is EnvironmentClass.UNCLASSIFIED
-    )
+    env = environment_coverage(elements)
     return (
         f"Extracted {len(elements)} elements, {adjacencies} adjacencies found "
         f"({unknown_material} unknown material, {unknown_system} unknown system, "
-        f"{unclassified_env} unclassified environment)"
+        f"{env['unclassified']} unclassified environment, "
+        f"{env['defaulted']} environment defaulted to {DEFAULT_ENVIRONMENT_CLASS.value})"
     )
 

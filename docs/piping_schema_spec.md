@@ -86,7 +86,18 @@ Extending the canonical set is fine but must be done by PR to `piping_schema.py`
 | `T5_industrial` | aggressive chemical atmosphere | chemical store, dosing room |
 | `unclassified` | cannot determine | Module2 fallback |
 
-`environment_source` records where the classification came from: `"space_metadata"` (IFC property on the enclosing IfcSpace), `"zone"` (derived from IfcZone membership), or `"manual"` (set by a rule in Module2 based on element type — e.g. any pipe in a space named "POOL-*" gets T3).
+`environment_class` describes the **atmosphere around the pipe** (rooftop, coastal, pool hall, indoor), not the fluid inside it. The media axis is `media_for_system()`, and the environment is never derived from it: potable water says nothing about the room.
+
+The producer resolves it in three tiers, mirroring material resolution, and records the tier in `environment_source` with a matching `environment_confidence`:
+
+| `environment_source` | Meaning | `environment_confidence` |
+|---|---|---|
+| `ifc_property` | an `EnvironmentClass` / `EnvironmentalClass` / `CorrosivityCategory` / `AtmosphericEnvironment` property on the element, parsed as a T0–T5 code or enum value | `high` |
+| `inferred from spatial names` | `classify_environment()` over the space, storey and system names ("Pool Hall", "Basement Plant Room") | `medium` |
+| `default_indoor` | nothing to go on, so `T1_indoor_damp` was applied as the safe indoor default, with an extraction warning | `low` |
+| `None` | left `unclassified` — only when the caller passes `environment_default=False` | `None` |
+
+MEP discipline models carry no atmospheric metadata (most have no `IfcSpace` at all and their storey names are floor ids), so on the validation set the reading alone classifies under 1 % of elements and the default carries the rest. A default is an assumption, not a measurement: consumers that need to distinguish the two must check `environment_source`, and `scripts/trace_environment_coverage.py` reports the split per model.
 
 ---
 
@@ -126,7 +137,7 @@ Required for pipe_segment specifically:
 - `nominal_diameter_mm`
 
 Required for corrosion comparators to run:
-- `material` (non-`Unknown`), `environment_class` (non-`unclassified`)
+- `material` (non-`Unknown`), `environment_class` (non-`unclassified` — always satisfied when the T1 default is on; check `environment_source` for whether it was read or assumed)
 
 Required for seismic bracing:
 - `centerline`, `mass_filled_kg`, `system`

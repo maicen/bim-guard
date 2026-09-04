@@ -1,0 +1,392 @@
+{
+  "models_dir": "test-models\\models",
+  "default_enabled": true,
+  "totals": {
+    "total": 93457,
+    "classified": 93457,
+    "coverage_pct": 100.0,
+    "by_source": {
+      "ifc_property": 0,
+      "spatial_names": 783,
+      "default_indoor": 92674,
+      "unclassified": 0
+    },
+    "by_class": {
+      "T1_indoor_damp": 93026,
+      "T0_dry": 305,
+      "T2_humid": 67,
+      "T3_chloride": 59
+    }
+  },
+  "models": [
+    {
+      "name": "Clinic_Architectural.ifc",
+      "total": 102,
+      "classified": 102,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 102,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 102
+      },
+      "by_confidence": {
+        "low": 102
+      }
+    },
+    {
+      "name": "Clinic_Electrical.ifc",
+      "total": 2089,
+      "classified": 2089,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 2089,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 2089
+      },
+      "by_confidence": {
+        "low": 2089
+      }
+    },
+    {
+      "name": "Clinic_HVAC.ifc",
+      "total": 3704,
+      "classified": 3704,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 1,
+        "default_indoor": 3703,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 3704
+      },
+      "by_confidence": {
+        "low": 3703,
+        "medium": 1
+      }
+    },
+    {
+      "name": "Clinic_Plumbing.ifc",
+      "total": 6587,
+      "classified": 6587,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 6587,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 6587
+      },
+      "by_confidence": {
+        "low": 6587
+      }
+    },
+    {
+      "name": "west_riverside_hospital_elec_ifc4.ifc",
+      "total": 1673,
+      "classified": 1673,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 1673,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 1673
+      },
+      "by_confidence": {
+        "low": 1673
+      }
+    },
+    {
+      "name": "west_riverside_hospital_fire_ifc4.ifc",
+      "total": 861,
+      "classified": 861,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 861,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 861
+      },
+      "by_confidence": {
+        "low": 861
+      }
+    },
+    {
+      "name": "west_riverside_hospital_mech_ifc4.ifc",
+      "total": 17424,
+      "classified": 17424,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 198,
+        "default_indoor": 17226,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 17226,
+        "T0_dry": 140,
+        "T2_humid": 31,
+        "T3_chloride": 27
+      },
+      "by_confidence": {
+        "low": 17226,
+        "medium": 198
+      }
+    },
+    {
+      "name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "total": 8539,
+      "classified": 8539,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 8539,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 8539
+      },
+      "by_confidence": {
+        "low": 8539
+      }
+    },
+    {
+      "name": "west_riverside_hospital_sprinkle_ifc4.ifc",
+      "total": 13490,
+      "classified": 13490,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 13490,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 13490
+      },
+      "by_confidence": {
+        "low": 13490
+      }
+    },
+    {
+      "name": "DigitalHub_FM-HZG_v2.ifc",
+      "total": 1795,
+      "classified": 1795,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 1795,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 1795
+      },
+      "by_confidence": {
+        "low": 1795
+      }
+    },
+    {
+      "name": "DigitalHub_FM-LFT_v2.ifc",
+      "total": 1310,
+      "classified": 1310,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 1310,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 1310
+      },
+      "by_confidence": {
+        "low": 1310
+      }
+    },
+    {
+      "name": "DigitalHub_FM-SAN_v2.ifc",
+      "total": 1010,
+      "classified": 1010,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 1010,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 1010
+      },
+      "by_confidence": {
+        "low": 1010
+      }
+    },
+    {
+      "name": "Duplex_Electrical_20121207.ifc",
+      "total": 99,
+      "classified": 99,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 99,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 99
+      },
+      "by_confidence": {
+        "low": 99
+      }
+    },
+    {
+      "name": "Duplex_MEP_20110907.ifc",
+      "total": 926,
+      "classified": 926,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 1,
+        "default_indoor": 925,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 926
+      },
+      "by_confidence": {
+        "low": 925,
+        "medium": 1
+      }
+    },
+    {
+      "name": "Duplex_Plumbing_20121113.ifc",
+      "total": 498,
+      "classified": 498,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 3,
+        "default_indoor": 495,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 498
+      },
+      "by_confidence": {
+        "low": 495,
+        "medium": 3
+      }
+    },
+    {
+      "name": "IFC_Schependomlaan.ifc",
+      "total": 73,
+      "classified": 73,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 73,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 73
+      },
+      "by_confidence": {
+        "low": 73
+      }
+    },
+    {
+      "name": "Molio_with_URIs.ifc",
+      "total": 48,
+      "classified": 48,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 48,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 48
+      },
+      "by_confidence": {
+        "low": 48
+      }
+    },
+    {
+      "name": "wbdg_office_arc.ifc",
+      "total": 31,
+      "classified": 31,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 31,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 31
+      },
+      "by_confidence": {
+        "low": 31
+      }
+    },
+    {
+      "name": "wbdg_office_mep.ifc",
+      "total": 5697,
+      "classified": 5697,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 347,
+        "default_indoor": 5350,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 5697
+      },
+      "by_confidence": {
+        "low": 5350,
+        "medium": 347
+      }
+    },
+    {
+      "name": "west_riverside_hospital_mech_ifc2x3.ifc",
+      "total": 18488,
+      "classified": 18488,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 233,
+        "default_indoor": 18255,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 18255,
+        "T0_dry": 165,
+        "T2_humid": 36,
+        "T3_chloride": 32
+      },
+      "by_confidence": {
+        "low": 18255,
+        "medium": 233
+      }
+    },
+    {
+      "name": "west_riverside_hospital_plumb_ifc2x3.ifc",
+      "total": 9013,
+      "classified": 9013,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 9013,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 9013
+      },
+      "by_confidence": {
+        "low": 9013
+      }
+    }
+  ]
+}

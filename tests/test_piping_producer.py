@@ -521,3 +521,148 @@ class TestMaterialCoverage:
         assert pp.material_coverage([]) == {
             "total": 0, "from_ifc": 0, "inferred": 0, "unknown": 0,
         }
+
+
+# ---------------------------------------------------------------------------
+# Environment provenance and the T1 indoor default
+# ---------------------------------------------------------------------------
+
+
+class TestEnvironmentProvenance:
+    """Environment resolves in three tiers: IFC property, spatial names, default.
+
+    EnvironmentClass is the atmosphere around the pipe, never the fluid in it,
+    so a potable-water system must not push an indoor pipe towards marine.
+    """
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("T1", EnvironmentClass.T1_INDOOR_DAMP),
+            ("t0", EnvironmentClass.T0_DRY),
+            ("T3 chloride", EnvironmentClass.T3_CHLORIDE),
+            ("T4_marine", EnvironmentClass.T4_MARINE),
+            ("T5_INDUSTRIAL", EnvironmentClass.T5_INDUSTRIAL),
+            ("T2-humid", EnvironmentClass.T2_HUMID),
+            ("unclassified", None),
+            ("T10", None),
+            ("marine", None),
+            ("", None),
+            (None, None),
+        ],
+    )
+    def test_parse_environment_class(self, raw, expected):
+        assert pp.parse_environment_class(raw) is expected
+
+    def test_explicit_ifc_property_wins_and_is_high_confidence(self):
+        env, source, confidence, warning = pp.resolve_environment(
+            {"EnvironmentClass": "T4"}, "Open Plan Office"
+        )
+        assert env is EnvironmentClass.T4_MARINE
+        assert source == pp.ENVIRONMENT_SOURCE_IFC
+        assert confidence == "high"
+        assert warning is None
+
+    def test_spatial_names_are_medium_confidence(self):
+        env, source, confidence, warning = pp.resolve_environment({}, "Pool Hall", "L01", None)
+        assert env is EnvironmentClass.T3_CHLORIDE
+        assert source == pp.ENVIRONMENT_SOURCE_SPATIAL
+        assert confidence == "medium"
+        assert warning is None
+
+    def test_default_is_t1_indoor_damp_low_confidence_with_warning(self):
+        env, source, confidence, warning = pp.resolve_environment({}, None, "Level 1", None)
+        assert env is EnvironmentClass.T1_INDOOR_DAMP
+        assert env is pp.DEFAULT_ENVIRONMENT_CLASS
+        assert source == pp.ENVIRONMENT_SOURCE_DEFAULT
+        assert confidence == "low"
+        assert warning == pp.ENVIRONMENT_DEFAULTED_WARNING
+        assert "T1_indoor_damp" in warning and "low confidence" in warning
+
+    def test_default_can_be_switched_off(self):
+        env, source, confidence, warning = pp.resolve_environment(
+            {}, None, "Level 1", None, allow_default=False
+        )
+        assert env is EnvironmentClass.UNCLASSIFIED
+        assert source is None and confidence is None
+        assert warning == pp.ENVIRONMENT_UNCLASSIFIED_WARNING
+
+    def test_media_never_drives_the_atmosphere_class(self):
+        """Potable water in an unnamed room is indoor by default, not marine."""
+        env, source, _, _ = pp.resolve_environment({}, None, None, "Domestic Cold Water")
+        assert env is EnvironmentClass.T1_INDOOR_DAMP
+        assert source == pp.ENVIRONMENT_SOURCE_DEFAULT
+
+    def test_a_property_saying_unclassified_is_not_a_classification(self):
+        env, source, _, _ = pp.resolve_environment({"EnvironmentClass": "unclassified"}, None)
+        assert env is EnvironmentClass.T1_INDOOR_DAMP
+        assert source == pp.ENVIRONMENT_SOURCE_DEFAULT
+
+    def test_confidence_ladder(self):
+        assert pp.ENVIRONMENT_CONFIDENCE == {
+            pp.ENVIRONMENT_SOURCE_IFC: "high",
+            pp.ENVIRONMENT_SOURCE_SPATIAL: "medium",
+            pp.ENVIRONMENT_SOURCE_DEFAULT: "low",
+        }
+
+
+MEP_SCENARIO_MODEL = "data/test_hospital_mep_scenario.ifc"
+
+
+@pytest.fixture(scope="module")
+def elements():
+    """Producer output for the small hospital MEP scenario model."""
+    from pathlib import Path
+
+    if not Path(MEP_SCENARIO_MODEL).exists():
+        pytest.skip(f"{MEP_SCENARIO_MODEL} not available")
+    return pp.produce_piping_elements(MEP_SCENARIO_MODEL)
+
+
+class TestEnvironmentCoverageOnModel:
+    """On a real MEP model every element ends up classified, with provenance."""
+
+    MODEL = MEP_SCENARIO_MODEL
+
+    def test_every_element_is_classified_with_provenance(self, elements):
+        assert elements
+        for element in elements:
+            assert element.environment_class is not EnvironmentClass.UNCLASSIFIED
+            assert element.environment_source in (
+                pp.ENVIRONMENT_SOURCE_IFC,
+                pp.ENVIRONMENT_SOURCE_SPATIAL,
+                pp.ENVIRONMENT_SOURCE_DEFAULT,
+            )
+            assert element.environment_confidence in ("high", "medium", "low")
+
+        counts = pp.environment_coverage(elements)
+        assert counts["unclassified"] == 0
+        assert counts["from_ifc"] + counts["spatial"] + counts["defaulted"] == counts["total"]
+
+    def test_defaulted_elements_are_low_confidence_and_warned(self, elements):
+        defaulted = [e for e in elements if e.environment_source == pp.ENVIRONMENT_SOURCE_DEFAULT]
+        assert defaulted, "an MEP model without IfcSpace containment must hit the default"
+        for element in defaulted:
+            assert element.environment_class is EnvironmentClass.T1_INDOOR_DAMP
+            assert element.environment_confidence == "low"
+            assert pp.ENVIRONMENT_DEFAULTED_WARNING in element.extraction_warnings
+
+    def test_switching_the_default_off_reproduces_the_raw_reading(self):
+        from pathlib import Path
+
+        if not Path(self.MODEL).exists():
+            pytest.skip(f"{self.MODEL} not available")
+        raw = pp.produce_piping_elements(self.MODEL, environment_default=False)
+        counts = pp.environment_coverage(raw)
+        assert counts["defaulted"] == 0
+        assert counts["unclassified"] == counts["total"] - counts["from_ifc"] - counts["spatial"]
+        for element in raw:
+            if element.environment_class is EnvironmentClass.UNCLASSIFIED:
+                assert element.environment_source is None
+                assert pp.ENVIRONMENT_UNCLASSIFIED_WARNING in element.extraction_warnings
+
+    def test_summary_line_reports_the_default_count(self, elements):
+        summary = pp.summarise(elements)
+        counts = pp.environment_coverage(elements)
+        assert f"{counts['defaulted']} environment defaulted to T1_indoor_damp" in summary
+        assert f"{counts['unclassified']} unclassified environment" in summary
