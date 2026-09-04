@@ -306,6 +306,11 @@ class PipingElement:
     # --- Service ---
     system: PipingSystem = PipingSystem.UNKNOWN
     operating_temperature_c: Optional[float] = None
+    #: piping_producer.TEMPERATURE_SOURCE_* - read from an IFC property or
+    #: inferred from the system design convention. None = no temperature.
+    temperature_source: Optional[str] = None
+    #: "high" (IFC property) / "established" or "provisional" (inferred).
+    temperature_confidence: Optional[str] = None
     design_pressure_bar: Optional[float] = None
 
     # --- Environment (required for corrosion comparators) ---

@@ -721,6 +721,190 @@ def resolve_environment(
 
 
 # ---------------------------------------------------------------------------
+# Operating temperature inference from system type
+# ---------------------------------------------------------------------------
+# The third input MM-001 needs, after material and environment, and the one
+# real models are most consistently missing: no model measured here states an
+# operating temperature on any piping element.
+#
+# Temperature drives the pack's temperature_stress term two ways. Corrosion
+# kinetics roughly double per 10 C (Arrhenius), and above about 60 C the zinc
+# on galvanised steel reverses polarity and starts to pit the substrate it was
+# protecting. That reversal is a STEP, not a gradient, which is why the value
+# chosen for a hot service matters far more than a few degrees usually would:
+# 59 C and 60 C sit in different bands (0.55 against 0.80).
+#
+# The values below are design temperatures from ordinary MEP practice, chosen
+# to land in the band the pack itself names for that service - its band notes
+# read "Chilled and cold services", "Pool circulation and tempered services",
+# "Domestic hot water storage and distribution", "LTHW heating flow", "Steam
+# and pressurised HTHW". They are a statement about how these systems are
+# designed, NOT a measurement of this model, and every element filled this way
+# is tagged and warned on like an inferred material.
+#
+# The pack's kinetics_guard caps the temperature term at 0.35 whenever the
+# material/media cell is itself below 0.35, so an inferred temperature cannot
+# escalate a benign pairing on its own. That is what makes this fallback safe
+# to apply broadly: it can sharpen a real incompatibility, not invent one.
+#
+# Systems deliberately ABSENT, because no single design temperature describes
+# them:
+#   FOUL_DRAINAGE   normally empty, with intermittent hot discharges; there is
+#                   no standing operating temperature to state
+#   RAINWATER       external, follows the weather
+#   UNKNOWN         nothing to infer from
+
+_SYSTEM_TEMPERATURE_INFERENCE: dict[PipingSystem, tuple[float, str]] = {
+    # Domestic hot water is stored and distributed at 60 C for Legionella
+    # control (HSE ACOP L8, NZS 4305). That is exactly the zinc-reversal band
+    # edge, which is the point: a galvanised DHW line is a real failure mode.
+    PipingSystem.DOMESTIC_HOT_WATER: (60.0, "established"),
+    # The circulating return must come back at 50 C or above (L8); 55 C is the
+    # usual design figure. Provisional because it lands just BELOW the 60 C
+    # reversal edge: a galvanised return running hotter than design would be
+    # scored one band too kindly, so a hot galvanised return is worth checking
+    # explicitly rather than trusting this default.
+    PipingSystem.DOMESTIC_HOT_WATER_RETURN: (55.0, "provisional"),
+    # Cold water must stay below 20 C for the same reason; 15 C is typical.
+    PipingSystem.DOMESTIC_COLD_WATER: (15.0, "established"),
+    # Classic 6/12 C chilled water design.
+    PipingSystem.CHILLED_WATER_FLOW: (6.0, "established"),
+    PipingSystem.CHILLED_WATER_RETURN: (12.0, "established"),
+    # Classic 82/71 C LTHW design.
+    PipingSystem.HEATING_FLOW: (82.0, "established"),
+    PipingSystem.HEATING_RETURN: (71.0, "established"),
+    # Condenser water on a 30/35 C loop.
+    PipingSystem.CONDENSER_WATER: (30.0, "established"),
+    # Saturation temperatures: LP steam at roughly 2 bar g, HP well above.
+    PipingSystem.STEAM_LP: (120.0, "established"),
+    PipingSystem.STEAM_HP: (180.0, "established"),
+    # Condensate leaves the trap close to saturation.
+    PipingSystem.CONDENSATE_RETURN: (90.0, "established"),
+    # Pool water is held at bathing temperature.
+    PipingSystem.POOL_CIRCULATION: (29.0, "established"),
+    # Dosing lines carry concentrated chemical at room temperature; the
+    # aggression is chemical, and that is the media axis, not this one.
+    PipingSystem.POOL_CHEMICAL_DOSING: (20.0, "provisional"),
+    # Wet fire systems stand full at room temperature.
+    PipingSystem.FIRE_SPRINKLER: (20.0, "established"),
+    PipingSystem.FIRE_WET_RISER: (20.0, "established"),
+    # Dry gas services sit at ambient.
+    PipingSystem.MEDICAL_GAS_OXYGEN: (20.0, "established"),
+    PipingSystem.MEDICAL_GAS_NITROUS: (20.0, "established"),
+    PipingSystem.MEDICAL_GAS_VACUUM: (20.0, "established"),
+    PipingSystem.MEDICAL_GAS_COMPRESSED_AIR: (20.0, "established"),
+    PipingSystem.NATURAL_GAS: (20.0, "established"),
+    PipingSystem.COMPRESSED_AIR: (20.0, "established"),
+}
+
+TEMPERATURE_SOURCE_IFC = "ifc_property"
+TEMPERATURE_SOURCE_INFERENCE = "system_inference"
+
+#: Confidence per source. An inferred design temperature is an assumption.
+TEMPERATURE_CONFIDENCE = {
+    TEMPERATURE_SOURCE_IFC: "high",
+    TEMPERATURE_SOURCE_INFERENCE: "low",
+}
+
+#: Property names an authoring tool may use to state the operating temperature.
+TEMPERATURE_PROPERTY_KEYS = (
+    "OperatingTemperature",
+    "WorkingTemperature",
+    "FluidTemperature",
+    "DesignTemperature",
+    "MediumTemperature",
+)
+
+TEMPERATURE_INFERRED_TEMPLATE = (
+    "Operating temperature {temperature} C assumed from system {system!r} "
+    "({confidence} design convention) - not read from the IFC; confirm against "
+    "the system design data before relying on any finding derived from it"
+)
+
+TEMPERATURE_MISSING_WARNING = (
+    "no operating temperature: absent from the IFC and no design convention "
+    "for this system"
+)
+
+
+def infer_temperature_from_system(system: Any) -> Optional[float]:
+    """Infer a design operating temperature, in Celsius, from the system.
+
+    A statement about ordinary MEP design practice, not a reading of the
+    model. Use it only where the caller records the provenance - see
+    resolve_temperature, which tags and warns on every inferred value.
+
+    Args:
+        system: A PipingSystem, or its string value. Anything unrecognised,
+            including None and PipingSystem.UNKNOWN, yields None.
+
+    Returns:
+        A temperature in Celsius, or None where no single design temperature
+        describes the system. None means "no convention to apply" and must not
+        be turned into a default by the caller.
+    """
+    entry = _system_temperature_entry(system)
+    return entry[0] if entry else None
+
+
+def _system_temperature_entry(system: Any) -> Optional[tuple[float, str]]:
+    """Return (temperature_c, confidence) for a system, or None."""
+    if system is None:
+        return None
+    if not isinstance(system, PipingSystem):
+        try:
+            system = PipingSystem(str(getattr(system, "value", system)).strip().lower())
+        except ValueError:
+            return None
+    return _SYSTEM_TEMPERATURE_INFERENCE.get(system)
+
+
+def resolve_temperature(
+    properties: dict,
+    system: Any = None,
+    *,
+    allow_inference: bool = True,
+) -> tuple[Optional[float], Optional[str], Optional[str], Optional[str]]:
+    """Resolve an element's operating temperature with provenance.
+
+    Args:
+        properties: The element's flattened Pset values.
+        system: The element's PipingSystem, used only for the fallback.
+        allow_inference: Set False to read the file alone, with no design
+            convention filled in.
+
+    Returns:
+        ``(temperature_c, source, confidence, warning)``. A stated property
+        (high) beats the system design convention (low). When neither
+        resolves, the temperature is None and MM-001 raises
+        temperature_missing rather than scoring the element - Undetermined,
+        not a defaulted ambient.
+    """
+    stated = _first_number(properties, *TEMPERATURE_PROPERTY_KEYS)
+    if stated is not None:
+        source = TEMPERATURE_SOURCE_IFC
+        return float(stated), source, TEMPERATURE_CONFIDENCE[source], None
+
+    if allow_inference:
+        entry = _system_temperature_entry(system)
+        if entry is not None:
+            temperature, confidence = entry
+            source = TEMPERATURE_SOURCE_INFERENCE
+            return (
+                temperature,
+                source,
+                confidence,
+                TEMPERATURE_INFERRED_TEMPLATE.format(
+                    temperature=temperature,
+                    system=getattr(system, "value", system),
+                    confidence=confidence,
+                ),
+            )
+
+    return None, None, None, TEMPERATURE_MISSING_WARNING
+
+
+# ---------------------------------------------------------------------------
 # Subtype classification
 # ---------------------------------------------------------------------------
 # subtype is one of only three required PipingElement fields and has no
@@ -1608,6 +1792,7 @@ def _build_element(
     unit_scale: float,
     material_inference: bool = True,
     environment_default: bool = True,
+    temperature_inference: bool = True,
 ) -> Optional[PipingElement]:
     """Convert one IFC entity to a PipingElement, or None if unusable.
 
@@ -1620,6 +1805,10 @@ def _build_element(
         environment_default: Apply the T1 indoor default when neither an IFC
             property nor spatial names classify the environment. Set False
             to leave such elements UNCLASSIFIED.
+        temperature_inference: Fall back to the system's design operating
+            temperature when the file states none. Defaults True;
+            inferred values are tagged temperature_source and warned
+            on. Set False for a reading of the file alone.
     """
     global_id = _safe_str(getattr(entity, "GlobalId", None))
     if not global_id:
@@ -1689,6 +1878,19 @@ def _build_element(
     if centroid is None:
         warnings.append("no placement — element excluded from adjacency detection")
 
+    operating_temperature_c, temperature_source, temperature_confidence, temperature_warning = (
+        resolve_temperature(properties, system, allow_inference=temperature_inference)
+    )
+    if temperature_warning:
+        warnings.append(temperature_warning)
+    if operating_temperature_c is None:
+        logger.debug("temperature unresolved: %s (system=%s)", global_id, system.value)
+    elif temperature_source == TEMPERATURE_SOURCE_INFERENCE:
+        logger.debug(
+            "temperature inferred: %s (system=%s) -> %s C [%s]",
+            global_id, system.value, operating_temperature_c, temperature_confidence,
+        )
+
     joint_type = classify_joint_type(name, description, predefined)
 
     return PipingElement(
@@ -1716,9 +1918,9 @@ def _build_element(
         ),
         insulation_material=_first_text(properties, "InsulationMaterial", "InsulationType"),
         system=system,
-        operating_temperature_c=_first_number(
-            properties, "OperatingTemperature", "WorkingTemperature", "FluidTemperature"
-        ),
+        operating_temperature_c=operating_temperature_c,
+        temperature_source=temperature_source,
+        temperature_confidence=temperature_confidence,
         design_pressure_bar=_first_number(
             properties, "DesignPressure", "WorkingPressure", "PressureRating"
         ),
@@ -1739,6 +1941,7 @@ def produce_piping_elements_from_model(
     geometric_adjacency: bool = False,
     material_inference: bool = True,
     environment_default: bool = True,
+    temperature_inference: bool = True,
 ) -> list[PipingElement]:
     """Emit the canonical PipingElement list from an already-open IFC model.
 
@@ -1767,6 +1970,10 @@ def produce_piping_elements_from_model(
             classify. Defaults True; defaulted values carry
             environment_source == ENVIRONMENT_SOURCE_DEFAULT, low confidence
             and a warning. Set False to keep them UNCLASSIFIED.
+        temperature_inference: Fall back to the system's design operating
+            temperature when the file states none. Defaults True;
+            inferred values are tagged temperature_source and warned
+            on. Set False for a reading of the file alone.
 
     Returns:
         One PipingElement per piping entity found, with joined_to populated.
@@ -1794,7 +2001,8 @@ def produce_piping_elements_from_model(
                 # yielded under both its own class and a supertype.
                 continue
             element = _build_element(
-                model, entity, unit_scale, material_inference, environment_default
+                model, entity, unit_scale, material_inference, environment_default,
+                temperature_inference,
             )
             if element is None:
                 continue
@@ -1804,6 +2012,7 @@ def produce_piping_elements_from_model(
     _build_adjacency(model, elements, adjacency_tolerance_m, geometric_adjacency)
     _log_material_coverage(elements)
     _log_environment_coverage(elements)
+    _log_temperature_coverage(elements)
     return elements
 
 
@@ -1885,6 +2094,40 @@ def _log_environment_coverage(elements: list[PipingElement]) -> None:
     )
 
 
+def temperature_coverage(elements: list[PipingElement]) -> dict[str, int]:
+    """Count how each element's operating temperature was resolved.
+
+    Returns:
+        Counts keyed "total", "from_ifc", "inferred", "unknown".
+    """
+    counts = {"total": 0, "from_ifc": 0, "inferred": 0, "unknown": 0}
+    for element in elements:
+        counts["total"] += 1
+        source = element.temperature_source
+        if source == TEMPERATURE_SOURCE_IFC:
+            counts["from_ifc"] += 1
+        elif source:
+            counts["inferred"] += 1
+        else:
+            counts["unknown"] += 1
+    return counts
+
+
+def _log_temperature_coverage(elements: list[PipingElement]) -> None:
+    """Emit one temperature-coverage line per model. Detail is at DEBUG."""
+    if not elements:
+        return
+    counts = temperature_coverage(elements)
+    total = counts["total"]
+    resolved = counts["from_ifc"] + counts["inferred"]
+    logger.info(
+        "Temperature coverage: %d/%d (%.1f%%) - %d from IFC, %d inferred from system, "
+        "%d unknown",
+        resolved, total, 100.0 * resolved / total,
+        counts["from_ifc"], counts["inferred"], counts["unknown"],
+    )
+
+
 def produce_piping_elements(
     ifc_path: str,
     *,
@@ -1892,6 +2135,7 @@ def produce_piping_elements(
     geometric_adjacency: bool = False,
     material_inference: bool = True,
     environment_default: bool = True,
+    temperature_inference: bool = True,
 ) -> list[PipingElement]:
     """Read an IFC file and emit the canonical PipingElement list.
 
@@ -1928,6 +2172,7 @@ def produce_piping_elements(
         geometric_adjacency=geometric_adjacency,
         material_inference=material_inference,
         environment_default=environment_default,
+        temperature_inference=temperature_inference,
     )
 
 

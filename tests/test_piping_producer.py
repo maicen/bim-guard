@@ -666,3 +666,173 @@ class TestEnvironmentCoverageOnModel:
         counts = pp.environment_coverage(elements)
         assert f"{counts['defaulted']} environment defaulted to T1_indoor_damp" in summary
         assert f"{counts['unclassified']} unclassified environment" in summary
+
+
+class TestTemperatureInferenceFromSystem:
+    """infer_temperature_from_system deduces a design temperature.
+
+    The table is a statement about ordinary MEP design practice, not a reading
+    of any model. These tests pin the conventions it encodes, the systems it
+    deliberately leaves out, and - most importantly - which MM-001 stress band
+    each value lands in. The 60 C zinc-polarity-reversal edge is a step, not a
+    gradient, so a value drifting across a band edge changes a verdict.
+    """
+
+    @pytest.mark.parametrize(
+        "system,expected",
+        [
+            (PipingSystem.DOMESTIC_HOT_WATER, 60.0),
+            (PipingSystem.DOMESTIC_HOT_WATER_RETURN, 55.0),
+            (PipingSystem.DOMESTIC_COLD_WATER, 15.0),
+            (PipingSystem.CHILLED_WATER_FLOW, 6.0),
+            (PipingSystem.CHILLED_WATER_RETURN, 12.0),
+            (PipingSystem.HEATING_FLOW, 82.0),
+            (PipingSystem.HEATING_RETURN, 71.0),
+            (PipingSystem.CONDENSER_WATER, 30.0),
+            (PipingSystem.STEAM_LP, 120.0),
+            (PipingSystem.STEAM_HP, 180.0),
+            (PipingSystem.CONDENSATE_RETURN, 90.0),
+            (PipingSystem.POOL_CIRCULATION, 29.0),
+            (PipingSystem.FIRE_SPRINKLER, 20.0),
+            (PipingSystem.FIRE_WET_RISER, 20.0),
+            (PipingSystem.MEDICAL_GAS_OXYGEN, 20.0),
+            (PipingSystem.NATURAL_GAS, 20.0),
+            (PipingSystem.COMPRESSED_AIR, 20.0),
+        ],
+    )
+    def test_design_temperatures(self, system, expected):
+        assert pp.infer_temperature_from_system(system) == expected
+
+    @pytest.mark.parametrize(
+        "system",
+        [
+            PipingSystem.FOUL_DRAINAGE,  # normally empty, intermittent discharges
+            PipingSystem.RAINWATER,      # external, follows the weather
+            PipingSystem.UNKNOWN,
+        ],
+    )
+    def test_systems_without_a_design_temperature_infer_nothing(self, system):
+        assert pp.infer_temperature_from_system(system) is None
+
+    @pytest.mark.parametrize("system", [None, "", "not_a_system", 42])
+    def test_unusable_input_infers_nothing(self, system):
+        assert pp.infer_temperature_from_system(system) is None
+
+    def test_accepts_the_enum_value_as_a_string(self):
+        assert pp.infer_temperature_from_system("domestic_hot_water") == 60.0
+
+    def test_dhw_sits_on_the_zinc_reversal_edge(self):
+        """60 C is the band edge, and DHW must land in the band ABOVE it.
+
+        The MM-001 bands are inclusive of their lower bound, so 60.0 falls in
+        60-80 (stress 0.80), not 40-60 (0.55). Dropping DHW below 60 would
+        score a galvanised hot-water line one band too kindly - the exact
+        failure mode the reversal threshold exists to catch.
+        """
+        assert pp.infer_temperature_from_system(PipingSystem.DOMESTIC_HOT_WATER) >= 60.0
+
+    def test_chilled_flow_stays_below_the_kinetics_floor(self):
+        """Chilled flow belongs in the <10 C band the pack names for it."""
+        assert pp.infer_temperature_from_system(PipingSystem.CHILLED_WATER_FLOW) < 10.0
+
+    def test_confidence_is_declared_for_every_entry(self):
+        levels = {conf for _, conf in pp._SYSTEM_TEMPERATURE_INFERENCE.values()}
+        assert levels <= {"established", "provisional"}
+
+    def test_every_temperature_is_physically_plausible(self):
+        """A stray value would silently push elements into the wrong band."""
+        for system, (temperature, _) in pp._SYSTEM_TEMPERATURE_INFERENCE.items():
+            assert -50.0 < temperature < 400.0, system
+
+
+class TestResolveTemperatureProvenance:
+    """resolve_temperature must say where each answer came from."""
+
+    def test_stated_property_wins_over_inference(self):
+        temperature, source, confidence, warning = pp.resolve_temperature(
+            {"OperatingTemperature": 45.0}, PipingSystem.DOMESTIC_HOT_WATER
+        )
+        assert temperature == 45.0
+        assert source == pp.TEMPERATURE_SOURCE_IFC
+        assert confidence == "high"
+        assert warning is None
+
+    @pytest.mark.parametrize(
+        "key",
+        ["OperatingTemperature", "WorkingTemperature", "FluidTemperature",
+         "DesignTemperature", "MediumTemperature"],
+    )
+    def test_every_documented_property_key_is_read(self, key):
+        temperature, source, _, _ = pp.resolve_temperature({key: 33.0})
+        assert temperature == 33.0
+        assert source == pp.TEMPERATURE_SOURCE_IFC
+
+    def test_inference_is_tagged_and_warned(self):
+        temperature, source, confidence, warning = pp.resolve_temperature(
+            {}, PipingSystem.FIRE_SPRINKLER
+        )
+        assert temperature == 20.0
+        assert source == pp.TEMPERATURE_SOURCE_INFERENCE
+        assert confidence == "established"
+        assert warning and "assumed from system" in warning
+
+    def test_unresolvable_stays_none(self):
+        """No property and no convention is Undetermined, not a default ambient.
+
+        MM-001 raises temperature_missing for this rather than scoring, which
+        is the whole point: a defaulted 20 C would score every unclassified
+        element as though its service were known.
+        """
+        temperature, source, confidence, warning = pp.resolve_temperature(
+            {}, PipingSystem.UNKNOWN
+        )
+        assert temperature is None
+        assert source is None
+        assert confidence is None
+        assert warning == pp.TEMPERATURE_MISSING_WARNING
+
+    def test_inference_can_be_switched_off(self):
+        temperature, source, _, _ = pp.resolve_temperature(
+            {}, PipingSystem.DOMESTIC_HOT_WATER, allow_inference=False
+        )
+        assert temperature is None
+        assert source is None
+
+    def test_zero_celsius_is_a_reading_not_a_miss(self):
+        """0 C is falsy; it must not be mistaken for an absent value."""
+        temperature, source, _, _ = pp.resolve_temperature({"OperatingTemperature": 0.0})
+        assert temperature == 0.0
+        assert source == pp.TEMPERATURE_SOURCE_IFC
+
+
+class TestTemperatureCoverage:
+    """temperature_coverage counts the two sources separately."""
+
+    def _element(self, element_id, source):
+        return PipingElement(
+            id=element_id,
+            ifc_class="IfcPipeSegment",
+            subtype="pipe_segment",
+            temperature_source=source,
+        )
+
+    def test_counts_each_source(self):
+        elements = [
+            self._element("a", pp.TEMPERATURE_SOURCE_IFC),
+            self._element("b", pp.TEMPERATURE_SOURCE_INFERENCE),
+            self._element("c", pp.TEMPERATURE_SOURCE_INFERENCE),
+            self._element("d", None),
+        ]
+        assert pp.temperature_coverage(elements) == {
+            "total": 4, "from_ifc": 1, "inferred": 2, "unknown": 1,
+        }
+
+    def test_inferred_is_never_folded_into_from_ifc(self):
+        counts = pp.temperature_coverage([self._element("a", pp.TEMPERATURE_SOURCE_INFERENCE)])
+        assert counts["from_ifc"] == 0
+        assert counts["inferred"] == 1
+
+    def test_empty_network(self):
+        assert pp.temperature_coverage([]) == {
+            "total": 0, "from_ifc": 0, "inferred": 0, "unknown": 0,
+        }
