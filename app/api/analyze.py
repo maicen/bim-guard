@@ -218,9 +218,18 @@ _BAND_WEIGHT: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 #: sliced verbatim, exactly as the unpaginated body would have listed it.
 PageSort = Literal["band_then_score", "score_desc", "natural"]
 
-#: Bands a page may be filtered to. Data-quality notes are not a band and are
-#: governed by ``include_data_quality`` instead.
-IssueBand = Literal["critical", "high", "medium", "low"]
+#: Bands a page may be filtered to.
+#:
+#: ``data_quality`` is not a band the engines emit; it selects the notes that
+#: report what could not be assessed. It is here because the analyse page's
+#: severity dropdown offers it alongside the four real bands, and a filter the
+#: page cannot express is a filter the page cannot use. ``include_data_quality``
+#: remains the separate, global "show these at all" switch.
+IssueBand = Literal["critical", "high", "medium", "low", "data_quality"]
+
+#: The ``mechanism`` token that selects data-quality notes rather than an
+#: engine prefix, mirroring the analyse page's mechanism dropdown.
+DATA_QUALITY_TOKEN = "DATA_QUALITY"
 
 
 def _band_of(issue: Any) -> str:
@@ -238,12 +247,27 @@ def _is_data_quality(issue: Any) -> bool:
     return issue.mechanism in ("data_quality", "Data Quality")
 
 
+def _search_haystack(issue: Any) -> list[str]:
+    """Return the text ``q`` matches against.
+
+    The same fields the analyse page's search box already covers, so moving
+    the search to the server does not quietly change what a query finds.
+    """
+    fields = [issue.title, issue.rule_id, issue.element_id, issue.mechanism]
+    for citation in getattr(issue, "citations", None) or []:
+        if isinstance(citation, dict):
+            fields.append(citation.get("standard", ""))
+            fields.append(citation.get("clause", ""))
+    return fields
+
+
 def _select_issues(
     issues: list,
     *,
     bands: list[str] | None,
     mechanisms: list[str] | None,
     include_data_quality: bool,
+    query: str | None = None,
 ) -> list:
     """Narrow ``issues`` to what a page should list.
 
@@ -251,11 +275,15 @@ def _select_issues(
     the whole run, so a page of criticals still reports the run's real totals
     rather than the page's.
 
-    ``bands`` excludes data-quality notes even when one carries a matching
-    band: asking for "the criticals" means the critical verdicts, which is how
-    the page's severity dropdown already behaves. ``mechanisms`` is a
-    case-insensitive prefix match on ``rule_id``, so ``GC`` and ``GC-001``
-    both select an engine's verdicts together with its ``.DATA`` notes.
+    ``bands`` excludes data-quality notes from the four real bands even when a
+    note carries a matching one: asking for "the criticals" means the critical
+    verdicts. The notes are selected by the ``data_quality`` band instead,
+    which is exactly how the page's severity dropdown behaves.
+
+    ``mechanisms`` is a case-insensitive prefix match on ``rule_id``, so ``GC``
+    and ``GC-001`` both select an engine's verdicts together with its ``.DATA``
+    notes; the token ``data_quality`` selects the notes on their own. Several
+    values union, so ``GC`` and ``data_quality`` together select both.
 
     Unlike :func:`_filter_issues_by_engine`, an unrecognised mechanism selects
     nothing rather than falling back to everything. That function guards a run
@@ -270,13 +298,32 @@ def _select_issues(
 
     if bands:
         wanted_bands = {b.lower() for b in bands}
+        notes_wanted = "data_quality" in wanted_bands
         selected = [
-            i for i in selected if _band_of(i) in wanted_bands and not _is_data_quality(i)
+            i
+            for i in selected
+            if (notes_wanted if _is_data_quality(i) else _band_of(i) in wanted_bands)
         ]
 
     if mechanisms:
-        prefixes = tuple(m.upper() for m in mechanisms)
-        selected = [i for i in selected if i.rule_id.upper().startswith(prefixes)]
+        tokens = {m.upper() for m in mechanisms}
+        notes_wanted = DATA_QUALITY_TOKEN in tokens
+        prefixes = tuple(t for t in tokens if t != DATA_QUALITY_TOKEN)
+        selected = [
+            i
+            for i in selected
+            if (notes_wanted and _is_data_quality(i))
+            or (prefixes and i.rule_id.upper().startswith(prefixes))
+        ]
+
+    if query:
+        needle = query.strip().lower()
+        if needle:
+            selected = [
+                i
+                for i in selected
+                if any(needle in (field or "").lower() for field in _search_haystack(i))
+            ]
 
     return selected
 
@@ -307,6 +354,7 @@ def _paginate_result(
     mechanisms: list[str] | None,
     include_data_quality: bool,
     sort: PageSort,
+    query: str | None = None,
 ) -> tuple[dict, ResultPageContract]:
     """Return ``result`` with ``audit_issues`` narrowed to one page.
 
@@ -325,6 +373,7 @@ def _paginate_result(
         bands=bands,
         mechanisms=mechanisms,
         include_data_quality=include_data_quality,
+        query=query,
     )
     ordered = _sort_issues(matching, sort)
 
@@ -484,6 +533,7 @@ def get_analysis_results(
         None,
         description=(
             "Bands the returned issues are limited to; repeat for several. "
+            "`data_quality` selects the notes rather than a verdict band. "
             "Filters audit_issues only — issue_stats still describes the whole run."
         ),
     ),
@@ -492,7 +542,17 @@ def get_analysis_results(
         description=(
             "Engine code prefixes the returned issues are limited to, e.g. GC or "
             "GC-001. Same prefix semantics as `engines`, but applied to what is "
-            "returned rather than to what runs."
+            "returned rather than to what runs. The token `data_quality` selects "
+            "the data-quality notes instead."
+        ),
+    ),
+    q: str | None = Query(
+        None,
+        max_length=200,
+        description=(
+            "Free-text filter over title, rule id, element id, mechanism and "
+            "citation standard/clause — the fields the analyse page's search box "
+            "already covers. Case-insensitive substring match."
         ),
     ),
     include_data_quality: bool = Query(
@@ -512,7 +572,7 @@ def get_analysis_results(
     Sending no pagination parameter returns the whole run and no ``page``
     object, byte for byte what this endpoint returned before pagination
     existed. Sending any of ``limit``, a non-zero ``offset``, ``band``,
-    ``mechanism``, ``include_data_quality=false`` or ``sort`` narrows
+    ``mechanism``, ``q``, ``include_data_quality=false`` or ``sort`` narrows
     ``audit_issues`` and adds ``page``.
 
     Narrowing happens after ``run_analysis`` has returned, so the cache keeps
@@ -543,6 +603,7 @@ def get_analysis_results(
         or bool(mechanism)
         or not include_data_quality
         or sort is not None
+        or bool(q and q.strip())
     )
     if not paginating:
         return _format_result(slug, project_id, raw_result)
@@ -555,6 +616,7 @@ def get_analysis_results(
         mechanisms=mechanism,
         include_data_quality=include_data_quality,
         sort=sort or "band_then_score",
+        query=q,
     )
     contract = _format_result(slug, project_id, narrowed)
     contract.page = page

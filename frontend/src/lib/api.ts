@@ -74,6 +74,11 @@ import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
+/** An `Error` from a non-OK response, carrying the HTTP status that caused it. */
+export interface ApiError extends Error {
+  status?: number;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let errorDetail = res.statusText;
@@ -95,7 +100,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
     } catch {
       // not json
     }
-    throw new Error(errorDetail);
+    // The status rides along so a caller can tell a rejected request apart
+    // from a failed one — a 422 means the query this client built was wrong,
+    // which is a bug to report rather than a condition to show the user.
+    const failure = new Error(errorDetail) as ApiError;
+    failure.status = res.status;
+    throw failure;
   }
   if (res.status === 204) {
     return {} as T;
@@ -561,8 +571,14 @@ function engineQuery(engines?: string[]): string {
   return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join("");
 }
 
-/** Severity bands a results page can be limited to. */
-export type IssueBand = "critical" | "high" | "medium" | "low";
+/**
+ * Severity bands a results page can be limited to.
+ *
+ * `data_quality` is not a band the engines emit; it selects the notes that
+ * report what could not be assessed, which is how the analyse page's severity
+ * dropdown already presents them.
+ */
+export type IssueBand = "critical" | "high" | "medium" | "low" | "data_quality";
 
 /**
  * Order a results page is cut from.
@@ -584,9 +600,12 @@ export interface ResultPageQuery {
   limit?: number;
   offset?: number;
   bands?: IssueBand[];
+  /** Engine code prefixes, or the token `data_quality` for the notes. */
   mechanisms?: string[];
   includeDataQuality?: boolean;
   sort?: IssueSort;
+  /** Free text over title, rule id, element id, mechanism and citations. */
+  search?: string;
 }
 
 function pageQuery(page?: ResultPageQuery): string {
@@ -600,6 +619,7 @@ function pageQuery(page?: ResultPageQuery): string {
     parts.push(`include_data_quality=${page.includeDataQuality}`);
   }
   if (page.sort !== undefined) parts.push(`sort=${page.sort}`);
+  if (page.search) parts.push(`q=${encodeURIComponent(page.search)}`);
   return parts.length ? `&${parts.join("&")}` : "";
 }
 
