@@ -23,6 +23,7 @@
     CheckCircle2,
     Save,
     FileCheck,
+    AlertTriangle,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, lineageApi, rulesApi } from "../lib/api";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
@@ -690,8 +691,15 @@
     </div>
   {/if}
 
-  <!-- ═══ Run Analysis Bar ═══ -->
-  <div class="flex flex-wrap items-center justify-center gap-2.5">
+  <!-- ═══ Run Analysis Bar ═══
+       Sticky once results are open: on a long scroll through domain cards,
+       "View in 3D/BCF" and "Run"/"Recompute" stay within a short reach
+       instead of requiring a trip back to the top of the page. -->
+  <div
+    class="flex flex-wrap items-center justify-center gap-2.5 {result
+      ? 'sticky top-16 z-20 -mx-4 bg-slate-950/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:px-8'
+      : ''}"
+  >
     {#if result && selectedProjectId}
       <button
         type="button"
@@ -1680,6 +1688,63 @@
         </div>
       {/if}
     {/each}
+
+    <!-- ═══ Next Steps ═══
+         The results used to just trail off after the last domain card — the
+         very end of the page is what shapes how the whole audit is
+         remembered, so close with a clear outcome and an action instead of
+         a plain data table stopping. -->
+    {#if (result.total_issues || 0) === 0}
+      <div
+        class="flex items-center gap-3 rounded-2xl border border-emerald-800/60 bg-emerald-950/30 p-5"
+      >
+        <CheckCircle2 class="h-5 w-5 shrink-0 text-emerald-400" />
+        <div>
+          <p class="text-sm font-bold text-emerald-200">All architectural checks passed</p>
+          <p class="mt-0.5 text-xs text-emerald-400/80">
+            No further action needed for this ruleset — re-run after any model changes.
+          </p>
+        </div>
+      </div>
+    {:else}
+      <div
+        class="flex flex-col gap-3 rounded-2xl border border-amber-800/60 bg-amber-950/20 p-5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div class="flex items-start gap-3">
+          <AlertTriangle class="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+          <div>
+            <p class="text-sm font-bold text-amber-200">
+              {result.total_issues} issue{result.total_issues === 1 ? "" : "s"} found
+            </p>
+            <p class="mt-0.5 text-xs text-amber-400/80">
+              Review the failing domains above, then hand off the findings for remediation.
+            </p>
+          </div>
+        </div>
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+          {#if result.bcf_artifact_id}
+            <a
+              href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
+              download
+              class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-hover"
+            >
+              <Download class="h-3.5 w-3.5" />
+              Generate BCF Report
+            </a>
+          {/if}
+          <button
+            type="button"
+            onclick={() =>
+              selectedProjectId &&
+              openViewerInNewTab(selectedProjectId, undefined, result?.bcf_artifact_id || undefined)}
+            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+          >
+            <ScanEye class="h-3.5 w-3.5" />
+            Review in 3D
+          </button>
+        </div>
+      </div>
+    {/if}
   {:else if isRunning}
     <div class="space-y-2 p-16 text-center text-xs text-slate-400">
       <div
