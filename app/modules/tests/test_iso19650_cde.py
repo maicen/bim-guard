@@ -1,19 +1,12 @@
-"""
-Unit and Integration Tests for ISO 19650 Compliance & CDE State Machine Workflow.
-"""
+"""Unit and integration tests for ISO 19650 compliance and the CDE state machine workflow."""
 
-import pytest
-from app.modules.contracts import CDEState
-from app.modules.document_parsing.iso_validator import ISO19650Validator, ISOValidationResult
-from app.modules.ifc_reader.ifc_parser import extract_ifc_header_iso_metadata
-from app.modules.rule_builder.ids_exporter import build_ids_document, filter_exportable_rules
 from app.modules.comparator.compliance_runner import run_ids_loin_verification
-from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf, _markup_xml
-from app.modules.phase_6.phase_6e_export import export, to_ids
-from app.services.cde_state_machine import CDEStateMachine, TransitionResult
-from app.services.bcf_exporter import BCFExporter
-from app.modules.comparator.issue_schema import Issue, RiskBand
-
+from app.modules.contracts import CDEState
+from app.modules.document_parsing.iso_validator import ISO19650Validator
+from app.modules.phase_6.phase_6e_export import export
+from app.modules.reporter.bcf_generator import BCFIssue, _markup_xml
+from app.modules.rule_builder.ids_exporter import build_ids_document
+from app.services.cde_state_machine import CDEStateMachine
 
 # ---------------------------------------------------------------------------
 # ISO 19650 Validator Tests
