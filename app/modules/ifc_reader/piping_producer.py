@@ -1838,6 +1838,7 @@ def _build_element(
         # it becomes the schema's way of saying the same thing. XM-001 raises
         # material_not_in_series for it rather than scoring a couple.
         material = "Unknown"
+        confidence = None
         warnings.append(
             f"material not identified from {material_raw!r}"
             if material_raw
@@ -1908,6 +1909,7 @@ def _build_element(
         zone_ids=zone_ids,
         material=material,
         material_raw=material_raw,
+        material_confidence=confidence,
         nominal_diameter_mm=_first_number(
             properties, "NominalDiameter", "NominalDiameterMM", "DN", "Size"
         ),
@@ -2053,6 +2055,73 @@ def _log_material_coverage(elements: list[PipingElement]) -> None:
         resolved, total, 100.0 * resolved / total,
         counts["from_ifc"], counts["inferred"], counts["unknown"],
     )
+
+
+#: Reported when nothing produced a value, so there is no source to name. A
+#: finding that omitted the key instead would read as "not recorded", which is
+#: a different claim from "the model carried none".
+SOURCE_ABSENT = "absent"
+#: Reported alongside SOURCE_ABSENT: there is no value to have confidence in.
+CONFIDENCE_NONE = "none"
+
+
+def element_provenance(
+    element: PipingElement,
+    *,
+    prefix: str = "",
+    include_temperature: bool = True,
+) -> dict[str, str]:
+    """Report where this element's scored inputs came from.
+
+    Material, environment and temperature are the three inputs MM-001 and
+    XM-001 score on, and each can be read from the IFC, inferred, or defaulted.
+    By the time a comparator has a number in hand the three are
+    indistinguishable, so a finding built from them cannot say whether it
+    describes the building or this module's assumptions unless it carries this.
+
+    ``material_source`` is read from ``properties`` rather than a field because
+    that is where the producer records it and where ``material_coverage``
+    already reads it; duplicating it onto the element would create two answers
+    that can drift.
+
+    Args:
+        element: The element the finding was scored from.
+        prefix: Prepended to every key, for a finding about two elements —
+            XM-001 couples ``anode_`` with ``cathode_``.
+        include_temperature: Set ``False`` for a mechanism that does not read
+            a temperature, so the finding does not imply one was consulted.
+
+    Returns:
+        ``{source: confidence}`` pairs as plain strings, never ``None``: a null
+        in a metadata table reads as a missing field rather than as an absent
+        input.
+    """
+    # Read through getattr for the same reason material_media._environment_key
+    # does: the orchestrator hands the comparators whatever Path A was given,
+    # which is not always a fully populated PipingElement. An element missing
+    # the field has no provenance to report, which is exactly SOURCE_ABSENT --
+    # raising here would lose the finding over the annotation on it.
+    material_source = (getattr(element, "properties", None) or {}).get(MATERIAL_SOURCE_KEY)
+    provenance = {
+        f"{prefix}material_source": material_source or SOURCE_ABSENT,
+        f"{prefix}material_confidence": (
+            getattr(element, "material_confidence", None) or CONFIDENCE_NONE
+        ),
+        f"{prefix}environment_source": (
+            getattr(element, "environment_source", None) or SOURCE_ABSENT
+        ),
+        f"{prefix}environment_confidence": (
+            getattr(element, "environment_confidence", None) or CONFIDENCE_NONE
+        ),
+    }
+    if include_temperature:
+        provenance[f"{prefix}temperature_source"] = (
+            getattr(element, "temperature_source", None) or SOURCE_ABSENT
+        )
+        provenance[f"{prefix}temperature_confidence"] = (
+            getattr(element, "temperature_confidence", None) or CONFIDENCE_NONE
+        )
+    return provenance
 
 
 def environment_coverage(elements: list[PipingElement]) -> dict[str, int]:
