@@ -28,7 +28,7 @@
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
-  import { pipelineTracker } from "../lib/stores/activePipelines.svelte";
+  import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
   import type {
     Project,
     ArchAnalysisResult,
@@ -278,34 +278,85 @@
     label: string;
     targets: string[];
     category: string;
+    /** Super-group these 10 cards are chunked under — a flat list of 10
+     * accordions past Miller's-Law scanning limits, so related domains are
+     * visually clustered instead of one long undifferentiated scroll. */
+    group: string;
   }
 
+  const GROUP_LABELS: Record<string, string> = {
+    envelope: "Envelope & Openings",
+    circulation: "Vertical Circulation & Egress",
+    amenities: "Occupant Amenities",
+    lifeSafety: "Life Safety",
+    governance: "Governance",
+  };
+
   const DOMAIN_CARDS: DomainConfig[] = [
-    { key: "windows", label: "Windows & Glazing", targets: ["IfcWindow"], category: "windows" },
-    { key: "doors", label: "Doors", targets: ["IfcDoor"], category: "doors" },
+    {
+      key: "windows",
+      label: "Windows & Glazing",
+      targets: ["IfcWindow"],
+      category: "windows",
+      group: "envelope",
+    },
+    { key: "doors", label: "Doors", targets: ["IfcDoor"], category: "doors", group: "envelope" },
     {
       key: "stairs",
       label: "Stairs, Guards & Handrails",
       targets: ["IfcStairFlight", "IfcRailing"],
       category: "stairs",
+      group: "circulation",
     },
-    { key: "ramps", label: "Ramps", targets: ["IfcRamp", "IfcRampFlight"], category: "ramps" },
-    { key: "egress", label: "Means of Egress", targets: [], category: "egress" },
+    {
+      key: "ramps",
+      label: "Ramps",
+      targets: ["IfcRamp", "IfcRampFlight"],
+      category: "ramps",
+      group: "circulation",
+    },
+    {
+      key: "egress",
+      label: "Means of Egress",
+      targets: [],
+      category: "egress",
+      group: "circulation",
+    },
     {
       key: "washrooms",
       label: "Washrooms & Accessibility",
       targets: ["IfcSanitaryTerminal"],
       category: "washrooms",
+      group: "amenities",
     },
-    { key: "plumbing", label: "Plumbing Fixture Counts", targets: [], category: "plumbing" },
+    {
+      key: "plumbing",
+      label: "Plumbing Fixture Counts",
+      targets: [],
+      category: "plumbing",
+      group: "amenities",
+    },
     {
       key: "fire",
       label: "Fire Protection (House-Level)",
       targets: ["IfcAlarm"],
       category: "fire",
+      group: "lifeSafety",
     },
-    { key: "garage", label: "Garage / Carport", targets: [], category: "garage" },
-    { key: "iso19650", label: "ISO 19650 Compliance", targets: [], category: "iso19650" },
+    {
+      key: "garage",
+      label: "Garage / Carport",
+      targets: [],
+      category: "garage",
+      group: "lifeSafety",
+    },
+    {
+      key: "iso19650",
+      label: "ISO 19650 Compliance",
+      targets: [],
+      category: "iso19650",
+      group: "governance",
+    },
   ];
 
   function getDomainRules(targets: string[]): RuleComplianceResult[] {
@@ -398,6 +449,13 @@
   // door_mock) that has nothing to do with any specific building code.
   let selectedFolderDisplayName = $derived(
     ruleFolders.find((f) => f.ruleset_id === selectedFolder)?.display_name || selectedFolder,
+  );
+
+  // Live progress for the Run button itself — echoing it right where the
+  // user clicked keeps their attention anchored there instead of requiring
+  // a scroll down to the progress panel to see the same number.
+  let runProgress = $derived(
+    avgPipelineProgress(pipelineTracker.tracked.find((t) => t.projectId === selectedProjectId)?.status),
   );
 </script>
 
@@ -516,7 +574,11 @@
         class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >
         <Play class="h-4 w-4" />
-        {isRunning ? "Checking…" : isCheckingEnhancement ? "Checking model…" : "Run ISO Check"}
+        {isRunning
+          ? `Checking… ${runProgress}%`
+          : isCheckingEnhancement
+            ? "Checking model…"
+            : "Run ISO Check"}
       </button>
     </div>
 
@@ -661,7 +723,11 @@
       class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
     >
       <Play class="h-4 w-4" />
-      {isRunning ? "Auditing…" : isCheckingEnhancement ? "Checking model…" : "Run Compliance Test"}
+      {isRunning
+        ? `Auditing… ${runProgress}%`
+        : isCheckingEnhancement
+          ? "Checking model…"
+          : "Run Compliance Test"}
     </button>
   </div>
 
@@ -908,10 +974,19 @@
     {/if}
 
     <!-- ═══ Domain cards ═══ -->
-    {#each DOMAIN_CARDS as domain (domain.key)}
+    {#each DOMAIN_CARDS as domain, i (domain.key)}
       {@const rules = getDomainRules(domain.targets)}
       {@const badge = domainBadge(rules)}
       {@const isOpen = openDomains[domain.key] || false}
+      {@const isNewGroup = i === 0 || DOMAIN_CARDS[i - 1].group !== domain.group}
+
+      {#if isNewGroup}
+        <div
+          class="px-1 pt-3 text-caption font-bold uppercase tracking-wider text-slate-500 first:pt-0"
+        >
+          {GROUP_LABELS[domain.group]}
+        </div>
+      {/if}
 
       <!-- Special handling for domains with non-rule-compliance data -->
       {#if domain.key === "egress"}

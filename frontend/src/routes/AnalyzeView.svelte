@@ -51,7 +51,7 @@
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
   import SortHeader from "../lib/components/SortHeader.svelte";
-  import { pipelineTracker } from "../lib/stores/activePipelines.svelte";
+  import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
 
   interface Props {
     initialProjectId?: number | null;
@@ -346,6 +346,11 @@
     }
   });
   let currentProject = $derived(relevantProjects.find((p) => p.id === selectedProjectId) || null);
+  // Live progress echoed on the Run button itself, not just the progress
+  // panel below — keeps attention anchored at the point of the click.
+  let runProgress = $derived(
+    avgPipelineProgress(pipelineTracker.tracked.find((t) => t.projectId === selectedProjectId)?.status),
+  );
   // Ordering for the severity column: bands are ranked, not alphabetical.
   const SEVERITY_WEIGHTS: Record<string, number> = {
     critical: 4,
@@ -520,7 +525,7 @@
       >
         {#if isRunning}
           <RefreshCw class="h-3.5 w-3.5 animate-spin" />
-          <span>Running Engine…</span>
+          <span>Running Engine… {runProgress}%</span>
         {:else}
           <Play class="h-3.5 w-3.5 fill-current" />
           <span>Run Audit</span>

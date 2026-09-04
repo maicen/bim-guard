@@ -59,3 +59,11 @@ class PipelineTrackerStore {
 }
 
 export const pipelineTracker = new PipelineTrackerStore();
+
+/** Average progress across a run's active engines, 0-100. */
+export function avgPipelineProgress(status: WorkflowStatus | null | undefined): number {
+  if (!status) return 0;
+  const engines = Object.values(status.engines || {}).filter((e) => e.status !== "not_implemented");
+  if (!engines.length) return 0;
+  return Math.round(engines.reduce((acc, e) => acc + (e.progress_percent || 0), 0) / engines.length);
+}
