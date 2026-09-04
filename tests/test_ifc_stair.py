@@ -684,6 +684,50 @@ class TestEndToEndThroughIFCReader:
         results = self._evaluate(model_path, [rule])
         assert results["TEST-3"]["status"] == "PASS"
 
+    def test_winder_warning_reaches_the_final_result_not_just_the_module(self, tmp_path_factory):
+        """The gap this closes: ifc_stair.analyze_stair_flight() has always
+        computed the winder warning, but until now it was discarded inside
+        rich_detail and never reached extract_for_compliance()'s output --
+        so a PASS on a winder stair looked exactly like a PASS on a straight
+        one. This proves the warning survives the whole pipeline."""
+        model, _flight = _build_winder_like_model(lateral_shift_per_tread=40.0)
+        path = tmp_path_factory.mktemp("winder") / "winder.ifc"
+        model.write(str(path))
+
+        rule = {
+            "rule_id": 4,
+            "reference": "TEST-4",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "MinTreadDepth",
+            "operator": ">=",
+            "check_value": 200.0,
+            "unit": "mm",
+        }
+        results = self._evaluate(path, [rule])
+        result = results["TEST-4"]
+        # The value itself still resolves and can still pass -- the warning
+        # is a caveat riding alongside it, not a status override.
+        assert result["status"] == "PASS"
+        element = result["all_elements"][0]
+        assert element["data_quality_warnings"]
+        assert any(
+            "winder" in w or "curvature" in w for w in element["data_quality_warnings"]
+        )
+
+    def test_straight_stair_carries_no_data_quality_warnings(self, model_path):
+        rule = {
+            "rule_id": 5,
+            "reference": "TEST-5",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "MinRiserHeight",
+            "operator": ">=",
+            "check_value": 150.0,
+            "unit": "mm",
+        }
+        results = self._evaluate(model_path, [rule])
+        element = results["TEST-5"]["all_elements"][0]
+        assert not element["data_quality_warnings"]
+
 
 class TestAgainstModel:
     @pytest.fixture(scope="class")

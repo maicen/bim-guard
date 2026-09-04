@@ -742,6 +742,11 @@ class ComplianceComparator:
             # (x, y, z) mm from Module 2, or None — consumed by Module 5's
             # BCF export to aim the viewpoint camera at the failing element.
             "position_mm": el.get("position_mm"),
+            # Geometry-analysis caveats (e.g. a winder stair whose tread
+            # depth was measured along the wrong axis) — see Module 2's
+            # data_quality_warnings comment for why this rides on every
+            # status, not just failures.
+            "data_quality_warnings": el.get("data_quality_warnings"),
         }
 
     @staticmethod
@@ -759,6 +764,7 @@ class ComplianceComparator:
             # per-element view built from all_elements (not just failures)
             # can still offer a "View in 3D" link.
             "position_mm": el.get("position_mm"),
+            "data_quality_warnings": el.get("data_quality_warnings"),
         }
 
     @staticmethod

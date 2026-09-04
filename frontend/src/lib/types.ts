@@ -554,6 +554,11 @@ export interface RuleElementResult {
   status?: string; // PASS, FAIL, MISSING
   reason?: string;
   position_mm?: number[];
+  /** Geometry-analysis caveats (e.g. a winder stair whose tread depth was
+   * measured along the wrong axis, or a guard whose baluster spacing isn't
+   * computed) — present on ANY status, including PASS, since a caveat
+   * matters most when a value looks compliant but wasn't reliably measured. */
+  data_quality_warnings?: string[] | null;
 }
 
 export interface RuleComplianceResult {

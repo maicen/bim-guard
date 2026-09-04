@@ -23,6 +23,7 @@
     CheckCircle2,
     Save,
     FileCheck,
+    AlertTriangle,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, lineageApi, rulesApi } from "../lib/api";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
@@ -1638,9 +1639,17 @@
                                     : ""}
                               <tr class="border-b border-slate-800/40 last:border-0 {rowBg}">
                                 <td class="px-3 py-2">
-                                  <span class="font-mono text-xs text-slate-50"
-                                    >{(el.element_name || "—").slice(0, 32)}</span
-                                  >
+                                  <span class="inline-flex items-center gap-1">
+                                    {#if el.data_quality_warnings?.length}
+                                      <AlertTriangle
+                                        class="h-3 w-3 shrink-0 text-amber-400"
+                                        title={el.data_quality_warnings.join(" ")}
+                                      />
+                                    {/if}
+                                    <span class="font-mono text-xs text-slate-50"
+                                      >{(el.element_name || "—").slice(0, 32)}</span
+                                    >
+                                  </span>
                                 </td>
                                 <td class="px-3 py-2">
                                   <span class="block text-xs text-slate-300"

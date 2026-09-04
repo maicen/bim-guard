@@ -1702,6 +1702,15 @@ class IFCReader:
                         "lower_bound": rich_detail.get("lower_bound"),
                         "upper_bound": rich_detail.get("upper_bound"),
                         "enum_values": rich_detail.get("enum_values"),
+                        # Geometry-analysis caveats (e.g. ifc_stair flagging a
+                        # winder flight, or a guard whose baluster spacing
+                        # isn't computed) -- surfaced regardless of PASS/FAIL
+                        # status, because a caveat matters most on a PASS: a
+                        # value that looks compliant but was measured along
+                        # the wrong axis for a curved stair is the case a
+                        # reviewer most needs to see flagged, not just a
+                        # failure they'd investigate anyway.
+                        "data_quality_warnings": rich_detail.get("warnings") or None,
                         # Gap 2: spatial + type
                         "storey": spatial.get("storey_name"),
                         "space": spatial.get("space_name"),
