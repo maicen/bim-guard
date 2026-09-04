@@ -161,8 +161,8 @@
 
   // Opens the 3D Viewer in its own browser tab instead of navigating away
   // from these results in-app, so a reviewer can keep the audit open
-  // alongside the model. Relies on App.svelte's existing /viewer deep-link
-  // handler (applyDeepLinkFromLocation), which reads these same query params.
+  // alongside the model. App.svelte reads these same query params reactively
+  // off the router's querystring whenever /viewer is the active hash route.
   function openViewerInNewTab(projectId: number, elementGuid?: string, bcfArtifactId?: number) {
     // A one-shot builder for a URL string, never read reactively, so the
     // plain built-in is correct here.
@@ -171,7 +171,7 @@
     params.set("project_id", String(projectId));
     if (elementGuid) params.set("element_guid", elementGuid);
     if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
-    window.open(`/viewer?${params.toString()}`, "_blank");
+    window.open(`/#/viewer?${params.toString()}`, "_blank");
   }
 
   async function runCheck() {

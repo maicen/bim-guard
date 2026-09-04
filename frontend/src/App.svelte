@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { router, push, replace } from "svelte-spa-router";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import TopHeader from "./lib/components/TopHeader.svelte";
   import ProjectWizardModal from "./lib/components/ProjectWizardModal.svelte";
@@ -30,7 +31,12 @@
   import { initTheme } from "./lib/theme";
   import type { Project } from "./lib/types";
 
-  let activeView = $state("dashboard");
+  // The URL hash (via svelte-spa-router) is the source of truth for which
+  // view is on screen — this is what makes refresh, back/forward, and
+  // shareable links work. "/" maps to the dashboard; every other view's id
+  // (e.g. "rules", "manual-rule-editor") is used verbatim as its path.
+  let activeView = $derived(router.location === "/" ? "dashboard" : router.location.slice(1));
+  let queryParams = $derived(new URLSearchParams(router.querystring || ""));
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
   let targetProjectId: number | null = $state(null);
@@ -67,38 +73,54 @@
     }
   }
 
-  // The app is a client-state SPA with no URL-driven router, but the backend
-  // still hands out real links (e.g. "View in 3D" on analysis/report pages)
-  // built as /viewer?project_id=...&bcf_artifact_id=...&element_guid=....
-  // Without this, landing on one of those just shows the default Dashboard —
-  // the query string was never read. Only /viewer is handled here since it's
-  // the one path server-generated links actually point at today.
-  function applyDeepLinkFromLocation() {
-    if (window.location.pathname !== "/viewer") return;
-    const params = new URLSearchParams(window.location.search);
+  // Every navigation that targets a specific project encodes it as
+  // ?project_id=...&element_guid=...&bcf_artifact_id=... in the URL's query
+  // string (see buildTargetUrl below), so this stays live across refresh,
+  // back/forward, and links shared from elsewhere — not just a one-shot read
+  // on mount. A previous version of this only handled the initial load of
+  // /viewer specifically; this generalizes it to every view.
+  $effect(() => {
+    const params = queryParams;
     const projectId = Number(params.get("project_id"));
-    if (!projectId) return;
-    targetProjectId = projectId;
+    if (projectId && projectId !== targetProjectId) {
+      targetProjectId = projectId;
+      loadProjectDetails(projectId);
+    }
     targetElementGuid = params.get("element_guid");
     const bcfArtifactId = Number(params.get("bcf_artifact_id"));
     targetBcfArtifactId = bcfArtifactId || null;
-    loadProjectDetails(projectId);
-    activeView = "viewer";
+  });
+
+  function buildTargetUrl(
+    view: string,
+    projectId: number,
+    elementGuid?: string | null,
+    bcfArtifactId?: number | null,
+  ): string {
+    const params = new URLSearchParams();
+    params.set("project_id", String(projectId));
+    if (elementGuid) params.set("element_guid", elementGuid);
+    if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
+    return `/${view}?${params.toString()}`;
   }
 
   onMount(() => {
     initTheme();
     checkHealth();
     dashboardApi.prefetchAll();
-    applyDeepLinkFromLocation();
+    // Backward compatibility for the one link shape that predates hash
+    // routing: a plain (non-hash) /viewer?... URL, e.g. an old bookmark.
+    if (window.location.pathname === "/viewer" && !window.location.hash) {
+      replace(`/viewer?${window.location.search.slice(1)}`);
+    }
     const interval = setInterval(checkHealth, 20000);
     return () => clearInterval(interval);
   });
 
   async function handleSelectView(view: string) {
     // "New Project" is an action, not a destination: it opens the wizard over
-    // whatever is on screen. Changing activeView would leave the sidebar
-    // highlighting a view that renders nothing once the modal is dismissed.
+    // whatever is on screen. Navigating would leave the sidebar highlighting
+    // a view that renders nothing once the modal is dismissed.
     if (view === "newproject") {
       isGlobalWizardOpen = true;
       return;
@@ -106,18 +128,16 @@
     // "New Rule Document Upload" mirrors that: land on the Documents view,
     // then open its upload modal once it's actually mounted.
     if (view === "newdocument") {
-      activeView = "documents";
+      await push("/documents");
       await tick();
       documentsViewRef?.openUploadModal();
       return;
     }
-    activeView = view;
+    push(`/${view}`);
   }
 
   function handleSelectProjectForAudit(projectId: number) {
-    targetProjectId = projectId;
-    loadProjectDetails(projectId);
-    activeView = "analyze";
+    push(buildTargetUrl("analyze", projectId));
   }
 
   function handleSelectProjectForViewer(
@@ -125,11 +145,7 @@
     elementGuid?: string,
     bcfArtifactId?: number,
   ) {
-    targetProjectId = projectId;
-    targetElementGuid = elementGuid || null;
-    targetBcfArtifactId = bcfArtifactId || null;
-    loadProjectDetails(projectId);
-    activeView = "viewer";
+    push(buildTargetUrl("viewer", projectId, elementGuid, bcfArtifactId));
   }
 
   // The wizard closes itself once the project is saved; this puts the new
@@ -138,9 +154,8 @@
   // wizard sends the canonical 'Arch' / 'Piping' / 'seismic', and matching only
   // the legacy spellings sent every Arch project to the piping view.
   function handleProjectCreated(project: Project) {
-    targetProjectId = project.id;
     selectedProject = project;
-    activeView = viewForAnalysisDomain(project.analysis_type);
+    push(buildTargetUrl(viewForAnalysisDomain(project.analysis_type), project.id));
   }
 </script>
 
@@ -172,10 +187,7 @@
       {dbOk}
       {dbBackend}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
-      onOpenPipeline={(projectId) => {
-        targetProjectId = projectId;
-        activeView = "workflow";
-      }}
+      onOpenPipeline={(projectId) => push(buildTargetUrl("workflow", projectId))}
     />
 
     <!-- Viewport Container -->
@@ -202,14 +214,14 @@
         {:else if activeView === "documents"}
           <DocumentsView
             bind:this={documentsViewRef}
-            onNavigateToManualRuleEditor={() => (activeView = "manual-rule-editor")}
+            onNavigateToManualRuleEditor={() => push("/manual-rule-editor")}
           />
         {:else if activeView === "extract"}
           <RuleExtractionView />
         {:else if activeView === "rules"}
           <RulesView />
         {:else if activeView === "manual-rule-editor"}
-          <ManualRuleEditorView onBack={() => (activeView = "rules")} />
+          <ManualRuleEditorView onBack={() => push("/rules")} />
         {:else if activeView === "arch"}
           <ArchAnalyzeView initialProjectId={targetProjectId} />
         {:else if activeView === "piping"}
