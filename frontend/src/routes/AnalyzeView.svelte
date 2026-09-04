@@ -71,6 +71,15 @@
 
   let projects: Project[] = $state([]);
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
+  // Re-syncs when the header's project switcher changes initialProjectId
+  // while this view is already mounted — without this, only the initial
+  // value (read once via untrack above) ever took effect.
+  run(() => {
+    if (initialProjectId && initialProjectId !== selectedProjectId) {
+      selectedProjectId = initialProjectId;
+      handleProjectChange();
+    }
+  });
   let selectedSlug: "corrosion" | "seismic" = $state("corrosion");
   let isRunning = $state(false);
   let error = $state("");

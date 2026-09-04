@@ -52,6 +52,15 @@
 
   let projects: Project[] = $state([]);
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
+  // Re-syncs when the header's project switcher changes initialProjectId
+  // while this view is already mounted — without this, only the initial
+  // value (read once via untrack above) ever took effect.
+  $effect(() => {
+    if (initialProjectId && initialProjectId !== selectedProjectId) {
+      selectedProjectId = initialProjectId;
+      checkEnhancedModel();
+    }
+  });
   let isRunning = $state(false);
   let error = $state("");
   let result: ArchAnalysisResult | null = $state(null);

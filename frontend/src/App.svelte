@@ -163,6 +163,29 @@
     selectedProject = project;
     push(buildTargetUrl(viewForAnalysisDomain(project.analysis_type), project.id));
   }
+
+  // Views that read a project from targetProjectId/query string. Switching
+  // context from the header's ProjectSwitcher while on one of these re-runs
+  // that same view against the new project; from anywhere else it just
+  // updates the context so the next project-scoped view you open has it.
+  const PROJECT_SCOPED_VIEWS = new Set([
+    "arch",
+    "piping",
+    "seismic",
+    "analyze",
+    "reports",
+    "viewer",
+    "workflow",
+  ]);
+
+  function handleSwitchProject(projectId: number) {
+    if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+      push(buildTargetUrl(activeView, projectId));
+    } else {
+      targetProjectId = projectId;
+      loadProjectDetails(projectId);
+    }
+  }
 </script>
 
 <a
@@ -193,6 +216,7 @@
       {dbBackend}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
+      onSwitchProject={handleSwitchProject}
     />
 
     <!-- Viewport Container -->

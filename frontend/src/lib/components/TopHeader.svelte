@@ -2,6 +2,7 @@
   import { ExternalLink, Activity, Menu } from "lucide-svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
+  import ProjectSwitcher from "./ProjectSwitcher.svelte";
   import type { Project } from "../types";
 
   interface Props {
@@ -14,6 +15,8 @@
     onOpenMobileNav?: () => void;
     /** Navigate to the Live Workflow view for a tracked project's pipeline. */
     onOpenPipeline?: (projectId: number) => void;
+    /** Switch the app's current project context. */
+    onSwitchProject?: (projectId: number) => void;
   }
 
   let {
@@ -24,6 +27,7 @@
     dbBackend = "SUPABASE",
     onOpenMobileNav = () => {},
     onOpenPipeline,
+    onSwitchProject,
   }: Props = $props();
 
   const TITLES: Record<string, { section: string; title: string }> = {
@@ -73,7 +77,9 @@
     <span class="hidden text-slate-600 sm:inline">/</span>
     <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
 
-    {#if selectedProject}
+    {#if onSwitchProject}
+      <ProjectSwitcher {selectedProject} onSwitch={onSwitchProject} />
+    {:else if selectedProject}
       <span
         class="ml-2 hidden items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-400 lg:inline-flex"
       >
