@@ -293,6 +293,13 @@ class PipingElement:
     # --- Material (required for corrosion comparators) ---
     material: str = "Unknown"  # must be in CANONICAL_MATERIALS
     material_raw: Optional[str] = None  # original IFC string for debugging
+    #: "high" (read from IFC) / "established" or "provisional" (inferred from
+    #: the system's design convention). None = no material identified. The
+    #: matching source string lives in properties[MATERIAL_SOURCE_KEY], which
+    #: material_coverage already reads; this is the confidence resolve_material
+    #: computes alongside it, kept so a finding can report how far the material
+    #: it was scored on may be trusted.
+    material_confidence: Optional[str] = None
     coating: Optional[str] = None  # "galvanised_zinc_60um", "epoxy_powder"
     pren: Optional[float] = None  # overrides rulepack default if set
 
