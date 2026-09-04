@@ -882,6 +882,8 @@ export interface BSDDClassItem {
   code: string;
   name: string;
   dictionary_uri: string;
+  /** bSDD classType, e.g. "Class" (an IFC entity) or "GroupOfProperties" (a Pset_/Qto_ definition). */
+  class_type: string;
   parent_class_code?: string | null;
   child_class_codes?: string[];
   related_ifc_entities: string[];
@@ -941,6 +943,8 @@ export interface BSDDOntologyClassSummary {
   uri: string;
   code: string;
   name: string;
+  /** bSDD classType, e.g. "Class" (an IFC entity) or "GroupOfProperties" (a Pset_/Qto_ definition). */
+  class_type: string;
   parent_class_uri: string | null;
 }
 

@@ -29,6 +29,7 @@ _CLASS_SCHEMA = {
     "dictionary_uri": str,
     "class_type": str,
     "parent_class_uri": str,
+    "related_ifc_entities": str,  # jsonb
     "definition": str,
     "description": str,
 }
@@ -121,9 +122,10 @@ class BSDDOntologyRepository:
             code=row["code"],
             name=row["name"],
             dictionary_uri=row["dictionary_uri"],
+            class_type=row.get("class_type") or "Class",
             parent_class_code=(parent_uri or "").rsplit("/", 1)[-1] or None,
             child_class_codes=sorted(child_codes),
-            related_ifc_entities=[],
+            related_ifc_entities=row.get("related_ifc_entities") or [],
             properties=props,
             definition=row.get("definition"),
             description=row.get("description"),
@@ -199,6 +201,7 @@ class BSDDOntologyRepository:
                 "uri": row["uri"],
                 "code": row["code"],
                 "name": row["name"],
+                "class_type": row.get("class_type") or "Class",
                 "parent_class_uri": row.get("parent_class_uri"),
             }
             for row in self._classes_by_uri.values()
@@ -249,10 +252,11 @@ class BSDDOntologyRepository:
                     "code": item.code,
                     "name": item.name,
                     "dictionary_uri": item.dictionary_uri,
-                    "class_type": "Class",
+                    "class_type": item.class_type,
                     "parent_class_uri": f"{item.dictionary_uri}/class/{item.parent_class_code}"
                     if item.parent_class_code
                     else None,
+                    "related_ifc_entities": item.related_ifc_entities,
                     "definition": item.definition,
                     "description": item.description,
                 },
@@ -300,9 +304,11 @@ class BSDDOntologyRepository:
                 "code": item.code,
                 "name": item.name,
                 "dictionary_uri": item.dictionary_uri,
+                "class_type": item.class_type,
                 "parent_class_uri": f"{item.dictionary_uri}/class/{item.parent_class_code}"
                 if item.parent_class_code
                 else None,
+                "related_ifc_entities": item.related_ifc_entities,
                 "definition": item.definition,
                 "description": item.description,
             }

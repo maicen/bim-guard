@@ -1269,6 +1269,9 @@ class BSDDClassItem(BaseModel):
     code: str = Field(..., description="Class code (e.g. Pr_65_52_63 or IfcPipeSegment)")
     name: str = Field(..., description="Human-readable class name")
     dictionary_uri: str = Field(..., description="URI of the parent dictionary")
+    class_type: str = Field(
+        "Class", description="bSDD classType (e.g. Class, GroupOfProperties for a Pset_/Qto_ property or quantity set)"
+    )
     parent_class_code: Optional[str] = Field(None, description="Parent class code if hierarchical")
     child_class_codes: list[str] = Field(default_factory=list, description="Codes of direct subtypes of this class")
     related_ifc_entities: list[str] = Field(default_factory=list, description="Associated IFC entity types")

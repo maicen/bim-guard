@@ -5,18 +5,29 @@ supabase/migrations/20260903213309_create_bsdd_ontology.sql) from the live
 buildingSMART Data Dictionary API, so the app can look up class/property
 definitions, hierarchy, and relationships without a live bSDD round trip.
 
-Scope is deliberately curated, not a full-dictionary crawl: starting from a
-set of seed classes (by default, every distinct target_ifc_class already
-used in public.rules), it walks each seed's full DESCENDANT subtree
-(children, recursively) plus its ANCESTOR chain up to IfcRoot -- but does
-NOT expand an ancestor's other children, which is what would otherwise
-explode this into most of the IFC entity hierarchy. A door's cousins (other
-built elements) stay out unless they're a seed or a descendant of one.
+The IFC *entity* hierarchy (classType=Class) is deliberately curated, not a
+full-dictionary crawl: starting from a set of seed classes (by default,
+every distinct target_ifc_class already used in public.rules), it walks
+each seed's full DESCENDANT subtree (children, recursively) plus its
+ANCESTOR chain up to IfcRoot -- but does NOT expand an ancestor's other
+children, which is what would otherwise explode this into most of the IFC
+entity hierarchy. A door's cousins (other built elements) stay out unless
+they're a seed or a descendant of one.
+
+GroupOfProperties classes (every Pset_/Qto_ property and quantity set
+definition in the dictionary) have no parent-child relation for that walk
+to follow, so they're crawled separately and exhaustively instead: paged
+straight from GET /api/Dictionary/v1/Classes?classtype=groupofproperties
+(see BSDDClient.list_classes_by_type), then each one's full detail (and
+member properties) fetched the same way as an IFC entity class. This is the
+whole bucket, not a curated subset -- there's no cousin-explosion risk to
+curate away, since Psets/Qtos don't reference each other.
 
 Usage:
     uv run python scripts/crawl_bsdd_ontology.py
     uv run python scripts/crawl_bsdd_ontology.py --roots IfcDoor IfcWindow
     uv run python scripts/crawl_bsdd_ontology.py --max-classes 50 --dry-run
+    uv run python scripts/crawl_bsdd_ontology.py --skip-group-of-properties
 """
 
 from __future__ import annotations
@@ -138,6 +149,47 @@ class Crawler:
                     queue.append(child_code)
 
 
+def crawl_group_of_properties(
+    client: BSDDClient, dictionary_uri: str, delay: float, max_items: int | None
+) -> dict[str, BSDDClassItem]:
+    """Fetch every GroupOfProperties class (Pset_/Qto_ definition) in a dictionary.
+
+    Paged straight from the dictionary's class listing rather than walked
+    from seeds -- see the module docstring for why these need a different
+    strategy than the IFC entity hierarchy.
+    """
+    visited: dict[str, BSDDClassItem] = {}
+    offset = 0
+    limit = 100
+    total: int | None = None
+    while total is None or offset < total:
+        summaries, total = client.list_classes_by_type(dictionary_uri, "groupofproperties", offset, limit)
+        if not summaries:
+            break
+        for summary in summaries:
+            code = summary.get("code")
+            if not code:
+                continue
+            if max_items is not None and len(visited) >= max_items:
+                return visited
+
+            item = None
+            for attempt in range(4):
+                item = client.get_class(dictionary_uri, code)
+                if item is not None:
+                    break
+                time.sleep(delay * (3**attempt) + 1.0)
+            time.sleep(delay)
+
+            if item is not None:
+                visited[item.uri] = item
+                print(f"  [gop {len(visited)}/{total}] {code}")
+            else:
+                print(f"  ! {code} -- not found after retries")
+        offset += limit
+    return visited
+
+
 def build_rows(visited: dict[str, BSDDClassItem]) -> tuple[list[dict], list[dict], list[dict]]:
     class_rows: list[dict] = []
     property_rows: dict[str, dict] = {}
@@ -150,10 +202,11 @@ def build_rows(visited: dict[str, BSDDClassItem]) -> tuple[list[dict], list[dict
                 "code": item.code,
                 "name": item.name,
                 "dictionary_uri": item.dictionary_uri,
-                "class_type": "Class",
+                "class_type": item.class_type,
                 "parent_class_uri": f"{item.dictionary_uri}/class/{item.parent_class_code}"
                 if item.parent_class_code
                 else None,
+                "related_ifc_entities": item.related_ifc_entities,
                 "definition": item.definition,
                 "description": item.description,
             }
@@ -198,9 +251,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--roots", nargs="*", default=None, help="Seed IFC class codes (default: distinct target_ifc_class from public.rules)")
     parser.add_argument("--dictionary-uri", default=IFC43_DICTIONARY_URI)
-    parser.add_argument("--max-classes", type=int, default=600, help="Safety cap on total classes visited")
+    parser.add_argument("--max-classes", type=int, default=600, help="Safety cap on IFC entity classes visited")
     parser.add_argument("--delay", type=float, default=0.5, help="Seconds between bSDD requests")
     parser.add_argument("--dry-run", action="store_true", help="Crawl and print counts without writing to the database")
+    parser.add_argument(
+        "--skip-group-of-properties",
+        action="store_true",
+        help="Skip the exhaustive Pset_/Qto_ (GroupOfProperties) crawl and only walk the IFC entity hierarchy",
+    )
+    parser.add_argument(
+        "--max-group-of-properties",
+        type=int,
+        default=None,
+        help="Safety cap on GroupOfProperties classes visited (default: all of them)",
+    )
     args = parser.parse_args()
 
     db = _build_client()
@@ -215,6 +279,15 @@ def main() -> None:
     bsdd_client = BSDDClient(timeout_seconds=20.0)
     crawler = Crawler(bsdd_client, args.dictionary_uri, args.max_classes, args.delay)
     crawler.crawl(roots)
+    print(f"\nCrawled {len(crawler.visited)} IFC entity classes.")
+
+    if not args.skip_group_of_properties:
+        print("\nCrawling GroupOfProperties classes (every Pset_/Qto_ definition)...")
+        gop_visited = crawl_group_of_properties(
+            bsdd_client, args.dictionary_uri, args.delay, args.max_group_of_properties
+        )
+        print(f"Crawled {len(gop_visited)} GroupOfProperties classes.")
+        crawler.visited.update(gop_visited)
 
     class_rows, property_rows, edge_rows = build_rows(crawler.visited)
     print(
