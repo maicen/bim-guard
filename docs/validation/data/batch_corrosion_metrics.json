@@ -1,0 +1,305 @@
+{
+  "timestamp": 1788559776.934387,
+  "models_count": 3,
+  "total_runs": 18,
+  "runs": [
+    {
+      "model_name": "Clinic_Plumbing.ifc",
+      "engine_selection": "all",
+      "element_count": 6587,
+      "piping_count": 6587,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "low": 6587,
+        "medium": 6587,
+        "critical": 6587
+      },
+      "data_quality_by_check": {
+        "unmapped_pairing": 870,
+        "material_normalisation": 4024,
+        "material_not_in_series": 3066
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          7960
+        ]
+      ]
+    },
+    {
+      "model_name": "Clinic_Plumbing.ifc",
+      "engine_selection": "GC-001",
+      "element_count": 6587,
+      "piping_count": 6587,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "low": 6587
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "Clinic_Plumbing.ifc",
+      "engine_selection": "CC-001",
+      "element_count": 6587,
+      "piping_count": 6587,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "medium": 6587
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "Clinic_Plumbing.ifc",
+      "engine_selection": "MC-001",
+      "element_count": 6587,
+      "piping_count": 6587,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "critical": 6587
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "Clinic_Plumbing.ifc",
+      "engine_selection": "MM-001",
+      "element_count": 6587,
+      "piping_count": 6587,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {},
+      "data_quality_by_check": {
+        "unmapped_pairing": 870,
+        "material_normalisation": 4024
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          4894
+        ]
+      ]
+    },
+    {
+      "model_name": "Clinic_Plumbing.ifc",
+      "engine_selection": "XM-001",
+      "element_count": 6587,
+      "piping_count": 6587,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {},
+      "data_quality_by_check": {
+        "material_not_in_series": 3066
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          3066
+        ]
+      ]
+    },
+    {
+      "model_name": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "all",
+      "element_count": 498,
+      "piping_count": 498,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "low": 498,
+        "medium": 498,
+        "critical": 498
+      },
+      "data_quality_by_check": {
+        "unmapped_pairing": 62,
+        "material_normalisation": 279,
+        "material_not_in_series": 235
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          576
+        ]
+      ]
+    },
+    {
+      "model_name": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "GC-001",
+      "element_count": 498,
+      "piping_count": 498,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "low": 498
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "CC-001",
+      "element_count": 498,
+      "piping_count": 498,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "medium": 498
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "MC-001",
+      "element_count": 498,
+      "piping_count": 498,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "critical": 498
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "MM-001",
+      "element_count": 498,
+      "piping_count": 498,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {},
+      "data_quality_by_check": {
+        "unmapped_pairing": 62,
+        "material_normalisation": 279
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          341
+        ]
+      ]
+    },
+    {
+      "model_name": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "XM-001",
+      "element_count": 498,
+      "piping_count": 498,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {},
+      "data_quality_by_check": {
+        "material_not_in_series": 235
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          235
+        ]
+      ]
+    },
+    {
+      "model_name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "all",
+      "element_count": 8539,
+      "piping_count": 8539,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "low": 8539,
+        "medium": 8539,
+        "critical": 8539
+      },
+      "data_quality_by_check": {
+        "material_normalisation": 3563,
+        "material_not_in_series": 1
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          3564
+        ]
+      ]
+    },
+    {
+      "model_name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "GC-001",
+      "element_count": 8539,
+      "piping_count": 8539,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "low": 8539
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "CC-001",
+      "element_count": 8539,
+      "piping_count": 8539,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "medium": 8539
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "MC-001",
+      "element_count": 8539,
+      "piping_count": 8539,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {
+        "critical": 8539
+      },
+      "data_quality_by_check": {},
+      "data_quality_reason_top5": []
+    },
+    {
+      "model_name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "MM-001",
+      "element_count": 8539,
+      "piping_count": 8539,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {},
+      "data_quality_by_check": {
+        "material_normalisation": 3563
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          3563
+        ]
+      ]
+    },
+    {
+      "model_name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "XM-001",
+      "element_count": 8539,
+      "piping_count": 8539,
+      "parsed_time_s": 0.0,
+      "analysis_time_s": 0.0,
+      "findings_by_band": {},
+      "data_quality_by_check": {
+        "material_not_in_series": 1
+      },
+      "data_quality_reason_top5": [
+        [
+          "unspecified",
+          1
+        ]
+      ]
+    }
+  ]
+}

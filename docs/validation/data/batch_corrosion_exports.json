@@ -1,0 +1,114 @@
+{
+  "timestamp": 1788559560.590966,
+  "models_analyzed": 3,
+  "runs": [
+    {
+      "model": "Clinic_Plumbing.ifc",
+      "engine_selection": "all",
+      "issues": 27721,
+      "error": null
+    },
+    {
+      "model": "Clinic_Plumbing.ifc",
+      "engine_selection": "GC-001",
+      "issues": 6587,
+      "error": null
+    },
+    {
+      "model": "Clinic_Plumbing.ifc",
+      "engine_selection": "CC-001",
+      "issues": 6587,
+      "error": null
+    },
+    {
+      "model": "Clinic_Plumbing.ifc",
+      "engine_selection": "MC-001",
+      "issues": 6587,
+      "error": null
+    },
+    {
+      "model": "Clinic_Plumbing.ifc",
+      "engine_selection": "MM-001",
+      "issues": 4894,
+      "error": null
+    },
+    {
+      "model": "Clinic_Plumbing.ifc",
+      "engine_selection": "XM-001",
+      "issues": 3066,
+      "error": null
+    },
+    {
+      "model": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "all",
+      "issues": 2070,
+      "error": null
+    },
+    {
+      "model": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "GC-001",
+      "issues": 498,
+      "error": null
+    },
+    {
+      "model": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "CC-001",
+      "issues": 498,
+      "error": null
+    },
+    {
+      "model": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "MC-001",
+      "issues": 498,
+      "error": null
+    },
+    {
+      "model": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "MM-001",
+      "issues": 341,
+      "error": null
+    },
+    {
+      "model": "Duplex_Plumbing_20121113.ifc",
+      "engine_selection": "XM-001",
+      "issues": 235,
+      "error": null
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "all",
+      "issues": 29181,
+      "error": null
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "GC-001",
+      "issues": 8539,
+      "error": null
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "CC-001",
+      "issues": 8539,
+      "error": null
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "MC-001",
+      "issues": 8539,
+      "error": null
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "MM-001",
+      "issues": 3563,
+      "error": null
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "engine_selection": "XM-001",
+      "issues": 1,
+      "error": null
+    }
+  ]
+}
