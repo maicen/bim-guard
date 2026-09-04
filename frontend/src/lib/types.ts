@@ -465,6 +465,23 @@ export interface AnalysisInputItem {
   file_path?: string;
 }
 
+/**
+ * Window over a paginated `audit_issues` list.
+ *
+ * Only present when the request carried a pagination parameter; a call with
+ * none returns the whole run and no `page`. `total_matching` counts the issues
+ * left after the band/mechanism filters and before offset/limit, so a pager
+ * can size itself from it. It is unrelated to `issue_stats`, which always
+ * describes the whole run.
+ */
+export interface ResultPage {
+  limit?: number | null;
+  offset: number;
+  returned: number;
+  total_matching: number;
+  has_more: boolean;
+}
+
 export interface AnalysisResult {
   pipeline: string;
   project_id: number;
@@ -475,6 +492,7 @@ export interface AnalysisResult {
   compliance_error?: string | null;
   compliance_is_demo?: boolean;
   cached: boolean;
+  page?: ResultPage | null;
   duration_seconds?: number | null;
   elements_evaluated?: number | null;
   unique_elements_evaluated?: number | null;

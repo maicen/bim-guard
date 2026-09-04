@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -29,6 +29,7 @@ from app.modules.contracts import (
     ArchAnalysisResponse,
     AuditIssueContract,
     IssueStatsContract,
+    ResultPageContract,
     RevitRuleResult,
     RevitSyncRequest,
     RevitSyncResponse,
@@ -67,6 +68,25 @@ SELECTABLE_ENGINES: tuple[str, ...] = (
 )
 
 
+def _issue_stats(issues: list) -> dict[str, int]:
+    """Count ``issues`` by band, keeping data-quality notes out of the totals.
+
+    Data-quality findings report what could not be assessed rather than a
+    verdict, so they are counted on their own line and excluded from ``total``
+    — the same split the analyse page draws.
+    """
+    stats = {"total": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "data_quality": 0}
+    for issue in issues:
+        if issue.mechanism == "data_quality":
+            stats["data_quality"] += 1
+            continue
+        stats["total"] += 1
+        band = getattr(issue.band, "value", str(issue.band)).lower()
+        if band in stats:
+            stats[band] += 1
+    return stats
+
+
 def _filter_issues_by_engine(result: dict, engines: list[str]) -> dict:
     """Narrow an ``AnalysisResult`` to the issues the given engines raised.
 
@@ -98,17 +118,7 @@ def _filter_issues_by_engine(result: dict, engines: list[str]) -> dict:
     # issue_stats describes the whole run, so it is recomputed rather than
     # carried across: a narrowed list under unnarrowed totals reads as data
     # silently going missing.
-    stats = {"total": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "data_quality": 0}
-    for issue in kept:
-        if issue.mechanism == "data_quality":
-            stats["data_quality"] += 1
-            continue
-        stats["total"] += 1
-        band = getattr(issue.band, "value", str(issue.band)).lower()
-        if band in stats:
-            stats[band] += 1
-
-    return {**result, "audit_issues": kept, "issue_stats": stats}
+    return {**result, "audit_issues": kept, "issue_stats": _issue_stats(kept)}
 
 
 def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultContract:
@@ -186,6 +196,158 @@ def _selected_engines(payload: AnalysisRunRequest) -> list[str] | None:
     if payload.engines is not None:
         return payload.engines
     return payload.rule_ids
+
+
+# ---------------------------------------------------------------------------
+# Result pagination
+# ---------------------------------------------------------------------------
+
+#: Band ranking used when ordering a page, mirroring ``SEVERITY_WEIGHTS`` in
+#: ``AnalyzeView.svelte``. An unrecognised band ranks last rather than raising,
+#: the same as the page's ``?? 0``.
+_BAND_WEIGHT: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+#: Sort orders a paginated request may ask for.
+#:
+#: ``band_then_score`` is the default and is the analyse page's order: the page
+#: sorts on the band column descending and nothing else, so criticals lead and
+#: lows trail. Within a band the page relies on ``Array.prototype.sort`` being
+#: stable, i.e. on whatever order the run emitted — which is not a sort key a
+#: second request can reproduce, so score descending is the tiebreak here.
+#: ``natural`` is the escape hatch for a caller that wants the run's own order
+#: sliced verbatim, exactly as the unpaginated body would have listed it.
+PageSort = Literal["band_then_score", "score_desc", "natural"]
+
+#: Bands a page may be filtered to. Data-quality notes are not a band and are
+#: governed by ``include_data_quality`` instead.
+IssueBand = Literal["critical", "high", "medium", "low"]
+
+
+def _band_of(issue: Any) -> str:
+    """Return an issue's band as a lowercase string, enum or not."""
+    return getattr(issue.band, "value", str(issue.band)).lower()
+
+
+def _is_data_quality(issue: Any) -> bool:
+    """Report whether a finding describes unassessable data, not a verdict.
+
+    Both spellings are checked because the engines emit ``"data_quality"`` and
+    the architecture path emits ``"Data Quality"``; the analyse page tests for
+    both for the same reason.
+    """
+    return issue.mechanism in ("data_quality", "Data Quality")
+
+
+def _select_issues(
+    issues: list,
+    *,
+    bands: list[str] | None,
+    mechanisms: list[str] | None,
+    include_data_quality: bool,
+) -> list:
+    """Narrow ``issues`` to what a page should list.
+
+    Filters shape ``audit_issues`` alone. ``issue_stats`` is left describing
+    the whole run, so a page of criticals still reports the run's real totals
+    rather than the page's.
+
+    ``bands`` excludes data-quality notes even when one carries a matching
+    band: asking for "the criticals" means the critical verdicts, which is how
+    the page's severity dropdown already behaves. ``mechanisms`` is a
+    case-insensitive prefix match on ``rule_id``, so ``GC`` and ``GC-001``
+    both select an engine's verdicts together with its ``.DATA`` notes.
+
+    Unlike :func:`_filter_issues_by_engine`, an unrecognised mechanism selects
+    nothing rather than falling back to everything. That function guards a run
+    selection, where narrowing to nothing would throw away work already done;
+    here the caller is filtering a view, and quietly widening it back to the
+    full run would misreport what was asked for.
+    """
+    selected = issues
+
+    if not include_data_quality:
+        selected = [i for i in selected if not _is_data_quality(i)]
+
+    if bands:
+        wanted_bands = {b.lower() for b in bands}
+        selected = [
+            i for i in selected if _band_of(i) in wanted_bands and not _is_data_quality(i)
+        ]
+
+    if mechanisms:
+        prefixes = tuple(m.upper() for m in mechanisms)
+        selected = [i for i in selected if i.rule_id.upper().startswith(prefixes)]
+
+    return selected
+
+
+def _sort_issues(issues: list, sort: PageSort) -> list:
+    """Order ``issues`` deterministically for slicing.
+
+    Every order but ``natural`` breaks ties on ``id``, so two requests for
+    adjacent pages of the same run cannot overlap or skip a finding just
+    because two issues compared equal.
+    """
+    if sort == "natural":
+        return issues
+    if sort == "score_desc":
+        return sorted(issues, key=lambda i: (-(i.score or 0.0), i.id))
+    return sorted(
+        issues,
+        key=lambda i: (-_BAND_WEIGHT.get(_band_of(i), 0), -(i.score or 0.0), i.id),
+    )
+
+
+def _paginate_result(
+    result: dict,
+    *,
+    limit: int | None,
+    offset: int,
+    bands: list[str] | None,
+    mechanisms: list[str] | None,
+    include_data_quality: bool,
+    sort: PageSort,
+) -> tuple[dict, ResultPageContract]:
+    """Return ``result`` with ``audit_issues`` narrowed to one page.
+
+    Applied to what ``run_analysis`` returned, in the same place
+    :func:`_filter_issues_by_engine` narrows and for the same reason: the cache
+    entry must hold the whole run its key describes, so nothing here reaches
+    the cache.
+
+    ``issue_stats`` is filled in from the whole run before the slice, and
+    ``ifc_element_count`` is pinned, so :func:`_format_result` computes neither
+    from the handful of issues it is about to be handed.
+    """
+    all_issues = result.get("audit_issues", [])
+    matching = _select_issues(
+        all_issues,
+        bands=bands,
+        mechanisms=mechanisms,
+        include_data_quality=include_data_quality,
+    )
+    ordered = _sort_issues(matching, sort)
+
+    # An offset past the end is an empty page, not an error: a client holding a
+    # page number while the run shrank asked a reasonable question and gets a
+    # truthful "nothing here", with total_matching to re-aim by.
+    window = ordered[offset:] if limit is None else ordered[offset : offset + limit]
+
+    page = ResultPageContract(
+        limit=limit,
+        offset=offset,
+        returned=len(window),
+        total_matching=len(ordered),
+        has_more=offset + len(window) < len(ordered),
+    )
+
+    narrowed = {
+        **result,
+        "audit_issues": window,
+        "issue_stats": result.get("issue_stats") or _issue_stats(all_issues),
+        "ifc_element_count": result.get("ifc_element_count") or len(all_issues),
+    }
+    return narrowed, page
 
 
 @router.post("/upload", summary="Attach an IFC model to a project")
@@ -311,8 +473,54 @@ def get_analysis_results(
     engines: list[str] | None = Query(
         None, description="Engine codes to run; omit to run every engine"
     ),
+    limit: int | None = Query(
+        None,
+        ge=1,
+        le=2000,
+        description="Issues per page. Omit to return every matching issue.",
+    ),
+    offset: int = Query(0, ge=0, description="Issues to skip before the page"),
+    band: list[IssueBand] | None = Query(
+        None,
+        description=(
+            "Bands the returned issues are limited to; repeat for several. "
+            "Filters audit_issues only — issue_stats still describes the whole run."
+        ),
+    ),
+    mechanism: list[str] | None = Query(
+        None,
+        description=(
+            "Engine code prefixes the returned issues are limited to, e.g. GC or "
+            "GC-001. Same prefix semantics as `engines`, but applied to what is "
+            "returned rather than to what runs."
+        ),
+    ),
+    include_data_quality: bool = Query(
+        True, description="Set false to leave data-quality notes out of the page"
+    ),
+    sort: PageSort | None = Query(
+        None,
+        description=(
+            "Order the page is cut from, defaulting to band_then_score: the "
+            "analyse page's order (criticals first), tiebroken on score then "
+            "id. score_desc ignores bands; natural keeps the run's own order."
+        ),
+    ),
 ) -> AnalysisResultContract:
-    """Get analysis results (retrieved from cache or computed on-demand)."""
+    """Get analysis results (retrieved from cache or computed on-demand).
+
+    Sending no pagination parameter returns the whole run and no ``page``
+    object, byte for byte what this endpoint returned before pagination
+    existed. Sending any of ``limit``, a non-zero ``offset``, ``band``,
+    ``mechanism``, ``include_data_quality=false`` or ``sort`` narrows
+    ``audit_issues`` and adds ``page``.
+
+    Narrowing happens after ``run_analysis`` has returned, so the cache keeps
+    the whole run and two callers paging the same result share one computation.
+    ``issue_stats`` always counts the whole run: a page of 200 criticals under
+    a run of 22,827 findings still reports 22,827, because stats that shrank
+    with the window would read as findings having disappeared.
+    """
     if slug not in RUNNABLE_SLUGS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -324,7 +532,33 @@ def get_analysis_results(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=raw_result["compliance_error"],
         )
-    return _format_result(slug, project_id, raw_result)
+
+    # Defaults are indistinguishable from an unsent parameter, and that is the
+    # point: a request that asks for nothing in particular must not sprout a
+    # `page` object that an existing consumer never expected to parse.
+    paginating = (
+        limit is not None
+        or offset > 0
+        or bool(band)
+        or bool(mechanism)
+        or not include_data_quality
+        or sort is not None
+    )
+    if not paginating:
+        return _format_result(slug, project_id, raw_result)
+
+    narrowed, page = _paginate_result(
+        raw_result,
+        limit=limit,
+        offset=offset,
+        bands=list(band) if band else None,
+        mechanisms=mechanism,
+        include_data_quality=include_data_quality,
+        sort=sort or "band_then_score",
+    )
+    contract = _format_result(slug, project_id, narrowed)
+    contract.page = page
+    return contract
 
 
 @router.get("/status/{project_id}", response_model=WorkflowStatusContract)
