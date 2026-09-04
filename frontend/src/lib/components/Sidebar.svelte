@@ -21,6 +21,7 @@
     Download,
     BookText,
   } from "lucide-svelte";
+  import { link } from "svelte-spa-router";
 
   interface Props {
     activeView?: string;
@@ -45,6 +46,12 @@
     onSelectView(view);
     onCloseMobile();
   }
+
+  // "New Project"/"New Rule Document Upload" are actions (they open a modal
+  // over whatever's on screen), not destinations — everything else navigates
+  // to a real hash route and renders as an <a>, so right-click/open-in-new-tab
+  // and screen-reader link semantics work like any other link on the page.
+  const ACTION_IDS = new Set(["newproject", "newdocument"]);
 
   const NAV_SECTIONS = [
     {
@@ -172,28 +179,50 @@
         {/if}
 
         {#each section.items as item (item.id)}
-          <button
-            type="button"
-            onclick={() => handleSelect(item.id)}
-            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
-            item.id
-              ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
-              : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
-            title={collapsed ? item.label : undefined}
-          >
-            <item.icon
-              class="h-4 w-4 shrink-0 {activeView === item.id
-                ? 'text-slate-50'
-                : 'text-slate-400 group-hover:text-slate-200'}"
-            />
-            {#if !collapsed}
-              <span class="truncate text-left">{item.label}</span>
-            {/if}
+          {#if ACTION_IDS.has(item.id)}
+            <button
+              type="button"
+              onclick={() => handleSelect(item.id)}
+              class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
+              item.id
+                ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
+                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+              title={collapsed ? item.label : undefined}
+            >
+              <item.icon
+                class="h-4 w-4 shrink-0 {activeView === item.id
+                  ? 'text-slate-50'
+                  : 'text-slate-400 group-hover:text-slate-200'}"
+              />
+              {#if !collapsed}
+                <span class="truncate text-left">{item.label}</span>
+              {/if}
+            </button>
+          {:else}
+            <a
+              href="/{item.id}"
+              use:link
+              onclick={onCloseMobile}
+              class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
+              item.id
+                ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
+                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+              title={collapsed ? item.label : undefined}
+            >
+              <item.icon
+                class="h-4 w-4 shrink-0 {activeView === item.id
+                  ? 'text-slate-50'
+                  : 'text-slate-400 group-hover:text-slate-200'}"
+              />
+              {#if !collapsed}
+                <span class="truncate text-left">{item.label}</span>
+              {/if}
 
-            {#if collapsed && activeView === item.id}
-              <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r bg-white"></span>
-            {/if}
-          </button>
+              {#if collapsed && activeView === item.id}
+                <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r bg-white"></span>
+              {/if}
+            </a>
+          {/if}
         {/each}
       </div>
     {/each}
@@ -201,10 +230,11 @@
 
   <!-- Sidebar Footer: Settings -->
   <div class="space-y-1 border-t border-slate-800/80 bg-slate-950/60 p-2">
-    <!-- Settings Button -->
-    <button
-      type="button"
-      onclick={() => handleSelect("settings")}
+    <!-- Settings Link -->
+    <a
+      href="/settings"
+      use:link
+      onclick={onCloseMobile}
       class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
       'settings'
         ? 'bg-accent text-white'
@@ -221,6 +251,6 @@
       {#if !collapsed}
         <span>Settings</span>
       {/if}
-    </button>
+    </a>
   </div>
 </aside>
