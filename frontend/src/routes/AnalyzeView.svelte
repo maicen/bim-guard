@@ -51,6 +51,7 @@
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
   import SortHeader from "../lib/components/SortHeader.svelte";
+  import { pipelineTracker } from "../lib/stores/activePipelines.svelte";
 
   interface Props {
     initialProjectId?: number | null;
@@ -185,6 +186,9 @@
 
     isRunning = true;
     error = "";
+    // Registers with the global pipeline tracker so a user who navigates away
+    // mid-run still sees progress in the header and gets a completion toast.
+    pipelineTracker.track(selectedProjectId, currentProject?.name || `Project ${selectedProjectId}`);
     // The previous report is deliberately kept until the new one lands: if this
     // run fails, discarding it first would have left the user with nothing but
     // an error message. It is dimmed while the run is in flight.
@@ -208,6 +212,7 @@
         runController = null;
         isRunning = false;
       }
+      pipelineTracker.untrack(selectedProjectId);
     }
   }
 
