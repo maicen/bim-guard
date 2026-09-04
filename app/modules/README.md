@@ -1,260 +1,147 @@
-# BIMGuard Modules — Module 1 + 3 (CODE Example)
+# app/modules — Compliance Pipeline
 
-Automated building-code compliance rule extraction pipeline.
-Converts building-code PDFs (any jurisdiction or standard) into structured rules stored in `rules.db`,
-ready for IFC model compliance checking in Module 4.
-
-This module documentation uses an CODE example dataset, but the BIM-Guard app architecture is domain-agnostic and supports other standards/rulesets.
-
----
+Framework-agnostic Python pipeline stages that sit behind the FastAPI gateway
+(`app/api/`). Nothing here is domain-specific to one building code or
+standard: rule content is stored in and read from the database (Supabase
+`rules` table via `RuleService`), never hardcoded in these modules.
 
 ## Pipeline Overview
 
 ```
 app/modules/
-├── config.py
-├── orchestrator.py
-├── document_parsing/          (unchanged)
-├── ifc_reader/            ← was ifc_reader.py
-│   ├── __init__.py              (IFCReader + quality gate)
-│   ├── ifc_parser.py
-│   ├── ifc_geometry.py
-│   ├── piping_schema.py
-│   └── ifc_quality/
-│       ├── validator.py
-│       ├── improver.py
-│       └── generator.py
-├── rule_builder/        (unchanged)
-├── comparator/          ← was comparator.py
-│   ├── __init__.py              (ComplianceComparator)
-│   ├── compliance_runner.py
-│   ├── galvanic.py
-│   ├── issue_schema.py
-│   └── issue_tracker.py
-└── reporter/            ← was reporter.py
-    ├── __init__.py              (ComplianceReporter)
-    ├── bcf_generator.py
-    ├── report_generator.py
-    ├── schedule_impact.py
-    └── cost_model.py
-All 11 import checks pass, the web app imports cleanly, and the structure is better than before.
-
-c:\Users\Malak\OneDrive\Desktop\Masters course materials\FMP\repo\bim-guard\app\modules\README.md
-list the new structure for all modules
-Bash List full modules directory tree
-IN
-find "/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules" -not -path "*/__pycache__/*" -not -name "*.pyc" | sort
-
-OUT
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/README.md
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/config.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/bert_classifier.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/confidence_scorer.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/dependency_parser.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/docling_extractor.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/enhanced_orchestrator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keyword_filter.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/keywords/keyword_master.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/section_chunker.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/table_rule_builder.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/document_parsing/tfidf_analyzer.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_geometry.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_parser.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/improver.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/ifc_quality/validator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/ifc_reader/piping_schema.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_builder_mock.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/code_seed_rules.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_converter.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/rule_builder/rule_store.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/compliance_runner.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/galvanic.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/issue_schema.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/comparator/issue_tracker.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/__init__.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/__pycache__
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/bcf_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/cost_model.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/report_generator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/reporter/schedule_impact.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/orchestrator.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/requirements.txt
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/TEST_README.md
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/conftest.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/eval_harness.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/pdf_stairs_mock.pdf
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_compliance.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_integration.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_document_parsing.py
-/c/Users/Malak/OneDrive/Desktop/Masters course materials/FMP/repo/bim-guard/app/modules/tests/test_rule_builder.py
-
-app/modules/
-│
-├── orchestrator.py              — pipeline entry point & BIMGuard_App
-├── config.py                    — shared constants (M1 + M3)
-├── __init__.py
-├── requirements.txt
-├── README.md
-│
-├── document_parsing/          — PDF extraction → structured rules
-│   ├── __init__.py
-│   ├── docling_extractor.py
-│   ├── enhanced_orchestrator.py
-│   ├── section_chunker.py
-│   ├── keyword_filter.py
-│   ├── table_rule_builder.py
-│   ├── tfidf_analyzer.py
-│   ├── confidence_scorer.py
-│   ├── dependency_parser.py
-│   ├── bert_classifier.py
-│   └── keywords/
-│       ├── __init__.py
-│       └── keyword_master.py
-│
-├── ifc_reader/            — IFC parsing + quality gate
-│   ├── __init__.py              ← IFCReader (with auto quality check)
-│   ├── ifc_parser.py            — raw IFC element reader (ServiceElement)
-│   ├── ifc_geometry.py          — geometry extraction from pipe segments
-│   ├── piping_schema.py         — M2→M4 data contract (PipingElement)
-│   └── ifc_quality/             — IFC file quality toolkit
-│       ├── __init__.py
-│       ├── validator.py         — score labeling / GUIDs / properties (0–100%)
-│       ├── improver.py          — auto-add missing GUIDs, names, Psets
-│       └── generator.py        — generate well-formed test IFC files
-│
-├── rule_builder/        — NLP → structured compliance rules
-│   ├── __init__.py
-│   ├── rule_generator.py
-│   ├── rule_converter.py        — OpenAI GPT-4o rule extractor
-│   ├── rule_store.py            — shared rule persistence via app services
-│   ├── code_seed_rules.py        — 25+ CODE baseline rules
-│   └── rule_builder_mock.py
-│
-├── comparator/          — IFC data vs rule library validation
-│   ├── __init__.py              ← ComplianceComparator
-│   ├── compliance_runner.py     — GC-001 / CC-001 engine orchestrator
-│   ├── galvanic.py              — galvanic corrosion comparator
-│   ├── issue_schema.py          — Issue data contract (M4 → M5)
-│   └── issue_tracker.py         — issue history across runs
-│
-├── reporter/            — report generation
-│   ├── __init__.py              ← ComplianceReporter
-│   ├── bcf_generator.py         — BCF 2.1 ZIP output
-│   ├── report_generator.py      — Word / PDF compliance report
-│   ├── schedule_impact.py       — delay days + Gantt data
-│   └── cost_model.py            — configurable cost/duration model
-│
+├── config.py                 # Shared constants for the document/rule pipeline
+├── contracts.py               # Strict Pydantic data contracts (inter-module exchange)
+├── orchestrator.py             # BIMGuard_App — dashboard stats + orchestrate_workflow()
+├── pipeline_services.py        # Read-only AnalysisService vs. versioned EnhancementService
+├── document_parsing/           # Document → structured text/nodes (Module 1)
+│   ├── docling_extractor.py       — Docling-backed PDF/table extraction
+│   ├── document_extractor.py      — generic document text extraction
+│   ├── unstructured_extractor.py  — Unstructured.io-backed extraction
+│   ├── light_extractor.py         — lightweight pypdf-only fallback
+│   ├── section_chunker.py         — splits extracted text into clause-scoped sections
+│   ├── iso_validator.py           — ISO 19650 document/container validation helpers
+│   ├── llamaindex_ingestor.py      — LlamaIndex ingestion (table/layout-aware chunking,
+│   │                                 clause metadata), gated by
+│   │                                 BIM_GUARD_USE_LLAMAINDEX_INGESTION
+│   ├── llamaindex_program.py      — deontic statement extraction (shall/must/should)
+│   ├── engines/                   — Docling/Unstructured driver adapters
+│   └── keywords/                  — keyword reference data used by extraction heuristics
+├── rule_builder/                # Structured text → compliance rules (Module 3)
+│   ├── llamaindex_rule_generator.py — the live LLM rule-extraction engine: a typed
+│   │                                  LlamaIndex Pydantic program producing schema-validated
+│   │                                  rule drafts. Wired in via app/services/rule_extraction_service.py.
+│   ├── rule_generator.py          — validates and saves rule dicts
+│   ├── rule_store.py              — adapter forwarding all reads/writes to RuleService
+│   │                                (Supabase-backed `rules` table)
+│   ├── code_seed_rules.py         — seeds baseline building-code rules from DB static assets
+│   ├── code_extended_rules.py     — seeds extended building-code rules from DB static assets
+│   ├── ids_exporter.py            — buildingSMART IDS 1.0 export/import via ifctester.ids
+│   ├── rule_converter.py          — legacy direct GPT-4o converter, kept only for its
+│   │                                 existing LLM test coverage; not used by the live path
+│   └── regex_rule_converter.py    — legacy free/offline regex converter, same status
+├── ifc_reader/                  # IFC parsing, property resolution, quality gate (Module 2)
+│   ├── ifc_parser.py               — raw IFC element reader
+│   ├── ifc_geometry.py             — geometry-derived property extraction
+│   ├── ifc_graph.py                — spatial/topological graph traversal (NetworkX)
+│   ├── ifc_egress.py               — means-of-egress path analysis
+│   ├── ifc_spatial.py              — daylight/spatial boundary checks
+│   ├── ifc_seismic.py              — seismic clearance element extraction
+│   ├── ifc_supports.py             — support/bracing element extraction
+│   ├── ifc_penetrations.py         — penetration/fire-separation extraction
+│   ├── iso19650_check.py           — ISO 19650 GUID, containment, and coverage checks
+│   ├── piping_schema.py            — Module 2 → Module 4 piping data contract
+│   ├── piping_fixtures.py          — plumbing fixture extraction
+│   ├── piping_producer.py          — piping element/segment extraction
+│   └── ifc_quality/                — score labeling, GUID/property validation, and
+│                                      auto-improvement of IFC files (used only by the
+│                                      separately authorized enhancement pipeline, never
+│                                      by the audit/analysis path)
+├── comparator/                  # IFC element data vs. rule library (Module 4)
+│   ├── compliance_runner.py        — engine orchestrator
+│   ├── compliance_orchestrator.py  — multi-engine run coordination
+│   ├── engine_registry.py          — RuleEvaluator registry (GC-001, CC-001, MC-001, ARCH-*)
+│   ├── galvanic.py                 — galvanic corrosion comparator
+│   ├── cross_material.py           — cross-material (XM-001) comparator
+│   ├── material_media.py           — material/media (MM-001) comparator
+│   ├── issue_adapter.py            — maps engine results onto the shared issue contract
+│   ├── issue_schema.py             — Issue data contract (Module 4 → Module 5)
+│   └── issue_tracker.py            — issue history across runs
+├── reporter/                     # Report generation (Module 5)
+│   ├── bcf_generator.py             — BCF 2.1 ZIP output
+│   ├── blue_halo_bcf_exporter.py    — Blue Halo (seismic) BCF export
+│   ├── report_generator.py         — Word/PDF compliance report
+│   ├── schedule_impact.py          — delay days + Gantt data
+│   └── cost_model.py               — configurable cost/duration model
+├── blue_halo/                    # Seismic bracing clearance ("Blue Halo") algorithm
+│   ├── halo_volume_generator.py    — standard-agnostic clearance envelope generation
+│   ├── hermes_config_expanded.py   — jurisdiction clearance/spacing config loader
+│   ├── generate_expanded_config.py — config generation helper
+│   └── build_test_ifc.py           — synthetic IFC fixture builder for tests
+├── phase_6/                      # Legacy phase-numbered pipeline stages (upload, parsing,
+│                                    corrosion UI, seismic, export) — see
+│                                    docs/PHASE_6_DATA_CONTRACTS.md for stage boundaries
 └── tests/
+    ├── conftest.py
     ├── test_document_parsing.py
     ├── test_rule_builder.py
-    ├── test_compliance.py
-    ├── test_integration.py
-    ├── conftest.py
-    └── eval_harness.py
-
-
-
-
----
-
-## Switching Between Regex and GPT-4o
-
-Open `orchestrator.py` and change one line:
-
-```python
-USE_GPT4O = False   # regex — free, no API key, works offline
-USE_GPT4O = True    # GPT-4o — more accurate, costs per API call
+    └── test_iso19650_cde.py
 ```
 
----
+## Rule Extraction: LLM-Only
 
-## Setup
+The live rule-extraction path is entirely LLM-based, with **zero hardcoded
+building-code content**:
 
-### 1. Run commands from the project root
+1. A document is ingested via `LlamaIndexIngestor`, which produces
+   table/layout-aware, clause-scoped nodes (`DocumentNodeContract`) carrying
+   clause ID, page number, and parent section metadata.
+2. `SectionChunker` splits extracted text into clause-scoped sections.
+3. `LlamaIndexRuleGenerator` (`rule_builder/llamaindex_rule_generator.py`) runs
+   a typed LlamaIndex Pydantic program per node/section, producing zero or
+   more schema-validated rule drafts — a malformed LLM response fails Pydantic
+   validation rather than being silently coerced.
+4. Drafts persist as `pending_review` rows (`rule_extraction_drafts` table)
+   with an approve/reject/edit workflow before promotion into the canonical
+   `public.rules` table (`RuleDraftService`).
 
-All commands below assume you are in the repository root (`bim-guard/`).
+This whole path is fronted by `app/services/rule_extraction_service.py`
+(`RuleExtractionService`), which any caller (API route, agent tool) depends on
+through the `RuleExtractionProvider` protocol — the extraction algorithm can be
+swapped without touching callers.
 
-### 2. Install Python dependencies
+`rule_converter.py` (direct GPT-4o) and `regex_rule_converter.py` (free/offline
+regex) are earlier, superseded converters. They are not wired into the live
+extraction path — they remain only because `tests/test_rule_builder.py` still
+exercises them directly.
+
+## Seeding Baseline Rules
+
+Seeded rulesets (e.g. `BUILDING-CODE-PART9`, `BUILDING-CODE-PART9-EXT`) live as
+JSON static assets in the database, loaded by `code_seed_rules.py` and
+`code_extended_rules.py`:
 
 ```bash
-uv sync --group ml-pipeline
+uv run python -m app.services.ruleset_seeder
 ```
 
-> The spaCy English model (`en_core_web_sm`) is included in the `ml-pipeline` dependency group in `pyproject.toml` and installed automatically.
+See `app/services/ruleset_seeder.py` for the full list of seeded rulesets,
+including the corrosion (`BIMGUARD-GC-001`/`CC-001`/`MC-001`) and seismic
+(`BIMGUARD-SB-001`) rulesets.
 
-> **First run:** Docling will download its vision models (~2 min, one-time only).
-> Use a GPU runtime for faster processing if available.
+## Rules Table (Supabase `public.rules`)
 
-### 3. Set your API key (only needed if USE_GPT4O = True)
-
-```bash
-cp example.env .env
-# Edit .env and add your Gemini API key
-GEMINI_API_KEY=your_key_here
-```
-
----
-
-## Run the Pipeline
-
-```bash
-# Full pipeline — all 13 CODE sections
-uv run python -m app.modules.orchestrator data/input_docs/BuildingCode_Part9.pdf
-
-# Test on one section first (recommended)
-uv run python -m app.modules.orchestrator data/input_docs/BuildingCode_Part9.pdf
-```
-
-Or from Python:
-
-```python
-from app.modules.orchestrator import run_pipeline
-
-result = run_pipeline(
-    pdf_path      = "data/input_docs/BuildingCode_Part9.pdf",
-    run_sections  = ["4"],   # test Section 4 (Stairs) first
-    seed_db_first = True,
-)
-print(result)
-```
-
----
-
-## Seed Pre-built Rules
-
-25 pre-built CODE Part 9 rules are included.
-Seed them without uploading a PDF:
-
-```bash
-uv run python -m app.modules.rule_builder.code_seed_rules
-```
-
----
+| Field | Type | Description |
+|---|---|---|
+| rule_id | UUID | Primary key |
+| ruleset_id | TEXT | Groups rules into a selectable rule folder |
+| category | TEXT | `Arch`, `Piping`, or `seismic` |
+| target_ifc_class | TEXT | IFC class e.g. `IfcStairFlight` |
+| property_name / property_set | TEXT | IFC property to read |
+| operator | TEXT | `>=` / `<=` / `==` / `!=` / `between` / `exists` / … |
+| value | JSONB | Threshold: number, string, or `[min, max]` |
+| unit | TEXT | `mm` / `m` / `m2` / `deg` / `ratio` |
+| priority | INT | 1 = critical, 0 = standard |
+| description | TEXT | Plain-English explanation |
 
 ## Run Tests
 
@@ -262,77 +149,9 @@ uv run python -m app.modules.rule_builder.code_seed_rules
 uv run pytest app/modules/tests -v
 ```
 
----
+## Next Steps
 
-## File Structure
-
-```
-bim-guard/
-├── app/
-│   └── modules/
-│       ├── document_parsing/
-│       │   ├── docling_extractor.py        ← Step 1: PDF → text + tables
-│       │   ├── table_rule_builder.py       ← Step 2: tables → rules directly
-│       │   ├── section_chunker.py          ← Step 3: text → 13 sections
-│       │   ├── keyword_filter.py           ← Step 4: spaCy scoring
-│       │   ├── tfidf_analyzer.py           ← Improvement 1: keyword discovery
-│       │   ├── dependency_parser.py        ← Improvement 2: grammar signals
-│       │   ├── confidence_scorer.py        ← Improvement 3: SEND/SKIP decision
-│       │   ├── bert_classifier.py          ← Improvement 4: sentence classifier
-│       │   ├── enhanced_orchestrator.py    ← runs all 4 improvements
-│       │   └── keywords/
-│       │       └── keyword_master.py       ← 193 keywords, 12 groups
-│       ├── rule_builder/
-│       │   ├── rule_store.py               ← shared CRUD via RuleService
-│       │   ├── rule_generator.py           ← validate + save rules
-│       │   ├── rule_converter.py           ← GPT-4o + RAG NLP engine
-│       │   ├── regex_rule_converter.py     ← regex engine (default)
-│       │   └── code_seed_rules.py           ← 25 pre-built CODE rules
-│       └── orchestrator.py                 ← single entry point
-├── data/
-│   └── cache/                              ← runtime local cache for remote storage objects
-├── example.env                              ← copy to .env, add API key
-└── pyproject.toml                           ← dependency and tool config
-```
-
----
-
-## rules.db Schema
-
-| Field | Type | Description |
-|---|---|---|
-| rule_id | TEXT | UUID primary key |
-| source_doc | TEXT | BuildingCode_Part9_PDF / BuildingCode_Table_Direct / BuildingCode_Part9_Seed |
-| section_ref | TEXT | CODE section e.g. 9.8.2.1.(2) |
-| rule_type | TEXT | json_check / range_check / regex / exists_check |
-| entity_type | TEXT | IFC class e.g. IfcStairFlight |
-| property_name | TEXT | IFC property name |
-| operator | TEXT | >= / <= / == / != / between / exists |
-| value | TEXT | JSON-encoded number, string, or [min, max] |
-| unit | TEXT | mm / m / m2 / deg / ratio |
-| priority | INT | 1 = critical, 0 = standard |
-| description | TEXT | plain English explanation |
-
----
-
-## Converter Comparison
-
-| | Regex | GPT-4o |
-|---|---|---|
-| Cost | Free | Per API call |
-| API key needed | No | Yes |
-| Works offline | Yes | No |
-| Catches all phrasing | No | Yes |
-| Hallucinations | Never | Occasionally |
-| Speed | Instant | 1–3 sec per chunk |
-| Best for | Development / testing | Production accuracy |
-
----
-
-## Next Steps (Module 2 + 4)
-
-Once rules.db is populated:
-
-- **Module 2** reads IFC files and extracts element properties
-- **Module 4** compares IFC properties against rules.db and flags failures
-- **Module 5** generates BCF / CSV / PDF compliance reports
+- **Module 2** (`ifc_reader/`) reads IFC files and extracts element properties.
+- **Module 4** (`comparator/`) compares IFC properties against database rules
+  and flags failures via the registered `RuleEvaluator`s.
+- **Module 5** (`reporter/`) generates BCF / CSV / PDF compliance reports.

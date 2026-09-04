@@ -58,9 +58,13 @@ jurisdiction**: it is not the Musterbauordnung, not a Landesbauordnung, not the
 IBC and not Part B or Part M of the Approved Documents. Second, the rules live in
 the database, not in the code, so a project's live ruleset is whatever has been
 seeded plus whatever has been extracted from project documents or authored for
-that project. **Do not put a baseline-pack finding in front of a building control
-officer as a code position without first confirming the governing code and
-authoring rules against it.** Q14 covers how to do that.
+that project — the architectural audit itself is generic and has no built-in
+notion of "the" building code; it runs whatever ruleset a project selects,
+whether that's the seeded baseline, a jurisdiction pack you've authored, or
+rules an LLM extracted from an uploaded regulatory PDF and a reviewer approved.
+**Do not put a baseline-pack finding in front of a building control officer as
+a code position without first confirming the governing code and authoring
+rules against it.** Q14 covers how to do that.
 
 Elsewhere the system references **ISO 16739-1** (IFC), **ISO 19650-1 and -2**
 (information management), **buildingSMART BCF 2.1** (issue exchange) and

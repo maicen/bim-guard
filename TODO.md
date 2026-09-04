@@ -1,6 +1,6 @@
 # TODO
 
-Last reviewed: 2026-08-29
+Last reviewed: 2026-09-04
 
 ## Completed Foundations
 
@@ -95,8 +95,15 @@ Completion evidence (2026-08-29):
 - [ ] Transition alphanumeric and Property Set checks to `ifcopenshell.ids` validation.
 - [ ] Map IDS validation results into the shared issue and BCF model.
 - [ ] Validate imported/exported IDS documents with the buildingSMART IDS schema.
-- [ ] Retire TF-IDF, dependency-parser, confidence-scorer, and BERT routing only after
-      the Pydantic LLM workflow meets an agreed evaluation threshold.
+- [x] Retire TF-IDF, dependency-parser, confidence-scorer, and BERT routing now that
+      the single LLM extraction path (`LlamaIndexRuleGenerator`) covers the one
+      capability the legacy path had and it lacked (multiple rules per clause).
+      Deleted `table_rule_builder.py`, `keyword_filter.py`, `dependency_parser.py`,
+      `confidence_scorer.py`, `tfidf_analyzer.py`, `bert_classifier.py`, and the
+      orphaned `enhanced_orchestrator.py`; none were reachable from any live API
+      route or service. `RuleExtractionService` now defaults to
+      `LlamaIndexRuleGenerator` directly — `rule_extractor.py` (`LiteLLMRuleExtractor`)
+      and `BIM_GUARD_RULE_EXTRACTION_PROVIDER` are removed.
 - [ ] Add precision, recall, F1, and confusion-matrix evaluation for extraction.
 - [x] Expose the architectural rule folder selector in `ArchAnalyzeView.svelte` UI dropdown (backend endpoint already supports `rule_folder`). Owner: Marc / Osama.
 - [ ] Review and retire non-production rule folders (`door_mock`, `test`,
@@ -362,10 +369,10 @@ Completion evidence (2026-09-02):
   `PATCH /api/rules/drafts/{draft_id}`, `POST /api/rules/drafts/{draft_id}/promote`,
   `POST /api/projects/{id}/inspect`. Existing `POST /api/rules/extract` and
   `POST /api/rules/bulk` are unchanged.
-- Both new extraction paths are flag-gated (`BIM_GUARD_USE_LLAMAINDEX_INGESTION`,
-  `BIM_GUARD_RULE_EXTRACTION_PROVIDER`) so `LiteLLMRuleExtractor` keeps running
-  as the default until a precision/recall comparison justifies flipping the
-  default provider.
+- LlamaIndex ingestion is flag-gated (`BIM_GUARD_USE_LLAMAINDEX_INGESTION`).
+  Rule extraction itself has since been consolidated onto a single path,
+  `LlamaIndexRuleGenerator` (2026-09-04) — see Priority 3 above;
+  `LiteLLMRuleExtractor` and `BIM_GUARD_RULE_EXTRACTION_PROVIDER` no longer exist.
 - 984 tests pass (+26 new: `test_llamaindex_ingestion.py`,
   `test_rule_draft_workflow.py`, `test_ids_export.py`, `test_digital_inspector.py`,
   `test_cde_graph.py`; 2 pre-existing IDS tests and 1 settings test updated for

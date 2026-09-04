@@ -53,11 +53,24 @@ entrance doors minimum 900 mm clear" becomes an `IfcDoor` rule with an
 rule is rejected with a message naming the missing field rather than failing
 silently at run time.
 
-## Using NotebookLM to Extract Rules from a Brand Standard or Local Code
+## Extracting Rules from a Brand Standard or Local Code
 
 A 90-page brand standard is a document extraction problem before it is a rule
-authoring problem, and this is where NotebookLM earns its place — with a clear
-boundary around what it is doing.
+authoring problem. BIM-Guard's built-in rule extraction handles this
+in-product: upload the brand standard as a project document, then run
+extraction against it — an LLM (via the same LlamaIndex-based, schema-validated
+pipeline that reads any code or standard) produces a set of candidate rule
+drafts, each carrying the source clause and a confidence flag, held as
+`pending_review` until a reviewer approves, edits, or rejects it into the
+canonical ruleset. Nothing extracted this way reaches the audit path
+unreviewed — the same review gate applies whether the source is a national
+building code or a client's brand standard, because the pipeline has no
+built-in notion of one being more authoritative than the other.
+
+For research and cross-checking outside the app — reading a long prescriptive
+document and producing a structured, clause-referenced register before or
+alongside an in-app extraction run — NotebookLM is a useful complementary tool,
+with the same boundary around what it is doing.
 
 **What it is for:** reading a long prescriptive document and producing a
 structured, clause-referenced register of every quantitative requirement, in a
