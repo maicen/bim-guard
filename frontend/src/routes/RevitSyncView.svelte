@@ -30,6 +30,7 @@
   import SortHeader from "../lib/components/SortHeader.svelte";
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
+  import LoadingState from "../lib/components/LoadingState.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
@@ -298,6 +299,8 @@ print(response.read())
       <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
       <div>{testError}</div>
     </div>
+  {:else if isSendingTest}
+    <LoadingState message="Auditing payload against building codes…" />
   {/if}
 
   {#if testResponse}
