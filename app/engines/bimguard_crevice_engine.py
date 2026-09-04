@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Optional
 
+from app.logging_config import get_logger
 from app.modules.contracts import RuleEvaluationResult
 from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_cc_catalog
@@ -51,6 +52,8 @@ try:
     GC_AVAILABLE = True
 except ImportError:
     GC_AVAILABLE = False
+
+logger = get_logger(__name__)
 
 RULESET_VERSION = "BIMGUARD-CC-001 v1.0.0"
 ASSESSMENT_DATE = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -430,6 +433,17 @@ def assess_crevice_risk(element: CCElement) -> CCResult:
 
     # Material resolution
     mat_key = resolve_cc_material(element.material)
+    if mat_key and mat_key not in CCT_TABLE:
+        # The alias map is static but the CCT table comes from the loaded
+        # catalog, which may be the reduced offline fallback. Treat the grade
+        # as unresolved rather than aborting the run on the first such element.
+        logger.warning(
+            "Material %r resolves to CCT grade %s, which the loaded CC-001 catalog "
+            "does not define; assessing without a CCT value.",
+            element.material,
+            mat_key,
+        )
+        mat_key = None
     if mat_key:
         mat_label = CCT_TABLE[mat_key]["label"]
         cct_val = CCT_TABLE[mat_key]["cct_c"]

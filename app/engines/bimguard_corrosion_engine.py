@@ -32,11 +32,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Optional
 
+from app.logging_config import get_logger
 from app.modules.contracts import RuleEvaluationResult
 from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_gc_catalog
 from app.services.pipeline_tracker import GC_ENGINE, Stage, emit, increment
 from app.services.pipeline_tracker import fail as track_failure
+
+logger = get_logger(__name__)
 
 # ── VERSION ───────────────────────────────────────────────────────────────────
 RULESET_VERSION = "BIMGUARD-GC-001 v1.0.0"
@@ -215,11 +218,25 @@ ZONE_TO_ENV = _GC_CATALOG["zone_to_env"]
 
 
 def classify_environment(zone_category: str = "") -> tuple[str, dict]:
-    """Map an IFC zone category string to an environment class."""
+    """Map an IFC zone category string to an environment class.
+
+    A zone keyword whose target class is missing from the loaded catalog (a
+    reduced fallback table, or a partially seeded ruleset) falls back to
+    ``E2_NORMAL`` instead of raising, so a demo or pipeline run degrades to a
+    conservative default rather than aborting on the first pool element.
+    """
     cat = zone_category.lower().strip()
     for keyword, env_key in ZONE_TO_ENV.items():
         if keyword in cat:
-            return env_key, ENVIRONMENT_CLASSES[env_key]
+            if env_key in ENVIRONMENT_CLASSES:
+                return env_key, ENVIRONMENT_CLASSES[env_key]
+            logger.warning(
+                "Zone %r maps to environment class %s, which the loaded GC-001 "
+                "catalog does not define; using E2_NORMAL.",
+                zone_category,
+                env_key,
+            )
+            break
     return "E2_NORMAL", ENVIRONMENT_CLASSES["E2_NORMAL"]
 
 
