@@ -40,11 +40,17 @@ one below is actually detected and named in the affected element's own
     ``analyze_stair_flight``'s curvature check) -- a straight flight's tread
     centroids stay put; a winder's rotate with it.
   * Guards (IfcRailing with PredefinedType GUARDRAIL/BALUSTRADE/FENCE, or
-    unset): baluster/post spacing and the configurable sphere-passing test
-    are not yet computed. Height, continuity and profile-thickness checks
-    (shared with handrails) already work for guards today; every guard's
-    analysis carries a warning noting the gap, so it rides along with
-    whatever DOES resolve for that element.
+    unset): MaxOpening (largest horizontal infill gap, sampled at several
+    heights) and BottomClearGap (typical gap under the bottom rail, via the
+    median bottom elevation across run-bands so a few floor-touching posts
+    don't mask a real elevated-rail gap) ARE computed -- see
+    ``guard_opening_profile``. What is NOT: a true multi-directional
+    sphere-passing simulation (this is single-axis: the largest horizontal
+    gap at a sampled height, not the largest circle that fits through the
+    actual 2D opening shape), baluster CENTRE-TO-CENTRE spacing as its own
+    figure, and the triangular stair-nosing opening. Every guard's analysis
+    still carries a warning naming exactly these gaps, so it rides along
+    with whatever DOES resolve for that element.
   * Handrail/guard path length is a straight-line run-axis approximation.
     For a curved rail this undercounts the true swept length; a warning is
     attached whenever the mesh's lateral spread suggests real curvature.
@@ -541,6 +547,94 @@ def analyze_stair_flight(
     return result
 
 
+#: Default number of interior Z-heights sampled between a guard's top and
+#: bottom elevation when measuring baluster/infill openings. Sampling
+#: several heights (not just one) catches infill whose spacing varies with
+#: height -- a raked/angled picket, a lattice pattern -- the way
+#: min_clear_width_by_band samples several run positions rather than one.
+DEFAULT_OPENING_Z_SAMPLES = 5
+
+#: Separations below this (mm) are floating-point/tessellation noise, not a
+#: real opening -- unlike DEFAULT_GAP_MM (used for continuity, where small
+#: seams should be ignored as "still one piece"), an opening check wants to
+#: see almost every real gap, since even a modest one can fail a sphere test.
+_OPENING_NOISE_FLOOR_MM = 1.0
+
+
+def _face_z_ranges(verts, faces):
+    """Return (M,) arrays (z_min, z_max) per face."""
+    face_z = verts[:, 2][faces]
+    return face_z.min(axis=1), face_z.max(axis=1)
+
+
+def guard_opening_gap_at_height(
+    verts, faces, origin, u, v, z: float, run_span: tuple[float, float], band_mm: float = 20.0
+) -> float | None:
+    """Largest horizontal (run-axis) gap in the guard's infill coverage at
+    height *z*, or None if the mesh has no faces at all (nothing to measure
+    anywhere, not just at this height).
+
+    Approximates a true horizontal cross-section: rather than computing the
+    exact line where each triangle crosses the plane z=z (expensive, and
+    unnecessary precision for this purpose), it selects every face whose OWN
+    Z-extent overlaps a thin band around *z* and finds the run-axis gaps in
+    their combined coverage. This can slightly UNDER-report a gap (a face
+    spanning past the band on one side still counts as "covering" the band),
+    which is the conservative direction for a safety check -- it will not
+    invent an opening that is not there, though it can occasionally miss one
+    genuinely at the edge of a member.
+
+    A height where NOTHING overlaps at all (no top/bottom rail, no baluster
+    anywhere near it) is not "unmeasurable" -- it is the guard being
+    completely open there, the worst case this check exists to catch -- so
+    it reports the full *run_span* as the opening, not None.
+    """
+    if faces is None or faces.size == 0:
+        return None
+    run_min, run_max = run_span
+    z_lo, z_hi = z - band_mm / 2.0, z + band_mm / 2.0
+    face_z_min, face_z_max = _face_z_ranges(verts, faces)
+    overlapping = (face_z_max >= z_lo) & (face_z_min <= z_hi)
+    if not np.any(overlapping):
+        return round(run_max - run_min, 1)
+    intervals = face_run_intervals(verts, faces[overlapping], origin, u, v)
+    _segments, gaps = merge_run_intervals(intervals, gap_mm=_OPENING_NOISE_FLOOR_MM)
+    if not gaps:
+        return 0.0
+    return round(max(hi - lo for lo, hi in gaps), 1)
+
+
+def guard_opening_profile(
+    verts, faces, origin, u, v,
+    z_min: float, z_max: float,
+    run_span: tuple[float, float],
+    n_samples: int = DEFAULT_OPENING_Z_SAMPLES,
+) -> dict:
+    """Sample several interior heights between *z_min* and *z_max* and
+    report the worst (largest) horizontal infill gap found -- the measurement
+    a sphere/baluster-spacing rule checks against.
+
+    Returns {"max_opening_mm": float | None, "samples_mm": [float, ...]}.
+    ``samples_mm`` lists the gap found at every height sampled (a fully-open
+    height contributes *run_span*'s full width, per
+    ``guard_opening_gap_at_height`` -- see there for why that is not treated
+    as missing data).
+    """
+    if z_max <= z_min or n_samples < 1:
+        return {"max_opening_mm": None, "samples_mm": []}
+    heights = np.linspace(z_min, z_max, n_samples + 2)[1:-1]
+    samples = [
+        gap for gap in (
+            guard_opening_gap_at_height(verts, faces, origin, u, v, float(h), run_span)
+            for h in heights
+        )
+        if gap is not None
+    ]
+    if not samples:
+        return {"max_opening_mm": None, "samples_mm": []}
+    return {"max_opening_mm": round(max(samples), 1), "samples_mm": samples}
+
+
 def _min_rotated_rect_dims_mm(run, lateral) -> tuple[float, float] | None:
     """Return (short_side_mm, long_side_mm) of the min-rotated-rectangle
     enclosing the (run, lateral) point set, or None if shapely is unavailable
@@ -635,13 +729,17 @@ def analyze_railing(railing, geometry_extractor, floor_z_mm: float | None = None
     # from a genuinely unauthored one.
     predefined_type = str(getattr(railing, "PredefinedType", None) or "").upper()
     result["predefined_type"] = predefined_type or None
-    if predefined_type != "HANDRAIL":
+    is_guard_like = predefined_type != "HANDRAIL"
+    if is_guard_like:
         result["warnings"].append(
-            f"PredefinedType={predefined_type or 'unset'} -- guard/balustrade "
-            "baluster/post spacing and the configurable sphere-passing "
-            "opening test are not yet computed by this engine (v1 "
-            "limitation); height, continuity and profile-thickness checks "
-            "above are still valid"
+            f"PredefinedType={predefined_type or 'unset'} -- MaxOpeningWidth/"
+            "BottomClearGap below are single-axis approximations (largest "
+            "horizontal gap per sampled height; typical under-rail gap), not "
+            "a true multi-directional sphere-passing simulation, and "
+            "baluster CENTRE-TO-CENTRE spacing and the triangular "
+            "stair-nosing opening are not yet computed (v1 limitation); "
+            "height, continuity and profile-thickness checks above are "
+            "still valid"
         )
 
     if not (_NP_AVAILABLE and geometry_extractor):
@@ -692,6 +790,27 @@ def analyze_railing(railing, geometry_extractor, floor_z_mm: float | None = None
             result["min_height_mm"] = round(min(tops) - floor_z_mm, 1)
     if bottoms:
         result["min_bottom_elevation_mm"] = round(min(bottoms), 1)
+        # Median, not minimum: a post/baluster typically anchors AT the
+        # walking surface (bottom elevation ~= floor_z there), which would
+        # make the pure minimum read as "no gap" everywhere even when the
+        # bottom RAIL between posts sits well clear of the floor. The median
+        # across run-bands is dominated by the rail's own (more common)
+        # elevation instead of the few post-footprint outliers.
+        median_bottom = float(np.median(bottoms))
+        reference_z = floor_z_mm if floor_z_mm is not None else float(z.min())
+        result["bottom_clear_gap_mm"] = round(max(0.0, median_bottom - reference_z), 1)
+
+    if is_guard_like:
+        opening = guard_opening_profile(
+            verts, faces, origin, u, v, float(z.min()), float(z.max()), (run_min, run_max)
+        )
+        if opening["max_opening_mm"] is not None:
+            result["max_opening_mm"] = opening["max_opening_mm"]
+            result["opening_samples_mm"] = opening["samples_mm"]
+            candidates = [opening["max_opening_mm"]]
+            if "bottom_clear_gap_mm" in result:
+                candidates.append(result["bottom_clear_gap_mm"])
+            result["guard_max_opening_mm"] = round(max(candidates), 1)
 
     intervals = face_run_intervals(verts, faces, origin, u, v)
     segments, gaps = merge_run_intervals(intervals)

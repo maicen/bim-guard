@@ -192,14 +192,21 @@ rule's `unit` column states mm/deg) and it resolves automatically once
 | `HandrailContinuousSegments` | IfcRailing | 1 for an unbroken rail, >1 if a real gap (not just tessellation sparsity) is detected |
 | `HandrailMinBottomElevation` | IfcRailing | Underside elevation — useful for a bottom-gap/guard check |
 | `HandrailProfileLateral` / `HandrailProfileVertical` | IfcRailing | Coarse cross-section dimensions near mid-run |
+| `BottomClearGap` | IfcRailing | Median bottom elevation across run-bands minus `floor_z_mm` — the *typical* gap under the bottom rail, robust to a few floor-touching posts pulling a plain minimum down to ~0 |
+| `MaxOpening` | IfcRailing (guard-type only) | Largest horizontal infill gap (baluster/post spacing), sampled at several heights between the guard's top and bottom — a height with NO material at all counts as a full-span opening, not a skipped sample |
+| `GuardMaxOpening` | IfcRailing (guard-type only) | `max(MaxOpening, BottomClearGap)` — the single worst opening anywhere on the guard, for a rule that wants one number to check against a sphere diameter |
 
 **v1 limitations**, named in each result's `warnings` list rather than
 silently guessed: winder/curved-flight per-position tread depth (inner /
-walking-line / outer) is not yet computed; guard baluster/post spacing and
-the configurable sphere-passing test are not yet computed.
+walking-line / outer) is not yet computed; baluster CENTRE-TO-CENTRE spacing
+(as opposed to clear opening width, which `MaxOpening` above already
+covers) and the triangular stair-nosing opening are not yet computed;
+`MaxOpening`/`GuardMaxOpening` are single-axis (largest horizontal gap per
+sampled height), not a true multi-directional sphere-passing simulation
+(the largest circle that fits through the actual 2D opening shape).
 
-Both are actually *detected*, not just documented — every affected element's
-own analysis carries a warning at runtime:
+All of the above are actually *detected*, not just documented — every
+affected element's own analysis carries a warning at runtime:
 
 - A flight whose tread-band centroids drift more than 75mm laterally along
   its run (`tread_lateral_drift_mm`) is marked `winder_suspected: true` and
@@ -207,6 +214,11 @@ own analysis carries a warning at runtime:
   true per-position tread depth. A straight-but-wide stair is not flagged —
   the check is an absolute drift threshold, not a ratio against width.
 - Any `IfcRailing` whose `PredefinedType` isn't `HANDRAIL` (including unset)
-  carries a warning that baluster spacing and the sphere-passing test aren't
-  computed for it, alongside whatever height/continuity properties *do*
-  resolve.
+  carries a warning naming the remaining gaps above (centre-to-centre
+  spacing, triangular opening, true sphere simulation), alongside whatever
+  height/continuity/opening properties *do* resolve.
+
+**Guard-only gate:** `MaxOpening`/`GuardMaxOpening` are only computed when
+`PredefinedType != HANDRAIL` — a plain handrail never gets them (there's no
+"opening" concept for a single rail). `BottomClearGap` is computed for every
+`IfcRailing`, handrail or guard, since it's just a height measurement.

@@ -190,6 +190,82 @@ class TestMergeRunIntervals:
         assert st.merge_run_intervals([]) == ([], [])
 
 
+# ── Guard opening / baluster spacing ──────────────────────────────────────────
+
+# Identity local frame (run=x, lateral=y) so these tests can hand-build
+# vertices directly in "local" coordinates without a real footprint to run
+# PCA against.
+_ORIGIN = np.array([0.0, 0.0])
+_U = np.array([1.0, 0.0])
+_V = np.array([0.0, 1.0])
+
+
+def _vertical_member_mesh(segments):
+    """One flat quad face (2 triangles) per (x0, x1, z0, z1) segment, all at
+    y=0 -- enough for guard_opening_gap_at_height, which only reads each
+    face's run- and Z-extent, never true 3D volume."""
+    verts: list[tuple[float, float, float]] = []
+    faces: list[list[int]] = []
+    for x0, x1, z0, z1 in segments:
+        base = len(verts)
+        verts.extend([(x0, 0.0, z0), (x1, 0.0, z0), (x1, 0.0, z1), (x0, 0.0, z1)])
+        faces.append([base, base + 1, base + 2])
+        faces.append([base, base + 2, base + 3])
+    return np.array(verts, dtype=float), np.array(faces, dtype=np.intp)
+
+
+class TestGuardOpeningGapAtHeight:
+    def test_gap_between_two_balusters(self):
+        # Balusters at x=[0,20] and x=[120,140], full height -- clear gap 100mm.
+        verts, faces = _vertical_member_mesh([(0, 20, 0, 1000), (120, 140, 0, 1000)])
+        gap = st.guard_opening_gap_at_height(verts, faces, _ORIGIN, _U, _V, 500.0, (0.0, 140.0))
+        assert gap == pytest.approx(100.0, abs=1.0)
+
+    def test_solid_panel_has_no_gap(self):
+        verts, faces = _vertical_member_mesh([(0, 500, 0, 1000)])
+        gap = st.guard_opening_gap_at_height(verts, faces, _ORIGIN, _U, _V, 500.0, (0.0, 500.0))
+        assert gap == pytest.approx(0.0, abs=1.0)
+
+    def test_completely_open_height_reports_full_span_not_none(self):
+        # A baluster only in the LOWER half -- sampling above it finds
+        # nothing there, which must read as "fully open" (worst case), not
+        # "unmeasurable".
+        verts, faces = _vertical_member_mesh([(0, 20, 0, 500)])
+        gap = st.guard_opening_gap_at_height(verts, faces, _ORIGIN, _U, _V, 750.0, (0.0, 140.0))
+        assert gap == pytest.approx(140.0, abs=1.0)
+
+    def test_empty_mesh_is_none(self):
+        assert st.guard_opening_gap_at_height(None, None, _ORIGIN, _U, _V, 500.0, (0.0, 100.0)) is None
+
+
+class TestGuardOpeningProfile:
+    def test_worst_height_wins(self):
+        # Balusters full height except a wider gap band around z=600-700.
+        verts, faces = _vertical_member_mesh([
+            (0, 20, 0, 1000), (60, 80, 0, 550), (60, 80, 750, 1000),
+            (120, 140, 0, 1000),
+        ])
+        profile = st.guard_opening_profile(verts, faces, _ORIGIN, _U, _V, 0.0, 1000.0, (0.0, 140.0))
+        # At z~625 (inside the 550-750 missing band for the middle member),
+        # the middle member contributes nothing, widening that sample's gap
+        # beyond the uniform 40mm gaps elsewhere.
+        assert profile["max_opening_mm"] > 40.0
+
+    def test_uniform_baluster_spacing(self):
+        # 5 balusters, 20mm wide, evenly spaced with a 90mm clear gap.
+        segments = [(i * 110, i * 110 + 20, 0, 1000) for i in range(5)]
+        verts, faces = _vertical_member_mesh(segments)
+        profile = st.guard_opening_profile(
+            verts, faces, _ORIGIN, _U, _V, 0.0, 1000.0, (0.0, 4 * 110 + 20)
+        )
+        assert profile["max_opening_mm"] == pytest.approx(90.0, abs=1.0)
+
+    def test_degenerate_height_range_returns_none(self):
+        verts, faces = _vertical_member_mesh([(0, 20, 0, 1000)])
+        profile = st.guard_opening_profile(verts, faces, _ORIGIN, _U, _V, 500.0, 500.0, (0.0, 20.0))
+        assert profile["max_opening_mm"] is None
+
+
 # ── End-to-end against a real (small) IFC4 model ──────────────────────────────
 
 ifcopenshell = pytest.importorskip("ifcopenshell")
@@ -621,6 +697,75 @@ class TestAnalyzeRailing:
         analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
         assert any("baluster" in w for w in analysis["warnings"])
 
+    def test_baluster_spacing_measured_from_real_geometry(self):
+        from ifcopenshell.api import run
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, body, storey = _base_model()
+        # Top rail (z 980-1000) + bottom rail at floor (z 0-20), both
+        # continuous, plus 5 balusters (20mm wide) with a known 90mm clear
+        # gap between them (pitch 110mm), spanning the rails' full height.
+        triangles = _box_triangles(0.0, 460.0, 0.0, 40.0, 980.0, 1000.0)  # top rail
+        triangles += _box_triangles(0.0, 460.0, 0.0, 40.0, 0.0, 20.0)      # bottom rail
+        for i in range(5):
+            x0 = i * 110.0
+            triangles += _box_triangles(x0, x0 + 20.0, 0.0, 40.0, 0.0, 1000.0)
+        rep = _tessellated_representation(model, body, triangles)
+        railing = run(
+            "root.create_entity", model, ifc_class="IfcRailing", name="Guard Balusters",
+            predefined_type="GUARDRAIL",
+        )
+        run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+        run("geometry.assign_representation", model, product=railing, representation=rep)
+        run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+        analysis = st.analyze_railing(railing, IFCGeometryExtractor(model), floor_z_mm=0.0)
+        assert analysis["max_opening_mm"] == pytest.approx(90.0, abs=10.0)
+        # Bottom rail is continuous at floor level -- no gap underneath it.
+        assert analysis["bottom_clear_gap_mm"] == pytest.approx(0.0, abs=5.0)
+        assert analysis["guard_max_opening_mm"] == pytest.approx(90.0, abs=10.0)
+
+    def test_bottom_clear_gap_when_bottom_rail_is_elevated(self):
+        from ifcopenshell.api import run
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, body, storey = _base_model()
+        # Top rail (z 980-1000) + bottom rail raised 100mm off the floor
+        # (z 100-120), both continuous -- the classic "gap a small object
+        # could pass under" design.
+        triangles = _box_triangles(0.0, 2000.0, 0.0, 40.0, 980.0, 1000.0)
+        triangles += _box_triangles(0.0, 2000.0, 0.0, 40.0, 100.0, 120.0)
+        rep = _tessellated_representation(model, body, triangles)
+        railing = run(
+            "root.create_entity", model, ifc_class="IfcRailing", name="Guard Raised Rail",
+            predefined_type="GUARDRAIL",
+        )
+        run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+        run("geometry.assign_representation", model, product=railing, representation=rep)
+        run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+        analysis = st.analyze_railing(railing, IFCGeometryExtractor(model), floor_z_mm=0.0)
+        assert analysis["bottom_clear_gap_mm"] == pytest.approx(100.0, abs=5.0)
+
+    def test_handrail_does_not_compute_opening_fields(self):
+        from ifcopenshell.api import run
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, body, storey = _base_model()
+        triangles = _box_triangles(0.0, 2000.0, 0.0, 40.0, 880.0, 920.0)
+        rep = _tessellated_representation(model, body, triangles)
+        railing = run(
+            "root.create_entity", model, ifc_class="IfcRailing", name="Plain Handrail",
+            predefined_type="HANDRAIL",
+        )
+        run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+        run("geometry.assign_representation", model, product=railing, representation=rep)
+        run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+        analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
+        assert "max_opening_mm" not in analysis
+        assert "guard_max_opening_mm" not in analysis
+
 
 class TestEndToEndThroughIFCReader:
     """Proves the wiring, not just the module: a rule asking for a
@@ -727,6 +872,55 @@ class TestEndToEndThroughIFCReader:
         results = self._evaluate(model_path, [rule])
         element = results["TEST-5"]["all_elements"][0]
         assert not element["data_quality_warnings"]
+
+    def test_guard_max_opening_resolves_through_the_full_pipeline(self, tmp_path_factory):
+        """GuardMaxOpening is a brand new derived property (baluster/opening
+        analysis) -- prove it reaches a real rule verdict through
+        IFCReader.extract_for_compliance(), not just through calling
+        ifc_stair.analyze_railing() directly."""
+        from ifcopenshell.api import run as ifc_run
+
+        model, body, storey = _base_model()
+        # 90mm clear baluster gap -- a 100mm sphere-passing rule must FAIL,
+        # a 150mm one must PASS.
+        triangles = _box_triangles(0.0, 460.0, 0.0, 40.0, 980.0, 1000.0)
+        triangles += _box_triangles(0.0, 460.0, 0.0, 40.0, 0.0, 20.0)
+        for i in range(5):
+            x0 = i * 110.0
+            triangles += _box_triangles(x0, x0 + 20.0, 0.0, 40.0, 0.0, 1000.0)
+        rep = _tessellated_representation(model, body, triangles)
+        railing = ifc_run(
+            "root.create_entity", model, ifc_class="IfcRailing", name="Guard",
+            predefined_type="GUARDRAIL",
+        )
+        ifc_run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+        ifc_run("geometry.assign_representation", model, product=railing, representation=rep)
+        ifc_run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+        path = tmp_path_factory.mktemp("guard") / "guard.ifc"
+        model.write(str(path))
+
+        rule_fails = {
+            "rule_id": 6,
+            "reference": "TEST-6",
+            "target_ifc_class": "IfcRailing",
+            "property_name": "GuardMaxOpening",
+            "operator": "<=",
+            "check_value": 50.0,  # the guard's real gap is ~90mm
+            "unit": "mm",
+        }
+        rule_passes = {
+            "rule_id": 7,
+            "reference": "TEST-7",
+            "target_ifc_class": "IfcRailing",
+            "property_name": "GuardMaxOpening",
+            "operator": "<=",
+            "check_value": 150.0,
+            "unit": "mm",
+        }
+        results = self._evaluate(path, [rule_fails, rule_passes])
+        assert results["TEST-6"]["status"] == "FAIL"
+        assert results["TEST-7"]["status"] == "PASS"
 
 
 class TestAgainstModel:

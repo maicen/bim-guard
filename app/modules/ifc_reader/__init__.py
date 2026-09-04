@@ -383,6 +383,16 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     "handrailminbottomelevation": "min_bottom_elevation_mm",
     "handrailprofilelateral": "profile_lateral_mm",
     "handrailprofilevertical": "profile_vertical_mm",
+    "bottomcleargap": "bottom_clear_gap_mm",
+    # Guard opening / baluster spacing -- guard-type IfcRailing only (see
+    # ifc_stair.analyze_railing's is_guard_like gate). MaxOpening is the
+    # largest horizontal infill gap found (baluster/post spacing);
+    # GuardMaxOpening also folds in BottomClearGap, so a single rule can
+    # check "the worst opening anywhere on this guard" without querying
+    # both. Neither is a true multi-directional sphere-passing simulation --
+    # see the module docstring's v1 limitations.
+    "maxopening": "max_opening_mm",
+    "guardmaxopening": "guard_max_opening_mm",
 }
 
 
