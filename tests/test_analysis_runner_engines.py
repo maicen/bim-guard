@@ -123,6 +123,76 @@ class TestCacheSeparation:
         assert len(calls) == 2
 
 
+class TestCachedFlag:
+    """``cached`` describes this delivery, not the entry it was served from.
+
+    The flag is the only thing that distinguishes a four-second answer from a
+    seven-minute one on the results page. Reporting False on a hit is not a
+    cosmetic slip: it tells a reviewer the engines just ran over the model when
+    they did not.
+    """
+
+    def test_a_computed_result_is_not_cached(self, calls):
+        result = runner.run_analysis("corrosion", 1, engines=["GC"])
+        assert result["cached"] is False
+
+    def test_a_hit_is_cached(self, calls):
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        result = runner.run_analysis("corrosion", 1, engines=["GC"])
+        assert len(calls) == 1, "the second call must not have recomputed"
+        assert result["cached"] is True
+
+    def test_a_recompute_after_a_hit_is_not_cached(self, calls):
+        """A changed selection misses, so the flag has to go back to False."""
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        result = runner.run_analysis("corrosion", 1, engines=["CC"])
+        assert result["cached"] is False
+
+    def test_use_cache_false_reports_a_computed_result(self, calls):
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        result = runner.run_analysis("corrosion", 1, engines=["GC"], use_cache=False)
+        assert len(calls) == 2
+        assert result["cached"] is False
+
+    def test_the_stored_entry_is_never_flagged(self, calls):
+        """The entry must stay flag-free, or the next hit inherits this one's answer."""
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        key = runner.CacheKey(
+            project_id=1,
+            slug="corrosion",
+            source_sha256=runner.sha256_of(b"IFC"),
+            engines=runner.resolve_engine_codes(["GC"]),
+        )
+        stored = ANALYSIS_CACHE.get(key)
+        assert stored is not None
+        assert "cached" not in stored
+
+    def test_the_returned_result_is_not_the_stored_object(self, calls):
+        """Mutating what a caller was handed must not corrupt the entry."""
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        first = runner.run_analysis("corrosion", 1, engines=["GC"])
+        first["audit_issues"] = ["mutated"]
+        second = runner.run_analysis("corrosion", 1, engines=["GC"])
+        assert second["audit_issues"] == []
+
+    def test_a_third_read_is_still_a_hit(self, calls):
+        """Reading twice must not degrade the entry into looking computed."""
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        runner.run_analysis("corrosion", 1, engines=["GC"])
+        assert runner.run_analysis("corrosion", 1, engines=["GC"])["cached"] is True
+
+    def test_a_failure_is_not_reported_as_cached(self, monkeypatch):
+        """A failure is never stored, so it can never be served from the store."""
+        monkeypatch.setattr(runner, "model_bytes", lambda project_id: (b"", "unreadable"))
+        result = runner.run_analysis("corrosion", 1)
+        assert result.get("cached", False) is False
+
+    def test_an_unknown_slug_is_not_reported_as_cached(self):
+        assert runner.run_analysis("nonsense", 1).get("cached", False) is False
+
+
 class TestSeismicIsUnaffected:
     """A single kernel has nothing to select between."""
 
