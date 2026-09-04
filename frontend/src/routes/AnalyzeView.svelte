@@ -600,6 +600,7 @@
           disabled={isRunning || !currentProject?.ifc_file_path || engineSelectionEmpty}
           onclick={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
+          aria-label="Force uncached recomputation against the latest IFC digest"
           class="rounded-full border border-slate-800 bg-slate-900/80 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
           <RefreshCw class="h-3.5 w-3.5 {isRunning ? 'animate-spin' : ''}" />
@@ -672,6 +673,8 @@
                 <button
                   type="button"
                   onclick={() => copyText(currentProject?.ifc_md5_hash || "")}
+                  title="Copy full digest"
+                  aria-label="Copy full digest"
                   class="hover:text-slate-300"
                 >
                   <Copy class="h-3 w-3" />
@@ -1156,6 +1159,7 @@
                             onclick={() => copyText(issue.element_id)}
                             class="text-slate-500 transition-colors hover:text-slate-50"
                             title="Copy GUID"
+                            aria-label="Copy GUID"
                           >
                             <Copy class="h-3 w-3" />
                           </button>
@@ -1311,6 +1315,8 @@
               <button
                 type="button"
                 onclick={() => copyText(inspectedIssue?.element_id || "")}
+                title="Copy GUID"
+                aria-label="Copy GUID"
                 class="text-slate-400 hover:text-slate-50"
               >
                 <Copy class="h-3 w-3" />
