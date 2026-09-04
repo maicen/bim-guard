@@ -163,3 +163,37 @@ Use `property_name: ClearWidth` instead — that name is *not* aliased to
 `Width` for this reason, and instead falls through to the geometry-derived
 corridor-width calculation (`ifc_geometry.get_corridor_width_mm`), which
 computes the landing's actual minimum clear plan dimension from its mesh.
+
+### Per-riser/tread/handrail/guard derived properties (`ifc_stair.py`)
+
+No Pset stores these — a Pset carries at most one nominal value for a whole
+flight (`RiserHeight`, `TreadLength`), while these are the WORST value across
+every individual step, which is what a code check actually needs (a flight
+with one bad riser among twelve good ones still fails on that one riser).
+Author a rule with one of these as `property_name` (no unit suffix — the
+rule's `unit` column states mm/deg) and it resolves automatically once
+`IFCStairEngine` has analysed the model; no Pset or Shared Parameter needed.
+
+| `property_name` | IFC Class | What it measures |
+|---|---|---|
+| `MinRiserHeight` / `MaxRiserHeight` | IfcStairFlight | Smallest / largest individual riser height in this flight |
+| `RiserHeightDifference` | IfcStairFlight | Max − min riser height within this flight |
+| `MinTreadDepth` / `MaxTreadDepth` | IfcStairFlight | Smallest / largest individual going (nosing-to-nosing) |
+| `TreadDepthDifference` | IfcStairFlight | Max − min going within this flight |
+| `MinClearStairWidth` | IfcStairFlight | Narrowest point along the flight, sampled in bands (not a single whole-footprint average) |
+| `OpenRiserDetected` | IfcStairFlight | Whether any tread-to-tread transition lacks a bridging riser face |
+| `TotalFlightRise` / `TotalFlightRun` / `FlightPitch` / `FlightSlopedLength` | IfcStairFlight | Whole-flight geometry |
+| `NumberOfTreadsDetected` | IfcStairFlight | Tread count from geometry, independent of any authored `NumberOfTreads` |
+| `StairRiserHeightDifference` / `StairTreadDepthDifference` | IfcStairFlight, IfcStair | Same as above but pooled across **every flight of the same stairway** — most codes require uniformity stairway-wide, not just per flight |
+| `StairFlightCount` | IfcStairFlight, IfcStair | Number of flights making up the stairway |
+| `LandingClearWidth` / `LandingClearLength` / `LandingClearArea` | IfcSlab (LANDING) | Clear plan dimensions from the landing's own footprint mesh |
+| `HandrailMinHeight` / `HandrailMaxHeight` / `HandrailHeightVariation` | IfcRailing | Top-of-rail height above the floor, sampled along its length |
+| `HandrailPathLength` | IfcRailing | Straight-line run-axis approximation (undercounts a curved/winder rail — see warnings) |
+| `HandrailContinuousSegments` | IfcRailing | 1 for an unbroken rail, >1 if a real gap (not just tessellation sparsity) is detected |
+| `HandrailMinBottomElevation` | IfcRailing | Underside elevation — useful for a bottom-gap/guard check |
+| `HandrailProfileLateral` / `HandrailProfileVertical` | IfcRailing | Coarse cross-section dimensions near mid-run |
+
+**v1 limitations**, named in each result's `warnings` list rather than
+silently guessed: winder/curved-flight per-position tread depth (inner /
+walking-line / outer) is not yet computed; guard baluster/post spacing and
+the configurable sphere-passing test are not yet computed.

@@ -102,6 +102,12 @@ except ImportError:
     _SEISMIC_AVAILABLE = False
 
 try:
+    from .ifc_stair import IFCStairEngine, stair_context
+    _STAIR_AVAILABLE = True
+except ImportError:
+    _STAIR_AVAILABLE = False
+
+try:
     from .ifc_quality.validator import IFCValidator
 
     _QUALITY_TOOLS_AVAILABLE = True
@@ -320,6 +326,65 @@ _SEISMIC_DETAIL_KEYS = {
     "has_dual_structural_supports": "restraint_detail",
 }
 
+#: Per-riser/tread/handrail/guard geometry produced by ifc_stair's mesh
+#: decomposition, never a Pset key: a Pset carries at most ONE nominal value
+#: for a whole flight (RiserHeight, TreadLength), while these are the WORST
+#: value across every individual step -- exactly the numbers a code check
+#: actually needs (a flight with one bad riser among twelve good ones still
+#: fails on that one riser).
+#:
+#: Value is either a plain field name (read off the element's own stair
+#: context -- a flight, landing, or railing) or a (nested_key, field) pair
+#: for whole-stairway aggregates nested under "stair_uniformity" (see
+#: ifc_stair.IFCStairEngine.get_stair_uniformity -- pools every flight of
+#: the same IfcStair, not just one).
+#: Keys deliberately carry NO unit suffix, matching how every other
+#: property_name in this file is written (RiserHeight, HandrailHeight,
+#: TreadLength, ...) -- unlike _SEISMIC_DERIVED_PROPERTIES' predicate-style
+#: keys (mass_kg, flexible_coupling_within_mm), which come from
+#: applies_when/exceptions predicates that spell their own unit in the key.
+#: A rule's `unit` column, not its property_name, states mm/deg/m2.
+_STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
+    # Per-flight: worst riser/going within THIS flight.
+    "minriserheight": "min_riser_mm",
+    "maxriserheight": "max_riser_mm",
+    "riserheightdifference": "riser_difference_mm",
+    "mintreaddepth": "min_going_mm",
+    "maxtreaddepth": "max_going_mm",
+    "treaddepthdifference": "going_difference_mm",
+    "goingdifference": "going_difference_mm",
+    "minclearstairwidth": "min_clear_width_mm",
+    "minclearwidth": "min_clear_width_mm",
+    "openriserdetected": "open_riser",
+    "openriser": "open_riser",
+    "totalflightrise": "total_rise_mm",
+    "totalflightrun": "total_run_mm",
+    "flightpitch": "pitch_deg",
+    "flightslopedlength": "sloped_length_mm",
+    "numberoftreadsdetected": "tread_count",
+    # Whole-stairway (every flight of the same IfcStair pooled together) --
+    # codes require riser/tread uniformity across the WHOLE stairway, not
+    # just within one flight.
+    "stairriserheightdifference": ("stair_uniformity", "riser_difference_mm"),
+    "stairtreaddepthdifference": ("stair_uniformity", "going_difference_mm"),
+    "stairflightcount": ("stair_uniformity", "flight_count"),
+    # Landing (IfcSlab, PredefinedType=LANDING). Deliberately named
+    # "LandingClearWidth", not "Width" -- see the Qto_SlabBaseQuantities
+    # landmine documented in docs/ifc-property-mapping.md.
+    "landingclearwidth": "clear_width_mm",
+    "landingclearlength": "clear_length_mm",
+    "landingcleararea": "clear_area_mm2",
+    # Handrail / guard (IfcRailing).
+    "handrailminheight": "min_height_mm",
+    "handrailmaxheight": "max_height_mm",
+    "handrailheightvariation": "top_elevation_variation_mm",
+    "handrailpathlength": "path_length_mm",
+    "handrailcontinuoussegments": "continuous_segments",
+    "handrailminbottomelevation": "min_bottom_elevation_mm",
+    "handrailprofilelateral": "profile_lateral_mm",
+    "handrailprofilevertical": "profile_vertical_mm",
+}
+
 
 class IFCReader:
     """Full IFC reader for Module 2 compliance extraction."""
@@ -333,6 +398,7 @@ class IFCReader:
         self.geometry_extractor: "IFCGeometryExtractor | None" = None
         self.spatial_adjacency: "IFCSpatialAdjacency | None" = None
         self.egress_graph: "IFCEgressGraph | None" = None
+        self.stair_engine: "IFCStairEngine | None" = None
         if self.file_path:
             self.load_ifc_file()
 
@@ -374,6 +440,10 @@ class IFCReader:
         if _EGRESS_AVAILABLE and self.spatial_adjacency is not None:
             self.egress_graph = IFCEgressGraph(
                 self.spatial_adjacency, geometry_extractor=self.geometry_extractor
+            ).build()
+        if _STAIR_AVAILABLE and self.geometry_extractor is not None:
+            self.stair_engine = IFCStairEngine(
+                self.ifc_file, self.geometry_extractor
             ).build()
         return self.ifc_file
 
@@ -910,6 +980,7 @@ class IFCReader:
         penetration: dict | None = None,
         support: dict | None = None,
         seismic: dict | None = None,
+        stair: dict | None = None,
         unit_scale_mm: float = 1.0,
     ) -> tuple[object, "str | None", dict]:
         """
@@ -1010,6 +1081,18 @@ class IFCReader:
             value, detail = self._seismic_derived_value(prop_key_name, seismic)
             if value is not None:
                 return value, "derived:seismic", detail
+        elif prop_key_name in _STAIR_DERIVED_PROPERTIES:
+            # Per-riser/tread/handrail/guard geometry: no Pset stores these,
+            # since a Pset carries only one nominal value for a whole flight
+            # (e.g. RiserHeight) while these are the WORST value across every
+            # individual step (MinRiserHeight, RiserHeightDifference, ...),
+            # resolved by ifc_stair's mesh decomposition. Falls through like
+            # the other derived routes: a model that also authors the plain
+            # Pset property (RiserHeight itself, not a derived min/max) still
+            # gets it from Pass 1 below.
+            value, detail = self._stair_derived_value(prop_key_name, stair)
+            if value is not None:
+                return value, "geometry:stair", detail
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -1271,6 +1354,12 @@ class IFCReader:
         # than re-read from the file for every pipe in it.
         _project_coefficient: tuple | None = None
         _mass_scale_kg: float | None = None
+        # Stair geometry: unlike the three traversals above, IFCStairEngine
+        # is already built once in load_ifc_file() (self.stair_engine), so
+        # there is no index to lazily construct here -- only the per-element
+        # context lookup is worth caching across rules targeting the same
+        # flight/landing/railing.
+        _stair_cache: dict[int, dict] = {}
 
         for rule_index, rule in enumerate(rules, start=1):
             rule_started_at = time.monotonic()
@@ -1331,6 +1420,10 @@ class IFCReader:
                 # the braces and reads the detailing flags off them, so it needs
                 # the same candidate scan even when no spacing rule asked for it.
                 _support_index = build_support_index(self.ifc_file)
+
+            needs_stair = _STAIR_AVAILABLE and self.stair_engine is not None and self._needs_stair_context(
+                prop_name, scope_predicate, resolved_exceptions
+            )
             logger.info(
                 "Rule extraction rule=%d/%d reference=%s target=%s property=%s pset=%s operator=%s fallback=%s",
                 rule_index,
@@ -1483,6 +1576,22 @@ class IFCReader:
                             seismic = {}
                         _seismic_cache[seis_id] = seismic
 
+                # Per-riser/tread/handrail/guard geometry, already analysed
+                # once for the whole model in load_ifc_file() -- only the
+                # per-element lookup is cached here, not a re-analysis.
+                stair = {}
+                if needs_stair:
+                    stair_id = el.id()
+                    if stair_id in _stair_cache:
+                        stair = _stair_cache[stair_id]
+                    else:
+                        try:
+                            stair = stair_context(el, self.stair_engine)
+                        except Exception as exc:
+                            logger.debug("Stair context failed for %s: %s", el, exc)
+                            stair = {}
+                        _stair_cache[stair_id] = stair
+
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
                     prop_name,
@@ -1494,6 +1603,7 @@ class IFCReader:
                     penetration=penetration,
                     support=support,
                     seismic=seismic,
+                    stair=stair,
                     unit_scale_mm=_unit_scale_mm,
                 )
 
@@ -1539,6 +1649,7 @@ class IFCReader:
                             penetration=penetration,
                             support=support,
                             seismic=seismic,
+                            stair=stair,
                             unit_scale_mm=_unit_scale_mm,
                         )
                     except Exception:
@@ -2530,6 +2641,12 @@ class IFCReader:
         }
     )
 
+    #: Property names produced by the stair geometry engine (``ifc_stair``),
+    #: matched the same way. v1 gates on property name only -- unlike the
+    #: three traversals above, no scope/waiver predicate yet references a
+    #: stair-derived property, so there is no predicate-key set to check.
+    _STAIR_PROPERTIES = frozenset(_STAIR_DERIVED_PROPERTIES)
+
     #: Operators marking a rule as a waiver *definition* rather than a
     #: requirement. Such a row states the condition under which some other rule
     #: is excused; on its own it asserts nothing about the model and has no
@@ -2657,6 +2774,40 @@ class IFCReader:
             if cls._SEISMIC_PREDICATE_KEYS & set(predicate or {}):
                 return True
         return False
+
+    @staticmethod
+    def _stair_derived_value(prop_key_name: str, stair: dict | None):
+        """Return (value, detail) for a stair-derived property, or (None, {}).
+
+        None means the geometry analysis could not answer -- no resolvable
+        mesh, fewer than two detected tread bands, or (for whole-stairway
+        properties) no sibling flights to aggregate. Never a guessed 0,
+        False, or empty list standing in for "not measured".
+        """
+        spec = _STAIR_DERIVED_PROPERTIES[prop_key_name]
+        context = stair or {}
+        if isinstance(spec, tuple):
+            nested_key, field = spec
+            value = (context.get(nested_key) or {}).get(field)
+        else:
+            value = context.get(spec)
+        if value is None:
+            return None, {}
+        return value, {"warnings": context.get("warnings") or []}
+
+    @classmethod
+    def _needs_stair_context(
+        cls, prop_name: str, scope: dict, exceptions: list[dict]
+    ) -> bool:
+        """Whether this rule needs the stair geometry engine for its elements.
+
+        Gated like the three traversals above -- ``IFCStairEngine`` meshes
+        and decomposes every flight/landing/railing once per model up front
+        (not per rule), but a rule that never asks for a stair-derived
+        property must not pay even that lookup cost.
+        """
+        normalized = str(prop_name or "").replace("_", "").replace(" ", "").lower()
+        return normalized in cls._STAIR_PROPERTIES
 
     @staticmethod
     def _decode_json_obj(value):
