@@ -63,7 +63,7 @@
 
   let sorted = $derived(
     [...filtered].sort((a, b) => {
-      let cmp = 0;
+      let cmp: number;
       if (sortField === "status") {
         cmp = (STATUS_ORDER[a.status ?? ""] ?? 3) - (STATUS_ORDER[b.status ?? ""] ?? 3);
       } else if (sortField === "actual") {
@@ -91,7 +91,7 @@
 
   $effect(() => {
     // Reset to page 1 whenever the search narrows the result set.
-    search;
+    void search;
     currentPage = 1;
   });
 </script>

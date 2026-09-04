@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount } from "svelte";
   import { router, push, replace } from "svelte-spa-router";
   import Sidebar from "./lib/components/Sidebar.svelte";
+  import AnalysisDomainTabs from "./lib/components/AnalysisDomainTabs.svelte";
+  import type { AnalysisDomainTab } from "./lib/components/AnalysisDomainTabs.svelte";
   import TopHeader from "./lib/components/TopHeader.svelte";
   import ProjectWizardModal from "./lib/components/ProjectWizardModal.svelte";
   import Toaster from "./lib/components/Toaster.svelte";
@@ -36,6 +38,10 @@
   // shareable links work. "/" maps to the dashboard; every other view's id
   // (e.g. "rules", "manual-rule-editor") is used verbatim as its path.
   let activeView = $derived(router.location === "/" ? "dashboard" : router.location.slice(1));
+  // "analyze" is a legacy alias for "piping"; both render AnalyzeView.
+  let auditDomain: AnalysisDomainTab = $derived(
+    activeView === "arch" ? "arch" : activeView === "seismic" ? "seismic" : "piping",
+  );
   let queryParams = $derived(new URLSearchParams(router.querystring || ""));
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
@@ -44,7 +50,6 @@
   let targetBcfArtifactId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
   let isGlobalWizardOpen = $state(false);
-  let documentsViewRef: DocumentsView = $state();
 
   let dbOk = $state(true);
   let dbBackend = $state("SUPABASE");
@@ -97,6 +102,9 @@
     elementGuid?: string | null,
     bcfArtifactId?: number | null,
   ): string {
+    // A one-shot builder for a URL string, never read reactively, so the
+    // plain built-in is correct here.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const params = new URLSearchParams();
     params.set("project_id", String(projectId));
     if (elementGuid) params.set("element_guid", elementGuid);
@@ -117,27 +125,16 @@
     return () => clearInterval(interval);
   });
 
-  async function handleSelectView(view: string) {
-    // "New Project" is an action, not a destination: it opens the wizard over
-    // whatever is on screen. Navigating would leave the sidebar highlighting
-    // a view that renders nothing once the modal is dismissed.
-    if (view === "newproject") {
-      isGlobalWizardOpen = true;
-      return;
-    }
-    // "New Rule Document Upload" mirrors that: land on the Documents view,
-    // then open its upload modal once it's actually mounted.
-    if (view === "newdocument") {
-      await push("/documents");
-      await tick();
-      documentsViewRef?.openUploadModal();
-      return;
-    }
+  function handleSelectView(view: string) {
     push(`/${view}`);
   }
 
-  function handleSelectProjectForAudit(projectId: number) {
-    push(buildTargetUrl("analyze", projectId));
+  // Routes to the audit view matching the project's own domain rather than
+  // always landing on Piping — a project created as Arch or Seismic used to
+  // open in AnalyzeView regardless, where it wouldn't even appear in the
+  // project picker (AnalyzeView only lists Piping/Seismic projects).
+  function handleSelectProjectForAudit(projectId: number, analysisType?: string | null) {
+    push(buildTargetUrl(viewForAnalysisDomain(analysisType), projectId));
   }
 
   function handleSelectProjectForViewer(
@@ -172,7 +169,6 @@
   <!-- Apple-Style Sidebar -->
   <Sidebar
     {activeView}
-    onSelectView={handleSelectView}
     mobileOpen={isMobileNavOpen}
     onCloseMobile={() => (isMobileNavOpen = false)}
   />
@@ -204,6 +200,7 @@
           <ProjectsView
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}
+            onOpenWizard={() => (isGlobalWizardOpen = true)}
           />
         {:else if activeView === "viewer"}
           <ViewerView
@@ -212,43 +209,34 @@
             initialBcfArtifactId={targetBcfArtifactId}
           />
         {:else if activeView === "documents"}
-          <DocumentsView
-            bind:this={documentsViewRef}
-            onNavigateToManualRuleEditor={() => push("/manual-rule-editor")}
-          />
+          <DocumentsView onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
         {:else if activeView === "extract"}
           <RuleExtractionView />
         {:else if activeView === "rules"}
           <RulesView />
         {:else if activeView === "manual-rule-editor"}
           <ManualRuleEditorView onBack={() => push("/rules")} />
-        {:else if activeView === "arch"}
-          <ArchAnalyzeView initialProjectId={targetProjectId} />
-        {:else if activeView === "piping"}
-          <!-- Keyed so moving between PIPING and SEISMIC remounts the view:
-             both routes share AnalyzeView, and without this the previous
-             route's results and filters survive the switch. -->
-          {#key activeView}
-            <AnalyzeView
-              activeCategory="Piping"
-              initialProjectId={targetProjectId}
-              onSelectProjectForViewer={handleSelectProjectForViewer}
-            />
-          {/key}
-        {:else if activeView === "seismic"}
-          {#key activeView}
-            <AnalyzeView
-              activeCategory="seismic"
-              initialProjectId={targetProjectId}
-              onSelectProjectForViewer={handleSelectProjectForViewer}
-            />
-          {/key}
-        {:else if activeView === "analyze"}
-          <AnalyzeView
-            activeCategory="Piping"
-            initialProjectId={targetProjectId}
-            onSelectProjectForViewer={handleSelectProjectForViewer}
-          />
+        {:else if activeView === "arch" || activeView === "piping" || activeView === "seismic" || activeView === "analyze"}
+          <!-- One "Compliance Audit" destination covers all three domains; the
+             tab strip is how you switch between them without a trip back to
+             the sidebar. "analyze" is a legacy alias for "piping". -->
+          <div class="space-y-5">
+            <AnalysisDomainTabs active={auditDomain} onSelect={(domain) => push(`/${domain}`)} />
+            {#if activeView === "arch"}
+              <ArchAnalyzeView initialProjectId={targetProjectId} />
+            {:else}
+              <!-- Keyed so moving between PIPING and SEISMIC remounts the view:
+                 both routes share AnalyzeView, and without this the previous
+                 route's results and filters survive the switch. -->
+              {#key activeView}
+                <AnalyzeView
+                  activeCategory={activeView === "seismic" ? "seismic" : "Piping"}
+                  initialProjectId={targetProjectId}
+                  onSelectProjectForViewer={handleSelectProjectForViewer}
+                />
+              {/key}
+            {/if}
+          </div>
         {:else if activeView === "workflow"}
           <WorkflowView initialProjectId={targetProjectId} onNavigate={handleSelectView} />
         {:else if activeView === "reports"}

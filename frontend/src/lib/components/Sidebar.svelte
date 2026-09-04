@@ -1,12 +1,9 @@
 <script lang="ts">
   import {
     LayoutDashboard,
-    Plus,
     FolderOpen,
     ScanEye,
     LayoutList,
-    Cpu,
-    Workflow,
     FileText,
     BookOpen,
     Sparkles,
@@ -17,7 +14,6 @@
     ChevronLeft,
     ChevronRight,
     RefreshCw,
-    Compass,
     Download,
     BookText,
   } from "lucide-svelte";
@@ -25,49 +21,33 @@
 
   interface Props {
     activeView?: string;
-    onSelectView: (view: string) => void;
     /** Drawer visibility below `md`. Above it the sidebar is always shown. */
     mobileOpen?: boolean;
     onCloseMobile?: () => void;
   }
 
-  let {
-    activeView = "dashboard",
-    onSelectView,
-    mobileOpen = false,
-    onCloseMobile = () => {},
-  }: Props = $props();
+  let { activeView = "dashboard", mobileOpen = false, onCloseMobile = () => {} }: Props = $props();
 
   let collapsed = $state(false);
 
-  // On a phone the sidebar is a drawer over the content, so choosing a
-  // destination should dismiss it; on desktop it stays put.
-  function handleSelect(view: string) {
-    onSelectView(view);
-    onCloseMobile();
-  }
-
-  // "New Project"/"New Rule Document Upload" are actions (they open a modal
-  // over whatever's on screen), not destinations — everything else navigates
-  // to a real hash route and renders as an <a>, so right-click/open-in-new-tab
-  // and screen-reader link semantics work like any other link on the page.
-  const ACTION_IDS = new Set(["newproject", "newdocument"]);
+  // Views that all fall under the single "Compliance Audit" destination —
+  // switching between them happens via the in-page domain tab strip
+  // (AnalysisDomainTabs), not a separate sidebar entry per domain.
+  const AUDIT_VIEW_IDS = new Set(["arch", "piping", "seismic", "analyze"]);
 
   const NAV_SECTIONS = [
     {
-      title: "Project Uploads",
+      title: "Projects",
       items: [
-        { id: "newproject", label: "New Project Upload", icon: Plus },
         { id: "projects", label: "Existing Projects", icon: FolderOpen },
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
         { id: "viewer", label: "3D Viewer", icon: ScanEye },
       ],
     },
     {
-      title: "Rule Document Uploads",
+      title: "Rule Library",
       items: [
-        { id: "newdocument", label: "New Rule Document Upload", icon: Plus },
-        { id: "documents", label: "Existing Rule Documents", icon: BookOpen },
+        { id: "documents", label: "Rule Documents", icon: BookOpen },
         { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
         { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
       ],
@@ -75,10 +55,7 @@
     {
       title: "Analysis",
       items: [
-        { id: "arch", label: "Architectural", icon: LayoutList },
-        { id: "piping", label: "Piping", icon: Cpu },
-        { id: "seismic", label: "Seismic", icon: Compass },
-        { id: "workflow", label: "Live Workflow", icon: Workflow },
+        { id: "arch", label: "Compliance Audit", icon: LayoutList },
         { id: "reports", label: "Reports & Exports", icon: FileText },
       ],
     },
@@ -179,50 +156,30 @@
         {/if}
 
         {#each section.items as item (item.id)}
-          {#if ACTION_IDS.has(item.id)}
-            <button
-              type="button"
-              onclick={() => handleSelect(item.id)}
-              class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
-              item.id
-                ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
-                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
-              title={collapsed ? item.label : undefined}
-            >
-              <item.icon
-                class="h-4 w-4 shrink-0 {activeView === item.id
-                  ? 'text-slate-50'
-                  : 'text-slate-400 group-hover:text-slate-200'}"
-              />
-              {#if !collapsed}
-                <span class="truncate text-left">{item.label}</span>
-              {/if}
-            </button>
-          {:else}
-            <a
-              href="/{item.id}"
-              use:link
-              onclick={onCloseMobile}
-              class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
-              item.id
-                ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
-                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
-              title={collapsed ? item.label : undefined}
-            >
-              <item.icon
-                class="h-4 w-4 shrink-0 {activeView === item.id
-                  ? 'text-slate-50'
-                  : 'text-slate-400 group-hover:text-slate-200'}"
-              />
-              {#if !collapsed}
-                <span class="truncate text-left">{item.label}</span>
-              {/if}
+          {@const isActive =
+            activeView === item.id || (item.id === "arch" && AUDIT_VIEW_IDS.has(activeView))}
+          <a
+            href="/{item.id}"
+            use:link
+            onclick={onCloseMobile}
+            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {isActive
+              ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
+              : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+            title={collapsed ? item.label : undefined}
+          >
+            <item.icon
+              class="h-4 w-4 shrink-0 {isActive
+                ? 'text-slate-50'
+                : 'text-slate-400 group-hover:text-slate-200'}"
+            />
+            {#if !collapsed}
+              <span class="truncate text-left">{item.label}</span>
+            {/if}
 
-              {#if collapsed && activeView === item.id}
-                <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r bg-white"></span>
-              {/if}
-            </a>
-          {/if}
+            {#if collapsed && isActive}
+              <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r bg-white"></span>
+            {/if}
+          </a>
         {/each}
       </div>
     {/each}

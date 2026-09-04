@@ -25,7 +25,7 @@
   import PageHeader from "../lib/components/PageHeader.svelte";
 
   interface Props {
-    onSelectProjectForAudit: (projectId: number) => void;
+    onSelectProjectForAudit: (projectId: number, analysisType?: string | null) => void;
     onSelectProjectForViewer: (projectId: number) => void;
     onOpenWizard: () => void;
     onNavigate: (view: string) => void;
@@ -371,7 +371,7 @@
 
                     <button
                       type="button"
-                      onclick={() => onSelectProjectForAudit(project.id)}
+                      onclick={() => onSelectProjectForAudit(project.id, project.analysis_type)}
                       class="rounded-lg bg-blue-600/20 px-2.5 py-1 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-600/30 hover:text-blue-300"
                     >
                       Audit

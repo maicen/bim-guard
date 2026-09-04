@@ -43,11 +43,12 @@
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
 
   interface Props {
-    onSelectProjectForAudit: (projectId: number) => void;
+    onSelectProjectForAudit: (projectId: number, analysisType?: string | null) => void;
     onSelectProjectForViewer: (projectId: number) => void;
+    onOpenWizard?: () => void;
   }
 
-  let { onSelectProjectForAudit, onSelectProjectForViewer }: Props = $props();
+  let { onSelectProjectForAudit, onSelectProjectForViewer, onOpenWizard }: Props = $props();
 
   // Initialize immediately from synchronous client cache for 0ms render time
   const initialCache = projectsApi.getCachedList();
@@ -211,7 +212,7 @@
       });
       await loadProjects(true);
       // Automatically navigate to audit for imported model
-      onSelectProjectForAudit(imported.id);
+      onSelectProjectForAudit(imported.id, imported.analysis_type);
     } catch (err: any) {
       error = err.message || "Failed to import model from GitHub repository.";
     } finally {
@@ -291,6 +292,17 @@
     icon={Box}
   >
     {#snippet actions()}
+      <div class="flex flex-wrap items-center gap-2.5">
+        {#if onOpenWizard}
+          <button
+            type="button"
+            onclick={onOpenWizard}
+            class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+          >
+            <Plus class="h-3.5 w-3.5" />
+            <span>New Project</span>
+          </button>
+        {/if}
       <div
         class="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-2"
       >
@@ -354,6 +366,7 @@
             <span>Sync Repo</span>
           </button>
         {/if}
+      </div>
       </div>
     {/snippet}
   </PageHeader>
@@ -587,7 +600,7 @@
 
                       <button
                         type="button"
-                        onclick={() => onSelectProjectForAudit(project.id)}
+                        onclick={() => onSelectProjectForAudit(project.id, project.analysis_type)}
                         class="rounded-lg bg-blue-600/20 px-2.5 py-1 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-600/30 hover:text-blue-300"
                       >
                         Audit
