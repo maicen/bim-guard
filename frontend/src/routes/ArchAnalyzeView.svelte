@@ -28,6 +28,7 @@
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
+  import { pipelineTracker } from "../lib/stores/activePipelines.svelte";
   import type {
     Project,
     ArchAnalysisResult,
@@ -178,6 +179,9 @@
     isRunning = true;
     error = "";
     bcfSaveMessage = "";
+    // Registers with the global pipeline tracker so a user who navigates away
+    // mid-run still sees progress in the header and gets a completion toast.
+    pipelineTracker.track(selectedProjectId, selectedProject?.name || `Project ${selectedProjectId}`);
     try {
       result = await analyzeApi.runArch(selectedProjectId, selectedFolder);
       if (result) {
@@ -194,6 +198,7 @@
       error = err.message || "Architectural compliance check failed.";
     } finally {
       isRunning = false;
+      pipelineTracker.untrack(selectedProjectId);
     }
   }
 

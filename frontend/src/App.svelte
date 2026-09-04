@@ -172,6 +172,10 @@
       {dbOk}
       {dbBackend}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
+      onOpenPipeline={(projectId) => {
+        targetProjectId = projectId;
+        activeView = "workflow";
+      }}
     />
 
     <!-- Viewport Container -->
