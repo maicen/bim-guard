@@ -372,7 +372,9 @@ def run_analysis(
             single kernel with nothing to select between.
 
     Returns:
-        An ``AnalysisResult``. An unknown slug, a missing project or an
+        An ``AnalysisResult``. Its ``cached`` field says how this particular
+        call was served: ``True`` when the result came from the store, ``False``
+        when the engines ran. An unknown slug, a missing project or an
         unreadable model all come back as a result carrying
         ``compliance_error`` — never as an exception.
     """
@@ -408,9 +410,14 @@ def run_analysis(
     )
 
     if use_cache:
-        cached = ANALYSIS_CACHE.get(key)
-        if cached is not None:
-            return cached
+        hit = ANALYSIS_CACHE.get(key)
+        if hit is not None:
+            # A shallow copy, not the stored dict: flagging the entry in place
+            # would make the next read of it report cached=True for a result
+            # that was never served from the cache before, and would leave the
+            # store holding a field that describes one delivery rather than the
+            # result. The copy is per-request; the entry stays flag-free.
+            return {**hit, "cached": True}
 
     # A cache hit returns above without reaching here, and deliberately without
     # touching the tracker: no engine ran, so reporting stages for one would
@@ -432,11 +439,14 @@ def run_analysis(
         ANALYSIS_CACHE.put(key, result)
 
     logger.info(
-        "Analysis computed project_id=%d slug=%s engines=%s issues=%d cached=%s",
+        "Analysis computed project_id=%d slug=%s engines=%s issues=%d ok=%s",
         project_id,
         slug,
         ",".join(engine_codes) or "-",
         len(result.get("audit_issues", [])),
         not result.get("compliance_error"),
     )
-    return result
+    # Copied for the same reason as the hit above, and after the put: what goes
+    # into the store carries no flag, so whether a result was served from the
+    # cache stays a property of the delivery rather than of the entry.
+    return {**result, "cached": False}
