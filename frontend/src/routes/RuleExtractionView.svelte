@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import {
     Sparkles,
     BookOpen,
@@ -44,7 +45,7 @@
   // scoped to a chosen clause rather than blindly sent as one document-sized
   // request (which can exceed the LLM provider's per-request size limit).
   let docSections: DocumentSection[] = $state([]);
-  let selectedSectionKeys: Set<string> = $state(new Set());
+  const selectedSectionKeys: Set<string> = new SvelteSet();
   let isLoadingSections = $state(false);
 
   function sectionKey(section: DocumentSection, index: number): string {
@@ -52,24 +53,23 @@
   }
 
   function toggleSection(key: string) {
-    const next = new Set(selectedSectionKeys);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    selectedSectionKeys = next;
+    if (selectedSectionKeys.has(key)) selectedSectionKeys.delete(key);
+    else selectedSectionKeys.add(key);
   }
 
   function selectAllSections() {
-    selectedSectionKeys = new Set(docSections.map((s, i) => sectionKey(s, i)));
+    selectedSectionKeys.clear();
+    for (const [i, s] of docSections.entries()) selectedSectionKeys.add(sectionKey(s, i));
   }
 
   function clearSectionSelection() {
-    selectedSectionKeys = new Set();
+    selectedSectionKeys.clear();
   }
 
   $effect(() => {
     const docId = selectedDocId;
     docSections = [];
-    selectedSectionKeys = new Set();
+    selectedSectionKeys.clear();
     if (!docId) return;
 
     isLoadingSections = true;
