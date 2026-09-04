@@ -561,6 +561,48 @@ function engineQuery(engines?: string[]): string {
   return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join("");
 }
 
+/** Severity bands a results page can be limited to. */
+export type IssueBand = "critical" | "high" | "medium" | "low";
+
+/**
+ * Order a results page is cut from.
+ *
+ * `band_then_score` is the default and matches the analyse table's own
+ * ordering — criticals first — with score then id as tiebreaks. `score_desc`
+ * ignores bands; `natural` keeps the run's own order, which is what an
+ * unpaginated response lists.
+ */
+export type IssueSort = "band_then_score" | "score_desc" | "natural";
+
+/**
+ * Optional server-side paging and filtering of `audit_issues`.
+ *
+ * Every field is optional and an empty object is the same as sending nothing,
+ * so a caller that does not paginate keeps the response it has today.
+ */
+export interface ResultPageQuery {
+  limit?: number;
+  offset?: number;
+  bands?: IssueBand[];
+  mechanisms?: string[];
+  includeDataQuality?: boolean;
+  sort?: IssueSort;
+}
+
+function pageQuery(page?: ResultPageQuery): string {
+  if (!page) return "";
+  const parts: string[] = [];
+  if (page.limit !== undefined) parts.push(`limit=${page.limit}`);
+  if (page.offset !== undefined) parts.push(`offset=${page.offset}`);
+  for (const band of page.bands ?? []) parts.push(`band=${encodeURIComponent(band)}`);
+  for (const code of page.mechanisms ?? []) parts.push(`mechanism=${encodeURIComponent(code)}`);
+  if (page.includeDataQuality !== undefined) {
+    parts.push(`include_data_quality=${page.includeDataQuality}`);
+  }
+  if (page.sort !== undefined) parts.push(`sort=${page.sort}`);
+  return parts.length ? `&${parts.join("&")}` : "";
+}
+
 /** True when a rejection is an aborted fetch rather than a real failure. */
 export function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
@@ -616,15 +658,25 @@ export const analyzeApi = {
     return handleResponse<AnalysisResult>(res);
   },
 
+  /**
+   * Fetch a stored or freshly computed run.
+   *
+   * `page` is optional and omitting it is the pre-pagination call: the whole
+   * run comes back and the response carries no `page` object. Passing any
+   * field narrows `audit_issues` only — `issue_stats` still describes the
+   * whole run, so a page of criticals reports the run's real totals rather
+   * than the window's.
+   */
   async getResults(
     projectId: number,
     slug: "corrosion" | "seismic" = "corrosion",
     useCache = true,
     engines?: string[],
     signal?: AbortSignal,
+    page?: ResultPageQuery,
   ): Promise<AnalysisResult> {
     const res = await fetch(
-      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}`,
+      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}`,
       { signal },
     );
     return handleResponse<AnalysisResult>(res);

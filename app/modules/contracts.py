@@ -819,6 +819,32 @@ class ComplianceSummaryContract(BaseModel):
     by_target: dict[str, Any] = Field(default_factory=dict)
 
 
+class ResultPageContract(BaseModel):
+    """Window description for a paginated ``audit_issues`` list.
+
+    Present only when the caller sent at least one pagination parameter. A
+    request with none returns the whole run and no ``page``, so a consumer
+    written before pagination existed sees an unchanged body.
+
+    ``total_matching`` counts the issues left after ``band``/``mechanism``/
+    ``include_data_quality`` filtering and before ``offset``/``limit``, which
+    is what a pager needs to size itself. It is deliberately unrelated to
+    ``issue_stats``, which always describes the whole run.
+    """
+
+    limit: Optional[int] = Field(
+        default=None, description="Page size requested; None when only filters were sent"
+    )
+    offset: int = Field(default=0, description="Issues skipped before the page")
+    returned: int = Field(default=0, description="Issues in this response")
+    total_matching: int = Field(
+        default=0, description="Issues matching the filters, before offset/limit"
+    )
+    has_more: bool = Field(
+        default=False, description="True when issues remain after this page"
+    )
+
+
 class AnalysisResultContract(BaseModel):
     """Composite analysis result returned by analysis runners."""
 
@@ -831,6 +857,13 @@ class AnalysisResultContract(BaseModel):
     compliance_error: Optional[str] = None
     compliance_is_demo: bool = False
     cached: bool = False
+    page: Optional[ResultPageContract] = Field(
+        default=None,
+        description=(
+            "Pagination window over audit_issues. Absent unless the request "
+            "carried a pagination parameter."
+        ),
+    )
     duration_seconds: Optional[float] = None
     elements_evaluated: Optional[int] = None
     unique_elements_evaluated: Optional[int] = None
