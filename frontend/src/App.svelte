@@ -238,7 +238,7 @@
             onSelectProjectForViewer={handleSelectProjectForViewer}
           />
         {:else if activeView === "workflow"}
-          <WorkflowView initialProjectId={targetProjectId} />
+          <WorkflowView initialProjectId={targetProjectId} onNavigate={handleSelectView} />
         {:else if activeView === "reports"}
           <ReportsView
             initialProjectId={targetProjectId}
