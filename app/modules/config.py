@@ -85,6 +85,14 @@ DOCLING_API_KEY = os.environ.get("DOCLING_API_KEY", "")
 # for the bim-guard app container talking to it over the compose network.
 DOCLING_LOCAL_URL = os.environ.get("DOCLING_LOCAL_URL", "")
 
+# ── Google Drive import ────────────────────────────────────────────────────
+# API-key-only access to publicly link-shared ("Anyone with the link") Drive
+# files via the Drive v3 REST API — see app/services/google_drive_service.py.
+# Deliberately distinct from GOOGLE_API_KEY above (that one is Gemini's) —
+# different concern, different key, same reasoning as the FEATURE_PATH_B_MM/
+# FEATURE_PATH_B_XM split below.
+GOOGLE_DRIVE_API_KEY = os.environ.get("GOOGLE_DRIVE_API_KEY", "")
+
 # ── Path B feature flags ─────────────────────────────────────────────────
 # Gate the MM-001 and XM-001 comparators independently. Both default OFF.
 #

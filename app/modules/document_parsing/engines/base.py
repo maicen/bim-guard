@@ -28,7 +28,7 @@ class ParsingEngine(Protocol):
     need to know it exists.
     """
 
-    def extract_bytes(self, content: bytes, filename: str) -> tuple[str, list[dict]]: ...
+    def extract_bytes(self, content: bytes, filename: str) -> tuple[str, list[dict], list[dict]]: ...
 
 
 @dataclass(frozen=True)

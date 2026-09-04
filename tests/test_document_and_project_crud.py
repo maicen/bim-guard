@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import io
+
 import pytest
 from starlette.testclient import TestClient
 
 from app.main import app
+from app.services.document_pages_service import DocumentPagesService
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
+from app.services.rule_draft_service import RuleDraftService
+from app.services.rules_service import RuleService
 
 
 @pytest.fixture(scope="module")
@@ -130,5 +135,89 @@ def test_document_create_and_link_with_doc_type() -> None:
         assert client_docs[0]["filename"] == "equipment_manual.pdf"
     finally:
         proj_service.delete_project(project_id)
+        doc_service.delete_document(doc_id)
+
+
+def _one_page_pdf_bytes(text: str) -> bytes:
+    """Build a minimal single-page PDF with reportlab, for page-tagged extraction tests."""
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer)
+    pdf.drawString(72, 720, text)
+    pdf.save()
+    return buffer.getvalue()
+
+
+def test_upload_stores_pages_and_serves_original_file(client: TestClient) -> None:
+    """Uploading a PDF persists page-tagged text and GET /api/documents/{id}/file streams the original bytes."""
+    doc_service = DocumentService()
+    pages_service = DocumentPagesService()
+    snippet = "Rule test snippet for page lookup"
+    pdf_bytes = _one_page_pdf_bytes(snippet)
+
+    row, created = doc_service.ingest_uploaded_bytes(
+        "test_pages.pdf", pdf_bytes, parser="light"
+    )
+    assert created is True
+    doc_id = row["id"]
+
+    try:
+        pages = pages_service.get_pages(doc_id)
+        assert len(pages) == 1
+        assert pages[0]["page_number"] == 1
+        assert snippet in pages[0]["text"]
+
+        response = client.get(f"/api/documents/{doc_id}/file")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content == pdf_bytes
+    finally:
+        doc_service.delete_document_with_file(doc_id)
+
+
+def test_promote_draft_carries_source_document_and_snippet() -> None:
+    """promote_draft() writes source_document_id/source_text onto the canonical rule."""
+    from app.modules.contracts import RuleCreateRequest, RuleDraftStatus, RuleExtractionDraft
+
+    doc_service = DocumentService()
+    doc = doc_service.create_document(
+        md5_hash="dummy-md5-for-promote-test",
+        filename="promote_source.txt",
+        file_path="uploads/promote_source.txt",
+        extracted_text="Doors shall have a clear width of at least 860 mm.",
+        doc_type="Code",
+    )
+    doc_id = doc["id"]
+
+    draft_service = RuleDraftService()
+    snippet = "Doors shall have a clear width of at least 860 mm."
+    draft = RuleExtractionDraft(
+        source_document_id=doc_id,
+        source_node_id="node-1",
+        source_snippet=snippet,
+        proposed_rule=RuleCreateRequest(
+            rule_id="REQ-TEST-PROMOTE-001",
+            description="Door clear width",
+            target_ifc_class="IfcDoor",
+            property_name="ClearWidth",
+            operator=">=",
+            check_value="860",
+        ),
+        status=RuleDraftStatus.accepted,
+    )
+    saved = draft_service.save_drafts([draft])[0]
+    draft_id = saved.id
+
+    rule_id = None
+    try:
+        created_rule = draft_service.promote_draft(draft_id)
+        rule_id = created_rule["id"]
+        assert created_rule["source_document_id"] == doc_id
+        assert created_rule["source_text"] == snippet
+    finally:
+        draft_service._drafts.delete(draft_id)
+        if rule_id is not None:
+            RuleService().delete_rule(rule_id)
         doc_service.delete_document(doc_id)
 

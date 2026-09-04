@@ -117,6 +117,10 @@ class DocumentService:
         logger.info("Document file stored filename=%s bytes=%d", filename, len(content))
         return storage_ref
 
+    def materialize_local_path(self, file_path: str):
+        """Resolve a stored file reference to a local path for streaming/serving."""
+        return self._storage.materialize_local_path(file_path)
+
     def update_document(
         self,
         document_id: int,
@@ -177,6 +181,86 @@ class DocumentService:
 
         self.delete_document(document_id)
 
+    def ingest_uploaded_bytes(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        doc_type: str = "Specification",
+        project_code: str = "",
+        originator: str = "",
+        suitability_code: str = "S0",
+        revision_code: str = "P01.01",
+        parser: str = "auto",
+        instance: dict | None = None,
+    ) -> tuple[dict, bool]:
+        """Extract, store, and persist an uploaded/imported document.
+
+        Shared by the multipart upload endpoint and the Google Drive import
+        endpoint — the only difference between those two entry points is how
+        `content` bytes were obtained. Dedupes by md5: a byte-identical
+        re-upload/re-import returns the existing row unchanged.
+
+        Returns:
+            row (dict): the document row (existing or newly created)
+            created (bool): False when an existing row was reused
+        """
+        from app.modules.document_parsing.iso_validator import ISO19650Validator
+        from app.utils import md5_hex
+
+        file_md5 = md5_hex(content)
+        existing = self.find_by_md5(file_md5)
+        if existing:
+            return existing, False
+
+        clean_doc_type = (doc_type or "").strip() or "Specification"
+
+        val = ISO19650Validator.validate_filename(filename)
+        if val.is_valid:
+            project_code = project_code or val.fields.get("project_code", "")
+            originator = originator or val.fields.get("originator", "")
+            suitability_code = (
+                suitability_code
+                if suitability_code != "S0"
+                else val.fields.get("suitability_code", "S0")
+            )
+            revision_code = (
+                revision_code
+                if revision_code != "P01.01"
+                else val.fields.get("revision_code", "P01.01")
+            )
+
+        try:
+            extracted_text, pages = self.extract_document_text_paged(
+                filename, content, parser=parser, instance=instance
+            )
+        except (ValueError, RuntimeError):
+            raise
+        except Exception as exc:
+            logger.warning("Document extraction failed filename=%s parser=%s error=%s", filename, parser, exc)
+            extracted_text, pages = f"[Text extraction error: {exc}]", []
+
+        file_path = self.store_document_file(filename, content)
+        created = self.create_document(
+            md5_hash=file_md5,
+            filename=filename,
+            file_path=file_path,
+            extracted_text=extracted_text,
+            doc_type=clean_doc_type,
+            project_code=project_code,
+            originator=originator,
+            suitability_code=suitability_code,
+            revision_code=revision_code,
+            cde_state="WIP",
+        )
+
+        if pages:
+            from app.services.document_pages_service import DocumentPagesService
+
+            DocumentPagesService().save_pages(created["id"], pages)
+
+        return created, True
+
     @staticmethod
     def extract_document_text(
         filename: str, content: bytes, parser: str = "auto", instance: dict | None = None
@@ -190,7 +274,22 @@ class DocumentService:
         container, or which hosted account) — see
         document_parsing/document_extractor.py.
         """
+        text, _pages = DocumentService.extract_document_text_paged(
+            filename, content, parser=parser, instance=instance
+        )
+        return text
+
+    @staticmethod
+    def extract_document_text_paged(
+        filename: str, content: bytes, parser: str = "auto", instance: dict | None = None
+    ) -> tuple[str, list[dict]]:
+        """Extract text and page-tagged text, like `extract_document_text` plus pages.
+
+        See document_parsing/document_extractor.py for the `pages` shape
+        ([{"page_number": int, "text": str}, ...], empty for pageless
+        formats or engines that don't report page numbers).
+        """
         from app.modules.document_parsing.document_extractor import extract_document_text
 
-        text, _tables = extract_document_text(filename, content, parser=parser, instance=instance)
-        return text
+        text, _tables, pages = extract_document_text(filename, content, parser=parser, instance=instance)
+        return text, pages

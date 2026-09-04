@@ -133,7 +133,9 @@ class RuleExtractionService:
             except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                 logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
                 continue
-            drafts.extend(node_drafts)
+            drafts.extend(
+                draft.model_copy(update={"source_snippet": node.text}) for draft in node_drafts
+            )
 
         saved_drafts = RuleDraftService().save_drafts(drafts)
         logger.info(

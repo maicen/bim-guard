@@ -394,6 +394,34 @@ class DocumentDetailResponse(BaseModel):
     cde_state: CDEState = CDEState.WIP
 
 
+class GoogleDriveImportRequest(BaseModel):
+    """Payload for importing one or more documents from Google Drive share links."""
+
+    urls: list[str] = Field(..., min_length=1, description="Google Drive file URLs or bare file IDs")
+    doc_type: Optional[str] = Field(default="Specification", description="Document type applied to every import")
+    project_code: Optional[str] = Field(default="", description="ISO 19650 Project Code")
+    originator: Optional[str] = Field(default="", description="ISO 19650 Originator Code")
+    suitability_code: Optional[str] = Field(default="S0", description="ISO 19650 Suitability Code")
+    revision_code: Optional[str] = Field(default="P01.01", description="ISO 19650 Revision Code")
+    parser: Optional[str] = Field(default="auto", description="Extraction parser: auto | unstructured | light")
+    engine_instance: Optional[str] = Field(default="", description="Named parsing engine instance to use")
+
+
+class GoogleDriveImportResult(BaseModel):
+    """Per-URL outcome of a Google Drive import batch."""
+
+    url: str
+    ok: bool
+    document: Optional[DocumentDetailResponse] = None
+    error: Optional[str] = None
+
+
+class GoogleDriveImportResponse(BaseModel):
+    """Result of importing a batch of Google Drive share links."""
+
+    results: list[GoogleDriveImportResult] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # LlamaIndex Document Ingestion Contracts
 # ---------------------------------------------------------------------------
@@ -504,6 +532,9 @@ class RuleResponse(BaseModel):
     rule_id: Optional[str] = None
     description: Optional[str] = None
     source_text: Optional[str] = None
+    source_document_id: Optional[int] = Field(
+        default=None, description="FK to documents.id — the document this rule was extracted from, when known"
+    )
     mechanism: Optional[str] = None
     ruleset_id: Optional[str] = None
     rule_category: Optional[str] = None
@@ -548,6 +579,9 @@ class RuleExtractionDraft(BaseModel):
     id: Optional[int] = None
     source_document_id: int
     source_node_id: Optional[str] = Field(default=None, description="Links back to DocumentNodeContract.node_id")
+    source_snippet: Optional[str] = Field(
+        default=None, description="The originating node's text, carried forward for promotion into rules.source_text"
+    )
     clause: Optional[ClauseMetadata] = None
     proposed_rule: RuleCreateRequest
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
@@ -563,6 +597,17 @@ class RuleExtractionDraftListResponse(BaseModel):
     """List of extraction drafts for a document."""
 
     drafts: list[RuleExtractionDraft]
+
+
+class RuleSourceResponse(BaseModel):
+    """Resolved document-viewer target for a rule's source annotation."""
+
+    document_id: int
+    filename: str
+    page_number: Optional[int] = Field(
+        default=None, description="Best-matching page for the rule's source_text, when the document has page-tagged text"
+    )
+    snippet: str = Field(default="", description="The rule's source_text, for text-layer highlighting")
 
 
 class RuleDraftReviewRequest(BaseModel):

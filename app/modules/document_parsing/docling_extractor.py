@@ -28,7 +28,7 @@ Usage:
     # Local docling-serve container, no API key required
     extractor = DoclingExtractor(kind="docling-local", api_url="http://localhost:5001")
 
-    text, tables = extractor.extract("data/input_docs/BuildingCode_Part9.pdf")
+    text, tables, pages = extractor.extract("data/input_docs/BuildingCode_Part9.pdf")
 """
 
 from io import BytesIO
@@ -95,7 +95,7 @@ class DoclingExtractor:
 
     def extract(self, file_path: str | Path, filename: str | None = None) -> tuple:
         """
-        Extract text and tables from a document on disk.
+        Extract text, tables, and page-tagged text from a document on disk.
 
         Args:
             file_path (str | Path): path to the document
@@ -106,6 +106,7 @@ class DoclingExtractor:
         Returns:
             text   (str)
             tables (list[dict])
+            pages  (list[dict]): [{"page_number": int, "text": str}, ...]
         """
         path = Path(file_path)
         if not path.exists():
@@ -113,18 +114,18 @@ class DoclingExtractor:
 
         with self._client_cls(url=self.api_url, api_key=self.api_key) as client:
             result = client.convert(source=path)
-        return self._result_to_text_and_tables(result, filename or path.name)
+        return self._result_to_text_tables_pages(result, filename or path.name)
 
     def extract_bytes(self, content: bytes, filename: str) -> tuple:
-        """Extract text and tables from raw file bytes via the hosted service."""
+        """Extract text, tables, and page-tagged text from raw file bytes via the hosted service."""
         from docling_core.types.io import DocumentStream
 
         stream = DocumentStream(name=filename, stream=BytesIO(content))
         with self._client_cls(url=self.api_url, api_key=self.api_key) as client:
             result = client.convert(source=stream)
-        return self._result_to_text_and_tables(result, filename)
+        return self._result_to_text_tables_pages(result, filename)
 
-    def _result_to_text_and_tables(self, result, filename: str) -> tuple:
+    def _result_to_text_tables_pages(self, result, filename: str) -> tuple:
         document = result.document
         text = document.export_to_markdown()
 
@@ -141,5 +142,33 @@ class DoclingExtractor:
                     }
                 )
 
-        print(f"[DoclingExtractor] Done — {len(text):,} chars, {len(tables)} tables ({filename})")
-        return text, tables
+        pages = self._pages_from_document(document)
+
+        print(
+            f"[DoclingExtractor] Done — {len(text):,} chars, {len(tables)} tables, "
+            f"{len(pages)} pages ({filename})"
+        )
+        return text, tables, pages
+
+    @staticmethod
+    def _pages_from_document(document) -> list[dict]:
+        """Group DoclingDocument text items by their provenance page number.
+
+        Each `TextItem.prov` entry carries the source page number Docling's
+        layout model already computed — this just groups by it instead of
+        letting it get discarded at `export_to_markdown()`.
+        """
+        pages_text: dict[int, list[str]] = {}
+        for item in document.texts:
+            item_text = (item.text or "").strip()
+            if not item_text or not item.prov:
+                continue
+            page_no = item.prov[0].page_no
+            if page_no is None:
+                continue
+            pages_text.setdefault(page_no, []).append(item_text)
+
+        return [
+            {"page_number": page_no, "text": "\n\n".join(parts)}
+            for page_no, parts in sorted(pages_text.items())
+        ]

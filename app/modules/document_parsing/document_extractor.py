@@ -29,9 +29,9 @@ behavior.
 
 Usage:
     from document_parsing.document_extractor import extract_document_text
-    text, tables = extract_document_text("code.pdf", file_bytes)                # auto
-    text, tables = extract_document_text("code.pdf", file_bytes, parser="light")
-    text, tables = extract_document_text(
+    text, tables, pages = extract_document_text("code.pdf", file_bytes)                # auto
+    text, tables, pages = extract_document_text("code.pdf", file_bytes, parser="light")
+    text, tables, pages = extract_document_text(
         "code.pdf", file_bytes, parser="unstructured", instance=resolved_instance
     )
 """
@@ -92,6 +92,9 @@ def extract_document_text(
     Returns:
         text   (str)
         tables (list[dict])
+        pages  (list[dict]): [{"page_number": int, "text": str}, ...] — empty
+                              for pageless formats (CSV/TXT/MD) or when the
+                              engine/extractor doesn't report page numbers.
     """
     if parser not in VALID_PARSERS:
         raise ValueError(f"Unknown parser '{parser}'. Expected one of {sorted(VALID_PARSERS)}.")
@@ -100,7 +103,8 @@ def extract_document_text(
     from app.modules.document_parsing.light_extractor import LightExtractor
 
     if parser == PARSER_LIGHT:
-        return LightExtractor().extract(filename, content), []
+        text, pages = LightExtractor().extract_paged(filename, content)
+        return text, [], pages
 
     have_engine = bool(instance) or bool(UNSTRUCTURED_API_KEY)
 
@@ -112,9 +116,9 @@ def extract_document_text(
     if have_engine:
         try:
             extractor = _build_extractor(instance)
-            text, tables = extractor.extract_bytes(content, filename)
+            text, tables, pages = extractor.extract_bytes(content, filename)
             if text.strip():
-                return text, tables
+                return text, tables, pages
             logger.warning(
                 "Structured extraction returned empty text filename=%s instance=%s",
                 filename,
@@ -134,4 +138,5 @@ def extract_document_text(
             "No parsing engine instance configured — using light extractor for filename=%s", filename
         )
 
-    return LightExtractor().extract(filename, content), []
+    text, pages = LightExtractor().extract_paged(filename, content)
+    return text, [], pages

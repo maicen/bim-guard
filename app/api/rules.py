@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Optional
 
 from fastapi import (
@@ -36,6 +37,7 @@ from app.modules.contracts import (
     RuleResponse,
     RuleSnapshotCreateRequest,
     RuleSnapshotResponse,
+    RuleSourceResponse,
     RuleUpdateRequest,
 )
 from app.services.rule_extraction_service import RuleExtractionService
@@ -559,6 +561,89 @@ def get_rule(
             detail=f"Rule with ID {rule_id} not found.",
         )
     return _rule_response(rule)
+
+
+def _normalize_for_match(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip().lower()
+
+
+def _find_best_matching_page(pages: list[dict], snippet: str) -> Optional[int]:
+    """Resolve which page's text a rule's source snippet lives on.
+
+    Whitespace-normalized substring match first (the common case — the
+    snippet is a contiguous quote from one page); falls back to the page
+    with the highest word-overlap ratio when no page contains it verbatim
+    (e.g. the snippet spans a page break, or minor OCR/whitespace drift).
+    """
+    norm_snippet = _normalize_for_match(snippet)
+    if not norm_snippet or not pages:
+        return None
+
+    for page in pages:
+        if norm_snippet in _normalize_for_match(page.get("text", "")):
+            return page.get("page_number")
+
+    snippet_words = set(norm_snippet.split())
+    if not snippet_words:
+        return None
+
+    best_page, best_score = None, 0.0
+    for page in pages:
+        page_words = set(_normalize_for_match(page.get("text", "")).split())
+        if not page_words:
+            continue
+        overlap = len(snippet_words & page_words) / len(snippet_words)
+        if overlap > best_score:
+            best_score, best_page = overlap, page.get("page_number")
+
+    return best_page if best_score > 0.3 else None
+
+
+@router.get(
+    "/{rule_id}/source",
+    response_model=RuleSourceResponse,
+    summary="Resolve a rule's source document/page for document-viewer annotation",
+)
+def get_rule_source(
+    rule_id: int,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleSourceResponse:
+    """Resolve a rule's `source_document_id` + `source_text` into a viewer target.
+
+    404s when the rule has no source document (manually-authored rules,
+    or rules created before this linkage existed).
+    """
+    rule = service.get_rule(rule_id)
+    if not rule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Rule with ID {rule_id} not found.")
+
+    document_id = rule.get("source_document_id")
+    if not document_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Rule {rule_id} has no source document.",
+        )
+
+    from app.services.document_pages_service import DocumentPagesService
+    from app.services.documents_service import DocumentService
+
+    doc = DocumentService().get_document(int(document_id))
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Source document {document_id} for rule {rule_id} no longer exists.",
+        )
+
+    snippet = rule.get("source_text") or ""
+    pages = DocumentPagesService().get_pages(int(document_id))
+    page_number = _find_best_matching_page(pages, snippet)
+
+    return RuleSourceResponse(
+        document_id=int(document_id),
+        filename=doc.get("filename", "document"),
+        page_number=page_number,
+        snippet=snippet,
+    )
 
 
 @router.post(

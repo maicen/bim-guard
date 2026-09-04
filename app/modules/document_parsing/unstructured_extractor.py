@@ -46,7 +46,7 @@ Usage:
     # Local Docker container
     extractor = UnstructuredExtractor(kind="local", api_url="http://localhost:8001")
 
-    text, tables = extractor.extract("data/input_docs/BuildingCode_Part9.pdf")
+    text, tables, pages = extractor.extract("data/input_docs/BuildingCode_Part9.pdf")
 """
 
 import io
@@ -148,6 +148,7 @@ class UnstructuredExtractor:
         Returns:
             text   (str):        elements' text, concatenated in reading order
             tables (list[dict]): each table as a dict with a DataFrame
+            pages  (list[dict]): [{"page_number": int, "text": str}, ...]
         """
         path = Path(file_path)
         if not path.exists():
@@ -157,12 +158,12 @@ class UnstructuredExtractor:
         return self.extract_bytes(content, filename or path.name)
 
     def extract_bytes(self, content: bytes, filename: str) -> tuple:
-        """Extract text and tables from raw file bytes."""
+        """Extract text, tables, and page-tagged text from raw file bytes."""
         if self.kind == KIND_LOCAL:
             elements = self._partition_local(content, filename)
         else:
             elements = self._run_hosted_workflow(content, filename)
-        return self._elements_to_text_and_tables(elements, filename)
+        return self._elements_to_text_tables_pages(elements, filename)
 
     def _partition_local(self, content: bytes, filename: str) -> list:
         """Partition a file synchronously via a self-hosted server's classic endpoint."""
@@ -200,14 +201,16 @@ class UnstructuredExtractor:
         return self._wait_for_elements(job_id)
 
     @staticmethod
-    def _elements_to_text_and_tables(elements: list, filename: str) -> tuple:
+    def _elements_to_text_tables_pages(elements: list, filename: str) -> tuple:
         text_parts: list[str] = []
         tables: list[dict] = []
+        pages_text: dict[int, list[str]] = {}
         for element in elements:
             el_type = element.get("type", "")
             el_text = (element.get("text") or "").strip()
             metadata = element.get("metadata") or {}
             html_table = metadata.get("text_as_html")
+            page_number = metadata.get("page_number")
 
             if el_type == "Table" and html_table:
                 dataframe = UnstructuredExtractor._table_html_to_dataframe(html_table)
@@ -227,9 +230,19 @@ class UnstructuredExtractor:
             elif el_text:
                 text_parts.append(el_text)
 
+            if el_text and page_number is not None:
+                pages_text.setdefault(int(page_number), []).append(el_text)
+
         text = "\n\n".join(text_parts)
-        print(f"[UnstructuredExtractor] Done — {len(text):,} chars, {len(tables)} tables ({filename})")
-        return text, tables
+        pages = [
+            {"page_number": page_no, "text": "\n\n".join(parts)}
+            for page_no, parts in sorted(pages_text.items())
+        ]
+        print(
+            f"[UnstructuredExtractor] Done — {len(text):,} chars, {len(tables)} tables, "
+            f"{len(pages)} pages ({filename})"
+        )
+        return text, tables, pages
 
     def _ensure_workflow(self) -> str:
         """Look up the shared partition-only workflow, creating it on first use."""

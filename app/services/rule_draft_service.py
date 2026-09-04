@@ -35,6 +35,7 @@ class RuleDraftService:
                     "id": int,
                     "source_document_id": int,
                     "source_node_id": str,
+                    "source_snippet": str,
                     "clause": dict,
                     "proposed_rule": dict,
                     "confidence": float,
@@ -58,6 +59,7 @@ class RuleDraftService:
                 {
                     "source_document_id": draft.source_document_id,
                     "source_node_id": draft.source_node_id or "",
+                    "source_snippet": draft.source_snippet or "",
                     "clause": draft.clause.model_dump() if draft.clause else None,
                     "proposed_rule": draft.proposed_rule.model_dump(),
                     "confidence": draft.confidence,
@@ -124,7 +126,8 @@ class RuleDraftService:
         created = self._rule_service.create_rule(
             rule_id=payload.rule_id,
             description=payload.description or "",
-            source_text="",
+            source_text=row.get("source_snippet") or "",
+            source_document_id=row.get("source_document_id"),
             property_set=payload.property_set or "",
             property_name=payload.property_name or "",
             operator=payload.operator or "==",

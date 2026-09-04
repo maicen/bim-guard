@@ -22,38 +22,52 @@ class LightExtractor:
 
     def extract(self, filename: str, content: bytes) -> str:
         """Extract plain text from file bytes, dispatching on file extension."""
+        text, _pages = self.extract_paged(filename, content)
+        return text
+
+    def extract_paged(self, filename: str, content: bytes) -> tuple[str, list[dict]]:
+        """Extract plain text and, for PDFs, page-tagged text.
+
+        Returns:
+            text  (str)
+            pages (list[dict]): [{"page_number": int, "text": str}, ...] —
+                                 only populated for .pdf (the only format here
+                                 with a native, reliable page concept).
+        """
         if not content:
-            return ""
+            return "", []
 
         suffix = Path(filename).suffix.lower()
         try:
             if suffix == ".pdf":
                 return self._extract_pdf(content)
             if suffix == ".docx":
-                return self._extract_docx(content)
+                return self._extract_docx(content), []
             if suffix in (".xlsx", ".xlsm"):
-                return self._extract_xlsx(content)
+                return self._extract_xlsx(content), []
             if suffix == ".csv":
-                return self._extract_csv(content)
+                return self._extract_csv(content), []
         except Exception:
-            return ""
+            return "", []
 
         # .md, .txt, and any other text-like format
-        return content.decode("utf-8", errors="replace")
+        return content.decode("utf-8", errors="replace"), []
 
-    def _extract_pdf(self, content: bytes) -> str:
+    def _extract_pdf(self, content: bytes) -> tuple[str, list[dict]]:
         from pypdf import PdfReader
 
         try:
             reader = PdfReader(io.BytesIO(content))
         except Exception:
-            return ""
+            return "", []
         parts = []
-        for page in reader.pages:
+        pages = []
+        for page_index, page in enumerate(reader.pages, start=1):
             page_text = (page.extract_text() or "").strip()
             if page_text:
                 parts.append(page_text)
-        return "\n\n".join(parts)
+                pages.append({"page_number": page_index, "text": page_text})
+        return "\n\n".join(parts), pages
 
     def _extract_docx(self, content: bytes) -> str:
         from docx import Document

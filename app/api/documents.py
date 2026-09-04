@@ -1,5 +1,6 @@
 """FastAPI router for document management and text extraction."""
 
+import mimetypes
 from typing import Annotated
 
 from fastapi import (
@@ -14,6 +15,7 @@ from fastapi import (
     status,
 )
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
 
 from app.api.dependencies import get_documents_service, get_parsing_engine_instances_service
 from app.logging_config import get_logger
@@ -22,13 +24,16 @@ from app.modules.contracts import (
     DocumentIngestResponse,
     DocumentResponse,
     DocumentUpdateRequest,
+    GoogleDriveImportRequest,
+    GoogleDriveImportResponse,
+    GoogleDriveImportResult,
     RuleExtractionDraft,
     RuleExtractionDraftListResponse,
 )
 from app.services.documents_service import DocumentService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.rule_extraction_service import RuleExtractionService
-from app.utils import md5_hex, safe_upload_name, validate_document_upload
+from app.utils import safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
 
@@ -115,6 +120,83 @@ def get_document(
     )
 
 
+@router.get("/{document_id}/file", summary="Download/stream the original uploaded document file")
+def get_document_file(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> FileResponse:
+    """Stream the original uploaded file bytes for the document viewer.
+
+    Resolves `documents.file_path` via `ObjectStorage.materialize_local_path`
+    — the same resolution path already used for re-extraction — so this
+    works whether the file lives in Supabase Storage, on disk, or at a
+    cached http(s) URL.
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    file_path = doc.get("file_path")
+    if not file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {document_id} has no stored file.",
+        )
+
+    local_path = service.materialize_local_path(file_path)
+    if local_path is None or not local_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stored file for document {document_id} could not be resolved.",
+        )
+
+    filename = doc.get("filename") or local_path.name
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return FileResponse(path=local_path, media_type=media_type, filename=filename)
+
+
+def _row_to_detail_response(row: dict) -> DocumentDetailResponse:
+    """Build a DocumentDetailResponse from a `documents` row dict."""
+    text = row.get("extracted_text") or ""
+    return DocumentDetailResponse(
+        id=row["id"],
+        filename=row.get("filename", "document"),
+        doc_type=row.get("doc_type") or "Specification",
+        file_path=row.get("file_path"),
+        upload_date=row.get("upload_date"),
+        extracted_text=text,
+        char_count=len(text),
+        project_code=row.get("project_code", ""),
+        originator=row.get("originator", ""),
+        volume_system=row.get("volume_system", ""),
+        level=row.get("level", ""),
+        type=row.get("type", ""),
+        role=row.get("role", ""),
+        number=row.get("number", ""),
+        suitability_code=row.get("suitability_code", "S0"),
+        revision_code=row.get("revision_code", "P01.01"),
+        cde_state=row.get("cde_state") or "WIP",
+    )
+
+
+def _resolve_parsing_instance(
+    engine_instance: str,
+    instances_service: ParsingEngineInstancesService,
+) -> dict | None:
+    clean_instance_name = (engine_instance or "").strip()
+    if clean_instance_name:
+        resolved = instances_service.get_by_name(clean_instance_name)
+        if not resolved:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Parsing engine instance '{clean_instance_name}' is not configured.",
+            )
+        return resolved
+    return instances_service.get_default()
+
+
 @router.post("", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Upload document")
 async def upload_document(
     file: UploadFile = File(...),
@@ -150,17 +232,7 @@ async def upload_document(
 
         instances_service = get_container().parsing_engine_instances_service
 
-    resolved_instance = None
-    clean_instance_name = (engine_instance or "").strip()
-    if clean_instance_name:
-        resolved_instance = instances_service.get_by_name(clean_instance_name)
-        if not resolved_instance:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Parsing engine instance '{clean_instance_name}' is not configured.",
-            )
-    else:
-        resolved_instance = instances_service.get_default()
+    resolved_instance = _resolve_parsing_instance(engine_instance, instances_service)
 
     content = await file.read()
     if not content:
@@ -172,87 +244,85 @@ async def upload_document(
     if error_msg:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
 
-    clean_doc_type = (doc_type or "").strip() or "Specification"
-    file_md5 = md5_hex(content)
-
-    # Auto-extract ISO 19650 container metadata from filename if valid
-    from app.modules.document_parsing.iso_validator import ISO19650Validator
-    val = ISO19650Validator.validate_filename(clean_filename)
-    if val.is_valid:
-        project_code = project_code or val.fields.get("project_code", "")
-        originator = originator or val.fields.get("originator", "")
-        suitability_code = suitability_code if suitability_code != "S0" else val.fields.get("suitability_code", "S0")
-        revision_code = revision_code if revision_code != "P01.01" else val.fields.get("revision_code", "P01.01")
-
-    existing = service.find_by_md5(file_md5)
-    if existing:
-        text = existing.get("extracted_text") or ""
-        return DocumentDetailResponse(
-            id=existing["id"],
-            filename=existing.get("filename", clean_filename),
-            doc_type=existing.get("doc_type") or clean_doc_type,
-            file_path=existing.get("file_path"),
-            upload_date=existing.get("upload_date"),
-            extracted_text=text,
-            char_count=len(text),
-            project_code=existing.get("project_code", project_code),
-            originator=existing.get("originator", originator),
-            volume_system=existing.get("volume_system", ""),
-            level=existing.get("level", ""),
-            type=existing.get("type", ""),
-            role=existing.get("role", ""),
-            number=existing.get("number", ""),
-            suitability_code=existing.get("suitability_code", suitability_code),
-            revision_code=existing.get("revision_code", revision_code),
-            cde_state=existing.get("cde_state") or "WIP",
-        )
-
     clean_parser = (parser or "auto").strip().lower()
     try:
         # The Unstructured path runs an async job under the hood (several to
         # tens of seconds) — offload to a worker thread so it doesn't block
         # the event loop for every other in-flight request.
-        extracted_text = await run_in_threadpool(
-            service.extract_document_text,
+        row, _created = await run_in_threadpool(
+            service.ingest_uploaded_bytes,
             clean_filename,
             content,
+            doc_type=doc_type,
+            project_code=project_code,
+            originator=originator,
+            suitability_code=suitability_code,
+            revision_code=revision_code,
             parser=clean_parser,
             instance=resolved_instance,
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except Exception as exc:
-        logger.warning("Document extraction failed filename=%s parser=%s error=%s", clean_filename, clean_parser, exc)
-        extracted_text = f"[Text extraction error: {exc}]"
 
-    file_path = service.store_document_file(clean_filename, content)
-    created = service.create_document(
-        md5_hash=file_md5,
-        filename=clean_filename,
-        file_path=file_path,
-        extracted_text=extracted_text,
-        doc_type=clean_doc_type,
-        project_code=project_code,
-        originator=originator,
-        suitability_code=suitability_code,
-        revision_code=revision_code,
-        cde_state="WIP",
-    )
+    return _row_to_detail_response(row)
 
-    return DocumentDetailResponse(
-        id=created["id"],
-        filename=clean_filename,
-        doc_type=created.get("doc_type") or clean_doc_type,
-        file_path=file_path,
-        upload_date=created.get("upload_date"),
-        extracted_text=extracted_text,
-        char_count=len(extracted_text),
-        project_code=project_code,
-        originator=originator,
-        suitability_code=suitability_code,
-        revision_code=revision_code,
-        cde_state="WIP",
-    )
+
+@router.post(
+    "/import/google-drive",
+    response_model=GoogleDriveImportResponse,
+    summary="Import one or more documents from Google Drive share links",
+)
+async def import_from_google_drive(
+    payload: GoogleDriveImportRequest,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    instances_service: Annotated[
+        ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)
+    ],
+) -> GoogleDriveImportResponse:
+    """Fetch one or more publicly link-shared Google Drive files and ingest them.
+
+    Uses a Google API key (GOOGLE_DRIVE_API_KEY) against the Drive v3 REST
+    API — works only for files shared "Anyone with the link"; a private file
+    fails with a clear per-URL error rather than aborting the whole batch.
+    Each fetched file runs through the same extract/store/create path as a
+    regular upload (`DocumentService.ingest_uploaded_bytes`).
+    """
+    from app.services.google_drive_service import GoogleDriveError, GoogleDriveService
+
+    resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", instances_service)
+    drive = GoogleDriveService()
+
+    results: list[GoogleDriveImportResult] = []
+    for url in payload.urls:
+        try:
+            filename, _mimetype, content = await run_in_threadpool(drive.fetch, url)
+            clean_filename = safe_upload_name(filename)
+            error_msg = validate_document_upload(clean_filename, _mimetype, content)
+            if error_msg:
+                results.append(GoogleDriveImportResult(url=url, ok=False, error=error_msg))
+                continue
+
+            row, _created = await run_in_threadpool(
+                service.ingest_uploaded_bytes,
+                clean_filename,
+                content,
+                doc_type=payload.doc_type or "Specification",
+                project_code=payload.project_code or "",
+                originator=payload.originator or "",
+                suitability_code=payload.suitability_code or "S0",
+                revision_code=payload.revision_code or "P01.01",
+                parser=(payload.parser or "auto").strip().lower(),
+                instance=resolved_instance,
+            )
+            results.append(GoogleDriveImportResult(url=url, ok=True, document=_row_to_detail_response(row)))
+        except (GoogleDriveError, ValueError, RuntimeError) as exc:
+            logger.warning("Google Drive import failed url=%s error=%s", url, exc)
+            results.append(GoogleDriveImportResult(url=url, ok=False, error=str(exc)))
+        except Exception as exc:  # noqa: BLE001 - one bad link must not abort the batch
+            logger.exception("Google Drive import failed unexpectedly url=%s", url)
+            results.append(GoogleDriveImportResult(url=url, ok=False, error=str(exc)))
+
+    return GoogleDriveImportResponse(results=results)
 
 
 @router.put("/{document_id}", response_model=DocumentDetailResponse, summary="Update document")

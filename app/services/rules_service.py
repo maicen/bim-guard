@@ -17,6 +17,7 @@ from app.utils import (
 
 _RICH_COLUMNS = {
     "source_text": str,
+    "source_document_id": int,  # FK to documents.id, when the rule was extracted from one
     "property_set": str,
     "property_name": str,
     "fallback_property": str,
@@ -401,6 +402,7 @@ class RuleService:
         parameters: str = "{}",
         # rich schema
         source_text: str = "",
+        source_document_id: int | None = None,
         property_set: str = "",
         property_name: str = "",
         fallback_property: str = "",
@@ -450,6 +452,7 @@ class RuleService:
             "target_ifc_class": target_ifc_class.strip(),
             "parameters": self._norm_json(parameters),
             "source_text": source_text or "",
+            "source_document_id": source_document_id,
             "property_set": property_set or "",
             "property_name": property_name or "",
             "fallback_property": fallback_property or "",

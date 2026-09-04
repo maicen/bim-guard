@@ -62,7 +62,7 @@ class LlamaIndexIngestor:
         Returns:
             One DocumentNodeContract per detected section/clause.
         """
-        text, _tables = extract_document_text(filename, content, parser=parser)
+        text, _tables, _pages = extract_document_text(filename, content, parser=parser)
         return self.nodes_from_text(text, source_document_id=source_document_id)
 
     def nodes_from_text(self, text: str, *, source_document_id: int) -> list[DocumentNodeContract]:

@@ -35,6 +35,7 @@ dependencies = [
     "ifctester>=0.8.5",
     "scipy>=1.11",
     "docling-slim>=2.124.0",
+    "httpx>=0.27.0",
 ]
 
 [project.scripts]
