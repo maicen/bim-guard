@@ -112,7 +112,7 @@
     category="Manuals"
     title="bSDD Wiki"
     icon={BookText}
-    subtitle="Browse this app's local buildingSMART Data Dictionary cache -- the same classes and properties the rule builder's hover cards and autocomplete draw from, without a live bSDD lookup. Seeded by scripts/crawl_bsdd_ontology.py; grows automatically as the app looks up anything not yet cached."
+    subtitle="Browse this app's local buildingSMART Data Dictionary cache -- the same classes and properties the rule builder's hover cards and autocomplete draw from"
   />
 
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-[280px,1fr]">
