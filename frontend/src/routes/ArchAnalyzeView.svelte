@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { run, stopPropagation } from "svelte/legacy";
+  import { run } from "svelte/legacy";
 
   import { onMount, untrack } from "svelte";
   import {
@@ -23,16 +23,15 @@
     CheckCircle2,
     Save,
     FileCheck,
-    AlertTriangle,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, lineageApi, rulesApi } from "../lib/api";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
+  import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
   import type {
     Project,
     ArchAnalysisResult,
     RuleComplianceResult,
-    RuleElementResult,
     BuildingSummary,
     ExitCountResult,
     TravelDistanceResult,
@@ -1575,12 +1574,6 @@
                     </button>
 
                     {#if isRuleOpen}
-                      {@const sortedEls = [...(rule.all_elements || [])].sort(
-                        (a: RuleElementResult, b: RuleElementResult) => {
-                          const order: Record<string, number> = { FAIL: 0, MISSING: 1, PASS: 2 };
-                          return (order[a.status ?? ""] ?? 3) - (order[b.status ?? ""] ?? 3);
-                        },
-                      )}
                       {#if rule.property_name}
                         <div
                           class="flex items-center gap-1.5 border-t border-slate-800/60 px-3.5 py-1.5 text-micro text-slate-500"
@@ -1589,120 +1582,15 @@
                           <BsddBadge kind="property" value={rule.property_name} class="font-mono text-slate-300" />
                         </div>
                       {/if}
-                      <div class="max-h-64 overflow-auto border-t border-slate-800/60">
-                        <table class="w-full text-xs">
-                          <thead
-                            ><tr class="bg-slate-800/80">
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
-                                >Element</th
-                              >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
-                                >Floor / Room</th
-                              >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
-                                >GUID</th
-                              >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
-                                >Actual</th
-                              >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
-                                >Required</th
-                              >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
-                                >Status</th
-                              >
-                            </tr></thead
-                          >
-                          <tbody>
-                            {#each sortedEls.slice(0, 50) as el (el.guid)}
-                              {@const elStatus = el.status || ""}
-                              {@const actualTxt =
-                                fmtVal(el.actual) +
-                                (rule.unit && el.actual != null ? ` ${rule.unit}` : "")}
-                              {@const statusTxt =
-                                elStatus === "FAIL"
-                                  ? el.reason || "fail"
-                                  : elStatus === "MISSING"
-                                    ? "missing"
-                                    : "✓ pass"}
-                              {@const statusCls =
-                                elStatus === "FAIL"
-                                  ? "text-rose-400 font-semibold"
-                                  : elStatus === "MISSING"
-                                    ? "text-amber-400 font-semibold"
-                                    : "text-emerald-400"}
-                              {@const rowBg =
-                                elStatus === "FAIL"
-                                  ? "bg-rose-950/20"
-                                  : elStatus === "MISSING"
-                                    ? "bg-amber-950/20"
-                                    : ""}
-                              <tr class="border-b border-slate-800/40 last:border-0 {rowBg}">
-                                <td class="px-3 py-2">
-                                  <span class="inline-flex items-center gap-1">
-                                    {#if el.data_quality_warnings?.length}
-                                      <AlertTriangle
-                                        class="h-3 w-3 shrink-0 text-amber-400"
-                                        title={el.data_quality_warnings.join(" ")}
-                                      />
-                                    {/if}
-                                    <span class="font-mono text-xs text-slate-50"
-                                      >{(el.element_name || "—").slice(0, 32)}</span
-                                    >
-                                  </span>
-                                </td>
-                                <td class="px-3 py-2">
-                                  <span class="block text-xs text-slate-300"
-                                    >{el.storey || "—"}</span
-                                  >
-                                  {#if el.space && el.space !== "—"}
-                                    <span class="block text-xs text-slate-500">{el.space}</span>
-                                  {/if}
-                                </td>
-                                <td class="px-3 py-2"
-                                  ><span class="font-mono text-xs text-slate-500"
-                                    >{(el.guid || "").slice(0, 14)}</span
-                                  ></td
-                                >
-                                <td
-                                  class="px-3 py-2 font-mono text-xs text-slate-300 {elStatus ===
-                                  'FAIL'
-                                    ? 'font-semibold text-rose-300'
-                                    : elStatus === 'MISSING'
-                                      ? 'font-semibold text-amber-300'
-                                      : ''}">{actualTxt}</td
-                                >
-                                <td class="px-3 py-2 text-xs text-slate-500"
-                                  >{ruleRequiredText(rule)}</td
-                                >
-                                <td class="px-3 py-2 text-xs {statusCls}">
-                                  {statusTxt}
-                                  {#if elStatus === "FAIL" && el.guid && selectedProjectId}
-                                    <button
-                                      type="button"
-                                      class="ml-2 text-blue-400 hover:text-blue-300 hover:underline"
-                                      onclick={stopPropagation(() =>
-                                        openViewerInNewTab(
-                                          selectedProjectId!,
-                                          el.guid,
-                                          result?.bcf_artifact_id || undefined,
-                                        ),
-                                      )}>View in 3D</button
-                                    >
-                                  {/if}
-                                </td>
-                              </tr>
-                            {/each}
-                            {#if sortedEls.length > 50}
-                              <tr
-                                ><td colspan="6" class="px-3 py-2 text-xs italic text-slate-500"
-                                  >… and {sortedEls.length - 50} more</td
-                                ></tr
-                              >
-                            {/if}
-                          </tbody>
-                        </table>
-                      </div>
+                      <ElementResultsTable
+                        elements={rule.all_elements || []}
+                        unit={rule.unit}
+                        requiredText={ruleRequiredText(rule)}
+                        {fmtVal}
+                        onViewIn3d={(guid) =>
+                          selectedProjectId &&
+                          openViewerInNewTab(selectedProjectId, guid, result?.bcf_artifact_id || undefined)}
+                      />
                     {/if}
                   </div>
                 {/each}
