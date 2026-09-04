@@ -7,7 +7,11 @@
   import TopHeader from "./lib/components/TopHeader.svelte";
   import ProjectWizardModal from "./lib/components/ProjectWizardModal.svelte";
   import Toaster from "./lib/components/Toaster.svelte";
+  import Modal from "./lib/components/Modal.svelte";
+  import PipelineProgress from "./lib/components/PipelineProgress.svelte";
+  import { Activity } from "lucide-svelte";
   import { toasts } from "./lib/toast.svelte";
+  import { pipelineTracker } from "./lib/stores/activePipelines.svelte";
 
   // Routes
   import DashboardView from "./routes/DashboardView.svelte";
@@ -50,6 +54,11 @@
   let targetBcfArtifactId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
   let isGlobalWizardOpen = $state(false);
+  // Clicking the header's running-pipeline badge opens the live tracker in a
+  // drawer rather than navigating to a dedicated page — the same information
+  // was previously duplicated across an inline panel, a standalone page, and
+  // this badge; the badge is now the one entry point into the detail view.
+  let pipelineModalProjectId: number | null = $state(null);
 
   let dbOk = $state(true);
   let dbBackend = $state("SUPABASE");
@@ -183,7 +192,7 @@
       {dbOk}
       {dbBackend}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
-      onOpenPipeline={(projectId) => push(buildTargetUrl("workflow", projectId))}
+      onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
     />
 
     <!-- Viewport Container -->
@@ -300,3 +309,18 @@
   onClose={() => (isGlobalWizardOpen = false)}
   onProjectCreated={handleProjectCreated}
 />
+
+<!-- Live pipeline detail, opened from the header's running-pipeline badge -->
+<Modal
+  isOpen={pipelineModalProjectId !== null}
+  title="Live Pipeline"
+  subtitle={pipelineTracker.tracked.find((t) => t.projectId === pipelineModalProjectId)
+    ?.projectName}
+  icon={Activity}
+  maxWidth="max-w-3xl"
+  onClose={() => (pipelineModalProjectId = null)}
+>
+  {#if pipelineModalProjectId !== null}
+    <PipelineProgress projectId={pipelineModalProjectId} />
+  {/if}
+</Modal>
