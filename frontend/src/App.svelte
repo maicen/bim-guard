@@ -172,6 +172,10 @@
       {dbOk}
       {dbBackend}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
+      onOpenPipeline={(projectId) => {
+        targetProjectId = projectId;
+        activeView = "workflow";
+      }}
     />
 
     <!-- Viewport Container -->
@@ -234,7 +238,7 @@
             onSelectProjectForViewer={handleSelectProjectForViewer}
           />
         {:else if activeView === "workflow"}
-          <WorkflowView initialProjectId={targetProjectId} />
+          <WorkflowView initialProjectId={targetProjectId} onNavigate={handleSelectView} />
         {:else if activeView === "reports"}
           <ReportsView
             initialProjectId={targetProjectId}

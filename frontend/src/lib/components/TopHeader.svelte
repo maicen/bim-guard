@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ExternalLink, Activity, Menu } from "lucide-svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
+  import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
   import type { Project } from "../types";
 
   interface Props {
@@ -11,6 +12,8 @@
     dbBackend?: string;
     /** Opens the navigation drawer; only rendered below `md`. */
     onOpenMobileNav?: () => void;
+    /** Navigate to the Live Workflow view for a tracked project's pipeline. */
+    onOpenPipeline?: (projectId: number) => void;
   }
 
   let {
@@ -20,6 +23,7 @@
     dbOk = true,
     dbBackend = "SUPABASE",
     onOpenMobileNav = () => {},
+    onOpenPipeline,
   }: Props = $props();
 
   const TITLES: Record<string, { section: string; title: string }> = {
@@ -80,6 +84,8 @@
 
   <!-- Actions & Status -->
   <div class="flex shrink-0 items-center gap-2.5">
+    <GlobalPipelineStatus onOpen={onOpenPipeline} />
+
     <!-- Compact combined health dot for narrow viewports -->
     <span
       class="inline-flex h-7 w-7 items-center justify-center rounded-full border lg:hidden {apiOnline &&
