@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BookText, Box, ExternalLink, Search, Tag } from "lucide-svelte";
+  import { BookText, Box, ExternalLink, Layers, Search, Tag } from "lucide-svelte";
   import { bsddApi } from "../lib/api";
   import type { BSDDClassItem, BSDDOntologyClassSummary, BSDDOntologyPropertyDetail } from "../lib/types";
   import PageHeader from "../lib/components/PageHeader.svelte";
@@ -10,6 +10,35 @@
   let isLoadingList = $state(true);
   let listError = $state("");
   let search = $state("");
+
+  // GroupOfProperties classes (every Pset_/Qto_ definition) sit in the same
+  // flat list as IFC entity classes but have no parent/child hierarchy of
+  // their own -- split them out by classType (and, within that, by the
+  // Pset_/Qto_ naming convention) so the list stays browsable now that it
+  // covers the whole dictionary rather than just the IFC entity tree.
+  type ClassGroup = "all" | "entities" | "psets" | "qtos";
+  const GROUP_LABELS: Record<ClassGroup, string> = {
+    all: "All",
+    entities: "IFC Entities",
+    psets: "Property Sets",
+    qtos: "Quantity Sets",
+  };
+  let activeGroup = $state<ClassGroup>("all");
+
+  function classGroup(c: BSDDOntologyClassSummary): Exclude<ClassGroup, "all"> {
+    if (c.class_type !== "GroupOfProperties") return "entities";
+    return c.code.startsWith("Qto_") ? "qtos" : "psets";
+  }
+
+  let groupCounts = $derived(
+    classes.reduce(
+      (acc, c) => {
+        acc[classGroup(c)]++;
+        return acc;
+      },
+      { entities: 0, psets: 0, qtos: 0 } as Record<Exclude<ClassGroup, "all">, number>,
+    ),
+  );
 
   // Two things can be open in the main panel: a class or a property. Only
   // one is ever "selected" -- viewing a property remembers which class it
@@ -41,9 +70,10 @@
   let classByUri = $derived(new Map(classes.map((c) => [c.uri, c])));
   let filteredClasses = $derived(
     (() => {
+      const scoped = activeGroup === "all" ? classes : classes.filter((c) => classGroup(c) === activeGroup);
       const needle = search.trim().toLowerCase();
-      if (!needle) return classes;
-      return classes.filter(
+      if (!needle) return scoped;
+      return scoped.filter(
         (c) => c.name.toLowerCase().includes(needle) || c.code.toLowerCase().includes(needle),
       );
     })(),
@@ -118,6 +148,23 @@
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-[280px,1fr]">
     <!-- Class list -->
     <div class="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+      <div class="flex flex-wrap gap-1">
+        {#each Object.keys(GROUP_LABELS) as g (g)}
+          {@const key = g as ClassGroup}
+          <button
+            type="button"
+            onclick={() => (activeGroup = key)}
+            class="rounded-lg px-2 py-1 text-nano font-semibold transition-colors {activeGroup === key
+              ? 'bg-accent/15 text-accent'
+              : 'text-slate-400 hover:bg-slate-800/60'}"
+          >
+            {GROUP_LABELS[key]}
+            {#if key !== "all"}
+              <span class="text-slate-500">({groupCounts[key]})</span>
+            {/if}
+          </button>
+        {/each}
+      </div>
       <div class="relative">
         <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
         <input
@@ -236,13 +283,28 @@
         <div class="space-y-4">
           <div class="flex items-start gap-3">
             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-800/50 bg-blue-950/50 text-accent">
-              <Box class="h-4 w-4" />
+              {#if classDetail.class_type === "GroupOfProperties"}
+                <Layers class="h-4 w-4" />
+              {:else}
+                <Box class="h-4 w-4" />
+              {/if}
             </div>
             <div class="min-w-0">
               <h2 class="text-lg font-bold text-slate-50">{classDetail.name}</h2>
               <p class="font-mono text-micro text-slate-500">{classDetail.code}</p>
             </div>
           </div>
+
+          {#if classDetail.related_ifc_entities.length}
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+              <span class="uppercase tracking-wider text-slate-500">Applies to</span>
+              {#each classDetail.related_ifc_entities as entity (entity)}
+                <span class="rounded-lg border border-slate-700/60 bg-slate-800 px-2 py-1 font-mono text-nano text-slate-300">
+                  {entity}
+                </span>
+              {/each}
+            </div>
+          {/if}
 
           <p class="text-sm leading-relaxed text-slate-300">
             {classDetail.definition || classDetail.description || "No definition available."}

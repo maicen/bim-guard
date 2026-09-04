@@ -33,6 +33,13 @@ logger = get_logger(__name__)
 DEFAULT_BSDD_BASE_URL = os.getenv("BSDD_API_BASE_URL", "https://api.bsdd.buildingsmart.org")
 FALLBACK_BSDD_BASE_URL = "https://test.bsdd.buildingsmart.org"
 
+# GroupOfProperties classes (Pset_/Qto_ definitions) carry no structured
+# relatedIfcEntities field -- the only hint of which IFC entities they apply
+# to is a free-text `[[IfcXxx]]` cross-reference in their definition (e.g.
+# "Properties that are applicable for [[IfcSensor]] with predefined type
+# TURNOUTCLOSURESENSOR."). Used by get_class() as a best-effort fallback.
+_IFC_TERM_RE = re.compile(r"\[\[(Ifc[A-Za-z0-9]+)\]\]")
+
 # ------------------------------------------------------------------------------
 # Built-in Resilient Fallback Dictionaries (for offline & air-gapped operations)
 # ------------------------------------------------------------------------------
@@ -291,6 +298,16 @@ class BSDDClient:
         return raw_property.get("symbol")
 
     @staticmethod
+    def _bracket_ifc_refs(*texts: Optional[str]) -> list[str]:
+        """Best-effort applicable-entity extraction for GroupOfProperties classes."""
+        seen: list[str] = []
+        for text in texts:
+            for match in _IFC_TERM_RE.findall(text or ""):
+                if match not in seen:
+                    seen.append(match)
+        return seen
+
+    @staticmethod
     def _allowed_value_strings(raw_values: Any) -> list[str]:
         """Reduce ClassPropertyValueContract.v1 entries to their display value."""
         values: list[str] = []
@@ -333,11 +350,21 @@ class BSDDClient:
                         description=self._distinct_note(p.get("description"), p.get("definition")),
                     )
                 )
+            class_type = api_data.get("classType") or "Class"
+            related_ifc_entities = api_data.get("relatedIfcEntities") or []
+            if not related_ifc_entities and class_type == "GroupOfProperties":
+                # Psets/Qtos carry no structured applicability field -- fall
+                # back to any `[[IfcXxx]]` reference in the raw (pre-cleaned)
+                # definition/description text.
+                related_ifc_entities = self._bracket_ifc_refs(
+                    api_data.get("definition"), api_data.get("description")
+                )
             class_item = BSDDClassItem(
                 uri=api_data.get("uri", class_uri),
                 code=api_data.get("code", class_code),
                 name=api_data.get("name", class_code),
                 dictionary_uri=api_data.get("dictionaryUri", dictionary_uri),
+                class_type=class_type,
                 # ClassContract.v1 nests the parent under `parentClassReference`
                 # ({uri, name, code}) -- there is no flat `parentClassCode` key,
                 # so reading that always returned None.
@@ -345,7 +372,7 @@ class BSDDClient:
                 child_class_codes=[
                     c.get("code") for c in api_data.get("childClassReferences", []) if c.get("code")
                 ],
-                related_ifc_entities=api_data.get("relatedIfcEntities", []),
+                related_ifc_entities=related_ifc_entities,
                 properties=props,
                 # Almost every real IFC class carries `definition`, essentially
                 # never `description` -- verified live against
@@ -428,6 +455,7 @@ class BSDDClient:
                         code=c.get("code", ""),
                         name=c.get("name", ""),
                         dictionary_uri=c.get("dictionaryUri", dictionary_uri or ""),
+                        class_type=c.get("classType") or "Class",
                         description=c.get("description"),
                     )
                 )
@@ -452,6 +480,33 @@ class BSDDClient:
                 )
 
         return BSDDClassSearchResponse(query=query, total=len(matched), classes=matched)
+
+    def list_classes_by_type(
+        self, dictionary_uri: str, class_type: str, offset: int = 0, limit: int = 100
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Page through GET /api/Dictionary/v1/Classes, filtered to one classType.
+
+        Bare summaries only (code/name/classType/referenceCode/descriptionPart)
+        -- no properties or hierarchy. Unlike get_class/search_classes, this
+        enumerates an entire classType bucket (e.g. every GroupOfProperties
+        class in a dictionary) that the ancestor/descendant crawl in
+        scripts/crawl_bsdd_ontology.py can't reach, since Psets/Qtos have no
+        parent-child relation to walk from a seed root.
+
+        Returns (page of class summaries, total count across all pages).
+        """
+        api_data = self._http_get(
+            "/api/Dictionary/v1/Classes",
+            {
+                "uri": dictionary_uri,
+                "offset": str(offset),
+                "limit": str(limit),
+                "classtype": class_type,
+            },
+        )
+        if not api_data or not isinstance(api_data, dict):
+            return [], 0
+        return api_data.get("classes", []), int(api_data.get("classesTotalCount", 0))
 
     def get_property(self, uri: str) -> Optional[BSDDPropertyItem]:
         """Fetch one property's full definition (dataType/units/allowedValues) by URI.
