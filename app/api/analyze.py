@@ -381,7 +381,7 @@ def run_arch_analysis(
     rule_folder: Annotated[str, Form()] = "",
     arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
 ) -> ArchAnalysisResponse:
-    """Run Ontario Building Code Part 9 architectural checks (egress, daylight, fire separations, clearances)."""
+    """Run architectural compliance checks (egress, daylight, fire separations, clearances) against the active building-code ruleset."""
     try:
         return arch_service.run_analysis(project_id=project_id, rule_folder=rule_folder)
     except ValueError as exc:

@@ -37,7 +37,7 @@
         {
           element: "Windows & Daylighting",
           rules:
-            "Unobstructed glass area must be >= 10% of floor area for habitable spaces (Ontario Building Code Part 9). Ensure IfcWindow instances belong to valid IfcSpace boundaries.",
+            "Unobstructed glass area must be >= 10% of floor area for habitable spaces (per the active building-code ruleset). Ensure IfcWindow instances belong to valid IfcSpace boundaries.",
         },
         {
           element: "Stairs & Handrails",

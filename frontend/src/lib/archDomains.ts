@@ -1,5 +1,5 @@
-// Building-element categories for Ontario Building Code Part 9 architectural
-// compliance, mirroring the domain breakdown shown on the ARCH Analysis
+// Building-element categories for architectural compliance checks, mirroring
+// the domain breakdown shown on the ARCH Analysis
 // results page (ArchAnalyzeView.svelte's DOMAIN_CARDS). Kept as a separate,
 // small reference here rather than imported from that view, so this page
 // never risks destabilizing the (already complex) results view.

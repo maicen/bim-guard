@@ -1,7 +1,7 @@
 # BIMGuard Modules — Module 1 + 3 (CODE Example)
 
-Automated CODE Part 9 compliance rule extraction pipeline.
-Converts Ontario Building Code PDFs into structured rules stored in `rules.db`,
+Automated building-code compliance rule extraction pipeline.
+Converts building-code PDFs (any jurisdiction or standard) into structured rules stored in `rules.db`,
 ready for IFC model compliance checking in Module 4.
 
 This module documentation uses an CODE example dataset, but the BIM-Guard app architecture is domain-agnostic and supports other standards/rulesets.

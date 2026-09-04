@@ -1827,7 +1827,7 @@
           />
           {#if !isEditingFolder}
             <p class="text-caption text-slate-500">
-              Unique ID used to link member rules (e.g. OBC-2024-STAIRS, GC-001, SEISMIC-CLEARANCE).
+              Unique ID used to link member rules (e.g. CODE-2024-STAIRS, GC-001, SEISMIC-CLEARANCE).
             </p>
           {/if}
         </div>
@@ -1840,7 +1840,7 @@
             id="folder-display-name"
             type="text"
             bind:value={folderDisplayName}
-            placeholder="e.g. OBC Part 3 - Fire Protection & Safety"
+            placeholder="e.g. Building Code Part 3 - Fire Protection & Safety"
             class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
         </div>

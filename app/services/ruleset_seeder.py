@@ -197,8 +197,8 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
     # property as MISSING_DATA (or PARTIAL if some elements have it), never
     # PASS, so these rules surface "this window has no documented X" rather
     # than asserting compliance against a threshold nobody has verified.
-    # Kept in a separate ruleset_id / mechanism from the OBC "CODE" rows
-    # above so they're never mistaken for real regulatory citations.
+    # Kept in a separate ruleset_id / mechanism from the seeded "CODE"
+    # building-code rows above so they're never mistaken for real regulatory citations.
     window_pset_common_fields = [
         "FireRating",
         "AcousticRating",

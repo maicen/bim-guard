@@ -458,7 +458,7 @@
         Architectural Audit
       </h3>
       <p class="mt-1 text-xs text-slate-400">
-        Check Ontario Building Code Part 9 daylight, fire, egress and clearance compliance.
+        Check daylight, fire, egress and clearance compliance against any loaded building-code ruleset.
       </p>
     </button>
   </div>

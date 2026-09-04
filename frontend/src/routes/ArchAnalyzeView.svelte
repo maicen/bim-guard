@@ -388,9 +388,9 @@
   let folderNote = $derived(
     result?.rule_folder ? ` · ${result.rule_folder}` : selectedFolder ? ` · ${selectedFolder}` : "",
   );
-  // The subtitle used to be a hardcoded "Ontario Building Code Part 9" claim,
-  // which goes wrong the moment someone scopes the audit to a custom ruleset
-  // (e.g. door_mock) that has nothing to do with OBC.
+  // The subtitle used to be a hardcoded building-code-name claim, which goes
+  // wrong the moment someone scopes the audit to a custom ruleset (e.g.
+  // door_mock) that has nothing to do with any specific building code.
   let selectedFolderDisplayName = $derived(
     ruleFolders.find((f) => f.ruleset_id === selectedFolder)?.display_name || selectedFolder,
   );
@@ -413,8 +413,7 @@
           >{selectedFolderDisplayName}</strong
         > ruleset.
       {:else}
-        Domain-based compliance check against Ontario Building Code Part 9 and every other loaded
-        architectural ruleset.
+        Domain-based compliance check against every loaded architectural ruleset.
       {/if}
     </p>
 
@@ -1713,7 +1712,7 @@
         {#if selectedFolder}
           Running "{selectedFolderDisplayName}" ruleset compliance analysis…
         {:else}
-          Running Ontario Building Code architectural compliance analysis…
+          Running architectural compliance analysis…
         {/if}
       </p>
     </div>

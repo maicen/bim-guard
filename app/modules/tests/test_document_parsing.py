@@ -7,8 +7,8 @@ and regression snapshots.
 Run with: pytest tests/test_document_parsing.py -v
 
 SETUP:
-  Place 1-3 real OBC PDF pages in tests/fixtures/
-  e.g.  tests/fixtures/sample_obc_stairs.pdf
+  Place 1-3 real building-code PDF pages in tests/fixtures/
+  e.g.  tests/fixtures/sample_code_stairs.pdf
 """
 
 import json

@@ -223,7 +223,7 @@
           id="rule-id"
           type="text"
           bind:value={formRuleId}
-          placeholder="e.g. OBC-9.9.4.2"
+          placeholder="e.g. CODE-9.9.4.2"
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
         />
       </div>
@@ -259,7 +259,7 @@
           id="rule-id"
           type="text"
           bind:value={formRuleId}
-          placeholder="e.g. OBC-9.9.4.2"
+          placeholder="e.g. CODE-9.9.4.2"
           class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
         />
       </div>

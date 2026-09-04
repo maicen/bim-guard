@@ -63,7 +63,7 @@
       title: "Run compliance analysis (ARCH & MEP)",
       icon: Cpu,
       description:
-        "Execute multi-domain checks against the IFC geometry. Run architectural compliance for Ontario Building Code egress, daylight, and fire separations, or MEP checks for galvanic (GC-001), crevice (CC-001), and MIC (MC-001) piping corrosion and seismic clearances.",
+        "Execute multi-domain checks against the IFC geometry. Run architectural compliance for egress, daylight, and fire-separation rules from any loaded building-code ruleset, or MEP checks for galvanic (GC-001), crevice (CC-001), and MIC (MC-001) piping corrosion and seismic clearances.",
       result: "Result: Non-compliant elements are tagged with risk bands, scores, and mitigations.",
       actions: [
         { label: "Run ARCH Audit", view: "arch", primary: true },
