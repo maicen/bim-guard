@@ -1,70 +1,14 @@
 {
-  "models_dir": "test-models\\models",
+  "models_dir": "data\\test_models",
   "inference_enabled": true,
   "totals": {
-    "total": 93457,
-    "from_ifc": 1780,
-    "inferred": 29884,
-    "unknown": 61793,
-    "coverage_pct": 33.88
+    "total": 56509,
+    "from_ifc": 1771,
+    "inferred": 15235,
+    "unknown": 39503,
+    "coverage_pct": 30.09
   },
   "models": [
-    {
-      "total": 102,
-      "from_ifc": 0,
-      "inferred": 10,
-      "unknown": 92,
-      "name": "Clinic_Architectural.ifc",
-      "resolved": 10,
-      "systems_missing": [
-        [
-          "unknown",
-          92
-        ]
-      ],
-      "raw_rejected": [
-        [
-          "Material",
-          92
-        ]
-      ]
-    },
-    {
-      "total": 2089,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 2089,
-      "name": "Clinic_Electrical.ifc",
-      "resolved": 0,
-      "systems_missing": [
-        [
-          "unknown",
-          2089
-        ]
-      ],
-      "raw_rejected": [
-        [
-          "N/A",
-          1353
-        ],
-        [
-          "Metal - Paint Finish - Dark Gray, Matte",
-          601
-        ],
-        [
-          "Metal - Paint Finish - Ivory, Glossy",
-          81
-        ],
-        [
-          "Paint-Philips Chloride-Black",
-          43
-        ],
-        [
-          "Glass - Frosted",
-          8
-        ]
-      ]
-    },
     {
       "total": 3704,
       "from_ifc": 496,
@@ -118,103 +62,6 @@
         [
           "Chrome - DELTA - Polished",
           3
-        ]
-      ]
-    },
-    {
-      "total": 1673,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 1673,
-      "name": "west_riverside_hospital_elec_ifc4.ifc",
-      "resolved": 0,
-      "systems_missing": [
-        [
-          "unknown",
-          1673
-        ]
-      ],
-      "raw_rejected": [
-        [
-          "Metal - Paint Finish - Ivory, Glossy",
-          52
-        ],
-        [
-          "Red",
-          44
-        ],
-        [
-          "White",
-          13
-        ],
-        [
-          "Metal - Chrome",
-          12
-        ]
-      ]
-    },
-    {
-      "total": 861,
-      "from_ifc": 0,
-      "inferred": 354,
-      "unknown": 507,
-      "name": "west_riverside_hospital_fire_ifc4.ifc",
-      "resolved": 354,
-      "systems_missing": [
-        [
-          "unknown",
-          507
-        ]
-      ],
-      "raw_rejected": []
-    },
-    {
-      "total": 17424,
-      "from_ifc": 0,
-      "inferred": 1893,
-      "unknown": 15531,
-      "name": "west_riverside_hospital_mech_ifc4.ifc",
-      "resolved": 1893,
-      "systems_missing": [
-        [
-          "unknown",
-          15531
-        ]
-      ],
-      "raw_rejected": []
-    },
-    {
-      "total": 8539,
-      "from_ifc": 0,
-      "inferred": 4976,
-      "unknown": 3563,
-      "name": "west_riverside_hospital_plumb_ifc4.ifc",
-      "resolved": 4976,
-      "systems_missing": [
-        [
-          "unknown",
-          3563
-        ]
-      ],
-      "raw_rejected": []
-    },
-    {
-      "total": 13490,
-      "from_ifc": 2,
-      "inferred": 12397,
-      "unknown": 1091,
-      "name": "west_riverside_hospital_sprinkle_ifc4.ifc",
-      "resolved": 12399,
-      "systems_missing": [
-        [
-          "unknown",
-          1091
-        ]
-      ],
-      "raw_rejected": [
-        [
-          "Victaulic",
-          1036
         ]
       ]
     },
@@ -283,42 +130,6 @@
       ]
     },
     {
-      "total": 99,
-      "from_ifc": 0,
-      "inferred": 3,
-      "unknown": 96,
-      "name": "Duplex_Electrical_20121207.ifc",
-      "resolved": 3,
-      "systems_missing": [
-        [
-          "unknown",
-          96
-        ]
-      ],
-      "raw_rejected": [
-        [
-          "N/A",
-          76
-        ],
-        [
-          "Metal - Chrome",
-          10
-        ],
-        [
-          "Glass - Frosted",
-          6
-        ],
-        [
-          "Metal - Painted Finish - Ivory, Matte",
-          2
-        ],
-        [
-          "Glass",
-          2
-        ]
-      ]
-    },
-    {
       "total": 926,
       "from_ifc": 0,
       "inferred": 222,
@@ -375,59 +186,14 @@
       ]
     },
     {
-      "total": 73,
-      "from_ifc": 13,
+      "total": 6,
+      "from_ifc": 6,
       "inferred": 0,
-      "unknown": 60,
-      "name": "IFC_Schependomlaan.ifc",
-      "resolved": 13,
-      "systems_missing": [
-        [
-          "unknown",
-          60
-        ]
-      ],
-      "raw_rejected": [
-        [
-          "04 Zink",
-          60
-        ]
-      ]
-    },
-    {
-      "total": 48,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 48,
-      "name": "Molio_with_URIs.ifc",
-      "resolved": 0,
-      "systems_missing": [
-        [
-          "unknown",
-          48
-        ]
-      ],
+      "unknown": 0,
+      "name": "nfpa13_test.ifc",
+      "resolved": 6,
+      "systems_missing": [],
       "raw_rejected": []
-    },
-    {
-      "total": 31,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 31,
-      "name": "wbdg_office_arc.ifc",
-      "resolved": 0,
-      "systems_missing": [
-        [
-          "unknown",
-          31
-        ]
-      ],
-      "raw_rejected": [
-        [
-          "Material",
-          31
-        ]
-      ]
     },
     {
       "total": 5697,
@@ -454,16 +220,16 @@
       ]
     },
     {
-      "total": 18488,
+      "total": 17424,
       "from_ifc": 0,
       "inferred": 1893,
-      "unknown": 16595,
-      "name": "west_riverside_hospital_mech_ifc2x3.ifc",
+      "unknown": 15531,
+      "name": "west_riverside_hospital_mech_ifc4.ifc",
       "resolved": 1893,
       "systems_missing": [
         [
           "unknown",
-          16595
+          15531
         ]
       ],
       "raw_rejected": []
@@ -471,26 +237,41 @@
     {
       "total": 9013,
       "from_ifc": 0,
-      "inferred": 5121,
-      "unknown": 3892,
+      "inferred": 5131,
+      "unknown": 3882,
       "name": "west_riverside_hospital_plumb_ifc2x3.ifc",
-      "resolved": 5121,
+      "resolved": 5131,
       "systems_missing": [
         [
           "unknown",
-          3892
+          3882
         ]
       ],
       "raw_rejected": [
         [
           "Porcelain,White",
-          97
+          98
         ],
         [
           "Metal Polished",
           93
         ]
       ]
+    },
+    {
+      "total": 8539,
+      "from_ifc": 0,
+      "inferred": 4974,
+      "unknown": 3565,
+      "name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "resolved": 4974,
+      "systems_missing": [
+        [
+          "unknown",
+          3565
+        ]
+      ],
+      "raw_rejected": []
     }
   ]
 }

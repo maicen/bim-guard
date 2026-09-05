@@ -6,8 +6,8 @@
  */
 
 import type { Session, User } from "@supabase/supabase-js";
-import { authApi } from "./api";
-import { setAuthToken } from "./authToken";
+import { authApi, clearTenantCaches } from "./api";
+import { setAuthToken, setActiveOrgId } from "./authToken";
 import { isAuthConfigured, supabase } from "./supabaseClient";
 import type { CurrentUserResponse, ProfileUpdatePayload } from "./types";
 
@@ -16,21 +16,31 @@ class AuthState {
   profile = $state<CurrentUserResponse | null>(null);
   loading = $state(true);
 
+  #activeOrgIdOverride = $state<number | null>(null);
+
   get user(): User | null {
     return this.session?.user ?? null;
   }
 
+  get isSuperadmin(): boolean {
+    return !!this.profile?.profile?.is_superadmin;
+  }
+
   /**
    * The organization every project-scoped view is currently filtered to.
-   * Backed by `profile.default_organization_id`, not just local state, so it
-   * survives a reload and is the same organization the backend would pick if
-   * asked to default one (see `_primary_organization_id` in
-   * `app/api/projects.py`, which this makes an explicit, saved choice instead
-   * of an implicit "first membership" guess).
+   * Backed by URL or explicit selection (#activeOrgIdOverride), and defaults
+   * to `profile.default_organization_id` so it survives reloads.
    */
   get activeOrganizationId(): number | null {
+    if (this.#activeOrgIdOverride != null) {
+      if (!this.profile || this.isSuperadmin) return this.#activeOrgIdOverride;
+      const orgs = this.profile.organizations ?? [];
+      if (orgs.some((o) => o.organization_id === this.#activeOrgIdOverride)) {
+        return this.#activeOrgIdOverride;
+      }
+    }
     const orgs = this.profile?.organizations ?? [];
-    if (orgs.length === 0) return null;
+    if (orgs.length === 0) return this.#activeOrgIdOverride;
     const saved = this.profile?.profile.default_organization_id;
     if (saved != null && orgs.some((o) => o.organization_id === saved)) return saved;
     return orgs.length === 1 ? orgs[0]!.organization_id : null;
@@ -47,9 +57,14 @@ class AuthState {
     return orgs.length > 1 && this.activeOrganizationId === null;
   }
 
-  /** Persist the caller's chosen organization as their new default. */
-  async setActiveOrganization(organizationId: number): Promise<void> {
-    await this.updateProfile({ default_organization_id: organizationId });
+  /** Set the caller's chosen organization, optionally persisting as their new default. */
+  async setActiveOrganization(organizationId: number, persist: boolean = true): Promise<void> {
+    this.#activeOrgIdOverride = organizationId;
+    setActiveOrgId(organizationId);
+    clearTenantCaches();
+    if (persist && this.session) {
+      await this.updateProfile({ default_organization_id: organizationId });
+    }
   }
 
   constructor() {
@@ -76,14 +91,19 @@ class AuthState {
   async #loadProfile() {
     if (!this.session) {
       this.profile = null;
+      setActiveOrgId(null);
+      clearTenantCaches();
       return;
     }
     try {
       this.profile = await authApi.me(this.session.access_token);
+      setActiveOrgId(this.activeOrganizationId);
+      clearTenantCaches();
     } catch {
       // Non-fatal: the header falls back to showing the Supabase user's
       // email, which is already on this.session.
       this.profile = null;
+      setActiveOrgId(null);
     }
   }
 
@@ -92,6 +112,8 @@ class AuthState {
     if (!this.session) return;
     const updated = await authApi.updateProfile(this.session.access_token, updates);
     if (this.profile) this.profile = { ...this.profile, profile: updated };
+    setActiveOrgId(this.activeOrganizationId);
+    clearTenantCaches();
   }
 
   /** Redirect to Google's consent screen; the browser comes back with a session. */
@@ -103,9 +125,26 @@ class AuthState {
     if (error) throw error;
   }
 
+  /**
+   * Sign in with a seeded local dev account (see scripts/seed_dev_auth_user.py).
+   * Goes through the real Supabase password grant -- same JWT, same backend
+   * verification path as Google sign-in -- just without the OAuth round trip.
+   * Only usable in dev builds with VITE_DEV_AUTH_EMAIL/PASSWORD set.
+   */
+  async signInWithDevAccount(): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: import.meta.env.VITE_DEV_AUTH_EMAIL as string,
+      password: import.meta.env.VITE_DEV_AUTH_PASSWORD as string,
+    });
+    if (error) throw error;
+  }
+
   async signOut(): Promise<void> {
     await supabase.auth.signOut();
     setAuthToken(null);
+    this.#activeOrgIdOverride = null;
+    setActiveOrgId(null);
+    clearTenantCaches();
     this.profile = null;
   }
 }

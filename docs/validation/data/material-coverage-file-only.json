@@ -1,0 +1,361 @@
+{
+  "models_dir": "data\\test_models",
+  "inference_enabled": false,
+  "totals": {
+    "total": 56509,
+    "from_ifc": 1771,
+    "inferred": 0,
+    "unknown": 54738,
+    "coverage_pct": 3.13
+  },
+  "models": [
+    {
+      "total": 3704,
+      "from_ifc": 496,
+      "inferred": 0,
+      "unknown": 3208,
+      "name": "Clinic_HVAC.ifc",
+      "resolved": 496,
+      "systems_missing": [
+        [
+          "unknown",
+          3208
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "Varies",
+          6
+        ]
+      ]
+    },
+    {
+      "total": 6587,
+      "from_ifc": 528,
+      "inferred": 0,
+      "unknown": 6059,
+      "name": "Clinic_Plumbing.ifc",
+      "resolved": 528,
+      "systems_missing": [
+        [
+          "unknown",
+          3944
+        ],
+        [
+          "foul_drainage",
+          822
+        ],
+        [
+          "domestic_hot_water",
+          624
+        ],
+        [
+          "domestic_cold_water",
+          589
+        ],
+        [
+          "rainwater",
+          80
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "Material",
+          5309
+        ],
+        [
+          "N/A",
+          408
+        ],
+        [
+          "Plastic",
+          339
+        ],
+        [
+          "Chrome - DELTA - Polished",
+          3
+        ]
+      ]
+    },
+    {
+      "total": 1795,
+      "from_ifc": 0,
+      "inferred": 0,
+      "unknown": 1795,
+      "name": "DigitalHub_FM-HZG_v2.ifc",
+      "resolved": 0,
+      "systems_missing": [
+        [
+          "unknown",
+          1795
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "<Unnamed>",
+          881
+        ]
+      ]
+    },
+    {
+      "total": 1310,
+      "from_ifc": 0,
+      "inferred": 0,
+      "unknown": 1310,
+      "name": "DigitalHub_FM-LFT_v2.ifc",
+      "resolved": 0,
+      "systems_missing": [
+        [
+          "unknown",
+          1296
+        ],
+        [
+          "fire_sprinkler",
+          13
+        ],
+        [
+          "heating_flow",
+          1
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "<Unnamed>",
+          715
+        ],
+        [
+          "Metall - Zink",
+          595
+        ]
+      ]
+    },
+    {
+      "total": 1010,
+      "from_ifc": 0,
+      "inferred": 0,
+      "unknown": 1010,
+      "name": "DigitalHub_FM-SAN_v2.ifc",
+      "resolved": 0,
+      "systems_missing": [
+        [
+          "unknown",
+          1010
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "<Unnamed>",
+          506
+        ]
+      ]
+    },
+    {
+      "total": 926,
+      "from_ifc": 0,
+      "inferred": 0,
+      "unknown": 926,
+      "name": "Duplex_MEP_20110907.ifc",
+      "resolved": 0,
+      "systems_missing": [
+        [
+          "unknown",
+          704
+        ],
+        [
+          "foul_drainage",
+          74
+        ],
+        [
+          "domestic_cold_water",
+          74
+        ],
+        [
+          "domestic_hot_water",
+          73
+        ],
+        [
+          "fire_sprinkler",
+          1
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "Material",
+          926
+        ]
+      ]
+    },
+    {
+      "total": 498,
+      "from_ifc": 46,
+      "inferred": 0,
+      "unknown": 452,
+      "name": "Duplex_Plumbing_20121113.ifc",
+      "resolved": 46,
+      "systems_missing": [
+        [
+          "unknown",
+          279
+        ],
+        [
+          "foul_drainage",
+          62
+        ],
+        [
+          "domestic_hot_water",
+          57
+        ],
+        [
+          "domestic_cold_water",
+          54
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "Material",
+          394
+        ],
+        [
+          "N/A",
+          38
+        ],
+        [
+          "Plastic",
+          16
+        ],
+        [
+          "Chrome - DELTA - Polished",
+          2
+        ],
+        [
+          "Metal - Delta - Aged Pewter - PT",
+          2
+        ]
+      ]
+    },
+    {
+      "total": 6,
+      "from_ifc": 6,
+      "inferred": 0,
+      "unknown": 0,
+      "name": "nfpa13_test.ifc",
+      "resolved": 6,
+      "systems_missing": [],
+      "raw_rejected": []
+    },
+    {
+      "total": 5697,
+      "from_ifc": 695,
+      "inferred": 0,
+      "unknown": 5002,
+      "name": "wbdg_office_mep.ifc",
+      "resolved": 695,
+      "systems_missing": [
+        [
+          "unknown",
+          4173
+        ],
+        [
+          "fire_sprinkler",
+          292
+        ],
+        [
+          "domestic_cold_water",
+          199
+        ],
+        [
+          "foul_drainage",
+          182
+        ],
+        [
+          "domestic_hot_water",
+          120
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "Material",
+          5002
+        ]
+      ]
+    },
+    {
+      "total": 17424,
+      "from_ifc": 0,
+      "inferred": 0,
+      "unknown": 17424,
+      "name": "west_riverside_hospital_mech_ifc4.ifc",
+      "resolved": 0,
+      "systems_missing": [
+        [
+          "unknown",
+          15528
+        ],
+        [
+          "domestic_hot_water",
+          1606
+        ],
+        [
+          "domestic_cold_water",
+          290
+        ]
+      ],
+      "raw_rejected": []
+    },
+    {
+      "total": 9013,
+      "from_ifc": 0,
+      "inferred": 0,
+      "unknown": 9013,
+      "name": "west_riverside_hospital_plumb_ifc2x3.ifc",
+      "resolved": 0,
+      "systems_missing": [
+        [
+          "unknown",
+          3895
+        ],
+        [
+          "domestic_cold_water",
+          3437
+        ],
+        [
+          "domestic_hot_water",
+          1681
+        ]
+      ],
+      "raw_rejected": [
+        [
+          "Metal Polished",
+          198
+        ],
+        [
+          "Porcelain,White",
+          136
+        ]
+      ]
+    },
+    {
+      "total": 8539,
+      "from_ifc": 0,
+      "inferred": 0,
+      "unknown": 8539,
+      "name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "resolved": 0,
+      "systems_missing": [
+        [
+          "unknown",
+          3563
+        ],
+        [
+          "domestic_cold_water",
+          3296
+        ],
+        [
+          "domestic_hot_water",
+          1680
+        ]
+      ],
+      "raw_rejected": []
+    }
+  ]
+}

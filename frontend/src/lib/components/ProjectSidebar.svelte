@@ -1,27 +1,36 @@
 <script lang="ts">
   import {
     LayoutDashboard,
-    FolderOpen,
+    Boxes,
     ScanEye,
     LayoutList,
     FileText,
-    BookOpen,
-    Sparkles,
-    ListChecks,
+    Activity,
     Settings,
     ChevronLeft,
     ChevronRight,
+    ArrowLeft,
   } from "lucide-svelte";
-  import { link } from "svelte-spa-router";
+  import { link, push } from "svelte-spa-router";
+  import { authState } from "../auth.svelte";
+  import type { Project } from "../types";
 
   interface Props {
     activeView?: string;
+    selectedProject?: Project | null;
+    selectedProjectId: number;
     /** Drawer visibility below `md`. Above it the sidebar is always shown. */
     mobileOpen?: boolean;
     onCloseMobile?: () => void;
   }
 
-  let { activeView = "dashboard", mobileOpen = false, onCloseMobile = () => {} }: Props = $props();
+  let {
+    activeView = "dashboard",
+    selectedProject = null,
+    selectedProjectId,
+    mobileOpen = false,
+    onCloseMobile = () => {},
+  }: Props = $props();
 
   let collapsed = $state(false);
 
@@ -30,27 +39,33 @@
   // (AnalysisDomainTabs), not a separate sidebar entry per domain.
   const AUDIT_VIEW_IDS = new Set(["arch", "piping", "seismic", "analyze"]);
 
-  // Grouped by intent (My Home / Model Coordination / Compliance / Rules &
-  // Standards) rather than by module — see the Tenant & Workspace Blueprint.
-  // View ids and routes are unchanged; only the grouping and labels moved, so
-  // every existing link keeps working. Reference material (User Manual,
-  // Modeling Manual, bSDD Wiki) and Integrations (Revit Sync, IFC Export
-  // Setting) moved out of this working sidebar entirely — they're in the
-  // navbar's Resources and Integrations menus instead (ResourcesMenu.svelte,
-  // IntegrationsMenu.svelte), reachable from any view without crowding
-  // project workspaces. Organization Settings is reachable from the user
-  // menu (UserMenu.svelte) instead of a sidebar entry, since it's an
-  // account-scoped action, not a project workspace.
+  function getNavHref(itemId: string): string {
+    const params = new URLSearchParams();
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    params.set("project_id", String(selectedProjectId));
+    return `/${itemId}?${params.toString()}`;
+  }
+
+  function handleExitProject() {
+    const params = new URLSearchParams();
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    const q = params.toString();
+    push(q ? `/dashboard?${q}` : "/dashboard");
+    onCloseMobile();
+  }
+
+  // Every item here requires a project in context — this sidebar only
+  // renders once one is selected (see App.svelte's isProjectView).
   const NAV_SECTIONS = [
     {
-      title: "My Home",
-      items: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }],
-    },
-    {
-      title: "Model Coordination",
+      title: "Project",
       items: [
-        { id: "projects", label: "Existing Projects", icon: FolderOpen },
-        { id: "viewer", label: "3D Viewer", icon: ScanEye },
+        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { id: "models", label: "Models", icon: Boxes },
       ],
     },
     {
@@ -61,11 +76,10 @@
       ],
     },
     {
-      title: "Rules & Standards",
+      title: "Coordination",
       items: [
-        { id: "documents", label: "Rule Documents", icon: BookOpen },
-        { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
-        { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
+        { id: "viewer", label: "3D Viewer", icon: ScanEye },
+        { id: "workflow", label: "Live Pipeline", icon: Activity },
       ],
     },
   ];
@@ -137,6 +151,26 @@
     </button>
   </div>
 
+  <!-- Current project + exit -->
+  <div class="border-b border-slate-800/80 px-2 py-3">
+    <button
+      type="button"
+      onclick={handleExitProject}
+      class="group flex w-full items-center gap-2 rounded-lg px-2 py-1 text-caption font-semibold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-900/60 hover:text-slate-300"
+      title="Back to Organization"
+    >
+      <ArrowLeft class="h-3 w-3 shrink-0" />
+      {#if !collapsed}
+        <span>All Projects</span>
+      {/if}
+    </button>
+    {#if !collapsed}
+      <div class="mt-1.5 truncate px-2 text-sm font-bold text-slate-50">
+        {selectedProject?.name || "Selected Project"}
+      </div>
+    {/if}
+  </div>
+
   <!-- Nav Groups -->
   <div class="flex-1 space-y-4 overflow-y-auto px-2 py-3">
     {#each NAV_SECTIONS as section (section)}
@@ -153,7 +187,7 @@
           {@const isActive =
             activeView === item.id || (item.id === "arch" && AUDIT_VIEW_IDS.has(activeView))}
           <a
-            href="/{item.id}"
+            href={getNavHref(item.id)}
             use:link
             onclick={onCloseMobile}
             class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {isActive
@@ -181,9 +215,10 @@
 
   <!-- Sidebar Footer: Settings -->
   <div class="space-y-1 border-t border-slate-800/80 bg-slate-950/60 p-2">
-    <!-- Settings Link -->
     <a
-      href="/settings"
+      href={authState.activeOrganizationId
+        ? `/settings?org=${authState.activeOrganizationId}`
+        : "/settings"}
       use:link
       onclick={onCloseMobile}
       class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===

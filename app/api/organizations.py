@@ -452,13 +452,14 @@ def get_organization_ruleset_grants(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
 ) -> OrganizationRulesetGrantsResponse:
-    """Return the rulesets this organization is allowed to use at all.
-
-    Superadmin only -- this is the platform-wide grant, not something an
-    organization's own owner can see or change about themselves.
-    """
-    _require_superadmin(current_user, profiles)
+    """Return the rulesets this organization is allowed to use at all."""
+    if not profiles.is_superadmin(current_user.id) and organization_id not in memberships.org_ids_for_user(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this organization's ruleset grants.",
+        )
     return OrganizationRulesetGrantsResponse(
         organization_id=organization_id,
         ruleset_ids=ruleset_access.list_org_grants(organization_id),
@@ -501,10 +502,14 @@ def get_organization_project_grants(
 ) -> OrganizationProjectGrantsResponse:
     """Return the projects shared into this organization from elsewhere.
 
-    Superadmin only. Projects the organization owns outright don't appear
-    here -- this is only the cross-org sharing grant on top of ownership.
+    Projects the organization owns outright don't appear here -- this is
+    only the cross-org sharing grant on top of ownership.
     """
-    _require_superadmin(current_user, profiles)
+    if not profiles.is_superadmin(current_user.id) and organization_id not in memberships.org_ids_for_user(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this organization's project grants.",
+        )
     return OrganizationProjectGrantsResponse(
         organization_id=organization_id,
         project_ids=memberships.list_org_project_grants(organization_id),
@@ -544,9 +549,14 @@ def get_organization_document_grants(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
 ) -> OrganizationDocumentGrantsResponse:
-    """Return the documents this organization is allowed to use at all. Superadmin only."""
-    _require_superadmin(current_user, profiles)
+    """Return the documents this organization is allowed to use at all."""
+    if not profiles.is_superadmin(current_user.id) and organization_id not in memberships.org_ids_for_user(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this organization's document grants.",
+        )
     return OrganizationDocumentGrantsResponse(
         organization_id=organization_id,
         document_ids=document_access.list_org_grants(organization_id),

@@ -1,7 +1,8 @@
 """FastAPI router for document management and text extraction."""
 
+import hashlib
 import mimetypes
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import (
     APIRouter,
@@ -10,6 +11,7 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Query,
     Response,
     UploadFile,
     status,
@@ -17,7 +19,11 @@ from fastapi import (
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
-from app.api.dependencies import get_documents_service, get_parsing_engine_instances_service
+from app.api.dependencies import (
+    get_document_access_service,
+    get_documents_service,
+    get_parsing_engine_instances_service,
+)
 from app.logging_config import get_logger
 from app.modules.contracts import (
     DocumentDetailResponse,
@@ -33,14 +39,13 @@ from app.modules.contracts import (
     RuleExtractionDraftListResponse,
 )
 from app.modules.document_parsing.section_chunker import SectionChunker
+from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.utils import safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
-
-import hashlib
 
 router = APIRouter()
 
@@ -49,11 +54,22 @@ router = APIRouter()
 def list_documents(
     service: Annotated[DocumentService, Depends(get_documents_service)],
     response: Response,
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     if_none_match: str | None = Header(default=None, alias="If-None-Match"),
 ) -> list[DocumentResponse]:
-    """Retrieve all specification documents ordered newest first."""
+    """Retrieve all specification documents, optionally filtered by organization grants."""
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"
     rows = service.list_documents()
+
+    effective_org_id: Optional[int] = organization_id
+    if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        effective_org_id = int(x_org_id.strip())
+
+    if effective_org_id is not None:
+        allowed_ids = set(document_access.list_org_grants(effective_org_id))
+        rows = [r for r in rows if r["id"] in allowed_ids]
     etag = f'"{hashlib.sha256(str(len(rows)).encode() + (rows[0]["created_at"].encode() if rows and "created_at" in rows[0] else b"")).hexdigest()[:16]}"'
     response.headers["ETag"] = etag
     if if_none_match and if_none_match.strip() == etag:
@@ -210,30 +226,25 @@ async def upload_document(
     revision_code: Annotated[str, Form()] = "P01.01",
     parser: Annotated[str, Form()] = "auto",
     engine_instance: Annotated[str, Form()] = "",
+    organization_id: Annotated[Optional[int], Form()] = None,
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     service: Annotated[DocumentService, Depends(get_documents_service)] = None,
     instances_service: Annotated[
         ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)
     ] = None,
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)] = None,
 ) -> DocumentDetailResponse:
-    """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and extract text.
-
-    `parser` selects the extraction engine: "auto" (the configured parsing
-    engine, falling back to a light local extractor), "unstructured" (force
-    the configured engine — a hosted job takes several to tens of seconds
-    per document; a local container or Docling responds in one synchronous
-    call), or "light" (force the local extractor — pypdf/python-docx/
-    openpyxl/csv, no upload, no API key, effectively instant).
-
-    `engine_instance` optionally names one of the configured parsing engines
-    (see GET /api/parsing-engines) — a local container, or a specific
-    hosted account. When omitted, the registry's default instance is used.
-    """
+    """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and extract text."""
     if service is None:
         service = DocumentService()
     if instances_service is None:
         from app.bootstrap import get_container
 
         instances_service = get_container().parsing_engine_instances_service
+    if document_access is None:
+        from app.bootstrap import get_container
+
+        document_access = get_container().document_access_service
 
     resolved_instance = _resolve_parsing_instance(engine_instance, instances_service)
 
@@ -266,6 +277,18 @@ async def upload_document(
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    target_org_id = organization_id
+    if target_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        target_org_id = int(x_org_id.strip())
+
+    if target_org_id is not None and document_access is not None and row and "id" in row:
+        try:
+            current_grants = document_access.list_org_grants(target_org_id)
+            if row["id"] not in current_grants:
+                document_access.set_org_grants(target_org_id, current_grants + [row["id"]])
+        except Exception as exc:
+            logger.warning("Could not auto-grant uploaded document to org %d: %s", target_org_id, exc)
 
     return _row_to_detail_response(row)
 

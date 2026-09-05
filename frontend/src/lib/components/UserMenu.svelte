@@ -18,27 +18,32 @@
 
   function goToProfile() {
     open = false;
-    push("/settings");
+    const orgId = authState.activeOrganizationId;
+    push(orgId ? `/settings?org=${orgId}` : "/settings");
   }
 
   function goToOrgSettings() {
     open = false;
-    push("/org-settings");
+    const orgId = authState.activeOrganizationId;
+    push(orgId ? `/org-settings?org=${orgId}` : "/org-settings");
   }
 
   function goToSuperadminRulesets() {
     open = false;
-    push("/superadmin-rulesets");
+    const orgId = authState.activeOrganizationId;
+    push(orgId ? `/superadmin-rulesets?org=${orgId}` : "/superadmin-rulesets");
   }
 
   function goToSuperadminProjectGrants() {
     open = false;
-    push("/superadmin-project-grants");
+    const orgId = authState.activeOrganizationId;
+    push(orgId ? `/superadmin-project-grants?org=${orgId}` : "/superadmin-project-grants");
   }
 
   function goToSuperadminDocumentGrants() {
     open = false;
-    push("/superadmin-document-grants");
+    const orgId = authState.activeOrganizationId;
+    push(orgId ? `/superadmin-document-grants?org=${orgId}` : "/superadmin-document-grants");
   }
 
   function toggle(e: MouseEvent) {

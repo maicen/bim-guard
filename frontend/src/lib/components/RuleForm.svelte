@@ -658,7 +658,7 @@
       type="button"
       disabled={isSaving}
       onclick={handleSaveRule}
-      class="rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+      class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
     >
       {isSaving ? "Saving..." : "Save Rule"}
     </button>

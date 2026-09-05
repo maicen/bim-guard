@@ -457,7 +457,7 @@
         type="button"
         disabled={isExtracting}
         onclick={handleExtract}
-        class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >
         <Sparkles class="h-4 w-4" />
         <span>{isExtracting ? "Extracting Rules via AI..." : "Extract Compliance Rules"}</span>

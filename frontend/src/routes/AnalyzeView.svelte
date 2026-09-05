@@ -33,7 +33,9 @@
     ArrowUp,
     ArrowDown,
   } from "lucide-svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import { isAbortError, analyzeApi, projectsApi, rulesApi } from "../lib/api";
+  import type { ApiError, IssueBand, IssueSort, ResultPageQuery } from "../lib/api";
   import HoverCard from "../lib/components/HoverCard.svelte";
   import { describeMechanism } from "../lib/glossary";
   import type {
@@ -49,7 +51,6 @@
   import { toasts } from "../lib/toast.svelte";
   import Modal from "../lib/components/Modal.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
-  import { createTableState } from "../lib/tableState.svelte";
   import SortHeader from "../lib/components/SortHeader.svelte";
   import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
 
@@ -72,10 +73,9 @@
   let projects: Project[] = $state([]);
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   // Re-syncs when the header's project switcher changes initialProjectId
-  // while this view is already mounted — without this, only the initial
-  // value (read once via untrack above) ever took effect.
-  run(() => {
-    if (initialProjectId && initialProjectId !== selectedProjectId) {
+  // while this view is already mounted.
+  $effect(() => {
+    if (initialProjectId !== undefined && initialProjectId !== selectedProjectId) {
       selectedProjectId = initialProjectId;
       handleProjectChange();
     }
@@ -118,6 +118,7 @@
     selectedEngines = selectedEngines.includes(id)
       ? selectedEngines.filter((e) => e !== id)
       : [...selectedEngines, id];
+    reloadAfterFilterChange();
   }
   let showLowRisk = $state(true);
   let isUploadModalOpen = $state(false);
@@ -136,19 +137,6 @@
     try {
       const data = await projectsApi.list();
       projects = data.projects || [];
-      const relevant = projects.filter((p) => {
-        if (activeCategory === "seismic") {
-          return (
-            p.analysis_type === "seismic" ||
-            p.analysis_type === "Seismic" ||
-            p.analysis_type === "Halo"
-          );
-        }
-        return p.analysis_type === "Piping" || p.analysis_type === "Piping (Corrosive)";
-      });
-      if (!selectedProjectId && relevant.length > 0) {
-        selectedProjectId = relevant[0].id;
-      }
       if (selectedProjectId) {
         await Promise.all([fetchResults(), loadInputs()]);
       }
@@ -167,68 +155,213 @@
     }
   }
 
-  async function fetchResults(useCache = true) {
-    if (!selectedProjectId) return;
-    try {
-      result = await analyzeApi.getResults(
-        selectedProjectId,
-        selectedSlug,
-        useCache,
-        requestedEngines,
-      );
-    } catch {
-      // A miss here is the normal "no analysis has been run yet" case, not a
-      // failure, so it stays quiet; handleRun surfaces real run errors.
-      result = null;
+  // Findings table: server-side paging.
+  //
+  // The table used to hold the whole run -- 17 MB and 21,134 issues on Clinic
+  // Plumbing -- and page through it in the browser. It now asks the backend
+  // for one page at a time, so every control below is a query parameter
+  // rather than a filter over an array that is already in memory.
+  //
+  // `result` still holds an AnalysisResult, but `audit_issues` is now just the
+  // current page. `issue_stats` describes the whole run in every response, so
+  // the stat cards read it exactly as before; `result.page.total_matching` is
+  // the row count for the current filters.
+
+  const PAGE_SIZE_OPTIONS = [50, 200, 500];
+
+  let pageSize = $state(50);
+  let pageIndex = $state(1);
+  let searchTerm = $state("");
+  let severityFilter = $state("all");
+  let mechanismFilter = $state("all");
+  let sortMode: IssueSort = $state("band_then_score");
+  let isPageLoading = $state(false);
+  /** Set after a rejected page query, so the table falls back to one request. */
+  let pagingUnavailable = $state(false);
+  let selectedIds = new SvelteSet<string>();
+
+  /** Translate the toolbar into query parameters. */
+  function buildPageQuery(): ResultPageQuery | undefined {
+    if (pagingUnavailable) return undefined;
+
+    const bands: IssueBand[] = [];
+    if (severityFilter !== "all") {
+      bands.push(severityFilter as IssueBand);
+    } else if (!showLowRisk) {
+      // Data-quality notes ride along: they report what could not be assessed
+      // rather than a mild verdict, so they survive the low-risk toggle the
+      // same way they always have.
+      bands.push("critical", "high", "medium", "data_quality");
     }
+
+    const mechanisms: string[] = [];
+    if (mechanismFilter !== "all") {
+      mechanisms.push(mechanismFilter);
+    } else if (requestedEngines) {
+      // The chips choose what runs and, in step, what is listed. The notes are
+      // exempt from the chips for the reason above.
+      mechanisms.push(...requestedEngines, "data_quality");
+    }
+
+    return {
+      limit: pageSize,
+      offset: (pageIndex - 1) * pageSize,
+      bands: bands.length ? bands : undefined,
+      mechanisms: mechanisms.length ? mechanisms : undefined,
+      sort: sortMode,
+      search: searchTerm.trim() || undefined,
+    };
   }
 
-  // Lets an in-flight run be abandoned, either by the user or because they
-  // switched to a different project while it was still going.
+  // Lets an in-flight request be abandoned, either by the user or because they
+  // switched project or filter while it was still going.
   let runController: AbortController | null = null;
 
-  async function handleRun(forceRecompute = false) {
+  /**
+   * Load one page of findings.
+   *
+   * `useCache: false` recomputes the run. That is what the Re-run button used
+   * to do through POST /run; asking this endpoint instead runs the same
+   * `run_analysis` call behind the same pipeline tracker -- so the SSE
+   * progress feed is unaffected -- and answers with a page rather than the
+   * entire result, which is the whole point of the change.
+   */
+  async function fetchPage({ useCache = true, isRun = false } = {}) {
     if (!selectedProjectId) return;
+    // Nothing can match, so there is nothing to ask for; the table renders its
+    // empty state from `emptyByConstruction` either way.
+    if (emptyByConstruction && !isRun) {
+      isPageLoading = false;
+      return;
+    }
+
     runController?.abort();
     const controller = new AbortController();
     runController = controller;
 
-    isRunning = true;
-    error = "";
-    // Registers with the global pipeline tracker so a user who navigates away
-    // mid-run still sees progress in the header and gets a completion toast.
-    pipelineTracker.track(selectedProjectId, currentProject?.name || `Project ${selectedProjectId}`);
+    if (isRun) {
+      isRunning = true;
+      error = "";
+      // Registers with the global pipeline tracker so a user who navigates away
+      // mid-run still sees progress in the header and gets a completion toast.
+      // Only on an actual run: paging the table starts no pipeline, and
+      // tracking one would show a phantom job in the global header.
+      pipelineTracker.track(selectedProjectId, currentProject?.name || `Project ${selectedProjectId}`);
+    } else {
+      isPageLoading = true;
+    }
+
     // The previous report is deliberately kept until the new one lands: if this
-    // run fails, discarding it first would have left the user with nothing but
-    // an error message. It is dimmed while the run is in flight.
+    // request fails, discarding it first would have left the user with nothing
+    // but an error message. It is dimmed while the request is in flight.
     try {
-      const next = await analyzeApi.run(
+      const next = await analyzeApi.getResults(
         selectedProjectId,
         selectedSlug,
-        false,
-        !forceRecompute,
+        useCache,
         requestedEngines,
         controller.signal,
+        buildPageQuery(),
       );
-      if (runController !== controller) return; // superseded by a newer run
+      if (runController !== controller) return; // superseded by a newer request
       result = next;
+      // Selection is per page: the rows it referred to are gone.
+      selectedIds.clear();
     } catch (err: any) {
       if (isAbortError(err)) return;
-      error = err.message || "Analysis failed";
-      toasts.fromError(err, "Analysis failed.");
+      if (runController !== controller) return;
+
+      // A 422 means this client built a query the endpoint rejected, which is
+      // a bug in the code above rather than anything the user did. Say so
+      // loudly, then fall back to the unpaginated request so the table still
+      // shows the findings instead of going blank.
+      if ((err as ApiError)?.status === 422 && !pagingUnavailable) {
+        console.error(
+          "[AnalyzeView] the results endpoint rejected the page query; " +
+            "falling back to an unpaginated request.",
+          err,
+        );
+        pagingUnavailable = true;
+        runController = null;
+        isRunning = false;
+        isPageLoading = false;
+        await fetchPage({ useCache, isRun });
+        return;
+      }
+
+      if (isRun) {
+        error = err.message || "Analysis failed";
+        toasts.fromError(err, "Analysis failed.");
+      } else {
+        // A miss here is the normal "no analysis has been run yet" case, not a
+        // failure, so it stays quiet; a run surfaces real errors.
+        result = null;
+      }
     } finally {
       if (runController === controller) {
         runController = null;
         isRunning = false;
+        isPageLoading = false;
       }
       pipelineTracker.untrack(selectedProjectId);
     }
+  }
+
+  /** Load page one. Kept under its old name for the call sites that predate paging. */
+  async function fetchResults(useCache = true) {
+    pageIndex = 1;
+    await fetchPage({ useCache });
+  }
+
+  // Toggling three chips should be one request, not three. Page and sort
+  // changes are deliberate single clicks and reload straight away.
+  let filterTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function reloadAfterFilterChange() {
+    pageIndex = 1;
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => {
+      filterTimer = null;
+      void fetchPage();
+    }, 250);
+  }
+
+  function reloadNow() {
+    if (filterTimer) {
+      clearTimeout(filterTimer);
+      filterTimer = null;
+    }
+    void fetchPage();
+  }
+
+  function goToPage(page: number) {
+    pageIndex = page;
+    reloadNow();
+  }
+
+  function setPageSize(size: number) {
+    pageSize = size;
+    pageIndex = 1;
+    reloadNow();
+  }
+
+  function setSort(column: string) {
+    sortMode = column === "score" ? "score_desc" : "band_then_score";
+    pageIndex = 1;
+    reloadNow();
+  }
+
+  async function handleRun(forceRecompute = false) {
+    if (!selectedProjectId) return;
+    pageIndex = 1;
+    await fetchPage({ useCache: !forceRecompute, isRun: true });
   }
 
   function handleCancelRun() {
     runController?.abort();
     runController = null;
     isRunning = false;
+    isPageLoading = false;
     toasts.info("Analysis cancelled.");
   }
 
@@ -236,9 +369,35 @@
     runController?.abort();
     runController = null;
     isRunning = false;
+    isPageLoading = false;
     error = "";
     result = null;
-    await Promise.all([fetchResults(), loadInputs()]);
+    pageIndex = 1;
+    selectedIds.clear();
+    await Promise.all([fetchPage(), loadInputs()]);
+  }
+
+  // Page-local selection.
+  //
+  // Selection covers the rows on screen. It cannot span the run without
+  // holding 21,134 ids for a set the user never sees, and it is cleared on
+  // every page change so a stale id can never reach an action.
+
+  function isSelected(id: string): boolean {
+    return selectedIds.has(id);
+  }
+
+  function toggleSelect(id: string) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+  }
+
+  function toggleSelectAllOnPage() {
+    if (allOnPageSelected) {
+      for (const issue of pageIssues) selectedIds.delete(issue.id);
+    } else {
+      for (const issue of pageIssues) selectedIds.add(issue.id);
+    }
   }
 
   async function handleUploadIfc() {
@@ -273,45 +432,22 @@
     }, 2000);
   }
 
-  // Finding table multi-selection, sort, and pagination state
+  /**
+   * Download the run as CSV.
+   *
+   * The same URL the CSV button in the toolbar uses. This used to build a
+   * spreadsheet from the issues held in memory, which with paging would have
+   * exported whichever 50 rows happened to be on screen and called it the
+   * report. The server renders the whole run from the same cached result.
+   */
   function exportFindingsToCsv() {
-    const target = table.selectedCount ? table.selectedRows : table.sorted;
-    const headers = [
-      "FindingID",
-      "Severity",
-      "Mechanism",
-      "RuleID",
-      "ElementGUID",
-      "Title",
-      "Description",
-      "Score",
-      "IntrusionDepthMM",
-      "Mitigation",
-    ];
-    const rows = target.map((i) => [
-      `"${(i.id || "").replace(/"/g, '""')}"`,
-      `"${(i.band || "").replace(/"/g, '""')}"`,
-      `"${(i.mechanism || "").replace(/"/g, '""')}"`,
-      `"${(i.rule_id || "").replace(/"/g, '""')}"`,
-      `"${(i.element_id || "").replace(/"/g, '""')}"`,
-      `"${(i.title || "").replace(/"/g, '""')}"`,
-      `"${(i.description || "").replace(/"/g, '""')}"`,
-      i.score ?? "",
-      i.details?.intrusion_depth_mm ?? "",
-      `"${(i.mitigation || "").replace(/"/g, '""')}"`,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `compliance_findings_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`,
+    if (!selectedProjectId) return;
+    window.location.href = analyzeApi.getExportUrl(
+      selectedProjectId,
+      selectedSlug,
+      "csv",
+      requestedEngines,
     );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   }
   run(() => {
     selectedSlug = activeCategory === "seismic" ? "seismic" : "corrosion";
@@ -330,100 +466,59 @@
   // A run with no engine selected assesses nothing, so the button is disabled
   // rather than returning an empty audit that looks like a clean model.
   let engineSelectionEmpty = $derived(activeCategory !== "seismic" && selectedEngines.length === 0);
-  let relevantProjects = $derived(
-    projects.filter((p) => {
-      if (activeCategory === "seismic") {
-        return (
-          p.analysis_type === "seismic" ||
-          p.analysis_type === "Seismic" ||
-          p.analysis_type === "Halo"
-        );
-      }
-      return p.analysis_type === "Piping" || p.analysis_type === "Piping (Corrosive)";
-    }),
-  );
-  let currentRelevantKey = $derived(
-    `${activeCategory}_${relevantProjects.map((p) => p.id).join(",")}`,
-  );
-  run(() => {
-    if (relevantProjects.length > 0 && currentRelevantKey !== prevRelevantKey) {
-      prevRelevantKey = currentRelevantKey;
-      if (!selectedProjectId || !relevantProjects.some((p) => p.id === selectedProjectId)) {
-        selectedProjectId = relevantProjects[0].id;
-        handleProjectChange();
-      }
-    }
-  });
-  let currentProject = $derived(relevantProjects.find((p) => p.id === selectedProjectId) || null);
+  let currentProject = $derived(projects.find((p) => p.id === selectedProjectId) || null);
   // Live progress echoed on the Run button itself, not just the progress
-  // panel below — keeps attention anchored at the point of the click.
+  // panel below — keeps attention anchored at the point of the click. Kept
+  // through the pagination merge: it is the global pipeline feature, not part
+  // of the table this merge replaced.
   let runProgress = $derived(
     avgPipelineProgress(pipelineTracker.tracked.find((t) => t.projectId === selectedProjectId)?.status),
   );
-  // Ordering for the severity column: bands are ranked, not alphabetical.
-  const SEVERITY_WEIGHTS: Record<string, number> = {
-    critical: 4,
-    high: 3,
-    medium: 2,
-    low: 1,
-    data_quality: 0,
-  };
+  // SEVERITY_WEIGHTS was dropped here: the severity ordering it fed moved to
+  // the server with pagination, and the table no longer sorts client-side.
 
   function isDataQuality(issue: AuditIssue): boolean {
     return issue.mechanism === "data_quality" || issue.mechanism === "Data Quality";
   }
 
-  // Search, filter, sort, paginate and select for the findings table.
-  //
-  // The always-on constraints — the low-risk toggle and the engine selector —
-  // shape the row source rather than being dropdown filters, so the table's own
-  // filters stay one-per-control. Data-quality findings are doctrine-exempt
-  // throughout: they report what could not be assessed, so they survive the
-  // low-risk toggle and belong to no single engine.
-  const table = createTableState<AuditIssue, string>({
-    rows: () =>
-      (result?.audit_issues || []).filter((issue: AuditIssue) => {
-        const dq = isDataQuality(issue);
-        if (!showLowRisk && issue.band === "low" && !dq) return false;
-        return (
-          activeCategory === "seismic" ||
-          dq ||
-          selectedEngines.some((id) => issue.rule_id.startsWith(id) || issue.mechanism.includes(id))
-        );
-      }),
-    getId: (issue) => issue.id,
-    searchFields: (issue) => [
-      issue.title,
-      issue.rule_id,
-      issue.element_id,
-      issue.mechanism,
-      ...(issue.citations || []).flatMap((c) => [c.standard, c.clause]),
-    ],
-    filters: {
-      severity: (issue, value) =>
-        value === "data_quality"
-          ? isDataQuality(issue)
-          : issue.band === value && !isDataQuality(issue),
-      mechanism: (issue, value) =>
-        value === "data_quality"
-          ? isDataQuality(issue)
-          : issue.rule_id.startsWith(value) || issue.mechanism.includes(value),
-    },
-    comparators: {
-      band: (a, b) =>
-        (SEVERITY_WEIGHTS[(a.band || "").toLowerCase()] ?? 0) -
-        (SEVERITY_WEIGHTS[(b.band || "").toLowerCase()] ?? 0),
-    },
-    initialSort: { field: "band", asc: false },
-  });
+  /** The findings on screen. One page of the run, in the order the server cut it. */
+  let pageIssues = $derived(result?.audit_issues || []);
 
-  let dataQualityCount = $derived(
-    result?.issue_stats?.data_quality ??
-      (result?.audit_issues || []).filter(
-        (issue: AuditIssue) =>
-          issue.mechanism === "data_quality" || issue.mechanism === "Data Quality",
-      ).length,
+  /** The window the server reported, absent while the fallback request is in use. */
+  let pageWindow = $derived(result?.page ?? null);
+
+  /**
+   * The one filter combination that can select nothing.
+   *
+   * Asking for the Low band while Low verdicts are hidden is empty by
+   * construction, and it was empty before this change too. It is answered here
+   * rather than by a request, because "no bands" on the wire means "every
+   * band", not "none".
+   */
+  let emptyByConstruction = $derived(!showLowRisk && severityFilter === "low");
+
+  /** Rows matching the current filters across the whole run, not just this page. */
+  let totalMatching = $derived(
+    emptyByConstruction ? 0 : (pageWindow?.total_matching ?? pageIssues.length),
   );
+
+  /** Findings in the run, verdicts and data-quality notes together. */
+  let runTotalIssues = $derived(
+    (result?.issue_stats?.total ?? 0) + (result?.issue_stats?.data_quality ?? 0),
+  );
+
+  let visibleIssues = $derived(emptyByConstruction ? [] : pageIssues);
+  let selectedCount = $derived(selectedIds.size);
+  let allOnPageSelected = $derived(
+    visibleIssues.length > 0 && visibleIssues.every((issue) => selectedIds.has(issue.id)),
+  );
+  let someOnPageSelected = $derived(
+    !allOnPageSelected && visibleIssues.some((issue) => selectedIds.has(issue.id)),
+  );
+
+  // The stat cards read the whole-run totals, which every response carries
+  // regardless of the window, so they are unaffected by paging.
+  let dataQualityCount = $derived(result?.issue_stats?.data_quality ?? 0);
 </script>
 
 <div class="space-y-6 pb-12">
@@ -452,7 +547,7 @@
             : "Piping System Corrosion Audit"}</span
         >
         <span
-          class="inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-xs font-semibold {activeCategory ===
+          class="inline-flex items-center rounded-md border px-2.5 py-0.5 font-mono text-xs font-semibold {activeCategory ===
           'seismic'
             ? 'border-purple-800/80 bg-purple-950/60 text-purple-300 shadow-sm'
             : 'border-amber-800/80 bg-amber-950/60 text-amber-300 shadow-sm'}"
@@ -461,7 +556,7 @@
         </span>
         {#if result?.cached}
           <span
-            class="inline-flex items-center gap-1 rounded-full border border-blue-800/80 bg-blue-950/80 px-2.5 py-0.5 text-caption font-semibold text-blue-300 shadow-sm"
+            class="inline-flex items-center gap-1 rounded-md border border-blue-800/80 bg-blue-950/80 px-2.5 py-0.5 text-caption font-semibold text-blue-300 shadow-sm"
           >
             <Sparkles class="h-3 w-3 text-blue-400" />
             Cached SHA-256
@@ -500,27 +595,8 @@
       {/if}
     </div>
 
-    <!-- Actions & Project Selector -->
+    <!-- Actions -->
     <div class="flex flex-wrap items-center gap-3">
-      <!-- Project Dropdown -->
-      <div class="relative">
-        <select
-          bind:value={selectedProjectId}
-          onchange={handleProjectChange}
-          class="cursor-pointer appearance-none rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 pr-8 text-xs font-medium text-slate-50 shadow-sm focus:border-accent focus:outline-none"
-        >
-          {#if relevantProjects.length === 0}
-            <option value={null}>No {activeCategory} projects found</option>
-          {:else}
-            {#each relevantProjects as p (p.id)}
-              <option value={p.id}>{p.name} ({p.country})</option>
-            {/each}
-          {/if}
-        </select>
-        <ChevronRight
-          class="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rotate-90 text-slate-400"
-        />
-      </div>
 
       <!-- Run Action Button -->
       <button
@@ -530,7 +606,7 @@
           ? "Select at least one engine to run"
           : "Run the audit against the selected engines"}
         onclick={() => handleRun(false)}
-        class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50"
       >
         {#if isRunning}
           <RefreshCw class="h-3.5 w-3.5 animate-spin" />
@@ -545,7 +621,7 @@
         <button
           type="button"
           onclick={handleCancelRun}
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
           title="Abandon the run in progress"
         >
           <span>Cancel</span>
@@ -578,7 +654,7 @@
             >
               {#snippet trigger()}
                 <label
-                  class="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-caption font-semibold transition-colors {selectedEngines.includes(
+                  class="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-caption font-semibold transition-colors {selectedEngines.includes(
                     engine.id,
                   )
                     ? 'border-amber-800/80 bg-amber-950/60 text-amber-300'
@@ -615,7 +691,7 @@
           onclick={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
           aria-label="Force uncached recomputation against the latest IFC digest"
-          class="rounded-full border border-slate-800 bg-slate-900/80 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg border border-slate-800 bg-slate-900/80 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
           <RefreshCw class="h-3.5 w-3.5 {isRunning ? 'animate-spin' : ''}" />
         </button>
@@ -892,9 +968,15 @@
           <div>
             <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
               <span>Audit Findings</span>
-              <span class="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
-                {table.totalItems} of {result.audit_issues.length}
+              <span class="rounded-md bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
+                {totalMatching.toLocaleString()} of {runTotalIssues.toLocaleString()}
               </span>
+              {#if isPageLoading}
+                <span class="inline-flex items-center gap-1 text-caption text-slate-500">
+                  <RefreshCw class="h-3 w-3 animate-spin" />
+                  <span>Loading…</span>
+                </span>
+              {/if}
             </h2>
             <p class="mt-0.5 text-xs text-slate-400">
               Component compliance verdicts, authoritative citations, and actionable engineering
@@ -912,7 +994,7 @@
                   "bcf",
                   requestedEngines,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
                 title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -925,7 +1007,7 @@
                   "csv",
                   requestedEngines,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                 title="Download tabulated audit spreadsheet with lineage and citations"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -938,7 +1020,7 @@
                   "json",
                   requestedEngines,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                 title="Download structured machine-readable JSON analysis report"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -955,7 +1037,11 @@
             <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              bind:value={table.search}
+              value={searchTerm}
+              oninput={(e) => {
+                searchTerm = (e.currentTarget as HTMLInputElement).value;
+                reloadAfterFilterChange();
+              }}
               placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
               class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
             />
@@ -964,7 +1050,11 @@
           <!-- Severity Filter -->
           <div class="sm:col-span-3">
             <select
-              bind:value={table.filters.severity}
+              value={severityFilter}
+              onchange={(e) => {
+                severityFilter = (e.currentTarget as HTMLSelectElement).value;
+                reloadAfterFilterChange();
+              }}
               class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="all">All Severities</option>
@@ -979,7 +1069,11 @@
           <!-- Mechanism Filter -->
           <div class="sm:col-span-3">
             <select
-              bind:value={table.filters.mechanism}
+              value={mechanismFilter}
+              onchange={(e) => {
+                mechanismFilter = (e.currentTarget as HTMLSelectElement).value;
+                reloadAfterFilterChange();
+              }}
               class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
             >
               <option value="all">All Mechanisms</option>
@@ -1002,21 +1096,25 @@
           <label class="flex cursor-pointer select-none items-center gap-2">
             <input
               type="checkbox"
-              bind:checked={showLowRisk}
+              checked={showLowRisk}
+              onchange={(e) => {
+                showLowRisk = (e.currentTarget as HTMLInputElement).checked;
+                reloadAfterFilterChange();
+              }}
               class="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 text-accent focus:ring-0"
             />
             <span>Include Low Severity verdicts in list</span>
           </label>
           <span class="text-caption text-slate-500">
-            Showing {table.totalItems} items
+            {totalMatching.toLocaleString()} matching {totalMatching === 1 ? "finding" : "findings"}
           </span>
         </div>
 
         <!-- Bulk Actions Bar -->
         <BulkActionBar
-          selectedCount={table.selectedCount}
+          selectedCount={selectedCount}
           itemLabel="finding"
-          onClearSelection={() => table.clearSelection()}
+          onClearSelection={() => selectedIds.clear()}
           onBulkExport={exportFindingsToCsv}
           onBulkDelete={null}
           onBulkEdit={null}
@@ -1024,7 +1122,7 @@
 
         <!-- Tabular Findings Table -->
         <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
-          {#if table.totalItems === 0}
+          {#if totalMatching === 0}
             <div class="p-12 text-center text-xs text-slate-500">
               No compliance issues match your selected filters.
             </div>
@@ -1038,54 +1136,42 @@
                     <th class="w-10 px-4 py-3.5">
                       <input
                         type="checkbox"
-                        checked={table.allFilteredSelected}
-                        indeterminate={table.someFilteredSelected}
-                        onchange={() => table.toggleSelectAll()}
+                        checked={allOnPageSelected}
+                        indeterminate={someOnPageSelected}
+                        onchange={() => toggleSelectAllOnPage()}
                         class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
-                        title="Select all findings"
+                        title="Select every finding on this page"
                       />
                     </th>
                     <SortHeader
                       column="band"
-                      sortField={table.sortField}
-                      sortAsc={table.sortAsc}
-                      onSort={(f) => table.toggleSort(f)}
+                      sortField={sortMode === "score_desc" ? "score" : "band"}
+                      sortAsc={false}
+                      onSort={setSort}
                       customClass="px-4 py-3.5"
                     >
                       Severity
                     </SortHeader>
-                    <SortHeader
-                      column="rule_id"
-                      sortField={table.sortField}
-                      sortAsc={table.sortAsc}
-                      onSort={(f) => table.toggleSort(f)}
-                      customClass="px-4 py-3.5"
+                    <th
+                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-slate-400"
                     >
                       Rule &amp; Mechanism
-                    </SortHeader>
-                    <SortHeader
-                      column="element_id"
-                      sortField={table.sortField}
-                      sortAsc={table.sortAsc}
-                      onSort={(f) => table.toggleSort(f)}
-                      customClass="px-4 py-3.5"
+                    </th>
+                    <th
+                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-slate-400"
                     >
                       Element GUID
-                    </SortHeader>
-                    <SortHeader
-                      column="title"
-                      sortField={table.sortField}
-                      sortAsc={table.sortAsc}
-                      onSort={(f) => table.toggleSort(f)}
-                      customClass="px-4 py-3.5"
+                    </th>
+                    <th
+                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-slate-400"
                     >
                       Finding &amp; Citations
-                    </SortHeader>
+                    </th>
                     <SortHeader
                       column="score"
-                      sortField={table.sortField}
-                      sortAsc={table.sortAsc}
-                      onSort={(f) => table.toggleSort(f)}
+                      sortField={sortMode === "score_desc" ? "score" : "band"}
+                      sortAsc={false}
+                      onSort={setSort}
                       align="center"
                       customClass="px-4 py-3.5"
                     >
@@ -1095,13 +1181,10 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
-                  {#each table.paginated as issue (issue.id)}
-                    {@const isDq =
-                      issue.mechanism === "data_quality" || issue.mechanism === "Data Quality"}
+                  {#each visibleIssues as issue (issue.id)}
+                    {@const isDq = isDataQuality(issue)}
                     <tr
-                      class="group transition-colors hover:bg-slate-900/60 {table.isSelected(
-                        issue.id,
-                      )
+                      class="group transition-colors hover:bg-slate-900/60 {isSelected(issue.id)
                         ? 'bg-blue-950/20'
                         : ''}"
                     >
@@ -1109,41 +1192,41 @@
                       <td class="w-10 px-4 py-3.5 align-top">
                         <input
                           type="checkbox"
-                          checked={table.isSelected(issue.id)}
-                          onchange={() => table.toggleSelect(issue.id)}
+                          checked={isSelected(issue.id)}
+                          onchange={() => toggleSelect(issue.id)}
                           class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
                         />
                       </td>
 
-                      <!-- Severity Band Pill -->
+                      <!-- Severity Band Tag -->
                       <td class="whitespace-nowrap px-4 py-3.5 align-top">
                         {#if isDq}
                           <span
-                            class="inline-block rounded-full border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-micro font-semibold uppercase text-slate-300"
+                            class="inline-block rounded-md border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-micro font-semibold uppercase text-slate-300"
                           >
                             Data Quality
                           </span>
                         {:else if issue.band === "critical"}
                           <span
-                            class="inline-block rounded-full border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-sm"
+                            class="inline-block rounded-md border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-sm"
                           >
                             Critical
                           </span>
                         {:else if issue.band === "high"}
                           <span
-                            class="inline-block rounded-full border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-sm"
+                            class="inline-block rounded-md border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-sm"
                           >
                             High
                           </span>
                         {:else if issue.band === "medium"}
                           <span
-                            class="inline-block rounded-full border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-sm"
+                            class="inline-block rounded-md border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-sm"
                           >
                             Medium
                           </span>
                         {:else}
                           <span
-                            class="inline-block rounded-full border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-sm"
+                            class="inline-block rounded-md border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-sm"
                           >
                             Low
                           </span>
@@ -1260,14 +1343,12 @@
             </div>
 
             <TablePagination
-              currentPage={table.page}
-              pageSize={table.pageSize}
-              totalItems={table.totalItems}
-              onPageChange={(p) => (table.requestedPage = p)}
-              onPageSizeChange={(size) => {
-                table.pageSize = size;
-                table.requestedPage = 1;
-              }}
+              currentPage={pageIndex}
+              {pageSize}
+              totalItems={totalMatching}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageChange={goToPage}
+              onPageSizeChange={setPageSize}
             />
           {/if}
         </div>
@@ -1295,8 +1376,7 @@
 
 <!-- Detailed Issue Inspection Modal / Drawer -->
 {#if inspectedIssue}
-  {@const isDq =
-    inspectedIssue.mechanism === "data_quality" || inspectedIssue.mechanism === "Data Quality"}
+  {@const isDq = isDataQuality(inspectedIssue)}
   <Modal
     isOpen={true}
     title={inspectedIssue.title}

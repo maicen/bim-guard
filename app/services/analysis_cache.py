@@ -73,12 +73,18 @@ class CacheKey:
             request that asked for every engine — the same staleness the digest
             rules out, arriving through the selection instead of the model.
             Empty means the caller made no selection.
+        include_low: Whether the result carries Low-band verdicts. A run that
+            suppressed them is a different result from one that kept them --
+            on Clinic Plumbing the difference is GC-001's 6,587 findings -- so
+            without this the first of the two to be computed would be served
+            back to a caller who asked for the other.
     """
 
     project_id: int
     slug: str
     source_sha256: str
     engines: tuple[str, ...] = ()
+    include_low: bool = True
 
 
 class AnalysisCache:

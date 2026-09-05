@@ -29,6 +29,7 @@
     ChevronDown,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import type {
     Rule,
     RuleFolder,
@@ -202,6 +203,11 @@
   let dragStartX = 0;
   let dragStartWidth = 280;
 
+  $effect(() => {
+    const _orgId = authState.activeOrganizationId;
+    loadData(true);
+  });
+
   async function loadData(force = false) {
     if (!rules.length) {
       isLoading = true;
@@ -211,8 +217,8 @@
     error = "";
     try {
       const [rulesData, foldersData] = await Promise.all([
-        rulesApi.list(undefined, { forceRefresh: force }),
-        rulesApi.folders(undefined, { forceRefresh: force }),
+        rulesApi.list({ organization_id: authState.activeOrganizationId }, { forceRefresh: force }),
+        rulesApi.folders(undefined, { forceRefresh: force, organization_id: authState.activeOrganizationId }),
       ]);
       rules = rulesData;
       folders = foldersData;
@@ -712,7 +718,7 @@
       <button
         type="button"
         onclick={() => loadData(true)}
-        class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
         title="Refresh rules catalog"
       >
         <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
@@ -722,7 +728,7 @@
       <button
         type="button"
         onclick={handleSeedRules}
-        class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
         title="Seed engine rulesets: GC-001, CC-001, MC-001"
       >
         <Database class="h-3.5 w-3.5 text-emerald-400" />
@@ -735,7 +741,7 @@
           <button
             type="button"
             onclick={() => (isImportExportMenuOpen = !isImportExportMenuOpen)}
-            class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
             title="Import or export rules"
             aria-expanded={isImportExportMenuOpen}
             aria-haspopup="menu"
@@ -804,7 +810,7 @@
           <button
             type="button"
             onclick={openSaveSnapshotModal}
-            class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
             title="Save the current folder's rules as a reusable snapshot"
           >
             <Camera class="h-3.5 w-3.5 text-purple-400" />
@@ -815,7 +821,7 @@
         <button
           type="button"
           onclick={openCreateModal}
-          class="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
         >
           <Plus class="h-3.5 w-3.5" />
           <span>New Rule</span>
@@ -1618,7 +1624,7 @@
                   <td class="px-4 py-3 font-mono text-slate-400">{snap.source_ruleset_id}</td>
                   <td class="px-4 py-3">
                     <span
-                      class="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold uppercase text-slate-300"
+                      class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold uppercase text-slate-300"
                     >
                       {snap.source_mode}
                     </span>

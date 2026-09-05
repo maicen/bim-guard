@@ -111,7 +111,7 @@
       type="button"
       disabled={!parseUrls().length || isImporting}
       onclick={handleImport}
-      class="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
     >
       {#if isImporting}
         <Loader2 class="h-3.5 w-3.5 animate-spin" />

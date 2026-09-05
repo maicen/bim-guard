@@ -13,8 +13,6 @@ from app.modules.contracts import (
     GitHubRepoResponse,
     GitHubRepoStructureResponse,
     GitHubRepoUpdateRequest,
-    ProjectImportFromRepoRequest,
-    ProjectResponse,
 )
 from app.services.github_repo_service import GitHubRepoService
 
@@ -128,35 +126,4 @@ def get_repository_structure(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Could not read GitHub repository structure: {exc}",
-        )
-
-
-@router.post(
-    "/{repo_id}/import",
-    response_model=ProjectResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Import repository model file as a project",
-)
-def import_project_from_repository(
-    repo_id: int,
-    payload: ProjectImportFromRepoRequest,
-    service: Annotated[GitHubRepoService, Depends(get_github_repo_service)],
-) -> ProjectResponse:
-    """Import an IFC model file from a GitHub repository as a new BIM-Guard project."""
-    try:
-        imported = service.import_model_as_project(
-            repo_id=repo_id,
-            file_path=payload.file_path,
-            name=payload.name,
-            country=payload.country,
-            analysis_type=payload.analysis_type,
-        )
-        return ProjectResponse(**imported)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    except Exception as exc:
-        logger.error("Failed to import model from GitHub repo_id=%d path=%s: %s", repo_id, payload.file_path, exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to import project model from GitHub repository: {exc}",
         )

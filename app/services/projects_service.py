@@ -821,6 +821,62 @@ class ProjectsService:
         logger.info("Primary IFC set project_id=%d file_id=%s", project_id, file_id)
         return {**target, "is_primary": True}
 
+    def delete_ifc_file(self, project_id: int, file_id: int) -> dict | None:
+        """Detach and delete one of a project's models.
+
+        Deleting the primary promotes the next remaining model (by
+        ``get_ifc_files_by_project`` order) so the project always has a model
+        to analyse as long as it has any left. Deleting a project's last model
+        is allowed -- an existing project with no model is a state this
+        service already supports (``get_ifc_files_by_project`` returns ``[]``
+        for one), so ``projects.ifc_file_path`` is cleared to match rather
+        than left naming bytes that no longer exist.
+
+        Args:
+            project_id: Project owning the row.
+            file_id: ``project_ifc_files.id`` to remove.
+
+        Returns:
+            The deleted row, or ``None`` if the project holds no such row --
+            including ``file_id`` belonging to another project.
+        """
+        rows = self._read_ifc_file_rows(project_id)
+        target = next((row for row in rows if row.get("id") == file_id), None)
+        if target is None:
+            logger.warning(
+                "IFC file not deleted; no such file project_id=%d file_id=%s",
+                project_id,
+                file_id,
+            )
+            return None
+
+        self._storage.delete(target.get("file_path") or "")
+        self._ifc_files.delete(file_id)
+        self._invalidate_ifc_files(project_id)
+
+        if target.get("is_primary"):
+            remaining = [row for row in rows if row.get("id") != file_id]
+            if remaining:
+                promoted = remaining[0]
+                self._ifc_files.update(updates={"is_primary": True}, pk_values=promoted["id"])
+                self._invalidate_ifc_files(project_id)
+                self.attach_ifc(project_id, promoted.get("file_path") or "")
+            else:
+                self._projects.update(
+                    updates={"ifc_file_path": "", "updated_at": now_iso_utc()},
+                    pk_values=project_id,
+                )
+                invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
+                invalidate_cache("bimguard:projects:list")
+
+        logger.info(
+            "IFC file deleted project_id=%d file_id=%s was_primary=%s",
+            project_id,
+            file_id,
+            target.get("is_primary"),
+        )
+        return target
+
     def resolve_primary_ifc_file(self, project_id: int) -> Path | None:
         """Materialise the one model an analysis of a single model reads.
 

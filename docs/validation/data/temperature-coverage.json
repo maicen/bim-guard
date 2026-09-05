@@ -1,51 +1,19 @@
 {
-  "models_dir": "test-models\\models",
+  "models_dir": "data\\test_models",
   "inference_enabled": true,
   "totals": {
-    "total": 93457,
+    "total": 56509,
     "from_ifc": 0,
-    "inferred": 29966,
-    "unknown": 63491,
-    "coverage_pct": 32.06
+    "inferred": 15308,
+    "unknown": 41201,
+    "coverage_pct": 27.09
   },
   "bands": {
-    "10-25 ambient": 22257,
-    "60-80 DHW / zinc reversal": 7708,
+    "10-25 ambient": 9204,
+    "60-80 DHW / zinc reversal": 6103,
     "80-100 LTHW flow": 1
   },
   "models": [
-    {
-      "total": 102,
-      "from_ifc": 0,
-      "inferred": 10,
-      "unknown": 92,
-      "name": "Clinic_Architectural.ifc",
-      "resolved": 10,
-      "bands": {
-        "10-25 ambient": 10
-      },
-      "systems_missing": [
-        [
-          "unknown",
-          92
-        ]
-      ]
-    },
-    {
-      "total": 2089,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 2089,
-      "name": "Clinic_Electrical.ifc",
-      "resolved": 0,
-      "bands": {},
-      "systems_missing": [
-        [
-          "unknown",
-          2089
-        ]
-      ]
-    },
     {
       "total": 3704,
       "from_ifc": 0,
@@ -84,91 +52,6 @@
         [
           "rainwater",
           80
-        ]
-      ]
-    },
-    {
-      "total": 1673,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 1673,
-      "name": "west_riverside_hospital_elec_ifc4.ifc",
-      "resolved": 0,
-      "bands": {},
-      "systems_missing": [
-        [
-          "unknown",
-          1673
-        ]
-      ]
-    },
-    {
-      "total": 861,
-      "from_ifc": 0,
-      "inferred": 354,
-      "unknown": 507,
-      "name": "west_riverside_hospital_fire_ifc4.ifc",
-      "resolved": 354,
-      "bands": {
-        "10-25 ambient": 354
-      },
-      "systems_missing": [
-        [
-          "unknown",
-          507
-        ]
-      ]
-    },
-    {
-      "total": 17424,
-      "from_ifc": 0,
-      "inferred": 1895,
-      "unknown": 15529,
-      "name": "west_riverside_hospital_mech_ifc4.ifc",
-      "resolved": 1895,
-      "bands": {
-        "60-80 DHW / zinc reversal": 1603,
-        "10-25 ambient": 292
-      },
-      "systems_missing": [
-        [
-          "unknown",
-          15529
-        ]
-      ]
-    },
-    {
-      "total": 8539,
-      "from_ifc": 0,
-      "inferred": 4974,
-      "unknown": 3565,
-      "name": "west_riverside_hospital_plumb_ifc4.ifc",
-      "resolved": 4974,
-      "bands": {
-        "10-25 ambient": 3296,
-        "60-80 DHW / zinc reversal": 1678
-      },
-      "systems_missing": [
-        [
-          "unknown",
-          3565
-        ]
-      ]
-    },
-    {
-      "total": 13490,
-      "from_ifc": 0,
-      "inferred": 12399,
-      "unknown": 1091,
-      "name": "west_riverside_hospital_sprinkle_ifc4.ifc",
-      "resolved": 12399,
-      "bands": {
-        "10-25 ambient": 12399
-      },
-      "systems_missing": [
-        [
-          "unknown",
-          1091
         ]
       ]
     },
@@ -221,24 +104,6 @@
       ]
     },
     {
-      "total": 99,
-      "from_ifc": 0,
-      "inferred": 3,
-      "unknown": 96,
-      "name": "Duplex_Electrical_20121207.ifc",
-      "resolved": 3,
-      "bands": {
-        "10-25 ambient": 1,
-        "60-80 DHW / zinc reversal": 2
-      },
-      "systems_missing": [
-        [
-          "unknown",
-          96
-        ]
-      ]
-    },
-    {
       "total": 926,
       "from_ifc": 0,
       "inferred": 148,
@@ -283,47 +148,19 @@
       ]
     },
     {
-      "total": 73,
+      "total": 6,
       "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 73,
-      "name": "IFC_Schependomlaan.ifc",
-      "resolved": 0,
-      "bands": {},
+      "inferred": 4,
+      "unknown": 2,
+      "name": "nfpa13_test.ifc",
+      "resolved": 4,
+      "bands": {
+        "10-25 ambient": 4
+      },
       "systems_missing": [
         [
           "unknown",
-          73
-        ]
-      ]
-    },
-    {
-      "total": 48,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 48,
-      "name": "Molio_with_URIs.ifc",
-      "resolved": 0,
-      "bands": {},
-      "systems_missing": [
-        [
-          "unknown",
-          48
-        ]
-      ]
-    },
-    {
-      "total": 31,
-      "from_ifc": 0,
-      "inferred": 0,
-      "unknown": 31,
-      "name": "wbdg_office_arc.ifc",
-      "resolved": 0,
-      "bands": {},
-      "systems_missing": [
-        [
-          "unknown",
-          31
+          2
         ]
       ]
     },
@@ -354,11 +191,11 @@
       ]
     },
     {
-      "total": 18488,
+      "total": 17424,
       "from_ifc": 0,
       "inferred": 1893,
-      "unknown": 16595,
-      "name": "west_riverside_hospital_mech_ifc2x3.ifc",
+      "unknown": 15531,
+      "name": "west_riverside_hospital_mech_ifc4.ifc",
       "resolved": 1893,
       "bands": {
         "60-80 DHW / zinc reversal": 1602,
@@ -367,25 +204,43 @@
       "systems_missing": [
         [
           "unknown",
-          16595
+          15531
         ]
       ]
     },
     {
       "total": 9013,
       "from_ifc": 0,
-      "inferred": 5120,
-      "unknown": 3893,
+      "inferred": 5119,
+      "unknown": 3894,
       "name": "west_riverside_hospital_plumb_ifc2x3.ifc",
-      "resolved": 5120,
+      "resolved": 5119,
       "bands": {
-        "10-25 ambient": 3439,
+        "10-25 ambient": 3438,
         "60-80 DHW / zinc reversal": 1681
       },
       "systems_missing": [
         [
           "unknown",
-          3893
+          3894
+        ]
+      ]
+    },
+    {
+      "total": 8539,
+      "from_ifc": 0,
+      "inferred": 4974,
+      "unknown": 3565,
+      "name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "resolved": 4974,
+      "bands": {
+        "10-25 ambient": 3296,
+        "60-80 DHW / zinc reversal": 1678
+      },
+      "systems_missing": [
+        [
+          "unknown",
+          3565
         ]
       ]
     }

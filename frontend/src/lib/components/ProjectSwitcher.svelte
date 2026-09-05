@@ -5,12 +5,13 @@
   import type { Project } from "../types";
 
   interface Props {
-    selectedProject: Project | null;
+    selectedProject?: Project | null;
+    selectedProjectId?: number | null;
     /** Switch the app's current project context. */
     onSwitch: (projectId: number) => void;
   }
 
-  let { selectedProject, onSwitch }: Props = $props();
+  let { selectedProject = null, selectedProjectId = null, onSwitch }: Props = $props();
 
   // Every project-scoped view (Compliance Audit, Reports, Viewer) used to
   // own an independent project dropdown with no shared "current project"
@@ -27,9 +28,9 @@
   );
 
   $effect(() => {
-    if (allProjects.length) return;
+    const orgId = authState.activeOrganizationId;
     projectsApi
-      .list()
+      .list({ forceRefresh: true, organization_id: orgId })
       .then((res) => {
         allProjects = res.projects || [];
       })
@@ -46,15 +47,15 @@
 </script>
 
 <div
-  class="ml-2 hidden items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 lg:inline-flex"
+  class="ml-1 sm:ml-2 flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2 sm:px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-700 shrink-0"
 >
   <Building2 class="h-3.5 w-3.5 shrink-0 text-blue-400" />
   <div class="relative">
     <select
-      value={selectedProject?.id ?? ""}
+      value={selectedProject?.id ?? selectedProjectId ?? ""}
       onchange={handleChange}
       aria-label="Switch current project"
-      class="max-w-[12rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-blue-300 focus:outline-none"
+      class="max-w-[7.5rem] sm:max-w-[11rem] md:max-w-[15rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-slate-200 focus:outline-none"
     >
       <option value="" disabled>Select project…</option>
       {#each projects as p (p.id)}
@@ -62,7 +63,7 @@
       {/each}
     </select>
     <ChevronDown
-      class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-blue-400"
+      class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400"
     />
   </div>
 </div>

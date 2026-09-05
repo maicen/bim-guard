@@ -1,58 +1,24 @@
 {
-  "models_dir": "test-models\\models",
+  "models_dir": "data\\test_models",
   "default_enabled": true,
   "totals": {
-    "total": 93457,
-    "classified": 93457,
+    "total": 56509,
+    "classified": 56509,
     "coverage_pct": 100.0,
     "by_source": {
       "ifc_property": 0,
-      "spatial_names": 783,
-      "default_indoor": 92674,
+      "spatial_names": 550,
+      "default_indoor": 55959,
       "unclassified": 0
     },
     "by_class": {
-      "T1_indoor_damp": 93026,
-      "T0_dry": 305,
-      "T2_humid": 67,
-      "T3_chloride": 59
+      "T1_indoor_damp": 56311,
+      "T0_dry": 140,
+      "T2_humid": 31,
+      "T3_chloride": 27
     }
   },
   "models": [
-    {
-      "name": "Clinic_Architectural.ifc",
-      "total": 102,
-      "classified": 102,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 102,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 102
-      },
-      "by_confidence": {
-        "low": 102
-      }
-    },
-    {
-      "name": "Clinic_Electrical.ifc",
-      "total": 2089,
-      "classified": 2089,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 2089,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 2089
-      },
-      "by_confidence": {
-        "low": 2089
-      }
-    },
     {
       "name": "Clinic_HVAC.ifc",
       "total": 3704,
@@ -86,95 +52,6 @@
       },
       "by_confidence": {
         "low": 6587
-      }
-    },
-    {
-      "name": "west_riverside_hospital_elec_ifc4.ifc",
-      "total": 1673,
-      "classified": 1673,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 1673,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 1673
-      },
-      "by_confidence": {
-        "low": 1673
-      }
-    },
-    {
-      "name": "west_riverside_hospital_fire_ifc4.ifc",
-      "total": 861,
-      "classified": 861,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 861,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 861
-      },
-      "by_confidence": {
-        "low": 861
-      }
-    },
-    {
-      "name": "west_riverside_hospital_mech_ifc4.ifc",
-      "total": 17424,
-      "classified": 17424,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 198,
-        "default_indoor": 17226,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 17226,
-        "T0_dry": 140,
-        "T2_humid": 31,
-        "T3_chloride": 27
-      },
-      "by_confidence": {
-        "low": 17226,
-        "medium": 198
-      }
-    },
-    {
-      "name": "west_riverside_hospital_plumb_ifc4.ifc",
-      "total": 8539,
-      "classified": 8539,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 8539,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 8539
-      },
-      "by_confidence": {
-        "low": 8539
-      }
-    },
-    {
-      "name": "west_riverside_hospital_sprinkle_ifc4.ifc",
-      "total": 13490,
-      "classified": 13490,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 13490,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 13490
-      },
-      "by_confidence": {
-        "low": 13490
       }
     },
     {
@@ -229,23 +106,6 @@
       }
     },
     {
-      "name": "Duplex_Electrical_20121207.ifc",
-      "total": 99,
-      "classified": 99,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 99,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 99
-      },
-      "by_confidence": {
-        "low": 99
-      }
-    },
-    {
       "name": "Duplex_MEP_20110907.ifc",
       "total": 926,
       "classified": 926,
@@ -282,54 +142,20 @@
       }
     },
     {
-      "name": "IFC_Schependomlaan.ifc",
-      "total": 73,
-      "classified": 73,
+      "name": "nfpa13_test.ifc",
+      "total": 6,
+      "classified": 6,
       "by_source": {
         "ifc_property": 0,
         "spatial_names": 0,
-        "default_indoor": 73,
+        "default_indoor": 6,
         "unclassified": 0
       },
       "by_class": {
-        "T1_indoor_damp": 73
+        "T1_indoor_damp": 6
       },
       "by_confidence": {
-        "low": 73
-      }
-    },
-    {
-      "name": "Molio_with_URIs.ifc",
-      "total": 48,
-      "classified": 48,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 48,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 48
-      },
-      "by_confidence": {
-        "low": 48
-      }
-    },
-    {
-      "name": "wbdg_office_arc.ifc",
-      "total": 31,
-      "classified": 31,
-      "by_source": {
-        "ifc_property": 0,
-        "spatial_names": 0,
-        "default_indoor": 31,
-        "unclassified": 0
-      },
-      "by_class": {
-        "T1_indoor_damp": 31
-      },
-      "by_confidence": {
-        "low": 31
+        "low": 6
       }
     },
     {
@@ -351,24 +177,24 @@
       }
     },
     {
-      "name": "west_riverside_hospital_mech_ifc2x3.ifc",
-      "total": 18488,
-      "classified": 18488,
+      "name": "west_riverside_hospital_mech_ifc4.ifc",
+      "total": 17424,
+      "classified": 17424,
       "by_source": {
         "ifc_property": 0,
-        "spatial_names": 233,
-        "default_indoor": 18255,
+        "spatial_names": 198,
+        "default_indoor": 17226,
         "unclassified": 0
       },
       "by_class": {
-        "T1_indoor_damp": 18255,
-        "T0_dry": 165,
-        "T2_humid": 36,
-        "T3_chloride": 32
+        "T1_indoor_damp": 17226,
+        "T0_dry": 140,
+        "T2_humid": 31,
+        "T3_chloride": 27
       },
       "by_confidence": {
-        "low": 18255,
-        "medium": 233
+        "low": 17226,
+        "medium": 198
       }
     },
     {
@@ -386,6 +212,23 @@
       },
       "by_confidence": {
         "low": 9013
+      }
+    },
+    {
+      "name": "west_riverside_hospital_plumb_ifc4.ifc",
+      "total": 8539,
+      "classified": 8539,
+      "by_source": {
+        "ifc_property": 0,
+        "spatial_names": 0,
+        "default_indoor": 8539,
+        "unclassified": 0
+      },
+      "by_class": {
+        "T1_indoor_damp": 8539
+      },
+      "by_confidence": {
+        "low": 8539
       }
     }
   ]

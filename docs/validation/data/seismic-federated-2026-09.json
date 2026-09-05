@@ -1,0 +1,966 @@
+{
+  "generated_by": "scripts/run_seismic_matrix.py",
+  "seismic_config": "data/rulesets/config_en_1998_1_din_4149.json",
+  "runs": [
+    {
+      "building": "clinic",
+      "run": "control-Clinic_HVAC",
+      "federated": false,
+      "primary_model": "Clinic_HVAC.ifc",
+      "extra_models": [],
+      "building_type": "hospital",
+      "wall_clock_s": 47.2,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 1806,
+        "critical": 19,
+        "high": 617,
+        "medium": 1170,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 3704,
+        "in_class": 1548,
+        "braced": 1543,
+        "below_threshold": 5,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 1806,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 1806,
+      "clashes_by_band": {
+        "critical": 19,
+        "high": 617,
+        "medium": 1170,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 1806,
+      "cross_model_pairs": [
+        {
+          "source_model": "Clinic_HVAC.ifc",
+          "clashing_source_model": "Clinic_HVAC.ifc",
+          "count": 1806
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/clinic/control-Clinic_HVAC/control-Clinic_HVAC.bcfzip",
+      "bcf_validation": {
+        "topics": 1806,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "clinic",
+      "run": "control-Clinic_Plumbing",
+      "federated": false,
+      "primary_model": "Clinic_Plumbing.ifc",
+      "extra_models": [],
+      "building_type": "hospital",
+      "wall_clock_s": 282.5,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 1931,
+        "critical": 29,
+        "high": 38,
+        "medium": 1864,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 6587,
+        "in_class": 2893,
+        "braced": 676,
+        "below_threshold": 2217,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 1931,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 1931,
+      "clashes_by_band": {
+        "critical": 29,
+        "high": 38,
+        "medium": 1864,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 1931,
+      "cross_model_pairs": [
+        {
+          "source_model": "Clinic_Plumbing.ifc",
+          "clashing_source_model": "Clinic_Plumbing.ifc",
+          "count": 1931
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/clinic/control-Clinic_Plumbing/control-Clinic_Plumbing.bcfzip",
+      "bcf_validation": {
+        "topics": 1931,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "clinic",
+      "run": "control-Clinic_Structural",
+      "federated": false,
+      "primary_model": "Clinic_Structural.ifc",
+      "extra_models": [],
+      "building_type": "hospital",
+      "wall_clock_s": 12.5,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 1085,
+        "in_class": 0,
+        "braced": 0,
+        "below_threshold": 0,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/clinic/control-Clinic_Structural/control-Clinic_Structural.bcfzip",
+      "bcf_validation": {
+        "topics": 0,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "clinic",
+      "run": "federated",
+      "federated": true,
+      "primary_model": "Clinic_Plumbing.ifc",
+      "extra_models": [
+        "Clinic_HVAC.ifc",
+        "Clinic_Structural.ifc"
+      ],
+      "building_type": "hospital",
+      "wall_clock_s": 378.4,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 4533,
+        "critical": 53,
+        "high": 847,
+        "medium": 3633,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 3,
+        "elements": 11376,
+        "in_class": 4441,
+        "braced": 2219,
+        "below_threshold": 2222,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 4533,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 4533,
+      "clashes_by_band": {
+        "critical": 53,
+        "high": 847,
+        "medium": 3633,
+        "low": 0
+      },
+      "cross_model_clashes": 796,
+      "same_model_clashes": 3737,
+      "cross_model_pairs": [
+        {
+          "source_model": "Clinic_Plumbing.ifc",
+          "clashing_source_model": "Clinic_Plumbing.ifc",
+          "count": 1931
+        },
+        {
+          "source_model": "Clinic_HVAC.ifc",
+          "clashing_source_model": "Clinic_HVAC.ifc",
+          "count": 1806
+        },
+        {
+          "source_model": "Clinic_HVAC.ifc",
+          "clashing_source_model": "Clinic_Structural.ifc",
+          "count": 521
+        },
+        {
+          "source_model": "Clinic_Plumbing.ifc",
+          "clashing_source_model": "Clinic_Structural.ifc",
+          "count": 121
+        },
+        {
+          "source_model": "Clinic_HVAC.ifc",
+          "clashing_source_model": "Clinic_Plumbing.ifc",
+          "count": 80
+        },
+        {
+          "source_model": "Clinic_Plumbing.ifc",
+          "clashing_source_model": "Clinic_HVAC.ifc",
+          "count": 74
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/clinic/federated/federated.bcfzip",
+      "bcf_validation": {
+        "topics": 4533,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "digitalhub",
+      "run": "control-DigitalHub_FM-HZG_v2",
+      "federated": false,
+      "primary_model": "DigitalHub_FM-HZG_v2.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 3.8,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 912
+      },
+      "scope": {
+        "models": 1,
+        "elements": 1795,
+        "in_class": 914,
+        "braced": 0,
+        "below_threshold": 2,
+        "unmeasurable": 912,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 912,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 912,
+      "geometry_unavailable": 912,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/control-DigitalHub_FM-HZG_v2/control-DigitalHub_FM-HZG_v2.bcfzip",
+      "bcf_validation": {
+        "topics": 912,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "digitalhub",
+      "run": "control-DigitalHub_FM-LFT_v2",
+      "federated": false,
+      "primary_model": "DigitalHub_FM-LFT_v2.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 3.2,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 547,
+        "critical": 41,
+        "high": 320,
+        "medium": 186,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 1310,
+        "in_class": 595,
+        "braced": 595,
+        "below_threshold": 0,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 547,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 547,
+      "clashes_by_band": {
+        "critical": 41,
+        "high": 320,
+        "medium": 186,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 547,
+      "cross_model_pairs": [
+        {
+          "source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "clashing_source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "count": 547
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/control-DigitalHub_FM-LFT_v2/control-DigitalHub_FM-LFT_v2.bcfzip",
+      "bcf_validation": {
+        "topics": 547,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "digitalhub",
+      "run": "control-DigitalHub_FM-SAN_v2",
+      "federated": false,
+      "primary_model": "DigitalHub_FM-SAN_v2.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 12.5,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 504
+      },
+      "scope": {
+        "models": 1,
+        "elements": 1034,
+        "in_class": 504,
+        "braced": 0,
+        "below_threshold": 0,
+        "unmeasurable": 504,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 504,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 504,
+      "geometry_unavailable": 504,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/control-DigitalHub_FM-SAN_v2/control-DigitalHub_FM-SAN_v2.bcfzip",
+      "bcf_validation": {
+        "topics": 504,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "digitalhub",
+      "run": "federated",
+      "federated": true,
+      "primary_model": "DigitalHub_FM-SAN_v2.ifc",
+      "extra_models": [
+        "DigitalHub_FM-HZG_v2.ifc",
+        "DigitalHub_FM-LFT_v2.ifc"
+      ],
+      "building_type": "standard",
+      "wall_clock_s": 16.8,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 549,
+        "critical": 41,
+        "high": 320,
+        "medium": 188,
+        "low": 0,
+        "data_quality": 1416
+      },
+      "scope": {
+        "models": 3,
+        "elements": 4139,
+        "in_class": 2013,
+        "braced": 595,
+        "below_threshold": 2,
+        "unmeasurable": 1416,
+        "threshold_mm": 63.0,
+        "clashes": 549,
+        "data_quality": 1416,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 549,
+      "clashes_by_band": {
+        "critical": 41,
+        "high": 320,
+        "medium": 188,
+        "low": 0
+      },
+      "cross_model_clashes": 2,
+      "same_model_clashes": 547,
+      "cross_model_pairs": [
+        {
+          "source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "clashing_source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "count": 547
+        },
+        {
+          "source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "clashing_source_model": "DigitalHub_FM-HZG_v2.ifc",
+          "count": 2
+        }
+      ],
+      "data_quality_total": 1416,
+      "geometry_unavailable": 1416,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/federated/federated.bcfzip",
+      "bcf_validation": {
+        "topics": 1965,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "duplex",
+      "run": "control-Duplex_A_20110907",
+      "federated": false,
+      "primary_model": "Duplex_A_20110907.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 1.4,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 265,
+        "in_class": 0,
+        "braced": 0,
+        "below_threshold": 0,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/duplex/control-Duplex_A_20110907/control-Duplex_A_20110907.bcfzip",
+      "bcf_validation": {
+        "topics": 0,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "duplex",
+      "run": "control-Duplex_MEP_20110907",
+      "federated": false,
+      "primary_model": "Duplex_MEP_20110907.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 20.8,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 68,
+        "critical": 0,
+        "high": 4,
+        "medium": 64,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 926,
+        "in_class": 427,
+        "braced": 12,
+        "below_threshold": 415,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 68,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 68,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 4,
+        "medium": 64,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 68,
+      "cross_model_pairs": [
+        {
+          "source_model": "Duplex_MEP_20110907.ifc",
+          "clashing_source_model": "Duplex_MEP_20110907.ifc",
+          "count": 68
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/duplex/control-Duplex_MEP_20110907/control-Duplex_MEP_20110907.bcfzip",
+      "bcf_validation": {
+        "topics": 68,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "duplex",
+      "run": "control-Duplex_Plumbing_20121113",
+      "federated": false,
+      "primary_model": "Duplex_Plumbing_20121113.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 33.9,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 498,
+        "in_class": 231,
+        "braced": 0,
+        "below_threshold": 231,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/duplex/control-Duplex_Plumbing_20121113/control-Duplex_Plumbing_20121113.bcfzip",
+      "bcf_validation": {
+        "topics": 0,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "duplex",
+      "run": "federated",
+      "federated": true,
+      "primary_model": "Duplex_MEP_20110907.ifc",
+      "extra_models": [
+        "Duplex_A_20110907.ifc",
+        "Duplex_Plumbing_20121113.ifc"
+      ],
+      "building_type": "standard",
+      "wall_clock_s": 55.6,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 85,
+        "critical": 0,
+        "high": 13,
+        "medium": 72,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 3,
+        "elements": 1530,
+        "in_class": 658,
+        "braced": 12,
+        "below_threshold": 646,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 85,
+        "data_quality": 0,
+        "federated_duplicates": 159
+      },
+      "clashes_total": 85,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 13,
+        "medium": 72,
+        "low": 0
+      },
+      "cross_model_clashes": 17,
+      "same_model_clashes": 68,
+      "cross_model_pairs": [
+        {
+          "source_model": "Duplex_MEP_20110907.ifc",
+          "clashing_source_model": "Duplex_MEP_20110907.ifc",
+          "count": 68
+        },
+        {
+          "source_model": "Duplex_MEP_20110907.ifc",
+          "clashing_source_model": "Duplex_A_20110907.ifc",
+          "count": 12
+        },
+        {
+          "source_model": "Duplex_MEP_20110907.ifc",
+          "clashing_source_model": "Duplex_Plumbing_20121113.ifc",
+          "count": 5
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/duplex/federated/federated.bcfzip",
+      "bcf_validation": {
+        "topics": 85,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "west-riverside",
+      "run": "control-west_riverside_hospital_mech_ifc4",
+      "federated": false,
+      "primary_model": "west_riverside_hospital_mech_ifc4.ifc",
+      "extra_models": [],
+      "building_type": "hospital",
+      "wall_clock_s": 225.7,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 4853,
+        "critical": 183,
+        "high": 1601,
+        "medium": 3069,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 16837,
+        "in_class": 8732,
+        "braced": 5238,
+        "below_threshold": 3494,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 4853,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 4853,
+      "clashes_by_band": {
+        "critical": 183,
+        "high": 1601,
+        "medium": 3069,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 4853,
+      "cross_model_pairs": [
+        {
+          "source_model": "west_riverside_hospital_mech_ifc4.ifc",
+          "clashing_source_model": "west_riverside_hospital_mech_ifc4.ifc",
+          "count": 4853
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/west-riverside/control-west_riverside_hospital_mech_ifc4/control-west_riverside_hospital_mech_ifc4.bcfzip",
+      "bcf_validation": {
+        "topics": 4853,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "west-riverside",
+      "run": "control-west_riverside_hospital_plumb_ifc2x3",
+      "federated": false,
+      "primary_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+      "extra_models": [],
+      "building_type": "hospital",
+      "wall_clock_s": 179.9,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 2403,
+        "critical": 66,
+        "high": 233,
+        "medium": 2104,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 9121,
+        "in_class": 4308,
+        "braced": 789,
+        "below_threshold": 3519,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 2403,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 2403,
+      "clashes_by_band": {
+        "critical": 66,
+        "high": 233,
+        "medium": 2104,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 2403,
+      "cross_model_pairs": [
+        {
+          "source_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+          "clashing_source_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+          "count": 2403
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/west-riverside/control-west_riverside_hospital_plumb_ifc2x3/control-west_riverside_hospital_plumb_ifc2x3.bcfzip",
+      "bcf_validation": {
+        "topics": 2403,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "west-riverside",
+      "run": "control-west_riverside_hospital_plumb_ifc4",
+      "federated": false,
+      "primary_model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "extra_models": [],
+      "building_type": "hospital",
+      "wall_clock_s": 350.1,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 2051,
+        "critical": 66,
+        "high": 233,
+        "medium": 1752,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 7650,
+        "in_class": 4308,
+        "braced": 789,
+        "below_threshold": 3519,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 2051,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 2051,
+      "clashes_by_band": {
+        "critical": 66,
+        "high": 233,
+        "medium": 1752,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 2051,
+      "cross_model_pairs": [
+        {
+          "source_model": "west_riverside_hospital_plumb_ifc4.ifc",
+          "clashing_source_model": "west_riverside_hospital_plumb_ifc4.ifc",
+          "count": 2051
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/west-riverside/control-west_riverside_hospital_plumb_ifc4/control-west_riverside_hospital_plumb_ifc4.bcfzip",
+      "bcf_validation": {
+        "topics": 2051,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "west-riverside",
+      "run": "control-west_riverside_hospital_str_ifc4",
+      "federated": false,
+      "primary_model": "west_riverside_hospital_str_ifc4.ifc",
+      "extra_models": [],
+      "building_type": "hospital",
+      "wall_clock_s": 10.7,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 2897,
+        "in_class": 0,
+        "braced": 0,
+        "below_threshold": 0,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/west-riverside/control-west_riverside_hospital_str_ifc4/control-west_riverside_hospital_str_ifc4.bcfzip",
+      "bcf_validation": {
+        "topics": 0,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "west-riverside",
+      "run": "federated",
+      "federated": true,
+      "primary_model": "west_riverside_hospital_mech_ifc4.ifc",
+      "extra_models": [
+        "west_riverside_hospital_plumb_ifc2x3.ifc",
+        "west_riverside_hospital_plumb_ifc4.ifc",
+        "west_riverside_hospital_str_ifc4.ifc"
+      ],
+      "building_type": "hospital",
+      "wall_clock_s": 892.7,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 14934,
+        "critical": 5825,
+        "high": 3240,
+        "medium": 5869,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 4,
+        "elements": 28855,
+        "in_class": 13040,
+        "braced": 6027,
+        "below_threshold": 7013,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 14934,
+        "data_quality": 0,
+        "federated_duplicates": 7650
+      },
+      "clashes_total": 14934,
+      "clashes_by_band": {
+        "critical": 5825,
+        "high": 3240,
+        "medium": 5869,
+        "low": 0
+      },
+      "cross_model_clashes": 7678,
+      "same_model_clashes": 7256,
+      "cross_model_pairs": [
+        {
+          "source_model": "west_riverside_hospital_mech_ifc4.ifc",
+          "clashing_source_model": "west_riverside_hospital_str_ifc4.ifc",
+          "count": 6761
+        },
+        {
+          "source_model": "west_riverside_hospital_mech_ifc4.ifc",
+          "clashing_source_model": "west_riverside_hospital_mech_ifc4.ifc",
+          "count": 4853
+        },
+        {
+          "source_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+          "clashing_source_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+          "count": 2403
+        },
+        {
+          "source_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+          "clashing_source_model": "west_riverside_hospital_str_ifc4.ifc",
+          "count": 886
+        },
+        {
+          "source_model": "west_riverside_hospital_mech_ifc4.ifc",
+          "clashing_source_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+          "count": 27
+        },
+        {
+          "source_model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+          "clashing_source_model": "west_riverside_hospital_mech_ifc4.ifc",
+          "count": 4
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/west-riverside/federated/federated.bcfzip",
+      "bcf_validation": {
+        "topics": 14934,
+        "violations_total": 0,
+        "violations": []
+      }
+    }
+  ]
+}

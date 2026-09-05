@@ -75,6 +75,18 @@ CSV_COLUMNS: tuple[str, ...] = (
     "status",
     "is_data_quality",
     "check",
+    # SB-001 clash geometry. Blank on every other mechanism, which is the point:
+    # a seismic row is the only one where a reviewer can ask "by how much?" and
+    # the column answers without them opening the JSON export.
+    #
+    # NOT intrusion_depth_mm. The client-side CSV that pagination removed
+    # carried an IntrusionDepthMM column reading issue.details.intrusion_depth_mm
+    # -- and details is dict(issue.metadata) (app/api/analyze.py), so that column
+    # was blank on every row ever exported: phase_6d_seismic records the overlap
+    # as a volume and the requirement as a clearance, and has never written an
+    # intrusion depth. These two are what the mechanism actually measures.
+    "overlap_volume_mm3",
+    "clearance_mm",
     "standards",
 )
 
@@ -143,6 +155,11 @@ def to_csv(result: dict) -> str:
                 # the mechanism string.
                 "is_data_quality": "yes" if _is_data_quality(issue) else "no",
                 "check": issue.metadata.get("check", ""),
+                # "" rather than 0 for a non-seismic row: a blank cell reads as
+                # "not applicable to this mechanism", a zero as "measured, and
+                # it was nothing".
+                "overlap_volume_mm3": issue.metadata.get("overlap_volume_mm3", ""),
+                "clearance_mm": issue.metadata.get("clearance_mm", ""),
                 "standards": _standards(issue),
             }
         )

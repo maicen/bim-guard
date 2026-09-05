@@ -67,7 +67,7 @@
     <div class="mt-4 flex items-center gap-2 text-xs">
       {#if trend}
         <span
-          class="rounded-full px-2 py-0.5 font-semibold {trendUp === true
+          class="rounded-md px-2 py-0.5 font-semibold {trendUp === true
             ? 'border border-emerald-800 bg-emerald-950/80 text-emerald-400'
             : trendUp === false
               ? 'border border-rose-800 bg-rose-950/80 text-rose-400'

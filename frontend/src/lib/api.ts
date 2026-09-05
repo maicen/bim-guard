@@ -1,5 +1,6 @@
 import type {
   AnalysisResult,
+  AttachRepoModelsPayload,
   BcfArtifact,
   BCFCommentCreatePayload,
   BCFCommentResponse,
@@ -59,7 +60,6 @@ import type {
   ProjectDocumentBindingsResponse,
   ProjectIfcFile,
   ProjectIfcUploadResponse,
-  ProjectImportPayload,
   ProjectOptions,
   ProjectListResponse,
   ProjectRulesetBindingsResponse,
@@ -86,10 +86,15 @@ import {
   type SWROptions,
   type Unsubscribe,
 } from "./cache";
-import { authHeaders } from "./authToken";
+import { authHeaders, getActiveOrgId } from "./authToken";
 import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
+
+/** An `Error` from a non-OK response, carrying the HTTP status that caused it. */
+export interface ApiError extends Error {
+  status?: number;
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -112,7 +117,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
     } catch {
       // not json
     }
-    throw new Error(errorDetail);
+    // The status rides along so a caller can tell a rejected request apart
+    // from a failed one — a 422 means the query this client built was wrong,
+    // which is a bug to report rather than a condition to show the user.
+    const failure = new Error(errorDetail) as ApiError;
+    failure.status = res.status;
+    throw failure;
   }
   if (res.status === 204) {
     return {} as T;
@@ -340,12 +350,15 @@ function buildRulesFilterKey(filters?: {
 }
 
 export const projectsApi = {
-  getCachedList(): ProjectListResponse | null {
-    const list = _projectsStore.getCachedList("__default__");
+  getCachedList(orgId?: number | null): ProjectListResponse | null {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
+    const list = _projectsStore.getCachedList(key) || _projectsStore.getCachedList("__default__");
     if (!list) return null;
+    const filtered = effectiveOrg ? list.filter((p) => p.organization_id === effectiveOrg) : list;
     return {
-      projects: list,
-      total: list.length,
+      projects: filtered,
+      total: filtered.length,
     };
   },
 
@@ -353,11 +366,18 @@ export const projectsApi = {
     return _projectsStore.subscribe(listener);
   },
 
-  async list(options: SWROptions = {}): Promise<ProjectListResponse> {
+  clearCache(): void {
+    _projectsStore.clear();
+  },
+
+  async list(options: SWROptions & { organization_id?: number | null } = {}): Promise<ProjectListResponse> {
+    const effectiveOrg = options.organization_id !== undefined ? options.organization_id : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
     const list = await _projectsStore.fetchList(
-      "__default__",
+      key,
       async () => {
-        const res = await apiFetch(`${API_BASE}/projects`);
+        const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+        const res = await apiFetch(`${API_BASE}/projects${query}`);
         const data = await handleResponse<ProjectListResponse | Project[]>(res);
         return Array.isArray(data) ? data : data.projects;
       },
@@ -478,6 +498,25 @@ export const projectsApi = {
     return handleResponse<ProjectIfcFile[]>(res);
   },
 
+  /** Promote one attached model to primary. Any previous primary is demoted. */
+  async setPrimaryIfcFile(projectId: number, fileId: number): Promise<ProjectIfcFile> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}/primary`, {
+      method: "POST",
+    });
+    return handleResponse<ProjectIfcFile>(res);
+  },
+
+  /**
+   * Detach and delete one attached model. Deleting the primary promotes the
+   * next remaining model; deleting a project's last model leaves it with none.
+   */
+  async deleteIfcFile(projectId: number, fileId: number): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
+  },
+
   /**
    * Attach IFC models to an existing project.
    *
@@ -550,20 +589,28 @@ export const rulesApi = {
     ruleset_id?: string;
     category?: RulesetCategory | string;
     keyword?: string;
+    organization_id?: number | null;
   }): Rule[] | null {
-    const key = buildRulesFilterKey(filters);
-    const cached = _rulesStore.getCachedList(key);
+    const effectiveOrg = filters?.organization_id !== undefined ? filters.organization_id : getActiveOrgId();
+    const key = `${buildRulesFilterKey(filters)}_org:${effectiveOrg ?? "all"}`;
+    const cached = _rulesStore.getCachedList(key) || _rulesStore.getCachedList(buildRulesFilterKey(filters));
     return cached || null;
   },
 
-  getCachedFolders(category?: RulesetCategory | string): RuleFolder[] | null {
-    const key = category || "__default__";
-    const cached = _ruleFoldersStore.getCached(key);
+  getCachedFolders(category?: RulesetCategory | string, orgId?: number | null): RuleFolder[] | null {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}:${category || "__default__"}`;
+    const cached = _ruleFoldersStore.getCached(key) || _ruleFoldersStore.getCached(category || "__default__");
     return cached || null;
   },
 
   subscribe(listener: (rules: Rule[]) => void): Unsubscribe {
     return _rulesStore.subscribe(listener);
+  },
+
+  clearCache(): void {
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
   },
 
   async list(
@@ -572,10 +619,12 @@ export const rulesApi = {
       ruleset_id?: string;
       category?: RulesetCategory | string;
       keyword?: string;
+      organization_id?: number | null;
     },
     options: SWROptions = {},
   ): Promise<Rule[]> {
-    const key = buildRulesFilterKey(filters);
+    const effectiveOrg = filters?.organization_id !== undefined ? filters.organization_id : getActiveOrgId();
+    const key = `${buildRulesFilterKey(filters)}_org:${effectiveOrg ?? "all"}`;
     return _rulesStore.fetchList(
       key,
       async () => {
@@ -584,6 +633,7 @@ export const rulesApi = {
         if (filters?.ruleset_id) params.set("ruleset_id", filters.ruleset_id);
         if (filters?.category) params.set("category", filters.category);
         if (filters?.keyword) params.set("keyword", filters.keyword);
+        if (effectiveOrg) params.set("organization_id", String(effectiveOrg));
         const query = params.toString() ? `?${params.toString()}` : "";
         const res = await apiFetch(`${API_BASE}/rules${query}`);
         return handleResponse<Rule[]>(res);
@@ -594,13 +644,17 @@ export const rulesApi = {
 
   async folders(
     category?: RulesetCategory | string,
-    options: SWROptions = {},
+    options: SWROptions & { organization_id?: number | null } = {},
   ): Promise<RuleFolder[]> {
-    const key = category || "__default__";
-    const query = category ? `?category=${encodeURIComponent(category)}` : "";
+    const effectiveOrg = options.organization_id !== undefined ? options.organization_id : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}:${category || "__default__"}`;
     return _ruleFoldersStore.execute(
       key,
       async () => {
+        const params = new URLSearchParams();
+        if (category) params.set("category", category);
+        if (effectiveOrg) params.set("organization_id", String(effectiveOrg));
+        const query = params.toString() ? `?${params.toString()}` : "";
         const res = await apiFetch(`${API_BASE}/rules/folders${query}`);
         return handleResponse<RuleFolder[]>(res);
       },
@@ -831,8 +885,14 @@ function engineQuery(engines?: string[]): string {
   return engines.map((e) => `&engines=${encodeURIComponent(e)}`).join("");
 }
 
-/** Severity bands a results page can be limited to. */
-export type IssueBand = "critical" | "high" | "medium" | "low";
+/**
+ * Severity bands a results page can be limited to.
+ *
+ * `data_quality` is not a band the engines emit; it selects the notes that
+ * report what could not be assessed, which is how the analyse page's severity
+ * dropdown already presents them.
+ */
+export type IssueBand = "critical" | "high" | "medium" | "low" | "data_quality";
 
 /**
  * Order a results page is cut from.
@@ -854,9 +914,23 @@ export interface ResultPageQuery {
   limit?: number;
   offset?: number;
   bands?: IssueBand[];
+  /** Engine code prefixes, or the token `data_quality` for the notes. */
   mechanisms?: string[];
   includeDataQuality?: boolean;
   sort?: IssueSort;
+  /** Free text over title, rule id, element id, mechanism and citations. */
+  search?: string;
+}
+
+/**
+ * `include_low` for a URL, omitted when the caller expressed no preference.
+ *
+ * Unlike the page filters, this selects what the run computes: it changes the
+ * server's cache key, so sending it needlessly would split the cache between
+ * two spellings of the same request.
+ */
+function includeLowQuery(includeLow?: boolean): string {
+  return includeLow === undefined ? "" : `&include_low=${includeLow}`;
 }
 
 function pageQuery(page?: ResultPageQuery): string {
@@ -870,6 +944,7 @@ function pageQuery(page?: ResultPageQuery): string {
     parts.push(`include_data_quality=${page.includeDataQuality}`);
   }
   if (page.sort !== undefined) parts.push(`sort=${page.sort}`);
+  if (page.search) parts.push(`q=${encodeURIComponent(page.search)}`);
   return parts.length ? `&${parts.join("&")}` : "";
 }
 
@@ -913,6 +988,7 @@ export const analyzeApi = {
     useCache = true,
     engines?: string[],
     signal?: AbortSignal,
+    includeLow?: boolean,
   ): Promise<AnalysisResult> {
     const res = await apiFetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: "POST",
@@ -922,6 +998,7 @@ export const analyzeApi = {
         slug,
         use_cache: useCache,
         engines: engines ?? null,
+        ...(includeLow === undefined ? {} : { include_low: includeLow }),
       }),
       signal,
     });
@@ -944,9 +1021,10 @@ export const analyzeApi = {
     engines?: string[],
     signal?: AbortSignal,
     page?: ResultPageQuery,
+    includeLow?: boolean,
   ): Promise<AnalysisResult> {
     const res = await apiFetch(
-      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}`,
+      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}${includeLowQuery(includeLow)}`,
       { signal },
     );
     return handleResponse<AnalysisResult>(res);
@@ -957,13 +1035,20 @@ export const analyzeApi = {
     return handleResponse<WorkflowStatus>(res);
   },
 
+  /**
+   * URL for the whole-run export.
+   *
+   * `includeLow` must match what the page ran, or the download reports a
+   * different set of findings from the results it was taken from.
+   */
   getExportUrl(
     projectId: number,
     slug: string,
     fmt: "bcf" | "csv" | "json",
     engines?: string[],
+    includeLow?: boolean,
   ): string {
-    return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}`;
+    return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}${includeLowQuery(includeLow)}`;
   },
 
   getBcfArtifactUrl(artifactId: number): string {
@@ -1031,19 +1116,29 @@ export const dashboardApi = {
 };
 
 export const documentsApi = {
-  getCachedList(): DocumentItem[] | null {
-    return _documentsStore.getCachedList("__default__") || null;
+  getCachedList(orgId?: number | null): DocumentItem[] | null {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
+    return _documentsStore.getCachedList(key) || _documentsStore.getCachedList("__default__") || null;
   },
 
   subscribe(listener: (docs: DocumentItem[]) => void): Unsubscribe {
     return _documentsStore.subscribe(listener);
   },
 
-  async list(options: SWROptions = {}): Promise<DocumentItem[]> {
+  clearCache(): void {
+    _documentsStore.clear();
+    _documentDetailStore.clear();
+  },
+
+  async list(options: SWROptions & { organization_id?: number | null } = {}): Promise<DocumentItem[]> {
+    const effectiveOrg = options.organization_id !== undefined ? options.organization_id : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
     return _documentsStore.fetchList(
-      "__default__",
+      key,
       async () => {
-        const res = await apiFetch(`${API_BASE}/documents`);
+        const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+        const res = await apiFetch(`${API_BASE}/documents${query}`);
         return handleResponse<DocumentItem[]>(res);
       },
       options,
@@ -1071,11 +1166,14 @@ export const documentsApi = {
       revision_code?: string;
       parser?: "auto" | "unstructured" | "light";
       engine_instance?: string;
+      organization_id?: number | null;
     },
   ): Promise<DocumentDetail> {
     const form = new FormData();
     form.append("file", file);
     form.append("doc_type", docType);
+    const effectiveOrg = isoOptions?.organization_id !== undefined ? isoOptions.organization_id : getActiveOrgId();
+    if (effectiveOrg) form.append("organization_id", String(effectiveOrg));
     if (isoOptions?.project_code) form.append("project_code", isoOptions.project_code);
     if (isoOptions?.originator) form.append("originator", isoOptions.originator);
     if (isoOptions?.suitability_code) form.append("suitability_code", isoOptions.suitability_code);
@@ -1330,15 +1428,21 @@ export const githubReposApi = {
     return data;
   },
 
-  async importProject(repoId: number, payload: ProjectImportPayload): Promise<Project> {
-    const res = await apiFetch(`${API_BASE}/repositories/${repoId}/import`, {
+  /**
+   * Attach one or more IFC models from this repository to an existing
+   * project. No bytes pass through this request -- each model is recorded
+   * pointing at the repository's raw-content URL, fetched on demand.
+   */
+  async attachModelsToProject(
+    projectId: number,
+    payload: AttachRepoModelsPayload,
+  ): Promise<ProjectIfcUploadResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/attach-repo-models`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const created = await handleResponse<Project>(res);
-    _projectsStore.addOrUpdate(created);
-    return created;
+    return handleResponse<ProjectIfcUploadResponse>(res);
   },
 };
 
@@ -1702,3 +1806,11 @@ export const bsddApi = {
     return result;
   },
 };
+
+/** Clear all entity and aggregate caches when switching active tenant. */
+export function clearTenantCaches(): void {
+  projectsApi.clearCache();
+  documentsApi.clearCache();
+  rulesApi.clearCache();
+  dashboardApi.invalidateCache();
+}

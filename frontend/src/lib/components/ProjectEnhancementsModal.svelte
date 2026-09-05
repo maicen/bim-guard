@@ -179,7 +179,7 @@
                         >
                         <td class="px-4 py-3">
                           <span
-                            class="inline-block rounded-full border border-emerald-800/60 bg-emerald-950/50 px-2 py-0.5 text-micro font-semibold text-emerald-400"
+                            class="inline-block rounded-md border border-emerald-800/60 bg-emerald-950/50 px-2 py-0.5 text-micro font-semibold text-emerald-400"
                           >
                             {row.status}
                           </span>

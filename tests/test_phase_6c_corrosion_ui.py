@@ -139,6 +139,26 @@ class TestNormaliseBand:
 
 
 @pytest.fixture
+def galvanic_engine_fails(monkeypatch):
+    """Make GC-001 raise, so an engine the pre-flight gate admits then fails.
+
+    Distinct from ``mic_engine_fails``: MC-001 is now refused by
+    :func:`_preflight` before ``_assess`` is entered, because ``_mic_element``
+    supplies no hydraulics, so monkeypatching the MIC engine no longer reaches
+    it. GC-001 is admitted for an element carrying a real material, which makes
+    it the mechanism that can still exercise ``check="band_unassessed"`` — the
+    "engine ran and returned nothing usable" path, as opposed to the gate's
+    "we declined to run the engine".
+    """
+    def boom(_element):
+        raise RuntimeError("engine unavailable")
+
+    monkeypatch.setattr(
+        "app.modules.phase_6.phase_6c_corrosion_ui.assess_galvanic_risk", boom
+    )
+
+
+@pytest.fixture
 def mic_engine_fails(monkeypatch):
     """Make MC-001 raise, so exactly one mechanism cannot be assessed.
 
@@ -146,6 +166,11 @@ def mic_engine_fails(monkeypatch):
     produce a band — so the data_quality path cannot be reached by feeding bad
     input. It is defensive code for an engine that genuinely fails, and the
     honest way to test it is to make one fail.
+
+    NOTE: since the pre-flight gate landed, MC-001 is refused before the engine
+    is called, so this fixture's patch is not what produces the data_quality
+    Issue for MC-001 any more — the gate does. Tests that need a *failed*
+    engine rather than a *refused* one use ``galvanic_engine_fails``.
     """
     def boom(_element):
         raise RuntimeError("engine unavailable")
@@ -205,10 +230,21 @@ class TestDataQualitySurvivesIncludeLowFilter:
 
 class TestDataQualityShape:
     @pytest.fixture
-    def dq_issue(self, mic_engine_fails):
+    def dq_issue(self, galvanic_engine_fails):
+        """Return the Issue raised when an engine ran and produced nothing usable.
+
+        Selected by check rather than by position: the run now also emits the
+        gate's ``hydraulics_unavailable`` Issue for MC-001, and taking
+        ``issues[0]`` would silently start asserting the shape of whichever one
+        happened to be allocated first.
+        """
         result = run_corrosion_analysis(parsed_ifc(), include_low=False)
-        issues = [i for i in result["audit_issues"] if i.mechanism == DATA_QUALITY]
-        assert issues, "expected at least one data_quality Issue"
+        issues = [
+            i
+            for i in result["audit_issues"]
+            if i.mechanism == DATA_QUALITY and i.metadata.get("check") == "band_unassessed"
+        ]
+        assert issues, "expected a band_unassessed data_quality Issue"
         return issues[0]
 
     def test_mechanism_is_exactly_data_quality(self, dq_issue):
@@ -227,6 +263,22 @@ class TestDataQualityShape:
 
     def test_points_at_the_element(self, dq_issue):
         assert dq_issue.element_id == "GUID-01"
+
+    def test_the_gate_uses_a_different_check(self, galvanic_engine_fails):
+        """A refused engine and a failed engine must not look alike.
+
+        Both are data_quality and both are Low, so ``check`` is the only thing
+        telling a reviewer whether the engine was never asked or was asked and
+        came back empty.
+        """
+        result = run_corrosion_analysis(parsed_ifc(), include_low=False)
+        checks = {
+            i.metadata.get("check")
+            for i in result["audit_issues"]
+            if i.mechanism == DATA_QUALITY
+        }
+        assert "band_unassessed" in checks
+        assert "hydraulics_unavailable" in checks
 
     def test_rule_id_marks_it_as_a_data_reference(self, dq_issue):
         assert dq_issue.rule_id.endswith(".DATA")

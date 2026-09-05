@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { router, push, replace } from "svelte-spa-router";
-  import Sidebar from "./lib/components/Sidebar.svelte";
+  import OrgSidebar from "./lib/components/OrgSidebar.svelte";
+  import ProjectSidebar from "./lib/components/ProjectSidebar.svelte";
+  import AdminSidebar from "./lib/components/AdminSidebar.svelte";
   import AnalysisDomainTabs from "./lib/components/AnalysisDomainTabs.svelte";
   import type { AnalysisDomainTab } from "./lib/components/AnalysisDomainTabs.svelte";
   import TopHeader from "./lib/components/TopHeader.svelte";
@@ -15,6 +17,8 @@
 
   // Routes
   import DashboardView from "./routes/DashboardView.svelte";
+  import ProjectDashboardView from "./routes/ProjectDashboardView.svelte";
+  import ModelsView from "./routes/ModelsView.svelte";
   import ProjectsView from "./routes/ProjectsView.svelte";
   import ViewerView from "./routes/ViewerView.svelte";
   import DocumentsView from "./routes/DocumentsView.svelte";
@@ -81,7 +85,23 @@
   });
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
-  let targetProjectId: number | null = $state(null);
+
+  const SELECTED_PROJECT_STORAGE_KEY = "bimguard_selected_project_id";
+
+  function getInitialProjectId(): number | null {
+    // 1. From URL
+    const params = new URLSearchParams(router.querystring || "");
+    const fromUrl = params.get("project_id");
+    if (fromUrl && /^\d+$/.test(fromUrl)) return Number(fromUrl);
+    // 2. From LocalStorage
+    try {
+      const fromStorage = localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY);
+      if (fromStorage && /^\d+$/.test(fromStorage)) return Number(fromStorage);
+    } catch {}
+    return null;
+  }
+
+  let targetProjectId: number | null = $state(getInitialProjectId());
   let targetElementGuid: string | null = $state(null);
   let targetBcfArtifactId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
@@ -113,25 +133,72 @@
   async function loadProjectDetails(projectId: number) {
     try {
       selectedProject = await projectsApi.get(projectId);
+      if (
+        authState.activeOrganizationId &&
+        selectedProject.organization_id &&
+        selectedProject.organization_id !== authState.activeOrganizationId
+      ) {
+        selectedProject = null;
+        targetProjectId = null;
+        try {
+          localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
+        } catch {}
+        ensureProjectSelected();
+      }
     } catch (err) {
       selectedProject = null;
       toasts.fromError(err, "Could not load the selected project.");
     }
   }
 
-  // Every navigation that targets a specific project encodes it as
-  // ?project_id=...&element_guid=...&bcf_artifact_id=... in the URL's query
-  // string (see buildTargetUrl below), so this stays live across refresh,
-  // back/forward, and links shared from elsewhere — not just a one-shot read
-  // on mount. A previous version of this only handled the initial load of
-  // /viewer specifically; this generalizes it to every view.
+  async function ensureProjectSelected() {
+    if (targetProjectId) return;
+    try {
+      const orgId = authState.activeOrganizationId;
+      const res = await projectsApi.list({ organization_id: orgId });
+      const available = res.projects || [];
+      if (available.length > 0) {
+        const firstId = available[0].id;
+        targetProjectId = firstId;
+        try {
+          localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(firstId));
+        } catch {}
+        loadProjectDetails(firstId);
+      }
+    } catch {}
+  }
+
+  // Synchronize targetProjectId <-> URL query parameters and localStorage.
+  // In project-scoped views (Viewer, Arch, Piping, Seismic, Reports, Workflow),
+  // ensure the project persists in the URL query string.
   $effect(() => {
     const params = queryParams;
-    const projectId = Number(params.get("project_id"));
-    if (projectId && projectId !== targetProjectId) {
-      targetProjectId = projectId;
-      loadProjectDetails(projectId);
+    const urlProjectIdStr = params.get("project_id");
+
+    if (urlProjectIdStr && /^\d+$/.test(urlProjectIdStr)) {
+      const parsedId = Number(urlProjectIdStr);
+      if (parsedId !== targetProjectId) {
+        targetProjectId = parsedId;
+        loadProjectDetails(parsedId);
+        try {
+          localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(parsedId));
+        } catch {}
+      }
+    } else if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+      if (targetProjectId) {
+        const currentParams = new URLSearchParams(router.querystring || "");
+        if (currentParams.get("project_id") !== String(targetProjectId)) {
+          currentParams.set("project_id", String(targetProjectId));
+          if (authState.activeOrganizationId) {
+            currentParams.set("org", String(authState.activeOrganizationId));
+          }
+          replace(`/${activeView}?${currentParams.toString()}`);
+        }
+      } else {
+        ensureProjectSelected();
+      }
     }
+
     targetElementGuid = params.get("element_guid");
     const bcfArtifactId = Number(params.get("bcf_artifact_id"));
     targetBcfArtifactId = bcfArtifactId || null;
@@ -150,6 +217,9 @@
     params.set("project_id", String(projectId));
     if (elementGuid) params.set("element_guid", elementGuid);
     if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
     return `/${view}?${params.toString()}`;
   }
 
@@ -157,6 +227,9 @@
     initTheme();
     checkHealth();
     dashboardApi.prefetchAll();
+    if (targetProjectId) {
+      loadProjectDetails(targetProjectId);
+    }
     // Backward compatibility for the one link shape that predates hash
     // routing: a plain (non-hash) /viewer?... URL, e.g. an old bookmark.
     if (window.location.pathname === "/viewer" && !window.location.hash) {
@@ -167,7 +240,11 @@
   });
 
   function handleSelectView(view: string) {
-    push(`/${view}`);
+    if (authState.activeOrganizationId) {
+      push(`/${view}?org=${authState.activeOrganizationId}`);
+    } else {
+      push(`/${view}`);
+    }
   }
 
   // Routes to the audit view matching the project's own domain rather than
@@ -208,14 +285,106 @@
     "reports",
     "viewer",
     "workflow",
+    "models",
   ]);
 
+  // Whether the app shell is in "project view" (project-scoped sidebar,
+  // navbar, and dashboard) vs. "organization view". Driven by project_id
+  // actually being present in the URL, not just by a project being
+  // remembered in targetProjectId/localStorage — otherwise a plain visit to
+  // "/" would immediately jump into project view for anyone who last worked
+  // in a project. "dashboard" is deliberately excluded from
+  // PROJECT_SCOPED_VIEWS itself (unlike Viewer/Arch/Reports) so visiting it
+  // never auto-injects project_id into the URL; it only renders the project
+  // dashboard when the URL already carries one.
+  let isProjectView = $derived(
+    PROJECT_SCOPED_VIEWS.has(activeView) ||
+      (activeView === "dashboard" && !!queryParams.get("project_id")),
+  );
+
+  const ADMIN_VIEWS = new Set([
+    "admin",
+    "org-settings",
+    "superadmin-rulesets",
+    "superadmin-project-grants",
+    "superadmin-document-grants",
+  ]);
+
+  let prevActiveOrgId: number | null = $state(null);
+
+  // 1. URL -> AuthState: when ?org= is in the query string, switch active organization
+  $effect(() => {
+    const orgParam = queryParams.get("org");
+    if (orgParam && /^\d+$/.test(orgParam)) {
+      const parsedOrgId = Number(orgParam);
+      if (parsedOrgId !== authState.activeOrganizationId) {
+        if (
+          !authState.profile ||
+          authState.isSuperadmin ||
+          authState.profile.organizations.some((o) => o.organization_id === parsedOrgId)
+        ) {
+          authState.setActiveOrganization(parsedOrgId, false);
+        }
+      }
+    }
+  });
+
+  // 2. AuthState -> URL: keep URL query param synchronized with active organization
+  $effect(() => {
+    const activeOrgId = authState.activeOrganizationId;
+    if (!activeOrgId || !showAppShell || activeView === "login") return;
+
+    const currentUrlOrg = queryParams.get("org");
+    if (currentUrlOrg !== String(activeOrgId)) {
+      const currentParams = new URLSearchParams(router.querystring || "");
+      currentParams.set("org", String(activeOrgId));
+      const targetView = activeView || "dashboard";
+      replace(`/${targetView}?${currentParams.toString()}`);
+    }
+  });
+
+  $effect(() => {
+    const currentOrgId = authState.activeOrganizationId;
+    if (prevActiveOrgId !== null && prevActiveOrgId !== currentOrgId) {
+      if (selectedProject && selectedProject.organization_id !== currentOrgId) {
+        selectedProject = null;
+        targetProjectId = null;
+        if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+          push(`/${activeView}?org=${currentOrgId}`);
+        }
+      }
+    }
+    prevActiveOrgId = currentOrgId;
+  });
+
+  // Leaves project view without forgetting the project: targetProjectId and
+  // localStorage are untouched, so re-entering (via ProjectSwitcher or
+  // Existing Projects) lands back in project view for the same project.
+  function handleExitProject() {
+    const params = new URLSearchParams();
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    const q = params.toString();
+    push(q ? `/dashboard?${q}` : "/dashboard");
+  }
+
   function handleSwitchProject(projectId: number) {
+    targetProjectId = projectId;
+    loadProjectDetails(projectId);
+    try {
+      localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(projectId));
+    } catch {}
     if (PROJECT_SCOPED_VIEWS.has(activeView)) {
       push(buildTargetUrl(activeView, projectId));
+    }
+  }
+
+  function handleSelectAuditDomain(domain: AnalysisDomainTab) {
+    if (targetProjectId) {
+      push(buildTargetUrl(domain, targetProjectId));
     } else {
-      targetProjectId = projectId;
-      loadProjectDetails(projectId);
+      push(authState.activeOrganizationId ? `/${domain}?org=${authState.activeOrganizationId}` : `/${domain}`);
     }
   }
 </script>
@@ -243,22 +412,41 @@
 <div
   class="flex min-h-screen bg-slate-950 font-sans text-slate-100 antialiased transition-colors duration-200 selection:bg-blue-500/30 selection:text-blue-200"
 >
-  <!-- Apple-Style Sidebar -->
-  <Sidebar
-    {activeView}
-    mobileOpen={isMobileNavOpen}
-    onCloseMobile={() => (isMobileNavOpen = false)}
-  />
+  <!-- Apple-Style Sidebar (Admin Portal vs Workspace) -->
+  {#if ADMIN_VIEWS.has(activeView)}
+    <AdminSidebar
+      {activeView}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+    />
+  {:else if isProjectView && targetProjectId}
+    <ProjectSidebar
+      {activeView}
+      {selectedProject}
+      selectedProjectId={targetProjectId}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+    />
+  {:else}
+    <OrgSidebar
+      {activeView}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+    />
+  {/if}
 
   <!-- Main Content Column -->
   <div class="flex min-w-0 flex-1 flex-col">
     <!-- Top Header Bar -->
     <TopHeader
       {activeView}
+      {isProjectView}
       {selectedProject}
+      selectedProjectId={targetProjectId}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
       onSwitchProject={handleSwitchProject}
+      onExitProject={handleExitProject}
     />
 
     <!-- Viewport Container -->
@@ -271,6 +459,12 @@
         {:else if authGateBlocking}
           <!-- The $effect above is already redirecting to "/"; render
                nothing of the protected view in the meantime. -->
+        {:else if activeView === "dashboard" && isProjectView && targetProjectId}
+          <ProjectDashboardView
+            initialProjectId={targetProjectId}
+            {selectedProject}
+            onNavigate={(view) => push(buildTargetUrl(view, targetProjectId!))}
+          />
         {:else if activeView === "dashboard"}
           <DashboardView
             onSelectProjectForAudit={handleSelectProjectForAudit}
@@ -278,10 +472,18 @@
             onOpenWizard={() => (isGlobalWizardOpen = true)}
             onNavigate={handleSelectView}
           />
+        {:else if activeView === "models"}
+          <ModelsView
+            initialProjectId={targetProjectId}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
         {:else if activeView === "projects"}
           <ProjectsView
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}
+            onSelectProjectForDashboard={(projectId) => push(buildTargetUrl("dashboard", projectId))}
+            {selectedProject}
+            onModelsAttached={(projectId) => push(buildTargetUrl("models", projectId))}
             onOpenWizard={() => (isGlobalWizardOpen = true)}
           />
         {:else if activeView === "viewer"}
@@ -303,7 +505,7 @@
              tab strip is how you switch between them without a trip back to
              the sidebar. "analyze" is a legacy alias for "piping". -->
           <div class="space-y-5">
-            <AnalysisDomainTabs active={auditDomain} onSelect={(domain) => push(`/${domain}`)} />
+            <AnalysisDomainTabs active={auditDomain} onSelect={handleSelectAuditDomain} />
             {#if activeView === "arch"}
               <ArchAnalyzeView initialProjectId={targetProjectId} />
             {:else}
@@ -338,7 +540,7 @@
           <IfcExportSettingView />
         {:else if activeView === "settings"}
           <SettingsView />
-        {:else if activeView === "org-settings"}
+        {:else if activeView === "org-settings" || activeView === "admin"}
           <OrgSettingsView />
         {:else if activeView === "superadmin-rulesets"}
           <SuperadminRulesetsView />
@@ -381,7 +583,7 @@
       <!-- Gateway/DB health — moved out of the header to keep it uncluttered. -->
       <div class="flex flex-wrap items-center gap-2.5">
         <span
-          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium {apiOnline
+          class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {apiOnline
             ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
             : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
         >
@@ -390,7 +592,7 @@
           {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
         </span>
         <span
-          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium {dbOk
+          class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {dbOk
             ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
             : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
         >

@@ -8,26 +8,24 @@ bug — except where a section explicitly marks itself as inspiration.
 
 ## Sources
 
-The visual language draws on Apple's product pages (single accent, tight
-tracking, restrained shadow) and on shadcn/basecoat component structure, adapted
+The visual language draws on shadcn/basecoat component structure, adapted
 for information density:
 
-- [Apple DESIGN.md](https://raw.githubusercontent.com/VoltAgent/awesome-design-md/refs/heads/main/design-md/apple/DESIGN.md) — the template this document was derived from
 - [shadcn/ui components](https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/bases/base/ui)
 - [basecoat css](https://github.com/hunvreus/basecoat/tree/main/src/css) / [js](https://github.com/hunvreus/basecoat/tree/main/src/js)
 - [What is DESIGN.md?](https://stitch.withgoogle.com/docs/design-md/overview)
 - [Svelte frontend README](frontend/README.md)
 
-**Deliberate divergences from the Apple template**, because a compliance audit
+**Deliberate divergences from the template**, because a compliance audit
 tool is not a product showcase:
 
-| Apple rule | BIMGuard | Why |
-| --- | --- | --- |
-| No borders on cards | Borders on every card (`border-slate-800`) | Dense grids need explicit boundaries; contrast alone cannot separate 40 stacked rows |
-| 980px pill CTAs | 8–12px radius buttons | Pills read as marketing; rectangular controls sit correctly in toolbars |
-| ~980px max content width | Full viewport width | Tables need every pixel |
-| Black ↔ light-gray section rhythm | One continuous canvas | There are no "sections" — there are views |
-| SF Pro optical sizing | Inter at one optical size | SF Pro does not exist off macOS; the app runs on Windows and Linux |
+| rule                              | BIMGuard                                             | Why                                                                                                            |
+| --------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| No borders on cards               | Borders on every card (`border-slate-800`)           | Dense grids need explicit boundaries; contrast alone cannot separate 40 stacked rows                           |
+| 980px pill CTAs                   | 8–12px radius controls (`rounded-lg` / `rounded-xl`) | Pills read as consumer marketing; crisp rectangular controls sit correctly in toolbars, menus, and data tables |
+| ~980px max content width          | Full viewport width                                  | Tables need every pixel                                                                                        |
+| Black ↔ light-gray section rhythm | One continuous canvas                                | There are no "sections" — there are views                                                                      |
+| SF Pro optical sizing             | Inter at one optical size                            | SF Pro does not exist off macOS; the app runs on Windows and Linux                                             |
 
 ## 1. Theme architecture (authoritative)
 
@@ -36,8 +34,15 @@ onto CSS custom properties, and `frontend/src/app.css` defines those properties
 twice — once for dark, once for light, with the ramp reversed:
 
 ```css
-:root, html.dark   { --color-slate-950: 2 6 23;      --color-slate-50: 248 250 252; }
-html.light         { --color-slate-950: 248 250 252; --color-slate-50: 2 6 23;      }
+:root,
+html.dark {
+  --color-slate-950: 2 6 23;
+  --color-slate-50: 248 250 252;
+}
+html.light {
+  --color-slate-950: 248 250 252;
+  --color-slate-50: 2 6 23;
+}
 ```
 
 Consequences to internalise before writing markup:
@@ -65,9 +70,9 @@ FOUC-prevention script in `index.html`.
 colour. Use `bg-accent`, `text-accent`, `border-accent`, `ring-accent`,
 `hover:bg-accent-hover`. **Never type the hex.**
 
-| Theme | Accent | Hover |
-| --- | --- | --- |
-| Dark | `#0071e3` | `#0077ed` |
+| Theme | Accent                  | Hover     |
+| ----- | ----------------------- | --------- |
+| Dark  | `#0071e3`               | `#0077ed` |
 | Light | `#0066cc` (AA on white) | `#0071e3` |
 
 The accent is reserved for interactive elements — primary buttons, focus rings,
@@ -78,14 +83,14 @@ active nav, links, selected states. It is not a decorative colour.
 Defined once in `frontend/src/lib/severity.ts` and consumed by `<SeverityBadge>`
 and `<Badge>`. Do not restate these anywhere else:
 
-| Band | Hue | Meaning |
-| --- | --- | --- |
-| `critical` | rose | Must be resolved before the model progresses |
-| `high` | amber | Significant compliance risk |
-| `medium` | yellow | Should be reviewed |
-| `low` | emerald | Tolerable / passing |
-| `data_quality` | indigo | Doctrine-exempt: could not be assessed, not a violation |
-| `neutral` | slate | No band |
+| Band           | Hue     | Meaning                                                 |
+| -------------- | ------- | ------------------------------------------------------- |
+| `critical`     | rose    | Must be resolved before the model progresses            |
+| `high`         | amber   | Significant compliance risk                             |
+| `medium`       | yellow  | Should be reviewed                                      |
+| `low`          | emerald | Tolerable / passing                                     |
+| `data_quality` | indigo  | Doctrine-exempt: could not be assessed, not a violation |
+| `neutral`      | slate   | No band                                                 |
 
 Status colours for pipeline state (`complete`, `running`, `pending`, `failed`)
 live in `<Badge>`.
@@ -99,15 +104,15 @@ Both are loaded in `index.html`; the stacks in `app.css` must keep naming them.
 
 Negative tracking applies at every size (`-0.015em` body, `-0.025em` headings).
 
-| Token | Size | Use |
-| --- | --- | --- |
-| `text-nano` | 9px | Dense table metadata, unit suffixes |
-| `text-micro` | 10px | Badges, chips, table cell metadata |
-| `text-caption` | 11px | Labels, secondary table text, toolbar buttons |
-| `text-xs` | 12px | Default body text in tables and modals |
-| `text-sm` | 14px | Nav items, form inputs |
-| `text-base` | 16px | Section headings |
-| `text-lg`–`text-3xl` | 18–30px | Page titles, stat values |
+| Token                | Size    | Use                                           |
+| -------------------- | ------- | --------------------------------------------- |
+| `text-nano`          | 9px     | Dense table metadata, unit suffixes           |
+| `text-micro`         | 10px    | Badges, chips, table cell metadata            |
+| `text-caption`       | 11px    | Labels, secondary table text, toolbar buttons |
+| `text-xs`            | 12px    | Default body text in tables and modals        |
+| `text-sm`            | 14px    | Nav items, form inputs                        |
+| `text-base`          | 16px    | Section headings                              |
+| `text-lg`–`text-3xl` | 18–30px | Page titles, stat values                      |
 
 The sub-12px steps exist because this is a data tool; do not invent more with
 `text-[Npx]`. Weights: 400 and 600 carry almost everything; 700 for stat values.
@@ -118,23 +123,28 @@ Never 800/900.
 Compose from `frontend/src/lib/components/` — see §12. General rules:
 
 - **Buttons.** Primary: `bg-accent text-white`, `rounded-xl`, `px-3.5 py-2`,
-  `text-caption font-semibold`. Secondary: `bg-slate-950 border border-slate-800
-  text-slate-200 hover:bg-slate-800`. Destructive: `bg-rose-600 text-white`.
-  Every button needs a `type` and a disabled state.
+  `text-caption font-semibold`. Secondary / Toolbar: `bg-slate-950 border border-slate-800
+text-slate-200 hover:bg-slate-800 rounded-xl` (or `rounded-lg` for compact toolbars). Destructive: `bg-rose-600 text-white rounded-xl`.
+  Every button needs a `type` and a disabled state. **Never use `rounded-full` on buttons.**
+- **Dropdowns & Menus.** Triggers: `rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-700`. Popovers / flyouts: `rounded-xl border border-slate-800 bg-slate-900 p-1.5 shadow-xl` with menu items `rounded-lg`. **Never wrap select controls or dropdown triggers in `rounded-full` pills.**
+- **Badges & Status Chips.** `<Badge>` and `<SeverityBadge>` use `rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide`. Rectangular tags ensure visual hierarchy and information density on complex tables. **Never use `rounded-full` for text tags or status badges.**
 - **Inputs.** `w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5
-  py-2.5 text-xs text-slate-50 focus:border-accent`. Always paired with a
+py-2.5 text-xs text-slate-50 focus:border-accent`. Always paired with a
   `<label for>`.
 - **Cards.** `bg-slate-900/60 border border-slate-800 rounded-xl`. Borders stay,
-  contrary to the Apple template.
+  contrary to the template.
 - **Glass.** `.apple-blur` (`saturate(180%) blur(20px)`) on sticky headers and
   the sidebar only.
 
 ## 5. Layout
 
 - 8px base unit; Tailwind's default spacing scale is already on it.
-- Radius: `rounded-sm` 5px, `rounded`/`rounded-md` 8px, `rounded-lg` 11px,
-  `rounded-xl`/`rounded-2xl` 12px. `rounded-full` for pills, dots and avatars.
-  **Nothing rectangular exceeds 12px.**
+- **Radius hierarchy**:
+  - `rounded-sm` (4px): subtle indicators, sub-pixel borders
+  - `rounded-md` (6–8px): badges, chips, tags, table row checkboxes
+  - `rounded-lg` (8–11px): dropdown triggers, toolbar buttons, select inputs, popover menu items
+  - `rounded-xl` (12px): cards, modals, primary CTA buttons, popover containers
+  - `rounded-full`: **strictly restricted to true circles (1:1 aspect ratio)**: circular status dots (`h-1.5 w-1.5`), user avatars (`h-7 w-7`), spinner animations, circular wizard step numbers (`w-6 h-6`), and slim progress bar tracks. **Nothing rectangular or containing text may use `rounded-full`.**
 - Content fills the viewport. Tables scroll horizontally inside
   `overflow-x-auto`; the page body never scrolls sideways.
 
@@ -143,13 +153,13 @@ Compose from `frontend/src/lib/components/` — see §12. General rules:
 Elevation comes from background contrast plus a hairline border, not shadow.
 Shadow is reserved for floating layers: modals, dropdowns, the bulk action bar.
 
-| Level | Treatment |
-| --- | --- |
-| Flat | Solid surface, no shadow — the default |
-| Card | `border border-slate-800` |
-| Glass | `.apple-blur` on sticky nav/header |
-| Floating | `shadow-2xl` on modals and popovers |
-| Focus | `2px` accent ring on **every** interactive element |
+| Level    | Treatment                                          |
+| -------- | -------------------------------------------------- |
+| Flat     | Solid surface, no shadow — the default             |
+| Card     | `border border-slate-800`                          |
+| Glass    | `.apple-blur` on sticky nav/header                 |
+| Floating | `shadow-2xl` on modals and popovers                |
+| Focus    | `2px` accent ring on **every** interactive element |
 
 Motion is functional: `animate-in fade-in`, `zoom-in-95`, `duration-200` for
 entrances (via `tailwindcss-animate`), `animate-spin` for pending work. All of it
@@ -167,6 +177,7 @@ is disabled under `prefers-reduced-motion`, which `app.css` honours globally.
 - Keep negative tracking at all sizes
 - Put wide content in `overflow-x-auto`
 - Give every `{#each}` a key
+- Use `rounded-md` for badges and tags, `rounded-lg` for dropdown triggers and toolbar controls, and `rounded-xl` for cards and primary action buttons
 
 ### Don't
 
@@ -174,6 +185,7 @@ is disabled under `prefers-reduced-motion`, which `app.css` honours globally.
 - Don't add `text-[Npx]` — the ramp already goes down to 9px
 - Don't introduce accent colours beyond the accent and the severity bands
 - Don't use radius above 12px on rectangles
+- Don't use `rounded-full` or pill borders on dropdowns, select menus, buttons, filter tabs, or data table badges
 - Don't use `!important` to fix a theme problem — fix the token
 - Don't use weight 800 or 900
 - Don't add textures, patterns or decorative gradients
@@ -185,11 +197,11 @@ is disabled under `prefers-reduced-motion`, which `app.css` honours globally.
 Tailwind's default breakpoints: `sm` 640, `md` 768, `lg` 1024, `xl` 1280,
 `2xl` 1536.
 
-| Range | Behaviour |
-| --- | --- |
-| <768px | Sidebar collapses to an off-canvas drawer behind a hamburger; single-column forms; tables scroll horizontally |
-| 768–1024px | Sidebar collapsible to icons; two-column forms |
-| >1024px | Full sidebar, multi-column layouts |
+| Range      | Behaviour                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| <768px     | Sidebar collapses to an off-canvas drawer behind a hamburger; single-column forms; tables scroll horizontally |
+| 768–1024px | Sidebar collapsible to icons; two-column forms                                                                |
+| >1024px    | Full sidebar, multi-column layouts                                                                            |
 
 Touch targets are at least 44×44px below `md`. Navigation links are 48px tall.
 The 3D viewport must not claim a fixed height taller than the viewport.
@@ -245,5 +257,5 @@ To maintain cohesive design patterns and avoid duplicate markup, all UI views mu
 - **`<BulkActionBar.svelte>`**: Floating/inline bulk action toolbar when rows are selected.
 - **`<EmptyState.svelte>`**: Standardized zero-state card with icon, title, description, and primary CTA button.
 - **`<LoadingState.svelte>`**: Spinner loading container with configurable message and sub-message.
-- **`<SeverityBadge.svelte>`**: Universal pill badge for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
+- **`<SeverityBadge.svelte>`**: Universal compact engineering badge (`rounded-md`) for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
 - **`<IsoGovernanceBadges.svelte>`**: Standard ISO 19650 metadata tags (Suitability `S0`–`S7`, Revision `P01.01`, CDE State `WIP`/`SHARED`/`PUBLISHED`/`ARCHIVED`).

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import {
     FolderOpen,
     BookOpen,
@@ -18,6 +18,7 @@
     RotateCw,
   } from "lucide-svelte";
   import { dashboardApi, projectsApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import type { DashboardStats, Project } from "../lib/types";
   import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
@@ -93,6 +94,15 @@
     recentProjects = recentProjects.map((p) => (p.id === updated.id ? updated : p));
   }
 
+  $effect(() => {
+    const _orgId = authState.activeOrganizationId;
+    // refreshDashboard reads/writes recentProjects synchronously before its
+    // first await; without untrack, that read gets tracked as a dependency
+    // of this effect, and the later write to recentProjects re-fires it,
+    // causing an unbounded refetch loop.
+    untrack(() => refreshDashboard(true));
+  });
+
   async function refreshDashboard(force = false) {
     if (!cachedStats && !recentProjects.length) {
       isLoading = true;
@@ -103,7 +113,7 @@
     try {
       const [statsData, projectsData] = await Promise.all([
         dashboardApi.getStats({ forceRefresh: force }),
-        projectsApi.list({ forceRefresh: force }),
+        projectsApi.list({ forceRefresh: force, organization_id: authState.activeOrganizationId }),
       ]);
       stats = statsData;
       recentProjects = (projectsData.projects || []).slice(0, 5);
@@ -148,7 +158,7 @@
         <button
           type="button"
           onclick={onOpenWizard}
-          class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
         >
           <Plus class="h-3.5 w-3.5" />
           <span>New Project</span>
@@ -327,7 +337,7 @@
                 </td>
                 <td class="px-3 py-3">
                   <span
-                    class="rounded-full px-2 py-0.5 text-micro font-semibold {project.status ===
+                    class="rounded-md px-2 py-0.5 text-micro font-semibold {project.status ===
                     'Active'
                       ? 'border border-emerald-800/60 bg-emerald-950/50 text-emerald-400'
                       : 'bg-slate-800 text-slate-400'}"

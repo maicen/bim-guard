@@ -8,6 +8,7 @@
     onBulkDelete?: (() => void) | null;
     onBulkEdit?: (() => void) | null;
     onBulkExport?: (() => void) | null;
+    children?: import("svelte").Snippet;
   }
 
   let {
@@ -17,6 +18,7 @@
     onBulkDelete = null,
     onBulkEdit = null,
     onBulkExport = null,
+    children,
   }: Props = $props();
 </script>
 
@@ -33,6 +35,8 @@
     </div>
 
     <div class="flex items-center gap-2">
+      {@render children?.()}
+
       {#if onBulkEdit}
         <button
           type="button"

@@ -82,7 +82,10 @@ class MissingTable(FakeTable):
 
 
 class NoopStorage:
-    """Storage stub; these tests never read or write a file."""
+    """Storage stub; these tests never read or write real bytes."""
+
+    def __init__(self) -> None:
+        self.deleted: list[str] = []
 
     def save_upload(self, filename: str, content: bytes, subdir: str) -> str:
         return f"mock://{subdir}/{filename}"
@@ -90,15 +93,20 @@ class NoopStorage:
     def materialize_local_path(self, reference: str) -> None:
         return None
 
+    def delete(self, reference: str) -> None:
+        self.deleted.append(reference)
 
-def build_service(projects: list[dict], ifc_files: Any) -> ProjectsService:
+
+def build_service(
+    projects: list[dict], ifc_files: Any, storage: NoopStorage | None = None
+) -> ProjectsService:
     """Return a ProjectsService wired to in-memory repositories."""
     return ProjectsService(
         projects_repo=FakeTable(projects),
         standards_repo=FakeTable(),
         client_documents_repo=FakeTable(),
         ifc_files_repo=ifc_files,
-        storage=NoopStorage(),
+        storage=storage or NoopStorage(),
     )
 
 
@@ -190,3 +198,61 @@ def test_missing_table_degrades_to_the_legacy_column() -> None:
 
     assert [row["file_path"] for row in files] == ["sb://m/uploads/ifc/abc_Clinic.ifc"]
     assert service.get_primary_ifc_file(12) is None
+
+
+# ── delete_ifc_file ──────────────────────────────────────────────────────────
+
+
+def test_delete_removes_a_non_primary_file_and_the_stored_bytes() -> None:
+    """Deleting a context model drops its row and frees its storage object."""
+    storage = NoopStorage()
+    service = build_service(PROJECTS, FakeTable(IFC_FILES), storage=storage)
+
+    deleted = service.delete_ifc_file(10, 1)
+
+    assert deleted is not None
+    assert deleted["file_name"] == "arch.ifc"
+    assert storage.deleted == ["sb://m/arch.ifc"]
+    remaining = service.get_ifc_files_by_project(10)
+    assert [row["file_name"] for row in remaining] == ["plumb.ifc", "struct.ifc"]
+    assert remaining[0]["is_primary"] is True
+
+
+def test_delete_of_the_primary_promotes_the_next_remaining_file() -> None:
+    """The project keeps a model to analyse as long as one is left."""
+    service = build_service(PROJECTS, FakeTable(IFC_FILES))
+
+    deleted = service.delete_ifc_file(10, 2)
+
+    assert deleted is not None
+    assert deleted["is_primary"] is True
+    primary = service.get_primary_ifc_file(10)
+    assert primary is not None
+    assert primary["file_name"] == "arch.ifc"
+    assert primary["is_primary"] is True
+    # The mirror column follows the newly promoted model.
+    assert service.get_project(10)["ifc_file_path"] == "sb://m/arch.ifc"
+
+
+def test_delete_of_the_last_file_clears_the_projects_mirror_column() -> None:
+    """A project can end up with no model, and the mirror column agrees."""
+    ifc_files = FakeTable(
+        [{"id": 99, "project_id": 12, "file_path": "sb://m/only.ifc", "file_name": "only.ifc", "is_primary": True, "role": "primary"}]
+    )
+    service = build_service(PROJECTS, ifc_files)
+
+    deleted = service.delete_ifc_file(12, 99)
+
+    assert deleted is not None
+    assert service.get_ifc_files_by_project(12) == []
+    assert service.get_project(12)["ifc_file_path"] == ""
+
+
+def test_delete_of_an_unknown_file_returns_none() -> None:
+    """A file_id belonging to another project, or no project, is a no-op."""
+    service = build_service(PROJECTS, FakeTable(IFC_FILES))
+
+    assert service.delete_ifc_file(10, 999) is None
+    # id 4 belongs to project 14, not 10 -- must not be deletable through it.
+    assert service.delete_ifc_file(10, 4) is None
+    assert len(service.get_ifc_files_by_project(14)) == 2

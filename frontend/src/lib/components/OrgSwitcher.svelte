@@ -26,7 +26,7 @@
 
 {#if organizations.length > 1}
   <div
-    class="hidden items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 lg:inline-flex"
+    class="hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-700 lg:inline-flex"
   >
     <Building2 class="h-3.5 w-3.5 shrink-0 text-violet-400" />
     <div class="relative">
@@ -35,7 +35,7 @@
         onchange={handleChange}
         disabled={switching}
         aria-label="Switch current organization"
-        class="max-w-[10rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-violet-300 focus:outline-none disabled:opacity-60"
+        class="max-w-[10rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-slate-200 focus:outline-none disabled:opacity-60"
       >
         <option value="" disabled>Select organization…</option>
         {#each organizations as org (org.organization_id)}
@@ -43,16 +43,16 @@
         {/each}
       </select>
       <ChevronDown
-        class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-violet-400"
+        class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400"
       />
     </div>
   </div>
 {:else if organizations.length === 1}
   <span
-    class="hidden items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/5 px-2.5 py-0.5 text-xs font-medium text-violet-300 lg:inline-flex"
+    class="hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs font-medium text-slate-300 lg:inline-flex"
     title="Your organization"
   >
-    <Building2 class="h-3.5 w-3.5 shrink-0" />
+    <Building2 class="h-3.5 w-3.5 shrink-0 text-violet-400" />
     {organizations[0]!.name}
   </span>
 {/if}

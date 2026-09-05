@@ -118,6 +118,21 @@ uv run pytest -m ""             # everything, including slow tests
 uv run pytest -m "not llm"      # skip tests that call an LLM
 ```
 
+## Local Dev Sign-In (Google OAuth bypass without weakening auth)
+
+Frontend auth is Google OAuth only (`frontend/src/lib/auth.svelte.ts`), which normally requires clicking through Google's consent screen. For local development there is a seeded Supabase Auth test account (`dev@bim-guard.local`) that signs in via a real password grant instead — the backend still verifies a genuine Supabase JWT against the JWKS (`app/auth.py`), so nothing about the auth path is bypassed or weakened.
+
+**To use it on any machine (no per-device setup needed — the account lives in the shared Supabase project):**
+
+1. Copy `frontend/.env.example` to `frontend/.env` — it already ships working `VITE_DEV_AUTH_EMAIL` / `VITE_DEV_AUTH_PASSWORD` values for the shared dev account.
+2. Run `cd frontend && npm run dev`. A "Sign in as dev test user" button appears on the login screen automatically in dev builds (gated on `import.meta.env.DEV`); click it to sign in as `dev@bim-guard.local`.
+
+**Rules:**
+
+- Never re-seed unless the account is missing or the password needs rotating. If needed: `uv run python scripts/seed_dev_auth_user.py` (reads `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` and optional `DEV_AUTH_EMAIL` / `DEV_AUTH_PASSWORD` from the root `.env`).
+- The password is committed in `frontend/.env.example`, so treat this account as low-trust and shared — never grant it elevated, admin-only, or sensitive-data permissions.
+- **Never** implement an unconditional auth bypass (e.g. `if os.getenv("SKIP_AUTH"): return True`) anywhere in `app/auth.py` or route dependencies. This dev-account pattern is the only sanctioned shortcut because it still exercises real authentication end-to-end.
+
 ## Dev Server Launch Configs (STRICT — keep generated, never hand-edit)
 
 BIM-Guard's two dev servers (FastAPI backend on `:8000`, Vite/Svelte frontend on `:5173`, per `run_server.sh`/`run_server.bat`) are also registered as launch configs for editors/agents that preview or debug the app directly instead of shelling out to the run scripts:

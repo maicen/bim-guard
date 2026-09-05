@@ -133,6 +133,7 @@ class ProjectCreateRequest(BaseModel):
     status: str = Field(default="Draft", description="Workflow status")
     country: str = Field(..., description="Jurisdiction governing code applicability")
     analysis_type: str = Field(..., description="Analysis domain: Arch, Piping, or seismic")
+    organization_id: Optional[int] = Field(default=None, description="Owning organization ID")
 
     # Wizard step 3: optional building code ID
     building_code: Optional[str] = Field(default=None, description="Building code ID")
@@ -806,6 +807,14 @@ class AnalysisRunRequest(BaseModel):
             "list runs none. Unselected engines are skipped, not filtered afterwards."
         ),
     )
+    include_low: bool = Field(
+        default=True,
+        description=(
+            "Emit Low-band verdicts. True by default: a Low verdict is an "
+            "assessed finding, and suppressing it made whole engines look "
+            "empty. Set false for the Medium-and-above view."
+        ),
+    )
     use_cache: bool = Field(default=True, description="Whether to use cached analysis results")
 
 
@@ -1170,13 +1179,16 @@ class GitHubRepoStructureResponse(BaseModel):
     items: list[GitHubRepoItem] = []
 
 
-class ProjectImportFromRepoRequest(BaseModel):
-    """Payload for importing an IFC model file from a GitHub repository into projects."""
+class AttachRepoModelsRequest(BaseModel):
+    """Payload for attaching one or more IFC models from a GitHub repository to an existing project."""
 
-    file_path: str = Field(..., min_length=1, description="Relative file path in repository (e.g. models/hospital/Clinic_Architectural.ifc)")
-    name: Optional[str] = Field(None, description="Custom project name (defaults to file basename)")
-    country: Optional[str] = Field(None, description="Jurisdiction / country code")
-    analysis_type: Optional[str] = Field(None, description="Domain analysis type (Arch, Piping, seismic)")
+    repo_id: int = Field(..., description="Registered GitHub repository the files live in")
+    file_paths: list[str] = Field(
+        ..., min_length=1, description="Relative file paths in the repository (e.g. models/hospital/Clinic_Architectural.ifc)"
+    )
+    primary_index: int = Field(
+        0, ge=0, description="Index into file_paths naming the model to attach as primary"
+    )
 
 
 # ==============================================================================

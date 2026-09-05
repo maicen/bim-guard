@@ -23,6 +23,10 @@ BIM-Guard uses a modern, decoupled architecture:
 The backend is available at `http://127.0.0.1:8000` (OpenAPI interactive docs at `/api/docs`).
 The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to backend).
 
+### Local dev sign-in
+
+Auth is Google OAuth only. For local dev, sign in without the OAuth click-through using the seeded Supabase test account `dev@bim-guard.local`: copy `frontend/.env.example` to `frontend/.env` (already has working `VITE_DEV_AUTH_EMAIL`/`VITE_DEV_AUTH_PASSWORD`), run the frontend, and click "Sign in as dev test user" on the login screen (dev builds only). This is a real password-grant sign-in verified by the backend's normal JWKS check (`app/auth.py`) — not a bypass. The account already exists in the shared Supabase project; re-seed only if needed with `uv run python scripts/seed_dev_auth_user.py`. Because its password is committed in `.env.example`, never grant this account elevated permissions, and never add an unconditional auth-skip flag to the backend. See [CLAUDE.md](CLAUDE.md) for full detail.
+
 ### Dev server launch configs
 
 `.claude/launch.json`, `.antigravity/launch.json`, and `.vscode/launch.json` register the same two dev servers for editor/agent preview and debugging. They are generated — never hand-edit them. Update `scripts/generate_launch_configs.py` (the source of truth) and rerun `uv run python scripts/generate_launch_configs.py` if the run commands, host, or ports change.

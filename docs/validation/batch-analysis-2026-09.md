@@ -1,5 +1,23 @@
 # BIMGUARD Batch Analysis Report — September 2026
 
+> **Superseded — the corrosion numbers in this report are invalid.** Every
+> per-element corrosion figure below was produced before Defect A was found:
+> GC-001, CC-001 and MC-001 each substituted a scoreable value for a missing
+> input, so a model carrying no material data still returned a confident
+> verdict for every element. That is where the uniform counts come from —
+> 6,587 Low galvanic, 6,587 Medium crevice and 6,587 Critical MIC verdicts on
+> Clinic_Plumbing, one per element, with not a single data_quality Issue among
+> them. The arithmetic was right; the inputs were invented. The environment
+> defaults behind the same figures are documented in
+> [environment-defaults.md](environment-defaults.md), and the pre-flight gate
+> that now refuses those runs is commit `cf6e953` (with `3dd69ea` and
+> `a6c6806`) on `fix/undetermined-gate`. The batch will be regenerated once
+> that gate merges; the timings and data_quality reasons here are wrong for a
+> second, unrelated reason — the driver recorded 0.0 and "unspecified"
+> literals — fixed separately in `scripts/batch_corrosion_runs.py`. Nothing
+> below has been edited.
+
+
 **Date:** 2026-09-05  
 **Scope:** All Piping models (corrosion audits), multi-discipline seismic sets  
 **Coverage:** 9 Piping models analyzed with all five corrosion engines (GC-001, CC-001, MC-001, MM-001, XM-001)  

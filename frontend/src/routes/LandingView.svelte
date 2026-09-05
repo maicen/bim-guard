@@ -56,7 +56,7 @@
     <!-- Hero -->
     <section class="mx-auto max-w-4xl px-6 pb-16 pt-10 text-center sm:pb-20 sm:pt-16">
       <div
-        class="mx-auto mb-6 inline-flex items-center gap-1.5 rounded-full border border-blue-800/60 bg-blue-950/40 px-3 py-1 text-xs font-medium text-blue-300"
+        class="mx-auto mb-6 inline-flex items-center gap-1.5 rounded-md border border-blue-800/60 bg-blue-950/40 px-3 py-1 text-xs font-medium text-blue-300"
       >
         <ShieldCheck class="h-3.5 w-3.5" />
         OpenBIM Compliance Engine
