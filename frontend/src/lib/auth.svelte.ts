@@ -125,6 +125,20 @@ class AuthState {
     if (error) throw error;
   }
 
+  /**
+   * Sign in with a seeded local dev account (see scripts/seed_dev_auth_user.py).
+   * Goes through the real Supabase password grant -- same JWT, same backend
+   * verification path as Google sign-in -- just without the OAuth round trip.
+   * Only usable in dev builds with VITE_DEV_AUTH_EMAIL/PASSWORD set.
+   */
+  async signInWithDevAccount(): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: import.meta.env.VITE_DEV_AUTH_EMAIL as string,
+      password: import.meta.env.VITE_DEV_AUTH_PASSWORD as string,
+    });
+    if (error) throw error;
+  }
+
   async signOut(): Promise<void> {
     await supabase.auth.signOut();
     setAuthToken(null);

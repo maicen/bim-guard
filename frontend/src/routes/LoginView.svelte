@@ -7,6 +7,10 @@
   let signingIn = $state(false);
   let error = $state<string | null>(null);
 
+  const devAuthConfigured =
+    import.meta.env.DEV &&
+    Boolean(import.meta.env.VITE_DEV_AUTH_EMAIL && import.meta.env.VITE_DEV_AUTH_PASSWORD);
+
   // Already signed in (or just finished the Google redirect) — nothing left
   // to do here.
   $effect(() => {
@@ -18,6 +22,17 @@
     error = null;
     try {
       await authState.signInWithGoogle();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      signingIn = false;
+    }
+  }
+
+  async function handleDevSignIn() {
+    signingIn = true;
+    error = null;
+    try {
+      await authState.signInWithDevAccount();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       signingIn = false;
@@ -76,5 +91,16 @@
       </svg>
       {signingIn ? "Redirecting…" : "Continue with Google"}
     </button>
+
+    {#if devAuthConfigured}
+      <button
+        type="button"
+        onclick={handleDevSignIn}
+        disabled={signingIn}
+        class="w-full rounded-xl border border-dashed border-amber-700/60 bg-transparent px-4 py-2 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-950/30 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        Sign in as dev test user
+      </button>
+    {/if}
   </div>
 </div>
