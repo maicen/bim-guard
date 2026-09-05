@@ -22,6 +22,7 @@ from app.modules.phase_6.phase_6d_seismic import (
     DATA_QUALITY,
     DEFAULT_CONFIG_PATH,
     MECHANISM_CODE,
+    PRIMARY_MODEL_LABEL,
     SEVERITY_TO_BAND,
     _severity_band,
     issue_stats,
@@ -215,3 +216,83 @@ class TestConfig:
         config = load_clearance_config(DEFAULT_CONFIG_PATH)
         assert config.standards_cited, "citations are built from these"
         assert config.jurisdiction
+
+
+# ---------------------------------------------------------------------------
+# Federation provenance — which file each side of a clash came from
+# ---------------------------------------------------------------------------
+
+
+class TestSourceModelNaming:
+    """A federated finding must name files, not roles.
+
+    The 2026-09-06 audit found 886 cross-model clashes reporting
+    ``clashing_source_model: "primary model"``. A coordinator cannot open a
+    role, so the primary is now named by the file the project has attached.
+    """
+
+    def test_primary_label_names_the_file(self):
+        """The label the caller supplies is what lands on the issue."""
+        outcome = run_seismic_analysis(
+            minimal_ifc(), primary_label="west_riverside_hospital_str_ifc4.ifc"
+        )
+        sources = {
+            issue.metadata.get("source_model")
+            for issue in outcome["audit_issues"]
+        }
+        assert sources == {"west_riverside_hospital_str_ifc4.ifc"}
+
+    def test_no_label_still_falls_back_to_the_role(self):
+        """A caller with no file name — a fixture — is not broken by the change."""
+        outcome = run_seismic_analysis(minimal_ifc())
+        sources = {issue.metadata.get("source_model") for issue in outcome["audit_issues"]}
+        assert sources == {PRIMARY_MODEL_LABEL}
+
+    def test_clash_issue_names_both_files(self):
+        """Both sides of a cross-model clash are attributed to their own file."""
+        from app.modules.blue_halo.halo_volume_generator import (
+            BoundingBox,
+            BraceType,
+            ClashReport,
+            HaloVolume,
+            Point3D,
+            load_clearance_config,
+        )
+        from app.modules.comparator.issue_adapter import IssueIdAllocator
+        from app.modules.phase_6.phase_6d_seismic import _clash_issue
+
+        box = BoundingBox(min=Point3D(0.0, 0.0, 0.0), max=Point3D(100.0, 100.0, 100.0))
+        halo = HaloVolume(
+            id="halo-1",
+            source_element_id="HALO-ELEMENT",
+            source_ifc_class="IfcPipeSegment",
+            brace_type=BraceType.ANGLE_IRON,
+            element_bbox_mm=box,
+            halo_bbox_mm=box,
+            clearance_mm=200.0,
+        )
+        clash = ClashReport(
+            id="clash-1",
+            halo_id="halo-1",
+            halo_source_element_id="HALO-ELEMENT",
+            clashing_element_id="CLASHING-ELEMENT",
+            clashing_element_class="IfcBeam",
+            overlap_bbox_mm=box,
+            overlap_volume_mm3=1000.0,
+            severity="major",
+            description="beam intrudes into the bracing halo",
+        )
+        issue = _clash_issue(
+            clash,
+            halo,
+            load_clearance_config(DEFAULT_CONFIG_PATH),
+            IssueIdAllocator("BGR"),
+            {
+                "HALO-ELEMENT": "west_riverside_hospital_plumb_ifc4.ifc",
+                "CLASHING-ELEMENT": "west_riverside_hospital_str_ifc4.ifc",
+            },
+        )
+
+        assert issue.metadata["source_model"] == "west_riverside_hospital_plumb_ifc4.ifc"
+        assert issue.metadata["clashing_source_model"] == "west_riverside_hospital_str_ifc4.ifc"
+        assert "primary model" not in issue.metadata.values()

@@ -447,7 +447,14 @@ def run_analysis(
         # Not tracked: the seismic analysis is not one of the engines the
         # workflow endpoint reports, and binding a tracker here would reset a
         # corrosion run's progress for the same project.
-        result = run_seismic_analysis(content, extra_models=models[1:])
+        # models[0][0] is the primary's file_name, from model_bytes_all. Passed
+        # so a federated clash names both files: without it the primary's
+        # elements were attributed to the literal "primary model".
+        result = run_seismic_analysis(
+            content,
+            primary_label=models[0][0] if models else "",
+            extra_models=models[1:],
+        )
     elif slug == "architecture":
         result = _run_architecture(project_id)
     else:
