@@ -218,7 +218,14 @@ def _parsed(elements: list[ServiceElement]) -> dict:
 
 @pytest.fixture(scope="module")
 def read_issues():
-    """Issues for an element whose material and environment were both read."""
+    """Issues for an element whose material and environment were both read.
+
+    GC-001 and CC-001 reach verdicts; MC-001 contributes a
+    ``hydraulics_unavailable`` refusal rather than a verdict, because
+    ``_mic_element`` supplies none of the three inputs the pre-flight gate
+    requires. Both kinds carry the provenance block, which is what this file
+    asserts.
+    """
     element = _service_element(
         material_source=MATERIAL_SOURCE_IFC,
         material_confidence=CONFIDENCE_HIGH,
@@ -276,15 +283,41 @@ class TestPerElementFindingsCarryProvenance:
         codes = {i.metadata.get("mechanism_code") for i in read_issues}
         assert {"GC-001", "CC-001", "MC-001"} <= codes
 
-    def test_the_mic_diameter_assumption_survives(self, read_issues):
-        """The provenance block is merged in beside it, not over it."""
+    def test_the_mic_diameter_assumption_survives(self, monkeypatch):
+        """The provenance block is merged in beside it, not over it.
+
+        MC-001 has to be given a hydraulic input to reach a verdict at all:
+        since the pre-flight gate landed, an element with no flow velocity, no
+        dead-leg length and no operating temperature is refused before the
+        engine is entered, and ``_mic_element`` supplies none of the three. The
+        assertion here is about what a *finding* carries, so the finding has to
+        exist — hence the temperature.
+        """
+        import app.modules.phase_6.phase_6c_corrosion_ui as mod
+
+        original = mod._mic_element
+
+        def with_temperature(element):
+            built = original(element)
+            built.operating_temp_c = 28.0
+            return built
+
+        monkeypatch.setattr(mod, "_mic_element", with_temperature)
+        element = _service_element(
+            material_source=MATERIAL_SOURCE_IFC,
+            material_confidence=CONFIDENCE_HIGH,
+            environment_source=ENVIRONMENT_SOURCE_SPATIAL,
+            environment_confidence=CONFIDENCE_MEDIUM,
+        )
+        issues = run_corrosion_analysis(_parsed([element]), include_low=True)["audit_issues"]
         mic = [
             i
-            for i in read_issues
+            for i in issues
             if i.metadata.get("mechanism_code") == "MC-001" and i.mechanism != "data_quality"
         ]
         assert mic
         assert all("assumed_nominal_diameter_m" in i.metadata for i in mic)
+        assert all("material_source" in i.metadata for i in mic)
 
 
 # ---------------------------------------------------------------------------

@@ -82,13 +82,19 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
-from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_risk
+from app.engines.bimguard_corrosion_engine import (
+    MATERIAL_ALIASES,
+    GCElement,
+    _alias_matches,
+    assess_galvanic_risk,
+)
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
 from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
 from app.logging_config import get_logger
 from app.modules.ifc_reader.ifc_parser import (
     MATERIAL_SOURCE_UNMAPPED,
     ServiceElement,
+    _spaced,
 )
 from app.modules.phase_6.phase_6b_parsing import UNKNOWN_MATERIAL
 from app.modules.comparator import cross_material, material_media
@@ -407,6 +413,30 @@ def _mic_citations(result) -> list[dict]:
 #     parser's canonical names, and both are out of scope for this gate.)
 
 
+def _known_to_the_galvanic_series(raw: str) -> bool:
+    """Does GC-001's alias table recognise ``raw`` at all?
+
+    Read-only use of the engine's own table -- no engine file is modified --
+    and deliberately not a call to ``resolve_material``, which cannot answer
+    this: it returns ``"carbon_steel"`` both for a string it recognised as
+    carbon steel and for one it recognised not at all. The distinction between
+    those two is the whole point of the gate.
+
+    "Recognised" includes mapping to ``None``: the non-metallics (PVC, HDPE)
+    are in the table precisely so the engine can answer "no galvanic risk",
+    which is a verdict, not an absence. Refusing them would replace a correct
+    finding with an Undetermined.
+
+    The spaced form is passed because short aliases are matched on a word
+    boundary, and ``ss_316_passive`` has none -- underscores are word
+    characters.
+    """
+    key = _spaced(raw)
+    if key in MATERIAL_ALIASES:
+        return True
+    return any(_alias_matches(alias, key) for alias in MATERIAL_ALIASES)
+
+
 def _material_gate(element: ServiceElement) -> tuple[str, dict[str, Any]] | None:
     """Return ``(reason, inputs)`` if GC-001/CC-001 must not run, else ``None``.
 
@@ -424,7 +454,9 @@ def _material_gate(element: ServiceElement) -> tuple[str, dict[str, Any]] | None
             "substitute a scoreable material for an absent one",
             {"material_a_raw": element.material_a, "material_source": element.material_source},
         )
-    if element.material_source == MATERIAL_SOURCE_UNMAPPED:
+    if element.material_source == MATERIAL_SOURCE_UNMAPPED and not _known_to_the_galvanic_series(
+        raw
+    ):
         return (
             f"material {raw!r} was read from the IFC but matches no known "
             "material key, and GC-001 would score it as carbon steel",

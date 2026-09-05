@@ -164,6 +164,30 @@ class TestKnownMaterialStillRuns:
         assert verdicts(found, code)
         assert gated(found, code, "material_unresolved") == []
 
+    def test_a_material_the_engine_knows_is_not_gated(self, code):
+        """Unmapped by the parser, but in GC-001's table: the engine can answer.
+
+        PVC is the sharp case. GC-001 maps the non-metallics to ``None`` on
+        purpose so it can report "no galvanic risk" -- a verdict. Refusing it
+        would replace a correct finding with an Undetermined.
+        """
+        element = service_element(
+            material_a="PVC", material_b=None, material_source=MATERIAL_SOURCE_UNMAPPED
+        )
+        found = run(element, [code])
+        assert gated(found, code, "material_unresolved") == []
+
+    def test_camelcase_material_names_are_recognised(self, code):
+        """Regression: IFC authoring tools write CarbonSteel, not "carbon steel".
+
+        The Fire Sprinkler Riser in test_hospital_mep_scenario.ifc carries
+        exactly this, and the first cut of the gate refused it -- a real, named
+        material reported as unresolvable.
+        """
+        found = run(service_element(material_a="CarbonSteel", material_b=None), [code])
+        assert gated(found, code, "material_unresolved") == []
+        assert verdicts(found, code)
+
     def test_a_hand_built_element_is_not_gated_by_default_provenance(self, code):
         """Value first, provenance second.
 
