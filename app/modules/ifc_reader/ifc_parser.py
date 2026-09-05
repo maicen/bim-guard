@@ -5,6 +5,7 @@ Standard: ISO 16739-1
 Library:  ifcopenshell (open source)
 """
 
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Optional
@@ -196,9 +197,31 @@ def resolve_material_name(raw: str) -> tuple[str, str, str]:
     return text.replace(" ", "_")[:30], MATERIAL_SOURCE_UNMAPPED, CONFIDENCE_LOW
 
 
+def _spaced(raw: str) -> str:
+    """Lower-case ``raw`` with separators and camelCase boundaries as spaces.
+
+    ``"CarbonSteel"`` -> ``"carbon steel"``, ``"Ductile_Iron"`` -> ``"ductile
+    iron"``, ``"SS_316_passive"`` -> ``"ss 316 passive"``. Digits are treated as
+    their own run so ``"Grade316L"`` separates too.
+    """
+    text = re.sub(r"[_\-/]+", " ", raw or "")
+    text = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", text)
+    text = re.sub(r"(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])", " ", text)
+    return re.sub(r"\s+", " ", text).lower().strip()
+
+
 def _match_material_key(raw: str) -> Optional[str]:
-    """Return the BIMGUARD material key ``raw`` names, or ``None`` for no match."""
-    r = raw.lower().strip()
+    """Return the BIMGUARD material key ``raw`` names, or ``None`` for no match.
+
+    The comparisons below are written as English phrases -- ``"carbon steel"``,
+    ``"cast iron"`` -- but IFC authoring tools write the same materials without
+    the space: ``"CarbonSteel"``, ``"Ductile_Iron"``. Those failed every test
+    and fell through as unrecognised, which since the pre-flight gate landed
+    means a real, named material is refused as unresolvable. So the string is
+    normalised to spaced lower case first: separators become spaces, and a
+    camelCase boundary gets one inserted.
+    """
+    r = _spaced(raw)
     if "316" in r or "1.4401" in r:
         return "SS_316_passive"
     if "304" in r or "1.4301" in r:
