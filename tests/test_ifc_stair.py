@@ -15,6 +15,8 @@ precedent:
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 
@@ -190,6 +192,40 @@ class TestMergeRunIntervals:
 
     def test_empty_input_returns_empty(self):
         assert st.merge_run_intervals([]) == ([], [])
+
+
+# ── Cross-referencing: world-bbox distance ─────────────────────────────────────
+
+
+def _bbox(min_x, max_x, min_y, max_y):
+    return {"min_x": min_x, "max_x": max_x, "min_y": min_y, "max_y": max_y}
+
+
+class TestBboxXyDistance:
+    def test_overlapping_boxes_are_zero(self):
+        a = _bbox(0, 100, 0, 100)
+        b = _bbox(50, 150, 50, 150)
+        assert st.bbox_xy_distance_mm(a, b) == 0.0
+
+    def test_separated_boxes_measure_the_gap(self):
+        # a spans x=[0,100]; b spans x=[300,400] -- 200mm gap, same y range.
+        a = _bbox(0, 100, 0, 100)
+        b = _bbox(300, 400, 0, 100)
+        assert st.bbox_xy_distance_mm(a, b) == pytest.approx(200.0)
+
+    def test_diagonal_separation_uses_both_axes(self):
+        a = _bbox(0, 100, 0, 100)
+        b = _bbox(200, 300, 200, 300)  # 100mm gap in both x and y
+        assert st.bbox_xy_distance_mm(a, b) == pytest.approx(math.hypot(100, 100), abs=0.1)
+
+    def test_touching_boxes_are_zero(self):
+        a = _bbox(0, 100, 0, 100)
+        b = _bbox(100, 200, 0, 100)
+        assert st.bbox_xy_distance_mm(a, b) == 0.0
+
+    def test_missing_box_returns_none(self):
+        assert st.bbox_xy_distance_mm(None, _bbox(0, 1, 0, 1)) is None
+        assert st.bbox_xy_distance_mm(_bbox(0, 1, 0, 1), None) is None
 
 
 # ── Guard opening / baluster spacing ──────────────────────────────────────────
@@ -795,6 +831,149 @@ class TestAnalyzeRailing:
         analysis = st.analyze_railing(railing, IFCGeometryExtractor(model))
         assert "max_opening_mm" not in analysis
         assert "guard_max_opening_mm" not in analysis
+
+
+def _build_two_flight_stair_with_landing_and_railings():
+    """Two 6-tread flights joined by a landing, each flight flanked by its
+    own handrail, plus a guard on flight 1's far side -- built with NO
+    IfcStair parent and NO decomposition relationships at all, so every
+    link this test checks comes from world-bbox/elevation matching
+    (IFCStairEngine._link_elements), not from IsDecomposedBy. That is
+    deliberately the harder, more common case: most real exports don't
+    bother decomposing a stair's landings/railings under a shared parent.
+    """
+    from ifcopenshell.api import run
+
+    RISER, GOING, N, WIDTH, LANDING_LEN = 175.0, 280.0, 6, 900.0, 1000.0
+    model, body, storey = _base_model()
+
+    def _flight_entity(name, x_offset, z_offset):
+        triangles = []
+        for i in range(N):
+            z = z_offset + (i + 1) * RISER
+            x0 = x_offset + i * GOING
+            triangles += _tread_quad_triangles(x0, x0 + GOING, 0.0, WIDTH, z)
+            triangles += _riser_quad_triangles(x0, z - RISER, z, 0.0, WIDTH)
+        rep = _tessellated_representation(model, body, triangles)
+        flight = run("root.create_entity", model, ifc_class="IfcStairFlight", name=name)
+        run("spatial.assign_container", model, products=[flight], relating_structure=storey)
+        run("geometry.assign_representation", model, product=flight, representation=rep)
+        run("geometry.edit_object_placement", model, product=flight, matrix=np.eye(4), is_si=False)
+        return flight
+
+    def _box_entity(name, ifc_class, x0, x1, y0, y1, z0, z1, predefined_type=None):
+        triangles = _box_triangles(x0, x1, y0, y1, z0, z1)
+        rep = _tessellated_representation(model, body, triangles)
+        kwargs = {"predefined_type": predefined_type} if predefined_type else {}
+        entity = run("root.create_entity", model, ifc_class=ifc_class, name=name, **kwargs)
+        run("spatial.assign_container", model, products=[entity], relating_structure=storey)
+        run("geometry.assign_representation", model, product=entity, representation=rep)
+        run("geometry.edit_object_placement", model, product=entity, matrix=np.eye(4), is_si=False)
+        return entity
+
+    flight1_x0 = 0.0
+    flight1_run = N * GOING  # 1680
+    flight1_end_elev = N * RISER  # 1050
+    flight1 = _flight_entity("Flight 1", flight1_x0, 0.0)
+
+    landing_x0 = flight1_x0 + flight1_run
+    landing = _box_entity(
+        "Landing", "IfcSlab", landing_x0, landing_x0 + LANDING_LEN, 0.0, WIDTH,
+        flight1_end_elev - 20.0, flight1_end_elev, predefined_type="LANDING",
+    )
+
+    flight2_x0 = landing_x0 + LANDING_LEN
+    flight2 = _flight_entity("Flight 2", flight2_x0, flight1_end_elev)
+    flight2_end_elev = flight1_end_elev + N * RISER  # 2100
+
+    # Handrails flush against each flight's own edge (y=WIDTH), spanning
+    # each flight's own run -- unambiguously the nearest flight to each.
+    handrail1 = _box_entity(
+        "Handrail 1", "IfcRailing", flight1_x0, flight1_x0 + flight1_run,
+        WIDTH, WIDTH + 40.0, 900.0, 940.0, predefined_type="HANDRAIL",
+    )
+    handrail2 = _box_entity(
+        "Handrail 2", "IfcRailing", flight2_x0, flight2_x0 + N * GOING,
+        WIDTH, WIDTH + 40.0, flight1_end_elev + 900.0, flight1_end_elev + 940.0,
+        predefined_type="HANDRAIL",
+    )
+    # A guard on flight 1's OTHER side (y=-40 to 0), so flight1 should end
+    # up with one handrail AND one guard, not two of either.
+    guard1 = _box_entity(
+        "Guard 1", "IfcRailing", flight1_x0, flight1_x0 + flight1_run,
+        -40.0, 0.0, 900.0, 1100.0, predefined_type="GUARDRAIL",
+    )
+
+    return {
+        "model": model,
+        "flight1": flight1, "flight2": flight2, "landing": landing,
+        "handrail1": handrail1, "handrail2": handrail2, "guard1": guard1,
+        "flight1_end_elev": flight1_end_elev, "flight2_end_elev": flight2_end_elev,
+    }
+
+
+class TestCrossReferencing:
+    @pytest.fixture(scope="class")
+    def built(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        parts = _build_two_flight_stair_with_landing_and_railings()
+        engine = st.IFCStairEngine(parts["model"], IFCGeometryExtractor(parts["model"])).build()
+        return parts, engine
+
+    def test_landing_connects_both_flights(self, built):
+        parts, engine = built
+        landing = engine.get_landing(parts["landing"].GlobalId)
+        assert landing["connects_flight_below_guid"] == parts["flight1"].GlobalId
+        assert landing["connects_flight_above_guid"] == parts["flight2"].GlobalId
+        assert landing["level_mismatch_mm"] == pytest.approx(0.0, abs=5.0)
+
+    def test_flights_know_their_landing(self, built):
+        parts, engine = built
+        flight1 = engine.get_flight(parts["flight1"].GlobalId)
+        flight2 = engine.get_flight(parts["flight2"].GlobalId)
+        assert flight1["landing_above_guid"] == parts["landing"].GlobalId
+        assert flight2["landing_below_guid"] == parts["landing"].GlobalId
+
+    def test_each_handrail_hosts_to_its_own_flight(self, built):
+        parts, engine = built
+        h1 = engine.get_railing(parts["handrail1"].GlobalId)
+        h2 = engine.get_railing(parts["handrail2"].GlobalId)
+        assert h1["host_element_guid"] == parts["flight1"].GlobalId
+        assert h1["host_element_type"] == "IfcStairFlight"
+        assert h2["host_element_guid"] == parts["flight2"].GlobalId
+
+    def test_flight_handrail_and_guard_counts_are_separate(self, built):
+        parts, engine = built
+        flight1 = engine.get_flight(parts["flight1"].GlobalId)
+        flight2 = engine.get_flight(parts["flight2"].GlobalId)
+        assert flight1["handrail_count"] == 1
+        assert flight1["guard_count"] == 1
+        assert flight2["handrail_count"] == 1
+        assert flight2["guard_count"] == 0
+
+    def test_flight_stair_guid_resolves_end_to_end(self, built, tmp_path_factory):
+        """A rule targeting IfcStairFlight and asking for ParentStairGlobalId
+        must resolve through the real pipeline, not just the engine's own
+        cache."""
+        from app.modules.ifc_reader import IFCReader
+        from app.modules.comparator import ComplianceComparator
+
+        parts, _engine = built
+        path = tmp_path_factory.mktemp("xref") / "stair.ifc"
+        parts["model"].write(str(path))
+
+        rule = {
+            "rule_id": 1,
+            "reference": "TEST-XREF-1",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "ParentStairGlobalId",
+            "operator": "exists",
+        }
+        extraction = IFCReader(path).extract_for_compliance([rule])
+        results = ComplianceComparator().validate_metadata(extraction)
+        result = {r["rule_ref"]: r for r in results}["TEST-XREF-1"]
+        assert result["status"] == "PASS"
 
 
 class TestEndToEndThroughIFCReader:

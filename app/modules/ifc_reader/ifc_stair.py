@@ -31,6 +31,20 @@ flight/landing/railing, and caches the results by GlobalId so
 through the same Pass-0 resolver shortcut ``ifc_seismic``/``ifc_supports``
 already use -- see ``_STAIR_DERIVED_PROPERTIES`` in ``ifc_reader/__init__.py``.
 
+A THIRD, engine-level pass (``IFCStairEngine._link_elements``, not part of
+either layer above, since it works ACROSS elements rather than on one
+element's own mesh) then cross-references flights, landings and railings
+that never explicitly decompose under a shared ``IfcStair`` -- the common
+case, not the exception. It matches a landing to the flight(s) it connects
+(by elevation + world-bbox proximity) and a railing to the flight/landing it
+runs alongside (by nearest world-bbox), producing ``ParentStairGlobalId``,
+``LandingBelow``/``LandingAbove``, ``ConnectsFlightBelow``/
+``ConnectsFlightAbove``, ``LandingLevelMismatch``, ``HostElementGlobalId``,
+and ``HandrailCountOnFlight``/``GuardCountOnFlight``. This is the one place
+in the module that works in WORLD coordinates rather than an element's own
+PCA-derived local frame, since two different elements' local frames are not
+directly comparable to each other.
+
 Known v1 limitations (deliberately out of scope, not silently wrong -- each
 one below is actually detected and named in the affected element's own
 ``warnings`` list at runtime, not just documented here):
@@ -117,6 +131,19 @@ DEFAULT_GAP_MM = 150.0
 #: straight stair has plenty of lateral spread from its width alone, which a
 #: ratio-based check would misread as curvature.
 DEFAULT_CURVATURE_DRIFT_MM = 75.0
+
+#: A landing's own elevation must be within this many mm of a flight's start
+#: or end elevation to be considered "connected" to it -- tight enough not to
+#: confuse two different storeys, generous enough to tolerate a landing
+#: surface modelled slightly proud of/recessed from the tread nosing line.
+DEFAULT_LANDING_ELEVATION_TOLERANCE_MM = 75.0
+
+#: Maximum plan (XY) distance, in mm, between two elements' world bounding
+#: boxes for them to be considered "in the same vicinity" when matching a
+#: landing or railing to the flight it connects to / runs alongside.
+#: Generous enough for a wide landing or a wall-offset handrail; still tight
+#: enough to rule out an unrelated stair elsewhere in a large building.
+DEFAULT_HOST_PROXIMITY_MM = 3000.0
 
 
 # ── Layer 1: pure numpy algorithms (no ifcopenshell) ──────────────────────────
@@ -361,6 +388,27 @@ def merge_run_intervals(
             gaps.append((round(merged[-1][1], 1), round(lo, 1)))
             merged.append([lo, hi])
     return [(round(a, 1), round(b, 1)) for a, b in merged], gaps
+
+
+def bbox_xy_distance_mm(bbox_a: dict | None, bbox_b: dict | None) -> float | None:
+    """Minimum plan (XY) distance in mm between two world-space bounding
+    boxes shaped like ``IFCGeometryExtractor.get_bounding_box()``'s output
+    (``min_x``/``max_x``/``min_y``/``max_y``/...). 0.0 when the boxes
+    overlap in plan. None when either box is unavailable -- the cross
+    -referencing pass this feeds must treat that as "cannot match", not as
+    "infinitely far" or "touching".
+
+    Used to match a landing or railing to the flight it connects to / runs
+    alongside, since each element's own local (run, lateral) frame is
+    independently derived (PCA per element) and not comparable across
+    elements -- world-space bounding boxes are the one thing every element
+    shares a common coordinate system for.
+    """
+    if not bbox_a or not bbox_b:
+        return None
+    dx = max(bbox_a["min_x"] - bbox_b["max_x"], bbox_b["min_x"] - bbox_a["max_x"], 0.0)
+    dy = max(bbox_a["min_y"] - bbox_b["max_y"], bbox_b["min_y"] - bbox_a["max_y"], 0.0)
+    return round(math.hypot(dx, dy), 1)
 
 
 # ── Layer 2: ifcopenshell-facing wrappers ─────────────────────────────────────
@@ -896,6 +944,7 @@ class IFCStairEngine:
                 analysis = {"guid": getattr(flight, "GlobalId", None), "warnings": [str(exc)]}
             guid = getattr(flight, "GlobalId", None)
             if guid:
+                analysis["world_bbox"] = self.geometry_extractor.get_bounding_box(flight)
                 self._flights[guid] = analysis
                 stair_guid = self._parent_stair_guid(flight) or guid
                 self._stair_flight_guids.setdefault(stair_guid, []).append(guid)
@@ -914,6 +963,7 @@ class IFCStairEngine:
                 analysis = {"guid": getattr(slab, "GlobalId", None), "warnings": [str(exc)]}
             guid = getattr(slab, "GlobalId", None)
             if guid:
+                analysis["world_bbox"] = self.geometry_extractor.get_bounding_box(slab)
                 self._landings[guid] = analysis
 
         railings = self._railings_with_fallback()
@@ -925,7 +975,10 @@ class IFCStairEngine:
                 analysis = {"guid": getattr(railing, "GlobalId", None), "warnings": [str(exc)]}
             guid = getattr(railing, "GlobalId", None)
             if guid:
+                analysis["world_bbox"] = self.geometry_extractor.get_bounding_box(railing)
                 self._railings[guid] = analysis
+
+        self._link_elements()
 
         self._built = True
         return self
@@ -965,6 +1018,123 @@ class IFCStairEngine:
         except Exception:
             pass
         return None
+
+    # ── Cross-referencing: flight <-> landing <-> railing <-> stair ─────────
+
+    def _link_elements(self) -> None:
+        """Second pass, run once after every flight/landing/railing has been
+        analysed: match landings to the flight(s) they connect, and railings
+        to the flight/landing they run alongside, via world-bbox proximity
+        (IFC decomposition already gives flight->stair in pass one, but
+        rarely goes further -- landings and railings are usually siblings in
+        the file, not children of a shared parent, so proximity is the
+        primary signal here, not a fallback).
+
+        Every flight/landing/railing ends up carrying its own ``stair_guid``
+        directly on its analysis dict (not just in the separate
+        ``_stair_flight_guids`` grouping), so it can be exposed as an
+        ordinary derived property the same way as everything else.
+        """
+        flight_stair: dict[str, str] = {}
+        for stair_guid, members in self._stair_flight_guids.items():
+            for fguid in members:
+                flight_stair[fguid] = stair_guid
+                self._flights[fguid]["stair_guid"] = stair_guid
+                # Determinate zero, not absent: every railing in the model
+                # gets a nearest-flight match attempt below, so "none matched
+                # this flight" is a real finding (no handrail/guard here),
+                # not a case this pass never got to.
+                self._flights[fguid]["handrail_count"] = 0
+                self._flights[fguid]["guard_count"] = 0
+
+        # -- Landings: match by elevation (the strong signal -- a landing's
+        # surface should sit almost exactly at a flight's start/end
+        # elevation) AND plan proximity (the weak signal, mainly to rule out
+        # an unrelated stair elsewhere with a coincidentally similar
+        # elevation). A landing typically borders TWO flights -- the one you
+        # just climbed (its END elevation matches) and the one you're about
+        # to climb (its START elevation matches) -- so both are checked and
+        # can both match, independently.
+        for lguid, landing in self._landings.items():
+            lbbox = landing.get("world_bbox")
+            lelev = landing.get("elevation_mm")
+            if lelev is None:
+                continue
+            best_below, best_below_dist = None, None
+            best_above, best_above_dist = None, None
+            for fguid, flight in self._flights.items():
+                dist = bbox_xy_distance_mm(lbbox, flight.get("world_bbox"))
+                if dist is None or dist > DEFAULT_HOST_PROXIMITY_MM:
+                    continue
+                end_elev = flight.get("end_elevation_mm")
+                if (
+                    end_elev is not None
+                    and abs(end_elev - lelev) <= DEFAULT_LANDING_ELEVATION_TOLERANCE_MM
+                    and (best_below_dist is None or dist < best_below_dist)
+                ):
+                    best_below, best_below_dist = fguid, dist
+                start_elev = flight.get("start_elevation_mm")
+                if (
+                    start_elev is not None
+                    and abs(start_elev - lelev) <= DEFAULT_LANDING_ELEVATION_TOLERANCE_MM
+                    and (best_above_dist is None or dist < best_above_dist)
+                ):
+                    best_above, best_above_dist = fguid, dist
+
+            mismatches: list[float] = []
+            if best_below is not None:
+                landing["connects_flight_below_guid"] = best_below
+                self._flights[best_below]["landing_above_guid"] = lguid
+                mismatches.append(abs(self._flights[best_below]["end_elevation_mm"] - lelev))
+            if best_above is not None:
+                landing["connects_flight_above_guid"] = best_above
+                self._flights[best_above]["landing_below_guid"] = lguid
+                mismatches.append(abs(self._flights[best_above]["start_elevation_mm"] - lelev))
+            if mismatches:
+                # The worst of the two: a landing is only as good as its
+                # least-aligned connection.
+                landing["level_mismatch_mm"] = round(max(mismatches), 1)
+
+            host_flight = best_below or best_above
+            if host_flight is not None:
+                stair_guid = flight_stair.get(host_flight)
+                if stair_guid:
+                    landing["stair_guid"] = stair_guid
+
+        # -- Railings: nearest flight OR landing by plan proximity, whichever
+        # is closer. A handrail/guard almost always runs immediately beside
+        # its host, so "nearest" is a reasonable, mounting-style-agnostic
+        # match (works whether it's fixed to the flight's own edge or offset
+        # to a wall) without requiring exact footprint overlap.
+        for rguid, railing in self._railings.items():
+            rbbox = railing.get("world_bbox")
+            best_guid, best_type, best_dist = None, None, None
+            for fguid, flight in self._flights.items():
+                dist = bbox_xy_distance_mm(rbbox, flight.get("world_bbox"))
+                if dist is not None and (best_dist is None or dist < best_dist):
+                    best_guid, best_type, best_dist = fguid, "IfcStairFlight", dist
+            for lguid, landing in self._landings.items():
+                dist = bbox_xy_distance_mm(rbbox, landing.get("world_bbox"))
+                if dist is not None and (best_dist is None or dist < best_dist):
+                    best_guid, best_type, best_dist = lguid, "IfcSlab", dist
+
+            if best_guid is None or best_dist is None or best_dist > DEFAULT_HOST_PROXIMITY_MM:
+                continue
+            railing["host_element_guid"] = best_guid
+            railing["host_element_type"] = best_type
+            if best_type == "IfcStairFlight":
+                stair_guid = flight_stair.get(best_guid)
+            else:
+                stair_guid = self._landings[best_guid].get("stair_guid")
+            if stair_guid:
+                railing["stair_guid"] = stair_guid
+            if best_type == "IfcStairFlight":
+                key = (
+                    "handrail_count"
+                    if str(railing.get("predefined_type") or "").upper() == "HANDRAIL"
+                    else "guard_count"
+                )
+                self._flights[best_guid][key] = self._flights[best_guid].get(key, 0) + 1
 
     # ── Accessors ──────────────────────────────────────────────────────────
 

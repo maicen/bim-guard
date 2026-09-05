@@ -377,6 +377,15 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     "stairriserheightdifference": ("stair_uniformity", "riser_difference_mm"),
     "stairtreaddepthdifference": ("stair_uniformity", "going_difference_mm"),
     "stairflightcount": ("stair_uniformity", "flight_count"),
+    # Cross-referencing (ifc_stair.IFCStairEngine._link_elements): which
+    # stair/flight/landing this element connects to or runs alongside.
+    # ParentStairGlobalId reads the same "stair_guid" field regardless of
+    # whether the element is a flight, a landing, or a railing.
+    "parentstairglobalid": "stair_guid",
+    "landingbelow": "landing_below_guid",
+    "landingabove": "landing_above_guid",
+    "handrailcountonflight": "handrail_count",
+    "guardcountonflight": "guard_count",
     # Landing (IfcSlab, PredefinedType=LANDING). Deliberately named
     # "LandingClearWidth", not "Width" -- see the Qto_SlabBaseQuantities
     # landmine documented in docs/ifc-property-mapping.md.
@@ -385,6 +394,9 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     "landingcleararea": "clear_area_mm2",
     "landingelevation": "elevation_mm",
     "landingslope": "slope_deg",
+    "connectsflightbelow": "connects_flight_below_guid",
+    "connectsflightabove": "connects_flight_above_guid",
+    "landinglevelmismatch": "level_mismatch_mm",
     # Handrail / guard (IfcRailing).
     "handrailminheight": "min_height_mm",
     "handrailmaxheight": "max_height_mm",
@@ -397,6 +409,7 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     "handrailgaplocations": "gap_locations_mm",
     "handrailmaxgaplength": "max_gap_length_mm",
     "bottomcleargap": "bottom_clear_gap_mm",
+    "hostelementglobalid": "host_element_guid",
     # Guard opening / baluster spacing -- guard-type IfcRailing only (see
     # ifc_stair.analyze_railing's is_guard_like gate). MaxOpening is the
     # largest horizontal infill gap found (baluster/post spacing);

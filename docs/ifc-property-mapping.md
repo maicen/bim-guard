@@ -202,6 +202,14 @@ rule's `unit` column states mm/deg) and it resolves automatically once
 | `BottomClearGap` | IfcRailing | Median bottom elevation across run-bands minus `floor_z_mm` — the *typical* gap under the bottom rail, robust to a few floor-touching posts pulling a plain minimum down to ~0 |
 | `MaxOpening` | IfcRailing (guard-type only) | Largest horizontal infill gap (baluster/post spacing), sampled at several heights between the guard's top and bottom — a height with NO material at all counts as a full-span opening, not a skipped sample |
 | `GuardMaxOpening` | IfcRailing (guard-type only) | `max(MaxOpening, BottomClearGap)` — the single worst opening anywhere on the guard, for a rule that wants one number to check against a sphere diameter |
+| `ParentStairGlobalId` | IfcStairFlight, IfcSlab (LANDING), IfcRailing | The `IfcStair` this element belongs to — from `IsDecomposedBy` when the model authors it, otherwise the element's own GlobalId as a single-flight fallback |
+| `LandingBelow` / `LandingAbove` | IfcStairFlight | GlobalId of the landing this flight's bottom/top connects to, if any |
+| `ConnectsFlightBelow` / `ConnectsFlightAbove` | IfcSlab (LANDING) | GlobalId of the flight whose top/bottom elevation matches this landing — a landing typically has both, bridging two flights |
+| `LandingLevelMismatch` | IfcSlab (LANDING) | Worst elevation gap between this landing and whichever flight(s) it connects to — should be ~0 for a well-modeled connection; a real number here is a genuine defect, not a modeling nicety |
+| `HostElementGlobalId` | IfcRailing | GlobalId of the nearest flight or landing this rail runs alongside |
+| `HandrailCountOnFlight` / `GuardCountOnFlight` | IfcStairFlight | Number of HANDRAIL / non-HANDRAIL railings hosted directly by this flight — `0` is a real, determinate finding (every railing in the model got a nearest-flight match attempt), not "not computed" |
+
+All of the cross-referencing properties above come from `IFCStairEngine._link_elements()`: IFC decomposition (`IsDecomposedBy`) when the model bothers to author it, otherwise world-bounding-box proximity — see `bbox_xy_distance_mm` and the module's `DEFAULT_LANDING_ELEVATION_TOLERANCE_MM`/`DEFAULT_HOST_PROXIMITY_MM` tunables. Each element's own per-element local (run/lateral) frame is independently PCA-derived and not comparable across elements, so this pass is the one place in the engine that works in world coordinates instead.
 
 **v1 limitations**, named in each result's `warnings` list rather than
 silently guessed: winder/curved-flight per-position tread depth (inner /
