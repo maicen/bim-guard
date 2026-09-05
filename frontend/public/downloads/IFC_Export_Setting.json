@@ -26,7 +26,7 @@
   "ExportSchedulesAsPsets": false,
   "ExportSpecificSchedules": false,
   "ExportUserDefinedPsets": true,
-  "ExportUserDefinedPsetsFileName": "C:\\Users\\Malak\\OneDrive\\Desktop\\BIMGuard_DoorPsets.txt",
+  "ExportUserDefinedPsetsFileName": "C:\\Users\\Malak\\OneDrive\\Desktop\\BIMGuard_UserDefinedPsets.txt",
   "UseTypePropertiesInInstacePSets": true,
   "ExportUserDefinedParameterMapping": false,
   "ExportUserDefinedParameterMappingFileName": "",
@@ -38,7 +38,7 @@
     "ClassificationLocation": null,
     "ClassificationFieldName": null
   },
-  "TessellationLevelOfDetail": 0.5,
+  "TessellationLevelOfDetail": 1.0,
   "ExportPartsAsBuildingElements": false,
   "ExportSolidModelRep": false,
   "UseActiveViewGeometry": false,
@@ -63,5 +63,5 @@
   "ExcludeFilter": "",
   "COBieCompanyInfo": "",
   "COBieProjectInfo": "",
-  "Name": "BIMGuard IFC4 Export - Door Psets"
+  "Name": "BIMGuard IFC4 Export - Doors Windows Stairs"
 }
