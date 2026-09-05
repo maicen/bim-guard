@@ -55,6 +55,7 @@ def _synthetic_issues() -> list[Issue]:
                 score=round(1.0 - n / 100, 4),
                 mechanism=f"{engine} synthetic",
                 mitigation="Replace the coupling.",
+                citations=[{"standard": "NASA-STD-6012", "clause": f"Table {n % 3}"}],
             )
         )
     for engine in ENGINES:
@@ -219,6 +220,76 @@ class TestFilters:
         for issue in body["audit_issues"]:
             assert issue["band"] == "critical"
             assert issue["rule_id"].startswith("GC-001")
+
+
+class TestDataQualitySelectors:
+    """The page's two data-quality dropdown options must be expressible."""
+
+    def test_the_data_quality_band_selects_only_the_notes(self, client):
+        body = client.get(f"{RESULTS_URL}?band=data_quality").json()
+        assert body["page"]["total_matching"] == len(ENGINES)
+        assert all(i["mechanism"] == "data_quality" for i in body["audit_issues"])
+
+    def test_the_data_quality_mechanism_selects_only_the_notes(self, client):
+        body = client.get(f"{RESULTS_URL}?mechanism=data_quality").json()
+        assert body["page"]["total_matching"] == len(ENGINES)
+        assert all(i["mechanism"] == "data_quality" for i in body["audit_issues"])
+
+    def test_a_real_band_still_leaves_the_notes_out(self, client):
+        body = client.get(f"{RESULTS_URL}?band=low").json()
+        assert all(i["mechanism"] != "data_quality" for i in body["audit_issues"])
+
+    def test_the_notes_can_ride_alongside_real_bands(self, client):
+        """What the low-risk toggle sends: the three real bands plus the notes."""
+        body = client.get(
+            f"{RESULTS_URL}?band=critical&band=high&band=medium&band=data_quality"
+        ).json()
+        mechanisms = {i["mechanism"] for i in body["audit_issues"]}
+        assert "data_quality" in mechanisms
+        assert all(
+            i["band"] != "low" or i["mechanism"] == "data_quality"
+            for i in body["audit_issues"]
+        )
+
+    def test_mechanism_unions_an_engine_with_the_notes(self, client):
+        body = client.get(f"{RESULTS_URL}?mechanism=GC&mechanism=data_quality").json()
+        rule_ids = {i["rule_id"] for i in body["audit_issues"]}
+        assert any(r.startswith("GC-001") for r in rule_ids)
+        assert "CC-001.DATA" in rule_ids
+
+
+class TestSearch:
+    def test_a_query_narrows_to_matching_titles(self, client):
+        body = client.get(f"{RESULTS_URL}?q=Finding 7").json()
+        assert body["page"]["total_matching"] == 1
+        assert body["audit_issues"][0]["title"] == "Finding 7"
+
+    def test_a_query_matches_a_citation_standard(self, client):
+        body = client.get(f"{RESULTS_URL}?q=nasa-std").json()
+        assert body["page"]["total_matching"] == VERDICT_COUNT
+
+    def test_a_query_matches_an_element_id(self, client):
+        body = client.get(f"{RESULTS_URL}?q=GUID-0012").json()
+        assert body["page"]["total_matching"] == 1
+
+    def test_a_query_is_case_insensitive(self, client):
+        assert (
+            client.get(f"{RESULTS_URL}?q=FINDING 7").json()["page"]["total_matching"]
+            == client.get(f"{RESULTS_URL}?q=finding 7").json()["page"]["total_matching"]
+        )
+
+    def test_a_blank_query_asks_for_no_narrowing(self, client, whole_run):
+        """Whitespace is an empty search box, not a filter that matches nothing."""
+        assert client.get(f"{RESULTS_URL}?q=%20%20").json() == whole_run
+
+    def test_a_query_leaves_the_stats_alone(self, client, whole_run):
+        body = client.get(f"{RESULTS_URL}?q=Finding 7").json()
+        assert body["issue_stats"] == whole_run["issue_stats"]
+
+    def test_a_query_combines_with_a_band(self, client):
+        body = client.get(f"{RESULTS_URL}?q=nasa-std&band=critical").json()
+        assert body["audit_issues"]
+        assert all(i["band"] == "critical" for i in body["audit_issues"])
 
 
 class TestOrdering:

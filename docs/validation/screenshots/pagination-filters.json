@@ -1,0 +1,53 @@
+{
+  "unfiltered": {
+    "row_count_label": "Audit Findings\n21,134 of 21,134",
+    "total_matching": "21,134",
+    "stat_cards": [
+      "13174",
+      "6587",
+      "0",
+      "6587",
+      "0",
+      "7960"
+    ]
+  },
+  "low_risk_off": {
+    "row_count_label": "Audit Findings\n21,134 of 21,134",
+    "total_matching": "21,134",
+    "stat_cards": [
+      "13174",
+      "6587",
+      "0",
+      "6587",
+      "0",
+      "7960"
+    ]
+  },
+  "low_risk_off_request": "/api/analyze/results/119/corrosion?use_cache=true&engines=GC&engines=CC&engines=MC&engines=MM&engines=XM&limit=50&offset=0&band=critical&band=high&band=medium&band=data_quality&mechanism=GC&mechanism=CC&mechanism=MC&mechanism=MM&mechanism=XM&mechanism=data_quality&sort=band_then_score",
+  "severity_critical": {
+    "row_count_label": "Audit Findings\n6,587 of 21,134",
+    "total_matching": "6,587",
+    "stat_cards": [
+      "13174",
+      "6587",
+      "0",
+      "6587",
+      "0",
+      "7960"
+    ]
+  },
+  "severity_critical_request": "/api/analyze/results/119/corrosion?use_cache=true&engines=GC&engines=CC&engines=MC&engines=MM&engines=XM&limit=50&offset=0&band=critical&mechanism=GC&mechanism=CC&mechanism=MC&mechanism=MM&mechanism=XM&mechanism=data_quality&sort=band_then_score",
+  "search_astm": {
+    "row_count_label": "Audit Findings\n0 of 21,134",
+    "total_matching": "0",
+    "stat_cards": [
+      "13174",
+      "6587",
+      "0",
+      "6587",
+      "0",
+      "7960"
+    ]
+  },
+  "search_astm_request": "/api/analyze/results/119/corrosion?use_cache=true&engines=GC&engines=CC&engines=MC&engines=MM&engines=XM&limit=50&offset=0&band=critical&mechanism=GC&mechanism=CC&mechanism=MC&mechanism=MM&mechanism=XM&mechanism=data_quality&sort=band_then_score&q=ASTM%20G48"
+}
