@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import {
     FolderOpen,
     BookOpen,
@@ -96,7 +96,11 @@
 
   $effect(() => {
     const _orgId = authState.activeOrganizationId;
-    refreshDashboard(true);
+    // refreshDashboard reads/writes recentProjects synchronously before its
+    // first await; without untrack, that read gets tracked as a dependency
+    // of this effect, and the later write to recentProjects re-fires it,
+    // causing an unbounded refetch loop.
+    untrack(() => refreshDashboard(true));
   });
 
   async function refreshDashboard(force = false) {
