@@ -665,8 +665,20 @@ def load_cc_catalog() -> dict[str, Any]:
     }
 
 
+#: The one MC-001 temperature class with no numeric range. classify_temperature
+#: returns it by name when the temperature is None, so it never takes part in a
+#: bounds comparison and needs none.
+UNBOUNDED_TEMPERATURE_CLASS = "T5_UNKNOWN"
+
+
 def load_mc_catalog() -> dict[str, Any]:
-    """Load the MC-001 lookup tables from the database or fallback JSON."""
+    """Load the MC-001 lookup tables from the database or fallback JSON.
+
+    ``temperature_classes`` carries only classes with usable numeric bounds.
+    Any bounded class whose rule row omits ``t_min``/``t_max`` is left out and
+    named in ``temperature_bounds_missing`` instead, so a rule gap surfaces as
+    a reported gap rather than as a benign verdict.
+    """
     json_data = _load_json_ruleset("mic_corrosion_ruleset.json")
     rows = _rules_for(json_data["ruleset_id"])
 
@@ -763,6 +775,9 @@ def load_mc_catalog() -> dict[str, Any]:
 
     flow_velocity_classes: dict[str, dict[str, Any]] = {}
     temperature_classes: dict[str, dict[str, Any]] = {}
+    #: Temperature classes dropped for want of numeric bounds. Surfaced by
+    #: phase_6c as a run-level data_quality issue.
+    temperature_bounds_missing: list[str] = []
     dead_leg_classes: dict[str, dict[str, Any]] = {}
     material_susceptibility: dict[str, tuple[float, str, str]] = {}
     system_type_modifiers: dict[str, tuple[float, str]] = {}
@@ -783,13 +798,28 @@ def load_mc_catalog() -> dict[str, Any]:
         elif rule_type == "temperature_class":
             key = str(params.get("class_key") or row.get("reference", "").split(".")[-1]).strip()
             if key:
-                temperature_classes[key] = {
+                entry = {
                     "range": params.get("range") or row.get("description") or key,
                     "risk": _coerce_float(row.get("check_value"), 0.0) or 0.0,
                     "reference": params.get("reference") or "",
-                    "t_min": _coerce_float(params.get("t_min"), 0.0) or 0.0,
-                    "t_max": _coerce_float(params.get("t_max"), 0.0) or 0.0,
                 }
+                t_min = _coerce_float(params.get("t_min"))
+                t_max = _coerce_float(params.get("t_max"))
+                if key == UNBOUNDED_TEMPERATURE_CLASS:
+                    # Selected by name, not by comparison, so it is the one
+                    # class that legitimately carries no bounds.
+                    temperature_classes[key] = entry
+                elif t_min is None or t_max is None:
+                    # Absent bounds were coerced to 0.0, which made
+                    # "t_min <= t < t_max" false for every temperature and sent
+                    # every element to the T4_SAFE_HOT fallback -- risk 0.05,
+                    # the lowest of the six. Water at 35 C in the middle of the
+                    # Legionella danger zone scored as safely hot. A class that
+                    # cannot be evaluated is dropped and the omission recorded,
+                    # so the run reports a rule gap instead of a benign verdict.
+                    temperature_bounds_missing.append(key)
+                else:
+                    temperature_classes[key] = {**entry, "t_min": t_min, "t_max": t_max}
         elif rule_type == "dead_leg_class":
             key = str(params.get("class_key") or row.get("reference", "").split(".")[-1]).strip()
             if key:
@@ -849,6 +879,7 @@ def load_mc_catalog() -> dict[str, Any]:
         "description": json_data.get("description", ""),
         "flow_velocity_classes": flow_velocity_classes,
         "temperature_classes": temperature_classes,
+        "temperature_bounds_missing": temperature_bounds_missing,
         "dead_leg_classes": dead_leg_classes,
         "material_susceptibility": material_susceptibility,
         "system_type_modifiers": system_type_modifiers,

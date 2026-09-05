@@ -867,6 +867,68 @@ def _network_data_quality_issue(
     )
 
 
+#: What the MC-001 temperature-bounds gap is called in Issue metadata.
+RULESET_TEMPERATURE_BOUNDS_MISSING = "ruleset_temperature_bounds_missing"
+
+
+def _ruleset_data_quality_issues(allocator: IssueIdAllocator) -> list[Issue]:
+    """Report MC-001 temperature classes the ruleset cannot supply bounds for.
+
+    A gap in the *rules* rather than in the model, so it is raised once per run
+    with no ``element_id`` -- the same shape as
+    :func:`_network_data_quality_issue`, for the same reason.
+
+    Why it has to be said out loud: a temperature class with no numeric bounds
+    is dropped from the catalog, and a dropped class cannot match, so every
+    element in that band falls through ``classify_temperature``'s final
+    ``return`` to T4_SAFE_HOT -- risk 0.05, the lowest of the six. The verdicts
+    stay plausible while the temperature term quietly stops working. Silence
+    here would be indistinguishable from a model with no hot water in it.
+    """
+    try:
+        from app.services.corrosion_rule_catalog import load_mc_catalog
+
+        missing = list(load_mc_catalog().get("temperature_bounds_missing") or [])
+    except Exception:  # pragma: no cover - a catalog that will not load is
+        return []      # already reported by the per-element path
+
+    if not missing:
+        return []
+
+    named = ", ".join(sorted(missing))
+    logger.warning("MC-001 temperature classes lack numeric bounds: %s", named)
+    return [
+        make_issue(
+            id=allocator.next(MIC.prefix),
+            element_id="",
+            rule_id=f"{MIC.code}.DATA",
+            title="MC-001 temperature classes carry no numeric bounds",
+            mechanism=DATA_QUALITY,
+            band=RiskBand.LOW,
+            score=0.10,
+            mitigation=(
+                "Seed t_min and t_max into the parameters of the "
+                f"MC-001.TEMP.* rules for {named}. Until then the temperature "
+                "term contributes its lowest risk to every MIC score."
+            ),
+            assignee_role="BIM coordinator",
+            description=(
+                f"The temperature classes {named} have no numeric t_min/t_max, "
+                "so they were dropped from the MC-001 catalog and cannot match. "
+                "Every element is classified T4_SAFE_HOT regardless of its "
+                "actual temperature, which understates MIC risk in the "
+                "Legionella range rather than overstating it."
+            ),
+            metadata={
+                "check": RULESET_TEMPERATURE_BOUNDS_MISSING,
+                "mechanism_code": MIC.code,
+                "classes": sorted(missing),
+            },
+            citations=[],
+        )
+    ]
+
+
 def _finding_issue(
     element: ServiceElement,
     spec: MechanismSpec,
@@ -956,6 +1018,10 @@ def run_corrosion_analysis(
     except Exception:
         pass
 
+    # Set when MC-001 actually scored something, so the ruleset gap below is
+    # reported only where it could have changed a verdict.
+    mic_scored = False
+
     for element in elements:
         for spec in active_elementwise:
             # Step 0, before step 1: an engine that would have to invent an
@@ -989,6 +1055,8 @@ def run_corrosion_analysis(
                 continue
 
             band = normalise_band(raw_band, element=element.guid, mechanism=spec.code)
+            if spec is MIC:
+                mic_scored = True
 
             # Step 4: the include_low filter never applies to data_quality —
             # those were emitted above and are already past this point.
@@ -996,6 +1064,13 @@ def run_corrosion_analysis(
                 continue
 
             issues.append(_finding_issue(element, spec, result, band, citations, allocator))
+
+    # A gap in the rules rather than in the model, and reported only when
+    # MC-001 actually scored something: on a run where every element was gated
+    # out, the missing bounds changed no verdict and saying so would be noise
+    # competing with the refusals that did matter.
+    if mic_scored:
+        issues.extend(_ruleset_data_quality_issues(allocator))
 
     # The network mechanisms. Their comparators return finished Issues -- banded
     # and cited -- so there is nothing here to band, only the same include_low
