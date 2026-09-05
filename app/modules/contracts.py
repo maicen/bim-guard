@@ -1895,6 +1895,8 @@ class OrganizationMemberResponse(BaseModel):
     full_name: str = ""
     avatar_url: str = ""
     role: Literal["owner", "admin", "member"]
+    group_id: Optional[int] = None
+    group_name: Optional[str] = None
 
 
 class OrganizationMemberListResponse(BaseModel):
@@ -1932,3 +1934,80 @@ class OrganizationInviteCreateRequest(BaseModel):
 
     email: str = Field(..., min_length=3, description="Address the invite is addressed to")
     role: Literal["owner", "admin", "member"] = "member"
+
+
+# ---------------------------------------------------------------------------
+# RBAC: Groups and Resource Grants
+# ---------------------------------------------------------------------------
+
+
+class GroupResponse(BaseModel):
+    """One user group within an organization."""
+
+    id: int
+    organization_id: int
+    name: str
+    member_count: int = 0
+
+
+class GroupListResponse(BaseModel):
+    """Every group in one organization."""
+
+    organization_id: int
+    groups: list[GroupResponse] = Field(default_factory=list)
+
+
+class GroupCreateRequest(BaseModel):
+    """A new group to create within an organization."""
+
+    name: str = Field(..., min_length=1, max_length=100)
+
+
+class MemberGroupUpdateRequest(BaseModel):
+    """Which group to place a member in, or null to leave them ungrouped."""
+
+    group_id: Optional[int] = None
+
+
+class GroupProjectGrantsResponse(BaseModel):
+    """The set of projects one group can access."""
+
+    group_id: int
+    project_ids: list[int] = Field(default_factory=list)
+
+
+class GroupProjectGrantsUpdateRequest(BaseModel):
+    """Replace a group's entire set of granted projects."""
+
+    project_ids: list[int] = Field(default_factory=list)
+
+
+class OrganizationRulesetGrantsResponse(BaseModel):
+    """The set of rulesets one organization may use at all (superadmin-controlled)."""
+
+    organization_id: int
+    ruleset_ids: list[str] = Field(default_factory=list)
+
+
+class OrganizationRulesetGrantsUpdateRequest(BaseModel):
+    """Replace an organization's entire set of granted rulesets."""
+
+    ruleset_ids: list[str] = Field(default_factory=list)
+
+
+class ProjectRulesetBindingsResponse(BaseModel):
+    """The rulesets bound to one project.
+
+    Also carries which of the org's grants remain available to bind
+    (owner-controlled, subset of ``OrganizationRulesetGrantsResponse``).
+    """
+
+    project_id: int
+    ruleset_ids: list[str] = Field(default_factory=list)
+    available_ruleset_ids: list[str] = Field(default_factory=list)
+
+
+class ProjectRulesetBindingsUpdateRequest(BaseModel):
+    """Replace a project's entire set of bound rulesets."""
+
+    ruleset_ids: list[str] = Field(default_factory=list)

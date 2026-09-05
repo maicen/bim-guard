@@ -7,15 +7,16 @@ services via constructor injection instead of creating them internally.
 from __future__ import annotations
 
 from app.logging_config import get_logger
-from app.modules.contracts import ArchAnalysisResponse
 from app.modules.comparator.engine_registry import (
     DEFAULT_ENGINE_REGISTRY,
     RuleEngineRegistry,
 )
+from app.modules.contracts import ArchAnalysisResponse
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
 from app.services.report_artifacts import ReportArtifactService
 from app.services.rules_service import RuleService
+from app.services.ruleset_access_service import RulesetAccessService
 
 logger = get_logger(__name__)
 
@@ -31,6 +32,7 @@ class ArchAnalysisService:
         documents_service: DocumentService | None = None,
         report_service: ReportArtifactService | None = None,
         engine_registry: RuleEngineRegistry | None = None,
+        ruleset_access_service: RulesetAccessService | None = None,
     ) -> None:
         """Initialize architectural analysis service with explicit dependencies."""
         self._projects = projects_service if projects_service is not None else ProjectsService()
@@ -38,14 +40,31 @@ class ArchAnalysisService:
         self._documents = documents_service if documents_service is not None else DocumentService()
         self._report_svc = report_service if report_service is not None else ReportArtifactService()
         self._registry = engine_registry if engine_registry is not None else DEFAULT_ENGINE_REGISTRY
+        self._ruleset_access = ruleset_access_service
 
     def run_analysis(
         self,
         project_id: int,
         rule_folder: str = "",
     ) -> ArchAnalysisResponse:
-        """Execute architectural compliance checks for a project and return response model."""
+        """Execute architectural compliance checks for a project and return response model.
+
+        Raises:
+            ValueError: if *rule_folder* is given but isn't bound to this
+                project (see ``RulesetAccessService`` / "zero bindings unless
+                assigned") -- a project's owner must explicitly assign a
+                custom ruleset before an analysis run can select it. Built-in
+                code rules (an empty ``rule_folder``) are unaffected.
+        """
         from app.services.pipeline_services import PipelineOrchestratorService
+
+        if rule_folder and self._ruleset_access is not None:
+            bound = self._ruleset_access.list_project_bindings(project_id)
+            if rule_folder not in bound:
+                raise ValueError(
+                    f"Ruleset {rule_folder!r} is not assigned to this project. "
+                    "Ask the project's organization owner to assign it first."
+                )
 
         result = PipelineOrchestratorService.orchestrate_workflow(
             project_id=project_id,

@@ -65,6 +65,19 @@ def _override_get_current_user() -> CurrentUser:
 
 app.dependency_overrides[get_current_user] = _override_get_current_user
 
+# Membership auto-provisioning lands a first-time signer as a plain 'member',
+# which the group-based RBAC layer (MembershipService.member_can_access_project)
+# now restricts to nothing without a group grant. Tests need TEST_USER to act
+# like an org owner — full access to whatever it creates — so promote it here,
+# once, rather than in every test file that touches a project.
+from app.bootstrap import get_container  # noqa: E402
+
+_test_user_memberships = get_container().membership_service.ensure_default_membership(TEST_USER.id)
+if _test_user_memberships:
+    get_container().membership_service.update_role(
+        _test_user_memberships[0]["organization_id"], TEST_USER.id, "owner"
+    )
+
 
 @pytest.fixture(autouse=True)
 def reset_in_memory_cache():

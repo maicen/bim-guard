@@ -27,11 +27,15 @@ class MembershipService:
         memberships_repo: DatabaseAdapter,
         organizations_repo: DatabaseAdapter,
         invites_repo: DatabaseAdapter,
+        groups_repo: DatabaseAdapter,
+        group_project_grants_repo: DatabaseAdapter,
     ):
         """Initialize service with persistence repository adapters."""
         self._memberships = memberships_repo
         self._organizations = organizations_repo
         self._invites = invites_repo
+        self._groups = groups_repo
+        self._group_project_grants = group_project_grants_repo
 
     def list_for_user(self, user_id: str) -> list[dict[str, Any]]:
         """Return the organizations *user_id* belongs to, with their role in each."""
@@ -203,3 +207,129 @@ class MembershipService:
             }
         )
         return self.list_for_user(user_id)
+
+    # -- Groups ---------------------------------------------------------------
+
+    def list_groups(self, organization_id: int) -> list[dict[str, Any]]:
+        """Return every group in *organization_id*, newest first, with member counts."""
+        groups = self._groups.rows_where("organization_id = ?", [organization_id])
+        members = self._memberships.rows_where("organization_id = ?", [organization_id])
+        counts: dict[int, int] = {}
+        for m in members:
+            gid = m.get("group_id")
+            if gid is not None:
+                counts[gid] = counts.get(gid, 0) + 1
+        results = [
+            {
+                "id": g["id"],
+                "organization_id": g["organization_id"],
+                "name": g["name"],
+                "member_count": counts.get(g["id"], 0),
+            }
+            for g in groups
+        ]
+        return sorted(results, key=lambda g: g["id"], reverse=True)
+
+    def create_group(self, organization_id: int, name: str) -> dict[str, Any]:
+        """Create a new group within *organization_id*.
+
+        Raises:
+            ValueError: if *name* is blank or already used in this organization.
+        """
+        clean_name = (name or "").strip()
+        if not clean_name:
+            raise ValueError("A group name is required.")
+        existing = self._groups.rows_where("organization_id = ?", [organization_id])
+        if any(g["name"].lower() == clean_name.lower() for g in existing):
+            raise ValueError(f"A group named {clean_name!r} already exists in this organization.")
+        return self._groups.insert({"organization_id": organization_id, "name": clean_name})
+
+    def get_group(self, group_id: int) -> dict[str, Any] | None:
+        """Return the group row for *group_id*, or None."""
+        return self._groups.get(group_id)
+
+    def delete_group(self, organization_id: int, group_id: int) -> None:
+        """Delete a group, un-grouping any members who were in it.
+
+        Raises:
+            ValueError: if no such group exists in this organization.
+        """
+        group = self._groups.get(group_id)
+        if group is None or group.get("organization_id") != organization_id:
+            raise ValueError(f"Group {group_id} not found in organization {organization_id}.")
+        for m in self._memberships.rows_where("organization_id = ?", [organization_id]):
+            if m.get("group_id") == group_id:
+                self._memberships.update(updates={"group_id": None}, pk_values=m["id"])
+        self._groups.delete(group_id)
+
+    def set_member_group(self, organization_id: int, user_id: str, group_id: int | None) -> None:
+        """Move a member into *group_id* (or ungroup them, if None).
+
+        Raises:
+            ValueError: if the member or the target group doesn't belong to
+                *organization_id*.
+        """
+        membership = self._membership_row(organization_id, user_id)
+        if membership is None:
+            raise ValueError(f"User {user_id} is not a member of organization {organization_id}.")
+        if group_id is not None:
+            group = self._groups.get(group_id)
+            if group is None or group.get("organization_id") != organization_id:
+                raise ValueError(f"Group {group_id} not found in organization {organization_id}.")
+        self._memberships.update(updates={"group_id": group_id}, pk_values=membership["id"])
+
+    def _membership_row(self, organization_id: int, user_id: str) -> dict[str, Any] | None:
+        rows = self._memberships.rows_where("organization_id = ?", [organization_id])
+        return next((r for r in rows if r["user_id"] == user_id), None)
+
+    # -- Group -> project grants ------------------------------------------------
+
+    def list_group_project_ids(self, group_id: int) -> list[int]:
+        """Return the ids of every project *group_id* is granted access to."""
+        rows = self._group_project_grants.rows_where("group_id = ?", [group_id])
+        return [r["project_id"] for r in rows]
+
+    def set_group_project_grants(self, group_id: int, project_ids: list[int]) -> None:
+        """Replace *group_id*'s entire set of granted projects."""
+        existing = {r["project_id"]: r for r in self._group_project_grants.rows_where("group_id = ?", [group_id])}
+        wanted = set(project_ids)
+        for project_id, row in existing.items():
+            if project_id not in wanted:
+                self._group_project_grants.delete(row["id"])
+        for project_id in wanted - set(existing.keys()):
+            self._group_project_grants.insert({"group_id": group_id, "project_id": project_id})
+
+    def member_can_access_project(self, organization_id: int, user_id: str, project_id: int) -> bool:
+        """Whether a confirmed member of *organization_id* may access *project_id*.
+
+        An owner or admin sees every project in their own organization. A
+        plain member sees only what their group is granted — nothing, if
+        they aren't in a group. This is the RBAC layer beneath organization
+        membership: belonging to the org is necessary but not sufficient.
+        """
+        membership = self._membership_row(organization_id, user_id)
+        if membership is None:
+            return False
+        if membership["role"] in ("owner", "admin"):
+            return True
+        group_id = membership.get("group_id")
+        if group_id is None:
+            return False
+        grants = self._group_project_grants.rows_where("group_id = ?", [group_id])
+        return any(g["project_id"] == project_id for g in grants)
+
+    def accessible_project_ids(self, organization_id: int, user_id: str) -> set[int] | None:
+        """Return the project ids a confirmed member of *organization_id* may access.
+
+        None means "every project in the organization" (owner/admin); a set
+        (possibly empty) is the member's group grant.
+        """
+        membership = self._membership_row(organization_id, user_id)
+        if membership is None:
+            return set()
+        if membership["role"] in ("owner", "admin"):
+            return None
+        group_id = membership.get("group_id")
+        if group_id is None:
+            return set()
+        return set(self.list_group_project_ids(group_id))

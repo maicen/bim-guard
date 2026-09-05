@@ -13,6 +13,7 @@ from app.api.dependencies import (
     get_phase6_service,
     get_profile_service,
     get_projects_service,
+    get_ruleset_access_service,
 )
 from app.auth import CurrentUser, get_current_user
 from app.constants import (
@@ -37,6 +38,8 @@ from app.modules.contracts import (
     ProjectListResponse,
     ProjectOptionsResponse,
     ProjectResponse,
+    ProjectRulesetBindingsResponse,
+    ProjectRulesetBindingsUpdateRequest,
     ProjectUpdateRequest,
     StandardOption,
 )
@@ -44,6 +47,7 @@ from app.services.membership_service import MembershipService
 from app.services.phase6_service import Phase6Service
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
+from app.services.ruleset_access_service import RulesetAccessService
 
 logger = get_logger(__name__)
 
@@ -75,8 +79,11 @@ def get_authorized_project(
         )
     if profiles.is_superadmin(current_user.id):
         return project
+    organization_id = project.get("organization_id")
     org_ids = memberships.org_ids_for_user(current_user.id)
-    if project.get("organization_id") not in org_ids:
+    if organization_id not in org_ids or not memberships.member_can_access_project(
+        organization_id, current_user.id, project_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID {project_id} not found.",
@@ -93,17 +100,23 @@ def _owned_project_ids(
 ) -> list[int]:
     """Filter *project_ids* down to ones the caller may act on.
 
-    A superadmin may act on all of them; everyone else only the ones inside
-    their own organizations.
+    A superadmin may act on all of them; an org owner/admin every project in
+    their own organization(s); a plain member only what their group grants.
     """
     if profiles.is_superadmin(current_user.id):
         return project_ids
     org_ids = memberships.org_ids_for_user(current_user.id)
-    return [
-        pid
-        for pid in project_ids
-        if (row := service.get_project(pid)) and row.get("organization_id") in org_ids
-    ]
+    owned = []
+    for pid in project_ids:
+        row = service.get_project(pid)
+        organization_id = row.get("organization_id") if row else None
+        if (
+            row
+            and organization_id in org_ids
+            and memberships.member_can_access_project(organization_id, current_user.id, pid)
+        ):
+            owned.append(pid)
+    return owned
 
 
 def _primary_organization_id(current_user: CurrentUser, memberships: MembershipService) -> int:
@@ -144,7 +157,21 @@ def list_projects(
         rows = all_rows
     else:
         org_ids = memberships.org_ids_for_user(current_user.id)
-        rows = [row for row in all_rows if row.get("organization_id") in org_ids]
+        # None from accessible_project_ids means "every project in this org"
+        # (owner/admin); cached per organization since every row in the same
+        # org shares the same answer.
+        accessible_by_org: dict[int, set[int] | None] = {
+            org_id: memberships.accessible_project_ids(org_id, current_user.id) for org_id in org_ids
+        }
+        rows = [
+            row
+            for row in all_rows
+            if (org_id := row.get("organization_id")) in accessible_by_org
+            and (
+                (accessible := accessible_by_org[org_id]) is None
+                or row.get("id") in accessible
+            )
+        ]
     projects = [ProjectResponse(**row) for row in rows]
     return ProjectListResponse(total=len(projects), projects=projects)
 
@@ -869,4 +896,80 @@ def validate_project_iso_naming(
     filename = project.get("ifc_file_path", "")
     val = ISO19650Validator.validate_filename(filename)
     return val.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# RBAC: Project Ruleset Bindings
+# ---------------------------------------------------------------------------
+
+
+def _require_project_admin(
+    project: dict,
+    current_user: CurrentUser,
+    memberships: MembershipService,
+    profiles: ProfileService,
+) -> None:
+    """Raise 403 unless the caller is an owner/admin of the project's organization."""
+    if profiles.is_superadmin(current_user.id):
+        return
+    role = memberships.role_for_user(project["organization_id"], current_user.id)
+    if role not in ("owner", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only an organization owner or admin can change a project's rule assignments.",
+        )
+
+
+@router.get(
+    "/{project_id}/ruleset-bindings",
+    response_model=ProjectRulesetBindingsResponse,
+    summary="Get the rulesets bound to a project",
+)
+def get_project_ruleset_bindings(
+    project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+) -> ProjectRulesetBindingsResponse:
+    """Return the rulesets bound to this project.
+
+    Also carries which of its organization's grants remain available to
+    bind. A brand-new project has none bound -- "zero bindings unless
+    assigned" is this response's ``ruleset_ids`` being empty, not a
+    special-case flag.
+    """
+    return ProjectRulesetBindingsResponse(
+        project_id=project_id,
+        ruleset_ids=ruleset_access.list_project_bindings(project_id),
+        available_ruleset_ids=ruleset_access.list_org_grants(project["organization_id"]),
+    )
+
+
+@router.put(
+    "/{project_id}/ruleset-bindings",
+    response_model=ProjectRulesetBindingsResponse,
+    summary="Set the rulesets bound to a project",
+)
+def set_project_ruleset_bindings(
+    project_id: int,
+    payload: ProjectRulesetBindingsUpdateRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+) -> ProjectRulesetBindingsResponse:
+    """Replace the project's bound rulesets.
+
+    Only an org owner/admin (or superadmin) may do this. Every requested
+    ruleset must already be granted to the project's organization -- a
+    project can only bind what its organization was itself granted.
+    """
+    _require_project_admin(project, current_user, memberships, profiles)
+    try:
+        ruleset_access.set_project_bindings(
+            project_id, payload.ruleset_ids, organization_id=project["organization_id"]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return get_project_ruleset_bindings(project_id, project, ruleset_access)
 

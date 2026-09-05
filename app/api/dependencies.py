@@ -20,6 +20,7 @@ from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.rules_service import RuleService
+from app.services.ruleset_access_service import RulesetAccessService
 from app.services.settings_service import SettingsService
 
 
@@ -97,3 +98,8 @@ def get_membership_service() -> MembershipService:
 def get_profile_service() -> ProfileService:
     """Return the configured ProfileService instance."""
     return get_container().profile_service
+
+
+def get_ruleset_access_service() -> RulesetAccessService:
+    """Return the configured RulesetAccessService instance."""
+    return get_container().ruleset_access_service

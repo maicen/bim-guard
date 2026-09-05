@@ -49,6 +49,7 @@ from app.services.rules_service import (
     _RICH_COLUMNS,
     RuleService,
 )
+from app.services.ruleset_access_service import RulesetAccessService
 from app.services.settings_service import SettingsService
 from app.services.static_data_service import (
     _SETTINGS_SCHEMA,
@@ -79,6 +80,10 @@ class ApplicationContainer:
     organizations_repo: DatabaseAdapter
     memberships_repo: DatabaseAdapter
     organization_invites_repo: DatabaseAdapter
+    groups_repo: DatabaseAdapter
+    group_project_grants_repo: DatabaseAdapter
+    organization_ruleset_grants_repo: DatabaseAdapter
+    project_ruleset_bindings_repo: DatabaseAdapter
     profiles_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
@@ -91,6 +96,7 @@ class ApplicationContainer:
     parsing_engine_instances_service: ParsingEngineInstancesService
     membership_service: MembershipService
     profile_service: ProfileService
+    ruleset_access_service: RulesetAccessService
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
@@ -252,6 +258,7 @@ def build_default_container() -> ApplicationContainer:
             "organization_id": int,
             "user_id": str,
             "role": str,
+            "group_id": int,
             "created_at": str,
         },
     )
@@ -265,6 +272,46 @@ def build_default_container() -> ApplicationContainer:
             "role": str,
             "created_at": str,
             "accepted_at": str,
+        },
+    )
+
+    groups_repo = PersistenceService.get_table(
+        "groups",
+        {
+            "id": int,
+            "organization_id": int,
+            "name": str,
+            "created_at": str,
+        },
+    )
+
+    group_project_grants_repo = PersistenceService.get_table(
+        "group_project_grants",
+        {
+            "id": int,
+            "group_id": int,
+            "project_id": int,
+            "created_at": str,
+        },
+    )
+
+    organization_ruleset_grants_repo = PersistenceService.get_table(
+        "organization_ruleset_grants",
+        {
+            "id": int,
+            "organization_id": int,
+            "ruleset_id": str,
+            "created_at": str,
+        },
+    )
+
+    project_ruleset_bindings_repo = PersistenceService.get_table(
+        "project_ruleset_bindings",
+        {
+            "id": int,
+            "project_id": int,
+            "ruleset_id": str,
+            "created_at": str,
         },
     )
 
@@ -339,6 +386,13 @@ def build_default_container() -> ApplicationContainer:
         memberships_repo=memberships_repo,
         organizations_repo=organizations_repo,
         invites_repo=organization_invites_repo,
+        groups_repo=groups_repo,
+        group_project_grants_repo=group_project_grants_repo,
+    )
+
+    ruleset_access_service = RulesetAccessService(
+        organization_ruleset_grants_repo=organization_ruleset_grants_repo,
+        project_ruleset_bindings_repo=project_ruleset_bindings_repo,
     )
 
     profile_service = ProfileService(profiles_repo=profiles_repo)
@@ -444,6 +498,7 @@ def build_default_container() -> ApplicationContainer:
         rules_service=rules_service,
         documents_service=documents_service,
         engine_registry=registry,
+        ruleset_access_service=ruleset_access_service,
     )
 
     digital_inspector_service = DigitalInspectorService()
@@ -465,6 +520,10 @@ def build_default_container() -> ApplicationContainer:
         organizations_repo=organizations_repo,
         memberships_repo=memberships_repo,
         organization_invites_repo=organization_invites_repo,
+        groups_repo=groups_repo,
+        group_project_grants_repo=group_project_grants_repo,
+        organization_ruleset_grants_repo=organization_ruleset_grants_repo,
+        project_ruleset_bindings_repo=project_ruleset_bindings_repo,
         profiles_repo=profiles_repo,
         lineage=lineage,
         static_data_service=static_data_service,
@@ -477,6 +536,7 @@ def build_default_container() -> ApplicationContainer:
         parsing_engine_instances_service=parsing_engine_instances_service,
         membership_service=membership_service,
         profile_service=profile_service,
+        ruleset_access_service=ruleset_access_service,
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,

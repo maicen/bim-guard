@@ -6,20 +6,44 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.dependencies import get_membership_service, get_profile_service
+from app.api.dependencies import (
+    get_membership_service,
+    get_profile_service,
+    get_projects_service,
+    get_ruleset_access_service,
+)
 from app.auth import CurrentUser, get_current_user
 from app.modules.contracts import (
+    GroupCreateRequest,
+    GroupListResponse,
+    GroupProjectGrantsResponse,
+    GroupProjectGrantsUpdateRequest,
+    GroupResponse,
+    MemberGroupUpdateRequest,
     MemberRoleUpdateRequest,
     OrganizationInviteCreateRequest,
     OrganizationInviteListResponse,
     OrganizationInviteResponse,
     OrganizationMemberListResponse,
     OrganizationMemberResponse,
+    OrganizationRulesetGrantsResponse,
+    OrganizationRulesetGrantsUpdateRequest,
 )
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
+from app.services.projects_service import ProjectsService
+from app.services.ruleset_access_service import RulesetAccessService
 
 router = APIRouter()
+
+
+def _require_superadmin(current_user: CurrentUser, profiles: ProfileService) -> None:
+    """Raise 403 unless the caller is the platform superadmin."""
+    if not profiles.is_superadmin(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the platform superadmin can do this.",
+        )
 
 
 def _require_membership(
@@ -61,15 +85,19 @@ def _require_org_admin(
 
 
 def _member_response(
-    member_id: str, role: str, profiles_by_id: dict[str, dict]
+    row: dict, profiles_by_id: dict[str, dict], groups_by_id: dict[int, dict]
 ) -> OrganizationMemberResponse:
-    profile = profiles_by_id.get(member_id, {})
+    profile = profiles_by_id.get(row["user_id"], {})
+    group_id = row.get("group_id")
+    group = groups_by_id.get(group_id) if group_id is not None else None
     return OrganizationMemberResponse(
-        user_id=member_id,
+        user_id=row["user_id"],
         email=profile.get("email") or "",
         full_name=profile.get("full_name") or "",
         avatar_url=profile.get("avatar_url") or "",
-        role=role,
+        role=row["role"],
+        group_id=group_id,
+        group_name=group.get("name") if group else None,
     )
 
 
@@ -84,13 +112,14 @@ def list_members(
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> OrganizationMemberListResponse:
-    """Return every member of the organization, with their profile and role."""
+    """Return every member of the organization, with their profile, role, and group."""
     _require_membership(organization_id, current_user, memberships, profiles)
     rows = memberships.list_members_raw(organization_id)
     profiles_by_id = profiles.get_many([row["user_id"] for row in rows])
+    groups_by_id = {g["id"]: g for g in memberships.list_groups(organization_id)}
     return OrganizationMemberListResponse(
         organization_id=organization_id,
-        members=[_member_response(row["user_id"], row["role"], profiles_by_id) for row in rows],
+        members=[_member_response(row, profiles_by_id, groups_by_id) for row in rows],
     )
 
 
@@ -221,3 +250,202 @@ def revoke_invite(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     return list_invites(organization_id, current_user, memberships, profiles)
+
+
+# ---------------------------------------------------------------------------
+# RBAC: Groups
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{organization_id}/groups",
+    response_model=GroupListResponse,
+    summary="List an organization's groups",
+)
+def list_groups(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> GroupListResponse:
+    """Return every group in the organization, with member counts."""
+    _require_membership(organization_id, current_user, memberships, profiles)
+    return GroupListResponse(
+        organization_id=organization_id,
+        groups=[GroupResponse(**g) for g in memberships.list_groups(organization_id)],
+    )
+
+
+@router.post(
+    "/{organization_id}/groups",
+    response_model=GroupListResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a group",
+)
+def create_group(
+    organization_id: int,
+    payload: GroupCreateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> GroupListResponse:
+    """Create a new group within the organization. Owner/admin only."""
+    _require_org_admin(organization_id, current_user, memberships, profiles)
+    try:
+        memberships.create_group(organization_id, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return list_groups(organization_id, current_user, memberships, profiles)
+
+
+@router.delete(
+    "/{organization_id}/groups/{group_id}",
+    response_model=GroupListResponse,
+    summary="Delete a group",
+)
+def delete_group(
+    organization_id: int,
+    group_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> GroupListResponse:
+    """Delete a group. Its members become ungrouped, not removed from the organization."""
+    _require_org_admin(organization_id, current_user, memberships, profiles)
+    try:
+        memberships.delete_group(organization_id, group_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return list_groups(organization_id, current_user, memberships, profiles)
+
+
+@router.patch(
+    "/{organization_id}/members/{user_id}/group",
+    response_model=OrganizationMemberListResponse,
+    summary="Move a member into a group (or ungroup them)",
+)
+def update_member_group(
+    organization_id: int,
+    user_id: str,
+    payload: MemberGroupUpdateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> OrganizationMemberListResponse:
+    """Change which group a member belongs to. A member belongs to at most one group."""
+    _require_org_admin(organization_id, current_user, memberships, profiles)
+    try:
+        memberships.set_member_group(organization_id, user_id, payload.group_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return list_members(organization_id, current_user, memberships, profiles)
+
+
+@router.get(
+    "/{organization_id}/groups/{group_id}/projects",
+    response_model=GroupProjectGrantsResponse,
+    summary="Get the projects a group can access",
+)
+def get_group_project_grants(
+    organization_id: int,
+    group_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> GroupProjectGrantsResponse:
+    """Return the ids of every project this group is granted access to."""
+    _require_membership(organization_id, current_user, memberships, profiles)
+    group = memberships.get_group(group_id)
+    if group is None or group.get("organization_id") != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group {group_id} not found in organization {organization_id}.",
+        )
+    return GroupProjectGrantsResponse(
+        group_id=group_id, project_ids=memberships.list_group_project_ids(group_id)
+    )
+
+
+@router.put(
+    "/{organization_id}/groups/{group_id}/projects",
+    response_model=GroupProjectGrantsResponse,
+    summary="Set the projects a group can access",
+)
+def set_group_project_grants(
+    organization_id: int,
+    group_id: int,
+    payload: GroupProjectGrantsUpdateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> GroupProjectGrantsResponse:
+    """Replace the set of projects this group can access. Owner/admin only.
+
+    Every project id must belong to this same organization -- a group can
+    never be granted a project outside its own organization.
+    """
+    _require_org_admin(organization_id, current_user, memberships, profiles)
+    group = memberships.get_group(group_id)
+    if group is None or group.get("organization_id") != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group {group_id} not found in organization {organization_id}.",
+        )
+    org_project_ids = {
+        row["id"] for row in projects_service.list_projects() if row.get("organization_id") == organization_id
+    }
+    outside = set(payload.project_ids) - org_project_ids
+    if outside:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Project(s) {sorted(outside)!r} do not belong to this organization.",
+        )
+    memberships.set_group_project_grants(group_id, payload.project_ids)
+    return get_group_project_grants(organization_id, group_id, current_user, memberships, profiles)
+
+
+# ---------------------------------------------------------------------------
+# RBAC: Organization Ruleset Grants (superadmin only)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{organization_id}/ruleset-grants",
+    response_model=OrganizationRulesetGrantsResponse,
+    summary="Get the rulesets an organization may use",
+)
+def get_organization_ruleset_grants(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+) -> OrganizationRulesetGrantsResponse:
+    """Return the rulesets this organization is allowed to use at all.
+
+    Superadmin only -- this is the platform-wide grant, not something an
+    organization's own owner can see or change about themselves.
+    """
+    _require_superadmin(current_user, profiles)
+    return OrganizationRulesetGrantsResponse(
+        organization_id=organization_id,
+        ruleset_ids=ruleset_access.list_org_grants(organization_id),
+    )
+
+
+@router.put(
+    "/{organization_id}/ruleset-grants",
+    response_model=OrganizationRulesetGrantsResponse,
+    summary="Set the rulesets an organization may use",
+)
+def set_organization_ruleset_grants(
+    organization_id: int,
+    payload: OrganizationRulesetGrantsUpdateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+) -> OrganizationRulesetGrantsResponse:
+    """Replace the set of rulesets this organization may use. Superadmin only."""
+    _require_superadmin(current_user, profiles)
+    ruleset_access.set_org_grants(organization_id, payload.ruleset_ids)
+    return get_organization_ruleset_grants(organization_id, current_user, profiles, ruleset_access)
