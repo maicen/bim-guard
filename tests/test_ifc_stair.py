@@ -1327,6 +1327,33 @@ class TestEndToEndThroughIFCReader:
         warnings = element["data_quality_warnings"] or []
         assert not any("winder" in w or "curvature" in w for w in warnings)
 
+    def test_treaddepth_resolves_via_alias_to_treadlength(self, tmp_path_factory):
+        """TreadDepth is the more common colloquial name a rule author is
+        likely to type, but Pset_StairFlightCommon's own schema property is
+        spelled TreadLength. The alias table used to only work in the
+        opposite direction (a rule spelled TreadLength finding a model that
+        used TreadDepth) -- a rule literally spelled TreadDepth got no alias
+        list at all and could never find a Pset authored under TreadLength,
+        the actual schema name every real export uses."""
+        from ifcopenshell.api import run
+
+        model, _flight = _build_stair_model()
+        pset = run("pset.add_pset", model, product=_flight, name="Pset_StairFlightCommon")
+        run("pset.edit_pset", model, pset=pset, properties={"TreadLength": GOING_MM})
+        path = tmp_path_factory.mktemp("alias") / "treaddepth.ifc"
+        model.write(str(path))
+
+        rule = {
+            "rule_id": 12,
+            "reference": "TEST-12",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "TreadDepth",
+            "operator": "==",
+            "check_value": GOING_MM,
+        }
+        results = self._evaluate(path, [rule])
+        assert results["TEST-12"]["status"] == "PASS"
+
     def test_newly_wired_quick_fix_properties_resolve(self, model_path):
         """FlightStartElevation, NumberOfRisersDetected -- computed since the
         first stair-engine commit, only wired to a queryable property name

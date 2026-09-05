@@ -189,6 +189,11 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
     "Width":            ["OverallWidth", "ClearWidth", "NominalWidth", "GrossWidth"],
     "Height":           ["OverallHeight", "ClearHeight", "NominalHeight", "GrossHeight"],
     "TreadLength":      ["TreadDepth", "GoingType", "Going", "TreadRun", "StepDepth"],
+    # Reverse of TreadLength above: "TreadDepth" is the more common colloquial
+    # name a rule author is likely to type, but Pset_StairFlightCommon's own
+    # schema property is spelled "TreadLength" -- a rule authored as
+    # "TreadDepth" would otherwise never try the canonical schema name.
+    "TreadDepth":       ["TreadLength", "GoingType", "Going", "TreadRun", "StepDepth"],
     "RiserHeight":      ["RiserType", "Riser", "RiserHeightType", "StepHeight"],
     "RequiredHeadroom": ["HeadroomClearance", "Headroom", "ClearHeight", "ClearanceHeight"],
     # Reverse of RequiredHeadroom above: Pset_StairFlightCommon's own property
