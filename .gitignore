@@ -99,3 +99,8 @@ docs/bcf_exports/*
 # fetched on demand from maicen/bimguard-test-models. Only the README is tracked.
 data/test_models/*
 !data/test_models/README.md
+
+# Per-building federation staging for scripts/run_full_pipeline.py --auto-extra
+# (copies of data/test_models, so --auto-extra federates one building rather
+# than every model in the flat directory). See docs/validation/seismic-and-coverage-2026-09.md.
+data/federated/
