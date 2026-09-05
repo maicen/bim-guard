@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Building2, ChevronDown } from "lucide-svelte";
   import { projectsApi } from "../api";
+  import { authState } from "../auth.svelte";
   import type { Project } from "../types";
 
   interface Props {
@@ -15,14 +16,22 @@
   // own an independent project dropdown with no shared "current project"
   // concept, so switching context on one screen never carried over to the
   // next — this is the one place that changes, backing every view's picker.
-  let projects: Project[] = $state(projectsApi.getCachedList()?.projects || []);
+  let allProjects: Project[] = $state(projectsApi.getCachedList()?.projects || []);
+
+  // Scoped to the active organization so switching projects can never land on
+  // one belonging to a different tenant — see auth.svelte.ts activeOrganizationId.
+  let projects = $derived(
+    authState.activeOrganizationId == null
+      ? allProjects
+      : allProjects.filter((p) => p.organization_id === authState.activeOrganizationId),
+  );
 
   $effect(() => {
-    if (projects.length) return;
+    if (allProjects.length) return;
     projectsApi
       .list()
       .then((res) => {
-        projects = res.projects || [];
+        allProjects = res.projects || [];
       })
       .catch(() => {
         // Silent: this is a convenience switcher, not the primary project

@@ -2,6 +2,7 @@
   import { ExternalLink, Activity, Menu } from "lucide-svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
+  import OrgSwitcher from "./OrgSwitcher.svelte";
   import ProjectSwitcher from "./ProjectSwitcher.svelte";
   import UserMenu from "./UserMenu.svelte";
   import type { Project } from "../types";
@@ -50,6 +51,7 @@
     "user-manual": { section: "Manuals", title: "User Workflow Manual" },
     "modeling-manual": { section: "Manuals", title: "3D Modeling Reference" },
     settings: { section: "System", title: "Application Settings" },
+    "org-settings": { section: "Admin", title: "Organization Settings" },
   };
 
   let headerInfo = $derived(
@@ -91,6 +93,7 @@
 
   <!-- Actions & Status -->
   <div class="flex shrink-0 items-center gap-2.5">
+    <OrgSwitcher />
     <GlobalPipelineStatus onOpen={onOpenPipeline} />
 
     <!-- Compact combined health dot for narrow viewports -->

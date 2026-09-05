@@ -44,6 +44,9 @@ from app.api import (
     naming_config as api_naming_config,
 )
 from app.api import (
+    organizations as api_organizations,
+)
+from app.api import (
     parsing_engines as api_parsing_engines,
 )
 from app.api import (
@@ -216,6 +219,9 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(api_auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(api_dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(api_projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(
+    api_organizations.router, prefix="/api/organizations", tags=["Organizations"]
+)
 app.include_router(
     api_digital_inspector.router, prefix="/api/projects", tags=["Digital Inspector"]
 )

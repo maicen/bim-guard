@@ -31,7 +31,9 @@
   import RevitSyncView from "./routes/RevitSyncView.svelte";
   import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
   import SettingsView from "./routes/SettingsView.svelte";
+  import OrgSettingsView from "./routes/OrgSettingsView.svelte";
   import LoginView from "./routes/LoginView.svelte";
+  import OrgPickerGate from "./lib/components/OrgPickerGate.svelte";
 
   import { dashboardApi, projectsApi } from "./lib/api";
   import { viewForAnalysisDomain } from "./lib/analysisDomain";
@@ -311,6 +313,8 @@
           <IfcExportSettingView />
         {:else if activeView === "settings"}
           <SettingsView />
+        {:else if activeView === "org-settings"}
+          <OrgSettingsView />
         {:else if activeView === "login"}
           <LoginView />
         {/if}
@@ -372,3 +376,9 @@
     <PipelineProgress projectId={pipelineModalProjectId} />
   {/if}
 </Modal>
+
+<!-- Blocks entry until a multi-org member picks which organization to work
+     in — see auth.svelte.ts needsOrgSelection. -->
+{#if !authGateBlocking && authState.needsOrgSelection}
+  <OrgPickerGate />
+{/if}

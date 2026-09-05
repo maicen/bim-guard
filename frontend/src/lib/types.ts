@@ -1287,10 +1287,13 @@ export interface UserProfile {
   title: string;
   default_organization_id: number | null;
   preferences: Record<string, unknown>;
+  is_superadmin: boolean;
 }
 
 /** Fields to write to the caller's profile. Mirrors ProfileUpdateRequest. */
-export type ProfileUpdatePayload = Partial<UserProfile>;
+export type ProfileUpdatePayload = Partial<
+  Pick<UserProfile, "full_name" | "avatar_url" | "title" | "default_organization_id" | "preferences">
+>;
 
 /** The signed-in caller's identity. Mirrors CurrentUserResponse. */
 export interface CurrentUserResponse {
@@ -1298,4 +1301,40 @@ export interface CurrentUserResponse {
   email: string | null;
   profile: UserProfile;
   organizations: OrganizationMembership[];
+}
+
+/** A member of an organization. Mirrors OrganizationMemberResponse. */
+export interface OrganizationMember {
+  user_id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  role: "owner" | "admin" | "member";
+}
+
+/** Mirrors OrganizationMemberListResponse. */
+export interface OrganizationMemberListResponse {
+  organization_id: number;
+  members: OrganizationMember[];
+}
+
+/** A pending or accepted invite into an organization. Mirrors OrganizationInviteResponse. */
+export interface OrganizationInvite {
+  id: number;
+  organization_id: number;
+  email: string;
+  role: "owner" | "admin" | "member";
+  accepted_at: string | null;
+}
+
+/** Mirrors OrganizationInviteListResponse. */
+export interface OrganizationInviteListResponse {
+  organization_id: number;
+  invites: OrganizationInvite[];
+}
+
+/** Mirrors OrganizationInviteCreateRequest. */
+export interface OrganizationInviteCreatePayload {
+  email: string;
+  role: "owner" | "admin" | "member";
 }

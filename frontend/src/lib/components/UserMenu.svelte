@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LogOut, LogIn, Settings } from "lucide-svelte";
+  import { LogOut, LogIn, Settings, Building2 } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
   import { isAuthConfigured } from "../supabaseClient";
@@ -12,10 +12,17 @@
     const source = authState.profile?.profile.full_name || authState.user?.email || "";
     return source ? source[0]!.toUpperCase() : "?";
   });
+  let activeOrg = $derived(authState.activeOrganization);
+  let canManageOrg = $derived(activeOrg?.role === "owner" || activeOrg?.role === "admin");
 
   function goToProfile() {
     open = false;
     push("/settings");
+  }
+
+  function goToOrgSettings() {
+    open = false;
+    push("/org-settings");
   }
 
   function toggle(e: MouseEvent) {
@@ -57,9 +64,9 @@
       >
         <p class="truncate px-2.5 py-1.5 text-xs font-medium text-slate-200">{displayName}</p>
         <p class="truncate px-2.5 pb-1.5 text-xs text-slate-500">{authState.user.email}</p>
-        {#if authState.profile?.organizations.length}
-          <p class="truncate px-2.5 pb-1.5 text-xs text-slate-600">
-            {authState.profile.organizations[0].name}
+        {#if activeOrg}
+          <p class="truncate px-2.5 pb-1.5 text-xs capitalize text-violet-400">
+            {activeOrg.name} &middot; {activeOrg.role}
           </p>
         {/if}
         <button
@@ -70,6 +77,16 @@
           <Settings class="h-3.5 w-3.5" />
           Edit profile
         </button>
+        {#if canManageOrg}
+          <button
+            type="button"
+            onclick={goToOrgSettings}
+            class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          >
+            <Building2 class="h-3.5 w-3.5" />
+            Organization settings
+          </button>
+        {/if}
         <button
           type="button"
           onclick={handleSignOut}

@@ -112,6 +112,69 @@ class MembershipService:
 
         return self.list_for_user(user_id)
 
+    def get_organization(self, organization_id: int) -> dict[str, Any] | None:
+        """Return the organization row for *organization_id*, or None."""
+        return self._organizations.get(organization_id)
+
+    def role_for_user(self, organization_id: int, user_id: str) -> str | None:
+        """Return *user_id*'s role in *organization_id*, or None if not a member."""
+        rows = self._memberships.rows_where(
+            "organization_id = ?", [organization_id]
+        )
+        return next((r["role"] for r in rows if r["user_id"] == user_id), None)
+
+    def list_members_raw(self, organization_id: int) -> list[dict[str, Any]]:
+        """Return the raw membership rows (user_id, role) for *organization_id*."""
+        return self._memberships.rows_where("organization_id = ?", [organization_id])
+
+    def update_role(self, organization_id: int, user_id: str, role: str) -> None:
+        """Change a member's role within an organization.
+
+        Raises:
+            ValueError: if *user_id* has no membership row in *organization_id*.
+        """
+        rows = self._memberships.rows_where("organization_id = ?", [organization_id])
+        membership = next((r for r in rows if r["user_id"] == user_id), None)
+        if membership is None:
+            raise ValueError(f"User {user_id} is not a member of organization {organization_id}.")
+        self._memberships.update(updates={"role": role}, pk_values=membership["id"])
+
+    def remove_member(self, organization_id: int, user_id: str) -> None:
+        """Remove *user_id*'s membership in *organization_id*, if any."""
+        rows = self._memberships.rows_where("organization_id = ?", [organization_id])
+        membership = next((r for r in rows if r["user_id"] == user_id), None)
+        if membership is not None:
+            self._memberships.delete(membership["id"])
+
+    def list_invites(self, organization_id: int) -> list[dict[str, Any]]:
+        """Return every invite (pending and accepted) for *organization_id*, newest first."""
+        rows = self._invites.rows_where("organization_id = ?", [organization_id])
+        return sorted(rows, key=lambda r: r.get("id", 0), reverse=True)
+
+    def create_invite(self, organization_id: int, email: str, role: str) -> dict[str, Any]:
+        """Create a pending invite addressed to *email* for *organization_id*."""
+        normalized = (email or "").strip().lower()
+        if not normalized:
+            raise ValueError("An email address is required to invite someone.")
+        return self._invites.insert(
+            {
+                "organization_id": organization_id,
+                "email": normalized,
+                "role": role,
+            }
+        )
+
+    def revoke_invite(self, organization_id: int, invite_id: int) -> None:
+        """Delete a pending invite, scoped to *organization_id* so one admin can't revoke another org's invite by guessing its id.
+
+        Raises:
+            ValueError: if no such invite exists in this organization.
+        """
+        invite = self._invites.get(invite_id)
+        if invite is None or invite.get("organization_id") != organization_id:
+            raise ValueError(f"Invite {invite_id} not found in organization {organization_id}.")
+        self._invites.delete(invite_id)
+
     def ensure_default_membership(self, user_id: str) -> list[dict[str, Any]]:
         """Join *user_id* into the default organization on first sign-in.
 

@@ -36,6 +36,10 @@ import type {
   NamingConfig,
   NamingConfigPayload,
   NamingPreview,
+  OrganizationInviteCreatePayload,
+  OrganizationInviteListResponse,
+  OrganizationMember,
+  OrganizationMemberListResponse,
   ParsingEngineInstance,
   ParsingEngineInstanceCreatePayload,
   ParsingEngineInstanceTestResult,
@@ -134,6 +138,57 @@ export const authApi = {
       body: JSON.stringify(payload),
     });
     return handleResponse<UserProfile>(res);
+  },
+};
+
+export const organizationsApi = {
+  async listMembers(organizationId: number): Promise<OrganizationMemberListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/members`);
+    return handleResponse<OrganizationMemberListResponse>(res);
+  },
+
+  async updateMemberRole(
+    organizationId: number,
+    userId: string,
+    role: OrganizationMember["role"],
+  ): Promise<OrganizationMemberListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/members/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    return handleResponse<OrganizationMemberListResponse>(res);
+  },
+
+  async removeMember(organizationId: number, userId: string): Promise<OrganizationMemberListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/members/${userId}`, {
+      method: "DELETE",
+    });
+    return handleResponse<OrganizationMemberListResponse>(res);
+  },
+
+  async listInvites(organizationId: number): Promise<OrganizationInviteListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/invites`);
+    return handleResponse<OrganizationInviteListResponse>(res);
+  },
+
+  async createInvite(
+    organizationId: number,
+    payload: OrganizationInviteCreatePayload,
+  ): Promise<OrganizationInviteListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/invites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<OrganizationInviteListResponse>(res);
+  },
+
+  async revokeInvite(organizationId: number, inviteId: number): Promise<OrganizationInviteListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/invites/${inviteId}`, {
+      method: "DELETE",
+    });
+    return handleResponse<OrganizationInviteListResponse>(res);
   },
 };
 

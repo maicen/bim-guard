@@ -1885,3 +1885,50 @@ class CurrentUserResponse(BaseModel):
     email: Optional[str] = None
     profile: UserProfile = Field(default_factory=UserProfile)
     organizations: list[OrganizationMembership] = Field(default_factory=list)
+
+
+class OrganizationMemberResponse(BaseModel):
+    """A member of an organization, as shown on the Org Settings screen."""
+
+    user_id: str
+    email: str = ""
+    full_name: str = ""
+    avatar_url: str = ""
+    role: Literal["owner", "admin", "member"]
+
+
+class OrganizationMemberListResponse(BaseModel):
+    """Every member of one organization."""
+
+    organization_id: int
+    members: list[OrganizationMemberResponse] = Field(default_factory=list)
+
+
+class MemberRoleUpdateRequest(BaseModel):
+    """New role to assign a member."""
+
+    role: Literal["owner", "admin", "member"]
+
+
+class OrganizationInviteResponse(BaseModel):
+    """A pending or accepted invite into an organization."""
+
+    id: int
+    organization_id: int
+    email: str
+    role: Literal["owner", "admin", "member"]
+    accepted_at: Optional[str] = None
+
+
+class OrganizationInviteListResponse(BaseModel):
+    """Every invite (pending and accepted) for one organization."""
+
+    organization_id: int
+    invites: list[OrganizationInviteResponse] = Field(default_factory=list)
+
+
+class OrganizationInviteCreateRequest(BaseModel):
+    """A new invite to send for an organization."""
+
+    email: str = Field(..., min_length=3, description="Address the invite is addressed to")
+    role: Literal["owner", "admin", "member"] = "member"

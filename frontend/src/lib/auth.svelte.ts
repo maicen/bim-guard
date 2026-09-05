@@ -20,6 +20,38 @@ class AuthState {
     return this.session?.user ?? null;
   }
 
+  /**
+   * The organization every project-scoped view is currently filtered to.
+   * Backed by `profile.default_organization_id`, not just local state, so it
+   * survives a reload and is the same organization the backend would pick if
+   * asked to default one (see `_primary_organization_id` in
+   * `app/api/projects.py`, which this makes an explicit, saved choice instead
+   * of an implicit "first membership" guess).
+   */
+  get activeOrganizationId(): number | null {
+    const orgs = this.profile?.organizations ?? [];
+    if (orgs.length === 0) return null;
+    const saved = this.profile?.profile.default_organization_id;
+    if (saved != null && orgs.some((o) => o.organization_id === saved)) return saved;
+    return orgs.length === 1 ? orgs[0]!.organization_id : null;
+  }
+
+  get activeOrganization() {
+    const id = this.activeOrganizationId;
+    return this.profile?.organizations.find((o) => o.organization_id === id) ?? null;
+  }
+
+  /** True once signed in with more than one organization and none chosen yet. */
+  get needsOrgSelection(): boolean {
+    const orgs = this.profile?.organizations ?? [];
+    return orgs.length > 1 && this.activeOrganizationId === null;
+  }
+
+  /** Persist the caller's chosen organization as their new default. */
+  async setActiveOrganization(organizationId: number): Promise<void> {
+    await this.updateProfile({ default_organization_id: organizationId });
+  }
+
   constructor() {
     if (!isAuthConfigured) {
       this.loading = false;

@@ -30,8 +30,14 @@ class ProfileService:
         *,
         full_name: str = "",
         avatar_url: str = "",
+        email: str = "",
     ) -> dict[str, Any]:
-        """Return the caller's profile, creating it from Google's claims on first sign-in."""
+        """Return the caller's profile, creating it from Google's claims on first sign-in.
+
+        ``email`` is stored alongside the profile (not just on ``auth.users``,
+        which PostgREST does not expose) so organization admin screens can list
+        members by email without a direct database query.
+        """
         existing = self.get(user_id)
         if existing is not None:
             return existing
@@ -40,6 +46,7 @@ class ProfileService:
                 "id": user_id,
                 "full_name": full_name,
                 "avatar_url": avatar_url,
+                "email": email,
             }
         )
 
@@ -48,6 +55,14 @@ class ProfileService:
         self.ensure_profile(user_id)
         self._profiles.update(updates=updates, pk_values=user_id)
         return self.get(user_id) or {}
+
+    def get_many(self, user_ids: list[str]) -> dict[str, dict[str, Any]]:
+        """Return the profile rows for *user_ids*, keyed by id.
+
+        A user with no profile row yet (never signed in, only invited) is
+        simply absent from the result rather than an error.
+        """
+        return {uid: profile for uid in user_ids if (profile := self.get(uid)) is not None}
 
     def is_superadmin(self, user_id: str) -> bool:
         """Return whether *user_id* bypasses organization-membership checks entirely.

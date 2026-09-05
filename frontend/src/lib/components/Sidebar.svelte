@@ -16,8 +16,10 @@
     RefreshCw,
     Download,
     BookText,
+    Building2,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
+  import { authState } from "../auth.svelte";
 
   interface Props {
     activeView?: string;
@@ -35,28 +37,40 @@
   // (AnalysisDomainTabs), not a separate sidebar entry per domain.
   const AUDIT_VIEW_IDS = new Set(["arch", "piping", "seismic", "analyze"]);
 
-  const NAV_SECTIONS = [
+  // Grouped by intent (My Home / Model Coordination / Compliance / Rules &
+  // Standards / Integrations / Manuals) rather than by module — see the
+  // Tenant & Workspace Blueprint. View ids and routes are unchanged; only the
+  // grouping and labels moved, so every existing link keeps working.
+  let canManageActiveOrg = $derived(
+    authState.activeOrganization?.role === "owner" ||
+      authState.activeOrganization?.role === "admin",
+  );
+
+  let NAV_SECTIONS = $derived([
     {
-      title: "Projects",
+      title: "My Home",
+      items: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    },
+    {
+      title: "Model Coordination",
       items: [
         { id: "projects", label: "Existing Projects", icon: FolderOpen },
-        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
         { id: "viewer", label: "3D Viewer", icon: ScanEye },
       ],
     },
     {
-      title: "Rule Library",
+      title: "Compliance",
+      items: [
+        { id: "arch", label: "Compliance Audit", icon: LayoutList },
+        { id: "reports", label: "Reports & Exports", icon: FileText },
+      ],
+    },
+    {
+      title: "Rules & Standards",
       items: [
         { id: "documents", label: "Rule Documents", icon: BookOpen },
         { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
         { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
-      ],
-    },
-    {
-      title: "Analysis",
-      items: [
-        { id: "arch", label: "Compliance Audit", icon: LayoutList },
-        { id: "reports", label: "Reports & Exports", icon: FileText },
       ],
     },
     {
@@ -74,7 +88,15 @@
         { id: "bsdd-wiki", label: "bSDD Wiki", icon: BookText },
       ],
     },
-  ];
+    ...(canManageActiveOrg
+      ? [
+          {
+            title: "Admin",
+            items: [{ id: "org-settings", label: "Organization Settings", icon: Building2 }],
+          },
+        ]
+      : []),
+  ]);
 </script>
 
 <!-- Scrim: only below md, and only while the drawer is open. -->
