@@ -467,6 +467,7 @@
       selectedSlug,
       "csv",
       requestedEngines,
+      true,
       bands,
       includeDataQuality,
     );
@@ -1016,6 +1017,7 @@
                   selectedSlug,
                   "bcf",
                   requestedEngines,
+                  true,
                   exportFilters.bands,
                   exportFilters.includeDataQuality,
                 )}
@@ -1031,6 +1033,7 @@
                   selectedSlug,
                   "csv",
                   requestedEngines,
+                  true,
                   exportFilters.bands,
                   exportFilters.includeDataQuality,
                 )}
@@ -1046,6 +1049,7 @@
                   selectedSlug,
                   "json",
                   requestedEngines,
+                  true,
                   exportFilters.bands,
                   exportFilters.includeDataQuality,
                 )}
