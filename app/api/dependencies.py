@@ -17,6 +17,7 @@ from app.services.naming_config_service import NamingConfigService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
+from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.rules_service import RuleService
 from app.services.settings_service import SettingsService
@@ -91,3 +92,8 @@ def get_parsing_engine_instances_service() -> ParsingEngineInstancesService:
 def get_membership_service() -> MembershipService:
     """Return the configured MembershipService instance."""
     return get_container().membership_service
+
+
+def get_profile_service() -> ProfileService:
+    """Return the configured ProfileService instance."""
+    return get_container().profile_service

@@ -7,8 +7,9 @@
 
 import type { Session, User } from "@supabase/supabase-js";
 import { authApi } from "./api";
+import { setAuthToken } from "./authToken";
 import { isAuthConfigured, supabase } from "./supabaseClient";
-import type { CurrentUserResponse } from "./types";
+import type { CurrentUserResponse, ProfileUpdatePayload } from "./types";
 
 class AuthState {
   session = $state<Session | null>(null);
@@ -27,12 +28,14 @@ class AuthState {
 
     supabase.auth.getSession().then(({ data }) => {
       this.session = data.session;
+      setAuthToken(data.session?.access_token ?? null);
       this.loading = false;
       this.#loadProfile();
     });
 
     supabase.auth.onAuthStateChange((_event, session) => {
       this.session = session;
+      setAuthToken(session?.access_token ?? null);
       this.loading = false;
       this.#loadProfile();
     });
@@ -52,6 +55,13 @@ class AuthState {
     }
   }
 
+  /** Merge fields into the caller's profile and refresh the cached copy. */
+  async updateProfile(updates: ProfileUpdatePayload): Promise<void> {
+    if (!this.session) return;
+    const updated = await authApi.updateProfile(this.session.access_token, updates);
+    if (this.profile) this.profile = { ...this.profile, profile: updated };
+  }
+
   /** Redirect to Google's consent screen; the browser comes back with a session. */
   async signInWithGoogle(): Promise<void> {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -63,6 +73,7 @@ class AuthState {
 
   async signOut(): Promise<void> {
     await supabase.auth.signOut();
+    setAuthToken(null);
     this.profile = null;
   }
 }

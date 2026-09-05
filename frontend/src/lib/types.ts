@@ -51,6 +51,7 @@ export type AnalysisDomain = "Arch" | "Piping" | "seismic";
 export interface Project {
   id: number;
   name: string;
+  organization_id?: number | null;
   description?: string;
   status: string;
   country: string;
@@ -1279,9 +1280,22 @@ export interface OrganizationMembership {
   role: "owner" | "admin" | "member";
 }
 
+/** Editable identity/preferences layered on auth.users. Mirrors UserProfile. */
+export interface UserProfile {
+  full_name: string;
+  avatar_url: string;
+  title: string;
+  default_organization_id: number | null;
+  preferences: Record<string, unknown>;
+}
+
+/** Fields to write to the caller's profile. Mirrors ProfileUpdateRequest. */
+export type ProfileUpdatePayload = Partial<UserProfile>;
+
 /** The signed-in caller's identity. Mirrors CurrentUserResponse. */
 export interface CurrentUserResponse {
   id: string;
   email: string | null;
+  profile: UserProfile;
   organizations: OrganizationMembership[];
 }

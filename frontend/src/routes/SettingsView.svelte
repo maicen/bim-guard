@@ -19,6 +19,8 @@
   } from "lucide-svelte";
   import { settingsApi, parsingEnginesApi } from "../lib/api";
   import { themeMode, setTheme, type ThemeMode } from "../lib/theme";
+  import { authState } from "../lib/auth.svelte";
+  import { isAuthConfigured } from "../lib/supabaseClient";
   import type {
     SettingItem,
     ParsingEngineInstance,
@@ -35,6 +37,35 @@
   let isSaving = $state(false);
   let error = $state("");
   let successMessage = $state("");
+
+  // ── Your Profile ──────────────────────────────────────────────────────────
+  let profileFullName = $state("");
+  let profileTitle = $state("");
+  let profileSaving = $state(false);
+  let profileError = $state("");
+  let profileSuccess = $state("");
+
+  // authState.profile loads asynchronously after sign-in, independent of this
+  // view's own onMount, so the form fields track it reactively rather than
+  // being read once.
+  $effect(() => {
+    profileFullName = authState.profile?.profile.full_name || "";
+    profileTitle = authState.profile?.profile.title || "";
+  });
+
+  async function handleSaveProfile() {
+    profileSaving = true;
+    profileError = "";
+    profileSuccess = "";
+    try {
+      await authState.updateProfile({ full_name: profileFullName.trim(), title: profileTitle.trim() });
+      profileSuccess = "Profile saved.";
+    } catch (err: any) {
+      profileError = err.message || "Failed to save profile.";
+    } finally {
+      profileSaving = false;
+    }
+  }
 
   // ── Parsing Engines ──────────────────────────────────────────────────────
   // `kinds` is fetched from the backend's ParsingEngineRegistry — the "Kind"
@@ -262,6 +293,95 @@
     >
       <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
       <span>{successMessage}</span>
+    </div>
+  {/if}
+
+  {#if isAuthConfigured && authState.user}
+    <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <div>
+        <h2 class="text-base font-bold tracking-tight text-slate-50">Your Profile</h2>
+        <p class="text-xs text-slate-400">
+          Display name and title shown alongside your account. Your avatar and email come from
+          Google and aren't editable here.
+        </p>
+      </div>
+
+      {#if profileError}
+        <div
+          class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300"
+        >
+          <AlertCircle class="h-4 w-4 shrink-0 text-rose-400" />
+          <span>{profileError}</span>
+        </div>
+      {/if}
+      {#if profileSuccess}
+        <div
+          class="flex items-center gap-2 rounded-xl border border-emerald-800 bg-emerald-950/50 p-3.5 text-xs text-emerald-300"
+        >
+          <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
+          <span>{profileSuccess}</span>
+        </div>
+      {/if}
+
+      <div class="flex items-center gap-4">
+        {#if authState.profile?.profile.avatar_url}
+          <img
+            src={authState.profile.profile.avatar_url}
+            alt=""
+            referrerpolicy="no-referrer"
+            class="h-14 w-14 shrink-0 rounded-full object-cover"
+          />
+        {:else}
+          <div
+            class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-800 text-lg font-semibold text-slate-300"
+          >
+            {(profileFullName || authState.user.email || "?")[0]?.toUpperCase()}
+          </div>
+        {/if}
+        <div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label for="profile-full-name" class="mb-1 block text-caption font-semibold text-slate-400"
+              >Display name</label
+            >
+            <input
+              id="profile-full-name"
+              type="text"
+              bind:value={profileFullName}
+              placeholder={authState.user.email}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div>
+            <label for="profile-title" class="mb-1 block text-caption font-semibold text-slate-400"
+              >Title / discipline</label
+            >
+            <input
+              id="profile-title"
+              type="text"
+              bind:value={profileTitle}
+              placeholder="e.g. BIM Coordinator"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button
+          type="button"
+          disabled={profileSaving}
+          onclick={handleSaveProfile}
+          class="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-1.5 text-xs font-semibold text-white transition-all hover:bg-accent-hover disabled:opacity-50"
+        >
+          {#if profileSaving}
+            <Loader2 class="h-3.5 w-3.5 animate-spin" />
+            <span>Saving...</span>
+          {:else}
+            <Save class="h-3.5 w-3.5" />
+            <span>Save Profile</span>
+          {/if}
+        </button>
+      </div>
     </div>
   {/if}
 

@@ -29,10 +29,22 @@ import pytest
 from starlette.testclient import TestClient
 
 import app.services.analysis_runner as runner
-from app.api.dependencies import get_phase6_service, get_projects_service
+from app.api.dependencies import get_membership_service, get_phase6_service, get_projects_service
 from app.main import app
 from app.modules.phase_6.phase_6a_upload import FileUploadService
 from app.services.projects_service import ProjectsService
+
+#: The fake project below needs an organization_id for app.api.projects'
+#: get_authorized_project check to pass; FakeMemberships below says the test
+#: user belongs to exactly this one, so nothing here touches the live DB.
+FAKE_ORG_ID = 1
+
+
+class FakeMemberships:
+    """A membership service fixed to one organization, no live DB involved."""
+
+    def org_ids_for_user(self, user_id: str) -> set[int]:
+        return {FAKE_ORG_ID}
 
 ifcopenshell = pytest.importorskip("ifcopenshell", reason="the seismic kernel needs ifcopenshell")
 
@@ -152,7 +164,15 @@ def service(tmp_path: Path) -> ProjectsService:
     """Build a ProjectsService over in-memory repositories and dict storage."""
     return ProjectsService(
         projects_repo=FakeTable(
-            [{"id": 7, "name": "Federated tower", "ifc_file_path": "", "created_at": "2026-08-30"}]
+            [
+                {
+                    "id": 7,
+                    "name": "Federated tower",
+                    "ifc_file_path": "",
+                    "created_at": "2026-08-30",
+                    "organization_id": FAKE_ORG_ID,
+                }
+            ]
         ),
         standards_repo=FakeTable(),
         client_documents_repo=FakeTable(),
@@ -171,11 +191,17 @@ def client(service: ProjectsService, monkeypatch) -> TestClient:
 
     app.dependency_overrides[get_projects_service] = lambda: service
     app.dependency_overrides[get_phase6_service] = lambda: Phase6Double()
+    app.dependency_overrides[get_membership_service] = lambda: FakeMemberships()
     # The runner holds a module-level service of its own; point it at the same
     # one so an upload made through the API is the model the analysis reads.
     monkeypatch.setattr(runner, "_projects_service", service)
     yield TestClient(app, raise_server_exceptions=False)
-    app.dependency_overrides.clear()
+    # Only undo what this fixture set — a bare .clear() would also remove
+    # conftest.py's session-wide get_current_user override, breaking every
+    # test that runs after this one in the same session.
+    del app.dependency_overrides[get_projects_service]
+    del app.dependency_overrides[get_phase6_service]
+    del app.dependency_overrides[get_membership_service]
 
 
 def upload(client: TestClient, project_id: int = 7, **form: Any):

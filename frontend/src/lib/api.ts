@@ -41,6 +41,7 @@ import type {
   ParsingEngineInstanceTestResult,
   ParsingEngineInstanceUpdatePayload,
   ParsingEngineKind,
+  ProfileUpdatePayload,
   Project,
   ProjectBulkActionResponse,
   ProjectBulkUpdatePayload,
@@ -63,6 +64,7 @@ import type {
   RuleSnapshot,
   RuleSnapshotCreatePayload,
   RuleSourceResponse,
+  UserProfile,
   WorkflowStatus,
 } from "./types";
 import {
@@ -72,6 +74,7 @@ import {
   type SWROptions,
   type Unsubscribe,
 } from "./cache";
+import { authHeaders } from "./authToken";
 import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -105,13 +108,32 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json();
 }
 
+/**
+ * Drop-in replacement for `fetch` against this app's own API: every call
+ * below goes through this so the caller's Supabase token (if any) rides
+ * along automatically. Endpoints that don't require auth simply ignore the
+ * header; projects/rules (the ones that do) need it on every request.
+ */
+async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, { ...init, headers: { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) } });
+}
+
 export const authApi = {
   /** Fetch the signed-in caller's identity. Requires a Supabase access token. */
   async me(accessToken: string): Promise<CurrentUserResponse> {
-    const res = await fetch(`${API_BASE}/auth/me`, {
+    const res = await apiFetch(`${API_BASE}/auth/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return handleResponse<CurrentUserResponse>(res);
+  },
+
+  async updateProfile(accessToken: string, payload: ProfileUpdatePayload): Promise<UserProfile> {
+    const res = await apiFetch(`${API_BASE}/auth/profile`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<UserProfile>(res);
   },
 };
 
@@ -156,7 +178,7 @@ export const projectsApi = {
     const list = await _projectsStore.fetchList(
       "__default__",
       async () => {
-        const res = await fetch(`${API_BASE}/projects`);
+        const res = await apiFetch(`${API_BASE}/projects`);
         const data = await handleResponse<ProjectListResponse | Project[]>(res);
         return Array.isArray(data) ? data : data.projects;
       },
@@ -173,7 +195,7 @@ export const projectsApi = {
     return _projectsStore.fetchItem(
       id,
       async () => {
-        const res = await fetch(`${API_BASE}/projects/${id}`);
+        const res = await apiFetch(`${API_BASE}/projects/${id}`);
         return handleResponse<Project>(res);
       },
       options,
@@ -181,7 +203,7 @@ export const projectsApi = {
   },
 
   async getInputs(id: number): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/projects/${id}/inputs`);
+    const res = await apiFetch(`${API_BASE}/projects/${id}/inputs`);
     return handleResponse<any[]>(res);
   },
 
@@ -189,7 +211,7 @@ export const projectsApi = {
     return _projectOptionsStore.execute(
       "__options__",
       async () => {
-        const res = await fetch(`${API_BASE}/projects/options`);
+        const res = await apiFetch(`${API_BASE}/projects/options`);
         return handleResponse<ProjectOptions>(res);
       },
       options,
@@ -197,7 +219,7 @@ export const projectsApi = {
   },
 
   async create(payload: ProjectCreatePayload): Promise<Project> {
-    const res = await fetch(`${API_BASE}/projects`, {
+    const res = await apiFetch(`${API_BASE}/projects`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -208,7 +230,7 @@ export const projectsApi = {
   },
 
   async uploadWithIfc(formData: FormData): Promise<Project> {
-    const res = await fetch(`${API_BASE}/projects/upload`, {
+    const res = await apiFetch(`${API_BASE}/projects/upload`, {
       method: "POST",
       body: formData,
     });
@@ -218,7 +240,7 @@ export const projectsApi = {
   },
 
   async update(id: number, payload: ProjectUpdatePayload): Promise<Project> {
-    const res = await fetch(`${API_BASE}/projects/${id}`, {
+    const res = await apiFetch(`${API_BASE}/projects/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -229,7 +251,7 @@ export const projectsApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/projects/${id}`, {
+    const res = await apiFetch(`${API_BASE}/projects/${id}`, {
       method: "DELETE",
     });
     await handleResponse<void>(res);
@@ -237,7 +259,7 @@ export const projectsApi = {
   },
 
   async bulkDelete(ids: number[]): Promise<ProjectBulkActionResponse> {
-    const res = await fetch(`${API_BASE}/projects/bulk-delete`, {
+    const res = await apiFetch(`${API_BASE}/projects/bulk-delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_ids: ids }),
@@ -248,7 +270,7 @@ export const projectsApi = {
   },
 
   async bulkUpdate(payload: ProjectBulkUpdatePayload): Promise<ProjectBulkActionResponse> {
-    const res = await fetch(`${API_BASE}/projects/bulk-update`, {
+    const res = await apiFetch(`${API_BASE}/projects/bulk-update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -273,7 +295,7 @@ export const projectsApi = {
   },
 
   async listIfcFiles(projectId: number): Promise<ProjectIfcFile[]> {
-    const res = await fetch(`${API_BASE}/projects/${projectId}/files`);
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files`);
     return handleResponse<ProjectIfcFile[]>(res);
   },
 
@@ -296,7 +318,7 @@ export const projectsApi = {
     form.append("primary_index", String(primaryIndex));
     roles.forEach((role) => form.append("roles", role));
 
-    const res = await fetch(`${API_BASE}/projects/${projectId}/upload`, {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/upload`, {
       method: "POST",
       body: form,
     });
@@ -348,7 +370,7 @@ export const rulesApi = {
         if (filters?.category) params.set("category", filters.category);
         if (filters?.keyword) params.set("keyword", filters.keyword);
         const query = params.toString() ? `?${params.toString()}` : "";
-        const res = await fetch(`${API_BASE}/rules${query}`);
+        const res = await apiFetch(`${API_BASE}/rules${query}`);
         return handleResponse<Rule[]>(res);
       },
       options,
@@ -364,7 +386,7 @@ export const rulesApi = {
     return _ruleFoldersStore.execute(
       key,
       async () => {
-        const res = await fetch(`${API_BASE}/rules/folders${query}`);
+        const res = await apiFetch(`${API_BASE}/rules/folders${query}`);
         return handleResponse<RuleFolder[]>(res);
       },
       options,
@@ -372,7 +394,7 @@ export const rulesApi = {
   },
 
   async createFolder(payload: RuleFolderCreatePayload): Promise<RuleFolder> {
-    const res = await fetch(`${API_BASE}/rules/folders`, {
+    const res = await apiFetch(`${API_BASE}/rules/folders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -383,7 +405,7 @@ export const rulesApi = {
   },
 
   async updateFolder(rulesetId: string, payload: RuleFolderUpdatePayload): Promise<RuleFolder> {
-    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
+    const res = await apiFetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -396,7 +418,7 @@ export const rulesApi = {
   async deleteFolder(
     rulesetId: string,
   ): Promise<{ success: boolean; ruleset_id: string; deleted_rules: number }> {
-    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
+    const res = await apiFetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`, {
       method: "DELETE",
     });
     const result = await handleResponse<{
@@ -412,7 +434,7 @@ export const rulesApi = {
   async bulkUpdateFolders(
     payload: RuleFolderBulkUpdatePayload,
   ): Promise<RuleFolderBulkActionResponse> {
-    const res = await fetch(`${API_BASE}/rules/folders/bulk-update`, {
+    const res = await apiFetch(`${API_BASE}/rules/folders/bulk-update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -424,7 +446,7 @@ export const rulesApi = {
   },
 
   async bulkDeleteFolders(rulesetIds: string[]): Promise<RuleFolderBulkActionResponse> {
-    const res = await fetch(`${API_BASE}/rules/folders/bulk-delete`, {
+    const res = await apiFetch(`${API_BASE}/rules/folders/bulk-delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ruleset_ids: rulesetIds }),
@@ -436,7 +458,7 @@ export const rulesApi = {
   },
 
   async getFolder(rulesetId: string): Promise<RuleFolder> {
-    const res = await fetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`);
+    const res = await apiFetch(`${API_BASE}/rules/folders/${encodeURIComponent(rulesetId)}`);
     return handleResponse<RuleFolder>(res);
   },
 
@@ -444,7 +466,7 @@ export const rulesApi = {
     return _rulesStore.fetchItem(
       id,
       async () => {
-        const res = await fetch(`${API_BASE}/rules/${id}`);
+        const res = await apiFetch(`${API_BASE}/rules/${id}`);
         return handleResponse<Rule>(res);
       },
       options,
@@ -452,12 +474,12 @@ export const rulesApi = {
   },
 
   async getSource(id: number): Promise<RuleSourceResponse> {
-    const res = await fetch(`${API_BASE}/rules/${id}/source`);
+    const res = await apiFetch(`${API_BASE}/rules/${id}/source`);
     return handleResponse<RuleSourceResponse>(res);
   },
 
   async create(payload: Partial<Rule>): Promise<Rule> {
-    const res = await fetch(`${API_BASE}/rules`, {
+    const res = await apiFetch(`${API_BASE}/rules`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -469,7 +491,7 @@ export const rulesApi = {
   },
 
   async update(id: number, payload: Partial<Rule>): Promise<Rule> {
-    const res = await fetch(`${API_BASE}/rules/${id}`, {
+    const res = await apiFetch(`${API_BASE}/rules/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -481,7 +503,7 @@ export const rulesApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/rules/${id}`, {
+    const res = await apiFetch(`${API_BASE}/rules/${id}`, {
       method: "DELETE",
     });
     await handleResponse<void>(res);
@@ -490,7 +512,7 @@ export const rulesApi = {
   },
 
   async bulkUpdate(payload: RuleBulkUpdatePayload): Promise<RuleBulkActionResponse> {
-    const res = await fetch(`${API_BASE}/rules/bulk-update`, {
+    const res = await apiFetch(`${API_BASE}/rules/bulk-update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -502,7 +524,7 @@ export const rulesApi = {
   },
 
   async bulkDelete(ruleIds: number[]): Promise<RuleBulkActionResponse> {
-    const res = await fetch(`${API_BASE}/rules/bulk-delete`, {
+    const res = await apiFetch(`${API_BASE}/rules/bulk-delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rule_ids: ruleIds }),
@@ -536,7 +558,7 @@ export const rulesApi = {
     const form = new FormData();
     form.append("file", file);
     form.append("ruleset_id", rulesetId);
-    const res = await fetch(`${API_BASE}/rules/import-ids`, {
+    const res = await apiFetch(`${API_BASE}/rules/import-ids`, {
       method: "POST",
       body: form,
     });
@@ -550,7 +572,7 @@ export const rulesApi = {
     const form = new FormData();
     form.append("file", file);
     form.append("ruleset_id", rulesetId);
-    const res = await fetch(`${API_BASE}/rules/import-json`, {
+    const res = await apiFetch(`${API_BASE}/rules/import-json`, {
       method: "POST",
       body: form,
     });
@@ -561,7 +583,7 @@ export const rulesApi = {
   },
 
   async createSnapshot(payload: RuleSnapshotCreatePayload): Promise<RuleSnapshot> {
-    const res = await fetch(`${API_BASE}/rules/snapshots`, {
+    const res = await apiFetch(`${API_BASE}/rules/snapshots`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -570,12 +592,12 @@ export const rulesApi = {
   },
 
   async listSnapshots(): Promise<RuleSnapshot[]> {
-    const res = await fetch(`${API_BASE}/rules/snapshots`);
+    const res = await apiFetch(`${API_BASE}/rules/snapshots`);
     return handleResponse<RuleSnapshot[]>(res);
   },
 
   async deleteSnapshot(snapshotId: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/rules/snapshots/${snapshotId}`, {
+    const res = await apiFetch(`${API_BASE}/rules/snapshots/${snapshotId}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -650,7 +672,7 @@ export const analyzeApi = {
     form.append("project_id", projectId.toString());
     form.append("ifc_file", file);
 
-    const res = await fetch(`${API_BASE}/analyze/upload`, {
+    const res = await apiFetch(`${API_BASE}/analyze/upload`, {
       method: "POST",
       body: form,
     });
@@ -677,7 +699,7 @@ export const analyzeApi = {
     engines?: string[],
     signal?: AbortSignal,
   ): Promise<AnalysisResult> {
-    const res = await fetch(`${API_BASE}/analyze/run?background=${background}`, {
+    const res = await apiFetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -708,7 +730,7 @@ export const analyzeApi = {
     signal?: AbortSignal,
     page?: ResultPageQuery,
   ): Promise<AnalysisResult> {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}`,
       { signal },
     );
@@ -716,7 +738,7 @@ export const analyzeApi = {
   },
 
   async getStatus(projectId: number): Promise<WorkflowStatus> {
-    const res = await fetch(`${API_BASE}/analyze/status/${projectId}`);
+    const res = await apiFetch(`${API_BASE}/analyze/status/${projectId}`);
     return handleResponse<WorkflowStatus>(res);
   },
 
@@ -742,7 +764,7 @@ export const analyzeApi = {
     form.append("project_id", projectId.toString());
     if (ruleFolder) form.append("rule_folder", ruleFolder);
 
-    const res = await fetch(`${API_BASE}/analyze/arch`, {
+    const res = await apiFetch(`${API_BASE}/analyze/arch`, {
       method: "POST",
       body: form,
     });
@@ -750,12 +772,12 @@ export const analyzeApi = {
   },
 
   async listBcfArtifacts(): Promise<BcfArtifact[]> {
-    const res = await fetch(`${API_BASE}/analyze/bcf/list`);
+    const res = await apiFetch(`${API_BASE}/analyze/bcf/list`);
     return handleResponse<BcfArtifact[]>(res);
   },
 
   async deleteBcfArtifact(artifactId: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/analyze/bcf/artifacts/${artifactId}`, {
+    const res = await apiFetch(`${API_BASE}/analyze/bcf/artifacts/${artifactId}`, {
       method: "DELETE",
     });
     return handleResponse<void>(res);
@@ -771,7 +793,7 @@ export const dashboardApi = {
     return _dashboardStatsStore.execute(
       "__stats__",
       async () => {
-        const res = await fetch(`${API_BASE}/dashboard/stats`);
+        const res = await apiFetch(`${API_BASE}/dashboard/stats`);
         return handleResponse<any>(res);
       },
       options,
@@ -806,7 +828,7 @@ export const documentsApi = {
     return _documentsStore.fetchList(
       "__default__",
       async () => {
-        const res = await fetch(`${API_BASE}/documents`);
+        const res = await apiFetch(`${API_BASE}/documents`);
         return handleResponse<DocumentItem[]>(res);
       },
       options,
@@ -817,7 +839,7 @@ export const documentsApi = {
     return _documentDetailStore.execute(
       id,
       async () => {
-        const res = await fetch(`${API_BASE}/documents/${id}`);
+        const res = await apiFetch(`${API_BASE}/documents/${id}`);
         return handleResponse<DocumentDetail>(res);
       },
       options,
@@ -845,7 +867,7 @@ export const documentsApi = {
     if (isoOptions?.revision_code) form.append("revision_code", isoOptions.revision_code);
     if (isoOptions?.parser) form.append("parser", isoOptions.parser);
     if (isoOptions?.engine_instance) form.append("engine_instance", isoOptions.engine_instance);
-    const res = await fetch(`${API_BASE}/documents`, {
+    const res = await apiFetch(`${API_BASE}/documents`, {
       method: "POST",
       body: form,
     });
@@ -869,7 +891,7 @@ export const documentsApi = {
   },
 
   async update(id: number, payload: DocumentUpdatePayload): Promise<DocumentDetail> {
-    const res = await fetch(`${API_BASE}/documents/${id}`, {
+    const res = await apiFetch(`${API_BASE}/documents/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -889,7 +911,7 @@ export const documentsApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/documents/${id}`, {
+    const res = await apiFetch(`${API_BASE}/documents/${id}`, {
       method: "DELETE",
     });
     await handleResponse<void>(res);
@@ -902,12 +924,12 @@ export const documentsApi = {
   },
 
   async getSections(id: number): Promise<DocumentSectionsResponse> {
-    const res = await fetch(`${API_BASE}/documents/${id}/sections`);
+    const res = await apiFetch(`${API_BASE}/documents/${id}/sections`);
     return handleResponse<DocumentSectionsResponse>(res);
   },
 
   async importFromGoogleDrive(payload: GoogleDriveImportPayload): Promise<GoogleDriveImportResponse> {
-    const res = await fetch(`${API_BASE}/documents/import/google-drive`, {
+    const res = await apiFetch(`${API_BASE}/documents/import/google-drive`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -943,12 +965,12 @@ export const documentsApi = {
 
 export const settingsApi = {
   async get(): Promise<any> {
-    const res = await fetch(`${API_BASE}/settings`);
+    const res = await apiFetch(`${API_BASE}/settings`);
     return handleResponse<any>(res);
   },
 
   async update(settings: Record<string, string>): Promise<any> {
-    const res = await fetch(`${API_BASE}/settings`, {
+    const res = await apiFetch(`${API_BASE}/settings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
@@ -959,12 +981,12 @@ export const settingsApi = {
 
 export const lineageApi = {
   async getHistory(projectId: number): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/projects/${projectId}/enhancements`);
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/enhancements`);
     return handleResponse<any[]>(res);
   },
 
   async enhance(projectId: number, token?: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/projects/${projectId}/enhance`, {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/enhance`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(token ? { token } : {}),
@@ -982,7 +1004,7 @@ export const ruleExtractionApi = {
     if (file) form.append("file", file);
     if (rawText) form.append("raw_text", rawText);
 
-    const res = await fetch(`${API_BASE}/rules/extract`, {
+    const res = await apiFetch(`${API_BASE}/rules/extract`, {
       method: "POST",
       body: form,
     });
@@ -990,7 +1012,7 @@ export const ruleExtractionApi = {
   },
 
   async bulkCreate(rules: any[]): Promise<any> {
-    const res = await fetch(`${API_BASE}/rules/bulk`, {
+    const res = await apiFetch(`${API_BASE}/rules/bulk`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rules),
@@ -999,7 +1021,7 @@ export const ruleExtractionApi = {
   },
 
   async seed(): Promise<any> {
-    const res = await fetch(`${API_BASE}/rules/seed`, {
+    const res = await apiFetch(`${API_BASE}/rules/seed`, {
       method: "POST",
     });
     return handleResponse<any>(res);
@@ -1012,7 +1034,7 @@ export const ruleExtractionApi = {
 
 export const revitSyncApi = {
   async sync(payload: any): Promise<any> {
-    const res = await fetch(`${API_BASE}/analyze/revit-sync`, {
+    const res = await apiFetch(`${API_BASE}/analyze/revit-sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1027,7 +1049,7 @@ const _cachedStructureMap: Record<number, GitHubRepoStructure> = {};
 export const githubReposApi = {
   async list(forceRefresh = false): Promise<GitHubRepo[]> {
     if (_cachedReposList && !forceRefresh) {
-      fetch(`${API_BASE}/repositories`)
+      apiFetch(`${API_BASE}/repositories`)
         .then((res) => handleResponse<GitHubRepo[]>(res))
         .then((data) => {
           _cachedReposList = data;
@@ -1035,19 +1057,19 @@ export const githubReposApi = {
         .catch(() => {});
       return _cachedReposList;
     }
-    const res = await fetch(`${API_BASE}/repositories`);
+    const res = await apiFetch(`${API_BASE}/repositories`);
     const data = await handleResponse<GitHubRepo[]>(res);
     _cachedReposList = data;
     return data;
   },
 
   async get(id: number): Promise<GitHubRepo> {
-    const res = await fetch(`${API_BASE}/repositories/${id}`);
+    const res = await apiFetch(`${API_BASE}/repositories/${id}`);
     return handleResponse<GitHubRepo>(res);
   },
 
   async create(payload: GitHubRepoCreatePayload): Promise<GitHubRepo> {
-    const res = await fetch(`${API_BASE}/repositories`, {
+    const res = await apiFetch(`${API_BASE}/repositories`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1058,7 +1080,7 @@ export const githubReposApi = {
   },
 
   async update(id: number, payload: GitHubRepoUpdatePayload): Promise<GitHubRepo> {
-    const res = await fetch(`${API_BASE}/repositories/${id}`, {
+    const res = await apiFetch(`${API_BASE}/repositories/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1069,7 +1091,7 @@ export const githubReposApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/repositories/${id}`, {
+    const res = await apiFetch(`${API_BASE}/repositories/${id}`, {
       method: "DELETE",
     });
     await handleResponse<void>(res);
@@ -1079,7 +1101,7 @@ export const githubReposApi = {
 
   async getStructure(id: number, forceRefresh = false): Promise<GitHubRepoStructure> {
     if (_cachedStructureMap[id] && !forceRefresh) {
-      fetch(`${API_BASE}/repositories/${id}/structure`)
+      apiFetch(`${API_BASE}/repositories/${id}/structure`)
         .then((res) => handleResponse<GitHubRepoStructure>(res))
         .then((data) => {
           _cachedStructureMap[id] = data;
@@ -1087,14 +1109,14 @@ export const githubReposApi = {
         .catch(() => {});
       return _cachedStructureMap[id];
     }
-    const res = await fetch(`${API_BASE}/repositories/${id}/structure`);
+    const res = await apiFetch(`${API_BASE}/repositories/${id}/structure`);
     const data = await handleResponse<GitHubRepoStructure>(res);
     _cachedStructureMap[id] = data;
     return data;
   },
 
   async importProject(repoId: number, payload: ProjectImportPayload): Promise<Project> {
-    const res = await fetch(`${API_BASE}/repositories/${repoId}/import`, {
+    const res = await apiFetch(`${API_BASE}/repositories/${repoId}/import`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1113,17 +1135,17 @@ export const parsingEnginesApi = {
   /** Registered engine kinds (drivers) — drives the Settings UI's kind
    * selector so a new backend driver appears with no frontend change. */
   async kinds(): Promise<ParsingEngineKind[]> {
-    const res = await fetch(`${API_BASE}/parsing-engines/kinds`);
+    const res = await apiFetch(`${API_BASE}/parsing-engines/kinds`);
     return handleResponse<ParsingEngineKind[]>(res);
   },
 
   async list(): Promise<ParsingEngineInstance[]> {
-    const res = await fetch(`${API_BASE}/parsing-engines`);
+    const res = await apiFetch(`${API_BASE}/parsing-engines`);
     return handleResponse<ParsingEngineInstance[]>(res);
   },
 
   async create(payload: ParsingEngineInstanceCreatePayload): Promise<ParsingEngineInstance> {
-    const res = await fetch(`${API_BASE}/parsing-engines`, {
+    const res = await apiFetch(`${API_BASE}/parsing-engines`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1132,7 +1154,7 @@ export const parsingEnginesApi = {
   },
 
   async update(id: number, payload: ParsingEngineInstanceUpdatePayload): Promise<ParsingEngineInstance> {
-    const res = await fetch(`${API_BASE}/parsing-engines/${id}`, {
+    const res = await apiFetch(`${API_BASE}/parsing-engines/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1141,14 +1163,14 @@ export const parsingEnginesApi = {
   },
 
   async delete(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/parsing-engines/${id}`, {
+    const res = await apiFetch(`${API_BASE}/parsing-engines/${id}`, {
       method: "DELETE",
     });
     await handleResponse<void>(res);
   },
 
   async test(id: number): Promise<ParsingEngineInstanceTestResult> {
-    const res = await fetch(`${API_BASE}/parsing-engines/${id}/test`, {
+    const res = await apiFetch(`${API_BASE}/parsing-engines/${id}/test`, {
       method: "POST",
     });
     return handleResponse<ParsingEngineInstanceTestResult>(res);
@@ -1161,12 +1183,12 @@ export const parsingEnginesApi = {
 
 export const cdeApi = {
   async getVersions(): Promise<CDEVersionsResponse> {
-    const res = await fetch(`${API_BASE}/cde/versions`);
+    const res = await apiFetch(`${API_BASE}/cde/versions`);
     return handleResponse<CDEVersionsResponse>(res);
   },
 
   async getUser(): Promise<CDEUserResponse> {
-    const res = await fetch(`${API_BASE}/cde/v1/user`);
+    const res = await apiFetch(`${API_BASE}/cde/v1/user`);
     return handleResponse<CDEUserResponse>(res);
   },
 
@@ -1180,12 +1202,12 @@ export const cdeApi = {
     if (params?.skip) query.set("$skip", String(params.skip));
     if (params?.orderby) query.set("$orderby", params.orderby);
     const qs = query.toString() ? `?${query.toString()}` : "";
-    const res = await fetch(`${API_BASE}/cde/v1/projects/${projectId}/documents${qs}`);
+    const res = await apiFetch(`${API_BASE}/cde/v1/projects/${projectId}/documents${qs}`);
     return handleResponse<CDEDocumentItem[]>(res);
   },
 
   async syncDocuments(payload: CDESyncRequest): Promise<CDESyncResponse> {
-    const res = await fetch(`${API_BASE}/cde/v1/projects/${payload.project_id}/documents/sync`, {
+    const res = await apiFetch(`${API_BASE}/cde/v1/projects/${payload.project_id}/documents/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1200,12 +1222,12 @@ export const cdeApi = {
 
 export const bcfApi = {
   async listProjects(): Promise<BCFProjectResponse[]> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects`);
+    const res = await apiFetch(`${API_BASE}/bcf/v2.1/projects`);
     return handleResponse<BCFProjectResponse[]>(res);
   },
 
   async getProject(projectId: string | number): Promise<BCFProjectResponse> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}`);
+    const res = await apiFetch(`${API_BASE}/bcf/v2.1/projects/${projectId}`);
     return handleResponse<BCFProjectResponse>(res);
   },
 
@@ -1226,12 +1248,12 @@ export const bcfApi = {
     if (filters?.assigned_to) query.set("assigned_to", filters.assigned_to);
     if (filters?.cde_state) query.set("cde_state", filters.cde_state);
     const qs = query.toString() ? `?${query.toString()}` : "";
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics${qs}`);
+    const res = await apiFetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics${qs}`);
     return handleResponse<BCFTopicResponse[]>(res);
   },
 
   async getTopic(projectId: string | number, topicGuid: string): Promise<BCFTopicResponse> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`);
+    const res = await apiFetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`);
     return handleResponse<BCFTopicResponse>(res);
   },
 
@@ -1239,7 +1261,7 @@ export const bcfApi = {
     projectId: string | number,
     payload: BCFTopicCreatePayload,
   ): Promise<BCFTopicResponse> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics`, {
+    const res = await apiFetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1252,7 +1274,7 @@ export const bcfApi = {
     topicGuid: string,
     payload: BCFTopicUpdatePayload,
   ): Promise<BCFTopicResponse> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
+    const res = await apiFetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1261,7 +1283,7 @@ export const bcfApi = {
   },
 
   async listComments(projectId: string | number, topicGuid: string): Promise<BCFCommentResponse[]> {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`,
     );
     return handleResponse<BCFCommentResponse[]>(res);
@@ -1272,7 +1294,7 @@ export const bcfApi = {
     topicGuid: string,
     payload: BCFCommentCreatePayload,
   ): Promise<BCFCommentResponse> {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/comments`,
       {
         method: "POST",
@@ -1287,7 +1309,7 @@ export const bcfApi = {
     projectId: string | number,
     topicGuid: string,
   ): Promise<BCFViewpointResponse[]> {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`,
     );
     return handleResponse<BCFViewpointResponse[]>(res);
@@ -1298,7 +1320,7 @@ export const bcfApi = {
     topicGuid: string,
     payload: BCFViewpointCreatePayload,
   ): Promise<BCFViewpointResponse> {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}/viewpoints`,
       {
         method: "POST",
@@ -1310,7 +1332,7 @@ export const bcfApi = {
   },
 
   async deleteTopic(projectId: string | number, topicGuid: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
+    const res = await apiFetch(`${API_BASE}/bcf/v2.1/projects/${projectId}/topics/${topicGuid}`, {
       method: "DELETE",
     });
     return handleResponse<void>(res);
@@ -1324,19 +1346,19 @@ export const bcfApi = {
 export const namingConfigApi = {
   /** Fetch the conventions, tokens, code library and CDE statuses. */
   async catalog(): Promise<NamingCatalog> {
-    const res = await fetch(`${API_BASE}/naming-config/catalog`);
+    const res = await apiFetch(`${API_BASE}/naming-config/catalog`);
     return handleResponse<NamingCatalog>(res);
   },
 
   /** Fetch one project's naming setup; unconfigured projects report defaults. */
   async get(projectId: number): Promise<NamingConfig> {
-    const res = await fetch(`${API_BASE}/naming-config/projects/${projectId}`);
+    const res = await apiFetch(`${API_BASE}/naming-config/projects/${projectId}`);
     return handleResponse<NamingConfig>(res);
   },
 
   /** Write one project's naming setup. Absent fields keep their stored value. */
   async save(projectId: number, payload: NamingConfigPayload): Promise<NamingConfig> {
-    const res = await fetch(`${API_BASE}/naming-config/projects/${projectId}`, {
+    const res = await apiFetch(`${API_BASE}/naming-config/projects/${projectId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1346,7 +1368,7 @@ export const namingConfigApi = {
 
   /** Drop a project's saved setup, returning the defaults it falls back to. */
   async reset(projectId: number): Promise<NamingConfig> {
-    const res = await fetch(`${API_BASE}/naming-config/projects/${projectId}`, {
+    const res = await apiFetch(`${API_BASE}/naming-config/projects/${projectId}`, {
       method: "DELETE",
     });
     return handleResponse<NamingConfig>(res);
@@ -1362,7 +1384,7 @@ export const namingConfigApi = {
     config: NamingConfigPayload,
     overrides: Record<string, string> = {},
   ): Promise<NamingPreview> {
-    const res = await fetch(`${API_BASE}/naming-config/preview`, {
+    const res = await apiFetch(`${API_BASE}/naming-config/preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ config, overrides }),
@@ -1390,7 +1412,7 @@ const BSDD_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const bsddApi = {
   /** Classification standards a project can be coded against (Uniclass, OmniClass, IFC, ...). */
   async listDictionaries(): Promise<BSDDDictionaryItem[]> {
-    const res = await fetch(`${API_BASE}/bsdd/dictionaries`);
+    const res = await apiFetch(`${API_BASE}/bsdd/dictionaries`);
     return handleResponse<BSDDDictionaryItem[]>(res);
   },
 
@@ -1401,7 +1423,7 @@ export const bsddApi = {
     if (cached) return cached;
     const params = new URLSearchParams({ q: query });
     if (dictionaryUri) params.set('dictionary_uri', dictionaryUri);
-    const res = await fetch(`${API_BASE}/bsdd/classes/search?${params.toString()}`);
+    const res = await apiFetch(`${API_BASE}/bsdd/classes/search?${params.toString()}`);
     const result = await handleResponse<BSDDClassSearchResponse>(res);
     setPersistentCache(cacheKey, result);
     return result;
@@ -1414,7 +1436,7 @@ export const bsddApi = {
     if (cached) return cached;
     const params = new URLSearchParams({ q: query });
     if (dictionaryUri) params.set('dictionary_uri', dictionaryUri);
-    const res = await fetch(`${API_BASE}/bsdd/properties/search?${params.toString()}`);
+    const res = await apiFetch(`${API_BASE}/bsdd/properties/search?${params.toString()}`);
     const result = await handleResponse<BSDDPropertySearchResponse>(res);
     setPersistentCache(cacheKey, result);
     return result;
@@ -1426,7 +1448,7 @@ export const bsddApi = {
     const cached = getPersistentCache<BSDDClassItem>(cacheKey, BSDD_CACHE_TTL_MS);
     if (cached) return cached;
     const params = dictionaryUri ? `?dictionary_uri=${encodeURIComponent(dictionaryUri)}` : '';
-    const res = await fetch(`${API_BASE}/bsdd/classes/${encodeURIComponent(classCode)}${params}`);
+    const res = await apiFetch(`${API_BASE}/bsdd/classes/${encodeURIComponent(classCode)}${params}`);
     const result = await handleResponse<BSDDClassItem>(res);
     setPersistentCache(cacheKey, result);
     return result;
@@ -1437,7 +1459,7 @@ export const bsddApi = {
     const cacheKey = "bsdd:ontology:classes";
     const cached = getPersistentCache<BSDDOntologyClassSummary[]>(cacheKey, BSDD_CACHE_TTL_MS);
     if (cached) return cached;
-    const res = await fetch(`${API_BASE}/bsdd/ontology/classes`);
+    const res = await apiFetch(`${API_BASE}/bsdd/ontology/classes`);
     const result = await handleResponse<BSDDOntologyClassSummary[]>(res);
     setPersistentCache(cacheKey, result);
     return result;
@@ -1448,7 +1470,7 @@ export const bsddApi = {
     const cacheKey = `bsdd:ontology:class:${uri}`;
     const cached = getPersistentCache<BSDDClassItem>(cacheKey, BSDD_CACHE_TTL_MS);
     if (cached) return cached;
-    const res = await fetch(`${API_BASE}/bsdd/ontology/class?uri=${encodeURIComponent(uri)}`);
+    const res = await apiFetch(`${API_BASE}/bsdd/ontology/class?uri=${encodeURIComponent(uri)}`);
     const result = await handleResponse<BSDDClassItem>(res);
     setPersistentCache(cacheKey, result);
     return result;
@@ -1459,7 +1481,7 @@ export const bsddApi = {
     const cacheKey = `bsdd:ontology:property:${uri}`;
     const cached = getPersistentCache<BSDDOntologyPropertyDetail>(cacheKey, BSDD_CACHE_TTL_MS);
     if (cached) return cached;
-    const res = await fetch(`${API_BASE}/bsdd/ontology/property?uri=${encodeURIComponent(uri)}`);
+    const res = await apiFetch(`${API_BASE}/bsdd/ontology/property?uri=${encodeURIComponent(uri)}`);
     const result = await handleResponse<BSDDOntologyPropertyDetail>(res);
     setPersistentCache(cacheKey, result);
     return result;

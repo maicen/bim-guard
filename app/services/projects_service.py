@@ -247,6 +247,7 @@ class ProjectsService:
         status: str = "Draft",
         ifc_file_path: str = "",
         ifc_md5_hash: str = "",
+        organization_id: int | None = None,
         country: str = "",
         analysis_type: str = "",
         building_code: str | None = None,
@@ -334,6 +335,8 @@ class ProjectsService:
             "revision_code": revision_code or "P01.01",
             "cde_state": cde_state or "WIP",
         }
+        if organization_id is not None:
+            row["organization_id"] = organization_id
         # Only send the wizard columns the caller actually filled in, so a
         # project created through the plain API is not written a row full of
         # NULLs for fields it never had an opinion about.

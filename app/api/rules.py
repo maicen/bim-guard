@@ -20,6 +20,7 @@ from fastapi import (
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.api.dependencies import get_rules_service
+from app.auth import get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     IdsImportResponse,
@@ -47,7 +48,11 @@ from app.services.rules_service import RuleService
 
 logger = get_logger(__name__)
 
-router = APIRouter()
+# Rules are a shared global catalog (no project_id/organization_id column),
+# so unlike app.api.projects there's nothing here to filter by tenant --
+# this just requires sign-in, applied once for the whole router rather than
+# on every route.
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 def _rule_response(row: dict) -> RuleResponse:

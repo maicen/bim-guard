@@ -40,6 +40,31 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# ---------------------------------------------------------------------------
+# Auth override
+# ---------------------------------------------------------------------------
+# app.api.projects and app.api.rules require Depends(get_current_user).
+# Every test file builds its own TestClient(app) against the same singleton
+# `app`, so overriding the dependency once here — rather than in each test
+# file — authenticates all of them as one fixed fake user. FastAPI applies a
+# dependency override transitively, so this also covers get_authorized_project
+# and anywhere else get_current_user appears in a dependency chain.
+from app.auth import CurrentUser, get_current_user  # noqa: E402
+from app.main import app  # noqa: E402
+
+TEST_USER = CurrentUser(
+    id="99999999-9999-9999-9999-999999999999",
+    email="test@example.com",
+    claims={"sub": "99999999-9999-9999-9999-999999999999", "email": "test@example.com"},
+)
+
+
+def _override_get_current_user() -> CurrentUser:
+    return TEST_USER
+
+
+app.dependency_overrides[get_current_user] = _override_get_current_user
+
 
 @pytest.fixture(autouse=True)
 def reset_in_memory_cache():

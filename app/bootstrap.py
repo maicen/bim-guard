@@ -41,6 +41,7 @@ from app.services.parsing_engine_instances_service import ParsingEngineInstances
 from app.services.persistence import PersistenceService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
+from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.rules_service import (
     _FOLDER_COLUMNS,
@@ -77,6 +78,7 @@ class ApplicationContainer:
     parsing_engine_instances_repo: DatabaseAdapter
     organizations_repo: DatabaseAdapter
     memberships_repo: DatabaseAdapter
+    profiles_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
@@ -87,6 +89,7 @@ class ApplicationContainer:
     naming_config_service: NamingConfigService
     parsing_engine_instances_service: ParsingEngineInstancesService
     membership_service: MembershipService
+    profile_service: ProfileService
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
@@ -252,6 +255,21 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    profiles_repo = PersistenceService.get_table(
+        "profiles",
+        {
+            "id": str,
+            "full_name": str,
+            "avatar_url": str,
+            "title": str,
+            "default_organization_id": int,
+            "preferences": dict,
+            "created_at": str,
+            "updated_at": str,
+        },
+        pk="id",
+    )
+
     parsing_engine_instances_repo = PersistenceService.get_table(
         "parsing_engine_instances",
         {
@@ -308,6 +326,8 @@ def build_default_container() -> ApplicationContainer:
         memberships_repo=memberships_repo,
         organizations_repo=organizations_repo,
     )
+
+    profile_service = ProfileService(profiles_repo=profiles_repo)
 
     # Seed default repo if database is empty
     try:
@@ -430,6 +450,7 @@ def build_default_container() -> ApplicationContainer:
         parsing_engine_instances_repo=parsing_engine_instances_repo,
         organizations_repo=organizations_repo,
         memberships_repo=memberships_repo,
+        profiles_repo=profiles_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
@@ -440,6 +461,7 @@ def build_default_container() -> ApplicationContainer:
         naming_config_service=naming_config_service,
         parsing_engine_instances_service=parsing_engine_instances_service,
         membership_service=membership_service,
+        profile_service=profile_service,
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,

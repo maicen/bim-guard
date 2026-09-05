@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from app.api.dependencies import get_phase6_service, get_projects_service
+from app.api.dependencies import (
+    get_membership_service,
+    get_phase6_service,
+    get_projects_service,
+)
+from app.auth import CurrentUser, get_current_user
 from app.constants import (
     ANALYSIS_TYPES,
     BUILDING_CODES,
@@ -34,6 +39,7 @@ from app.modules.contracts import (
     ProjectUpdateRequest,
     StandardOption,
 )
+from app.services.membership_service import MembershipService
 from app.services.phase6_service import Phase6Service
 from app.services.projects_service import ProjectsService
 
@@ -42,14 +48,59 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def get_authorized_project(
+    project_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+) -> dict:
+    """Return *project_id* if one of the caller's organizations owns it.
+
+    404 rather than 403: a project outside the caller's organizations should
+    look indistinguishable from one that doesn't exist, not confirm it exists
+    behind someone else's wall.
+    """
+    project = service.get_project(project_id)
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    if not project or project.get("organization_id") not in org_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found.",
+        )
+    return project
+
+
+def _primary_organization_id(current_user: CurrentUser, memberships: MembershipService) -> int:
+    """Return the organization a newly created project should belong to.
+
+    There's no "current organization" selector in the UI yet, so this is
+    simply the caller's first membership — for almost every user today that's
+    the single default organization every pre-multi-tenant project also
+    lives in.
+
+    Raises:
+        HTTPException: 400 if the caller somehow has no organization at all.
+    """
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    if not org_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your account is not a member of any organization.",
+        )
+    return next(iter(org_ids))
+
+
 @router.get("", response_model=ProjectListResponse, summary="List all projects")
 def list_projects(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
     response: Response,
 ) -> ProjectListResponse:
-    """Return all projects ordered newest first."""
+    """Return the caller's organizations' projects, ordered newest first."""
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"
-    rows = service.list_projects()
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    rows = [row for row in service.list_projects() if row.get("organization_id") in org_ids]
     projects = [ProjectResponse(**row) for row in rows]
     return ProjectListResponse(total=len(projects), projects=projects)
 
@@ -83,10 +134,23 @@ def get_project_options(response: Response) -> ProjectOptionsResponse:
 )
 def bulk_delete_projects(
     payload: ProjectBulkDeleteRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
 ) -> ProjectBulkActionResponse:
-    """Delete multiple projects by their primary keys."""
-    deleted_ids = service.bulk_delete_projects(payload.project_ids)
+    """Delete multiple projects by their primary keys.
+
+    IDs outside the caller's organizations are silently dropped rather than
+    erroring the whole batch — the existing partial-success response shape
+    already accounts for "some of these succeeded".
+    """
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    owned_ids = [
+        pid
+        for pid in payload.project_ids
+        if (row := service.get_project(pid)) and row.get("organization_id") in org_ids
+    ]
+    deleted_ids = service.bulk_delete_projects(owned_ids)
     return ProjectBulkActionResponse(success_count=len(deleted_ids), affected_ids=deleted_ids)
 
 
@@ -97,12 +161,24 @@ def bulk_delete_projects(
 )
 def bulk_update_projects(
     payload: ProjectBulkUpdateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
 ) -> ProjectBulkActionResponse:
-    """Update metadata for multiple projects in bulk."""
+    """Update metadata for multiple projects in bulk.
+
+    IDs outside the caller's organizations are silently dropped rather than
+    erroring the whole batch — see ``bulk_delete_projects``.
+    """
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    owned_ids = [
+        pid
+        for pid in payload.project_ids
+        if (row := service.get_project(pid)) and row.get("organization_id") in org_ids
+    ]
     try:
         updated_ids = service.bulk_update_projects(
-            payload.project_ids,
+            owned_ids,
             status=payload.status,
             country=payload.country,
             analysis_type=payload.analysis_type,
@@ -115,33 +191,21 @@ def bulk_update_projects(
 
 @router.get("/{project_id}", response_model=ProjectResponse, summary="Get project by ID")
 def get_project(
-    project_id: int,
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
     response: Response,
 ) -> ProjectResponse:
     """Retrieve a single project by primary key."""
     response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=30"
-    row = service.get_project(project_id)
-    if not row:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
-    return ProjectResponse(**row)
+    return ProjectResponse(**project)
 
 
 @router.get("/{project_id}/inputs", response_model=list[AnalysisInputItemContract], summary="Get analysis inputs")
 def get_project_inputs(
     project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ) -> list[AnalysisInputItemContract]:
     """Retrieve merged project standards and client documents."""
-    project = service.get_project(project_id)
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
     inputs = service.get_analysis_inputs(project_id)
     return [AnalysisInputItemContract(**i) for i in inputs]
 
@@ -180,12 +244,15 @@ def _link_project_inputs(
 )
 def create_project(
     payload: ProjectCreateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
 ) -> ProjectResponse:
-    """Create a new project using a JSON payload."""
+    """Create a new project using a JSON payload, owned by the caller's organization."""
     try:
         created = service.create_project(
             name=payload.name,
+            organization_id=_primary_organization_id(current_user, memberships),
             description=payload.description or "",
             status=payload.status,
             country=payload.country,
@@ -227,7 +294,9 @@ def create_project(
 )
 async def create_project_with_ifc(
     name: Annotated[str, Form(..., min_length=1)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
     description: Annotated[str, Form()] = "",
     status_field: Annotated[str, Form(alias="status")] = "Draft",
     country: Annotated[str, Form()] = DEFAULT_COUNTRY,
@@ -273,6 +342,7 @@ async def create_project_with_ifc(
     try:
         created = service.create_project(
             name=name,
+            organization_id=_primary_organization_id(current_user, memberships),
             description=description,
             status=status_field,
             ifc_file_path=ifc_file_path,
@@ -311,16 +381,10 @@ async def create_project_with_ifc(
 def update_project(
     project_id: int,
     payload: ProjectUpdateRequest,
+    existing: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ) -> ProjectResponse:
     """Update metadata for an existing project."""
-    existing = service.get_project(project_id)
-    if not existing:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
-
     name = payload.name if payload.name is not None else existing.get("name", "")
     description = (
         payload.description if payload.description is not None else existing.get("description", "")
@@ -361,30 +425,20 @@ def update_project(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete project")
 def delete_project(
     project_id: int,
+    existing: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ) -> None:
     """Delete a project and its associated metadata."""
-    existing = service.get_project(project_id)
-    if not existing:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
     service.delete_project(project_id)
 
 
 @router.get("/{project_id}/ifc", summary="Download project IFC model")
 def download_project_ifc(
     project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ):
     """Retrieve and download the stored IFC model for a project."""
-    project = service.get_project(project_id)
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
     if not project.get("ifc_file_path"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -409,7 +463,7 @@ def download_project_ifc(
 @router.get("/{project_id}/enhancements", summary="Get model lineage history")
 def get_project_enhancements(
     project_id: int,
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
 ) -> list[dict]:
     """Retrieve immutable model lineage versions and quality improvement records."""
     from app.services.model_lineage import SupabaseModelLineageRepository
@@ -425,14 +479,13 @@ class EnhanceRequest(BaseModel):
 @router.post("/{project_id}/enhance", summary="Trigger IFC model quality improvements")
 def trigger_project_enhancement(
     project_id: int,
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
     payload: Optional[EnhanceRequest] = None,
 ) -> dict:
     """Execute model enhancement pipeline and persist a new immutable version."""
     from app.services.pipeline_services import execute_model_enhancement
 
-    project = service.get_project(project_id)
-    if not project or not project.get("ifc_file_path"):
+    if not project.get("ifc_file_path"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Project has no IFC model attached.",
@@ -456,6 +509,7 @@ def trigger_project_enhancement(
 def download_project_enhancement(
     project_id: int,
     lineage_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
 ):
     """Download quality-improved IFC model artifact for a specific lineage version."""
     from app.services.model_lineage import SupabaseModelLineageRepository
@@ -554,6 +608,7 @@ def _roles_for(roles: list[str], count: int, primary_index: int) -> list[str]:
 )
 async def upload_project_ifc_files(
     project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
     files: Annotated[list[UploadFile], File(description="IFC models to attach")],
@@ -580,12 +635,6 @@ async def upload_project_ifc_files(
             ``roles`` is given with a different length than ``files``; 500 if
             storage rejects a model, naming it and how many were stored first.
     """
-    if service.get_project(project_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
-
     names = _validated_ifc_names(files)
     if not 0 <= primary_index < len(names):
         raise HTTPException(
@@ -646,6 +695,7 @@ async def upload_project_ifc_files(
 )
 def list_project_ifc_files(
     project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ) -> list[ProjectIfcFileResponse]:
     """Return a project's attached models, primary first.
@@ -659,11 +709,6 @@ def list_project_ifc_files(
             with no model is an empty list, not a 404 -- having no model yet is
             a state, not a missing resource.
     """
-    if service.get_project(project_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
     return [
         ProjectIfcFileResponse(**{"project_id": project_id, **row})
         for row in service.get_ifc_files_by_project(project_id)
@@ -677,6 +722,7 @@ def list_project_ifc_files(
 def download_project_ifc_file(
     project_id: int,
     file_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ):
     """Retrieve the bytes of one attached model, by ``project_ifc_files.id``.
@@ -693,12 +739,6 @@ def download_project_ifc_file(
         HTTPException: 404 if the project does not exist or holds no such model;
             502 if the row names bytes that storage cannot produce.
     """
-    if service.get_project(project_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
-
     resolved, missing = service.resolve_ifc_file_paths(project_id)
     for row, local_path in resolved:
         if row.get("id") == file_id and local_path.exists():
@@ -740,6 +780,7 @@ class CDEApprovalRequest(BaseModel):
 def transition_project_cde_state(
     project_id: int,
     payload: CDETransitionRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ):
     """Execute ISO 19650 CDE state transition with gateway verification."""
@@ -762,6 +803,7 @@ def transition_project_cde_state(
 def approve_project_cde_state(
     project_id: int,
     payload: CDEApprovalRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ):
     """Grant Lead Appointed Party approval for PUBLISHED state transition."""
@@ -782,14 +824,10 @@ def approve_project_cde_state(
 @router.get("/{project_id}/cde/validate-naming", summary="Validate project IFC container ISO 19650 naming")
 def validate_project_iso_naming(
     project_id: int,
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
 ) -> dict:
     """Validate project attached primary model filename against ISO 19650 National Annex."""
     from app.modules.document_parsing.iso_validator import ISO19650Validator
-
-    project = service.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     filename = project.get("ifc_file_path", "")
     val = ISO19650Validator.validate_filename(filename)

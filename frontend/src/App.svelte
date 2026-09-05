@@ -36,6 +36,8 @@
   import { dashboardApi, projectsApi } from "./lib/api";
   import { viewForAnalysisDomain } from "./lib/analysisDomain";
   import { initTheme } from "./lib/theme";
+  import { authState } from "./lib/auth.svelte";
+  import { isAuthConfigured } from "./lib/supabaseClient";
   import type { Project } from "./lib/types";
 
   // The URL hash (via svelte-spa-router) is the source of truth for which
@@ -48,6 +50,18 @@
     activeView === "arch" ? "arch" : activeView === "seismic" ? "seismic" : "piping",
   );
   let queryParams = $derived(new URLSearchParams(router.querystring || ""));
+  // Signing in is required once Supabase Auth is actually configured (see
+  // supabaseClient.ts) -- everything the app does reads through /api/projects
+  // or /api/rules, both of which now require a bearer token. Left ungated
+  // when auth isn't configured so a checkout without Supabase set up still
+  // runs, per isAuthConfigured's own "non-fatal until configured" contract.
+  let authGateBlocking = $derived(
+    isAuthConfigured && !authState.loading && !authState.user && activeView !== "login",
+  );
+
+  $effect(() => {
+    if (authGateBlocking) push("/login");
+  });
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
   let targetProjectId: number | null = $state(null);
@@ -223,7 +237,14 @@
     <!-- Viewport Container -->
     <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
       <svelte:boundary>
-        {#if activeView === "dashboard"}
+        {#if isAuthConfigured && authState.loading}
+          <div class="flex min-h-[50vh] items-center justify-center text-sm text-slate-500">
+            Loading your session…
+          </div>
+        {:else if authGateBlocking}
+          <!-- The $effect above is already redirecting to /login; render
+               nothing of the protected view in the meantime. -->
+        {:else if activeView === "dashboard"}
           <DashboardView
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}

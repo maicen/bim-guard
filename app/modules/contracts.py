@@ -245,6 +245,7 @@ class ProjectResponse(BaseModel):
 
     id: int
     name: str
+    organization_id: Optional[int] = None
     description: Optional[str] = ""
     status: Optional[str] = "Draft"
     country: Optional[str] = "US"
@@ -1853,9 +1854,30 @@ class OrganizationMembership(BaseModel):
     role: Literal["owner", "admin", "member"]
 
 
+class UserProfile(BaseModel):
+    """Editable identity and preferences layered on top of auth.users."""
+
+    full_name: str = ""
+    avatar_url: str = ""
+    title: str = Field(default="", description="Job title / discipline, shown alongside the name")
+    default_organization_id: Optional[int] = None
+    preferences: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProfileUpdateRequest(BaseModel):
+    """Fields to write to the caller's profile. Every field is optional."""
+
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    title: Optional[str] = None
+    default_organization_id: Optional[int] = None
+    preferences: Optional[dict[str, Any]] = None
+
+
 class CurrentUserResponse(BaseModel):
-    """The authenticated caller's identity and organization memberships."""
+    """The authenticated caller's identity, profile, and organization memberships."""
 
     id: str = Field(..., description="Supabase auth.users.id (uuid)")
     email: Optional[str] = None
+    profile: UserProfile = Field(default_factory=UserProfile)
     organizations: list[OrganizationMembership] = Field(default_factory=list)

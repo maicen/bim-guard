@@ -1,15 +1,22 @@
 <script lang="ts">
-  import { LogOut, LogIn } from "lucide-svelte";
+  import { LogOut, LogIn, Settings } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
   import { isAuthConfigured } from "../supabaseClient";
 
   let open = $state(false);
 
+  let displayName = $derived(authState.profile?.profile.full_name || authState.user?.email || "");
+  let avatarUrl = $derived(authState.profile?.profile.avatar_url || "");
   let initials = $derived.by(() => {
-    const email = authState.user?.email || "";
-    return email ? email[0]!.toUpperCase() : "?";
+    const source = authState.profile?.profile.full_name || authState.user?.email || "";
+    return source ? source[0]!.toUpperCase() : "?";
   });
+
+  function goToProfile() {
+    open = false;
+    push("/settings");
+  }
 
   function toggle(e: MouseEvent) {
     e.stopPropagation();
@@ -33,23 +40,36 @@
     <button
       type="button"
       onclick={toggle}
-      class="flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-600"
+      class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-600"
       aria-label="Account menu"
       aria-haspopup="true"
       aria-expanded={open}
     >
-      {initials}
+      {#if avatarUrl}
+        <img src={avatarUrl} alt="" class="h-full w-full object-cover" referrerpolicy="no-referrer" />
+      {:else}
+        {initials}
+      {/if}
     </button>
     {#if open}
       <div
         class="absolute right-0 top-full z-40 mt-2 w-56 rounded-xl border border-slate-800 bg-slate-900 p-1.5 shadow-xl"
       >
-        <p class="truncate px-2.5 py-1.5 text-xs text-slate-400">{authState.user.email}</p>
+        <p class="truncate px-2.5 py-1.5 text-xs font-medium text-slate-200">{displayName}</p>
+        <p class="truncate px-2.5 pb-1.5 text-xs text-slate-500">{authState.user.email}</p>
         {#if authState.profile?.organizations.length}
           <p class="truncate px-2.5 pb-1.5 text-xs text-slate-600">
             {authState.profile.organizations[0].name}
           </p>
         {/if}
+        <button
+          type="button"
+          onclick={goToProfile}
+          class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        >
+          <Settings class="h-3.5 w-3.5" />
+          Edit profile
+        </button>
         <button
           type="button"
           onclick={handleSignOut}

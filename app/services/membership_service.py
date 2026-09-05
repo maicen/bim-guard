@@ -1,11 +1,10 @@
 """Organization membership lookups — the multi-tenancy bridge for authenticated users.
 
 ``public.memberships`` links a Supabase-authenticated user to the
-organizations they belong to. Nothing scopes existing project/rule data by
-organization yet (see CLAUDE.md's multi-tenancy notes); this service exists so
-a freshly authenticated user has somewhere to belong, defaulting into the
-single pre-existing "Default Organization" that owns all legacy
-(pre-multi-tenant) projects.
+organizations they belong to. ``app.api.projects`` uses ``org_ids_for_user``
+to scope project access; this service also exists so a freshly authenticated
+user has somewhere to belong, defaulting into the single pre-existing
+"Default Organization" that owns all legacy (pre-multi-tenant) projects.
 """
 
 from __future__ import annotations
@@ -42,6 +41,19 @@ class MembershipService:
                 }
             )
         return results
+
+    def org_ids_for_user(self, user_id: str) -> set[int]:
+        """Return the ids of every organization *user_id* belongs to.
+
+        Falls back to :meth:`ensure_default_membership` when the caller has
+        no membership row yet — normally this has already happened by login
+        time (``GET /api/auth/me`` calls it), so this is just a safety net
+        for a request that somehow arrives first.
+        """
+        memberships = self.list_for_user(user_id)
+        if not memberships:
+            memberships = self.ensure_default_membership(user_id)
+        return {m["organization_id"] for m in memberships}
 
     def ensure_default_membership(self, user_id: str) -> list[dict[str, Any]]:
         """Join *user_id* into the default organization on first sign-in.
