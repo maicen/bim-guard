@@ -78,6 +78,7 @@ class ApplicationContainer:
     parsing_engine_instances_repo: DatabaseAdapter
     organizations_repo: DatabaseAdapter
     memberships_repo: DatabaseAdapter
+    organization_invites_repo: DatabaseAdapter
     profiles_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
@@ -255,6 +256,18 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    organization_invites_repo = PersistenceService.get_table(
+        "organization_invites",
+        {
+            "id": int,
+            "organization_id": int,
+            "email": str,
+            "role": str,
+            "created_at": str,
+            "accepted_at": str,
+        },
+    )
+
     profiles_repo = PersistenceService.get_table(
         "profiles",
         {
@@ -325,6 +338,7 @@ def build_default_container() -> ApplicationContainer:
     membership_service = MembershipService(
         memberships_repo=memberships_repo,
         organizations_repo=organizations_repo,
+        invites_repo=organization_invites_repo,
     )
 
     profile_service = ProfileService(profiles_repo=profiles_repo)
@@ -450,6 +464,7 @@ def build_default_container() -> ApplicationContainer:
         parsing_engine_instances_repo=parsing_engine_instances_repo,
         organizations_repo=organizations_repo,
         memberships_repo=memberships_repo,
+        organization_invites_repo=organization_invites_repo,
         profiles_repo=profiles_repo,
         lineage=lineage,
         static_data_service=static_data_service,

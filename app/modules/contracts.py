@@ -1862,6 +1862,10 @@ class UserProfile(BaseModel):
     title: str = Field(default="", description="Job title / discipline, shown alongside the name")
     default_organization_id: Optional[int] = None
     preferences: dict[str, Any] = Field(default_factory=dict)
+    is_superadmin: bool = Field(
+        default=False,
+        description="Platform-wide bypass of organization-membership checks. Not settable via PATCH.",
+    )
 
 
 class ProfileUpdateRequest(BaseModel):

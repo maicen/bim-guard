@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from app.api.dependencies import (
     get_membership_service,
     get_phase6_service,
+    get_profile_service,
     get_projects_service,
 )
 from app.auth import CurrentUser, get_current_user
@@ -41,6 +42,7 @@ from app.modules.contracts import (
 )
 from app.services.membership_service import MembershipService
 from app.services.phase6_service import Phase6Service
+from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
@@ -53,21 +55,55 @@ def get_authorized_project(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> dict:
     """Return *project_id* if one of the caller's organizations owns it.
+
+    A superadmin (``profiles.is_superadmin``) bypasses the organization check
+    entirely — that flag means authority over every organization's data, not
+    just their own.
 
     404 rather than 403: a project outside the caller's organizations should
     look indistinguishable from one that doesn't exist, not confirm it exists
     behind someone else's wall.
     """
     project = service.get_project(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found.",
+        )
+    if profiles.is_superadmin(current_user.id):
+        return project
     org_ids = memberships.org_ids_for_user(current_user.id)
-    if not project or project.get("organization_id") not in org_ids:
+    if project.get("organization_id") not in org_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID {project_id} not found.",
         )
     return project
+
+
+def _owned_project_ids(
+    project_ids: list[int],
+    current_user: CurrentUser,
+    service: ProjectsService,
+    memberships: MembershipService,
+    profiles: ProfileService,
+) -> list[int]:
+    """Filter *project_ids* down to ones the caller may act on.
+
+    A superadmin may act on all of them; everyone else only the ones inside
+    their own organizations.
+    """
+    if profiles.is_superadmin(current_user.id):
+        return project_ids
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    return [
+        pid
+        for pid in project_ids
+        if (row := service.get_project(pid)) and row.get("organization_id") in org_ids
+    ]
 
 
 def _primary_organization_id(current_user: CurrentUser, memberships: MembershipService) -> int:
@@ -95,12 +131,20 @@ def list_projects(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     response: Response,
 ) -> ProjectListResponse:
-    """Return the caller's organizations' projects, ordered newest first."""
+    """Return the caller's organizations' projects, ordered newest first.
+
+    A superadmin sees every organization's projects, not just their own.
+    """
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"
-    org_ids = memberships.org_ids_for_user(current_user.id)
-    rows = [row for row in service.list_projects() if row.get("organization_id") in org_ids]
+    all_rows = service.list_projects()
+    if profiles.is_superadmin(current_user.id):
+        rows = all_rows
+    else:
+        org_ids = memberships.org_ids_for_user(current_user.id)
+        rows = [row for row in all_rows if row.get("organization_id") in org_ids]
     projects = [ProjectResponse(**row) for row in rows]
     return ProjectListResponse(total=len(projects), projects=projects)
 
@@ -137,19 +181,16 @@ def bulk_delete_projects(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> ProjectBulkActionResponse:
     """Delete multiple projects by their primary keys.
 
     IDs outside the caller's organizations are silently dropped rather than
     erroring the whole batch — the existing partial-success response shape
-    already accounts for "some of these succeeded".
+    already accounts for "some of these succeeded". A superadmin has no IDs
+    dropped.
     """
-    org_ids = memberships.org_ids_for_user(current_user.id)
-    owned_ids = [
-        pid
-        for pid in payload.project_ids
-        if (row := service.get_project(pid)) and row.get("organization_id") in org_ids
-    ]
+    owned_ids = _owned_project_ids(payload.project_ids, current_user, service, memberships, profiles)
     deleted_ids = service.bulk_delete_projects(owned_ids)
     return ProjectBulkActionResponse(success_count=len(deleted_ids), affected_ids=deleted_ids)
 
@@ -164,18 +205,14 @@ def bulk_update_projects(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> ProjectBulkActionResponse:
     """Update metadata for multiple projects in bulk.
 
     IDs outside the caller's organizations are silently dropped rather than
     erroring the whole batch — see ``bulk_delete_projects``.
     """
-    org_ids = memberships.org_ids_for_user(current_user.id)
-    owned_ids = [
-        pid
-        for pid in payload.project_ids
-        if (row := service.get_project(pid)) and row.get("organization_id") in org_ids
-    ]
+    owned_ids = _owned_project_ids(payload.project_ids, current_user, service, memberships, profiles)
     try:
         updated_ids = service.bulk_update_projects(
             owned_ids,

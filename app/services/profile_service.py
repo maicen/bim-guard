@@ -48,3 +48,14 @@ class ProfileService:
         self.ensure_profile(user_id)
         self._profiles.update(updates=updates, pk_values=user_id)
         return self.get(user_id) or {}
+
+    def is_superadmin(self, user_id: str) -> bool:
+        """Return whether *user_id* bypasses organization-membership checks entirely.
+
+        Not reachable through :meth:`update` / ``PATCH /api/auth/profile`` --
+        ``ProfileUpdateRequest`` has no such field, so this can only be set
+        directly against the database (see
+        ``supabase/migrations/20260905094121_organization_invites_and_superadmin.sql``).
+        """
+        profile = self.get(user_id)
+        return bool(profile and profile.get("is_superadmin"))

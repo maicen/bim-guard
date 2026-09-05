@@ -3,12 +3,15 @@
 ``public.memberships`` links a Supabase-authenticated user to the
 organizations they belong to. ``app.api.projects`` uses ``org_ids_for_user``
 to scope project access; this service also exists so a freshly authenticated
-user has somewhere to belong, defaulting into the single pre-existing
-"Default Organization" that owns all legacy (pre-multi-tenant) projects.
+user has somewhere to belong on first sign-in — either by consuming a pending
+``public.organization_invites`` row addressed to their email, or, absent one,
+defaulting into the single pre-existing "Default Organization" that owns all
+legacy (pre-multi-tenant) projects.
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from app.services.db_adapters import DatabaseAdapter
@@ -19,10 +22,16 @@ DEFAULT_ORGANIZATION_SLUG = "default"
 class MembershipService:
     """Domain service for organization membership records."""
 
-    def __init__(self, memberships_repo: DatabaseAdapter, organizations_repo: DatabaseAdapter):
+    def __init__(
+        self,
+        memberships_repo: DatabaseAdapter,
+        organizations_repo: DatabaseAdapter,
+        invites_repo: DatabaseAdapter,
+    ):
         """Initialize service with persistence repository adapters."""
         self._memberships = memberships_repo
         self._organizations = organizations_repo
+        self._invites = invites_repo
 
     def list_for_user(self, user_id: str) -> list[dict[str, Any]]:
         """Return the organizations *user_id* belongs to, with their role in each."""
@@ -48,12 +57,60 @@ class MembershipService:
         Falls back to :meth:`ensure_default_membership` when the caller has
         no membership row yet — normally this has already happened by login
         time (``GET /api/auth/me`` calls it), so this is just a safety net
-        for a request that somehow arrives first.
+        for a request that somehow arrives first. This path has no email to
+        consume invites with, so it can only ever land someone in the default
+        organization; :meth:`ensure_membership` is what handles invites.
         """
         memberships = self.list_for_user(user_id)
         if not memberships:
             memberships = self.ensure_default_membership(user_id)
         return {m["organization_id"] for m in memberships}
+
+    def ensure_membership(self, user_id: str, email: str) -> list[dict[str, Any]]:
+        """Give a first-time signer somewhere to belong.
+
+        Order of precedence: an existing membership wins outright; failing
+        that, any pending invite addressed to *email* is consumed (turned
+        into real memberships, one per invited organization); failing that,
+        the caller joins the default organization — see
+        :meth:`ensure_default_membership`.
+        """
+        existing = self.list_for_user(user_id)
+        if existing:
+            return existing
+
+        invited = self._consume_invites(user_id, email)
+        if invited:
+            return invited
+
+        return self.ensure_default_membership(user_id)
+
+    def _consume_invites(self, user_id: str, email: str) -> list[dict[str, Any]]:
+        """Turn every pending invite addressed to *email* into a real membership."""
+        normalized = (email or "").strip().lower()
+        if not normalized:
+            return []
+
+        pending = [
+            invite
+            for invite in self._invites.rows_where("email = ?", [normalized])
+            if not invite.get("accepted_at")
+        ]
+        if not pending:
+            return []
+
+        now = datetime.now(timezone.utc).isoformat()
+        for invite in pending:
+            self._memberships.insert(
+                {
+                    "organization_id": invite["organization_id"],
+                    "user_id": user_id,
+                    "role": invite.get("role") or "member",
+                }
+            )
+            self._invites.update(updates={"accepted_at": now}, pk_values=invite["id"])
+
+        return self.list_for_user(user_id)
 
     def ensure_default_membership(self, user_id: str) -> list[dict[str, Any]]:
         """Join *user_id* into the default organization on first sign-in.
@@ -62,8 +119,7 @@ class MembershipService:
         would see no organizations at all. Every pre-multi-tenant project
         already lives in the "default" organization (see
         ``supabase/migrations/20260904235344_create_organizations_and_memberships.sql``),
-        so that's where a first-time sign-in lands until real organization
-        creation/invite flows exist.
+        so that's where a first-time sign-in lands absent a pending invite.
         """
         existing = self.list_for_user(user_id)
         if existing:

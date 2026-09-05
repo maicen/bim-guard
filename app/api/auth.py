@@ -42,10 +42,10 @@ def get_me(
 
     A first-time sign-in has neither a profile nor a membership row yet, so
     both are provisioned here — the profile from Google's own claims, the
-    membership into the default organization (see
-    ``MembershipService.ensure_default_membership``).
+    membership from a pending invite addressed to this email if one exists,
+    else the default organization (see ``MembershipService.ensure_membership``).
     """
-    orgs = memberships.ensure_default_membership(current_user.id)
+    orgs = memberships.ensure_membership(current_user.id, current_user.email or "")
     full_name, avatar_url = _google_claims(current_user)
     profile = profiles.ensure_profile(current_user.id, full_name=full_name, avatar_url=avatar_url)
     return CurrentUserResponse(
