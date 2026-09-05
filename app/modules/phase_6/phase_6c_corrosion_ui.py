@@ -314,6 +314,14 @@ def _mic_element(element: ServiceElement) -> MICElement:
     ``nominal_diameter_m`` is required by the engine but absent from
     ``ServiceElement``, so an assumed value is supplied. See
     :data:`ASSUMED_NOMINAL_DIAMETER_M`.
+
+    The three hydraulic inputs are passed straight through from the parser,
+    ``None`` included. Passing ``None`` is the point: ``MICElement`` declares
+    all three ``Optional`` and :func:`_hydraulics_gate` reads them back off the
+    built element to decide whether MC-001 runs at all. Substituting a number
+    for an absent reading here — 0.0 m/s, say — would open the gate on every
+    element and hand the engine FV0_STAGNANT, the worst flow class, as though
+    it had been measured.
     """
     return MICElement(
         global_id=element.guid,
@@ -323,6 +331,9 @@ def _mic_element(element: ServiceElement) -> MICElement:
         nominal_diameter_m=ASSUMED_NOMINAL_DIAMETER_M,
         floor=element.floor,
         zone=element.location_tag,
+        flow_velocity_ms=element.flow_velocity_ms,
+        operating_temp_c=element.operating_temp_c,
+        dead_leg_length_m=element.dead_leg_length_m,
     )
 
 
