@@ -292,14 +292,24 @@ empty grant table, not a flag.
       grandfathered into full access to every ruleset that existed at
       migration time, so today's single-tenant behavior didn't regress; only
       new organizations/projects start with zero bindings.
-- [ ] Frontend: superadmin org<->ruleset matrix UI, owner group management +
-      group<->project matrix UI, and a per-project "Rule Assignments" section
-      — the backend/API surface exists (`app/api/organizations.py`'s group
-      and ruleset-grant endpoints, `app/api/projects.py`'s
-      `/ruleset-bindings`) but nothing in `frontend/` calls it yet.
-- [ ] Reflect group-based project visibility in the Svelte client's own
-      project pickers/switchers (they currently only account for
-      organization scope, not group scope, for a plain member).
+- [x] Frontend: superadmin org<->ruleset matrix (`SuperadminRulesetsView.svelte`,
+      reachable from the user menu when `profile.is_superadmin`), owner group
+      management (groups + member group assignment + group<->project grants
+      in `OrgSettingsView.svelte`), and a per-project "Rule Assignments" modal
+      (`ProjectRulesetBindingsModal.svelte`, from each project row in
+      `ProjectsView.svelte`). Needed one new backend endpoint,
+      `GET /api/organizations` (superadmin-only, lists every org), to back
+      the matrix screen.
+- [x] Project pickers already respect group-based visibility with no
+      frontend change needed: `GET /api/projects` filters server-side by
+      `accessible_project_ids`, so `ProjectSwitcher`/`ProjectsView` only ever
+      see what the backend already decided they may.
+- [ ] Not verified end-to-end in a real signed-in browser session this pass
+      (no test Google credentials available) — covered instead by
+      `svelte-check`/`eslint` passing clean, the OpenAPI schema generating
+      correctly with every new route present, and the full pytest suite
+      (1471) passing. Worth a manual pass with a real signed-in session
+      before calling this done.
 
 Owner: unassigned.
 
