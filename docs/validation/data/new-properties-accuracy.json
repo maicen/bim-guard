@@ -1,0 +1,311 @@
+{
+  "cases_total": 27,
+  "cases_within_tolerance": 27,
+  "cases_out_of_tolerance": 0,
+  "accuracy_by_property_pct": {
+    "StepFormula": 100.0,
+    "EgressWindowClearOpening": 100.0,
+    "DoorClearOpeningWidth": 100.0,
+    "HandrailExtension": 100.0
+  },
+  "overall_accuracy_pct": 100.0,
+  "cases": [
+    {
+      "property": "StepFormula",
+      "case": "uniform-step-0",
+      "expected": 630.0,
+      "actual": 630.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "StepFormula",
+      "case": "uniform-step-1",
+      "expected": 630.0,
+      "actual": 630.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "StepFormula",
+      "case": "uniform-step-2",
+      "expected": 630.0,
+      "actual": 630.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "StepFormula",
+      "case": "nonuniform-step-0",
+      "expected": 650.0,
+      "actual": 650.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "StepFormula",
+      "case": "nonuniform-step-1",
+      "expected": 660.0,
+      "actual": 660.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SIDEHUNGLEFTHAND-width",
+      "expected": 810.0,
+      "actual": 810.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SIDEHUNGLEFTHAND-height",
+      "expected": 1080.0,
+      "actual": 1080.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SIDEHUNGLEFTHAND-area",
+      "expected": 0.8748,
+      "actual": 0.875,
+      "tolerance": 0.0005,
+      "unit": "m2",
+      "error": 0.0002,
+      "within_tolerance": true,
+      "accuracy_pct": 99.977
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SLIDINGVERTICAL-width",
+      "expected": 810.0,
+      "actual": 810.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SLIDINGVERTICAL-height",
+      "expected": 552.0,
+      "actual": 552.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SLIDINGVERTICAL-area",
+      "expected": 0.44712,
+      "actual": 0.447,
+      "tolerance": 0.0005,
+      "unit": "m2",
+      "error": 0.0001,
+      "within_tolerance": true,
+      "accuracy_pct": 99.973
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SLIDINGHORIZONTAL-width",
+      "expected": 720.0,
+      "actual": 720.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SLIDINGHORIZONTAL-height",
+      "expected": 900.0,
+      "actual": 900.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "SLIDINGHORIZONTAL-area",
+      "expected": 0.648,
+      "actual": 0.648,
+      "tolerance": 0.0005,
+      "unit": "m2",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "FIXEDCASEMENT-width",
+      "expected": 0.0,
+      "actual": 0.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "FIXEDCASEMENT-height",
+      "expected": 0.0,
+      "actual": 0.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "EgressWindowClearOpening",
+      "case": "FIXEDCASEMENT-area",
+      "expected": 0.0,
+      "actual": 0.0,
+      "tolerance": 0.0005,
+      "unit": "m2",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "DoorClearOpeningWidth",
+      "case": "single-leaf",
+      "expected": 855.0,
+      "actual": 855.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "DoorClearOpeningWidth",
+      "case": "declared-panel-width",
+      "expected": 495.0,
+      "actual": 495.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "DoorClearOpeningWidth",
+      "case": "two-leaf-even-split",
+      "expected": 405.0,
+      "actual": 405.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "DoorClearOpeningWidth",
+      "case": "narrow-leaf-clips-to-zero",
+      "expected": 0.0,
+      "actual": 0.0,
+      "tolerance": 0.05,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "HandrailExtension",
+      "case": "overhang-both-ends-bottom",
+      "expected": 300.0,
+      "actual": 300.0,
+      "tolerance": 10.0,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "HandrailExtension",
+      "case": "overhang-both-ends-top",
+      "expected": 450.0,
+      "actual": 450.0,
+      "tolerance": 10.0,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "HandrailExtension",
+      "case": "flush-both-ends-bottom",
+      "expected": 0.0,
+      "actual": -0.0,
+      "tolerance": 10.0,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "HandrailExtension",
+      "case": "flush-both-ends-top",
+      "expected": 0.0,
+      "actual": 0.0,
+      "tolerance": 10.0,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "HandrailExtension",
+      "case": "short-both-ends-bottom",
+      "expected": -200.0,
+      "actual": -200.0,
+      "tolerance": 10.0,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    },
+    {
+      "property": "HandrailExtension",
+      "case": "short-both-ends-top",
+      "expected": -150.0,
+      "actual": -150.0,
+      "tolerance": 10.0,
+      "unit": "mm",
+      "error": 0.0,
+      "within_tolerance": true,
+      "accuracy_pct": 100.0
+    }
+  ]
+}

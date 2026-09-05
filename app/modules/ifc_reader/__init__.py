@@ -60,6 +60,7 @@ try:
         check_fire_separation,
         check_garage_separation,
         check_door_space_connection,
+        check_egress_window_openings,
         _element_matches_location,
     )
     _SPATIAL_AVAILABLE = True
@@ -222,6 +223,13 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
 }
 
 
+#: Generic allowance (mm) for the leaf thickness and door-stop projection
+#: lost from a door's active-leaf width when it's swung to 90 degrees --
+#: used by ``_door_clear_opening_width`` to approximate the accessible
+#: clear/net passage width from OverallWidth. A fixed constant, not a
+#: measured swing simulation -- see that method's docstring.
+DEFAULT_DOOR_STOP_DEDUCTION_MM: float = 45.0
+
 # ── Length measure IFC types ──────────────────────────────────────────────────
 # Values with these NominalValue types are in model length units and must be
 # scaled to mm before Module 4 comparison when the model is not in mm.
@@ -371,6 +379,12 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     # number to compare).
     "riserheights": "risers_mm",
     "treaddepths": "goings_mm",
+    # Combined riser+going stride formula (2*riser + going), per step --
+    # see derive_flight_steps' docstring for why this is checked pairwise
+    # per transition rather than from the flight's own separate min/max.
+    "stepformulamin": "min_step_formula_mm",
+    "stepformulamax": "max_step_formula_mm",
+    "stepformulavalues": "step_formula_mm",
     # Headroom (IFCStairEngine._compute_headroom): worst overhead clearance
     # found near this flight's walking line, and what's causing it -- a
     # whole-model search, not just this element's own geometry, so it can
@@ -426,6 +440,11 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     # see the module docstring's v1 limitations.
     "maxopening": "max_opening_mm",
     "guardmaxopening": "guard_max_opening_mm",
+    # How far this rail's own path reaches past its host flight's bottom/top
+    # tread nosing (IFCStairEngine._set_handrail_extension) -- positive
+    # extends past that end, negative falls short of reaching it.
+    "handrailextensionbottom": "extension_bottom_mm",
+    "handrailextensiontop": "extension_top_mm",
 }
 
 
@@ -1009,6 +1028,120 @@ class IFCReader:
             "interior_single_space_mismatch": d.get("interior_single_space_mismatch", False),
         }
 
+    def _door_clear_opening_width(self, el) -> tuple[float | None, dict]:
+        """Accessible clear (net passage) opening width for a door leaf, mm.
+
+        ``OverallWidth`` is the FRAME width, not what a wheelchair/stroller
+        can actually pass through: on a multi-leaf door only the ACTIVE leaf
+        counts, and every leaf loses some width to its own thickness/stop
+        when swung open. Computed as::
+
+            clear_width = overall_width * active_leaf_fraction - stop_deduction_mm
+
+        ``active_leaf_fraction`` comes from ``PanelWidth`` (an
+        ``IfcNormalisedRatioMeasure``, 0-1) on ``Pset_DoorPanelProperties``
+        when a model declares it. Most models do not, so this falls back to
+        an even split across ``NumberOfPanels`` when that's authored (>=2),
+        or 1.0 for an apparent single-leaf door -- both are documented
+        approximations, not a measurement, and are flagged as such in the
+        returned detail's ``warnings``. ``DEFAULT_DOOR_STOP_DEDUCTION_MM``
+        (a fixed generic allowance for the leaf thickness/door-stop lost
+        when swung to 90 degrees) is likewise an approximation, not a
+        simulated swing.
+
+        Returns (None, {}) only when OverallWidth itself cannot be resolved
+        at all (no Pset value and no geometry) -- there is nothing to
+        approximate from in that case.
+        """
+        detail: dict = {"unit": "mm", "warnings": []}
+        try:
+            psets = ifcopenshell.util.element.get_psets(el, psets_only=False)
+        except Exception:
+            psets = {}
+
+        # OverallWidth is a direct IfcDoor/IfcDoorType ATTRIBUTE in the
+        # schema, never a Pset_DoorCommon property -- checked first, the
+        # same way every other direct-attribute length value is read
+        # elsewhere in this cascade (Pass 3/4). The Pset scan below is a
+        # fallback only for the rare exporter that also duplicates it there.
+        overall_width = None
+        scale = getattr(self.geometry_extractor, "_unit_scale", 1.0) or 1.0
+        raw_attr = getattr(el, "OverallWidth", None)
+        if raw_attr is None and _IFCOPENSHELL_AVAILABLE:
+            try:
+                door_type = ifcopenshell.util.element.get_type(el)
+            except Exception:
+                door_type = None
+            raw_attr = getattr(door_type, "OverallWidth", None) if door_type else None
+        if raw_attr is not None:
+            try:
+                overall_width = float(raw_attr) * scale
+            except (TypeError, ValueError):
+                overall_width = None
+
+        if overall_width is None:
+            for ps in psets.values():
+                if isinstance(ps, dict) and ps.get("OverallWidth") is not None:
+                    try:
+                        overall_width = float(ps["OverallWidth"]) * scale
+                    except (TypeError, ValueError):
+                        overall_width = None
+                    break
+        if overall_width is None and self.geometry_extractor:
+            overall_width = self.geometry_extractor.get_width_mm(el)
+            if overall_width is not None:
+                detail["warnings"].append(
+                    "OverallWidth not authored; using bounding-box width instead"
+                )
+
+        if overall_width is None:
+            return None, {}
+
+        panel_fraction = None
+        for ps in psets.values():
+            if isinstance(ps, dict) and ps.get("PanelWidth") is not None:
+                try:
+                    candidate = float(ps["PanelWidth"])
+                except (TypeError, ValueError):
+                    candidate = None
+                if candidate is not None and 0.0 < candidate <= 1.0:
+                    panel_fraction = candidate
+                break
+
+        if panel_fraction is not None:
+            detail["active_leaf_fraction_source"] = "Pset_DoorPanelProperties.PanelWidth"
+        else:
+            num_panels = None
+            for ps in psets.values():
+                if isinstance(ps, dict) and ps.get("NumberOfPanels") is not None:
+                    try:
+                        num_panels = int(float(ps["NumberOfPanels"]))
+                    except (TypeError, ValueError):
+                        num_panels = None
+                    break
+            if num_panels and num_panels >= 2:
+                panel_fraction = 1.0 / num_panels
+                detail["warnings"].append(
+                    f"PanelWidth not declared; assumed an evenly split "
+                    f"{num_panels}-leaf door -- verify the actual active-leaf "
+                    "width before relying on this for an accessibility check"
+                )
+            else:
+                panel_fraction = 1.0
+                detail["active_leaf_fraction_source"] = "single leaf (NumberOfPanels not > 1)"
+
+        active_leaf_width_mm = overall_width * panel_fraction
+        clear_width_mm = max(0.0, round(active_leaf_width_mm - DEFAULT_DOOR_STOP_DEDUCTION_MM, 1))
+        detail["overall_width_mm"] = round(overall_width, 1)
+        detail["active_leaf_fraction"] = round(panel_fraction, 3)
+        detail["active_leaf_width_mm"] = round(active_leaf_width_mm, 1)
+        detail["stop_deduction_mm"] = DEFAULT_DOOR_STOP_DEDUCTION_MM
+        detail["warnings"].append(
+            "clear opening width assumes a fixed door-stop/thickness "
+            "deduction, not a measured swing-through opening"
+        )
+        return clear_width_mm, detail
+
     # ── Reusable single-property resolution cascade ──────────────────────────
 
     def _resolve_element_property(
@@ -1136,6 +1269,22 @@ class IFCReader:
             value, detail = self._stair_derived_value(prop_key_name, stair)
             if value is not None:
                 return value, "geometry:stair", detail
+        elif prop_key_name == "doorclearopeningwidth" and el.is_a() in (
+            "IfcDoor", "IfcDoorStandardCase",
+        ):
+            # OverallWidth is the FRAME width, not the accessible passage
+            # width: a multi-leaf door's OTHER leaf doesn't count, and every
+            # leaf loses some width to its own thickness/stop when swung
+            # open. Neither of those is a Pset key on its own, so no amount
+            # of Pset searching below could derive this -- see
+            # _door_clear_opening_width's docstring for the approximation.
+            #
+            # Falls through when it produced nothing, so a model that
+            # authors "DoorClearOpeningWidth" as a real Pset property still
+            # gets it from Pass 1 below.
+            value, detail = self._door_clear_opening_width(el)
+            if value is not None:
+                return value, "geometry:door_clear_opening", detail
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -1959,6 +2108,11 @@ class IFCReader:
             "travel_ref": "applicable code rule",
             "travel_max": None,
             "travel_unit": "m",
+            "egress_window_ref": "applicable code rule",
+            "egress_window_clear_area_m2": None,
+            "egress_window_clear_width_mm": None,
+            "egress_window_clear_height_mm": None,
+            "egress_window_max_sill_mm": None,
         }
 
         try:
@@ -2044,6 +2198,23 @@ class IFCReader:
             if ratio_val and unit == "ratio" and 0.0 < ratio_val <= 1.0:
                 context["daylight_ratio"] = ratio_val
                 break
+
+        _EGRESS_WINDOW_PROP_MAP = {
+            "EgressWindowClearArea": "egress_window_clear_area_m2",
+            "EgressWindowClearWidth": "egress_window_clear_width_mm",
+            "EgressWindowClearHeight": "egress_window_clear_height_mm",
+            "EgressWindowMaxSillHeight": "egress_window_max_sill_mm",
+        }
+        for row in rules:
+            prop = str(row.get("property_name") or "")
+            context_key = _EGRESS_WINDOW_PROP_MAP.get(prop)
+            if context_key is None or context[context_key] is not None:
+                continue
+            val = self._as_float(row.get("check_value"))
+            if val is None:
+                continue
+            context[context_key] = val
+            context["egress_window_ref"] = str(row.get("reference") or context["egress_window_ref"])
 
         return context
 
@@ -2332,6 +2503,7 @@ class IFCReader:
               "party_wall_count": int,
               "daylight": [list of per-room daylight ratio results],
               "fire_separation": [list of per-party-wall fire rating results],
+              "egress_windows": [list of per-sleeping-room rescue-opening results],
               "warnings": [str],
             }
         """
@@ -2371,6 +2543,14 @@ class IFCReader:
         fire_sep = check_fire_separation(adj, min_rating_min=fire_min)
         garage_sep = check_garage_separation(adj)
         space_connection = check_door_space_connection(adj, self.ifc_file)
+        egress_windows = check_egress_window_openings(
+            adj,
+            geometry_extractor=self.geometry_extractor,
+            min_clear_area_m2=self._as_float(rule_ctx.get("egress_window_clear_area_m2")),
+            min_clear_width_mm=self._as_float(rule_ctx.get("egress_window_clear_width_mm")),
+            min_clear_height_mm=self._as_float(rule_ctx.get("egress_window_clear_height_mm")),
+            max_sill_height_mm=self._as_float(rule_ctx.get("egress_window_max_sill_mm")),
+        )
 
         if daylight_ratio is None:
             warnings.append(
@@ -2405,6 +2585,26 @@ class IFCReader:
                     f"{fire_min_label} {fire_unit} ({fire_ref})."
                 )
 
+        if not any(
+            rule_ctx.get(k) is not None
+            for k in (
+                "egress_window_clear_area_m2", "egress_window_clear_width_mm",
+                "egress_window_clear_height_mm", "egress_window_max_sill_mm",
+            )
+        ):
+            warnings.append(
+                "No rule was found for the emergency escape and rescue window "
+                "opening -- egress-window check not evaluated."
+            )
+        else:
+            egress_window_fails = sum(1 for r in egress_windows if not r["passes"])
+            if egress_window_fails:
+                warnings.append(
+                    f"{egress_window_fails} sleeping room(s) do not have a "
+                    f"compliant emergency escape and rescue window opening "
+                    f"({rule_ctx.get('egress_window_ref')})."
+                )
+
         return {
             "has_boundaries": adj.has_boundaries,
             "space_count": adj.space_count(),
@@ -2413,6 +2613,7 @@ class IFCReader:
             "fire_separation": fire_sep,
             "garage_separation": garage_sep,
             "space_connection": space_connection,
+            "egress_windows": egress_windows,
             "warnings": warnings,
         }
 

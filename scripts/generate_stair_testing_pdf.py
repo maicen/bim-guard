@@ -118,6 +118,8 @@ ROWS_A = [
     ["NumberOfTreadsDetected / NumberOfRisersDetected", "Count of tread-top bands / mid-flight risers actually detected in the mesh", "count"],
     ["FlightStartElevation / FlightEndElevation", "Absolute Z elevation at the bottom / top of the flight", "mm"],
     ["RiserHeights / TreadDepths", "Full per-step lists (every riser / every going), not just min-max-difference — for exists/documented checks, not numeric thresholds", "list of mm"],
+    ["StepFormulaMin / StepFormulaMax", "Smallest / largest per-step riser+going stride value (2×riser + going), paired per transition — not mixed from the flight's separate riser/going extremes", "mm"],
+    ["StepFormulaValues", "Full per-step 2×riser+going list, paired with that same transition's own riser/going", "list of mm"],
 ]
 
 GROUP_B = "Group B — Headroom (whole-model overhead search)"
@@ -164,6 +166,7 @@ ROWS_F = [
     ["HandrailProfileLateral / HandrailProfileVertical", "Coarse cross-section width / height of the rail profile near mid-run", "mm"],
     ["MaxOpening", "Guard-type railings only: largest horizontal infill/baluster gap found across several sampled heights", "mm"],
     ["GuardMaxOpening", "Guard-type railings only: the worse of MaxOpening and BottomClearGap, for a single “worst opening anywhere” check", "mm"],
+    ["HandrailExtensionBottom / HandrailExtensionTop", "How far this rail's own path reaches past its host flight's bottom / top tread nosing, projected onto the flight's own walking direction. Positive extends past that end; negative falls short of reaching it (a real, worse condition, not clipped to zero)", "mm"],
 ]
 
 ALIAS_HEADER = ["Rule Property Name", "Also Tries (resolved automatically)", "IFC Class"]

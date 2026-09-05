@@ -138,6 +138,42 @@ class TestDeriveFlightSteps:
         assert steps["riser_count"] is None
         assert steps["goings_mm"] == []
         assert steps["min_riser_mm"] is None
+        assert steps["step_formula_mm"] == []
+        assert steps["min_step_formula_mm"] is None
+        assert steps["max_step_formula_mm"] is None
+
+
+class TestStepFormula:
+    """Blondel's-formula-style stride check (2*riser + going), computed PER
+    STEP and paired with that same transition's own riser/going -- not from
+    the flight's separate min/max, which could pair a riser from one step
+    with a going from a different one and describe a stride that doesn't
+    exist anywhere in the flight."""
+
+    def test_uniform_stair_has_one_constant_value(self):
+        run, _lateral, z = _synthetic_treads(n_treads=4, riser=175.0, going=280.0)
+        bands = st.cluster_step_bands(run, z)
+        steps = st.derive_flight_steps(bands)
+        expected = 2 * 175.0 + 280.0  # 630.0
+        assert steps["step_formula_mm"] == pytest.approx([expected] * 3, abs=0.5)
+        assert steps["min_step_formula_mm"] == pytest.approx(expected, abs=0.5)
+        assert steps["max_step_formula_mm"] == pytest.approx(expected, abs=0.5)
+
+    def test_pairs_each_riser_with_its_own_going_not_the_flight_extremes(self):
+        # Riser grows (175 -> 200) while going SHRINKS (300 -> 260) --
+        # a formula that mixed the flight's max riser with its max going
+        # would report 2*200+300=700, which never actually occurs on this
+        # flight. The real per-step values are 2*175+300=650 and
+        # 2*200+260=660.
+        bands = [
+            {"z_mean": 0.0, "run_min": 0.0, "run_max": 300.0},
+            {"z_mean": 175.0, "run_min": 300.0, "run_max": 560.0},
+            {"z_mean": 375.0, "run_min": 560.0, "run_max": 820.0},
+        ]
+        steps = st.derive_flight_steps(bands)
+        assert steps["step_formula_mm"] == [650.0, 660.0]
+        assert steps["min_step_formula_mm"] == 650.0
+        assert steps["max_step_formula_mm"] == 660.0
 
 
 # ── Minimum clear width sampling ─────────────────────────────────────────────
@@ -1317,6 +1353,34 @@ class TestEndToEndThroughIFCReader:
         assert results["TEST-8"]["status"] == "PASS"
         assert results["TEST-9"]["status"] == "PASS"
 
+    def test_step_formula_resolves_through_the_full_pipeline(self, model_path):
+        """StepFormulaMax (2*riser + going) is a brand new derived property --
+        prove it reaches a real rule verdict through
+        IFCReader.extract_for_compliance(), not just through calling
+        ifc_stair.derive_flight_steps() directly. The model's real value is
+        2*175 + 280 = 630mm."""
+        rule_fails = {
+            "rule_id": 10,
+            "reference": "TEST-10",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "StepFormulaMax",
+            "operator": "<=",
+            "check_value": 600.0,
+            "unit": "mm",
+        }
+        rule_passes = {
+            "rule_id": 11,
+            "reference": "TEST-11",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "StepFormulaMin",
+            "operator": "<=",
+            "check_value": 650.0,
+            "unit": "mm",
+        }
+        results = self._evaluate(model_path, [rule_fails, rule_passes])
+        assert results["TEST-10"]["status"] == "FAIL"
+        assert results["TEST-11"]["status"] == "PASS"
+
     def test_guard_max_opening_resolves_through_the_full_pipeline(self, tmp_path_factory):
         """GuardMaxOpening is a brand new derived property (baluster/opening
         analysis) -- prove it reaches a real rule verdict through
@@ -1367,6 +1431,118 @@ class TestEndToEndThroughIFCReader:
         assert results["TEST-7"]["status"] == "PASS"
 
 
+def _build_flight_with_extended_handrail(bottom_extension_mm: float, top_extension_mm: float):
+    """One 6-tread flight (RISER_MM/GOING_MM/WIDTH_MM/N_TREADS) plus a
+    straight handrail flush against its edge (y=WIDTH_MM), whose own x-range
+    is deliberately offset from the flight's bottom/top NOSING positions
+    (x=0 and x=(N_TREADS-1)*GOING_MM -- nosing-to-nosing, not the flight's
+    full run, since the last tread's own depth extends past its nosing) by
+    known amounts, so HandrailExtensionBottom/Top can be checked against an
+    exact expected value rather than just a sign."""
+    from ifcopenshell.api import run
+
+    model, body, storey = _base_model()
+
+    triangles = []
+    for i in range(N_TREADS):
+        z = (i + 1) * RISER_MM
+        x0, x1 = i * GOING_MM, i * GOING_MM + GOING_MM
+        triangles += _tread_quad_triangles(x0, x1, 0.0, WIDTH_MM, z)
+        triangles += _riser_quad_triangles(x0, z - RISER_MM, z, 0.0, WIDTH_MM)
+    rep = _tessellated_representation(model, body, triangles)
+    flight = run("root.create_entity", model, ifc_class="IfcStairFlight", name="Flight")
+    run("spatial.assign_container", model, products=[flight], relating_structure=storey)
+    run("geometry.assign_representation", model, product=flight, representation=rep)
+    run("geometry.edit_object_placement", model, product=flight, matrix=np.eye(4), is_si=False)
+
+    flight_top_nosing_x = (N_TREADS - 1) * GOING_MM
+    rail_x0 = -bottom_extension_mm
+    rail_x1 = flight_top_nosing_x + top_extension_mm
+    rail_triangles = _box_triangles(rail_x0, rail_x1, WIDTH_MM, WIDTH_MM + 40.0, 880.0, 920.0)
+    rail_rep = _tessellated_representation(model, body, rail_triangles)
+    railing = run(
+        "root.create_entity", model, ifc_class="IfcRailing", name="Handrail",
+        predefined_type="HANDRAIL",
+    )
+    run("spatial.assign_container", model, products=[railing], relating_structure=storey)
+    run("geometry.assign_representation", model, product=railing, representation=rail_rep)
+    run("geometry.edit_object_placement", model, product=railing, matrix=np.eye(4), is_si=False)
+
+    return {"model": model, "flight": flight, "railing": railing}
+
+
+class TestHandrailExtension:
+    """HandrailExtensionBottom/Top: how far a rail's own path reaches past
+    its host flight's first/last detected tread nosing, projected onto the
+    flight's own walking direction -- not the rail's own local frame, which
+    is independently PCA-derived and not directly comparable to the
+    flight's (see the module docstring)."""
+
+    def test_extension_matches_known_overhang_on_both_ends(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        parts = _build_flight_with_extended_handrail(
+            bottom_extension_mm=300.0, top_extension_mm=450.0
+        )
+        engine = st.IFCStairEngine(parts["model"], IFCGeometryExtractor(parts["model"])).build()
+        railing = engine.get_railing(parts["railing"].GlobalId)
+        assert railing["extension_bottom_mm"] == pytest.approx(300.0, abs=10.0)
+        assert railing["extension_top_mm"] == pytest.approx(450.0, abs=10.0)
+
+    def test_rail_flush_with_flight_reports_near_zero_extension(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        parts = _build_flight_with_extended_handrail(
+            bottom_extension_mm=0.0, top_extension_mm=0.0
+        )
+        engine = st.IFCStairEngine(parts["model"], IFCGeometryExtractor(parts["model"])).build()
+        railing = engine.get_railing(parts["railing"].GlobalId)
+        assert railing["extension_bottom_mm"] == pytest.approx(0.0, abs=10.0)
+        assert railing["extension_top_mm"] == pytest.approx(0.0, abs=10.0)
+
+    def test_rail_shorter_than_flight_reports_negative_extension(self):
+        """A rail that stops SHORT of the flight's own bottom/top nosing is a
+        real, worse condition than merely 'no extension' -- it must report a
+        NEGATIVE value, not clip to zero, so a rule can tell the two apart."""
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        parts = _build_flight_with_extended_handrail(
+            bottom_extension_mm=-200.0, top_extension_mm=-150.0
+        )
+        engine = st.IFCStairEngine(parts["model"], IFCGeometryExtractor(parts["model"])).build()
+        railing = engine.get_railing(parts["railing"].GlobalId)
+        assert railing["extension_bottom_mm"] == pytest.approx(-200.0, abs=10.0)
+        assert railing["extension_top_mm"] == pytest.approx(-150.0, abs=10.0)
+
+    def test_resolves_through_the_full_pipeline(self, tmp_path_factory):
+        """HandrailExtensionBottom is a brand new derived property -- prove
+        it reaches a real rule verdict through
+        IFCReader.extract_for_compliance(), not just the engine's own
+        cache."""
+        from app.modules.ifc_reader import IFCReader
+        from app.modules.comparator import ComplianceComparator
+
+        parts = _build_flight_with_extended_handrail(
+            bottom_extension_mm=300.0, top_extension_mm=300.0
+        )
+        path = tmp_path_factory.mktemp("extension") / "extension.ifc"
+        parts["model"].write(str(path))
+
+        rule = {
+            "rule_id": 1,
+            "reference": "TEST-EXT-1",
+            "target_ifc_class": "IfcRailing",
+            "property_name": "HandrailExtensionBottom",
+            "operator": ">=",
+            "check_value": 250.0,  # code minimum; the model provides 300mm
+            "unit": "mm",
+        }
+        extraction = IFCReader(path).extract_for_compliance([rule])
+        results = ComplianceComparator().validate_metadata(extraction)
+        result = {r["rule_ref"]: r for r in results}["TEST-EXT-1"]
+        assert result["status"] == "PASS"
+
+
 class TestAgainstModel:
     @pytest.fixture(scope="class")
     def analysis(self):
@@ -1403,3 +1579,11 @@ class TestAgainstModel:
 
     def test_no_open_riser_detected(self, analysis):
         assert analysis["open_riser"] is False
+
+    def test_step_formula_matches_2r_plus_g_from_real_mesh(self, analysis):
+        expected = 2 * RISER_MM + GOING_MM  # 2*175 + 280 = 630
+        assert analysis["step_formula_mm"] == pytest.approx(
+            [expected] * (N_TREADS - 1), abs=1.0
+        )
+        assert analysis["min_step_formula_mm"] == pytest.approx(expected, abs=1.0)
+        assert analysis["max_step_formula_mm"] == pytest.approx(expected, abs=1.0)

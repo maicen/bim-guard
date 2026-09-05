@@ -388,6 +388,284 @@ def check_daylight_ratios(
     return results
 
 
+#: Sleeping-room keywords -- the emergency-escape-and-rescue-opening
+#: requirement (residential codes' "egress window" clause, e.g. IRC R310 /
+#: NBC Part 9's window-egress provisions) applies specifically to bedrooms,
+#: not every habitable room: a living room or kitchen with no operable
+#: window of its own is not the same code violation a windowless bedroom is.
+_SLEEPING_ROOM_KW = frozenset([
+    "bedroom", "master bedroom", "guest room", "guest bedroom",
+    "bunk room", "nursery",
+])
+
+
+def _is_sleeping_room(name: str) -> bool:
+    """Pure name classifier -- no IFC access, unit-testable on its own."""
+    n = (name or "").lower()
+    return any(kw in n for kw in _SLEEPING_ROOM_KW)
+
+
+#: (width_fraction, height_fraction) of a window's own full glazed envelope
+#: that becomes the CLEAR OPENING once the sash is operated, keyed by
+#: ``IfcWindowPanelOperationEnum``. A side/top/bottom-hung or pivoting sash
+#: swings its whole leaf clear of the frame (minus hardware), so both
+#: dimensions shrink only slightly; a sliding sash only ever has ONE of its
+#: two dimensions open at a time -- the other sash permanently occupies the
+#: rest of that dimension -- so that dimension is cut roughly in half while
+#: the other stays near-full. FIXEDCASEMENT never opens at all.
+#:
+#: This is a documented v1 approximation (see compute_egress_clear_opening's
+#: docstring), not a true net-clear-opening measurement of the sash's own
+#: frame profile -- an operation type absent from this table, or absent
+#: from the model entirely, is left Undetermined rather than guessed.
+_OPERABLE_FRACTIONS: dict[str, tuple[float, float]] = {
+    "SIDEHUNGLEFTHAND": (0.90, 0.90),
+    "SIDEHUNGRIGHTHAND": (0.90, 0.90),
+    "TILTANDTURNLEFTHAND": (0.90, 0.90),
+    "TILTANDTURNRIGHTHAND": (0.90, 0.90),
+    "TOPHUNG": (0.90, 0.90),
+    "BOTTOMHUNG": (0.90, 0.90),
+    "PIVOTHORIZONTAL": (0.85, 0.85),
+    "PIVOTVERTICAL": (0.85, 0.85),
+    "REMOVABLECASEMENT": (0.95, 0.95),
+    "SLIDINGHORIZONTAL": (0.48, 0.90),
+    "SLIDINGVERTICAL": (0.90, 0.46),
+    "FIXEDCASEMENT": (0.0, 0.0),
+}
+
+
+def compute_egress_clear_opening(
+    operation_type: str | None, width_mm: float | None, height_mm: float | None
+) -> dict:
+    """Pure arithmetic layer: no IFC access, unit-testable with plain
+    values -- mirrors the split ``ifc_stair.py`` uses for the same reason
+    (the arithmetic that could produce a wrong verdict should be provable
+    without a model).
+
+    Returns ``{"assessed": bool, "clear_width_mm", "clear_height_mm",
+    "clear_area_m2", "reason"}``. ``assessed`` is False -- with a ``reason``
+    naming why, never a guessed number -- whenever the operation type is
+    missing, unrecognised, or the window's own geometry didn't resolve.
+    """
+    if width_mm is None or height_mm is None:
+        return {"assessed": False, "reason": "window geometry not resolvable"}
+    op = (operation_type or "").strip().upper().replace(" ", "").replace("_", "")
+    fractions = _OPERABLE_FRACTIONS.get(op)
+    if fractions is None:
+        return {
+            "assessed": False,
+            "reason": (
+                "window operation type not declared"
+                if not op
+                else f"unrecognised operation type '{operation_type}'"
+            ),
+        }
+    width_fraction, height_fraction = fractions
+    clear_width_mm = round(width_mm * width_fraction, 1)
+    clear_height_mm = round(height_mm * height_fraction, 1)
+    clear_area_m2 = round((clear_width_mm * clear_height_mm) / 1e6, 3)
+    return {
+        "assessed": True,
+        "operation_type": op,
+        "clear_width_mm": clear_width_mm,
+        "clear_height_mm": clear_height_mm,
+        "clear_area_m2": clear_area_m2,
+    }
+
+
+def _resolve_window_operation_type(window) -> str | None:
+    """Best-effort read of a window's sash operation, from any Pset key
+    literally named OperationType/PanelOperation -- on the instance or its
+    type, since ``get_psets(should_inherit=True)`` (the default) walks both.
+    Returns None (not a guess) when no such key is found anywhere."""
+    if not _IFC_AVAILABLE:
+        return None
+    try:
+        psets = ifcopenshell.util.element.get_psets(window, psets_only=False)
+    except Exception:
+        return None
+    for ps in psets.values():
+        if not isinstance(ps, dict):
+            continue
+        for key in ("OperationType", "PanelOperation"):
+            v = ps.get(key)
+            if v:
+                return str(v).strip()
+    return None
+
+
+def _get_floor_z_mm(element, geometry_extractor) -> float | None:
+    """Storey floor elevation in mm, for measuring a window's sill height
+    above its OWN floor rather than an arbitrary world Z=0 -- same
+    ContainedInStructure walk and unit-scale convention already used
+    elsewhere in this codebase (see ifc_reader.__init__'s SillHeight path)."""
+    try:
+        for rel in getattr(element, "ContainedInStructure", []):
+            container = rel.RelatingStructure
+            if container.is_a("IfcBuildingStorey"):
+                elev = getattr(container, "Elevation", None)
+                if elev is None:
+                    return None
+                scale = getattr(geometry_extractor, "_unit_scale", 1.0) or 1.0
+                return float(elev) * scale
+    except Exception:
+        pass
+    return None
+
+
+def check_egress_window_openings(
+    adjacency: "IFCSpatialAdjacency",
+    geometry_extractor=None,
+    *,
+    min_clear_area_m2: float | None = None,
+    min_clear_width_mm: float | None = None,
+    min_clear_height_mm: float | None = None,
+    max_sill_height_mm: float | None = None,
+) -> list[dict]:
+    """
+    Evaluate the emergency-escape-and-rescue-opening requirement: every
+    sleeping room needs at least one OPERABLE window with a minimum clear
+    opening (area/width/height) and a maximum sill height above its own
+    floor.
+
+    Every threshold comes from an explicit argument, else a
+    BUILDING-CODE-PART9 rule keyed by property_name (EgressWindowClearArea,
+    EgressWindowClearWidth, EgressWindowClearHeight,
+    EgressWindowMaxSillHeight). With none configured and none supplied, this
+    returns an empty list -- consistent with every other check in this
+    module, never a hardcoded residential-default number.
+
+    Returns one result dict per sleeping-room IfcSpace with boundary data,
+    describing the BEST (largest clear-area) window found -- a room needs
+    only ONE compliant opening, so it should be judged by its best window,
+    not penalised for also having smaller or fixed ones. A room with no
+    assessable window still gets a result (``best_window`` is None, and
+    ``passes`` is False), so a missing rescue opening is a reported
+    failure, not a silently-skipped one.
+    """
+    if not adjacency.has_boundaries:
+        return []
+
+    if (
+        min_clear_area_m2 is None
+        and min_clear_width_mm is None
+        and min_clear_height_mm is None
+        and max_sill_height_mm is None
+    ):
+        try:
+            from app.services.rules_service import RuleService
+
+            for r in RuleService().list_by_ruleset("BUILDING-CODE-PART9"):
+                prop = str(r.get("property_name") or "")
+                val = r.get("check_value")
+                if val is None:
+                    continue
+                if prop == "EgressWindowClearArea":
+                    min_clear_area_m2 = float(val)
+                elif prop == "EgressWindowClearWidth":
+                    min_clear_width_mm = float(val)
+                elif prop == "EgressWindowClearHeight":
+                    min_clear_height_mm = float(val)
+                elif prop == "EgressWindowMaxSillHeight":
+                    max_sill_height_mm = float(val)
+        except Exception:
+            pass
+
+    if (
+        min_clear_area_m2 is None
+        and min_clear_width_mm is None
+        and min_clear_height_mm is None
+        and max_sill_height_mm is None
+    ):
+        return []
+
+    results = []
+    for space_guid, data in adjacency._space_data.items():
+        space = data["space"]
+        space_name = (
+            getattr(space, "LongName", None)
+            or getattr(space, "Name", None)
+            or space_guid
+        )
+        if not _is_sleeping_room(space_name):
+            continue
+        storey_name = _get_storey_name(space)
+
+        windows = [
+            b["element"]
+            for b in data["boundaries"]
+            if b["element_type"] == "IfcWindow" and b["physical"]
+        ]
+
+        candidates = []
+        for win in windows:
+            win_name = getattr(win, "Name", None) or win.GlobalId
+            width_mm = geometry_extractor.get_width_mm(win) if geometry_extractor else None
+            height_mm = geometry_extractor.get_height_mm(win) if geometry_extractor else None
+            bottom_mm = geometry_extractor.get_bottom_z_mm(win) if geometry_extractor else None
+            floor_mm = _get_floor_z_mm(win, geometry_extractor) if geometry_extractor else None
+            sill_mm = (
+                round(bottom_mm - floor_mm, 1)
+                if bottom_mm is not None and floor_mm is not None
+                else None
+            )
+            operation_type = _resolve_window_operation_type(win)
+            opening = compute_egress_clear_opening(operation_type, width_mm, height_mm)
+
+            candidates.append({
+                "name": win_name,
+                "guid": win.GlobalId,
+                "sill_height_mm": sill_mm,
+                **opening,
+            })
+
+        assessed = [c for c in candidates if c["assessed"] and c["sill_height_mm"] is not None]
+        best = max(assessed, key=lambda c: c["clear_area_m2"], default=None)
+
+        checks: dict[str, bool] = {}
+        if best is not None:
+            if min_clear_area_m2 is not None:
+                checks["clear_area"] = best["clear_area_m2"] >= min_clear_area_m2
+            if min_clear_width_mm is not None:
+                checks["clear_width"] = best["clear_width_mm"] >= min_clear_width_mm
+            if min_clear_height_mm is not None:
+                checks["clear_height"] = best["clear_height_mm"] >= min_clear_height_mm
+            if max_sill_height_mm is not None:
+                checks["sill_height"] = best["sill_height_mm"] <= max_sill_height_mm
+
+        passes = bool(checks) and all(checks.values())
+        if best is None:
+            reason = (
+                "no window found bounding this sleeping room"
+                if not windows
+                else "no window's operable clear opening could be determined "
+                "(missing operation-type or sill-elevation data)"
+            )
+        else:
+            reason = None if passes else f"fails: {', '.join(k for k, ok in checks.items() if not ok)}"
+
+        results.append({
+            "check": "egress_window_opening",
+            "code_ref": "CODE 9.9 (emergency escape and rescue opening)",
+            "space_guid": space_guid,
+            "space_name": space_name,
+            "storey_name": storey_name or "—",
+            "window_count": len(windows),
+            "windows": candidates,
+            "best_window": best,
+            "required_clear_area_m2": min_clear_area_m2,
+            "required_clear_width_mm": min_clear_width_mm,
+            "required_clear_height_mm": min_clear_height_mm,
+            "required_max_sill_height_mm": max_sill_height_mm,
+            "checks": checks,
+            "passes": passes,
+            "reason": reason,
+            "severity": "mandatory",
+        })
+
+    return results
+
+
 _GARAGE_KW = frozenset(["garage", "carport", "car port", "parking", "vehicle"])
 
 

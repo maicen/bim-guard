@@ -67,6 +67,136 @@ class EgressAnalysisEngine(RuleEvaluator):
             pass
         return None
 
+    def _get_egress_window_thresholds(self) -> dict[str, float | None]:
+        """Resolve the four possible BUILDING-CODE-PART9 egress-window
+        thresholds (min clear area/width/height, max sill height).
+
+        Any threshold not configured in the DB stays None -- evaluate() must
+        treat a None threshold as simply not checked, never as a
+        residential-default number, matching every other threshold in this
+        engine.
+        """
+        thresholds: dict[str, float | None] = {
+            "clear_area_m2": None,
+            "clear_width_mm": None,
+            "clear_height_mm": None,
+            "max_sill_height_mm": None,
+        }
+        prop_map = {
+            "EgressWindowClearArea": "clear_area_m2",
+            "EgressWindowClearWidth": "clear_width_mm",
+            "EgressWindowClearHeight": "clear_height_mm",
+            "EgressWindowMaxSillHeight": "max_sill_height_mm",
+        }
+        try:
+            svc = self._rules_service or RuleService()
+            for r in svc.list_by_ruleset("BUILDING-CODE-PART9"):
+                key = prop_map.get(str(r.get("property_name") or ""))
+                if key is None or thresholds[key] is not None:
+                    continue
+                val = r.get("check_value")
+                if val is not None:
+                    thresholds[key] = float(val)
+        except Exception:
+            pass
+        return thresholds
+
+    def _evaluate_egress_window(
+        self, data: dict, guid: str, space_name: str, storey_name: str
+    ) -> RuleEvaluationResult:
+        """Evaluate one sleeping room's emergency-escape-and-rescue-opening
+        record (from ``ifc_spatial.check_egress_window_openings``) against
+        live BUILDING-CODE-PART9 thresholds -- re-resolved here rather than
+        trusting the record's own precomputed ``passes``, the same way
+        travel-distance and exit-count below always re-derive their limits
+        at evaluation time instead of relying on stale check-time data.
+        """
+        thresholds = self._get_egress_window_thresholds()
+        best = data.get("best_window")
+        window_count = int(data.get("window_count") or 0)
+
+        if not any(v is not None for v in thresholds.values()):
+            return RuleEvaluationResult(
+                rule_type=self.rule_type,
+                band=None,
+                score=0.0,
+                details={
+                    "check_type": "egress_window",
+                    "space_name": space_name,
+                    "storey": storey_name,
+                    "window_count": window_count,
+                    "best_window": best,
+                    "thresholds": thresholds,
+                    "passes": None,
+                    "code_reference": "CODE 9.9 (emergency escape and rescue opening)",
+                },
+                status="NOT_ASSESSED",
+                element_id=guid,
+                action="No rule was found for the emergency escape and rescue window opening",
+            )
+
+        checks: dict[str, bool] = {}
+        if best is not None:
+            if thresholds["clear_area_m2"] is not None:
+                checks["clear_area"] = (
+                    best.get("clear_area_m2") is not None
+                    and best["clear_area_m2"] >= thresholds["clear_area_m2"]
+                )
+            if thresholds["clear_width_mm"] is not None:
+                checks["clear_width"] = (
+                    best.get("clear_width_mm") is not None
+                    and best["clear_width_mm"] >= thresholds["clear_width_mm"]
+                )
+            if thresholds["clear_height_mm"] is not None:
+                checks["clear_height"] = (
+                    best.get("clear_height_mm") is not None
+                    and best["clear_height_mm"] >= thresholds["clear_height_mm"]
+                )
+            if thresholds["max_sill_height_mm"] is not None:
+                checks["sill_height"] = (
+                    best.get("sill_height_mm") is not None
+                    and best["sill_height_mm"] <= thresholds["max_sill_height_mm"]
+                )
+
+        passes = bool(checks) and all(checks.values())
+        failed = [k for k, ok in checks.items() if not ok]
+
+        if passes:
+            band, score, status, action = "Low", 0.1, "PASS", "Compliant"
+        else:
+            band, score, status = "High", 0.8, "FAIL"
+            if best is None:
+                action = (
+                    "No sleeping-room window with a determinable operable clear "
+                    "opening was found; verify an egress window exists and its "
+                    "operation type is declared"
+                    if window_count
+                    else "No window found in this sleeping room; provide a "
+                    "compliant emergency escape and rescue opening"
+                )
+            else:
+                action = f"Egress window opening fails: {', '.join(failed)} below required minimum"
+
+        return RuleEvaluationResult(
+            rule_type=self.rule_type,
+            band=band,
+            score=score,
+            details={
+                "check_type": "egress_window",
+                "space_name": space_name,
+                "storey": storey_name,
+                "window_count": window_count,
+                "best_window": best,
+                "thresholds": thresholds,
+                "checks": checks,
+                "passes": passes,
+                "code_reference": "CODE 9.9 (emergency escape and rescue opening)",
+            },
+            status=status,
+            element_id=guid,
+            action=action,
+        )
+
     def evaluate(
         self,
         element: Any,
@@ -81,6 +211,10 @@ class EgressAnalysisEngine(RuleEvaluator):
         guid = str(data.get("space_guid") or data.get("guid") or data.get("id") or "UNKNOWN")
         space_name = str(data.get("space_name") or data.get("name") or "Unnamed Space")
         storey_name = str(data.get("storey_name") or data.get("storey") or "—")
+
+        # Check if evaluating an emergency-escape-and-rescue window record
+        if data.get("check") == "egress_window_opening" or "best_window" in data:
+            return self._evaluate_egress_window(data, guid, space_name, storey_name)
 
         # Check if evaluating an exit count record
         if "exit_count" in data:

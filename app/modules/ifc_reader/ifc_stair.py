@@ -298,6 +298,9 @@ def derive_flight_steps(bands: list[dict]) -> dict:
             "min_riser_mm": None,
             "max_riser_mm": None,
             "riser_difference_mm": None,
+            "step_formula_mm": [],
+            "min_step_formula_mm": None,
+            "max_step_formula_mm": None,
         }
 
     goings = [
@@ -308,6 +311,16 @@ def derive_flight_steps(bands: list[dict]) -> dict:
         round(bands[i + 1]["z_mean"] - bands[i]["z_mean"], 1)
         for i in range(len(bands) - 1)
     ]
+    # Blondel's-formula-style stride check (2*riser + going): the standard
+    # ergonomic combination most codes actually write the comfort/safety
+    # limit against, rather than an independent riser limit and an
+    # independent going limit -- a flight can pass MinRiserHeight and
+    # MinTreadDepth individually and still produce an unsafe stride if the
+    # two were never checked together. Computed PER STEP (paired with the
+    # riser/going of that same tread-to-tread transition), not from the
+    # flight's own min/max, since pairing the flight's smallest riser with
+    # its smallest going could describe a step that doesn't actually exist.
+    step_formula = [round(2 * r + g, 1) for r, g in zip(risers, goings)]
 
     return {
         "tread_count": len(bands),
@@ -324,6 +337,9 @@ def derive_flight_steps(bands: list[dict]) -> dict:
         "min_riser_mm": round(min(risers), 1),
         "max_riser_mm": round(max(risers), 1),
         "riser_difference_mm": round(max(risers) - min(risers), 1),
+        "step_formula_mm": step_formula,
+        "min_step_formula_mm": round(min(step_formula), 1),
+        "max_step_formula_mm": round(max(step_formula), 1),
     }
 
 
@@ -860,6 +876,20 @@ def analyze_railing(railing, geometry_extractor, floor_z_mm: float | None = None
         return result
     origin, u, v = frame
     run, lateral, z = project_local(verts, origin, u, v)
+
+    # World-space (x, y) at this rail's own two run extremes, along its own
+    # lateral midpoint -- the only thing IFCStairEngine._link_elements needs
+    # to measure how far this rail extends past its host flight's own top/
+    # bottom tread (HandrailExtensionTop/Bottom), since a rail and its host
+    # flight each have an independently PCA-derived local frame that isn't
+    # otherwise comparable (see the module docstring).
+    if run.size and lateral.size:
+        lateral_mid = float((lateral.min() + lateral.max()) / 2.0)
+        run_lo, run_hi = float(run.min()), float(run.max())
+        result["path_endpoints_xy_mm"] = [
+            tuple(np.round(origin + run_lo * u + lateral_mid * v, 1).tolist()),
+            tuple(np.round(origin + run_hi * u + lateral_mid * v, 1).tolist()),
+        ]
 
     result["path_length_mm"] = round(float(run.max() - run.min()), 1) if run.size else None
     lateral_spread = float(lateral.max() - lateral.min()) if lateral.size else 0.0
@@ -1407,6 +1437,54 @@ class IFCStairEngine:
                     else "guard_count"
                 )
                 self._flights[best_guid][key] = self._flights[best_guid].get(key, 0) + 1
+                self._set_handrail_extension(railing, self._flights[best_guid])
+
+    @staticmethod
+    def _set_handrail_extension(railing: dict, flight: dict) -> None:
+        """HandrailExtensionBottom/Top: how far this rail's own path reaches
+        past its host flight's bottom/top tread nosing, projected onto the
+        flight's own walking direction (derived from its first/last
+        detected nosing point, not the rail's own local frame -- the two
+        frames are independently PCA-derived and not otherwise comparable).
+
+        Positive = extends past that end (code-compliant direction);
+        negative = falls short of even reaching it. Both are real,
+        determinate answers -- only a genuinely unmeasurable case (host has
+        fewer than 2 detected treads, or this rail's own endpoints didn't
+        resolve) leaves the property unset, with a warning naming why.
+        """
+        nosing_pts = flight.get("nosing_world_points_mm")
+        rail_eps = railing.get("path_endpoints_xy_mm")
+        if not nosing_pts or len(nosing_pts) < 2 or not rail_eps or len(rail_eps) != 2:
+            railing["warnings"].append(
+                "handrail extension not evaluated -- host flight's walking "
+                "line or this rail's own path endpoints could not be "
+                "determined"
+            )
+            return
+        try:
+            bottom_pt = np.array(nosing_pts[0][:2], dtype=float)
+            top_pt = np.array(nosing_pts[-1][:2], dtype=float)
+            direction = top_pt - bottom_pt
+            flight_length = float(np.linalg.norm(direction))
+            if flight_length <= 1e-6:
+                return
+            direction = direction / flight_length
+
+            rail_lo = np.array(rail_eps[0], dtype=float)
+            rail_hi = np.array(rail_eps[1], dtype=float)
+            # Project BOTH rail endpoints onto the flight's direction and
+            # sort -- the rail's own path_endpoints_xy_mm ordering follows
+            # ITS local frame's sign convention, not the flight's, so which
+            # endpoint is "bottom-side" vs "top-side" is decided here, by
+            # the projection itself, not assumed from list order.
+            proj_lo = float(np.dot(rail_lo - bottom_pt, direction))
+            proj_hi = float(np.dot(rail_hi - bottom_pt, direction))
+            proj_min, proj_max = sorted((proj_lo, proj_hi))
+            railing["extension_bottom_mm"] = round(-proj_min, 1)
+            railing["extension_top_mm"] = round(proj_max - flight_length, 1)
+        except Exception as exc:
+            logger.debug("Handrail extension calc failed: %s", exc)
 
     # ── Accessors ──────────────────────────────────────────────────────────
 
