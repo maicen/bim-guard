@@ -43,11 +43,11 @@ STATUS:   ALL PASS
 ```
 
 **Test Coverage by Engine:**
-- **GC-001 (Galvanic Corrosion):** ✓ Implemented, 100+ tests, demo BCF validates
-- **CC-001 (Crevice Corrosion):** ✓ Implemented, 100+ tests, demo BCF validates
-- **MC-001 (Microbiological Corrosion):** ✓ Implemented, 100+ tests, demo BCF validates
-- **MM-001 (Material Microbial):** ✓ Implemented, 1,365 tests (Session 3 addition), real findings verified
-- **XM-001 (Cross-Material):** ⚠ Seeded & architecture documented, implementation deferred (post-FMP)
+- **GC-001 (Galvanic Corrosion):** ✓ `app/engines/bimguard_galvanic_engine.py`, 100+ tests, demo BCF validates
+- **CC-001 (Crevice Corrosion):** ✓ `app/engines/bimguard_crevice_engine.py`, 100+ tests, demo BCF validates
+- **MC-001 (Microbiological):** ✓ `app/engines/bimguard_mic_engine.py`, 100+ tests, demo BCF validates
+- **MM-001 (Material Microbial):** ✓ Comparator at `app/modules/comparator/`, 1,365 tests, **12/12 control cases passing** (galvanised-in-stagnant fires, copper-in-potable silent)
+- **XM-001 (Cross-Material):** ⚠ Comparator at `app/modules/comparator/cross_material.py`, seeded & architecture documented, implementation deferred (post-FMP)
 
 **Key Validation Tests Passing:**
 - `test_gc_bcf_validates_against_xsd` — all GC-001 demo archives valid
@@ -70,7 +70,7 @@ STATUS:   ALL PASS
 | **MM-001 Material Gate** | ✓ DONE | Coverage 1.9% → 33.9% (Sessions 1-2) |
 | **MM-001 Environment Gate** | ✓ DONE | Coverage 0% → 100%, T1_indoor_damp default (Session 3, commit 344772c) |
 | **MM-001 Temperature Gate** | ✓ DONE | Coverage 0% → 32.1%, system-type inference (Session 3, commit 1285570) |
-| **MM-001 Real Findings** | ✓ VERIFIED | 13,068 findings on Clinic Plumbing (galvanised steel in stagnant water) |
+| **MM-001 Real Findings** | ✓ VERIFIED | **Measured gate coverage:** Material 30.1% (17,006 / 56,509), Environment 100% (default T1), Temperature 27.1% (15,308 / 56,509). All 12 control cases pass: galvanised-in-stagnant/hot/pool fire correctly, copper-in-potable/chilled silent. See [`docs/validation/data/`](./validation/data/) for measured metrics. |
 | **BCF Export** | ✓ DONE | All engines + all three corrosion engines validated against buildingSMART XSD |
 | **Database-Driven Rules** | ✓ DONE | Zero hardcoded thresholds; all weights/bands read from Supabase |
 | **ISO 19650 Governance** | ✓ DONE | CDE state machine, metadata tracking, document/project isolation |
@@ -82,7 +82,7 @@ STATUS:   ALL PASS
 
 | Task | Status | Reason |
 |------|--------|--------|
-| **System Classification (62,235 unknowns)** | PARTIAL | Inference implemented; raw model coverage limits are MEP-inherent |
+| **System Classification (PipingSystem.UNKNOWN)** | PARTIAL | System inference implemented via `classify_system()` in `piping_producer.py`. Raw IFC payloads often omit system metadata; inference defaults unknown systems to UNKNOWN rather than fallback to carbon_steel, maintaining tri-state (honest, not assumed). Coverage is MEP-model inherent, not implementation gap. |
 | **XM-001 Cross-Material Engine** | ARCHITECTURAL | Requires dissimilar materials at junctions; system-type inference makes materials uniform → architectural limitation, not implementation bug |
 
 ---
