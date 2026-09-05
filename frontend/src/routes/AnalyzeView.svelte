@@ -138,6 +138,7 @@
       const data = await projectsApi.list();
       projects = data.projects || [];
       if (selectedProjectId) {
+        selectedSlug = activeCategory === "seismic" ? "seismic" : "corrosion";
         await Promise.all([fetchResults(), loadInputs()]);
       }
     } catch (err: any) {
