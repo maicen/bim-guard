@@ -40,7 +40,7 @@
   },
   "TessellationLevelOfDetail": 1.0,
   "ExportPartsAsBuildingElements": false,
-  "ExportSolidModelRep": false,
+  "ExportSolidModelRep": true,
   "UseActiveViewGeometry": false,
   "UseFamilyAndTypeNameForReference": false,
   "Use2DRoomBoundaryForVolume": true,

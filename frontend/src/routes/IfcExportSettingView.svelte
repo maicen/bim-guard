@@ -8,6 +8,8 @@
     "Base quantities and material property sets included",
     "Steel elements included, 2D elements excluded",
     "Stable IFC GUIDs stored for reliable re-audits",
+    "Max tessellation detail and solid model representation for accurate stair/railing mesh geometry",
+    "Custom BIM Guard property sets for door, window, stair flight, railing and landing fields with no standard IFC home",
   ];
 </script>
 
@@ -21,7 +23,7 @@
 
   <!-- Bento Grid Overview -->
   <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-    <BentoBox title="IFC Version" value="IFC4" icon={Layers} description="Reference View exchange" />
+    <BentoBox title="IFC Version" value="IFC4" icon={Layers} description="Design Transfer View exchange" />
     <BentoBox
       title="Space Boundaries"
       value="1st Level"
@@ -56,6 +58,36 @@
     >
       <Download class="h-3.5 w-3.5" />
       <span>Download IFC Export Setting</span>
+    </a>
+  </div>
+
+  <!-- User-Defined Property Sets -->
+  <div
+    class="flex flex-col justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 sm:flex-row sm:items-center"
+  >
+    <div>
+      <h2 class="text-base font-bold tracking-tight text-slate-50">
+        Download the Custom Property Set Mapping
+      </h2>
+      <p class="max-w-xl text-xs text-slate-400">
+        A handful of fields BIM Guard checks (stair flight width, winder angles, railing height,
+        clear opening dimensions) have no standard IFC property — Revit can only emit them via
+        Shared Parameters mapped through a user-defined property set file. Import this .txt in
+        Revit's IFC export setup (Property Sets → User-defined Property Sets), then create
+        matching Shared Parameters on the Door, Window, Stair, Stair Component and Railing
+        categories before exporting. Verify the header syntax against the template shipped with
+        your Revit version's IFC exporter first — the format is undocumented enough that it's
+        worth a quick sanity check before relying on it.
+      </p>
+    </div>
+
+    <a
+      href="/downloads/BIMGuard_UserDefinedPsets.txt"
+      download="BIMGuard_UserDefinedPsets.txt"
+      class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+    >
+      <Download class="h-3.5 w-3.5" />
+      <span>Download Property Set Mapping</span>
     </a>
   </div>
 

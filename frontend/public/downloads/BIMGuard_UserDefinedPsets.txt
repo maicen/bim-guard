@@ -1,0 +1,21 @@
+PropertySet:	Pset_BIMGuardDoor	I	IfcDoor
+	ClearWidth	Length	ClearWidth
+
+PropertySet:	Pset_BIMGuardWindow	I	IfcWindow
+	ClearOpeningArea	Area	ClearOpeningArea
+	ClearOpeningHeight	Length	ClearOpeningHeight
+	ClearOpeningWidth	Length	ClearOpeningWidth
+
+PropertySet:	Pset_BIMGuardStairFlight	I	IfcStairFlight
+	Width	Length	Width
+	FlightHeight	Length	FlightHeight
+	WinderTurnAngle	Real	WinderTurnAngle
+	IndividualWinderAngle	Real	IndividualWinderAngle
+	WinderSetSeparation	Length	WinderSetSeparation
+
+PropertySet:	Pset_BIMGuardRailing	I	IfcRailing
+	Height	Length	Height
+	HandrailHeight	Length	HandrailHeight
+
+PropertySet:	Pset_BIMGuardSlab	I	IfcSlab
+	HeadroomClearance	Length	HeadroomClearance
