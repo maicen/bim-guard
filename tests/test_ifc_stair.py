@@ -304,6 +304,77 @@ class TestGuardOpeningProfile:
         assert profile["max_opening_mm"] is None
 
 
+# ── Headroom: overhead-clearance search ─────────────────────────────────────
+
+
+def _flat_face_candidate(guid, x0, x1, y0, y1, z, bbox=None):
+    """A single flat quad (2 triangles) at height *z*, spanning
+    [x0,x1]x[y0,y1] -- e.g. a floor slab's underside, the ceiling surface a
+    headroom check actually cares about. Shaped like
+    build_headroom_candidate_index would produce: {guid, class, bbox, verts,
+    faces}. *bbox* defaults to the face's own footprint but can be widened
+    to test the broad-phase-passes/narrow-phase-rejects case (the whole
+    point of the point-in-triangle narrow phase)."""
+    verts = np.array(
+        [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], dtype=float
+    )
+    faces = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.intp)
+    if bbox is None:
+        bbox = {"min_x": x0, "max_x": x1, "min_y": y0, "max_y": y1, "min_z": z, "max_z": z}
+    return {"guid": guid, "class": "IfcSlab", "bbox": bbox, "verts": verts, "faces": faces}
+
+
+class TestHeadroomAtPoint:
+    def test_clearance_to_slab_directly_above(self):
+        slab = _flat_face_candidate("SLAB-1", -500, 500, -500, 500, 2000.0)
+        clearance, guid = st.headroom_at_point((0.0, 0.0, 100.0), [slab])
+        assert clearance == pytest.approx(1900.0, abs=1.0)
+        assert guid == "SLAB-1"
+
+    def test_worst_of_several_candidates_wins(self):
+        far = _flat_face_candidate("FAR", -500, 500, -500, 500, 3000.0)
+        near = _flat_face_candidate("NEAR", -500, 500, -500, 500, 1980.0)
+        clearance, guid = st.headroom_at_point((0.0, 0.0, 0.0), [far, near])
+        assert clearance == pytest.approx(1980.0, abs=1.0)
+        assert guid == "NEAR"
+
+    def test_candidate_not_covering_this_xy_is_ignored(self):
+        # The slab's BBOX is widened to contain the query point, but its
+        # actual FACE is a small square well off in the corner (an
+        # L-shaped/offset slab) -- point-in-triangle, not the bbox alone,
+        # must decide this: the bbox broad phase passes, the narrow phase
+        # must still correctly reject it.
+        candidate = _flat_face_candidate(
+            "OFFSET", 900, 950, 900, 950, 2000.0,
+            bbox={"min_x": 0, "max_x": 950, "min_y": 0, "max_y": 950, "min_z": 2000, "max_z": 2000},
+        )
+        clearance, guid = st.headroom_at_point((0.0, 0.0, 0.0), [candidate])
+        assert clearance is None
+        assert guid is None
+
+    def test_self_exclusion(self):
+        # The flight's own candidate entry (present because IfcStairFlight
+        # is itself a headroom candidate class, for the switchback case)
+        # must not be measured against itself.
+        self_slab = _flat_face_candidate("SELF", -500, 500, -500, 500, 2000.0)
+        clearance, guid = st.headroom_at_point(
+            (0.0, 0.0, 100.0), [self_slab], exclude_guid="SELF"
+        )
+        assert clearance is None
+        assert guid is None
+
+    def test_nothing_within_search_height_is_none(self):
+        far = _flat_face_candidate("FAR", -500, 500, -500, 500, 10000.0)
+        clearance, guid = st.headroom_at_point(
+            (0.0, 0.0, 0.0), [far], max_search_height_mm=5000.0
+        )
+        assert clearance is None
+        assert guid is None
+
+    def test_no_candidates_is_none(self):
+        assert st.headroom_at_point((0.0, 0.0, 0.0), []) == (None, None)
+
+
 # ── End-to-end against a real (small) IFC4 model ──────────────────────────────
 
 ifcopenshell = pytest.importorskip("ifcopenshell")
@@ -912,6 +983,139 @@ def _build_two_flight_stair_with_landing_and_railings():
     }
 
 
+def _build_flight_with_overhead_slab(slab_bottom_z: float):
+    """One 6-tread flight (RISER_MM/GOING_MM/WIDTH_MM/N_TREADS, treads
+    climbing z=175..1050) plus a flat slab spanning generously over its
+    whole footprint, underside at *slab_bottom_z*. A flat overhead slab
+    over a climbing flight means the LAST (highest) tread always has the
+    least headroom -- slab_bottom_z minus that tread's own elevation."""
+    from ifcopenshell.api import run
+
+    model, body, storey = _base_model()
+
+    triangles = []
+    for i in range(N_TREADS):
+        z = (i + 1) * RISER_MM
+        x0, x1 = i * GOING_MM, i * GOING_MM + GOING_MM
+        triangles += _tread_quad_triangles(x0, x1, 0.0, WIDTH_MM, z)
+        triangles += _riser_quad_triangles(x0, z - RISER_MM, z, 0.0, WIDTH_MM)
+    rep = _tessellated_representation(model, body, triangles)
+    flight = run("root.create_entity", model, ifc_class="IfcStairFlight", name="Flight")
+    run("spatial.assign_container", model, products=[flight], relating_structure=storey)
+    run("geometry.assign_representation", model, product=flight, representation=rep)
+    run("geometry.edit_object_placement", model, product=flight, matrix=np.eye(4), is_si=False)
+
+    slab_triangles = _box_triangles(
+        -500.0, N_TREADS * GOING_MM + 500.0, -500.0, WIDTH_MM + 500.0,
+        slab_bottom_z, slab_bottom_z + 200.0,
+    )
+    slab_rep = _tessellated_representation(model, body, slab_triangles)
+    slab = run("root.create_entity", model, ifc_class="IfcSlab", name="Floor Above")
+    run("spatial.assign_container", model, products=[slab], relating_structure=storey)
+    run("geometry.assign_representation", model, product=slab, representation=slab_rep)
+    run("geometry.edit_object_placement", model, product=slab, matrix=np.eye(4), is_si=False)
+
+    return {"model": model, "flight": flight, "slab": slab}
+
+
+def _build_two_stacked_flights(vertical_offset: float):
+    """Two identical 6-tread flights at the same XY footprint, the second
+    raised by *vertical_offset* -- a switchback stair's flight-above-flight
+    case. Flight A's headroom must be limited by flight B's underside, not
+    by nothing (there is deliberately no slab in this model at all)."""
+    from ifcopenshell.api import run
+
+    model, body, storey = _base_model()
+
+    def _flight(name, z_offset):
+        triangles = []
+        for i in range(N_TREADS):
+            z = z_offset + (i + 1) * RISER_MM
+            x0, x1 = i * GOING_MM, i * GOING_MM + GOING_MM
+            triangles += _tread_quad_triangles(x0, x1, 0.0, WIDTH_MM, z)
+            triangles += _riser_quad_triangles(x0, z - RISER_MM, z, 0.0, WIDTH_MM)
+        rep = _tessellated_representation(model, body, triangles)
+        entity = run("root.create_entity", model, ifc_class="IfcStairFlight", name=name)
+        run("spatial.assign_container", model, products=[entity], relating_structure=storey)
+        run("geometry.assign_representation", model, product=entity, representation=rep)
+        run("geometry.edit_object_placement", model, product=entity, matrix=np.eye(4), is_si=False)
+        return entity
+
+    flight_a = _flight("Flight A (lower)", 0.0)
+    flight_b = _flight("Flight B (upper)", vertical_offset)
+    return {"model": model, "flight_a": flight_a, "flight_b": flight_b}
+
+
+class TestHeadroomEndToEnd:
+    def test_headroom_from_slab_above(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        slab_bottom_z = N_TREADS * RISER_MM + 2000.0  # 1050 + 2000 = 3050
+        parts = _build_flight_with_overhead_slab(slab_bottom_z)
+        engine = st.IFCStairEngine(parts["model"], IFCGeometryExtractor(parts["model"])).build()
+
+        flight = engine.get_flight(parts["flight"].GlobalId)
+        assert flight["min_headroom_mm"] == pytest.approx(2000.0, abs=10.0)
+        assert flight["min_headroom_limiting_guid"] == parts["slab"].GlobalId
+
+    def test_headroom_from_flight_above_switchback(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        vertical_offset = N_TREADS * RISER_MM + 2200.0  # flight B starts 2200mm above flight A's top
+        parts = _build_two_stacked_flights(vertical_offset)
+        engine = st.IFCStairEngine(parts["model"], IFCGeometryExtractor(parts["model"])).build()
+
+        flight_a = engine.get_flight(parts["flight_a"].GlobalId)
+        # NOT vertical_offset (2200mm): flight B is geometrically identical
+        # to flight A, just shifted up, so flight A's last-tread sample
+        # point (x=1400) sits exactly on the shared edge between flight B's
+        # OWN treads 4 and 5. Both faces satisfy the point-in-triangle test
+        # there, and the code correctly takes the lower (tread 4, one riser
+        # height below tread 5) -- vertical_offset minus one riser height.
+        assert flight_a["min_headroom_mm"] == pytest.approx(
+            vertical_offset - RISER_MM, abs=10.0
+        )
+        assert flight_a["min_headroom_limiting_guid"] == parts["flight_b"].GlobalId
+        # Flight B must not see itself (or flight A, which is below it) as
+        # an obstruction to ITS OWN headroom.
+        flight_b = engine.get_flight(parts["flight_b"].GlobalId)
+        assert "min_headroom_mm" not in flight_b
+        assert any("headroom" in w for w in flight_b["warnings"])
+
+    def test_no_overhead_elements_warns_not_silently_missing(self):
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+
+        model, flight = _build_stair_model()  # a lone flight, nothing else in the model
+        engine = st.IFCStairEngine(model, IFCGeometryExtractor(model)).build()
+
+        result = engine.get_flight(flight.GlobalId)
+        assert "min_headroom_mm" not in result
+        assert any("headroom" in w for w in result["warnings"])
+
+    def test_min_headroom_resolves_through_the_full_pipeline(self, tmp_path_factory):
+        from app.modules.ifc_reader import IFCReader
+        from app.modules.comparator import ComplianceComparator
+
+        slab_bottom_z = N_TREADS * RISER_MM + 1800.0  # deliberately below a 1980mm code minimum
+        parts = _build_flight_with_overhead_slab(slab_bottom_z)
+        path = tmp_path_factory.mktemp("headroom") / "stair.ifc"
+        parts["model"].write(str(path))
+
+        rule = {
+            "rule_id": 1,
+            "reference": "TEST-HR-1",
+            "target_ifc_class": "IfcStairFlight",
+            "property_name": "MinHeadroom",
+            "operator": ">=",
+            "check_value": 1980.0,
+            "unit": "mm",
+        }
+        extraction = IFCReader(path).extract_for_compliance([rule])
+        results = ComplianceComparator().validate_metadata(extraction)
+        result = {r["rule_ref"]: r for r in results}["TEST-HR-1"]
+        assert result["status"] == "FAIL"
+
+
 class TestCrossReferencing:
     @pytest.fixture(scope="class")
     def built(self):
@@ -1068,7 +1272,11 @@ class TestEndToEndThroughIFCReader:
             "winder" in w or "curvature" in w for w in element["data_quality_warnings"]
         )
 
-    def test_straight_stair_carries_no_data_quality_warnings(self, model_path):
+    def test_straight_stair_carries_no_curvature_warning(self, model_path):
+        """A straight flight must never get the winder/curvature caveat --
+        it MAY still carry a headroom caveat, since this fixture is a lone
+        flight with nothing else in the model to measure headroom against,
+        which is itself an honest, correct observation, not a bug."""
         rule = {
             "rule_id": 5,
             "reference": "TEST-5",
@@ -1080,7 +1288,8 @@ class TestEndToEndThroughIFCReader:
         }
         results = self._evaluate(model_path, [rule])
         element = results["TEST-5"]["all_elements"][0]
-        assert not element["data_quality_warnings"]
+        warnings = element["data_quality_warnings"] or []
+        assert not any("winder" in w or "curvature" in w for w in warnings)
 
     def test_newly_wired_quick_fix_properties_resolve(self, model_path):
         """FlightStartElevation, NumberOfRisersDetected -- computed since the

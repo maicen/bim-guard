@@ -45,6 +45,18 @@ in the module that works in WORLD coordinates rather than an element's own
 PCA-derived local frame, since two different elements' local frames are not
 directly comparable to each other.
 
+A FOURTH pass (``IFCStairEngine._compute_headroom``, run after
+``_link_elements`` since it reuses each flight/landing's world bbox) searches
+the whole model for whatever sits above a flight's walking line or a
+landing's centroid -- another slab, a beam, a covering, a roof, or even
+another flight in a switchback stair -- and reports the worst (smallest)
+vertical clearance found, plus the GlobalId responsible for it
+(``MinHeadroom``/``MinHeadroomLimitingGlobalId``). It uses a real
+point-in-triangle test against candidate meshes (not vertex proximity, which
+misses a large flat slab whose only vertices are its four corners), and
+falls back to a runtime warning -- never a silently-omitted property --
+whenever nothing is found within search range.
+
 Known v1 limitations (deliberately out of scope, not silently wrong -- each
 one below is actually detected and named in the affected element's own
 ``warnings`` list at runtime, not just documented here):
@@ -68,6 +80,12 @@ one below is actually detected and named in the affected element's own
   * Handrail/guard path length is a straight-line run-axis approximation.
     For a curved rail this undercounts the true swept length; a warning is
     attached whenever the mesh's lateral spread suggests real curvature.
+  * Headroom is sampled at discrete points (one per detected tread nosing
+    for a flight, one at the plan centroid for a landing), not scanned
+    continuously across the full walking surface -- an obstruction that
+    misses every sample point (e.g. sits off to one side of a landing) will
+    not be caught. Named in the affected element's warnings whenever no
+    sample point finds coverage.
 """
 
 from __future__ import annotations
@@ -550,6 +568,19 @@ def analyze_stair_flight(
     result.update(steps)
     result["tread_top_elevations_mm"] = [round(b["z_mean"], 1) for b in bands]
 
+    # World-space (x, y, z) at each detected tread's nosing, along the
+    # flight's own lateral midpoint as a walking-line approximation. Cheap
+    # to compute now (a handful of points from data already in hand) and
+    # avoids re-meshing this flight later just to find where headroom should
+    # be sampled -- see IFCStairEngine's headroom pass, which is the only
+    # consumer of this field.
+    if all_lateral.size:
+        lateral_mid = float((all_lateral.min() + all_lateral.max()) / 2.0)
+        result["nosing_world_points_mm"] = [
+            tuple(np.round(origin + b["run_min"] * u + lateral_mid * v, 1).tolist()) + (round(b["z_mean"], 1),)
+            for b in bands
+        ]
+
     if len(bands) < 2:
         result["warnings"].append(
             "fewer than 2 tread-top bands detected -- riser/tread series unavailable"
@@ -906,6 +937,180 @@ def analyze_railing(railing, geometry_extractor, floor_z_mm: float | None = None
     return result
 
 
+# ── Headroom: whole-model overhead-clearance search ───────────────────────────
+
+#: IFC classes that can plausibly obstruct headroom above a stair: floor
+#: slabs, structural beams, another stair flight (the critical case for a
+#: switchback/scissor stair), dropped ceilings, roofs. Deliberately NOT an
+#: exhaustive "everything in the model" scan -- see
+#: build_headroom_candidate_index for why that would be needlessly
+#: expensive, and why this list is still bounded on top of that.
+HEADROOM_CANDIDATE_CLASSES = ("IfcSlab", "IfcBeam", "IfcStairFlight", "IfcCovering", "IfcRoof")
+
+#: How far above a sample point (mm) to keep searching for an obstruction.
+#: Beyond this, nothing found is nothing relevant -- nobody is asking
+#: whether there is 5+ metres of clearance.
+DEFAULT_HEADROOM_SEARCH_HEIGHT_MM = 5000.0
+
+#: When no face's XY-projected triangle contains the sample point exactly
+#: (floating-point/tessellation slop, or the walking line sitting a hair
+#: outside a candidate's modelled edge), triangles are tested with their
+#: barycentric coordinates allowed this far (mm-scale, in barycentric units
+#: this is a proxy, not a literal mm value) outside [0, 1] before being
+#: rejected. Small on purpose -- this is a numerical-noise allowance, not a
+#: search radius; see headroom_at_point's docstring for why a real search
+#: radius (checking nearby VERTICES) doesn't work for this.
+_HEADROOM_BARYCENTRIC_TOLERANCE = 1e-6
+
+
+def build_headroom_candidate_index(
+    ifc_file,
+    geometry_extractor,
+    reference_bboxes: list[dict],
+    max_distance_mm: float = DEFAULT_HEADROOM_SEARCH_HEIGHT_MM,
+) -> list[dict]:
+    """Once-per-model index of elements that could obstruct headroom above
+    a stair, restricted to those actually near one.
+
+    Meshing every slab/beam/covering in a large building would be
+    needlessly expensive when only the ones near a stairwell can ever
+    matter -- so only elements whose world bbox is within *max_distance_mm*
+    (in plan) of at least one of *reference_bboxes* (every flight's and
+    landing's own bbox, gathered by the caller) get their mesh pulled at
+    all. This is the same broad-phase-before-narrow-phase shape as
+    ``_link_elements``, just gated on distance instead of an exact match.
+
+    Returns a list of ``{guid, class, bbox, verts, faces}`` dicts. An
+    element with no resolvable bbox, mesh, or face connectivity is skipped,
+    not included with a placeholder -- headroom_at_point's point-in-triangle
+    test needs faces, not just a vertex cloud (see its docstring for why
+    vertex proximity alone is the wrong check here).
+    """
+    index: list[dict] = []
+    seen_ids: set[int] = set()
+    for cls in HEADROOM_CANDIDATE_CLASSES:
+        try:
+            elements = ifc_file.by_type(cls)
+        except Exception:
+            continue
+        for el in elements:
+            try:
+                eid = el.id()
+            except Exception:
+                continue
+            if eid in seen_ids:
+                continue
+            bbox = geometry_extractor.get_bounding_box(el)
+            if bbox is None:
+                continue
+            near_any = any(
+                (bbox_xy_distance_mm(bbox, ref) or 0.0) <= max_distance_mm
+                for ref in reference_bboxes
+            )
+            if not near_any:
+                continue
+            seen_ids.add(eid)
+            verts, faces = geometry_extractor._get_mesh_mm(el)
+            if verts is None or faces is None:
+                continue
+            index.append(
+                {
+                    "guid": getattr(el, "GlobalId", None),
+                    "class": cls,
+                    "bbox": bbox,
+                    "verts": verts,
+                    "faces": faces,
+                }
+            )
+    return index
+
+
+def _face_contains_xy(faces_xy, px: float, py: float):
+    """Barycentric point-in-triangle test, vectorised over faces_xy: (M,3,2)
+    array of each face's 3 corners' (x, y). Returns (inside_mask, a, b, c)
+    -- the boolean containment mask and the barycentric weights (needed by
+    the caller to interpolate Z at (px, py), not just at a vertex).
+    """
+    x0, y0 = faces_xy[:, 0, 0], faces_xy[:, 0, 1]
+    x1, y1 = faces_xy[:, 1, 0], faces_xy[:, 1, 1]
+    x2, y2 = faces_xy[:, 2, 0], faces_xy[:, 2, 1]
+    denom = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+    denom_safe = np.where(np.abs(denom) < 1e-9, 1.0, denom)
+    a = ((y1 - y2) * (px - x2) + (x2 - x1) * (py - y2)) / denom_safe
+    b = ((y2 - y0) * (px - x2) + (x0 - x2) * (py - y2)) / denom_safe
+    c = 1.0 - a - b
+    eps = _HEADROOM_BARYCENTRIC_TOLERANCE
+    inside = (
+        (np.abs(denom) >= 1e-9)
+        & (a >= -eps) & (a <= 1 + eps)
+        & (b >= -eps) & (b <= 1 + eps)
+        & (c >= -eps) & (c <= 1 + eps)
+    )
+    return inside, a, b, c
+
+
+def headroom_at_point(
+    point_xyz: tuple[float, float, float],
+    candidates: list[dict],
+    exclude_guid: str | None = None,
+    max_search_height_mm: float = DEFAULT_HEADROOM_SEARCH_HEIGHT_MM,
+) -> tuple[float | None, str | None]:
+    """Vertical clearance from *point_xyz* up to the nearest overhead
+    material among *candidates*, and that candidate's GUID.
+
+    Returns ``(None, None)`` when nothing is found within
+    *max_search_height_mm* -- not a guessed "plenty of clearance". A flight
+    is its own listed candidate class (for the switchback case), so
+    *exclude_guid* keeps a flight from being measured against itself.
+
+    Broad phase: candidate's bbox must be above the point (with a small
+    downward tolerance for the point sitting exactly on a shared surface)
+    and within plan range of the point's XY. Narrow phase: a genuine
+    point-in-triangle test against the candidate's own faces, Z
+    barycentrically interpolated at the exact query point -- NOT "is any
+    vertex nearby". A large flat slab is typically just 8 corner vertices;
+    a query point at its centre can be hundreds of mm from every vertex
+    while sitting squarely on its surface, so vertex proximity alone
+    reports no obstruction where a real ceiling plainly exists.
+    """
+    x, y, z = point_xyz
+    tol = 50.0
+    best_clearance: float | None = None
+    best_guid: str | None = None
+    for cand in candidates:
+        if exclude_guid is not None and cand.get("guid") == exclude_guid:
+            continue
+        bbox = cand["bbox"]
+        if bbox["min_z"] < z - tol:
+            continue
+        if bbox["min_z"] - z > max_search_height_mm:
+            continue
+        if not (bbox["min_x"] <= x <= bbox["max_x"]):
+            continue
+        if not (bbox["min_y"] <= y <= bbox["max_y"]):
+            continue
+
+        verts, faces = cand["verts"], cand.get("faces")
+        if faces is None or faces.size == 0:
+            continue
+        faces_xyz = verts[faces]  # (M, 3, 3)
+        inside, a, b, c = _face_contains_xy(faces_xyz[:, :, :2], x, y)
+        if not np.any(inside):
+            continue
+        z0, z1, z2 = faces_xyz[:, 0, 2], faces_xyz[:, 1, 2], faces_xyz[:, 2, 2]
+        interpolated_z = a * z0 + b * z1 + c * z2
+        candidate_z = float(interpolated_z[inside].min())
+        clearance = candidate_z - z
+        if clearance < 0:
+            continue
+        if best_clearance is None or clearance < best_clearance:
+            best_clearance, best_guid = clearance, cand.get("guid")
+
+    if best_clearance is None:
+        return None, None
+    return round(best_clearance, 1), best_guid
+
+
 # ── Engine: build once per model, cache by GUID ───────────────────────────────
 
 
@@ -979,9 +1184,76 @@ class IFCStairEngine:
                 self._railings[guid] = analysis
 
         self._link_elements()
+        self._compute_headroom()
 
         self._built = True
         return self
+
+    def _compute_headroom(self) -> None:
+        """Minimum overhead clearance for every flight (sampled at each
+        detected tread nosing) and landing (sampled at its own centroid --
+        a single point, unlike a flight's per-tread sampling, since a
+        landing's own footprint is comparatively small and roughly flat).
+
+        Runs after every flight/landing already has its own ``world_bbox``
+        (from pass one) so the candidate index can be scoped to elements
+        actually near this stair, not every slab/beam in the model.
+        """
+        reference_bboxes = [f["world_bbox"] for f in self._flights.values() if f.get("world_bbox")]
+        reference_bboxes += [l["world_bbox"] for l in self._landings.values() if l.get("world_bbox")]
+        if not reference_bboxes:
+            return
+
+        candidates = build_headroom_candidate_index(
+            self.ifc_file, self.geometry_extractor, reference_bboxes
+        )
+        if not candidates:
+            for flight in self._flights.values():
+                flight["warnings"].append(
+                    "no overhead elements found near this flight -- headroom not evaluated"
+                )
+            return
+
+        for fguid, flight in self._flights.items():
+            points = flight.get("nosing_world_points_mm")
+            if not points:
+                continue
+            best_clearance = None
+            best_guid = None
+            best_point = None
+            for point in points:
+                clearance, guid = headroom_at_point(point, candidates, exclude_guid=fguid)
+                if clearance is not None and (best_clearance is None or clearance < best_clearance):
+                    best_clearance, best_guid, best_point = clearance, guid, point
+            if best_clearance is not None:
+                flight["min_headroom_mm"] = best_clearance
+                flight["min_headroom_limiting_guid"] = best_guid
+                flight["min_headroom_location_mm"] = best_point
+            else:
+                flight["warnings"].append(
+                    "no overhead element found above this flight's walking line -- "
+                    "headroom not evaluated"
+                )
+
+        for lguid, landing in self._landings.items():
+            bbox = landing.get("world_bbox")
+            elevation = landing.get("elevation_mm")
+            if bbox is None or elevation is None:
+                continue
+            center = (
+                (bbox["min_x"] + bbox["max_x"]) / 2.0,
+                (bbox["min_y"] + bbox["max_y"]) / 2.0,
+                elevation,
+            )
+            clearance, guid = headroom_at_point(center, candidates, exclude_guid=lguid)
+            if clearance is not None:
+                landing["min_headroom_mm"] = clearance
+                landing["min_headroom_limiting_guid"] = guid
+            else:
+                landing["warnings"].append(
+                    "no overhead element found above this landing's centroid -- "
+                    "headroom not evaluated (single-point sample, not area-wide)"
+                )
 
     def _flights_with_fallback(self) -> list:
         try:

@@ -371,6 +371,13 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
     # number to compare).
     "riserheights": "risers_mm",
     "treaddepths": "goings_mm",
+    # Headroom (IFCStairEngine._compute_headroom): worst overhead clearance
+    # found near this flight's walking line, and what's causing it -- a
+    # whole-model search, not just this element's own geometry, so it can
+    # catch the flight above in a switchback/scissor stair as well as an
+    # ordinary floor slab or beam.
+    "minheadroom": "min_headroom_mm",
+    "minheadroomlimitingglobalid": "min_headroom_limiting_guid",
     # Whole-stairway (every flight of the same IfcStair pooled together) --
     # codes require riser/tread uniformity across the WHOLE stairway, not
     # just within one flight.

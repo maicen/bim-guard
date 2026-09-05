@@ -208,8 +208,49 @@ rule's `unit` column states mm/deg) and it resolves automatically once
 | `LandingLevelMismatch` | IfcSlab (LANDING) | Worst elevation gap between this landing and whichever flight(s) it connects to — should be ~0 for a well-modeled connection; a real number here is a genuine defect, not a modeling nicety |
 | `HostElementGlobalId` | IfcRailing | GlobalId of the nearest flight or landing this rail runs alongside |
 | `HandrailCountOnFlight` / `GuardCountOnFlight` | IfcStairFlight | Number of HANDRAIL / non-HANDRAIL railings hosted directly by this flight — `0` is a real, determinate finding (every railing in the model got a nearest-flight match attempt), not "not computed" |
+| `MinHeadroom` | IfcStairFlight, IfcSlab (LANDING) | Smallest vertical clearance found between this flight's/landing's walking surface and any overhead element in the model (slab, beam, covering, roof, or another flight) |
+| `MinHeadroomLimitingGlobalId` | IfcStairFlight, IfcSlab (LANDING) | GlobalId of the overhead element that produced `MinHeadroom` |
 
 All of the cross-referencing properties above come from `IFCStairEngine._link_elements()`: IFC decomposition (`IsDecomposedBy`) when the model bothers to author it, otherwise world-bounding-box proximity — see `bbox_xy_distance_mm` and the module's `DEFAULT_LANDING_ELEVATION_TOLERANCE_MM`/`DEFAULT_HOST_PROXIMITY_MM` tunables. Each element's own per-element local (run/lateral) frame is independently PCA-derived and not comparable across elements, so this pass is the one place in the engine that works in world coordinates instead.
+
+### Headroom (`MinHeadroom` / `MinHeadroomLimitingGlobalId`)
+
+`IFCStairEngine._compute_headroom()` runs after cross-referencing, in world
+coordinates, the same way. It does not compare a flight only against its own
+Pset value — it actually searches the model:
+
+1. `build_headroom_candidate_index` meshes every `IfcSlab`, `IfcBeam`,
+   `IfcStairFlight`, `IfcCovering`, and `IfcRoof` in the model whose world
+   bounding box is within `DEFAULT_HEADROOM_SEARCH_HEIGHT_MM` (5m) of any
+   flight/landing bounding box — a broad-phase filter so a whole-building
+   model doesn't get meshed element-by-element for this check.
+2. For each flight, `headroom_at_point` is evaluated at every detected
+   tread's nosing point (`nosing_world_points_mm`, one point per tread,
+   recorded during `analyze_stair_flight`); for each landing, it is
+   evaluated once at the landing's plan centroid.
+3. `headroom_at_point` does a proper point-in-triangle test against each
+   candidate's actual mesh faces (with barycentric Z interpolation for the
+   exact query point), not vertex proximity — a large flat slab may only
+   have 4-8 corner vertices, none of them "near" a query point that is well
+   within its actual surface, so vertex proximity silently misses real
+   coverage. Only faces that are horizontal-ish and strictly above the query
+   point count; the query element's own GlobalId is excluded so a flight
+   never measures headroom against itself.
+4. The flight/landing keeps the *lowest* clearance found across all its
+   sample points, and the GlobalId of whichever element produced it.
+
+**Single-point sampling, not area-wide**: a landing's headroom is measured
+at one point (its centroid), not scanned across its full plan area — a
+landing whose overhead obstruction sits away from centre will not be
+caught. This limitation is named directly in the landing's own warning list
+when no overhead element covers that one sampled point.
+
+**Silent-miss protection**: if nothing is found within search range, or no
+sampled point is covered by any candidate, the flight/landing gets a
+warning ("no overhead element(s) found ... headroom not evaluated") instead
+of silently omitting `MinHeadroom` — so a rule author can tell the
+difference between "genuinely no obstruction found nearby" (still worth a
+human check) and "this property was never computed."
 
 **v1 limitations**, named in each result's `warnings` list rather than
 silently guessed: winder/curved-flight per-position tread depth (inner /
