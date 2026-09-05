@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { router, push, replace } from "svelte-spa-router";
   import Sidebar from "./lib/components/Sidebar.svelte";
+  import AdminSidebar from "./lib/components/AdminSidebar.svelte";
   import AnalysisDomainTabs from "./lib/components/AnalysisDomainTabs.svelte";
   import type { AnalysisDomainTab } from "./lib/components/AnalysisDomainTabs.svelte";
   import TopHeader from "./lib/components/TopHeader.svelte";
@@ -217,6 +218,14 @@
     "workflow",
   ]);
 
+  const ADMIN_VIEWS = new Set([
+    "admin",
+    "org-settings",
+    "superadmin-rulesets",
+    "superadmin-project-grants",
+    "superadmin-document-grants",
+  ]);
+
   let prevActiveOrgId: number | null = $state(null);
 
   // 1. URL -> AuthState: when ?org= is in the query string, switch active organization
@@ -297,12 +306,20 @@
 <div
   class="flex min-h-screen bg-slate-950 font-sans text-slate-100 antialiased transition-colors duration-200 selection:bg-blue-500/30 selection:text-blue-200"
 >
-  <!-- Apple-Style Sidebar -->
-  <Sidebar
-    {activeView}
-    mobileOpen={isMobileNavOpen}
-    onCloseMobile={() => (isMobileNavOpen = false)}
-  />
+  <!-- Apple-Style Sidebar (Admin Portal vs Workspace) -->
+  {#if ADMIN_VIEWS.has(activeView)}
+    <AdminSidebar
+      {activeView}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+    />
+  {:else}
+    <Sidebar
+      {activeView}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+    />
+  {/if}
 
   <!-- Main Content Column -->
   <div class="flex min-w-0 flex-1 flex-col">
@@ -392,7 +409,7 @@
           <IfcExportSettingView />
         {:else if activeView === "settings"}
           <SettingsView />
-        {:else if activeView === "org-settings"}
+        {:else if activeView === "org-settings" || activeView === "admin"}
           <OrgSettingsView />
         {:else if activeView === "superadmin-rulesets"}
           <SuperadminRulesetsView />

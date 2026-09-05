@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { Activity, Menu } from "lucide-svelte";
+  import { Activity, Menu, Shield } from "lucide-svelte";
+  import { push } from "svelte-spa-router";
+  import { authState } from "../auth.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
   import OrgSwitcher from "./OrgSwitcher.svelte";
@@ -47,6 +49,7 @@
     "user-manual": { section: "Manuals", title: "User Workflow Manual" },
     "modeling-manual": { section: "Manuals", title: "3D Modeling Reference" },
     settings: { section: "System", title: "Application Settings" },
+    admin: { section: "Admin", title: "Organization Settings" },
     "org-settings": { section: "Admin", title: "Organization Settings" },
     "superadmin-rulesets": { section: "Platform", title: "Ruleset Access" },
     "superadmin-project-grants": { section: "Platform", title: "Project Access" },
@@ -97,6 +100,23 @@
 
     <IntegrationsMenu {activeView} />
     <ResourcesMenu {activeView} />
+
+    {#if authState.isSuperadmin || authState.activeOrganization?.role === 'owner' || authState.activeOrganization?.role === 'admin'}
+      <button
+        type="button"
+        onclick={() =>
+          push(
+            authState.activeOrganizationId
+              ? `/org-settings?org=${authState.activeOrganizationId}`
+              : "/org-settings",
+          )}
+        class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-300 transition-colors hover:bg-violet-500/20 hover:text-white"
+        title="Open Admin Console"
+      >
+        <Shield class="h-3.5 w-3.5 text-violet-400" />
+        <span>Admin</span>
+      </button>
+    {/if}
 
     <!-- Theme Toggle Button -->
     <ThemeToggle />
