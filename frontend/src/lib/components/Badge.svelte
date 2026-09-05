@@ -42,7 +42,7 @@
 
 <span
   class={cn(
-    "inline-flex items-center gap-1 rounded-full border font-semibold uppercase tracking-wide",
+    "inline-flex items-center gap-1 rounded-md border font-semibold uppercase tracking-wide",
     size === "sm" ? "px-2 py-0.5 text-micro" : "px-2.5 py-1 text-xs",
     cls,
   )}

@@ -2,12 +2,13 @@
   import {
     ShieldCheck,
     Save,
-    Search,
-    RotateCcw,
     CheckCircle2,
     XCircle,
     Building2,
     Filter,
+    Eye,
+    Layers,
+    Info,
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
@@ -16,10 +17,15 @@
   import SortHeader from "../lib/components/SortHeader.svelte";
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import DataTableHeader from "../lib/components/DataTableHeader.svelte";
+  import RulesetDetailsModal from "../lib/components/RulesetDetailsModal.svelte";
   import { organizationsApi, rulesApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { SvelteSet } from "svelte/reactivity";
   import type { OrganizationSummary, RuleFolder } from "../lib/types";
+
+  let isSuperadmin = $derived(authState.isSuperadmin);
 
   let orgs = $state.raw<OrganizationSummary[]>([]);
   let rulesets = $state.raw<RuleFolder[]>([]);
@@ -33,8 +39,9 @@
   // Table state: search, filter, sort, pagination, selection
   let searchQuery = $state("");
   let selectedOrgFilter = $state<number | "all">("all");
+  let categoryFilter = $state<string>("all");
   let grantStatusFilter = $state<"all" | "granted" | "ungranted">("all");
-  let sortField = $state<"name" | "id">("name");
+  let sortField = $state<"name" | "id" | "category" | "count">("name");
   let sortAsc = $state(true);
   let pageIndex = $state(1);
   let pageSize = $state(10);
@@ -43,24 +50,50 @@
   // Target org for bulk grant/revoke
   let bulkTargetOrgId = $state<number | "all">("all");
 
+  // Inspection modal
+  let inspectingRuleset = $state<RuleFolder | null>(null);
+
   async function load() {
     loading = true;
     error = null;
     try {
-      const [orgRes, folderRes] = await Promise.all([organizationsApi.listAll(), rulesApi.folders()]);
-      orgs = orgRes.organizations;
+      let loadedOrgs: OrganizationSummary[] = [];
+      if (authState.isSuperadmin) {
+        const orgRes = await organizationsApi.listAll();
+        loadedOrgs = orgRes.organizations;
+      } else {
+        const myOrgs = authState.profile?.organizations ?? [];
+        loadedOrgs = myOrgs.map((o) => ({
+          id: o.organization_id,
+          name: o.name,
+          slug: o.slug,
+        }));
+      }
+      orgs = loadedOrgs;
+
+      const folderRes = await rulesApi.folders();
       rulesets = folderRes;
+
       const nextGrants: Record<number, Set<string>> = {};
       await Promise.all(
         orgs.map(async (org) => {
-          const res = await organizationsApi.getRulesetGrants(org.id);
-          nextGrants[org.id] = new SvelteSet(res.ruleset_ids);
+          try {
+            const res = await organizationsApi.getRulesetGrants(org.id);
+            nextGrants[org.id] = new SvelteSet(res.ruleset_ids);
+          } catch {
+            nextGrants[org.id] = new SvelteSet();
+          }
         }),
       );
       grants = nextGrants;
       dirty.clear();
       selectedRulesetIds.clear();
-      if (orgs.length > 0 && bulkTargetOrgId === "all") {
+
+      if (authState.activeOrganizationId && orgs.some((o) => o.id === authState.activeOrganizationId)) {
+        selectedOrgFilter = authState.activeOrganizationId;
+        bulkTargetOrgId = authState.activeOrganizationId;
+      } else if (orgs.length > 0) {
+        if (!isSuperadmin) selectedOrgFilter = orgs[0]!.id;
         bulkTargetOrgId = orgs[0]!.id;
       }
     } catch (err) {
@@ -72,9 +105,21 @@
 
   load();
 
+  // Distinct categories from rulesets
+  let categories = $derived(
+    Array.from(new Set(rulesets.map((r) => r.category || "General"))).filter(Boolean),
+  );
+
   // Active columns to display based on org filter
   let displayOrgs = $derived(
     selectedOrgFilter === "all" ? orgs : orgs.filter((o) => o.id === selectedOrgFilter),
+  );
+
+  let hasActiveFilters = $derived(
+    searchQuery.trim() !== "" ||
+      selectedOrgFilter !== (isSuperadmin ? "all" : (authState.activeOrganizationId || (orgs[0]?.id ?? "all"))) ||
+      categoryFilter !== "all" ||
+      grantStatusFilter !== "all",
   );
 
   // Filtered rulesets
@@ -84,13 +129,17 @@
       const matchesSearch =
         !q ||
         r.display_name.toLowerCase().includes(q) ||
-        r.ruleset_id.toLowerCase().includes(q);
+        r.ruleset_id.toLowerCase().includes(q) ||
+        (r.description && r.description.toLowerCase().includes(q));
 
       if (!matchesSearch) return false;
 
+      if (categoryFilter !== "all" && (r.category || "General") !== categoryFilter) {
+        return false;
+      }
+
       if (grantStatusFilter === "all") return true;
 
-      // When checking granted/ungranted:
       const checkOrgs = selectedOrgFilter === "all" ? orgs : orgs.filter((o) => o.id === selectedOrgFilter);
       const isGrantedAny = checkOrgs.some((o) => grants[o.id]?.has(r.ruleset_id));
 
@@ -105,9 +154,21 @@
   let sortedRulesets = $derived.by(() => {
     const dir = sortAsc ? 1 : -1;
     return [...filteredRulesets].sort((a, b) => {
-      const valA = (sortField === "name" ? a.display_name : a.ruleset_id).toLowerCase();
-      const valB = (sortField === "name" ? b.display_name : b.ruleset_id).toLowerCase();
-      return valA < valB ? -dir : valA > valB ? dir : 0;
+      if (sortField === "name") {
+        return a.display_name.localeCompare(b.display_name) * dir;
+      }
+      if (sortField === "id") {
+        return a.ruleset_id.localeCompare(b.ruleset_id) * dir;
+      }
+      if (sortField === "category") {
+        return (a.category || "General").localeCompare(b.category || "General") * dir;
+      }
+      if (sortField === "count") {
+        const countA = a.rules?.length || a.count || 0;
+        const countB = b.rules?.length || b.count || 0;
+        return (countA - countB) * dir;
+      }
+      return 0;
     });
   });
 
@@ -116,7 +177,7 @@
     sortedRulesets.slice((pageIndex - 1) * pageSize, pageIndex * pageSize),
   );
 
-  function handleSort(col: "name" | "id") {
+  function handleSort(col: "name" | "id" | "category" | "count") {
     if (sortField === col) {
       sortAsc = !sortAsc;
     } else {
@@ -127,7 +188,12 @@
 
   function resetFilters() {
     searchQuery = "";
-    selectedOrgFilter = "all";
+    if (isSuperadmin) {
+      selectedOrgFilter = "all";
+    } else {
+      selectedOrgFilter = authState.activeOrganizationId || (orgs[0]?.id ?? "all");
+    }
+    categoryFilter = "all";
     grantStatusFilter = "all";
     pageIndex = 1;
   }
@@ -159,6 +225,7 @@
   );
 
   function toggleGrant(orgId: number, rulesetId: string) {
+    if (!isSuperadmin) return;
     const orgGrants = grants[orgId];
     if (!orgGrants) return;
     if (orgGrants.has(rulesetId)) orgGrants.delete(rulesetId);
@@ -167,6 +234,7 @@
   }
 
   async function saveOrg(orgId: number) {
+    if (!isSuperadmin) return;
     savingOrgId = orgId;
     try {
       await organizationsApi.setRulesetGrants(orgId, Array.from(grants[orgId] ?? []));
@@ -180,7 +248,7 @@
   }
 
   async function saveAllDirty() {
-    if (dirty.size === 0) return;
+    if (!isSuperadmin || dirty.size === 0) return;
     isSavingAll = true;
     try {
       for (const orgId of Array.from(dirty)) {
@@ -195,8 +263,8 @@
     }
   }
 
-  // Bulk actions
   function handleBulkGrant() {
+    if (!isSuperadmin) return;
     const targetOrgIds =
       bulkTargetOrgId === "all" ? orgs.map((o) => o.id) : [Number(bulkTargetOrgId)];
     for (const orgId of targetOrgIds) {
@@ -211,6 +279,7 @@
   }
 
   function handleBulkRevoke() {
+    if (!isSuperadmin) return;
     const targetOrgIds =
       bulkTargetOrgId === "all" ? orgs.map((o) => o.id) : [Number(bulkTargetOrgId)];
     for (const orgId of targetOrgIds) {
@@ -223,17 +292,41 @@
     }
     toasts.success(`Revoked ${selectedRulesetIds.size} ruleset(s). Click Save to persist.`);
   }
+
+  function exportSelectedRulesets() {
+    const selectedList = rulesets.filter((r) => selectedRulesetIds.has(r.ruleset_id));
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      ["Ruleset ID,Display Name,Category,Rule Count,Description"]
+        .concat(
+          selectedList.map(
+            (r) =>
+              `"${r.ruleset_id}","${r.display_name}","${r.category || ""}","${r.rules?.length || r.count || 0}","${(r.description || "").replace(/"/g, '""')}"`,
+          ),
+        )
+        .join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `rulesets-export-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toasts.success(`Exported ${selectedList.length} ruleset(s) to CSV.`);
+  }
 </script>
 
 <div class="space-y-6">
   <PageHeader
-    category="Administration"
+    category={isSuperadmin ? "Platform Governance" : "Organization Governance"}
     title="Ruleset Access"
-    subtitle="Which rulesets each organization may use. A project can only bind what its owning organization is granted here."
+    subtitle={isSuperadmin
+      ? "Manage which engineering compliance rulesets each organization is granted to bind to its projects."
+      : "Ruleset catalogs and active engineering compliance standards licensed for your organization."}
     icon={ShieldCheck}
   >
     {#snippet actions()}
-      {#if dirty.size > 0}
+      {#if isSuperadmin && dirty.size > 0}
         <button
           type="button"
           onclick={saveAllDirty}
@@ -247,33 +340,49 @@
     {/snippet}
   </PageHeader>
 
-  <!-- Controls Bar: Search, Filters, Reset -->
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-    <div class="flex flex-1 flex-wrap items-center gap-3">
-      <!-- Search -->
-      <div class="relative min-w-[16rem] flex-1 max-w-md">
-        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        <input
-          type="text"
-          placeholder="Search ruleset by name or ID…"
-          bind:value={searchQuery}
-          class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-        />
-      </div>
+  <!-- Standardized Data Table Header with Filters & Search -->
+  <DataTableHeader
+    bind:searchQuery
+    searchPlaceholder="Search rulesets by name, ID, or description…"
+    selectedCount={selectedRulesetIds.size}
+    selectedLabel="ruleset"
+    onClearSelection={() => selectedRulesetIds.clear()}
+    {hasActiveFilters}
+    onResetFilters={resetFilters}
+  >
+    {#snippet filters()}
+      <!-- Organization Selector -->
+      {#if orgs.length > 1 || isSuperadmin}
+        <div class="relative">
+          <select
+            bind:value={selectedOrgFilter}
+            aria-label="Filter by Organization"
+            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-none"
+          >
+            {#if isSuperadmin}
+              <option value="all">All Organizations ({orgs.length})</option>
+            {/if}
+            {#each orgs as org (org.id)}
+              <option value={org.id}>{org.name}</option>
+            {/each}
+          </select>
+          <Building2 class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        </div>
+      {/if}
 
-      <!-- Organization Filter -->
+      <!-- Category Filter -->
       <div class="relative">
         <select
-          bind:value={selectedOrgFilter}
-          aria-label="Filter by Organization"
+          bind:value={categoryFilter}
+          aria-label="Filter by Category"
           class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-none"
         >
-          <option value="all">All Organizations ({orgs.length})</option>
-          {#each orgs as org (org.id)}
-            <option value={org.id}>{org.name}</option>
+          <option value="all">All Categories</option>
+          {#each categories as cat}
+            <option value={cat}>{cat}</option>
           {/each}
         </select>
-        <Building2 class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        <Layers class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
       </div>
 
       <!-- Grant Status Filter -->
@@ -289,33 +398,8 @@
         </select>
         <Filter class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
       </div>
-
-      {#if searchQuery || selectedOrgFilter !== "all" || grantStatusFilter !== "all"}
-        <button
-          type="button"
-          onclick={resetFilters}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700"
-        >
-          <RotateCcw class="h-3.5 w-3.5" />
-          <span>Reset</span>
-        </button>
-      {/if}
-    </div>
-
-    <!-- Selection summary -->
-    {#if selectedRulesetIds.size > 0}
-      <div class="flex items-center gap-2 text-xs text-violet-300">
-        <span class="font-semibold">{selectedRulesetIds.size}</span> ruleset(s) selected
-        <button
-          type="button"
-          onclick={() => selectedRulesetIds.clear()}
-          class="text-micro underline text-slate-400 hover:text-slate-200 ml-1"
-        >
-          Clear
-        </button>
-      </div>
-    {/if}
-  </div>
+    {/snippet}
+  </DataTableHeader>
 
   {#if loading}
     <LoadingState message="Loading organizations and ruleset catalog…" />
@@ -324,7 +408,7 @@
   {:else if orgs.length === 0 || rulesets.length === 0}
     <EmptyState
       title="Nothing to show yet"
-      description="Ruleset access requires at least one organization and one active rule folder."
+      description="Ruleset access requires at least one organization and active rule folder."
       icon={ShieldCheck}
     />
   {:else if filteredRulesets.length === 0}
@@ -374,28 +458,77 @@
                 Ruleset ID
               </SortHeader>
 
-              <!-- Organization Columns -->
-              {#each displayOrgs as org (org.id)}
-                <th class="min-w-[11rem] px-4 py-3 text-center">
-                  <div class="truncate font-semibold text-slate-100" title={org.name}>
-                    {org.name}
+              <!-- Category -->
+              <SortHeader
+                column="category"
+                {sortField}
+                {sortAsc}
+                onSort={() => handleSort("category")}
+                customClass="min-w-[9rem] px-4 py-3"
+              >
+                Category
+              </SortHeader>
+
+              <!-- Rules Count -->
+              <SortHeader
+                column="count"
+                {sortField}
+                {sortAsc}
+                onSort={() => handleSort("count")}
+                customClass="min-w-[7rem] px-4 py-3 text-center"
+                align="center"
+              >
+                Rules
+              </SortHeader>
+
+              <!-- Organization Grant Columns (Superadmin Multi-Org View) -->
+              {#if isSuperadmin && displayOrgs.length > 1}
+                {#each displayOrgs as org (org.id)}
+                  <th class="min-w-[11rem] px-4 py-3 text-center">
+                    <div class="truncate font-semibold text-slate-100" title={org.name}>
+                      {org.name}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!dirty.has(org.id) || savingOrgId === org.id}
+                      onclick={() => saveOrg(org.id)}
+                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-medium text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Save class="h-3 w-3" />
+                      <span>{savingOrgId === org.id ? "Saving…" : dirty.has(org.id) ? "Save" : "Saved"}</span>
+                    </button>
+                  </th>
+                {/each}
+              {:else}
+                <!-- Single Org Access Status Column (Org Owner View or Single-Filtered Superadmin) -->
+                {@const targetOrg = displayOrgs[0] || orgs[0]}
+                <th class="min-w-[12rem] px-4 py-3 text-center">
+                  <div class="font-semibold text-slate-100">
+                    {targetOrg?.name || "Organization"} Access
                   </div>
-                  <button
-                    type="button"
-                    disabled={!dirty.has(org.id) || savingOrgId === org.id}
-                    onclick={() => saveOrg(org.id)}
-                    class="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-medium text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Save class="h-3 w-3" />
-                    <span>{savingOrgId === org.id ? "Saving…" : dirty.has(org.id) ? "Save" : "Saved"}</span>
-                  </button>
+                  {#if isSuperadmin && targetOrg && dirty.has(targetOrg.id)}
+                    <button
+                      type="button"
+                      disabled={savingOrgId === targetOrg.id}
+                      onclick={() => saveOrg(targetOrg.id)}
+                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-violet-500/40 bg-violet-600/30 px-2.5 py-0.5 text-micro font-semibold text-violet-200 transition-colors hover:bg-violet-600/50"
+                    >
+                      <Save class="h-3 w-3" />
+                      <span>{savingOrgId === targetOrg.id ? "Saving…" : "Save Changes"}</span>
+                    </button>
+                  {/if}
                 </th>
-              {/each}
+              {/if}
+
+              <!-- Actions Column -->
+              <th class="w-16 px-4 py-3 text-center">Details</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
             {#each paginatedRulesets as ruleset (ruleset.ruleset_id)}
               {@const isRowSelected = selectedRulesetIds.has(ruleset.ruleset_id)}
+              {@const singleOrg = displayOrgs[0] || orgs[0]}
+              {@const isSingleOrgGranted = singleOrg ? (grants[singleOrg.id]?.has(ruleset.ruleset_id) ?? false) : false}
               <tr
                 class="transition-colors hover:bg-slate-800/40 {isRowSelected ? 'bg-violet-950/20' : ''}"
               >
@@ -427,28 +560,93 @@
                   </span>
                 </td>
 
-                <!-- Grant Toggle per Org -->
-                {#each displayOrgs as org (org.id)}
-                  {@const isGranted = grants[org.id]?.has(ruleset.ruleset_id) ?? false}
+                <!-- Category -->
+                <td class="px-4 py-3">
+                  <span class="rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-0.5 text-micro font-medium text-slate-300">
+                    {ruleset.category || "General"}
+                  </span>
+                </td>
+
+                <!-- Rule Count -->
+                <td class="px-4 py-3 text-center font-mono text-micro text-slate-300">
+                  {ruleset.rules?.length || ruleset.count || 0}
+                </td>
+
+                <!-- Multi-Org Columns (Superadmin View) -->
+                {#if isSuperadmin && displayOrgs.length > 1}
+                  {#each displayOrgs as org (org.id)}
+                    {@const isGranted = grants[org.id]?.has(ruleset.ruleset_id) ?? false}
+                    <td class="px-4 py-3 text-center">
+                      <button
+                        type="button"
+                        onclick={() => toggleGrant(org.id, ruleset.ruleset_id)}
+                        class="group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all {isGranted
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                          : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'}"
+                        title={isGranted ? `Revoke from ${org.name}` : `Grant to ${org.name}`}
+                      >
+                        {#if isGranted}
+                          <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Granted</span>
+                        {:else}
+                          <XCircle class="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-400" />
+                          <span>No Access</span>
+                        {/if}
+                      </button>
+                    </td>
+                  {/each}
+                {:else}
+                  <!-- Single Org Status Row (Org Owner View or Single-Filtered Superadmin) -->
                   <td class="px-4 py-3 text-center">
-                    <button
-                      type="button"
-                      onclick={() => toggleGrant(org.id, ruleset.ruleset_id)}
-                      class="group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all {isGranted
-                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
-                        : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'}"
-                      title={isGranted ? `Revoke from ${org.name}` : `Grant to ${org.name}`}
-                    >
-                      {#if isGranted}
-                        <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Granted</span>
+                    {#if isSuperadmin && singleOrg}
+                      <button
+                        type="button"
+                        onclick={() => toggleGrant(singleOrg.id, ruleset.ruleset_id)}
+                        class="group inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-semibold transition-all {isSingleOrgGranted
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                          : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'}"
+                        title={isSingleOrgGranted ? `Click to revoke` : `Click to grant`}
+                      >
+                        {#if isSingleOrgGranted}
+                          <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Granted</span>
+                        {:else}
+                          <XCircle class="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-400" />
+                          <span>Not Granted</span>
+                        {/if}
+                      </button>
+                    {:else}
+                      <!-- Org Owner View: Clean Status Badge -->
+                      {#if isSingleOrgGranted}
+                        <span
+                          class="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300"
+                        >
+                          <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Granted to Org</span>
+                        </span>
                       {:else}
-                        <XCircle class="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-400" />
-                        <span>No Access</span>
+                        <span
+                          class="inline-flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs font-medium text-slate-400"
+                        >
+                          <Info class="h-3.5 w-3.5 text-slate-500" />
+                          <span>Catalog Standard</span>
+                        </span>
                       {/if}
-                    </button>
+                    {/if}
                   </td>
-                {/each}
+                {/if}
+
+                <!-- Inspect Button -->
+                <td class="px-4 py-3 text-center">
+                  <button
+                    type="button"
+                    onclick={() => (inspectingRuleset = ruleset)}
+                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+                    title="Inspect ruleset rules and metadata"
+                  >
+                    <Eye class="h-4 w-4" />
+                  </button>
+                </td>
               </tr>
             {/each}
           </tbody>
@@ -474,32 +672,45 @@
     selectedCount={selectedRulesetIds.size}
     itemLabel="ruleset"
     onClearSelection={() => selectedRulesetIds.clear()}
+    onBulkExport={exportSelectedRulesets}
   >
-    <div class="flex items-center gap-2">
-      <select
-        bind:value={bulkTargetOrgId}
-        aria-label="Target Organization for Bulk Action"
-        class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-none"
-      >
-        <option value="all">All Organizations</option>
-        {#each orgs as org (org.id)}
-          <option value={org.id}>{org.name}</option>
-        {/each}
-      </select>
-      <button
-        type="button"
-        onclick={handleBulkGrant}
-        class="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-emerald-500"
-      >
-        Grant Access
-      </button>
-      <button
-        type="button"
-        onclick={handleBulkRevoke}
-        class="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-rose-500"
-      >
-        Revoke Access
-      </button>
-    </div>
+    {#if isSuperadmin}
+      <div class="flex items-center gap-2">
+        <select
+          bind:value={bulkTargetOrgId}
+          aria-label="Target Organization for Bulk Action"
+          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-none"
+        >
+          <option value="all">All Organizations</option>
+          {#each orgs as org (org.id)}
+            <option value={org.id}>{org.name}</option>
+          {/each}
+        </select>
+        <button
+          type="button"
+          onclick={handleBulkGrant}
+          class="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-emerald-500"
+        >
+          Grant Access
+        </button>
+        <button
+          type="button"
+          onclick={handleBulkRevoke}
+          class="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-rose-500"
+        >
+          Revoke Access
+        </button>
+      </div>
+    {/if}
   </BulkActionBar>
+
+  <!-- Inspection Modal -->
+  <RulesetDetailsModal
+    open={inspectingRuleset !== null}
+    ruleset={inspectingRuleset}
+    isGranted={inspectingRuleset && (displayOrgs[0] || orgs[0])
+      ? (grants[(displayOrgs[0] || orgs[0])!.id]?.has(inspectingRuleset.ruleset_id) ?? false)
+      : false}
+    onClose={() => (inspectingRuleset = null)}
+  />
 </div>

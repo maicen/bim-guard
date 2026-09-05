@@ -502,10 +502,14 @@ def get_organization_project_grants(
 ) -> OrganizationProjectGrantsResponse:
     """Return the projects shared into this organization from elsewhere.
 
-    Superadmin only. Projects the organization owns outright don't appear
-    here -- this is only the cross-org sharing grant on top of ownership.
+    Projects the organization owns outright don't appear here -- this is
+    only the cross-org sharing grant on top of ownership.
     """
-    _require_superadmin(current_user, profiles)
+    if not profiles.is_superadmin(current_user.id) and organization_id not in memberships.org_ids_for_user(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this organization's project grants.",
+        )
     return OrganizationProjectGrantsResponse(
         organization_id=organization_id,
         project_ids=memberships.list_org_project_grants(organization_id),

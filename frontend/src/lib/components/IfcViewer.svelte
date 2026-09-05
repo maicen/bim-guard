@@ -185,7 +185,7 @@
     <div class="flex items-center gap-3">
       {#if loading}
         <div
-          class="flex items-center gap-2 rounded-full border border-blue-800/60 bg-blue-950/60 px-3 py-1 text-xs text-blue-300"
+          class="flex items-center gap-2 rounded-md border border-blue-800/60 bg-blue-950/60 px-3 py-1 text-xs text-blue-300"
         >
           <Loader2 class="h-3.5 w-3.5 animate-spin text-blue-400" />
           <span class="text-caption font-medium">{loadingMessage}</span>

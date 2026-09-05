@@ -143,7 +143,7 @@
         </h3>
         {#if isStreaming}
           <span
-            class="inline-flex items-center gap-1.5 rounded-full border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold text-emerald-400"
+            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold text-emerald-400"
           >
             <span class="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400"></span>
             SSE Live
@@ -221,7 +221,7 @@
                 <span class="text-xs font-semibold text-slate-200">{engine.label || code}</span>
               </div>
               <span
-                class="rounded-full border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider {getStatusBadge(
+                class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider {getStatusBadge(
                   engine.status,
                 )}"
               >

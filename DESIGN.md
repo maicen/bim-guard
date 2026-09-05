@@ -24,7 +24,7 @@ tool is not a product showcase:
 | Apple rule | BIMGuard | Why |
 | --- | --- | --- |
 | No borders on cards | Borders on every card (`border-slate-800`) | Dense grids need explicit boundaries; contrast alone cannot separate 40 stacked rows |
-| 980px pill CTAs | 8–12px radius buttons | Pills read as marketing; rectangular controls sit correctly in toolbars |
+| 980px pill CTAs | 8–12px radius controls (`rounded-lg` / `rounded-xl`) | Pills read as consumer marketing; crisp rectangular controls sit correctly in toolbars, menus, and data tables |
 | ~980px max content width | Full viewport width | Tables need every pixel |
 | Black ↔ light-gray section rhythm | One continuous canvas | There are no "sections" — there are views |
 | SF Pro optical sizing | Inter at one optical size | SF Pro does not exist off macOS; the app runs on Windows and Linux |
@@ -118,9 +118,11 @@ Never 800/900.
 Compose from `frontend/src/lib/components/` — see §12. General rules:
 
 - **Buttons.** Primary: `bg-accent text-white`, `rounded-xl`, `px-3.5 py-2`,
-  `text-caption font-semibold`. Secondary: `bg-slate-950 border border-slate-800
-  text-slate-200 hover:bg-slate-800`. Destructive: `bg-rose-600 text-white`.
-  Every button needs a `type` and a disabled state.
+  `text-caption font-semibold`. Secondary / Toolbar: `bg-slate-950 border border-slate-800
+  text-slate-200 hover:bg-slate-800 rounded-xl` (or `rounded-lg` for compact toolbars). Destructive: `bg-rose-600 text-white rounded-xl`.
+  Every button needs a `type` and a disabled state. **Never use `rounded-full` on buttons.**
+- **Dropdowns & Menus.** Triggers: `rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-700`. Popovers / flyouts: `rounded-xl border border-slate-800 bg-slate-900 p-1.5 shadow-xl` with menu items `rounded-lg`. **Never wrap select controls or dropdown triggers in `rounded-full` pills.**
+- **Badges & Status Chips.** `<Badge>` and `<SeverityBadge>` use `rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide`. Rectangular tags ensure visual hierarchy and information density on complex tables. **Never use `rounded-full` for text tags or status badges.**
 - **Inputs.** `w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5
   py-2.5 text-xs text-slate-50 focus:border-accent`. Always paired with a
   `<label for>`.
@@ -132,9 +134,12 @@ Compose from `frontend/src/lib/components/` — see §12. General rules:
 ## 5. Layout
 
 - 8px base unit; Tailwind's default spacing scale is already on it.
-- Radius: `rounded-sm` 5px, `rounded`/`rounded-md` 8px, `rounded-lg` 11px,
-  `rounded-xl`/`rounded-2xl` 12px. `rounded-full` for pills, dots and avatars.
-  **Nothing rectangular exceeds 12px.**
+- **Radius hierarchy**:
+  - `rounded-sm` (4px): subtle indicators, sub-pixel borders
+  - `rounded-md` (6–8px): badges, chips, tags, table row checkboxes
+  - `rounded-lg` (8–11px): dropdown triggers, toolbar buttons, select inputs, popover menu items
+  - `rounded-xl` (12px): cards, modals, primary CTA buttons, popover containers
+  - `rounded-full`: **strictly restricted to true circles (1:1 aspect ratio)**: circular status dots (`h-1.5 w-1.5`), user avatars (`h-7 w-7`), spinner animations, circular wizard step numbers (`w-6 h-6`), and slim progress bar tracks. **Nothing rectangular or containing text may use `rounded-full`.**
 - Content fills the viewport. Tables scroll horizontally inside
   `overflow-x-auto`; the page body never scrolls sideways.
 
@@ -167,6 +172,7 @@ is disabled under `prefers-reduced-motion`, which `app.css` honours globally.
 - Keep negative tracking at all sizes
 - Put wide content in `overflow-x-auto`
 - Give every `{#each}` a key
+- Use `rounded-md` for badges and tags, `rounded-lg` for dropdown triggers and toolbar controls, and `rounded-xl` for cards and primary action buttons
 
 ### Don't
 
@@ -174,6 +180,7 @@ is disabled under `prefers-reduced-motion`, which `app.css` honours globally.
 - Don't add `text-[Npx]` — the ramp already goes down to 9px
 - Don't introduce accent colours beyond the accent and the severity bands
 - Don't use radius above 12px on rectangles
+- Don't use `rounded-full` or pill borders on dropdowns, select menus, buttons, filter tabs, or data table badges
 - Don't use `!important` to fix a theme problem — fix the token
 - Don't use weight 800 or 900
 - Don't add textures, patterns or decorative gradients
@@ -245,5 +252,5 @@ To maintain cohesive design patterns and avoid duplicate markup, all UI views mu
 - **`<BulkActionBar.svelte>`**: Floating/inline bulk action toolbar when rows are selected.
 - **`<EmptyState.svelte>`**: Standardized zero-state card with icon, title, description, and primary CTA button.
 - **`<LoadingState.svelte>`**: Spinner loading container with configurable message and sub-message.
-- **`<SeverityBadge.svelte>`**: Universal pill badge for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
+- **`<SeverityBadge.svelte>`**: Universal compact engineering badge (`rounded-md`) for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
 - **`<IsoGovernanceBadges.svelte>`**: Standard ISO 19650 metadata tags (Suitability `S0`–`S7`, Revision `P01.01`, CDE State `WIP`/`SHARED`/`PUBLISHED`/`ARCHIVED`).

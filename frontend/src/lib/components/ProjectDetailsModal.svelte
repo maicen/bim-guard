@@ -73,7 +73,7 @@
               >Status</span
             >
             <span
-              class="inline-block rounded-full px-2.5 py-0.5 text-micro font-semibold {project.status ===
+              class="inline-block rounded-md px-2.5 py-0.5 text-micro font-semibold {project.status ===
               'Active'
                 ? 'border border-emerald-800/60 bg-emerald-950/50 text-emerald-400'
                 : 'bg-slate-800 text-slate-400'}"
@@ -159,7 +159,7 @@
             >
             {#if project.ifc_file_path}
               <span
-                class="inline-flex items-center gap-1 rounded-full border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold text-emerald-400"
+                class="inline-flex items-center gap-1 rounded-md border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold text-emerald-400"
               >
                 <ShieldCheck class="h-3 w-3" />
                 buildingSMART Validated

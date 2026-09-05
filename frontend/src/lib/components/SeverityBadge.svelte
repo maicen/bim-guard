@@ -16,7 +16,7 @@
 
 <span
   class={cn(
-    "inline-flex items-center gap-1.5 rounded-full border font-semibold uppercase tracking-wider shadow-sm",
+    "inline-flex items-center gap-1.5 rounded-md border font-semibold uppercase tracking-wider shadow-sm",
     size === "xs" ? "px-2.5 py-0.5 text-micro" : "px-3 py-1 text-xs",
     style.badge,
   )}

@@ -51,9 +51,9 @@
     settings: { section: "System", title: "Application Settings" },
     admin: { section: "Admin", title: "Organization Settings" },
     "org-settings": { section: "Admin", title: "Organization Settings" },
-    "superadmin-rulesets": { section: "Platform", title: "Ruleset Access" },
-    "superadmin-project-grants": { section: "Platform", title: "Project Access" },
-    "superadmin-document-grants": { section: "Platform", title: "Document Access" },
+    "superadmin-rulesets": { section: "Governance", title: "Ruleset Access" },
+    "superadmin-project-grants": { section: "Governance", title: "Project Access" },
+    "superadmin-document-grants": { section: "Governance", title: "Document Access" },
   };
 
   let headerInfo = $derived(
@@ -86,7 +86,7 @@
       <ProjectSwitcher {selectedProject} onSwitch={onSwitchProject} />
     {:else if selectedProject}
       <span
-        class="ml-2 hidden items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-400 lg:inline-flex"
+        class="ml-2 hidden items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/60 px-2.5 py-0.5 text-xs font-medium text-slate-300 lg:inline-flex"
       >
         Project: {selectedProject.name}
       </span>
@@ -110,7 +110,7 @@
               ? `/org-settings?org=${authState.activeOrganizationId}`
               : "/org-settings",
           )}
-        class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-300 transition-colors hover:bg-violet-500/20 hover:text-white"
+        class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-300 transition-colors hover:bg-violet-500/20 hover:text-white"
         title="Open Admin Console"
       >
         <Shield class="h-3.5 w-3.5 text-violet-400" />

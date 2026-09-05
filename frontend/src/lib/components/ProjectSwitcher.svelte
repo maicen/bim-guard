@@ -46,7 +46,7 @@
 </script>
 
 <div
-  class="ml-2 hidden items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 lg:inline-flex"
+  class="ml-2 hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-700 lg:inline-flex"
 >
   <Building2 class="h-3.5 w-3.5 shrink-0 text-blue-400" />
   <div class="relative">
@@ -54,7 +54,7 @@
       value={selectedProject?.id ?? ""}
       onchange={handleChange}
       aria-label="Switch current project"
-      class="max-w-[12rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-blue-300 focus:outline-none"
+      class="max-w-[12rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-slate-200 focus:outline-none"
     >
       <option value="" disabled>Select project…</option>
       {#each projects as p (p.id)}
@@ -62,7 +62,7 @@
       {/each}
     </select>
     <ChevronDown
-      class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-blue-400"
+      class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400"
     />
   </div>
 </div>
