@@ -7,6 +7,7 @@
  */
 
 let currentToken: string | null = null;
+let currentOrgId: number | null = null;
 
 export function setAuthToken(token: string | null): void {
   currentToken = token;
@@ -16,7 +17,22 @@ export function getAuthToken(): string | null {
   return currentToken;
 }
 
-/** `Authorization` header for an authenticated fetch, or {} when signed out. */
+export function setActiveOrgId(orgId: number | null): void {
+  currentOrgId = orgId;
+}
+
+export function getActiveOrgId(): number | null {
+  return currentOrgId;
+}
+
+/** `Authorization` and tenant headers for an authenticated fetch. */
 export function authHeaders(): Record<string, string> {
-  return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+  const headers: Record<string, string> = {};
+  if (currentToken) {
+    headers.Authorization = `Bearer ${currentToken}`;
+  }
+  if (currentOrgId != null) {
+    headers["X-Organization-Id"] = String(currentOrgId);
+  }
+  return headers;
 }

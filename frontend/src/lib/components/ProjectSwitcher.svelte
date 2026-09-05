@@ -27,9 +27,9 @@
   );
 
   $effect(() => {
-    if (allProjects.length) return;
+    const orgId = authState.activeOrganizationId;
     projectsApi
-      .list()
+      .list({ forceRefresh: true, organization_id: orgId })
       .then((res) => {
         allProjects = res.projects || [];
       })

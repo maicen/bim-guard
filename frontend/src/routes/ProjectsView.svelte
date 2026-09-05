@@ -71,12 +71,23 @@
   let repoCategoryFilter = $state("all");
   let importingPath = $state("");
 
+  let orgScopedProjects = $derived(
+    authState.activeOrganizationId == null
+      ? projects || []
+      : (projects || []).filter((p) => p.organization_id === authState.activeOrganizationId),
+  );
+
+  $effect(() => {
+    const _orgId = authState.activeOrganizationId;
+    loadProjects(true);
+  });
+
   // Search, filter, sort, paginate and select — all owned by the shared state.
   // The domain filter reuses normalizeAnalysisDomain rather than restating the
   // legacy alias list ("Architectural", "Piping (Corrosive)", "Halo", ...).
   const table = $state(
     createTableState<Project, number>({
-      rows: () => projects || [],
+      rows: () => orgScopedProjects,
       getId: (p) => p.id,
       searchFields: (p) => [p.name, p.description],
       filters: {

@@ -6,8 +6,8 @@
  */
 
 import type { Session, User } from "@supabase/supabase-js";
-import { authApi } from "./api";
-import { setAuthToken } from "./authToken";
+import { authApi, clearTenantCaches } from "./api";
+import { setAuthToken, setActiveOrgId } from "./authToken";
 import { isAuthConfigured, supabase } from "./supabaseClient";
 import type { CurrentUserResponse, ProfileUpdatePayload } from "./types";
 
@@ -49,6 +49,8 @@ class AuthState {
 
   /** Persist the caller's chosen organization as their new default. */
   async setActiveOrganization(organizationId: number): Promise<void> {
+    setActiveOrgId(organizationId);
+    clearTenantCaches();
     await this.updateProfile({ default_organization_id: organizationId });
   }
 
@@ -76,14 +78,19 @@ class AuthState {
   async #loadProfile() {
     if (!this.session) {
       this.profile = null;
+      setActiveOrgId(null);
+      clearTenantCaches();
       return;
     }
     try {
       this.profile = await authApi.me(this.session.access_token);
+      setActiveOrgId(this.activeOrganizationId);
+      clearTenantCaches();
     } catch {
       // Non-fatal: the header falls back to showing the Supabase user's
       // email, which is already on this.session.
       this.profile = null;
+      setActiveOrgId(null);
     }
   }
 
@@ -92,6 +99,8 @@ class AuthState {
     if (!this.session) return;
     const updated = await authApi.updateProfile(this.session.access_token, updates);
     if (this.profile) this.profile = { ...this.profile, profile: updated };
+    setActiveOrgId(this.activeOrganizationId);
+    clearTenantCaches();
   }
 
   /** Redirect to Google's consent screen; the browser comes back with a session. */
@@ -106,6 +115,8 @@ class AuthState {
   async signOut(): Promise<void> {
     await supabase.auth.signOut();
     setAuthToken(null);
+    setActiveOrgId(null);
+    clearTenantCaches();
     this.profile = null;
   }
 }

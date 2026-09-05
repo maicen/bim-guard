@@ -11,6 +11,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Response,
@@ -19,7 +20,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from app.api.dependencies import get_rules_service
+from app.api.dependencies import get_rules_service, get_ruleset_access_service
 from app.auth import get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
@@ -45,6 +46,7 @@ from app.modules.contracts import (
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rule_snapshot_service import RuleSnapshotService
 from app.services.rules_service import RuleService
+from app.services.ruleset_access_service import RulesetAccessService
 
 logger = get_logger(__name__)
 
@@ -72,11 +74,14 @@ def _rule_response(row: dict) -> RuleResponse:
 def list_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
     response: Response,
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
     mechanism: Optional[str] = Query(None, description="Filter by mechanism (e.g. GC-001, CODE)"),
     ruleset_id: Optional[str] = Query(None, description="Filter by ruleset identifier"),
     category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
     keyword: Optional[str] = Query(None, description="Keyword search query"),
     needs_review: Optional[int] = Query(None, description="Filter by review status (1 or 0)"),
+    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> list[RuleResponse]:
     """Retrieve compliance rules with optional multi-criteria filtering."""
     response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
@@ -88,6 +93,14 @@ def list_rules(
         rules = service.list_by_category(category)
     else:
         rules = service.list_rules()
+
+    effective_org_id: Optional[int] = organization_id
+    if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        effective_org_id = int(x_org_id.strip())
+
+    if effective_org_id is not None:
+        allowed_rulesets = set(ruleset_access.list_org_grants(effective_org_id))
+        rules = [r for r in rules if (r.get("ruleset_id") or "") in allowed_rulesets]
 
     if category and (mechanism or ruleset_id):
         norm_cat = service.normalize_category(category)
@@ -114,11 +127,23 @@ def list_rules(
 def list_rule_folders(
     service: Annotated[RuleService, Depends(get_rules_service)],
     response: Response,
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
     category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
+    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> list[RuleFolderResponse]:
-    """Return all rule folders along with their member rules."""
+    """Return all rule folders along with their member rules, optionally filtered by organization grants."""
     response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
     folders = service.list_folders_with_rules(category=category)
+
+    effective_org_id: Optional[int] = organization_id
+    if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        effective_org_id = int(x_org_id.strip())
+
+    if effective_org_id is not None:
+        allowed_rulesets = set(ruleset_access.list_org_grants(effective_org_id))
+        folders = [f for f in folders if (f.get("ruleset_id") or "") in allowed_rulesets]
+
     result: list[RuleFolderResponse] = []
     for f in folders:
         rules_list = [_rule_response(r) for r in f.get("rules", [])]

@@ -126,6 +126,7 @@ export interface ProjectListResponse {
 
 export interface ProjectCreatePayload {
   name: string;
+  organization_id?: number | null;
   description?: string;
   status?: string;
   country?: string;

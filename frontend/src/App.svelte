@@ -210,6 +210,21 @@
     "workflow",
   ]);
 
+  let prevActiveOrgId: number | null = $state(null);
+  $effect(() => {
+    const currentOrgId = authState.activeOrganizationId;
+    if (prevActiveOrgId !== null && prevActiveOrgId !== currentOrgId) {
+      if (selectedProject && selectedProject.organization_id !== currentOrgId) {
+        selectedProject = null;
+        targetProjectId = null;
+        if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+          push(`/${activeView}`);
+        }
+      }
+    }
+    prevActiveOrgId = currentOrgId;
+  });
+
   function handleSwitchProject(projectId: number) {
     if (PROJECT_SCOPED_VIEWS.has(activeView)) {
       push(buildTargetUrl(activeView, projectId));

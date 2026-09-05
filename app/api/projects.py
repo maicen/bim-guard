@@ -4,7 +4,18 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -157,29 +168,43 @@ def list_projects(
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     response: Response,
+    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> ProjectListResponse:
     """Return the caller's organizations' projects, ordered newest first.
 
-    A superadmin sees every organization's projects, not just their own.
+    If an organization_id is specified (via query or X-Organization-Id header),
+    only projects owned by or granted to that organization will be returned.
+    A superadmin sees every organization's projects when no filter is applied.
     """
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=30"
     all_rows = service.list_projects()
+
+    effective_org_id: Optional[int] = organization_id
+    if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        effective_org_id = int(x_org_id.strip())
+
     if profiles.is_superadmin(current_user.id):
-        rows = all_rows
+        if effective_org_id is not None:
+            shared_in = set(memberships.list_org_project_grants(effective_org_id))
+            rows = [
+                row for row in all_rows
+                if row.get("organization_id") == effective_org_id or row.get("id") in shared_in
+            ]
+        else:
+            rows = all_rows
     else:
-        org_ids = memberships.org_ids_for_user(current_user.id)
-        # None from accessible_project_ids means "every project owned by this
-        # org" (owner/admin); cached per organization since every row in the
-        # same org shares the same answer.
+        user_org_ids = memberships.org_ids_for_user(current_user.id)
+        if effective_org_id is not None:
+            if effective_org_id not in user_org_ids:
+                return ProjectListResponse(total=0, projects=[])
+            target_orgs = {effective_org_id}
+        else:
+            target_orgs = user_org_ids
+
         accessible_by_org: dict[int, set[int] | None] = {
-            org_id: memberships.accessible_project_ids(org_id, current_user.id) for org_id in org_ids
+            org_id: memberships.accessible_project_ids(org_id, current_user.id) for org_id in target_orgs
         }
-        # Cross-org shares: an owner/admin of a grantee org sees a shared-in
-        # project automatically, same as one their org owns outright. A
-        # member's group grant already covers this without extra work here --
-        # group_project_grants can reference an owned or a shared-in project
-        # id identically, and that's exactly what `accessible` (the concrete
-        # set branch below) already checks.
         granted_in_by_org: dict[int, set[int]] = {
             org_id: set(memberships.list_org_project_grants(org_id))
             for org_id, accessible in accessible_by_org.items()
@@ -337,12 +362,24 @@ def create_project(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> ProjectResponse:
     """Create a new project using a JSON payload, owned by the caller's organization."""
+    target_org_id = payload.organization_id
+    if target_org_id is not None:
+        user_org_ids = memberships.org_ids_for_user(current_user.id)
+        if not profiles.is_superadmin(current_user.id) and target_org_id not in user_org_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You are not a member of organization {target_org_id}.",
+            )
+    else:
+        target_org_id = _primary_organization_id(current_user, memberships)
+
     try:
         created = service.create_project(
             name=payload.name,
-            organization_id=_primary_organization_id(current_user, memberships),
+            organization_id=target_org_id,
             description=payload.description or "",
             status=payload.status,
             country=payload.country,
@@ -387,6 +424,9 @@ async def create_project_with_ifc(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    organization_id: Annotated[Optional[int], Form()] = None,
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     description: Annotated[str, Form()] = "",
     status_field: Annotated[str, Form(alias="status")] = "Draft",
     country: Annotated[str, Form()] = DEFAULT_COUNTRY,
@@ -402,6 +442,20 @@ async def create_project_with_ifc(
     ifc_file: Optional[UploadFile] = File(None),
 ) -> ProjectResponse:
     """Create a project and optionally attach an uploaded IFC model."""
+    target_org_id = organization_id
+    if target_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        target_org_id = int(x_org_id.strip())
+
+    if target_org_id is not None:
+        user_org_ids = memberships.org_ids_for_user(current_user.id)
+        if not profiles.is_superadmin(current_user.id) and target_org_id not in user_org_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You are not a member of organization {target_org_id}.",
+            )
+    else:
+        target_org_id = _primary_organization_id(current_user, memberships)
+
     ifc_file_path = ""
     ifc_md5_hash = ""
     project_code = ""
@@ -432,7 +486,7 @@ async def create_project_with_ifc(
     try:
         created = service.create_project(
             name=name,
-            organization_id=_primary_organization_id(current_user, memberships),
+            organization_id=target_org_id,
             description=description,
             status=status_field,
             ifc_file_path=ifc_file_path,

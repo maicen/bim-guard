@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import { X, Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from "lucide-svelte";
   import { bsddApi, projectsApi, documentsApi, namingConfigApi } from "../api";
+  import { authState } from "../auth.svelte";
   import { IFC_FILE_ROLES } from "../types";
   import type {
     BSDDDictionaryItem,
@@ -151,9 +152,24 @@
   ];
   const LAST_STEP = STEPS.length;
 
+  $effect(() => {
+    if (isOpen) {
+      documentsApi
+        .list({ organization_id: authState.activeOrganizationId ?? undefined, forceRefresh: true })
+        .then((docs) => {
+          documents = docs;
+        })
+        .catch(() => {
+          documents = [];
+        });
+    }
+  });
+
   onMount(async () => {
     try {
-      documents = await documentsApi.list();
+      documents = await documentsApi.list({
+        organization_id: authState.activeOrganizationId ?? undefined,
+      });
     } catch {
       documents = [];
     }
@@ -356,6 +372,7 @@
               document_ids: documentIds,
               standards_codes: standardsCodes,
               classification_standard: classificationStandard || null,
+              organization_id: authState.activeOrganizationId ?? null,
             });
       createdProjectId = createdProject.id;
 

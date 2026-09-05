@@ -18,6 +18,7 @@
     RotateCw,
   } from "lucide-svelte";
   import { dashboardApi, projectsApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import type { DashboardStats, Project } from "../lib/types";
   import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
@@ -93,6 +94,11 @@
     recentProjects = recentProjects.map((p) => (p.id === updated.id ? updated : p));
   }
 
+  $effect(() => {
+    const _orgId = authState.activeOrganizationId;
+    refreshDashboard(true);
+  });
+
   async function refreshDashboard(force = false) {
     if (!cachedStats && !recentProjects.length) {
       isLoading = true;
@@ -103,7 +109,7 @@
     try {
       const [statsData, projectsData] = await Promise.all([
         dashboardApi.getStats({ forceRefresh: force }),
-        projectsApi.list({ forceRefresh: force }),
+        projectsApi.list({ forceRefresh: force, organization_id: authState.activeOrganizationId }),
       ]);
       stats = statsData;
       recentProjects = (projectsData.projects || []).slice(0, 5);

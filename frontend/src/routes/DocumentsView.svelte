@@ -17,6 +17,7 @@
     ExternalLink,
   } from "lucide-svelte";
   import { documentsApi, parsingEnginesApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import { DOCUMENT_TYPES } from "../lib/types";
   import type {
     DocumentItem,
@@ -151,6 +152,11 @@
     }),
   );
 
+  $effect(() => {
+    const _orgId = authState.activeOrganizationId;
+    loadDocuments(true);
+  });
+
   async function loadDocuments(force = false) {
     if (!documents.length) {
       isLoading = true;
@@ -159,7 +165,10 @@
     }
     error = "";
     try {
-      documents = await documentsApi.list({ forceRefresh: force });
+      documents = await documentsApi.list({
+        forceRefresh: force,
+        organization_id: authState.activeOrganizationId,
+      });
     } catch (err: any) {
       if (!documents.length) {
         error = err.message || "Failed to load document specifications.";
@@ -232,6 +241,7 @@
       const created = await documentsApi.upload(uploadFile, uploadDocType, {
         parser: uploadParser,
         engine_instance: uploadParser === "light" ? undefined : uploadInstance || undefined,
+        organization_id: authState.activeOrganizationId,
       });
       documents = [created, ...documents];
       isUploadModalOpen = false;

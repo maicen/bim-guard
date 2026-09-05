@@ -133,6 +133,7 @@ class ProjectCreateRequest(BaseModel):
     status: str = Field(default="Draft", description="Workflow status")
     country: str = Field(..., description="Jurisdiction governing code applicability")
     analysis_type: str = Field(..., description="Analysis domain: Arch, Piping, or seismic")
+    organization_id: Optional[int] = Field(default=None, description="Owning organization ID")
 
     # Wizard step 3: optional building code ID
     building_code: Optional[str] = Field(default=None, description="Building code ID")

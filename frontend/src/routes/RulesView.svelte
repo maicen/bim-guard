@@ -29,6 +29,7 @@
     ChevronDown,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import type {
     Rule,
     RuleFolder,
@@ -202,6 +203,11 @@
   let dragStartX = 0;
   let dragStartWidth = 280;
 
+  $effect(() => {
+    const _orgId = authState.activeOrganizationId;
+    loadData(true);
+  });
+
   async function loadData(force = false) {
     if (!rules.length) {
       isLoading = true;
@@ -211,8 +217,8 @@
     error = "";
     try {
       const [rulesData, foldersData] = await Promise.all([
-        rulesApi.list(undefined, { forceRefresh: force }),
-        rulesApi.folders(undefined, { forceRefresh: force }),
+        rulesApi.list({ organization_id: authState.activeOrganizationId }, { forceRefresh: force }),
+        rulesApi.folders(undefined, { forceRefresh: force, organization_id: authState.activeOrganizationId }),
       ]);
       rules = rulesData;
       folders = foldersData;

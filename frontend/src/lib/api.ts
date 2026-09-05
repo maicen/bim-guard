@@ -86,7 +86,7 @@ import {
   type SWROptions,
   type Unsubscribe,
 } from "./cache";
-import { authHeaders } from "./authToken";
+import { authHeaders, getActiveOrgId } from "./authToken";
 import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -340,12 +340,15 @@ function buildRulesFilterKey(filters?: {
 }
 
 export const projectsApi = {
-  getCachedList(): ProjectListResponse | null {
-    const list = _projectsStore.getCachedList("__default__");
+  getCachedList(orgId?: number | null): ProjectListResponse | null {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
+    const list = _projectsStore.getCachedList(key) || _projectsStore.getCachedList("__default__");
     if (!list) return null;
+    const filtered = effectiveOrg ? list.filter((p) => p.organization_id === effectiveOrg) : list;
     return {
-      projects: list,
-      total: list.length,
+      projects: filtered,
+      total: filtered.length,
     };
   },
 
@@ -353,11 +356,18 @@ export const projectsApi = {
     return _projectsStore.subscribe(listener);
   },
 
-  async list(options: SWROptions = {}): Promise<ProjectListResponse> {
+  clearCache(): void {
+    _projectsStore.clear();
+  },
+
+  async list(options: SWROptions & { organization_id?: number | null } = {}): Promise<ProjectListResponse> {
+    const effectiveOrg = options.organization_id !== undefined ? options.organization_id : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
     const list = await _projectsStore.fetchList(
-      "__default__",
+      key,
       async () => {
-        const res = await apiFetch(`${API_BASE}/projects`);
+        const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+        const res = await apiFetch(`${API_BASE}/projects${query}`);
         const data = await handleResponse<ProjectListResponse | Project[]>(res);
         return Array.isArray(data) ? data : data.projects;
       },
@@ -550,20 +560,28 @@ export const rulesApi = {
     ruleset_id?: string;
     category?: RulesetCategory | string;
     keyword?: string;
+    organization_id?: number | null;
   }): Rule[] | null {
-    const key = buildRulesFilterKey(filters);
-    const cached = _rulesStore.getCachedList(key);
+    const effectiveOrg = filters?.organization_id !== undefined ? filters.organization_id : getActiveOrgId();
+    const key = `${buildRulesFilterKey(filters)}_org:${effectiveOrg ?? "all"}`;
+    const cached = _rulesStore.getCachedList(key) || _rulesStore.getCachedList(buildRulesFilterKey(filters));
     return cached || null;
   },
 
-  getCachedFolders(category?: RulesetCategory | string): RuleFolder[] | null {
-    const key = category || "__default__";
-    const cached = _ruleFoldersStore.getCached(key);
+  getCachedFolders(category?: RulesetCategory | string, orgId?: number | null): RuleFolder[] | null {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}:${category || "__default__"}`;
+    const cached = _ruleFoldersStore.getCached(key) || _ruleFoldersStore.getCached(category || "__default__");
     return cached || null;
   },
 
   subscribe(listener: (rules: Rule[]) => void): Unsubscribe {
     return _rulesStore.subscribe(listener);
+  },
+
+  clearCache(): void {
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
   },
 
   async list(
@@ -572,10 +590,12 @@ export const rulesApi = {
       ruleset_id?: string;
       category?: RulesetCategory | string;
       keyword?: string;
+      organization_id?: number | null;
     },
     options: SWROptions = {},
   ): Promise<Rule[]> {
-    const key = buildRulesFilterKey(filters);
+    const effectiveOrg = filters?.organization_id !== undefined ? filters.organization_id : getActiveOrgId();
+    const key = `${buildRulesFilterKey(filters)}_org:${effectiveOrg ?? "all"}`;
     return _rulesStore.fetchList(
       key,
       async () => {
@@ -584,6 +604,7 @@ export const rulesApi = {
         if (filters?.ruleset_id) params.set("ruleset_id", filters.ruleset_id);
         if (filters?.category) params.set("category", filters.category);
         if (filters?.keyword) params.set("keyword", filters.keyword);
+        if (effectiveOrg) params.set("organization_id", String(effectiveOrg));
         const query = params.toString() ? `?${params.toString()}` : "";
         const res = await apiFetch(`${API_BASE}/rules${query}`);
         return handleResponse<Rule[]>(res);
@@ -594,13 +615,17 @@ export const rulesApi = {
 
   async folders(
     category?: RulesetCategory | string,
-    options: SWROptions = {},
+    options: SWROptions & { organization_id?: number | null } = {},
   ): Promise<RuleFolder[]> {
-    const key = category || "__default__";
-    const query = category ? `?category=${encodeURIComponent(category)}` : "";
+    const effectiveOrg = options.organization_id !== undefined ? options.organization_id : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}:${category || "__default__"}`;
     return _ruleFoldersStore.execute(
       key,
       async () => {
+        const params = new URLSearchParams();
+        if (category) params.set("category", category);
+        if (effectiveOrg) params.set("organization_id", String(effectiveOrg));
+        const query = params.toString() ? `?${params.toString()}` : "";
         const res = await apiFetch(`${API_BASE}/rules/folders${query}`);
         return handleResponse<RuleFolder[]>(res);
       },
@@ -1031,19 +1056,29 @@ export const dashboardApi = {
 };
 
 export const documentsApi = {
-  getCachedList(): DocumentItem[] | null {
-    return _documentsStore.getCachedList("__default__") || null;
+  getCachedList(orgId?: number | null): DocumentItem[] | null {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
+    return _documentsStore.getCachedList(key) || _documentsStore.getCachedList("__default__") || null;
   },
 
   subscribe(listener: (docs: DocumentItem[]) => void): Unsubscribe {
     return _documentsStore.subscribe(listener);
   },
 
-  async list(options: SWROptions = {}): Promise<DocumentItem[]> {
+  clearCache(): void {
+    _documentsStore.clear();
+    _documentDetailStore.clear();
+  },
+
+  async list(options: SWROptions & { organization_id?: number | null } = {}): Promise<DocumentItem[]> {
+    const effectiveOrg = options.organization_id !== undefined ? options.organization_id : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
     return _documentsStore.fetchList(
-      "__default__",
+      key,
       async () => {
-        const res = await apiFetch(`${API_BASE}/documents`);
+        const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+        const res = await apiFetch(`${API_BASE}/documents${query}`);
         return handleResponse<DocumentItem[]>(res);
       },
       options,
@@ -1071,11 +1106,14 @@ export const documentsApi = {
       revision_code?: string;
       parser?: "auto" | "unstructured" | "light";
       engine_instance?: string;
+      organization_id?: number | null;
     },
   ): Promise<DocumentDetail> {
     const form = new FormData();
     form.append("file", file);
     form.append("doc_type", docType);
+    const effectiveOrg = isoOptions?.organization_id !== undefined ? isoOptions.organization_id : getActiveOrgId();
+    if (effectiveOrg) form.append("organization_id", String(effectiveOrg));
     if (isoOptions?.project_code) form.append("project_code", isoOptions.project_code);
     if (isoOptions?.originator) form.append("originator", isoOptions.originator);
     if (isoOptions?.suitability_code) form.append("suitability_code", isoOptions.suitability_code);
@@ -1702,3 +1740,11 @@ export const bsddApi = {
     return result;
   },
 };
+
+/** Clear all entity and aggregate caches when switching active tenant. */
+export function clearTenantCaches(): void {
+  projectsApi.clearCache();
+  documentsApi.clearCache();
+  rulesApi.clearCache();
+  dashboardApi.invalidateCache();
+}
