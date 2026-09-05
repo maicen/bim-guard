@@ -241,6 +241,218 @@
       }
     },
     {
+      "building": "digitalhub",
+      "run": "control-DigitalHub_FM-HZG_v2",
+      "federated": false,
+      "primary_model": "DigitalHub_FM-HZG_v2.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 3.8,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 912
+      },
+      "scope": {
+        "models": 1,
+        "elements": 1795,
+        "in_class": 914,
+        "braced": 0,
+        "below_threshold": 2,
+        "unmeasurable": 912,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 912,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 912,
+      "geometry_unavailable": 912,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/control-DigitalHub_FM-HZG_v2/control-DigitalHub_FM-HZG_v2.bcfzip",
+      "bcf_validation": {
+        "topics": 912,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "digitalhub",
+      "run": "control-DigitalHub_FM-LFT_v2",
+      "federated": false,
+      "primary_model": "DigitalHub_FM-LFT_v2.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 3.2,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 547,
+        "critical": 41,
+        "high": 320,
+        "medium": 186,
+        "low": 0,
+        "data_quality": 0
+      },
+      "scope": {
+        "models": 1,
+        "elements": 1310,
+        "in_class": 595,
+        "braced": 595,
+        "below_threshold": 0,
+        "unmeasurable": 0,
+        "threshold_mm": 63.0,
+        "clashes": 547,
+        "data_quality": 0,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 547,
+      "clashes_by_band": {
+        "critical": 41,
+        "high": 320,
+        "medium": 186,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 547,
+      "cross_model_pairs": [
+        {
+          "source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "clashing_source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "count": 547
+        }
+      ],
+      "data_quality_total": 0,
+      "geometry_unavailable": 0,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/control-DigitalHub_FM-LFT_v2/control-DigitalHub_FM-LFT_v2.bcfzip",
+      "bcf_validation": {
+        "topics": 547,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "digitalhub",
+      "run": "control-DigitalHub_FM-SAN_v2",
+      "federated": false,
+      "primary_model": "DigitalHub_FM-SAN_v2.ifc",
+      "extra_models": [],
+      "building_type": "standard",
+      "wall_clock_s": 12.5,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 0,
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "data_quality": 504
+      },
+      "scope": {
+        "models": 1,
+        "elements": 1034,
+        "in_class": 504,
+        "braced": 0,
+        "below_threshold": 0,
+        "unmeasurable": 504,
+        "threshold_mm": 63.0,
+        "clashes": 0,
+        "data_quality": 504,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 0,
+      "clashes_by_band": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "cross_model_clashes": 0,
+      "same_model_clashes": 0,
+      "cross_model_pairs": [],
+      "data_quality_total": 504,
+      "geometry_unavailable": 504,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/control-DigitalHub_FM-SAN_v2/control-DigitalHub_FM-SAN_v2.bcfzip",
+      "bcf_validation": {
+        "topics": 504,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
+      "building": "digitalhub",
+      "run": "federated",
+      "federated": true,
+      "primary_model": "DigitalHub_FM-SAN_v2.ifc",
+      "extra_models": [
+        "DigitalHub_FM-HZG_v2.ifc",
+        "DigitalHub_FM-LFT_v2.ifc"
+      ],
+      "building_type": "standard",
+      "wall_clock_s": 16.8,
+      "compliance_error": null,
+      "issue_stats": {
+        "total": 549,
+        "critical": 41,
+        "high": 320,
+        "medium": 188,
+        "low": 0,
+        "data_quality": 1416
+      },
+      "scope": {
+        "models": 3,
+        "elements": 4139,
+        "in_class": 2013,
+        "braced": 595,
+        "below_threshold": 2,
+        "unmeasurable": 1416,
+        "threshold_mm": 63.0,
+        "clashes": 549,
+        "data_quality": 1416,
+        "federated_duplicates": 0
+      },
+      "clashes_total": 549,
+      "clashes_by_band": {
+        "critical": 41,
+        "high": 320,
+        "medium": 188,
+        "low": 0
+      },
+      "cross_model_clashes": 2,
+      "same_model_clashes": 547,
+      "cross_model_pairs": [
+        {
+          "source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "clashing_source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "count": 547
+        },
+        {
+          "source_model": "DigitalHub_FM-LFT_v2.ifc",
+          "clashing_source_model": "DigitalHub_FM-HZG_v2.ifc",
+          "count": 2
+        }
+      ],
+      "data_quality_total": 1416,
+      "geometry_unavailable": 1416,
+      "bcf_archive": "docs/bcf_exports/seismic-2026-09/digitalhub/federated/federated.bcfzip",
+      "bcf_validation": {
+        "topics": 1965,
+        "violations_total": 0,
+        "violations": []
+      }
+    },
+    {
       "building": "duplex",
       "run": "control-Duplex_A_20110907",
       "federated": false,
