@@ -213,6 +213,25 @@
     };
   }
 
+  /** Get bands and include_data_quality for export, matching current filter state. */
+  function getExportFilters(): { bands?: string[]; includeDataQuality?: boolean } {
+    const bands: string[] = [];
+    if (severityFilter !== "all") {
+      bands.push(severityFilter);
+    } else if (!showLowRisk) {
+      bands.push("critical", "high", "medium", "data_quality");
+    }
+
+    // include_data_quality is true if data_quality is in bands or if no specific bands (all)
+    const includeDataQuality =
+      bands.length === 0 || bands.includes("data_quality");
+
+    return {
+      bands: bands.length ? bands : undefined,
+      includeDataQuality: includeDataQuality ? true : false,
+    };
+  }
+
   // Lets an in-flight request be abandoned, either by the user or because they
   // switched project or filter while it was still going.
   let runController: AbortController | null = null;
@@ -442,11 +461,15 @@
    */
   function exportFindingsToCsv() {
     if (!selectedProjectId) return;
+    const { bands, includeDataQuality } = getExportFilters();
     window.location.href = analyzeApi.getExportUrl(
       selectedProjectId,
       selectedSlug,
       "csv",
       requestedEngines,
+      true,
+      bands,
+      includeDataQuality,
     );
   }
   run(() => {
@@ -987,12 +1010,16 @@
           <!-- Multi-Format Export Actions (Session E) -->
           <div class="flex items-center gap-2">
             {#if selectedProjectId}
+              {@const exportFilters = getExportFilters()}
               <a
                 href={analyzeApi.getExportUrl(
                   selectedProjectId,
                   selectedSlug,
                   "bcf",
                   requestedEngines,
+                  true,
+                  exportFilters.bands,
+                  exportFilters.includeDataQuality,
                 )}
                 class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
                 title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
@@ -1006,6 +1033,9 @@
                   selectedSlug,
                   "csv",
                   requestedEngines,
+                  true,
+                  exportFilters.bands,
+                  exportFilters.includeDataQuality,
                 )}
                 class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                 title="Download tabulated audit spreadsheet with lineage and citations"
@@ -1019,6 +1049,9 @@
                   selectedSlug,
                   "json",
                   requestedEngines,
+                  true,
+                  exportFilters.bands,
+                  exportFilters.includeDataQuality,
                 )}
                 class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                 title="Download structured machine-readable JSON analysis report"

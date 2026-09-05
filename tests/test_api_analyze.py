@@ -64,3 +64,58 @@ def test_engines_wins_over_rule_ids():
     """When both are sent, the explicit engine selection is the request."""
     payload = AnalysisRunRequest(project_id=1, engines=["CC"], rule_ids=["GC-001.01"])
     assert _selected_engines(payload) == ["CC"]
+
+
+# ── Export Band Filtering Tests ──────────────────────────────────────────────────
+
+
+def test_export_csv_with_band_parameter():
+    """Verify export endpoint accepts band filtering parameter."""
+    response = client.get(
+        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=critical&band=high"
+    )
+    assert response.status_code in (200, 409)
+
+
+def test_export_csv_with_include_low_parameter():
+    """Verify export endpoint accepts include_low filtering parameter."""
+    response = client.get(
+        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_low=false"
+    )
+    assert response.status_code in (200, 409)
+
+
+def test_export_csv_with_include_data_quality_parameter():
+    """Verify export endpoint accepts include_data_quality filtering parameter."""
+    response = client.get(
+        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_data_quality=false"
+    )
+    assert response.status_code in (200, 409)
+
+
+def test_export_bcf_with_band_filters():
+    """Verify BCF export accepts band filtering parameter."""
+    response = client.get(
+        "/api/analyze/export?project_id=119&slug=corrosion&fmt=bcf&band=critical&band=high&band=medium"
+    )
+    # Should accept band parameters (200 success or 409 compliance error, not 400 bad param)
+    assert response.status_code in (200, 409)
+    if response.status_code == 200:
+        assert response.headers.get("content-type") in ["application/zip", "application/octet-stream"]
+
+
+def test_export_json_with_band_parameter():
+    """Verify JSON export accepts band filtering parameter."""
+    response = client.get(
+        "/api/analyze/export?project_id=119&slug=corrosion&fmt=json&band=critical"
+    )
+    # Should accept band parameters (200 success or 409 compliance error, not 400 bad param)
+    assert response.status_code in (200, 409)
+
+
+def test_export_csv_with_multiple_band_parameters():
+    """Verify CSV export accepts multiple band parameters."""
+    response = client.get(
+        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=critical&band=high&band=medium&band=low&band=data_quality"
+    )
+    assert response.status_code in (200, 409)

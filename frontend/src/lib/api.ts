@@ -1047,8 +1047,17 @@ export const analyzeApi = {
     fmt: "bcf" | "csv" | "json",
     engines?: string[],
     includeLow?: boolean,
+    bands?: string[],
+    includeDataQuality?: boolean,
   ): string {
-    return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}${includeLowQuery(includeLow)}`;
+    let url = `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}${includeLowQuery(includeLow)}`;
+    if (bands && bands.length > 0) {
+      url += bands.map((b) => `&band=${encodeURIComponent(b)}`).join("");
+    }
+    if (includeDataQuality !== undefined) {
+      url += `&include_data_quality=${includeDataQuality}`;
+    }
+    return url;
   },
 
   getBcfArtifactUrl(artifactId: number): string {

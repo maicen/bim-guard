@@ -679,6 +679,17 @@ def export_analysis_report(
             "produces, unlike band/mechanism, which narrow what a page returns."
         ),
     ),
+    band: list[IssueBand] | None = Query(
+        None,
+        description=(
+            "Bands the export is limited to; repeat for several. "
+            "`data_quality` selects the notes rather than a verdict band. "
+            "Omit to export all bands (the whole run)."
+        ),
+    ),
+    include_data_quality: bool = Query(
+        True, description="Set false to leave data-quality notes out of the export"
+    ),
 ):
     """Export compliance analysis findings into requested format.
 
@@ -691,6 +702,20 @@ def export_analysis_report(
     result = run_analysis(slug, project_id, engines=engines, include_low=include_low)
     if result.get("compliance_error"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result["compliance_error"])
+
+    # Apply band and data_quality filtering to the export
+    all_issues = result.get("audit_issues", [])
+    filtered_issues = _select_issues(
+        all_issues,
+        bands=band,
+        mechanisms=None,
+        include_data_quality=include_data_quality,
+        query=None,
+    )
+    result = {
+        **result,
+        "audit_issues": filtered_issues,
+    }
 
     try:
         content, media_type, extension = export(result, fmt)
