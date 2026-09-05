@@ -46,8 +46,8 @@ STATUS:   ALL PASS
 - **GC-001 (Galvanic Corrosion):** ✓ `app/engines/bimguard_galvanic_engine.py`, 100+ tests, demo BCF validates
 - **CC-001 (Crevice Corrosion):** ✓ `app/engines/bimguard_crevice_engine.py`, 100+ tests, demo BCF validates
 - **MC-001 (Microbiological):** ✓ `app/engines/bimguard_mic_engine.py`, 100+ tests, demo BCF validates
-- **MM-001 (Material Microbial):** ✓ Comparator at `app/modules/comparator/`, 1,365 tests, **12/12 control cases passing** (galvanised-in-stagnant fires, copper-in-potable silent)
-- **XM-001 (Cross-Material):** ⚠ Comparator at `app/modules/comparator/cross_material.py`, seeded & architecture documented, implementation deferred (post-FMP)
+- **MM-001 (Material-Media Compatibility):** ✓ Comparator at `app/modules/comparator/material_media.py`, **12/12 control cases passing** (galvanised-in-stagnant fires, copper-in-potable silent)
+- **XM-001 (Cross-Material):** ✓ Comparator at `app/modules/comparator/cross_material.py`, implemented — `compare()` performs pair detection and anode resolution; firing behaviour on the test corpus pending validation matrix
 
 **Key Validation Tests Passing:**
 - `test_gc_bcf_validates_against_xsd` — all GC-001 demo archives valid
@@ -63,7 +63,7 @@ STATUS:   ALL PASS
 
 | Feature | Status | Evidence |
 |---------|--------|----------|
-| **5 Compliance Engines** | ✓ DONE | GC-001, CC-001, MC-001, MM-001, XM-001 (arch hold) |
+| **5 Compliance Engines** | ✓ DONE | GC-001, CC-001, MC-001 (`app/engines/`), MM-001, XM-001 (comparators, `app/modules/comparator/`) — all five implemented |
 | **Server-Side Pagination** | ✓ DONE | Merged feat/results-pagination, tests passing |
 | **Include Low-Band Verdicts** | ✓ DONE | Commit b165985, caller chooses filtering |
 | **Undetermined-Gate Architecture** | ✓ DONE | Merged fix/undetermined-gate, refused scoring honest |
@@ -83,7 +83,7 @@ STATUS:   ALL PASS
 | Task | Status | Reason |
 |------|--------|--------|
 | **System Classification (PipingSystem.UNKNOWN)** | PARTIAL | System inference implemented via `classify_system()` in `piping_producer.py`. Raw IFC payloads often omit system metadata; inference defaults unknown systems to UNKNOWN rather than fallback to carbon_steel, maintaining tri-state (honest, not assumed). Coverage is MEP-model inherent, not implementation gap. |
-| **XM-001 Cross-Material Engine** | ARCHITECTURAL | Requires dissimilar materials at junctions; system-type inference makes materials uniform → architectural limitation, not implementation bug |
+| **XM-001 Cross-Material Firing Rate** | PENDING MEASUREMENT | Implemented, not deferred: `cross_material.py` provides `compare()` with pair detection and anode resolution. XM-001 needs dissimilar materials at a junction, and system-type inference makes materials uniform within a system, so the expectation is a low firing rate on this corpus — but that is a hypothesis until the validation matrix measures it. Firing behaviour on the test corpus pending validation matrix. |
 
 ---
 
