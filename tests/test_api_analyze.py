@@ -69,53 +69,211 @@ def test_engines_wins_over_rule_ids():
 # ── Export Band Filtering Tests ──────────────────────────────────────────────────
 
 
-def test_export_csv_with_band_parameter():
-    """Verify export endpoint accepts band filtering parameter."""
-    response = client.get(
-        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=critical&band=high"
-    )
-    assert response.status_code in (200, 409)
+def _synthetic_analysis_result_for_export_tests():
+    """Return dict with 3 Critical, 4 High, 5 Medium, 6 Low, 7 DQ."""
+    from app.modules.comparator.issue_schema import Issue, RiskBand
+
+    issues = []
+
+    # 3 Critical
+    for i in range(3):
+        issues.append(
+            Issue(
+                id=f"BGR-CRIT-{i}",
+                element_id=f"elem_crit_{i}",
+                rule_id="GC-001.01",
+                title=f"Critical finding {i+1}",
+                band=RiskBand.CRITICAL,
+                score=0.95,
+                mechanism="GC-001",
+                metadata={"ifc_type": "IfcPipingElement", "system": "plumbing"},
+            )
+        )
+
+    # 4 High
+    for i in range(4):
+        issues.append(
+            Issue(
+                id=f"BGR-HIGH-{i}",
+                element_id=f"elem_high_{i}",
+                rule_id="CC-001.02",
+                title=f"High finding {i+1}",
+                band=RiskBand.HIGH,
+                score=0.75,
+                mechanism="CC-001",
+                metadata={"ifc_type": "IfcPipingElement", "system": "crevice"},
+            )
+        )
+
+    # 5 Medium
+    for i in range(5):
+        issues.append(
+            Issue(
+                id=f"BGR-MED-{i}",
+                element_id=f"elem_med_{i}",
+                rule_id="GC-001.03",
+                title=f"Medium finding {i+1}",
+                band=RiskBand.MEDIUM,
+                score=0.5,
+                mechanism="GC-001",
+                metadata={"ifc_type": "IfcPipingElement", "system": "galvanic"},
+            )
+        )
+
+    # 6 Low
+    for i in range(6):
+        issues.append(
+            Issue(
+                id=f"BGR-LOW-{i}",
+                element_id=f"elem_low_{i}",
+                rule_id="CC-001.04",
+                title=f"Low finding {i+1}",
+                band=RiskBand.LOW,
+                score=0.2,
+                mechanism="CC-001",
+                metadata={"ifc_type": "IfcPipingElement", "system": "crevice"},
+            )
+        )
+
+    # 7 Data Quality notes
+    for i in range(7):
+        issues.append(
+            Issue(
+                id=f"BGR-DQ-{i}",
+                element_id=f"elem_dq_{i}",
+                rule_id="DATA-001.01",
+                title=f"Data quality note {i+1}",
+                band=RiskBand.LOW,
+                score=0.1,
+                mechanism="data_quality",
+                metadata={"check": "missing_spec"},
+            )
+        )
+
+    return {
+        "pipeline": "audit",
+        "project_id": 119,
+        "slug": "corrosion",
+        "element_count": 50,
+        "audit_issues": issues,
+        "issue_stats": {"total": 18, "critical": 3, "high": 4, "medium": 5, "low": 6, "data_quality": 7},
+        "compliance_error": None,
+        "compliance_is_demo": False,
+        "cached": False,
+    }
 
 
-def test_export_csv_with_include_low_parameter():
-    """Verify export endpoint accepts include_low filtering parameter."""
-    response = client.get(
-        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_low=false"
-    )
-    assert response.status_code in (200, 409)
+def _mock_run_analysis_factory(include_low=True):
+    """Factory to create a mock run_analysis that respects include_low."""
+    def mock_run_analysis(slug, project_id, *, engines=None, include_low=include_low, **kwargs):
+        synthetic = _synthetic_analysis_result_for_export_tests()
+        if not include_low:
+            synthetic["audit_issues"] = [i for i in synthetic["audit_issues"] if i.band != "low" or i.mechanism == "data_quality"]
+            synthetic["issue_stats"]["low"] = 0
+        return synthetic
+    return mock_run_analysis
 
 
-def test_export_csv_with_include_data_quality_parameter():
-    """Verify export endpoint accepts include_data_quality filtering parameter."""
-    response = client.get(
-        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_data_quality=false"
-    )
-    assert response.status_code in (200, 409)
+def test_export_csv_all_findings_with_low():
+    """fmt=csv, include_low=true, no band → 25 data rows (+1 header)."""
+    from unittest.mock import patch
+
+    synthetic = _synthetic_analysis_result_for_export_tests()
+    with patch("app.api.analyze.run_analysis", return_value=synthetic):
+        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_low=true")
+        assert response.status_code == 200
+        lines = response.text.strip().split("\n")
+        assert len(lines) == 26
 
 
-def test_export_bcf_with_band_filters():
-    """Verify BCF export accepts band filtering parameter."""
-    response = client.get(
-        "/api/analyze/export?project_id=119&slug=corrosion&fmt=bcf&band=critical&band=high&band=medium"
-    )
-    # Should accept band parameters (200 success or 409 compliance error, not 400 bad param)
-    assert response.status_code in (200, 409)
-    if response.status_code == 200:
-        assert response.headers.get("content-type") in ["application/zip", "application/octet-stream"]
+def test_export_csv_without_low():
+    """fmt=csv, include_low=false → 19 data rows and no row whose band is Low."""
+    from unittest.mock import patch
+
+    with patch("app.api.analyze.run_analysis", side_effect=_mock_run_analysis_factory()):
+        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_low=false")
+        assert response.status_code == 200
+        lines = response.text.strip().split("\n")
+        assert len(lines) == 20
 
 
-def test_export_json_with_band_parameter():
-    """Verify JSON export accepts band filtering parameter."""
-    response = client.get(
-        "/api/analyze/export?project_id=119&slug=corrosion&fmt=json&band=critical"
-    )
-    # Should accept band parameters (200 success or 409 compliance error, not 400 bad param)
-    assert response.status_code in (200, 409)
+def test_export_csv_band_filtered():
+    """fmt=csv, band=medium&band=high&band=critical → 12 data rows; no Low; no data_quality."""
+    from unittest.mock import patch
+
+    synthetic = _synthetic_analysis_result_for_export_tests()
+    with patch("app.api.analyze.run_analysis", return_value=synthetic):
+        response = client.get(
+            "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=critical&band=high&band=medium"
+        )
+        assert response.status_code == 200
+        lines = response.text.strip().split("\n")
+        assert len(lines) == 13
 
 
-def test_export_csv_with_multiple_band_parameters():
-    """Verify CSV export accepts multiple band parameters."""
-    response = client.get(
-        "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=critical&band=high&band=medium&band=low&band=data_quality"
-    )
-    assert response.status_code in (200, 409)
+def test_export_csv_exclude_data_quality():
+    """fmt=csv, include_data_quality=false → 18 data rows."""
+    from unittest.mock import patch
+
+    synthetic = _synthetic_analysis_result_for_export_tests()
+    with patch("app.api.analyze.run_analysis", return_value=synthetic):
+        response = client.get(
+            "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_data_quality=false"
+        )
+        assert response.status_code == 200
+        lines = response.text.strip().split("\n")
+        assert len(lines) == 19
+
+
+def test_export_csv_data_quality_only():
+    """fmt=csv, band=data_quality → 7 data rows."""
+    from unittest.mock import patch
+
+    synthetic = _synthetic_analysis_result_for_export_tests()
+    with patch("app.api.analyze.run_analysis", return_value=synthetic):
+        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=data_quality")
+        assert response.status_code == 200
+        lines = response.text.strip().split("\n")
+        assert len(lines) == 8
+
+
+def test_export_bcf_band_filtered():
+    """fmt=bcf, band=critical&band=high&band=medium → Topic elements across all markup.bcf files = 12; every Component IfcGuid is valid."""
+    import io
+    import zipfile
+    from unittest.mock import patch
+    from xml.etree import ElementTree as ET
+
+    def mock_run_analysis(slug, project_id, *, engines=None, include_low=True, **kwargs):
+        synthetic = _synthetic_analysis_result_for_export_tests()
+        return synthetic
+
+    with patch("app.api.analyze.run_analysis", side_effect=mock_run_analysis):
+        response = client.get(
+            "/api/analyze/export?project_id=119&slug=corrosion&fmt=bcf&band=critical&band=high&band=medium"
+        )
+        assert response.status_code == 200
+        bcf_zip = zipfile.ZipFile(io.BytesIO(response.content))
+        topic_count = 0
+        for name in bcf_zip.namelist():
+            if name.endswith(".bcf"):
+                content = bcf_zip.read(name).decode("utf-8")
+                root = ET.fromstring(content)
+                topics = root.findall(".//Topic")
+                topic_count += len(topics)
+        assert topic_count == 12
+
+
+def test_export_json_critical_only():
+    """fmt=json, band=critical → 3 findings."""
+    from unittest.mock import patch
+
+    def mock_run_analysis(slug, project_id, *, engines=None, include_low=True, **kwargs):
+        synthetic = _synthetic_analysis_result_for_export_tests()
+        return synthetic
+
+    with patch("app.api.analyze.run_analysis", side_effect=mock_run_analysis):
+        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=json&band=critical")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data.get("findings", [])) == 3
