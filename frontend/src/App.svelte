@@ -481,6 +481,9 @@
           <ProjectsView
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}
+            onSelectProjectForDashboard={(projectId) => push(buildTargetUrl("dashboard", projectId))}
+            {selectedProject}
+            onModelsAttached={(projectId) => push(buildTargetUrl("models", projectId))}
             onOpenWizard={() => (isGlobalWizardOpen = true)}
           />
         {:else if activeView === "viewer"}

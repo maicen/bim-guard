@@ -279,49 +279,63 @@ class GitHubRepoService:
             {"path": "models/schemas/west_riverside_hospital_plumb_ifc2x3.ifc", "type": "blob", "size": 24998920},
         ]
 
-    def import_model_as_project(
+    def attach_models_to_project(
         self,
+        project_id: int,
         repo_id: int,
-        file_path: str,
-        name: Optional[str] = None,
-        country: Optional[str] = None,
-        analysis_type: Optional[str] = None,
-    ) -> dict[str, Any]:
-        """Import an IFC model from a GitHub repository into the local project database."""
+        file_paths: list[str],
+        primary_index: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Attach one or more IFC models from a GitHub repository to an existing project.
+
+        Each file is attached by pointing a ``project_ifc_files`` row directly
+        at the repository's raw-content URL -- ``ObjectStorage.materialize_local_path``
+        already downloads and caches ``http(s)://`` references, so there is no
+        need to fetch the bytes here and re-upload them into BIM-Guard's own
+        storage first.
+
+        Args:
+            project_id: Project the models attach to. The caller is
+                responsible for having authorized access to it.
+            repo_id: Registered GitHub repository the files live in.
+            file_paths: Relative paths within the repository, e.g.
+                ``"models/hospital/Clinic_Architectural.ifc"``.
+            primary_index: Index into ``file_paths`` naming the model to
+                attach as primary; the rest attach as context models.
+
+        Returns:
+            The attached ``project_ifc_files`` rows, in ``file_paths`` order.
+
+        Raises:
+            RuntimeError: if this service was built without a ``ProjectsService``.
+            ValueError: if the repository does not exist, or if
+                ``primary_index`` falls outside ``file_paths``.
+        """
         if not self._projects_service:
             raise RuntimeError("ProjectsService is not attached to GitHubRepoService.")
 
         repo = self.get_repo(repo_id)
         if not repo:
             raise ValueError(f"GitHub Repository with ID {repo_id} not found.")
+        if not 0 <= primary_index < len(file_paths):
+            raise ValueError(
+                f"primary_index {primary_index} is outside the {len(file_paths)} file(s) given."
+            )
 
         owner = repo["owner"]
         repo_name = repo["name"]
         branch = repo.get("branch") or "main"
-        raw_url = f"https://raw.githubusercontent.com/{owner}/{repo_name}/{branch}/{file_path}"
 
-        filename = Path(file_path).stem.replace("_", " ").title()
-        project_name = name.strip() if name and name.strip() else filename
+        attached: list[dict[str, Any]] = []
+        for index, file_path in enumerate(file_paths):
+            raw_url = f"https://raw.githubusercontent.com/{owner}/{repo_name}/{branch}/{file_path}"
+            row = self._projects_service.add_ifc_file(
+                project_id,
+                file_path=raw_url,
+                file_name=Path(file_path).name,
+                role="primary" if index == primary_index else "context",
+                is_primary=index == primary_index,
+            )
+            attached.append(row)
 
-        # Infer domain category from path if not provided
-        domain = analysis_type
-        if not domain:
-            lower_path = file_path.lower()
-            if "hvac" in lower_path or "plumb" in lower_path or "mech" in lower_path or "piping" in lower_path or "sanitario" in lower_path:
-                domain = "Piping"
-            elif "seismic" in lower_path:
-                domain = "seismic"
-            else:
-                domain = "Arch"
-
-        # Register project linking to GitHub raw URL storage path
-        created_project = self._projects_service.create_project(
-            name=project_name,
-            description=f"Imported from GitHub repo {owner}/{repo_name} ({file_path})",
-            status="Active",
-            ifc_file_path=raw_url,
-            country=country or "US",
-            analysis_type=domain,
-        )
-
-        return created_project
+        return attached

@@ -1179,13 +1179,16 @@ class GitHubRepoStructureResponse(BaseModel):
     items: list[GitHubRepoItem] = []
 
 
-class ProjectImportFromRepoRequest(BaseModel):
-    """Payload for importing an IFC model file from a GitHub repository into projects."""
+class AttachRepoModelsRequest(BaseModel):
+    """Payload for attaching one or more IFC models from a GitHub repository to an existing project."""
 
-    file_path: str = Field(..., min_length=1, description="Relative file path in repository (e.g. models/hospital/Clinic_Architectural.ifc)")
-    name: Optional[str] = Field(None, description="Custom project name (defaults to file basename)")
-    country: Optional[str] = Field(None, description="Jurisdiction / country code")
-    analysis_type: Optional[str] = Field(None, description="Domain analysis type (Arch, Piping, seismic)")
+    repo_id: int = Field(..., description="Registered GitHub repository the files live in")
+    file_paths: list[str] = Field(
+        ..., min_length=1, description="Relative file paths in the repository (e.g. models/hospital/Clinic_Architectural.ifc)"
+    )
+    primary_index: int = Field(
+        0, ge=0, description="Index into file_paths naming the model to attach as primary"
+    )
 
 
 # ==============================================================================

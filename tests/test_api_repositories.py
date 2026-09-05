@@ -119,28 +119,56 @@ def test_repository_structure_endpoint(client: TestClient) -> None:
     assert "https://raw.githubusercontent.com/maicen/bimguard-test-models" in ifc_item["download_url"]
 
 
-def test_repository_import_model_endpoint(client: TestClient) -> None:
-    """POST /api/repositories/{id}/import imports an IFC model from repo as a new project."""
+def test_attach_repo_models_endpoint(client: TestClient) -> None:
+    """POST /api/projects/{id}/attach-repo-models attaches model(s) to an existing project."""
     repos_resp = client.get("/api/repositories")
     repos = repos_resp.json()
     seeded = next((r for r in repos if "bimguard-test-models" in r["name"]), repos[0])
     repo_id = seeded["id"]
 
-    import_resp = client.post(
-        f"/api/repositories/{repo_id}/import",
+    create_resp = client.post(
+        "/api/projects",
         json={
-            "file_path": "models/hospital/Clinic_Architectural.ifc",
-            "name": "Clinic Architectural Imported Project",
+            "name": "Repo Attach Target",
+            "description": "test",
             "country": "US",
             "analysis_type": "Arch",
         },
     )
-    assert import_resp.status_code == 201
-    imported = import_resp.json()
-    project_id = imported["id"]
-    assert imported["name"] == "Clinic Architectural Imported Project"
-    assert imported["analysis_type"] == "Arch"
-    assert "raw.githubusercontent.com" in imported["ifc_file_path"]
+    assert create_resp.status_code == 201
+    project_id = create_resp.json()["id"]
 
-    # Cleanup imported project
-    client.delete(f"/api/projects/{project_id}")
+    try:
+        attach_resp = client.post(
+            f"/api/projects/{project_id}/attach-repo-models",
+            json={
+                "repo_id": repo_id,
+                "file_paths": [
+                    "models/hospital/Clinic_Architectural.ifc",
+                    "models/hospital/Clinic_Electrical.ifc",
+                ],
+                "primary_index": 0,
+            },
+        )
+        assert attach_resp.status_code == 201
+        result = attach_resp.json()
+        assert result["success"] is True
+        assert len(result["files"]) == 2
+        primary = next(f for f in result["files"] if f["is_primary"])
+        assert "Clinic_Architectural.ifc" in primary["file_path"]
+        assert "raw.githubusercontent.com" in primary["file_path"]
+        context = next(f for f in result["files"] if not f["is_primary"])
+        assert "Clinic_Electrical.ifc" in context["file_path"]
+
+        # The project itself now reports the primary model too.
+        project_resp = client.get(f"/api/projects/{project_id}")
+        assert "raw.githubusercontent.com" in project_resp.json()["ifc_file_path"]
+
+        # An unknown repository is a 404, not a 500.
+        missing_repo_resp = client.post(
+            f"/api/projects/{project_id}/attach-repo-models",
+            json={"repo_id": 9999999, "file_paths": ["models/hospital/Clinic_HVAC.ifc"]},
+        )
+        assert missing_repo_resp.status_code == 404
+    finally:
+        client.delete(f"/api/projects/{project_id}")

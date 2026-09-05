@@ -813,11 +813,11 @@ export interface GitHubRepoUpdatePayload {
   is_active?: boolean;
 }
 
-export interface ProjectImportPayload {
-  file_path: string;
-  name?: string;
-  country?: string;
-  analysis_type?: string;
+/** Payload for attaching one or more IFC models from a GitHub repository to an existing project. */
+export interface AttachRepoModelsPayload {
+  repo_id: number;
+  file_paths: string[];
+  primary_index?: number;
 }
 
 // `kind` is a plain string, not a fixed union: the set of valid kinds is

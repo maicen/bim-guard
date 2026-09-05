@@ -1,5 +1,6 @@
 import type {
   AnalysisResult,
+  AttachRepoModelsPayload,
   BcfArtifact,
   BCFCommentCreatePayload,
   BCFCommentResponse,
@@ -59,7 +60,6 @@ import type {
   ProjectDocumentBindingsResponse,
   ProjectIfcFile,
   ProjectIfcUploadResponse,
-  ProjectImportPayload,
   ProjectOptions,
   ProjectListResponse,
   ProjectRulesetBindingsResponse,
@@ -1428,15 +1428,21 @@ export const githubReposApi = {
     return data;
   },
 
-  async importProject(repoId: number, payload: ProjectImportPayload): Promise<Project> {
-    const res = await apiFetch(`${API_BASE}/repositories/${repoId}/import`, {
+  /**
+   * Attach one or more IFC models from this repository to an existing
+   * project. No bytes pass through this request -- each model is recorded
+   * pointing at the repository's raw-content URL, fetched on demand.
+   */
+  async attachModelsToProject(
+    projectId: number,
+    payload: AttachRepoModelsPayload,
+  ): Promise<ProjectIfcUploadResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/attach-repo-models`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const created = await handleResponse<Project>(res);
-    _projectsStore.addOrUpdate(created);
-    return created;
+    return handleResponse<ProjectIfcUploadResponse>(res);
   },
 };
 

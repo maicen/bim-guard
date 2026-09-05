@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
     get_document_access_service,
+    get_github_repo_service,
     get_membership_service,
     get_phase6_service,
     get_profile_service,
@@ -40,6 +41,7 @@ from app.constants import (
 from app.logging_config import get_logger
 from app.modules.contracts import (
     AnalysisInputItemContract,
+    AttachRepoModelsRequest,
     BuildingCodeOption,
     ProjectBulkActionResponse,
     ProjectBulkDeleteRequest,
@@ -58,6 +60,7 @@ from app.modules.contracts import (
     StandardOption,
 )
 from app.services.document_access_service import DocumentAccessService
+from app.services.github_repo_service import GitHubRepoService
 from app.services.membership_service import MembershipService
 from app.services.phase6_service import Phase6Service
 from app.services.profile_service import ProfileService
@@ -824,6 +827,56 @@ async def upload_project_ifc_files(
         project_id,
         len(attached),
         (primary or {}).get("file_path"),
+    )
+    return ProjectIfcUploadResponse(
+        success=True,
+        files=attached,
+        primary_id=(primary or {}).get("id"),
+    )
+
+
+@router.post(
+    "/{project_id}/attach-repo-models",
+    response_model=ProjectIfcUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Attach one or more IFC models from a GitHub repository to a project",
+)
+def attach_repo_models(
+    project_id: int,
+    payload: AttachRepoModelsRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    repo_service: Annotated[GitHubRepoService, Depends(get_github_repo_service)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> ProjectIfcUploadResponse:
+    """Attach model file(s) from a registered GitHub repository, by path.
+
+    Unlike ``/upload``, no bytes pass through this request: each model is
+    recorded pointing at the repository's raw-content URL, which
+    ``ObjectStorage`` already knows how to fetch and cache on demand.
+
+    Raises:
+        HTTPException: 404 if the project or repository does not exist; 400 if
+            ``primary_index`` is out of range.
+    """
+    try:
+        rows = repo_service.attach_models_to_project(
+            project_id,
+            repo_id=payload.repo_id,
+            file_paths=payload.file_paths,
+            primary_index=payload.primary_index,
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        code = status.HTTP_404_NOT_FOUND if "Repository" in detail else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=detail)
+
+    attached = [ProjectIfcFileResponse(**{"project_id": project_id, **row}) for row in rows]
+    primary = service.get_primary_ifc_file(project_id)
+    logger.info(
+        "Project IFC models attached from repo project_id=%d repo_id=%d count=%d",
+        project_id,
+        payload.repo_id,
+        len(attached),
     )
     return ProjectIfcUploadResponse(
         success=True,

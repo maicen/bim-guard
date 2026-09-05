@@ -17,7 +17,7 @@
     FolderGit2,
     GitBranch,
     ExternalLink,
-    Import,
+    Boxes,
     Box,
     Loader2,
     Database,
@@ -26,7 +26,8 @@
   } from "lucide-svelte";
   import { projectsApi, githubReposApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
-  import type { Project, GitHubRepo, GitHubRepoStructure, GitHubRepoItem } from "../lib/types";
+  import { toasts } from "../lib/toast.svelte";
+  import type { Project, GitHubRepo, GitHubRepoStructure } from "../lib/types";
   import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
@@ -50,10 +51,23 @@
   interface Props {
     onSelectProjectForAudit: (projectId: number, analysisType?: string | null) => void;
     onSelectProjectForViewer: (projectId: number) => void;
+    onSelectProjectForDashboard: (projectId: number) => void;
+    /** The project the header's ProjectSwitcher currently has selected, if any -- the
+     * target that GitHub repo models attach to. */
+    selectedProject?: Project | null;
+    /** Called after models are attached from a repo, to jump to that project's Models view. */
+    onModelsAttached?: (projectId: number) => void;
     onOpenWizard?: () => void;
   }
 
-  let { onSelectProjectForAudit, onSelectProjectForViewer, onOpenWizard }: Props = $props();
+  let {
+    onSelectProjectForAudit,
+    onSelectProjectForViewer,
+    onSelectProjectForDashboard,
+    selectedProject = null,
+    onModelsAttached,
+    onOpenWizard,
+  }: Props = $props();
 
   // Initialize immediately from synchronous client cache for 0ms render time
   const initialCache = projectsApi.getCachedList();
@@ -69,7 +83,12 @@
   let isRepoLoading = $state(false);
   let activeRepoStructure: GitHubRepoStructure | null = $state(null);
   let repoCategoryFilter = $state("all");
-  let importingPath = $state("");
+  // Repo files browsed here attach as model(s) to whichever project is
+  // currently selected app-wide (the header's ProjectSwitcher) -- browsing a
+  // repo never creates a new project.
+  let selectedRepoPaths: Set<string> = $state(new Set());
+  let primaryRepoPath: string | null = $state(null);
+  let isAttaching = $state(false);
 
   let orgScopedProjects = $derived(
     authState.activeOrganizationId == null
@@ -171,6 +190,8 @@
   // repo manifest is fetched lazily and the previous one dropped.
   async function handleSourceChange() {
     repoCategoryFilter = "all";
+    selectedRepoPaths = new Set();
+    primaryRepoPath = null;
     if (selectedSource.startsWith("repo:")) {
       const repoId = parseInt(selectedSource.split(":")[1], 10);
       await loadSelectedRepoStructure(repoId);
@@ -204,45 +225,54 @@
     }),
   );
 
-  function getImportedProject(item: GitHubRepoItem): Project | undefined {
-    return projects.find((p) => {
-      if (!p.ifc_file_path) return false;
-      const pathClean = p.ifc_file_path.toLowerCase();
-      const itemUrlClean = item.download_url.toLowerCase();
-      const itemPathClean = item.path.toLowerCase();
-      const descClean = (p.description || "").toLowerCase();
-      return (
-        pathClean === itemUrlClean ||
-        pathClean.includes(itemPathClean) ||
-        descClean.includes(itemPathClean)
-      );
-    });
+  function toggleRepoPath(path: string) {
+    const next = new Set(selectedRepoPaths);
+    if (next.has(path)) {
+      next.delete(path);
+      if (primaryRepoPath === path) primaryRepoPath = next.values().next().value ?? null;
+    } else {
+      next.add(path);
+      if (!primaryRepoPath) primaryRepoPath = path;
+    }
+    selectedRepoPaths = next;
   }
 
-  function handleViewInMainRegistry(project: Project) {
-    selectedSource = "supabase";
-    activeRepoStructure = null;
-    table.search = project.name;
+  function toggleAllRepoPaths() {
+    if (selectedRepoPaths.size === filteredRepoItems.length && filteredRepoItems.length > 0) {
+      selectedRepoPaths = new Set();
+      primaryRepoPath = null;
+    } else {
+      selectedRepoPaths = new Set(filteredRepoItems.map((item) => item.path));
+      primaryRepoPath = filteredRepoItems[0]?.path ?? null;
+    }
   }
 
-  async function handleImportRepoModel(item: GitHubRepoItem) {
-    if (!selectedSource.startsWith("repo:")) return;
+  async function handleAttachSelectedModels() {
+    if (!selectedProject || !selectedSource.startsWith("repo:") || selectedRepoPaths.size === 0) {
+      return;
+    }
     const repoId = parseInt(selectedSource.split(":")[1], 10);
+    const filePaths = Array.from(selectedRepoPaths);
+    const primaryIndex = Math.max(0, filePaths.indexOf(primaryRepoPath || filePaths[0]));
 
-    importingPath = item.path;
+    isAttaching = true;
     error = "";
     try {
-      const imported = await githubReposApi.importProject(repoId, {
-        file_path: item.path,
-        name: item.name.replace(".ifc", "").replace(/_/g, " "),
+      await githubReposApi.attachModelsToProject(selectedProject.id, {
+        repo_id: repoId,
+        file_paths: filePaths,
+        primary_index: primaryIndex,
       });
-      await loadProjects(true);
-      // Automatically navigate to audit for imported model
-      onSelectProjectForAudit(imported.id, imported.analysis_type);
+      toasts.success(
+        `Attached ${filePaths.length} model${filePaths.length === 1 ? "" : "s"} to "${selectedProject.name}".`,
+      );
+      selectedRepoPaths = new Set();
+      primaryRepoPath = null;
+      onModelsAttached?.(selectedProject.id);
     } catch (err: any) {
-      error = err.message || "Failed to import model from GitHub repository.";
+      error = err.message || "Failed to attach model(s) from GitHub repository.";
     } finally {
-      importingPath = "";
+      isAttaching = false;
     }
   }
 
@@ -540,8 +570,15 @@
                     />
                   </td>
                   <td class="px-4 py-3 font-semibold text-slate-50">
-                    <div class="flex flex-col">
-                      <span class="text-sm">{project.name}</span>
+                    <div class="flex flex-col items-start">
+                      <button
+                        type="button"
+                        onclick={() => onSelectProjectForDashboard(project.id)}
+                        class="text-left text-sm text-slate-50 transition-colors hover:text-accent hover:underline"
+                        title="Open project"
+                      >
+                        {project.name}
+                      </button>
                       {#if project.description}
                         <span class="max-w-sm truncate text-caption font-normal text-slate-400">
                           {project.description}
@@ -743,6 +780,28 @@
           </div>
         </div>
 
+        <!-- Target project: repo files attach as model(s) to whichever project is
+             currently selected app-wide, they never create a new one. -->
+        {#if selectedProject}
+          <div
+            class="flex items-center gap-2.5 rounded-2xl border border-blue-800/40 bg-blue-950/20 p-3.5 text-xs"
+          >
+            <Boxes class="h-4 w-4 shrink-0 text-blue-400" />
+            <span class="text-slate-300"
+              >Selected models will attach to <span class="font-semibold text-slate-50"
+                >{selectedProject.name}</span
+              > — switch projects from the header to attach elsewhere.</span
+            >
+          </div>
+        {:else}
+          <div
+            class="flex items-center gap-2.5 rounded-2xl border border-amber-800/40 bg-amber-950/20 p-3.5 text-xs text-amber-300"
+          >
+            <XCircle class="h-4 w-4 shrink-0" />
+            <span>Select a project from the header switcher before attaching a model.</span>
+          </div>
+        {/if}
+
         <!-- Filter Bar -->
         <div
           class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:flex-row"
@@ -785,17 +844,39 @@
                   class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
                 >
                   <tr>
+                    <th class="w-10 px-4 py-3">
+                      <TableCheckbox
+                        checked={selectedRepoPaths.size > 0 &&
+                          selectedRepoPaths.size === filteredRepoItems.length}
+                        indeterminate={selectedRepoPaths.size > 0 &&
+                          selectedRepoPaths.size < filteredRepoItems.length}
+                        onchange={toggleAllRepoPaths}
+                        title="Select or deselect all visible models"
+                      />
+                    </th>
                     <th class="px-4 py-3">IFC Model Name</th>
                     <th class="px-4 py-3">Repository Path</th>
                     <th class="px-4 py-3">Category</th>
                     <th class="px-4 py-3">Size</th>
-                    <th class="px-4 py-3 text-right">Actions</th>
+                    <th class="px-4 py-3 text-center">Primary</th>
+                    <th class="px-4 py-3 text-right">Download</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
                   {#each filteredRepoItems as item (item.path)}
-                    {@const importedProject = getImportedProject(item)}
-                    <tr class="transition-colors hover:bg-slate-900/60">
+                    {@const isSelected = selectedRepoPaths.has(item.path)}
+                    <tr
+                      class="transition-colors hover:bg-slate-900/60 {isSelected
+                        ? 'bg-blue-950/20'
+                        : ''}"
+                    >
+                      <td class="w-10 px-4 py-3">
+                        <TableCheckbox
+                          checked={isSelected}
+                          onchange={() => toggleRepoPath(item.path)}
+                          ariaLabel={`Select ${item.name}`}
+                        />
+                      </td>
                       <td class="px-4 py-3 font-semibold text-slate-50">
                         <div class="flex items-center gap-2">
                           <Box class="h-4 w-4 shrink-0 text-blue-400" />
@@ -818,45 +899,27 @@
                       <td class="whitespace-nowrap px-4 py-3 text-slate-400">
                         {formatBytes(item.size)}
                       </td>
+                      <td class="px-4 py-3 text-center">
+                        {#if isSelected}
+                          <input
+                            type="radio"
+                            name="primary-repo-model"
+                            checked={primaryRepoPath === item.path}
+                            onchange={() => (primaryRepoPath = item.path)}
+                            title="Set as this project's primary model"
+                          />
+                        {/if}
+                      </td>
                       <td class="whitespace-nowrap px-4 py-3 text-right">
-                        <div class="flex items-center justify-end gap-2">
-                          <a
-                            href={item.download_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
-                            title="Direct download raw IFC"
-                          >
-                            <Download class="h-3.5 w-3.5" />
-                          </a>
-
-                          {#if importedProject}
-                            <button
-                              type="button"
-                              onclick={() => handleViewInMainRegistry(importedProject)}
-                              class="flex items-center gap-1.5 rounded-lg border border-emerald-800/80 bg-emerald-950/70 px-3 py-1 text-xs font-semibold text-emerald-300 shadow-sm transition-all hover:bg-emerald-900/90"
-                              title="Model is already imported into Main Registry. Click to view in Main Registry."
-                            >
-                              <Eye class="h-3.5 w-3.5 text-emerald-400" />
-                              <span>View in Main Registry</span>
-                            </button>
-                          {:else}
-                            <button
-                              type="button"
-                              onclick={() => handleImportRepoModel(item)}
-                              disabled={importingPath === item.path}
-                              class="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition-all hover:bg-blue-500 disabled:opacity-50"
-                            >
-                              {#if importingPath === item.path}
-                                <Loader2 class="h-3.5 w-3.5 animate-spin" />
-                                <span>Importing...</span>
-                              {:else}
-                                <Import class="h-3.5 w-3.5" />
-                                <span>Import to Main Registry & Audit</span>
-                              {/if}
-                            </button>
-                          {/if}
-                        </div>
+                        <a
+                          href={item.download_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          title="Direct download raw IFC"
+                        >
+                          <Download class="h-3.5 w-3.5" />
+                        </a>
                       </td>
                     </tr>
                   {/each}
@@ -867,6 +930,36 @@
         </div>
       {/if}
     </div>
+
+    <!-- Attach action bar: mirrors BulkActionBar's floating pattern, shown
+         once at least one repo model is checked. -->
+    {#if selectedRepoPaths.size > 0}
+      <div
+        class="sticky bottom-4 z-10 flex items-center justify-between gap-4 rounded-2xl border border-blue-800/60 bg-slate-900 p-4 shadow-lg shadow-black/40"
+      >
+        <span class="text-xs font-medium text-slate-300">
+          {selectedRepoPaths.size} model{selectedRepoPaths.size === 1 ? "" : "s"} selected
+        </span>
+        <button
+          type="button"
+          onclick={handleAttachSelectedModels}
+          disabled={!selectedProject || isAttaching}
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {#if isAttaching}
+            <Loader2 class="h-3.5 w-3.5 animate-spin" />
+            <span>Attaching…</span>
+          {:else}
+            <Boxes class="h-3.5 w-3.5" />
+            <span
+              >Attach to {selectedProject
+                ? selectedProject.name
+                : "a project"}</span
+            >
+          {/if}
+        </button>
+      </div>
+    {/if}
   {/if}
 </div>
 
