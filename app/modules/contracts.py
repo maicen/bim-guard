@@ -807,6 +807,14 @@ class AnalysisRunRequest(BaseModel):
             "list runs none. Unselected engines are skipped, not filtered afterwards."
         ),
     )
+    include_low: bool = Field(
+        default=True,
+        description=(
+            "Emit Low-band verdicts. True by default: a Low verdict is an "
+            "assessed finding, and suppressing it made whole engines look "
+            "empty. Set false for the Medium-and-above view."
+        ),
+    )
     use_cache: bool = Field(default=True, description="Whether to use cached analysis results")
 
 

@@ -903,6 +903,17 @@ export interface ResultPageQuery {
   search?: string;
 }
 
+/**
+ * `include_low` for a URL, omitted when the caller expressed no preference.
+ *
+ * Unlike the page filters, this selects what the run computes: it changes the
+ * server's cache key, so sending it needlessly would split the cache between
+ * two spellings of the same request.
+ */
+function includeLowQuery(includeLow?: boolean): string {
+  return includeLow === undefined ? "" : `&include_low=${includeLow}`;
+}
+
 function pageQuery(page?: ResultPageQuery): string {
   if (!page) return "";
   const parts: string[] = [];
@@ -958,6 +969,7 @@ export const analyzeApi = {
     useCache = true,
     engines?: string[],
     signal?: AbortSignal,
+    includeLow?: boolean,
   ): Promise<AnalysisResult> {
     const res = await apiFetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: "POST",
@@ -967,6 +979,7 @@ export const analyzeApi = {
         slug,
         use_cache: useCache,
         engines: engines ?? null,
+        ...(includeLow === undefined ? {} : { include_low: includeLow }),
       }),
       signal,
     });
@@ -989,9 +1002,10 @@ export const analyzeApi = {
     engines?: string[],
     signal?: AbortSignal,
     page?: ResultPageQuery,
+    includeLow?: boolean,
   ): Promise<AnalysisResult> {
     const res = await apiFetch(
-      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}`,
+      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}${includeLowQuery(includeLow)}`,
       { signal },
     );
     return handleResponse<AnalysisResult>(res);
@@ -1002,13 +1016,20 @@ export const analyzeApi = {
     return handleResponse<WorkflowStatus>(res);
   },
 
+  /**
+   * URL for the whole-run export.
+   *
+   * `includeLow` must match what the page ran, or the download reports a
+   * different set of findings from the results it was taken from.
+   */
   getExportUrl(
     projectId: number,
     slug: string,
     fmt: "bcf" | "csv" | "json",
     engines?: string[],
+    includeLow?: boolean,
   ): string {
-    return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}`;
+    return `${API_BASE}/analyze/export?project_id=${projectId}&slug=${slug}&fmt=${fmt}${engineQuery(engines)}${includeLowQuery(includeLow)}`;
   },
 
   getBcfArtifactUrl(artifactId: number): string {

@@ -455,6 +455,7 @@ def run_analysis_endpoint(
             payload.project_id,
             use_cache=payload.use_cache,
             engines=engines,
+            include_low=payload.include_low,
         )
         return {
             "status": "queued",
@@ -464,7 +465,11 @@ def run_analysis_endpoint(
         }
 
     raw_result = run_analysis(
-        slug, payload.project_id, use_cache=payload.use_cache, engines=engines
+        slug,
+        payload.project_id,
+        use_cache=payload.use_cache,
+        engines=engines,
+        include_low=payload.include_low,
     )
     if raw_result.get("compliance_error"):
         raise HTTPException(
@@ -483,6 +488,7 @@ def run_analysis_endpoint(
 def run_corrosion(
     project_id: Annotated[int, Form(...)],
     engines: Annotated[list[str] | None, Form()] = None,
+    include_low: Annotated[bool, Form()] = True,
 ) -> AnalysisResultContract:
     """Run the selected corrosion engines.
 
@@ -491,7 +497,9 @@ def run_corrosion(
     every one of them; naming a subset runs only those, and the rest are never
     entered.
     """
-    raw_result = run_analysis("corrosion", project_id, use_cache=False, engines=engines)
+    raw_result = run_analysis(
+        "corrosion", project_id, use_cache=False, engines=engines, include_low=include_low
+    )
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -521,6 +529,16 @@ def get_analysis_results(
     use_cache: bool = Query(True, description="Whether to read from cache"),
     engines: list[str] | None = Query(
         None, description="Engine codes to run; omit to run every engine"
+    ),
+    include_low: bool = Query(
+        True,
+        description=(
+            "Emit Low-band verdicts. True by default: a Low verdict is an "
+            "assessed finding, and suppressing it made whole engines look "
+            "empty — every GC-001 finding on Clinic Plumbing bands Low. Set "
+            "false for the Medium-and-above view. This selects what the run "
+            "produces, unlike band/mechanism, which narrow what a page returns."
+        ),
     ),
     limit: int | None = Query(
         None,
@@ -575,6 +593,10 @@ def get_analysis_results(
     ``mechanism``, ``q``, ``include_data_quality=false`` or ``sort`` narrows
     ``audit_issues`` and adds ``page``.
 
+    ``include_low`` is the exception among the parameters above: it selects
+    what the run computes, not what this page returns, so it changes the cache
+    key and never adds a ``page`` object on its own.
+
     Narrowing happens after ``run_analysis`` has returned, so the cache keeps
     the whole run and two callers paging the same result share one computation.
     ``issue_stats`` always counts the whole run: a page of 200 criticals under
@@ -586,7 +608,9 @@ def get_analysis_results(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown analysis slug {slug!r}.",
         )
-    raw_result = run_analysis(slug, project_id, use_cache=use_cache, engines=engines)
+    raw_result = run_analysis(
+        slug, project_id, use_cache=use_cache, engines=engines, include_low=include_low
+    )
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -645,6 +669,16 @@ def export_analysis_report(
     engines: list[str] | None = Query(
         None, description="Engine codes the export covers; omit for every engine"
     ),
+    include_low: bool = Query(
+        True,
+        description=(
+            "Emit Low-band verdicts. True by default: a Low verdict is an "
+            "assessed finding, and suppressing it made whole engines look "
+            "empty — every GC-001 finding on Clinic Plumbing bands Low. Set "
+            "false for the Medium-and-above view. This selects what the run "
+            "produces, unlike band/mechanism, which narrow what a page returns."
+        ),
+    ),
 ):
     """Export compliance analysis findings into requested format.
 
@@ -654,7 +688,7 @@ def export_analysis_report(
     if slug not in RUNNABLE_SLUGS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown slug {slug!r}")
 
-    result = run_analysis(slug, project_id, engines=engines)
+    result = run_analysis(slug, project_id, engines=engines, include_low=include_low)
     if result.get("compliance_error"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result["compliance_error"])
 

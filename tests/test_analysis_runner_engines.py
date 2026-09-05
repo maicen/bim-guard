@@ -49,7 +49,7 @@ def calls(monkeypatch) -> list:
     """Record every corrosion computation and the selection it ran under."""
     recorded: list = []
 
-    def fake_corrosion(content, project_id, engines=None):
+    def fake_corrosion(content, project_id, engines=None, include_low=True):
         recorded.append(engines)
         return empty_result()
 
@@ -66,6 +66,60 @@ def calls(monkeypatch) -> list:
         runner, "run_seismic_analysis", lambda content, **kwargs: empty_result()
     )
     return recorded
+
+
+@pytest.fixture
+def low_calls(monkeypatch) -> list:
+    """Record the ``include_low`` each corrosion computation ran under."""
+    recorded: list = []
+
+    def fake_corrosion(content, project_id, engines=None, include_low=True):
+        recorded.append(include_low)
+        return empty_result()
+
+    monkeypatch.setattr(runner, "model_bytes", lambda project_id: (b"IFC", None))
+    monkeypatch.setattr(runner, "_run_corrosion_tracked", fake_corrosion)
+    return recorded
+
+
+class TestLowBandSelection:
+    """A run that dropped Low verdicts is a different result, not the same one.
+
+    Suppressing Lows unconditionally did not merely hide the mild findings:
+    every GC-001 verdict on Clinic Plumbing bands Low, so the endpoint reported
+    that engine as having found nothing. The default is now to keep them, and
+    the two answers must not share a cache entry.
+    """
+
+    def test_the_default_keeps_low_verdicts(self, low_calls):
+        runner.run_analysis("corrosion", 1)
+        assert low_calls == [True]
+
+    def test_the_choice_reaches_the_engines(self, low_calls):
+        runner.run_analysis("corrosion", 1, include_low=False)
+        assert low_calls == [False]
+
+    def test_dropping_lows_is_not_served_from_a_full_run(self, low_calls):
+        runner.run_analysis("corrosion", 1, include_low=True)
+        runner.run_analysis("corrosion", 1, include_low=False)
+        assert low_calls == [True, False]
+
+    def test_a_full_run_is_not_served_from_one_that_dropped_lows(self, low_calls):
+        runner.run_analysis("corrosion", 1, include_low=False)
+        runner.run_analysis("corrosion", 1, include_low=True)
+        assert low_calls == [False, True]
+
+    def test_repeating_one_choice_computes_once(self, low_calls):
+        runner.run_analysis("corrosion", 1, include_low=False)
+        runner.run_analysis("corrosion", 1, include_low=False)
+        assert low_calls == [False]
+
+    def test_each_choice_keeps_its_own_entry(self, low_calls):
+        runner.run_analysis("corrosion", 1, include_low=True)
+        runner.run_analysis("corrosion", 1, include_low=False)
+        runner.run_analysis("corrosion", 1, include_low=True)
+        # The third call is a hit on the first entry, not a recompute.
+        assert low_calls == [True, False]
 
 
 class TestSelectionReachesTheEngines:

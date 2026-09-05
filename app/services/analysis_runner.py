@@ -162,7 +162,10 @@ def model_bytes_all(
 
 
 def _run_corrosion_tracked(
-    content: bytes, project_id: int, engines: list[str] | None = None
+    content: bytes,
+    project_id: int,
+    engines: list[str] | None = None,
+    include_low: bool = True,
 ) -> dict:
     """Parse and assess a model, reporting each stage to the pipeline tracker.
 
@@ -188,6 +191,10 @@ def _run_corrosion_tracked(
         engines: Ruleset codes to run, or ``None`` for all of them. Only the
             selected engines are tracked: reporting stages for an engine that
             was never entered would describe work that did not happen.
+        include_low: Keep Low-band verdicts. Passed straight through to
+            ``run_corrosion_analysis``; the tracker counts what is emitted, so
+            suppressing Lows lowers the reported findings rather than hiding
+            them from a total that still counts them.
 
     Returns:
         The ``AnalysisResult`` from :func:`run_corrosion_analysis`, unchanged.
@@ -221,13 +228,17 @@ def _run_corrosion_tracked(
                 track_failure(code, reason)
             # Still routed through run_corrosion_analysis so the error result is
             # shaped in exactly one place.
-            return run_corrosion_analysis(parsed, include_low=False, engines=engines)
+            return run_corrosion_analysis(
+                parsed, include_low=include_low, engines=engines
+            )
 
         elements_total = len(parsed.get("elements", []))
         for code in tracked:
             emit(code, Stage.ENGINE_EXECUTION, elements_total=elements_total)
 
-        result = run_corrosion_analysis(parsed, include_low=False, engines=engines)
+        result = run_corrosion_analysis(
+            parsed, include_low=include_low, engines=engines
+        )
 
         issues = result.get("audit_issues", [])
         for code in tracked:
@@ -359,6 +370,7 @@ def run_analysis(
     *,
     use_cache: bool = True,
     engines: list[str] | None = None,
+    include_low: bool = True,
 ) -> dict:
     """Return the ``AnalysisResult`` for ``slug`` on ``project_id``.
 
@@ -370,6 +382,12 @@ def run_analysis(
         engines: Corrosion ruleset codes to run, e.g. ``["GC-001", "CC"]``.
             ``None`` runs every engine. Ignored for ``"seismic"``, which is a
             single kernel with nothing to select between.
+        include_low: Emit Low-band verdicts. Defaults to ``True`` because a
+            Low verdict is an assessed finding, and suppressing it made whole
+            engines vanish: every GC-001 finding on Clinic Plumbing bands Low,
+            so the endpoint reported that engine as having found nothing.
+            Set ``False`` for the Medium-and-above view. Ignored for
+            ``"seismic"`` and ``"architecture"``, which do not band this way.
 
     Returns:
         An ``AnalysisResult``. Its ``cached`` field says how this particular
@@ -407,6 +425,9 @@ def run_analysis(
         # the answer genuinely differs once there is more geometry to clash with.
         source_sha256=_federated_sha256(models) if models else sha256_of(content),
         engines=engine_codes,
+        # Two results from one model that differ only in whether Low verdicts
+        # were kept are still two results, so they cannot share an entry.
+        include_low=include_low,
     )
 
     if use_cache:
@@ -430,7 +451,9 @@ def run_analysis(
     elif slug == "architecture":
         result = _run_architecture(project_id)
     else:
-        result = _run_corrosion_tracked(content, project_id, engines)
+        result = _run_corrosion_tracked(
+            content, project_id, engines, include_low=include_low
+        )
 
     # Failures are not cached: an unreachable storage object or an unreadable
     # model is usually transient, and caching it would make one bad moment
