@@ -859,6 +859,58 @@ def list_project_ifc_files(
     ]
 
 
+@router.post(
+    "/{project_id}/files/{file_id}/primary",
+    response_model=ProjectIfcFileResponse,
+    summary="Set one of a project's attached IFC models as primary",
+)
+def set_primary_project_ifc_file(
+    project_id: int,
+    file_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> ProjectIfcFileResponse:
+    """Promote one of a project's models to primary, by ``project_ifc_files.id``.
+
+    Raises:
+        HTTPException: 404 if the project does not exist or holds no such model.
+    """
+    row = service.set_primary_ifc_file(project_id, file_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} has no attached model with ID {file_id}.",
+        )
+    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
+
+
+@router.delete(
+    "/{project_id}/files/{file_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Detach and delete one of a project's attached IFC models",
+)
+def delete_project_ifc_file(
+    project_id: int,
+    file_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> None:
+    """Remove one of a project's models, by ``project_ifc_files.id``.
+
+    Deleting the primary model promotes the next remaining one; deleting a
+    project's last model leaves it with none, which is a valid state.
+
+    Raises:
+        HTTPException: 404 if the project does not exist or holds no such model.
+    """
+    deleted = service.delete_ifc_file(project_id, file_id)
+    if deleted is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} has no attached model with ID {file_id}.",
+        )
+
+
 @router.get(
     "/{project_id}/files/{file_id}/ifc",
     summary="Download one of a project's attached IFC models",

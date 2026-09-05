@@ -498,6 +498,25 @@ export const projectsApi = {
     return handleResponse<ProjectIfcFile[]>(res);
   },
 
+  /** Promote one attached model to primary. Any previous primary is demoted. */
+  async setPrimaryIfcFile(projectId: number, fileId: number): Promise<ProjectIfcFile> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}/primary`, {
+      method: "POST",
+    });
+    return handleResponse<ProjectIfcFile>(res);
+  },
+
+  /**
+   * Detach and delete one attached model. Deleting the primary promotes the
+   * next remaining model; deleting a project's last model leaves it with none.
+   */
+  async deleteIfcFile(projectId: number, fileId: number): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
+  },
+
   /**
    * Attach IFC models to an existing project.
    *

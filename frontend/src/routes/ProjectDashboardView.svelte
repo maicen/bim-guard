@@ -24,14 +24,23 @@
   let ifcFiles: ProjectIfcFile[] = $state([]);
   let isLoadingFiles = $state(true);
 
+  // See ModelsView.svelte for why this needs a token: App.svelte's
+  // targetProjectId can briefly resolve to a stale project before its
+  // URL-sync effect corrects it, and responses can arrive out of order.
+  let loadToken = 0;
+
   async function loadFiles(projectId: number) {
+    const token = ++loadToken;
     isLoadingFiles = true;
     try {
-      ifcFiles = await projectsApi.listIfcFiles(projectId);
+      const result = await projectsApi.listIfcFiles(projectId);
+      if (token !== loadToken) return;
+      ifcFiles = result;
     } catch {
+      if (token !== loadToken) return;
       ifcFiles = [];
     } finally {
-      isLoadingFiles = false;
+      if (token === loadToken) isLoadingFiles = false;
     }
   }
 
