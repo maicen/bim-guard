@@ -33,6 +33,7 @@
   import SettingsView from "./routes/SettingsView.svelte";
   import OrgSettingsView from "./routes/OrgSettingsView.svelte";
   import LoginView from "./routes/LoginView.svelte";
+  import LandingView from "./routes/LandingView.svelte";
   import OrgPickerGate from "./lib/components/OrgPickerGate.svelte";
 
   import { dashboardApi, projectsApi } from "./lib/api";
@@ -57,12 +58,23 @@
   // or /api/rules, both of which now require a bearer token. Left ungated
   // when auth isn't configured so a checkout without Supabase set up still
   // runs, per isAuthConfigured's own "non-fatal until configured" contract.
+  //
+  // The root path ("/", activeView "dashboard") and "/login" are the two
+  // signed-out-friendly destinations — landing page and sign-in respectively,
+  // rendered without the app shell below. Anything else requested while
+  // signed out redirects to the landing page instead of straight to login,
+  // so a shared deep link at least lands somewhere coherent.
+  let showAppShell = $derived(!isAuthConfigured || authState.loading || !!authState.user);
   let authGateBlocking = $derived(
-    isAuthConfigured && !authState.loading && !authState.user && activeView !== "login",
+    isAuthConfigured &&
+      !authState.loading &&
+      !authState.user &&
+      activeView !== "login" &&
+      activeView !== "dashboard",
   );
 
   $effect(() => {
-    if (authGateBlocking) push("/login");
+    if (authGateBlocking) push("/");
   });
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
@@ -212,6 +224,19 @@
   Skip to main content
 </a>
 
+{#if !showAppShell}
+  <!-- Signed out: the landing page and sign-in screen are full-bleed, with
+       none of the working app's sidebar/header chrome around them. -->
+  <div class="min-h-screen bg-slate-950 font-sans text-slate-100 antialiased">
+    {#if activeView === "login"}
+      <div class="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6">
+        <LoginView />
+      </div>
+    {:else}
+      <LandingView />
+    {/if}
+  </div>
+{:else}
 <div
   class="flex min-h-screen bg-slate-950 font-sans text-slate-100 antialiased transition-colors duration-200 selection:bg-blue-500/30 selection:text-blue-200"
 >
@@ -244,7 +269,7 @@
             Loading your session…
           </div>
         {:else if authGateBlocking}
-          <!-- The $effect above is already redirecting to /login; render
+          <!-- The $effect above is already redirecting to "/"; render
                nothing of the protected view in the meantime. -->
         {:else if activeView === "dashboard"}
           <DashboardView
@@ -352,6 +377,7 @@
     </footer>
   </div>
 </div>
+{/if}
 
 <Toaster />
 

@@ -4,6 +4,7 @@
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
   import OrgSwitcher from "./OrgSwitcher.svelte";
   import ProjectSwitcher from "./ProjectSwitcher.svelte";
+  import ResourcesMenu from "./ResourcesMenu.svelte";
   import UserMenu from "./UserMenu.svelte";
   import type { Project } from "../types";
 
@@ -147,6 +148,8 @@
       <span>API Docs</span>
       <ExternalLink class="h-3 w-3" />
     </a>
+
+    <ResourcesMenu {activeView} />
 
     <!-- Theme Toggle Button -->
     <ThemeToggle />

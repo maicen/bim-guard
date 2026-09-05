@@ -8,14 +8,11 @@
     BookOpen,
     Sparkles,
     ListChecks,
-    BookOpenCheck,
-    Box,
     Settings,
     ChevronLeft,
     ChevronRight,
     RefreshCw,
     Download,
-    BookText,
     Building2,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
@@ -38,9 +35,13 @@
   const AUDIT_VIEW_IDS = new Set(["arch", "piping", "seismic", "analyze"]);
 
   // Grouped by intent (My Home / Model Coordination / Compliance / Rules &
-  // Standards / Integrations / Manuals) rather than by module — see the
-  // Tenant & Workspace Blueprint. View ids and routes are unchanged; only the
-  // grouping and labels moved, so every existing link keeps working.
+  // Standards / Integrations) rather than by module — see the Tenant &
+  // Workspace Blueprint. View ids and routes are unchanged; only the grouping
+  // and labels moved, so every existing link keeps working. Reference
+  // material (User Manual, Modeling Manual, bSDD Wiki) moved out of this
+  // working sidebar entirely — it's in the navbar's Resources menu instead
+  // (ResourcesMenu.svelte), reachable from any view without crowding project
+  // workspaces.
   let canManageActiveOrg = $derived(
     authState.activeOrganization?.role === "owner" ||
       authState.activeOrganization?.role === "admin",
@@ -78,14 +79,6 @@
       items: [
         { id: "revit-sync", label: "Revit Direct Sync", icon: RefreshCw },
         { id: "ifc-export-setting", label: "IFC Export Setting", icon: Download },
-      ],
-    },
-    {
-      title: "Manuals",
-      items: [
-        { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
-        { id: "modeling-manual", label: "Modeling Manual", icon: Box },
-        { id: "bsdd-wiki", label: "bSDD Wiki", icon: BookText },
       ],
     },
     ...(canManageActiveOrg
