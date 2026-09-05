@@ -24,10 +24,12 @@ from app.modules.contracts import (
     OrganizationInviteCreateRequest,
     OrganizationInviteListResponse,
     OrganizationInviteResponse,
+    OrganizationListResponse,
     OrganizationMemberListResponse,
     OrganizationMemberResponse,
     OrganizationRulesetGrantsResponse,
     OrganizationRulesetGrantsUpdateRequest,
+    OrganizationSummary,
 )
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
@@ -44,6 +46,27 @@ def _require_superadmin(current_user: CurrentUser, profiles: ProfileService) -> 
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the platform superadmin can do this.",
         )
+
+
+@router.get(
+    "",
+    response_model=OrganizationListResponse,
+    summary="List every organization on the platform",
+)
+def list_organizations(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> OrganizationListResponse:
+    """Return every organization.
+
+    Superadmin only -- this backs the platform ruleset-grant screen, not
+    anything an ordinary member needs.
+    """
+    _require_superadmin(current_user, profiles)
+    return OrganizationListResponse(
+        organizations=[OrganizationSummary(**o) for o in memberships.list_all_organizations()]
+    )
 
 
 def _require_membership(

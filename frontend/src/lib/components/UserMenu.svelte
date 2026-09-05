@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LogOut, LogIn, Settings, Building2 } from "lucide-svelte";
+  import { LogOut, LogIn, Settings, Building2, ShieldCheck } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
   import { isAuthConfigured } from "../supabaseClient";
@@ -14,6 +14,7 @@
   });
   let activeOrg = $derived(authState.activeOrganization);
   let canManageOrg = $derived(activeOrg?.role === "owner" || activeOrg?.role === "admin");
+  let isSuperadmin = $derived(authState.profile?.profile.is_superadmin ?? false);
 
   function goToProfile() {
     open = false;
@@ -23,6 +24,11 @@
   function goToOrgSettings() {
     open = false;
     push("/org-settings");
+  }
+
+  function goToSuperadminRulesets() {
+    open = false;
+    push("/superadmin-rulesets");
   }
 
   function toggle(e: MouseEvent) {
@@ -85,6 +91,16 @@
           >
             <Building2 class="h-3.5 w-3.5" />
             Organization settings
+          </button>
+        {/if}
+        {#if isSuperadmin}
+          <button
+            type="button"
+            onclick={goToSuperadminRulesets}
+            class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          >
+            <ShieldCheck class="h-3.5 w-3.5" />
+            Ruleset access
           </button>
         {/if}
         <button

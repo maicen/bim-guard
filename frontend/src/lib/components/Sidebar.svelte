@@ -11,12 +11,8 @@
     Settings,
     ChevronLeft,
     ChevronRight,
-    RefreshCw,
-    Download,
-    Building2,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
-  import { authState } from "../auth.svelte";
 
   interface Props {
     activeView?: string;
@@ -35,19 +31,17 @@
   const AUDIT_VIEW_IDS = new Set(["arch", "piping", "seismic", "analyze"]);
 
   // Grouped by intent (My Home / Model Coordination / Compliance / Rules &
-  // Standards / Integrations) rather than by module — see the Tenant &
-  // Workspace Blueprint. View ids and routes are unchanged; only the grouping
-  // and labels moved, so every existing link keeps working. Reference
-  // material (User Manual, Modeling Manual, bSDD Wiki) moved out of this
-  // working sidebar entirely — it's in the navbar's Resources menu instead
-  // (ResourcesMenu.svelte), reachable from any view without crowding project
-  // workspaces.
-  let canManageActiveOrg = $derived(
-    authState.activeOrganization?.role === "owner" ||
-      authState.activeOrganization?.role === "admin",
-  );
-
-  let NAV_SECTIONS = $derived([
+  // Standards) rather than by module — see the Tenant & Workspace Blueprint.
+  // View ids and routes are unchanged; only the grouping and labels moved, so
+  // every existing link keeps working. Reference material (User Manual,
+  // Modeling Manual, bSDD Wiki) and Integrations (Revit Sync, IFC Export
+  // Setting) moved out of this working sidebar entirely — they're in the
+  // navbar's Resources and Integrations menus instead (ResourcesMenu.svelte,
+  // IntegrationsMenu.svelte), reachable from any view without crowding
+  // project workspaces. Organization Settings is reachable from the user
+  // menu (UserMenu.svelte) instead of a sidebar entry, since it's an
+  // account-scoped action, not a project workspace.
+  const NAV_SECTIONS = [
     {
       title: "My Home",
       items: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }],
@@ -74,22 +68,7 @@
         { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
       ],
     },
-    {
-      title: "Integrations",
-      items: [
-        { id: "revit-sync", label: "Revit Direct Sync", icon: RefreshCw },
-        { id: "ifc-export-setting", label: "IFC Export Setting", icon: Download },
-      ],
-    },
-    ...(canManageActiveOrg
-      ? [
-          {
-            title: "Admin",
-            items: [{ id: "org-settings", label: "Organization Settings", icon: Building2 }],
-          },
-        ]
-      : []),
-  ]);
+  ];
 </script>
 
 <!-- Scrim: only below md, and only while the drawer is open. -->

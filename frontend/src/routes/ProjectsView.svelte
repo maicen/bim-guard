@@ -21,12 +21,15 @@
     Box,
     Loader2,
     Database,
+    ListChecks,
   } from "lucide-svelte";
   import { projectsApi, githubReposApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import type { Project, GitHubRepo, GitHubRepoStructure, GitHubRepoItem } from "../lib/types";
   import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
+  import ProjectRulesetBindingsModal from "../lib/components/ProjectRulesetBindingsModal.svelte";
   import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
   import ProjectBulkEditModal from "../lib/components/ProjectBulkEditModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -92,6 +95,15 @@
   let selectedProjectForEdit: Project | null = $state(null);
   let selectedProjectForDetails: Project | null = $state(null);
   let selectedProjectForEnhance: Project | null = $state(null);
+  let rulesetBindingsTarget: Project | null = $state(null);
+
+  // An owner/admin of a project's own organization is the only one who may
+  // change its rule assignments -- everyone else doesn't get the button, and
+  // the backend (PUT /api/projects/{id}/ruleset-bindings) enforces the same
+  // rule regardless.
+  let canManageRuleAssignments = $derived(
+    authState.activeOrganization?.role === "owner" || authState.activeOrganization?.role === "admin",
+  );
   let projectToDelete: { id: number; name: string } | null = $state(null);
 
   // Bulk selection state
@@ -606,6 +618,17 @@
                         Audit
                       </button>
 
+                      {#if canManageRuleAssignments}
+                        <button
+                          type="button"
+                          onclick={() => (rulesetBindingsTarget = project)}
+                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-950/30 hover:text-emerald-400"
+                          title="Rule Assignments"
+                        >
+                          <ListChecks class="h-3.5 w-3.5" />
+                        </button>
+                      {/if}
+
                       <button
                         type="button"
                         onclick={() => openEdit(project)}
@@ -853,6 +876,11 @@
     isEnhancementsOpen = false;
     selectedProjectForEnhance = null;
   }}
+/>
+
+<ProjectRulesetBindingsModal
+  project={rulesetBindingsTarget}
+  onClose={() => (rulesetBindingsTarget = null)}
 />
 
 <GitHubRepoManagerModal

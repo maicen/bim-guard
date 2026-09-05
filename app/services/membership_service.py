@@ -120,6 +120,14 @@ class MembershipService:
         """Return the organization row for *organization_id*, or None."""
         return self._organizations.get(organization_id)
 
+    def list_all_organizations(self) -> list[dict[str, Any]]:
+        """Return every organization on the platform, newest first.
+
+        Used only for the superadmin's org<->ruleset grant screen; nothing
+        else needs to enumerate organizations outside the caller's own.
+        """
+        return sorted(self._organizations.rows, key=lambda o: o["id"], reverse=True)
+
     def role_for_user(self, organization_id: int, user_id: str) -> str | None:
         """Return *user_id*'s role in *organization_id*, or None if not a member."""
         rows = self._memberships.rows_where(

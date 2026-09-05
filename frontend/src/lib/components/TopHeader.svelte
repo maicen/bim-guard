@@ -1,19 +1,17 @@
 <script lang="ts">
-  import { ExternalLink, Activity, Menu } from "lucide-svelte";
+  import { Activity, Menu } from "lucide-svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
   import OrgSwitcher from "./OrgSwitcher.svelte";
   import ProjectSwitcher from "./ProjectSwitcher.svelte";
   import ResourcesMenu from "./ResourcesMenu.svelte";
+  import IntegrationsMenu from "./IntegrationsMenu.svelte";
   import UserMenu from "./UserMenu.svelte";
   import type { Project } from "../types";
 
   interface Props {
     activeView: string;
     selectedProject?: Project | null;
-    apiOnline?: boolean;
-    dbOk?: boolean;
-    dbBackend?: string;
     /** Opens the navigation drawer; only rendered below `md`. */
     onOpenMobileNav?: () => void;
     /** Navigate to the Live Workflow view for a tracked project's pipeline. */
@@ -25,9 +23,6 @@
   let {
     activeView,
     selectedProject = null,
-    apiOnline = true,
-    dbOk = true,
-    dbBackend = "SUPABASE",
     onOpenMobileNav = () => {},
     onOpenPipeline,
     onSwitchProject,
@@ -53,6 +48,7 @@
     "modeling-manual": { section: "Manuals", title: "3D Modeling Reference" },
     settings: { section: "System", title: "Application Settings" },
     "org-settings": { section: "Admin", title: "Organization Settings" },
+    "superadmin-rulesets": { section: "Platform", title: "Ruleset Access" },
   };
 
   let headerInfo = $derived(
@@ -97,58 +93,7 @@
     <OrgSwitcher />
     <GlobalPipelineStatus onOpen={onOpenPipeline} />
 
-    <!-- Compact combined health dot for narrow viewports -->
-    <span
-      class="inline-flex h-7 w-7 items-center justify-center rounded-full border lg:hidden {apiOnline &&
-      dbOk
-        ? 'border-emerald-800/60 bg-emerald-950/40'
-        : 'border-rose-800/60 bg-rose-950/40'}"
-      title={`Gateway ${apiOnline ? "active" : "offline"} - DB ${dbBackend} ${dbOk ? "connected" : "degraded"}`}
-    >
-      <span class="h-1.5 w-1.5 rounded-full {apiOnline && dbOk ? 'bg-emerald-400' : 'bg-rose-400'}"
-      ></span>
-      <span class="sr-only"
-        >Gateway {apiOnline ? "active" : "offline"}, database {dbOk
-          ? "connected"
-          : "degraded"}</span
-      >
-    </span>
-
-    <!-- Health status -->
-    <span
-      class="hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium lg:inline-flex {apiOnline
-        ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
-        : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
-    >
-      <span class="h-1.5 w-1.5 rounded-full {apiOnline ? 'bg-emerald-400' : 'bg-rose-400'}"></span>
-      {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
-    </span>
-
-    <!-- DB Status indicator -->
-    <span
-      class="hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium lg:inline-flex {dbOk
-        ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
-        : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
-    >
-      <span
-        class="h-1.5 w-1.5 rounded-full {dbOk
-          ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
-          : 'bg-rose-400'}"
-      ></span>
-      DB {dbBackend}: {dbOk ? "Connected" : "Degraded"}
-    </span>
-
-    <a
-      href="/api/docs"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="hidden items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:border-slate-700 hover:text-slate-50 md:flex"
-      title="Open Swagger OpenAPI Documentation"
-    >
-      <span>API Docs</span>
-      <ExternalLink class="h-3 w-3" />
-    </a>
-
+    <IntegrationsMenu {activeView} />
     <ResourcesMenu {activeView} />
 
     <!-- Theme Toggle Button -->

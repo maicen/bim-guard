@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Building2, Mail, Plus, Shield, Trash2, UserPlus } from "lucide-svelte";
+  import { Building2, Mail, Plus, Shield, Trash2, UserPlus, Users, FolderOpen } from "lucide-svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
@@ -9,15 +10,17 @@
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import Modal from "../lib/components/Modal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
-  import { organizationsApi } from "../lib/api";
+  import { organizationsApi, projectsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
-  import type { OrganizationInvite, OrganizationMember } from "../lib/types";
+  import type { Group, OrganizationInvite, OrganizationMember, Project } from "../lib/types";
 
   let activeOrg = $derived(authState.activeOrganization);
 
   let members = $state.raw<OrganizationMember[]>([]);
   let invites = $state.raw<OrganizationInvite[]>([]);
+  let groups = $state.raw<Group[]>([]);
+  let orgProjects = $state.raw<Project[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -27,7 +30,7 @@
   let sortAsc = $state(true);
   let pageIndex = $state(1);
   let pageSize = $state(10);
-  let selected = $state.raw<Set<string>>(new Set());
+  const selected: Set<string> = new SvelteSet();
 
   let filtered = $derived(
     members.filter((m) => {
@@ -55,21 +58,17 @@
   }
 
   function toggleRow(userId: string) {
-    const next = new Set(selected);
-    if (next.has(userId)) next.delete(userId);
-    else next.add(userId);
-    selected = next;
+    if (selected.has(userId)) selected.delete(userId);
+    else selected.add(userId);
   }
 
   function toggleAllOnPage() {
     const pageIds = page.map((m) => m.user_id);
     const allSelected = pageIds.every((id) => selected.has(id));
-    const next = new Set(selected);
     for (const id of pageIds) {
-      if (allSelected) next.delete(id);
-      else next.add(id);
+      if (allSelected) selected.delete(id);
+      else selected.add(id);
     }
-    selected = next;
   }
 
   let allOnPageSelected = $derived(page.length > 0 && page.every((m) => selected.has(m.user_id)));
@@ -80,12 +79,19 @@
     loading = true;
     error = null;
     try {
-      const [memberRes, inviteRes] = await Promise.all([
+      const [memberRes, inviteRes, groupRes, projectRes] = await Promise.all([
         organizationsApi.listMembers(activeOrg.organization_id),
         organizationsApi.listInvites(activeOrg.organization_id),
+        organizationsApi.listGroups(activeOrg.organization_id),
+        projectsApi.list(),
       ]);
       members = memberRes.members;
       invites = inviteRes.invites.filter((i) => !i.accepted_at);
+      groups = groupRes.groups;
+      // An owner/admin's project list is already every project in their
+      // organization (see app.api.projects.list_projects); still filter by
+      // org id in case the caller belongs to more than one.
+      orgProjects = projectRes.projects.filter((p) => p.organization_id === activeOrg.organization_id);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -122,7 +128,7 @@
         toasts.fromError(err, `Could not update role for one member.`);
       }
     }
-    selected = new Set();
+    selected.clear();
     await load();
   }
 
@@ -146,7 +152,7 @@
         toasts.fromError(err, "Could not remove one member.");
       }
     }
-    selected = new Set();
+    selected.clear();
     await load();
   }
 
@@ -188,6 +194,92 @@
       toasts.fromError(err, "Could not revoke invite.");
     } finally {
       revokeTarget = null;
+    }
+  }
+
+  // Groups
+  let newGroupModalOpen = $state(false);
+  let newGroupName = $state("");
+  let groupSubmitting = $state(false);
+  let groupPendingDelete: Group | null = $state(null);
+  let projectsGroup: Group | null = $state(null);
+  const projectsSelected: Set<number> = new SvelteSet();
+  let projectsSaving = $state(false);
+
+  async function submitNewGroup(e: Event) {
+    e.preventDefault();
+    if (!activeOrg || !newGroupName.trim()) return;
+    groupSubmitting = true;
+    try {
+      const res = await organizationsApi.createGroup(activeOrg.organization_id, newGroupName.trim());
+      groups = res.groups;
+      toasts.success(`Created group "${newGroupName.trim()}".`);
+      newGroupName = "";
+      newGroupModalOpen = false;
+    } catch (err) {
+      toasts.fromError(err, "Could not create group.");
+    } finally {
+      groupSubmitting = false;
+    }
+  }
+
+  async function deleteGroup(group: Group) {
+    if (!activeOrg) return;
+    try {
+      const res = await organizationsApi.deleteGroup(activeOrg.organization_id, group.id);
+      groups = res.groups;
+      await load(); // members who were in this group are now ungrouped
+      toasts.success(`Deleted group "${group.name}".`);
+    } catch (err) {
+      toasts.fromError(err, "Could not delete group.");
+    } finally {
+      groupPendingDelete = null;
+    }
+  }
+
+  async function setMemberGroup(userId: string, groupId: number | null) {
+    if (!activeOrg) return;
+    try {
+      const res = await organizationsApi.setMemberGroup(activeOrg.organization_id, userId, groupId);
+      members = res.members;
+    } catch (err) {
+      toasts.fromError(err, "Could not change this member's group.");
+    }
+  }
+
+  async function openProjectsModal(group: Group) {
+    if (!activeOrg) return;
+    projectsGroup = group;
+    try {
+      const res = await organizationsApi.getGroupProjectGrants(activeOrg.organization_id, group.id);
+      projectsSelected.clear();
+      for (const id of res.project_ids) projectsSelected.add(id);
+    } catch (err) {
+      toasts.fromError(err, "Could not load this group's project access.");
+      projectsGroup = null;
+    }
+  }
+
+  function toggleProjectSelected(projectId: number) {
+    if (projectsSelected.has(projectId)) projectsSelected.delete(projectId);
+    else projectsSelected.add(projectId);
+  }
+
+  async function saveProjectGrants() {
+    if (!activeOrg || !projectsGroup) return;
+    projectsSaving = true;
+    try {
+      await organizationsApi.setGroupProjectGrants(
+        activeOrg.organization_id,
+        projectsGroup.id,
+        Array.from(projectsSelected),
+      );
+      toasts.success(`Updated project access for "${projectsGroup.name}".`);
+      projectsGroup = null;
+    } catch (err) {
+      toasts.fromError(err, "Could not save project access.");
+    } finally {
+      projectsSaving = false;
     }
   }
 </script>
@@ -241,7 +333,7 @@
         <BulkActionBar
           selectedCount={selected.size}
           itemLabel="member"
-          onClearSelection={() => (selected = new Set())}
+          onClearSelection={() => selected.clear()}
           onBulkEdit={() => (bulkRoleModalOpen = true)}
           onBulkDelete={removeBulk}
         />
@@ -270,6 +362,9 @@
                   Member
                 </SortHeader>
                 <SortHeader column="role" {sortField} {sortAsc} onSort={handleSort}>Role</SortHeader>
+                <th class="py-3 px-4 text-left text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  >Group</th
+                >
                 <th class="py-3 px-4 text-right text-caption font-semibold uppercase tracking-wider text-slate-400"
                   >Actions</th
                 >
@@ -304,6 +399,21 @@
                       <option value="member">Member</option>
                     </select>
                   </td>
+                  <td class="px-4 py-3">
+                    <select
+                      value={member.group_id ?? ""}
+                      onchange={(e) => {
+                        const v = (e.target as HTMLSelectElement).value;
+                        setMemberGroup(member.user_id, v ? Number(v) : null);
+                      }}
+                      class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Ungrouped</option>
+                      {#each groups as group (group.id)}
+                        <option value={group.id}>{group.name}</option>
+                      {/each}
+                    </select>
+                  </td>
                   <td class="px-4 py-3 text-right">
                     <button
                       type="button"
@@ -329,6 +439,69 @@
             pageIndex = 1;
           }}
         />
+      {/if}
+    </div>
+
+    <!-- Groups: which projects each group can access -->
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 p-4">
+        <div>
+          <h2 class="text-sm font-bold text-slate-100">Groups ({groups.length})</h2>
+          <p class="mt-0.5 text-caption text-slate-500">
+            A plain member sees only the projects their group is granted — nothing, if ungrouped.
+            Owners and admins always see every project.
+          </p>
+        </div>
+        <button
+          type="button"
+          onclick={() => (newGroupModalOpen = true)}
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+        >
+          <Plus class="h-3.5 w-3.5" />
+          New group
+        </button>
+      </div>
+
+      {#if groups.length === 0}
+        <EmptyState
+          title="No groups yet"
+          description="Create a group to control which projects a set of members can access."
+          icon={Users}
+          actionLabel="New group"
+          onAction={() => (newGroupModalOpen = true)}
+        />
+      {:else}
+        <ul class="divide-y divide-slate-800/60">
+          {#each groups as group (group.id)}
+            <li class="flex items-center justify-between gap-3 px-4 py-3 text-xs">
+              <div class="flex items-center gap-2 text-slate-200">
+                <Users class="h-3.5 w-3.5 text-slate-500" />
+                <span class="font-semibold">{group.name}</span>
+                <span class="text-slate-500"
+                  >{group.member_count} member{group.member_count === 1 ? "" : "s"}</span
+                >
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onclick={() => openProjectsModal(group)}
+                  class="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-slate-300 transition-colors hover:bg-slate-800"
+                >
+                  <FolderOpen class="h-3.5 w-3.5" />
+                  Manage projects
+                </button>
+                <button
+                  type="button"
+                  onclick={() => (groupPendingDelete = group)}
+                  class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-rose-400 transition-colors hover:bg-rose-950/60"
+                >
+                  <Trash2 class="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              </div>
+            </li>
+          {/each}
+        </ul>
       {/if}
     </div>
 
@@ -461,4 +634,99 @@
   confirmText="Revoke"
   onConfirm={() => revokeTarget && revokeInvite(revokeTarget)}
   onCancel={() => (revokeTarget = null)}
+/>
+
+<!-- New group modal -->
+<Modal
+  isOpen={newGroupModalOpen}
+  title="Create a group"
+  subtitle={activeOrg?.name}
+  icon={Users}
+  onClose={() => (newGroupModalOpen = false)}
+>
+  <form onsubmit={submitNewGroup} class="space-y-4">
+    <div>
+      <label for="group-name" class="mb-1 block font-semibold text-slate-300">Group name</label>
+      <input
+        id="group-name"
+        type="text"
+        required
+        bind:value={newGroupName}
+        placeholder="e.g. Estimators"
+        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+      />
+    </div>
+    <div class="flex justify-end gap-2 pt-1">
+      <button
+        type="button"
+        onclick={() => (newGroupModalOpen = false)}
+        class="h-9 rounded-xl border border-slate-700 bg-slate-800 px-4 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={groupSubmitting}
+        class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+      >
+        <Plus class="h-3.5 w-3.5" />
+        {groupSubmitting ? "Creating…" : "Create group"}
+      </button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Manage a group's project access -->
+<Modal
+  isOpen={projectsGroup !== null}
+  title="Project access"
+  subtitle={projectsGroup ? `${projectsGroup.name} · ${activeOrg?.name ?? ""}` : ""}
+  icon={FolderOpen}
+  onClose={() => (projectsGroup = null)}
+>
+  {#if orgProjects.length === 0}
+    <p class="text-xs text-slate-500">This organization has no projects yet.</p>
+  {:else}
+    <div class="max-h-80 space-y-1 overflow-y-auto">
+      {#each orgProjects as project (project.id)}
+        <label
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-slate-200 transition-colors hover:bg-slate-800"
+        >
+          <input
+            type="checkbox"
+            checked={projectsSelected.has(project.id)}
+            onchange={() => toggleProjectSelected(project.id)}
+            class="h-3.5 w-3.5 rounded border-slate-600 bg-slate-950 text-accent focus:ring-1 focus:ring-blue-500"
+          />
+          {project.name}
+        </label>
+      {/each}
+    </div>
+  {/if}
+  <div class="flex justify-end gap-2 pt-4">
+    <button
+      type="button"
+      onclick={() => (projectsGroup = null)}
+      class="h-9 rounded-xl border border-slate-700 bg-slate-800 px-4 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+    >
+      Cancel
+    </button>
+    <button
+      type="button"
+      disabled={projectsSaving}
+      onclick={saveProjectGrants}
+      class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+    >
+      {projectsSaving ? "Saving…" : "Save access"}
+    </button>
+  </div>
+</Modal>
+
+<ConfirmModal
+  isOpen={groupPendingDelete !== null}
+  title="Delete group"
+  message={`Delete "${groupPendingDelete?.name}"? Its members become ungrouped rather than removed, and lose whatever project access this group granted them.`}
+  confirmText="Delete"
+  onConfirm={() => groupPendingDelete && deleteGroup(groupPendingDelete)}
+  onCancel={() => (groupPendingDelete = null)}
 />

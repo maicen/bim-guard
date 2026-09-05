@@ -1310,6 +1310,8 @@ export interface OrganizationMember {
   full_name: string;
   avatar_url: string;
   role: "owner" | "admin" | "member";
+  group_id: number | null;
+  group_name: string | null;
 }
 
 /** Mirrors OrganizationMemberListResponse. */
@@ -1337,4 +1339,49 @@ export interface OrganizationInviteListResponse {
 export interface OrganizationInviteCreatePayload {
   email: string;
   role: "owner" | "admin" | "member";
+}
+
+/** One organization, as listed for the platform superadmin. Mirrors OrganizationSummary. */
+export interface OrganizationSummary {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+/** Mirrors OrganizationListResponse. */
+export interface OrganizationListResponse {
+  organizations: OrganizationSummary[];
+}
+
+/** One user group within an organization. Mirrors GroupResponse. */
+export interface Group {
+  id: number;
+  organization_id: number;
+  name: string;
+  member_count: number;
+}
+
+/** Mirrors GroupListResponse. */
+export interface GroupListResponse {
+  organization_id: number;
+  groups: Group[];
+}
+
+/** Mirrors GroupProjectGrantsResponse. */
+export interface GroupProjectGrantsResponse {
+  group_id: number;
+  project_ids: number[];
+}
+
+/** Mirrors OrganizationRulesetGrantsResponse. */
+export interface OrganizationRulesetGrantsResponse {
+  organization_id: number;
+  ruleset_ids: string[];
+}
+
+/** Mirrors ProjectRulesetBindingsResponse. */
+export interface ProjectRulesetBindingsResponse {
+  project_id: number;
+  ruleset_ids: string[];
+  available_ruleset_ids: string[];
 }

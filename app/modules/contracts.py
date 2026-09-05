@@ -1936,6 +1936,20 @@ class OrganizationInviteCreateRequest(BaseModel):
     role: Literal["owner", "admin", "member"] = "member"
 
 
+class OrganizationSummary(BaseModel):
+    """One organization, as listed for the platform superadmin."""
+
+    id: int
+    name: str
+    slug: str
+
+
+class OrganizationListResponse(BaseModel):
+    """Every organization on the platform. Superadmin only."""
+
+    organizations: list[OrganizationSummary] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # RBAC: Groups and Resource Grants
 # ---------------------------------------------------------------------------

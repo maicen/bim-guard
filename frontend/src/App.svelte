@@ -32,6 +32,7 @@
   import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
   import SettingsView from "./routes/SettingsView.svelte";
   import OrgSettingsView from "./routes/OrgSettingsView.svelte";
+  import SuperadminRulesetsView from "./routes/SuperadminRulesetsView.svelte";
   import LoginView from "./routes/LoginView.svelte";
   import LandingView from "./routes/LandingView.svelte";
   import OrgPickerGate from "./lib/components/OrgPickerGate.svelte";
@@ -253,9 +254,6 @@
     <TopHeader
       {activeView}
       {selectedProject}
-      {apiOnline}
-      {dbOk}
-      {dbBackend}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
       onSwitchProject={handleSwitchProject}
@@ -340,6 +338,8 @@
           <SettingsView />
         {:else if activeView === "org-settings"}
           <OrgSettingsView />
+        {:else if activeView === "superadmin-rulesets"}
+          <SuperadminRulesetsView />
         {:else if activeView === "login"}
           <LoginView />
         {/if}
@@ -371,6 +371,32 @@
       <div>
         <span>BIM Guard OpenBIM Compliance Engine</span>
       </div>
+
+      <!-- Gateway/DB health — moved out of the header to keep it uncluttered. -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium {apiOnline
+            ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
+            : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
+        >
+          <span class="h-1.5 w-1.5 rounded-full {apiOnline ? 'bg-emerald-400' : 'bg-rose-400'}"
+          ></span>
+          {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
+        </span>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium {dbOk
+            ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
+            : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
+        >
+          <span
+            class="h-1.5 w-1.5 rounded-full {dbOk
+              ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
+              : 'bg-rose-400'}"
+          ></span>
+          DB {dbBackend}: {dbOk ? "Connected" : "Degraded"}
+        </span>
+      </div>
+
       <div>
         <span>&copy; {new Date().getFullYear()} BIM Guard</span>
       </div>

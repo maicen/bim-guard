@@ -36,10 +36,14 @@ import type {
   NamingConfig,
   NamingConfigPayload,
   NamingPreview,
+  GroupListResponse,
+  GroupProjectGrantsResponse,
   OrganizationInviteCreatePayload,
   OrganizationInviteListResponse,
+  OrganizationListResponse,
   OrganizationMember,
   OrganizationMemberListResponse,
+  OrganizationRulesetGrantsResponse,
   ParsingEngineInstance,
   ParsingEngineInstanceCreatePayload,
   ParsingEngineInstanceTestResult,
@@ -55,6 +59,7 @@ import type {
   ProjectImportPayload,
   ProjectOptions,
   ProjectListResponse,
+  ProjectRulesetBindingsResponse,
   ProjectUpdatePayload,
   Rule,
   RuleBulkActionResponse,
@@ -189,6 +194,86 @@ export const organizationsApi = {
       method: "DELETE",
     });
     return handleResponse<OrganizationInviteListResponse>(res);
+  },
+
+  /** Every organization on the platform. Superadmin only. */
+  async listAll(): Promise<OrganizationListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations`);
+    return handleResponse<OrganizationListResponse>(res);
+  },
+
+  async listGroups(organizationId: number): Promise<GroupListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/groups`);
+    return handleResponse<GroupListResponse>(res);
+  },
+
+  async createGroup(organizationId: number, name: string): Promise<GroupListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/groups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return handleResponse<GroupListResponse>(res);
+  },
+
+  async deleteGroup(organizationId: number, groupId: number): Promise<GroupListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/groups/${groupId}`, {
+      method: "DELETE",
+    });
+    return handleResponse<GroupListResponse>(res);
+  },
+
+  /** Move a member into a group, or pass `null` to ungroup them. */
+  async setMemberGroup(
+    organizationId: number,
+    userId: string,
+    groupId: number | null,
+  ): Promise<OrganizationMemberListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/members/${userId}/group`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ group_id: groupId }),
+    });
+    return handleResponse<OrganizationMemberListResponse>(res);
+  },
+
+  async getGroupProjectGrants(
+    organizationId: number,
+    groupId: number,
+  ): Promise<GroupProjectGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/groups/${groupId}/projects`);
+    return handleResponse<GroupProjectGrantsResponse>(res);
+  },
+
+  async setGroupProjectGrants(
+    organizationId: number,
+    groupId: number,
+    projectIds: number[],
+  ): Promise<GroupProjectGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/groups/${groupId}/projects`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: projectIds }),
+    });
+    return handleResponse<GroupProjectGrantsResponse>(res);
+  },
+
+  /** Rulesets an organization may use at all. Superadmin only. */
+  async getRulesetGrants(organizationId: number): Promise<OrganizationRulesetGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/ruleset-grants`);
+    return handleResponse<OrganizationRulesetGrantsResponse>(res);
+  },
+
+  async setRulesetGrants(
+    organizationId: number,
+    rulesetIds: string[],
+  ): Promise<OrganizationRulesetGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/ruleset-grants`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ruleset_ids: rulesetIds }),
+    });
+    return handleResponse<OrganizationRulesetGrantsResponse>(res);
   },
 };
 
@@ -381,6 +466,25 @@ export const projectsApi = {
     // caller holding a project row fetched before this call should re-read it
     // with { forceRefresh: true } -- the cache cannot know the column moved.
     return handleResponse<ProjectIfcUploadResponse>(res);
+  },
+
+  /** Rulesets bound to this project, and which of its org's grants remain
+   * available to bind. A brand-new project has none bound. */
+  async getRulesetBindings(projectId: number): Promise<ProjectRulesetBindingsResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/ruleset-bindings`);
+    return handleResponse<ProjectRulesetBindingsResponse>(res);
+  },
+
+  async setRulesetBindings(
+    projectId: number,
+    rulesetIds: string[],
+  ): Promise<ProjectRulesetBindingsResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/ruleset-bindings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ruleset_ids: rulesetIds }),
+    });
+    return handleResponse<ProjectRulesetBindingsResponse>(res);
   },
 };
 

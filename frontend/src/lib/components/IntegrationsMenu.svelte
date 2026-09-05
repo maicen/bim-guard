@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BookOpenCheck, Box, BookText, LifeBuoy, ChevronDown, ExternalLink } from "lucide-svelte";
+  import { RefreshCw, Download, Plug, ChevronDown } from "lucide-svelte";
   import { link } from "svelte-spa-router";
 
   interface Props {
@@ -10,14 +10,13 @@
 
   let open = $state(false);
 
-  // Reference material, not project work — pulled out of the working sidebar
-  // (see Tenant & Workspace Blueprint, Priority 11 in TODO.md) into its own
-  // navbar menu so it's reachable from any view without crowding the
-  // project-focused nav groups.
+  // Pulled out of the working sidebar into its own navbar menu, same
+  // treatment as Resources (see ResourcesMenu.svelte) — these are external
+  // sync/export destinations rather than day-to-day project work, so they
+  // don't need a permanent sidebar section.
   const ITEMS = [
-    { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
-    { id: "modeling-manual", label: "Modeling Manual", icon: Box },
-    { id: "bsdd-wiki", label: "bSDD Wiki", icon: BookText },
+    { id: "revit-sync", label: "Revit Direct Sync", icon: RefreshCw },
+    { id: "ifc-export-setting", label: "IFC Export Setting", icon: Download },
   ];
 
   let isActive = $derived(ITEMS.some((item) => item.id === activeView));
@@ -40,8 +39,8 @@
     aria-haspopup="true"
     aria-expanded={open}
   >
-    <LifeBuoy class="h-3.5 w-3.5" />
-    Resources
+    <Plug class="h-3.5 w-3.5" />
+    Integrations
     <ChevronDown class="h-3 w-3" />
   </button>
 
@@ -63,22 +62,6 @@
           {item.label}
         </a>
       {/each}
-
-      <div class="my-1 border-t border-slate-800"></div>
-
-      <a
-        href="/api/docs"
-        target="_blank"
-        rel="noopener noreferrer"
-        onclick={() => (open = false)}
-        class="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
-        title="Open Swagger OpenAPI Documentation"
-      >
-        <span class="flex items-center gap-2">
-          <ExternalLink class="h-3.5 w-3.5" />
-          API Docs
-        </span>
-      </a>
     </div>
   {/if}
 </div>
