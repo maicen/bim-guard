@@ -70,7 +70,7 @@ STATUS:   ALL PASS
 | **MM-001 Material Gate** | ✓ DONE | Coverage 1.9% → 33.9% (Sessions 1-2) |
 | **MM-001 Environment Gate** | ✓ DONE | Coverage 0% → 100%, T1_indoor_damp default (Session 3, commit 344772c) |
 | **MM-001 Temperature Gate** | ✓ DONE | Coverage 0% → 32.1%, system-type inference (Session 3, commit 1285570) |
-| **MM-001 Real Findings** | ✓ VERIFIED | **Measured gate coverage:** Material 30.1% (17,006 / 56,509), Environment 100% (default T1), Temperature 27.1% (15,308 / 56,509). All 12 control cases pass: galvanised-in-stagnant/hot/pool fire correctly, copper-in-potable/chilled silent. See [`docs/validation/data/`](./validation/data/) for measured metrics. |
+| **MM-001 Real Findings** | ✓ VERIFIED | **Measured gate coverage over full corpus (test-models/models, 93,457 piping elements):** Material 33.87% (1,780 IFC + 29,877 inferred), Environment 100% (99.2% defaulted to T1_indoor_damp), Temperature 32.10% (100% inference, 0 IFC). All 12 control cases pass: galvanised-in-stagnant/hot/pool fire correctly, copper-in-potable/chilled silent. See [`docs/validation/VALIDATION_REPORT.md`](./validation/VALIDATION_REPORT.md) for full Session 2 measured results. |
 | **BCF Export** | ✓ DONE | All engines + all three corrosion engines validated against buildingSMART XSD |
 | **Database-Driven Rules** | ✓ DONE | Zero hardcoded thresholds; all weights/bands read from Supabase |
 | **ISO 19650 Governance** | ✓ DONE | CDE state machine, metadata tracking, document/project isolation |
