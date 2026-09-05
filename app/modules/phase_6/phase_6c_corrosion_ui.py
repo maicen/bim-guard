@@ -251,6 +251,43 @@ def _gc_element(element: ServiceElement) -> GCElement:
     )
 
 
+#: What GC-001 was given for the second side of the couple.
+#:
+#: ``material_b`` is the second material at a bimetallic junction, and the IFC
+#: reader never populates it: ``ifc_parser`` sets ``mat_b = None`` outright and
+#: leaves reading a bracket or fitting material to a future Pset pass. So on
+#: every model read from a real file, GC-001 scores ``material_a`` against
+#: itself.
+#:
+#: That self-couple is deliberately **not** gated, because it is not the
+#: Defect A failure mode. Nothing is invented: substituting ``material_a`` for
+#: an absent ``material_b`` asserts only that the element is one material
+#: throughout, and a single-material element genuinely has no internal galvanic
+#: couple. "No couple here" is therefore a true statement about the element,
+#: not a clean bill of health resting on a fabricated input -- the distinction
+#: from ``"Unknown"`` becoming carbon steel, where the material itself was made
+#: up.
+#:
+#: Refusing it would also buy nothing and cost a great deal. It would blank
+#: GC-001 on every real model and delete a correct negative, and it would not
+#: recover one missed couple: a junction between two *different* elements is
+#: XM-001's mechanism, which walks connected pairs against GC-001's own
+#: galvanic series.
+#:
+#: What the self-couple must not do is stay silent, because the absence of
+#: ``material_b`` is an unconditional gap in the reader rather than an
+#: observation about the building. Every GC-001 finding records which of the
+#: two bases it rests on, the way ``assumed_nominal_diameter_m`` records
+#: MC-001's assumed diameter.
+COUPLE_FROM_MODEL = "bimetallic_pair_from_model"
+COUPLE_FROM_ONE_MATERIAL = "single_material_self_couple"
+
+
+def _couple_basis(element: ServiceElement) -> str:
+    """Report whether a GC-001 finding scored two materials or one against itself."""
+    return COUPLE_FROM_MODEL if (element.material_b or "").strip() else COUPLE_FROM_ONE_MATERIAL
+
+
 def _cc_element(element: ServiceElement) -> CCElement:
     """Build the CC-001 input for one service element."""
     return CCElement(
@@ -414,7 +451,7 @@ def _mic_citations(result) -> list[dict]:
 
 
 def _known_to_the_galvanic_series(raw: str) -> bool:
-    """Does GC-001's alias table recognise ``raw`` at all?
+    """Report whether GC-001's alias table recognises ``raw`` at all.
 
     Read-only use of the engine's own table -- no engine file is modified --
     and deliberately not a call to ``resolve_material``, which cannot answer
@@ -864,6 +901,7 @@ def _finding_issue(
                 if spec is MIC
                 else {}
             ),
+            **({"galvanic_couple": _couple_basis(element)} if spec is GALVANIC else {}),
         },
         citations=citations,
     )

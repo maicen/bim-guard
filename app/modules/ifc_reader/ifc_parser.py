@@ -5,9 +5,8 @@ Standard: ISO 16739-1
 Library:  ifcopenshell (open source)
 """
 
-import uuid
 import re
-
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 

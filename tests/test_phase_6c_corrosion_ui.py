@@ -231,7 +231,7 @@ class TestDataQualitySurvivesIncludeLowFilter:
 class TestDataQualityShape:
     @pytest.fixture
     def dq_issue(self, galvanic_engine_fails):
-        """The Issue raised when an engine ran and produced nothing usable.
+        """Return the Issue raised when an engine ran and produced nothing usable.
 
         Selected by check rather than by position: the run now also emits the
         gate's ``hydraulics_unavailable`` Issue for MC-001, and taking

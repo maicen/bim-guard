@@ -30,6 +30,8 @@ from app.modules.ifc_reader.ifc_parser import (
     ServiceElement,
 )
 from app.modules.phase_6.phase_6c_corrosion_ui import (
+    COUPLE_FROM_MODEL,
+    COUPLE_FROM_ONE_MATERIAL,
     DATA_QUALITY,
     run_corrosion_analysis,
 )
@@ -58,7 +60,7 @@ def service_element(**overrides) -> ServiceElement:
 
 
 def parsed(elements: list[ServiceElement]) -> dict:
-    """A minimal ParsedIFC with no piping view, so only GC/CC/MC run."""
+    """Build a minimal ParsedIFC with no piping view, so only GC/CC/MC run."""
     return {
         "source_ref": "uploads/ifc/test.ifc",
         "source_sha256": "0" * 64,
@@ -323,3 +325,51 @@ class TestGateProvenance:
             run_id="GATE",
         )["audit_issues"]
         assert len(found) == 3, "one refusal per mechanism should survive include_low=False"
+
+
+# ---------------------------------------------------------------------------
+# GC-001: one material is a verdict, not an absence
+# ---------------------------------------------------------------------------
+
+
+class TestSingleMaterialStillScores:
+    """``material_b`` absent is not the Defect A failure mode.
+
+    The IFC reader never populates ``material_b`` (``ifc_parser`` sets it to
+    ``None`` outright), so GC-001 scores ``material_a`` against itself on every
+    real model. That is left to run on purpose: substituting ``material_a`` for
+    an absent ``material_b`` invents nothing — it asserts only that the element
+    is one material throughout, and such an element has no internal couple. The
+    verdict is true, so refusing it would delete a correct negative and blank
+    GC-001 everywhere, while recovering no missed couple: junctions between two
+    different elements are XM-001's mechanism.
+
+    What it must not do is stay silent, hence the recorded basis.
+    """
+
+    def test_one_material_still_earns_a_verdict(self):
+        found = run(service_element(material_a="stainless_316", material_b=None), ["GC-001"])
+        assert verdicts(found, "GC-001"), "a single-material element must still be scored"
+
+    def test_one_material_is_not_gated(self):
+        found = run(service_element(material_a="stainless_316", material_b=None), ["GC-001"])
+        assert gated(found, "GC-001", "material_unresolved") == []
+
+    def test_the_self_couple_is_recorded_on_the_finding(self):
+        """A reviewer must be able to see the verdict rests on one material."""
+        found = run(service_element(material_a="stainless_316", material_b=None), ["GC-001"])
+        meta = verdicts(found, "GC-001")[0].metadata
+        assert meta["galvanic_couple"] == COUPLE_FROM_ONE_MATERIAL
+
+    def test_a_real_pair_is_recorded_as_a_pair(self):
+        found = run(
+            service_element(material_a="stainless_316", material_b="galvanised_steel"),
+            ["GC-001"],
+        )
+        meta = verdicts(found, "GC-001")[0].metadata
+        assert meta["galvanic_couple"] == COUPLE_FROM_MODEL
+
+    def test_an_absent_material_a_is_still_refused(self):
+        """The self-couple exemption must not reopen the defect it sits beside."""
+        found = run(service_element(material_a="Unknown", material_b=None), ["GC-001"])
+        assert verdicts(found, "GC-001") == []
