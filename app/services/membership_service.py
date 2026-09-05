@@ -29,6 +29,7 @@ class MembershipService:
         invites_repo: DatabaseAdapter,
         groups_repo: DatabaseAdapter,
         group_project_grants_repo: DatabaseAdapter,
+        organization_project_grants_repo: DatabaseAdapter,
     ):
         """Initialize service with persistence repository adapters."""
         self._memberships = memberships_repo
@@ -36,6 +37,7 @@ class MembershipService:
         self._invites = invites_repo
         self._groups = groups_repo
         self._group_project_grants = group_project_grants_repo
+        self._org_project_grants = organization_project_grants_repo
 
     def list_for_user(self, user_id: str) -> list[dict[str, Any]]:
         """Return the organizations *user_id* belongs to, with their role in each."""
@@ -341,3 +343,40 @@ class MembershipService:
         if group_id is None:
             return set()
         return set(self.list_group_project_ids(group_id))
+
+    # -- Organization -> project grants (cross-org sharing, superadmin) --------
+
+    def list_org_project_grants(self, organization_id: int) -> list[int]:
+        """Return the ids of every project shared into *organization_id*.
+
+        Projects it doesn't own but has been granted access to.
+        """
+        rows = self._org_project_grants.rows_where("organization_id = ?", [organization_id])
+        return [r["project_id"] for r in rows]
+
+    def set_org_project_grants(self, organization_id: int, project_ids: list[int]) -> None:
+        """Replace *organization_id*'s entire set of granted (non-owned) projects."""
+        existing = {
+            r["project_id"]: r for r in self._org_project_grants.rows_where("organization_id = ?", [organization_id])
+        }
+        wanted = set(project_ids)
+        for project_id, row in existing.items():
+            if project_id not in wanted:
+                self._org_project_grants.delete(row["id"])
+        for project_id in wanted - set(existing.keys()):
+            self._org_project_grants.insert({"organization_id": organization_id, "project_id": project_id})
+
+    def granting_organizations_for_project(self, project_id: int) -> list[int]:
+        """Organizations (other than the owner) granted access to *project_id*."""
+        rows = self._org_project_grants.rows_where("project_id = ?", [project_id])
+        return [r["organization_id"] for r in rows]
+
+    def organizations_with_project_access(self, project_id: int, owning_organization_id: int) -> set[int]:
+        """Every organization that may access *project_id*: its owner plus any cross-org grants.
+
+        ``member_can_access_project`` doesn't care whether an organization
+        owns a project or was merely granted it -- both checks are the same
+        role/group test -- so this is the only place ownership and grants
+        need to be combined.
+        """
+        return {owning_organization_id, *self.granting_organizations_for_project(project_id)}

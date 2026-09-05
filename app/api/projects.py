@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
+    get_document_access_service,
     get_membership_service,
     get_phase6_service,
     get_profile_service,
@@ -33,6 +34,8 @@ from app.modules.contracts import (
     ProjectBulkDeleteRequest,
     ProjectBulkUpdateRequest,
     ProjectCreateRequest,
+    ProjectDocumentBindingsResponse,
+    ProjectDocumentBindingsUpdateRequest,
     ProjectIfcFileResponse,
     ProjectIfcUploadResponse,
     ProjectListResponse,
@@ -43,6 +46,7 @@ from app.modules.contracts import (
     ProjectUpdateRequest,
     StandardOption,
 )
+from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
 from app.services.phase6_service import Phase6Service
 from app.services.profile_service import ProfileService
@@ -54,6 +58,22 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def _can_access_project(project: dict, user_id: str, memberships: MembershipService) -> bool:
+    """Whether *user_id* may access *project*, across every organization with a claim to it.
+
+    A project's ``organization_id`` is its owner, but ``organizations_with_project_access``
+    also folds in any cross-org sharing grants (``organization_project_grants``)
+    -- ``member_can_access_project`` doesn't care which of those relationships
+    got the caller's organization onto that list, only whether their role/group
+    within it clears the bar.
+    """
+    candidate_orgs = memberships.organizations_with_project_access(
+        project["id"], project.get("organization_id")
+    )
+    shared = candidate_orgs & memberships.org_ids_for_user(user_id)
+    return any(memberships.member_can_access_project(org_id, user_id, project["id"]) for org_id in shared)
+
+
 def get_authorized_project(
     project_id: int,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -61,14 +81,14 @@ def get_authorized_project(
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> dict:
-    """Return *project_id* if one of the caller's organizations owns it.
+    """Return *project_id* if the caller may access it.
 
-    A superadmin (``profiles.is_superadmin``) bypasses the organization check
-    entirely — that flag means authority over every organization's data, not
-    just their own.
+    A superadmin (``profiles.is_superadmin``) bypasses the check entirely —
+    that flag means authority over every organization's data, not just their
+    own.
 
-    404 rather than 403: a project outside the caller's organizations should
-    look indistinguishable from one that doesn't exist, not confirm it exists
+    404 rather than 403: a project outside the caller's reach should look
+    indistinguishable from one that doesn't exist, not confirm it exists
     behind someone else's wall.
     """
     project = service.get_project(project_id)
@@ -79,11 +99,7 @@ def get_authorized_project(
         )
     if profiles.is_superadmin(current_user.id):
         return project
-    organization_id = project.get("organization_id")
-    org_ids = memberships.org_ids_for_user(current_user.id)
-    if organization_id not in org_ids or not memberships.member_can_access_project(
-        organization_id, current_user.id, project_id
-    ):
+    if not _can_access_project(project, current_user.id, memberships):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID {project_id} not found.",
@@ -100,21 +116,16 @@ def _owned_project_ids(
 ) -> list[int]:
     """Filter *project_ids* down to ones the caller may act on.
 
-    A superadmin may act on all of them; an org owner/admin every project in
-    their own organization(s); a plain member only what their group grants.
+    A superadmin may act on all of them; everyone else only the ones they can
+    reach via ``_can_access_project`` (their own organization's, or one shared
+    in via a cross-org grant).
     """
     if profiles.is_superadmin(current_user.id):
         return project_ids
-    org_ids = memberships.org_ids_for_user(current_user.id)
     owned = []
     for pid in project_ids:
         row = service.get_project(pid)
-        organization_id = row.get("organization_id") if row else None
-        if (
-            row
-            and organization_id in org_ids
-            and memberships.member_can_access_project(organization_id, current_user.id, pid)
-        ):
+        if row and _can_access_project(row, current_user.id, memberships):
             owned.append(pid)
     return owned
 
@@ -157,21 +168,36 @@ def list_projects(
         rows = all_rows
     else:
         org_ids = memberships.org_ids_for_user(current_user.id)
-        # None from accessible_project_ids means "every project in this org"
-        # (owner/admin); cached per organization since every row in the same
-        # org shares the same answer.
+        # None from accessible_project_ids means "every project owned by this
+        # org" (owner/admin); cached per organization since every row in the
+        # same org shares the same answer.
         accessible_by_org: dict[int, set[int] | None] = {
             org_id: memberships.accessible_project_ids(org_id, current_user.id) for org_id in org_ids
         }
-        rows = [
-            row
-            for row in all_rows
-            if (org_id := row.get("organization_id")) in accessible_by_org
-            and (
-                (accessible := accessible_by_org[org_id]) is None
-                or row.get("id") in accessible
-            )
-        ]
+        # Cross-org shares: an owner/admin of a grantee org sees a shared-in
+        # project automatically, same as one their org owns outright. A
+        # member's group grant already covers this without extra work here --
+        # group_project_grants can reference an owned or a shared-in project
+        # id identically, and that's exactly what `accessible` (the concrete
+        # set branch below) already checks.
+        granted_in_by_org: dict[int, set[int]] = {
+            org_id: set(memberships.list_org_project_grants(org_id))
+            for org_id, accessible in accessible_by_org.items()
+            if accessible is None
+        }
+
+        def _visible(row: dict) -> bool:
+            pid = row.get("id")
+            owning_org = row.get("organization_id")
+            for org_id, accessible in accessible_by_org.items():
+                if accessible is None:
+                    if owning_org == org_id or pid in granted_in_by_org[org_id]:
+                        return True
+                elif pid in accessible:
+                    return True
+            return False
+
+        rows = [row for row in all_rows if _visible(row)]
     projects = [ProjectResponse(**row) for row in rows]
     return ProjectListResponse(total=len(projects), projects=projects)
 
@@ -972,4 +998,60 @@ def set_project_ruleset_bindings(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return get_project_ruleset_bindings(project_id, project, ruleset_access)
+
+
+# ---------------------------------------------------------------------------
+# RBAC: Project Document Bindings
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{project_id}/document-bindings",
+    response_model=ProjectDocumentBindingsResponse,
+    summary="Get the documents bound to a project",
+)
+def get_project_document_bindings(
+    project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+) -> ProjectDocumentBindingsResponse:
+    """Return the documents bound to this project.
+
+    Also carries which of its organization's document grants remain
+    available to bind. A brand-new project has none bound.
+    """
+    return ProjectDocumentBindingsResponse(
+        project_id=project_id,
+        document_ids=document_access.list_project_bindings(project_id),
+        available_document_ids=document_access.list_org_grants(project["organization_id"]),
+    )
+
+
+@router.put(
+    "/{project_id}/document-bindings",
+    response_model=ProjectDocumentBindingsResponse,
+    summary="Set the documents bound to a project",
+)
+def set_project_document_bindings(
+    project_id: int,
+    payload: ProjectDocumentBindingsUpdateRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+) -> ProjectDocumentBindingsResponse:
+    """Replace the project's bound documents.
+
+    Only an org owner/admin (or superadmin) may do this. Every requested
+    document must already be granted to the project's organization.
+    """
+    _require_project_admin(project, current_user, memberships, profiles)
+    try:
+        document_access.set_project_bindings(
+            project_id, payload.document_ids, organization_id=project["organization_id"]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return get_project_document_bindings(project_id, project, document_access)
 

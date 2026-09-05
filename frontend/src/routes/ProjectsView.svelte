@@ -22,6 +22,7 @@
     Loader2,
     Database,
     ListChecks,
+    BookOpen,
   } from "lucide-svelte";
   import { projectsApi, githubReposApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -30,6 +31,7 @@
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import ProjectRulesetBindingsModal from "../lib/components/ProjectRulesetBindingsModal.svelte";
+  import ProjectDocumentBindingsModal from "../lib/components/ProjectDocumentBindingsModal.svelte";
   import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
   import ProjectBulkEditModal from "../lib/components/ProjectBulkEditModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -96,6 +98,7 @@
   let selectedProjectForDetails: Project | null = $state(null);
   let selectedProjectForEnhance: Project | null = $state(null);
   let rulesetBindingsTarget: Project | null = $state(null);
+  let documentBindingsTarget: Project | null = $state(null);
 
   // An owner/admin of a project's own organization is the only one who may
   // change its rule assignments -- everyone else doesn't get the button, and
@@ -627,6 +630,15 @@
                         >
                           <ListChecks class="h-3.5 w-3.5" />
                         </button>
+
+                        <button
+                          type="button"
+                          onclick={() => (documentBindingsTarget = project)}
+                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-950/30 hover:text-emerald-400"
+                          title="Document Assignments"
+                        >
+                          <BookOpen class="h-3.5 w-3.5" />
+                        </button>
                       {/if}
 
                       <button
@@ -881,6 +893,11 @@
 <ProjectRulesetBindingsModal
   project={rulesetBindingsTarget}
   onClose={() => (rulesetBindingsTarget = null)}
+/>
+
+<ProjectDocumentBindingsModal
+  project={documentBindingsTarget}
+  onClose={() => (documentBindingsTarget = null)}
 />
 
 <GitHubRepoManagerModal

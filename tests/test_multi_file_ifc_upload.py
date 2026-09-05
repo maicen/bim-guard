@@ -52,6 +52,12 @@ class FakeMemberships:
     def accessible_project_ids(self, organization_id: int, user_id: str) -> set[int] | None:
         return None
 
+    def organizations_with_project_access(self, project_id: int, owning_organization_id: int) -> set[int]:
+        return {FAKE_ORG_ID}
+
+    def list_org_project_grants(self, organization_id: int) -> list[int]:
+        return []
+
 ifcopenshell = pytest.importorskip("ifcopenshell", reason="the seismic kernel needs ifcopenshell")
 
 

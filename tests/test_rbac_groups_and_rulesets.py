@@ -78,6 +78,7 @@ def memberships() -> MembershipService:
         invites_repo=FakeTable(),
         groups_repo=FakeTable(),
         group_project_grants_repo=FakeTable(),
+        organization_project_grants_repo=FakeTable(),
     )
 
 
@@ -215,3 +216,69 @@ def test_arch_analysis_allows_a_ruleset_bound_to_the_project(monkeypatch) -> Non
     )
     with pytest.raises(ValueError, match="stopped before real orchestration"):
         service.run_analysis(project_id=1, rule_folder="BIMGUARD-GC-001")
+
+
+# ---------------------------------------------------------------------------
+# Cross-org project sharing (organization_project_grants)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def two_org_memberships() -> MembershipService:
+    """Two organizations: 10 owns project 1; 20 owns nothing but may be granted access."""
+    return MembershipService(
+        memberships_repo=FakeTable(
+            [
+                {"id": 1, "organization_id": 10, "user_id": "owner-1", "role": "owner", "group_id": None},
+                {"id": 2, "organization_id": 20, "user_id": "owner-2", "role": "owner", "group_id": None},
+                {"id": 3, "organization_id": 20, "user_id": "member-2", "role": "member", "group_id": None},
+            ]
+        ),
+        organizations_repo=FakeTable(
+            [{"id": 10, "name": "Acme", "slug": "acme"}, {"id": 20, "name": "Consultancy", "slug": "consultancy"}]
+        ),
+        invites_repo=FakeTable(),
+        groups_repo=FakeTable(),
+        group_project_grants_repo=FakeTable(),
+        organization_project_grants_repo=FakeTable(),
+    )
+
+
+def test_project_is_invisible_to_a_non_owning_org_with_no_grant(
+    two_org_memberships: MembershipService,
+) -> None:
+    assert two_org_memberships.organizations_with_project_access(1, owning_organization_id=10) == {10}
+    assert two_org_memberships.member_can_access_project(20, "owner-2", 1) is True  # owner role alone
+    # ...but org 20 has no claim to project 1 at all, which is what the API
+    # layer actually checks (candidate_orgs & user_org_ids):
+    assert 20 not in two_org_memberships.organizations_with_project_access(1, owning_organization_id=10)
+
+
+def test_granting_a_project_to_another_org_makes_it_visible_to_that_orgs_owner(
+    two_org_memberships: MembershipService,
+) -> None:
+    two_org_memberships.set_org_project_grants(20, [1])
+    assert two_org_memberships.organizations_with_project_access(1, owning_organization_id=10) == {10, 20}
+    # Org 20's owner clears the bar via role alone, same as any other project.
+    assert two_org_memberships.member_can_access_project(20, "owner-2", 1) is True
+    # A plain member of org 20 still needs a group grant -- being shared into
+    # the org isn't a blanket grant to every one of its members.
+    assert two_org_memberships.member_can_access_project(20, "member-2", 1) is False
+
+
+def test_a_plain_member_of_the_grantee_org_needs_a_group_grant_too(
+    two_org_memberships: MembershipService,
+) -> None:
+    two_org_memberships.set_org_project_grants(20, [1])
+    group = two_org_memberships.create_group(20, "Auditors")
+    two_org_memberships.set_member_group(20, "member-2", group["id"])
+    two_org_memberships.set_group_project_grants(group["id"], [1])
+    assert two_org_memberships.member_can_access_project(20, "member-2", 1) is True
+
+
+def test_revoking_the_grant_removes_the_organization_from_project_access(
+    two_org_memberships: MembershipService,
+) -> None:
+    two_org_memberships.set_org_project_grants(20, [1])
+    two_org_memberships.set_org_project_grants(20, [])
+    assert two_org_memberships.organizations_with_project_access(1, owning_organization_id=10) == {10}

@@ -2025,3 +2025,51 @@ class ProjectRulesetBindingsUpdateRequest(BaseModel):
     """Replace a project's entire set of bound rulesets."""
 
     ruleset_ids: list[str] = Field(default_factory=list)
+
+
+class OrganizationProjectGrantsResponse(BaseModel):
+    """Projects shared into one organization from elsewhere.
+
+    Cross-org sharing, superadmin-controlled. Does not include projects the
+    organization owns outright -- those need no grant.
+    """
+
+    organization_id: int
+    project_ids: list[int] = Field(default_factory=list)
+
+
+class OrganizationProjectGrantsUpdateRequest(BaseModel):
+    """Replace an organization's entire set of shared-in (non-owned) projects."""
+
+    project_ids: list[int] = Field(default_factory=list)
+
+
+class OrganizationDocumentGrantsResponse(BaseModel):
+    """The set of documents one organization may use at all (superadmin-controlled)."""
+
+    organization_id: int
+    document_ids: list[int] = Field(default_factory=list)
+
+
+class OrganizationDocumentGrantsUpdateRequest(BaseModel):
+    """Replace an organization's entire set of granted documents."""
+
+    document_ids: list[int] = Field(default_factory=list)
+
+
+class ProjectDocumentBindingsResponse(BaseModel):
+    """The documents bound to one project.
+
+    Also carries which of the org's grants remain available to bind
+    (owner-controlled, subset of ``OrganizationDocumentGrantsResponse``).
+    """
+
+    project_id: int
+    document_ids: list[int] = Field(default_factory=list)
+    available_document_ids: list[int] = Field(default_factory=list)
+
+
+class ProjectDocumentBindingsUpdateRequest(BaseModel):
+    """Replace a project's entire set of bound documents."""
+
+    document_ids: list[int] = Field(default_factory=list)

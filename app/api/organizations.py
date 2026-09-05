@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import (
+    get_document_access_service,
     get_membership_service,
     get_profile_service,
     get_projects_service,
@@ -21,16 +22,21 @@ from app.modules.contracts import (
     GroupResponse,
     MemberGroupUpdateRequest,
     MemberRoleUpdateRequest,
+    OrganizationDocumentGrantsResponse,
+    OrganizationDocumentGrantsUpdateRequest,
     OrganizationInviteCreateRequest,
     OrganizationInviteListResponse,
     OrganizationInviteResponse,
     OrganizationListResponse,
     OrganizationMemberListResponse,
     OrganizationMemberResponse,
+    OrganizationProjectGrantsResponse,
+    OrganizationProjectGrantsUpdateRequest,
     OrganizationRulesetGrantsResponse,
     OrganizationRulesetGrantsUpdateRequest,
     OrganizationSummary,
 )
+from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
@@ -405,8 +411,10 @@ def set_group_project_grants(
 ) -> GroupProjectGrantsResponse:
     """Replace the set of projects this group can access. Owner/admin only.
 
-    Every project id must belong to this same organization -- a group can
-    never be granted a project outside its own organization.
+    Every project id must be one this organization can itself reach -- either
+    one it owns, or one shared into it via a superadmin's cross-org grant
+    (``organization_project_grants``). A group can never be granted a project
+    its own organization has no claim to.
     """
     _require_org_admin(organization_id, current_user, memberships, profiles)
     group = memberships.get_group(group_id)
@@ -415,14 +423,15 @@ def set_group_project_grants(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Group {group_id} not found in organization {organization_id}.",
         )
-    org_project_ids = {
+    owned_ids = {
         row["id"] for row in projects_service.list_projects() if row.get("organization_id") == organization_id
     }
-    outside = set(payload.project_ids) - org_project_ids
+    granted_ids = set(memberships.list_org_project_grants(organization_id))
+    outside = set(payload.project_ids) - owned_ids - granted_ids
     if outside:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Project(s) {sorted(outside)!r} do not belong to this organization.",
+            detail=f"Project(s) {sorted(outside)!r} are not reachable by this organization.",
         )
     memberships.set_group_project_grants(group_id, payload.project_ids)
     return get_group_project_grants(organization_id, group_id, current_user, memberships, profiles)
@@ -472,3 +481,91 @@ def set_organization_ruleset_grants(
     _require_superadmin(current_user, profiles)
     ruleset_access.set_org_grants(organization_id, payload.ruleset_ids)
     return get_organization_ruleset_grants(organization_id, current_user, profiles, ruleset_access)
+
+
+# ---------------------------------------------------------------------------
+# RBAC: Organization Project Grants (cross-org sharing, superadmin only)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{organization_id}/project-grants",
+    response_model=OrganizationProjectGrantsResponse,
+    summary="Get the projects shared into an organization from elsewhere",
+)
+def get_organization_project_grants(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+) -> OrganizationProjectGrantsResponse:
+    """Return the projects shared into this organization from elsewhere.
+
+    Superadmin only. Projects the organization owns outright don't appear
+    here -- this is only the cross-org sharing grant on top of ownership.
+    """
+    _require_superadmin(current_user, profiles)
+    return OrganizationProjectGrantsResponse(
+        organization_id=organization_id,
+        project_ids=memberships.list_org_project_grants(organization_id),
+    )
+
+
+@router.put(
+    "/{organization_id}/project-grants",
+    response_model=OrganizationProjectGrantsResponse,
+    summary="Set the projects shared into an organization from elsewhere",
+)
+def set_organization_project_grants(
+    organization_id: int,
+    payload: OrganizationProjectGrantsUpdateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+) -> OrganizationProjectGrantsResponse:
+    """Replace the set of projects shared into this organization. Superadmin only."""
+    _require_superadmin(current_user, profiles)
+    memberships.set_org_project_grants(organization_id, payload.project_ids)
+    return get_organization_project_grants(organization_id, current_user, profiles, memberships)
+
+
+# ---------------------------------------------------------------------------
+# RBAC: Organization Document Grants (superadmin only)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{organization_id}/document-grants",
+    response_model=OrganizationDocumentGrantsResponse,
+    summary="Get the documents an organization may use",
+)
+def get_organization_document_grants(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+) -> OrganizationDocumentGrantsResponse:
+    """Return the documents this organization is allowed to use at all. Superadmin only."""
+    _require_superadmin(current_user, profiles)
+    return OrganizationDocumentGrantsResponse(
+        organization_id=organization_id,
+        document_ids=document_access.list_org_grants(organization_id),
+    )
+
+
+@router.put(
+    "/{organization_id}/document-grants",
+    response_model=OrganizationDocumentGrantsResponse,
+    summary="Set the documents an organization may use",
+)
+def set_organization_document_grants(
+    organization_id: int,
+    payload: OrganizationDocumentGrantsUpdateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+) -> OrganizationDocumentGrantsResponse:
+    """Replace the set of documents this organization may use. Superadmin only."""
+    _require_superadmin(current_user, profiles)
+    document_access.set_org_grants(organization_id, payload.document_ids)
+    return get_organization_document_grants(organization_id, current_user, profiles, document_access)

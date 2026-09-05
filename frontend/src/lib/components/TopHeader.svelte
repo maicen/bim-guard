@@ -49,6 +49,8 @@
     settings: { section: "System", title: "Application Settings" },
     "org-settings": { section: "Admin", title: "Organization Settings" },
     "superadmin-rulesets": { section: "Platform", title: "Ruleset Access" },
+    "superadmin-project-grants": { section: "Platform", title: "Project Access" },
+    "superadmin-document-grants": { section: "Platform", title: "Document Access" },
   };
 
   let headerInfo = $derived(

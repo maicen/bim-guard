@@ -38,11 +38,13 @@ import type {
   NamingPreview,
   GroupListResponse,
   GroupProjectGrantsResponse,
+  OrganizationDocumentGrantsResponse,
   OrganizationInviteCreatePayload,
   OrganizationInviteListResponse,
   OrganizationListResponse,
   OrganizationMember,
   OrganizationMemberListResponse,
+  OrganizationProjectGrantsResponse,
   OrganizationRulesetGrantsResponse,
   ParsingEngineInstance,
   ParsingEngineInstanceCreatePayload,
@@ -54,6 +56,7 @@ import type {
   ProjectBulkActionResponse,
   ProjectBulkUpdatePayload,
   ProjectCreatePayload,
+  ProjectDocumentBindingsResponse,
   ProjectIfcFile,
   ProjectIfcUploadResponse,
   ProjectImportPayload,
@@ -275,6 +278,42 @@ export const organizationsApi = {
     });
     return handleResponse<OrganizationRulesetGrantsResponse>(res);
   },
+
+  /** Projects shared into an organization from elsewhere (cross-org sharing). Superadmin only. */
+  async getProjectGrants(organizationId: number): Promise<OrganizationProjectGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/project-grants`);
+    return handleResponse<OrganizationProjectGrantsResponse>(res);
+  },
+
+  async setProjectGrants(
+    organizationId: number,
+    projectIds: number[],
+  ): Promise<OrganizationProjectGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/project-grants`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: projectIds }),
+    });
+    return handleResponse<OrganizationProjectGrantsResponse>(res);
+  },
+
+  /** Documents an organization may use at all. Superadmin only. */
+  async getDocumentGrants(organizationId: number): Promise<OrganizationDocumentGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/document-grants`);
+    return handleResponse<OrganizationDocumentGrantsResponse>(res);
+  },
+
+  async setDocumentGrants(
+    organizationId: number,
+    documentIds: number[],
+  ): Promise<OrganizationDocumentGrantsResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/document-grants`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_ids: documentIds }),
+    });
+    return handleResponse<OrganizationDocumentGrantsResponse>(res);
+  },
 };
 
 // ── Standardized Entity Cache Stores (SOLID Architecture) ─────────────────────
@@ -485,6 +524,23 @@ export const projectsApi = {
       body: JSON.stringify({ ruleset_ids: rulesetIds }),
     });
     return handleResponse<ProjectRulesetBindingsResponse>(res);
+  },
+
+  async getDocumentBindings(projectId: number): Promise<ProjectDocumentBindingsResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/document-bindings`);
+    return handleResponse<ProjectDocumentBindingsResponse>(res);
+  },
+
+  async setDocumentBindings(
+    projectId: number,
+    documentIds: number[],
+  ): Promise<ProjectDocumentBindingsResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/document-bindings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_ids: documentIds }),
+    });
+    return handleResponse<ProjectDocumentBindingsResponse>(res);
   },
 };
 

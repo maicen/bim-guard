@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LogOut, LogIn, Settings, Building2, ShieldCheck } from "lucide-svelte";
+  import { LogOut, LogIn, Settings, Building2, ShieldCheck, FolderKanban, BookOpen } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
   import { isAuthConfigured } from "../supabaseClient";
@@ -29,6 +29,16 @@
   function goToSuperadminRulesets() {
     open = false;
     push("/superadmin-rulesets");
+  }
+
+  function goToSuperadminProjectGrants() {
+    open = false;
+    push("/superadmin-project-grants");
+  }
+
+  function goToSuperadminDocumentGrants() {
+    open = false;
+    push("/superadmin-document-grants");
   }
 
   function toggle(e: MouseEvent) {
@@ -101,6 +111,22 @@
           >
             <ShieldCheck class="h-3.5 w-3.5" />
             Ruleset access
+          </button>
+          <button
+            type="button"
+            onclick={goToSuperadminProjectGrants}
+            class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          >
+            <FolderKanban class="h-3.5 w-3.5" />
+            Project access
+          </button>
+          <button
+            type="button"
+            onclick={goToSuperadminDocumentGrants}
+            class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          >
+            <BookOpen class="h-3.5 w-3.5" />
+            Document access
           </button>
         {/if}
         <button

@@ -1385,3 +1385,22 @@ export interface ProjectRulesetBindingsResponse {
   ruleset_ids: string[];
   available_ruleset_ids: string[];
 }
+
+/** Cross-org project sharing grant. Mirrors OrganizationProjectGrantsResponse. */
+export interface OrganizationProjectGrantsResponse {
+  organization_id: number;
+  project_ids: number[];
+}
+
+/** Mirrors OrganizationDocumentGrantsResponse. */
+export interface OrganizationDocumentGrantsResponse {
+  organization_id: number;
+  document_ids: number[];
+}
+
+/** Mirrors ProjectDocumentBindingsResponse. */
+export interface ProjectDocumentBindingsResponse {
+  project_id: number;
+  document_ids: number[];
+  available_document_ids: number[];
+}

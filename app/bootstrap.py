@@ -26,6 +26,7 @@ from app.modules.document_parsing.engines.unstructured_driver import (
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.db_adapters import DatabaseAdapter
 from app.services.digital_inspector_service import DigitalInspectorService
+from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.membership_service import MembershipService
@@ -84,6 +85,9 @@ class ApplicationContainer:
     group_project_grants_repo: DatabaseAdapter
     organization_ruleset_grants_repo: DatabaseAdapter
     project_ruleset_bindings_repo: DatabaseAdapter
+    organization_project_grants_repo: DatabaseAdapter
+    organization_document_grants_repo: DatabaseAdapter
+    project_document_bindings_repo: DatabaseAdapter
     profiles_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
@@ -97,6 +101,7 @@ class ApplicationContainer:
     membership_service: MembershipService
     profile_service: ProfileService
     ruleset_access_service: RulesetAccessService
+    document_access_service: DocumentAccessService
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
@@ -315,6 +320,36 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    organization_project_grants_repo = PersistenceService.get_table(
+        "organization_project_grants",
+        {
+            "id": int,
+            "organization_id": int,
+            "project_id": int,
+            "created_at": str,
+        },
+    )
+
+    organization_document_grants_repo = PersistenceService.get_table(
+        "organization_document_grants",
+        {
+            "id": int,
+            "organization_id": int,
+            "document_id": int,
+            "created_at": str,
+        },
+    )
+
+    project_document_bindings_repo = PersistenceService.get_table(
+        "project_document_bindings",
+        {
+            "id": int,
+            "project_id": int,
+            "document_id": int,
+            "created_at": str,
+        },
+    )
+
     profiles_repo = PersistenceService.get_table(
         "profiles",
         {
@@ -388,11 +423,17 @@ def build_default_container() -> ApplicationContainer:
         invites_repo=organization_invites_repo,
         groups_repo=groups_repo,
         group_project_grants_repo=group_project_grants_repo,
+        organization_project_grants_repo=organization_project_grants_repo,
     )
 
     ruleset_access_service = RulesetAccessService(
         organization_ruleset_grants_repo=organization_ruleset_grants_repo,
         project_ruleset_bindings_repo=project_ruleset_bindings_repo,
+    )
+
+    document_access_service = DocumentAccessService(
+        organization_document_grants_repo=organization_document_grants_repo,
+        project_document_bindings_repo=project_document_bindings_repo,
     )
 
     profile_service = ProfileService(profiles_repo=profiles_repo)
@@ -524,6 +565,9 @@ def build_default_container() -> ApplicationContainer:
         group_project_grants_repo=group_project_grants_repo,
         organization_ruleset_grants_repo=organization_ruleset_grants_repo,
         project_ruleset_bindings_repo=project_ruleset_bindings_repo,
+        organization_project_grants_repo=organization_project_grants_repo,
+        organization_document_grants_repo=organization_document_grants_repo,
+        project_document_bindings_repo=project_document_bindings_repo,
         profiles_repo=profiles_repo,
         lineage=lineage,
         static_data_service=static_data_service,
@@ -537,6 +581,7 @@ def build_default_container() -> ApplicationContainer:
         membership_service=membership_service,
         profile_service=profile_service,
         ruleset_access_service=ruleset_access_service,
+        document_access_service=document_access_service,
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,

@@ -311,6 +311,45 @@ empty grant table, not a flag.
       (1471) passing. Worth a manual pass with a real signed-in session
       before calling this done.
 
+### Enterprise RBAC: Cross-Org Project Sharing and Document Grants
+
+Same two-level grant pattern extended to two more cases: projects (unlike
+rulesets) already had a single owning `organization_id`, so this adds a
+second, additive way in — a superadmin-controlled grant of *extra* access on
+top of ownership — plus giving documents the same org-grant/project-binding
+treatment rulesets already had.
+
+- [x] `organization_project_grants` (superadmin-only via
+      `PUT /api/organizations/{id}/project-grants`): projects shared into an
+      org beyond what it owns. `projects.organization_id` remains the
+      immutable owner column; this is purely additive. `member_can_access_project`
+      needed no change — it already only checks role/group within a given org,
+      never whether that org owns the row — so the only new logic is computing
+      the candidate org set (`MembershipService.organizations_with_project_access`
+      = owner union grants) before running that same check across each one.
+- [x] `organization_document_grants` + `project_document_bindings`
+      (`app/services/document_access_service.py`, exact mirror of
+      `RulesetAccessService`): which documents an org may use at all, and
+      which of those are bound to one project. Backfilled the default org's
+      grant to every pre-existing document id; no binding backfill needed
+      since documents never had a binding concept before.
+- [x] Migration:
+      `supabase/migrations/20260905123245_project_and_document_access_grants.sql`.
+- [x] Frontend: superadmin org<->project matrix (`SuperadminProjectGrantsView.svelte`,
+      owner's own cell shown locked/checked since ownership isn't managed
+      here) and org<->document matrix (`SuperadminDocumentGrantsView.svelte`),
+      both reachable from the user menu when `profile.is_superadmin`, alongside
+      a per-project "Document Assignments" modal
+      (`ProjectDocumentBindingsModal.svelte`, from each project row in
+      `ProjectsView.svelte` next to the existing Rule Assignments button).
+- [x] Tests: `tests/test_rbac_groups_and_rulesets.py` covers project
+      invisibility with no grant, visibility after a superadmin grant, a plain
+      member of the grantee org still needing its own group grant, and grant
+      revocation removing access — full suite at 1475 passing.
+- [ ] Not verified end-to-end in a real signed-in browser session this pass,
+      same caveat as above — covered by `svelte-check`/`eslint` clean and the
+      full pytest suite passing.
+
 Owner: unassigned.
 
 ## Priority 10: AI Framework Integration: LlamaIndex & LangGraph Architecture

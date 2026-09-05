@@ -10,6 +10,7 @@ from app.services.bsdd_ontology_repository import (
     get_bsdd_ontology_repository,
 )
 from app.services.digital_inspector_service import DigitalInspectorService
+from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.membership_service import MembershipService
@@ -103,3 +104,8 @@ def get_profile_service() -> ProfileService:
 def get_ruleset_access_service() -> RulesetAccessService:
     """Return the configured RulesetAccessService instance."""
     return get_container().ruleset_access_service
+
+
+def get_document_access_service() -> DocumentAccessService:
+    """Return the configured DocumentAccessService instance."""
+    return get_container().document_access_service
