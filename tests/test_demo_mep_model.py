@@ -32,11 +32,17 @@ import ifcopenshell
 import pytest
 
 from app.modules.ifc_reader.ifc_parser import (
+    CONFIDENCE_HIGH,
+    CONFIDENCE_NONE,
     HYDRAULIC_SOURCE_ABSENT,
     HYDRAULIC_SOURCE_IFC,
+    MATERIAL_SOURCE_ABSENT,
+    MATERIAL_SOURCE_IFC_PROPERTY,
+    MATERIAL_SOURCE_IFC_PROPERTY_UNMAPPED,
     ServiceElement,
     parse_ifc_model,
     read_hydraulics,
+    read_secondary_material,
 )
 from app.modules.phase_6.phase_6c_corrosion_ui import (
     CREVICE,
@@ -49,8 +55,10 @@ from scripts.generate_demo_mep_model import (
     ELEMENTS_PER_SYSTEM,
     SYSTEMS,
     build_model,
+    has_couple,
     has_hydraulics,
     has_material,
+    secondary_material_for,
 )
 
 
@@ -171,6 +179,137 @@ def test_read_hydraulics_reports_a_dead_leg_flag_without_inventing_a_length():
     read = read_hydraulics(element)
     assert read["dead_leg_length_m"] is None
     assert read["dead_leg_source"] == HYDRAULIC_SOURCE_IFC
+
+
+# ---------------------------------------------------------------------------
+# 1b. The declared second material at a junction
+# ---------------------------------------------------------------------------
+
+
+def _secondary_pset_element(value):
+    """Build an IfcPipeSegment with SecondaryMaterial=``value`` (None = no pset)."""
+    model = ifcopenshell.file(schema="IFC4")
+    element = model.create_entity("IfcPipeSegment", GlobalId=ifcopenshell.guid.new())
+    if value is None:
+        return element
+    pset = model.create_entity(
+        "IfcPropertySet",
+        GlobalId=ifcopenshell.guid.new(),
+        Name="Pset_BimGuardCouple",
+        HasProperties=[
+            model.create_entity(
+                "IfcPropertySingleValue",
+                Name="SecondaryMaterial",
+                NominalValue=model.create_entity("IfcLabel", value),
+            )
+        ],
+    )
+    model.create_entity(
+        "IfcRelDefinesByProperties",
+        GlobalId=ifcopenshell.guid.new(),
+        RelatedObjects=[element],
+        RelatingPropertyDefinition=pset,
+    )
+    return element
+
+
+def test_parser_reads_secondary_material_with_provenance(demo_elements):
+    """A declared second material lands in material_b, sourced to the property."""
+    coupled = [e for e in demo_elements if e.material_b is not None]
+    assert coupled, "no element declared a second material"
+
+    for element in coupled:
+        assert element.material_b_source == MATERIAL_SOURCE_IFC_PROPERTY
+        assert element.material_b_confidence == CONFIDENCE_HIGH
+        # The vocabulary is shared with material_a: both sides of a couple are
+        # canonical keys, not one key and one free-text string.
+        assert element.material_b == element.material_b.strip()
+        assert " " not in element.material_b
+
+
+def test_parser_leaves_absent_secondary_material_none(demo_elements):
+    """No SecondaryMaterial property means None, never the element's own material.
+
+    Defaulting material_b to material_a would read as a declared self-couple
+    rather than as "the model says nothing about a junction here", and GC-001
+    tags those two cases differently.
+    """
+    uncoupled = [e for e in demo_elements if e.material_b is None]
+    assert uncoupled
+
+    for element in uncoupled:
+        assert element.material_b_source == MATERIAL_SOURCE_ABSENT
+        assert element.material_b_confidence == CONFIDENCE_NONE
+
+
+def test_read_secondary_material_maps_through_the_shared_vocabulary():
+    """The property is resolved by resolve_material_name, as material_a is."""
+    read = read_secondary_material(_secondary_pset_element("Galvanised Steel"))
+    assert read["material_b"] == "Galvanized_steel"
+    assert read["material_b_source"] == MATERIAL_SOURCE_IFC_PROPERTY
+    assert read["material_b_confidence"] == CONFIDENCE_HIGH
+
+
+def test_read_secondary_material_marks_an_unmapped_value_as_such():
+    """Free text that matches no key is kept, but not dressed up as a reading."""
+    read = read_secondary_material(_secondary_pset_element("Unobtanium"))
+    assert read["material_b_source"] == MATERIAL_SOURCE_IFC_PROPERTY_UNMAPPED
+    assert read["material_b_confidence"] != CONFIDENCE_HIGH
+
+
+def test_read_secondary_material_absent_is_none():
+    """An element with no such property reads as absent."""
+    read = read_secondary_material(_secondary_pset_element(None))
+    assert read["material_b"] is None
+    assert read["material_b_source"] == MATERIAL_SOURCE_ABSENT
+    assert read["material_b_confidence"] == CONFIDENCE_NONE
+
+
+def test_generator_couple_proportion(demo_elements):
+    """Roughly 40% of the elements that carry a material declare a couple."""
+    with_material = [e for e in demo_elements if e.material_a != "Unknown"]
+    coupled = [e for e in with_material if e.material_b is not None]
+    assert len(coupled) == pytest.approx(len(with_material) * 0.40, abs=8)
+
+
+def test_no_element_without_a_material_declares_a_couple(demo_elements):
+    """A couple needs two sides. One-sided couples would be unreadable noise."""
+    assert not [
+        e for e in demo_elements if e.material_a == "Unknown" and e.material_b
+    ]
+
+
+def test_generator_writes_both_severe_and_benign_couples(demo_elements):
+    """The model carries dissimilar-metal couples and same-family ones.
+
+    Not asserted as bands: which band a pairing lands in is the engine's call
+    and a retuned rule pack would move it. What this pins is that the *model*
+    offers the engine both kinds to distinguish.
+    """
+    pairs = {(e.material_a, e.material_b) for e in demo_elements if e.material_b}
+    assert ("Copper", "Galvanized_steel") in pairs
+    assert ("Carbon_steel_mild", "SS_316_passive") in pairs
+    assert ("Copper", "Brass_naval") in pairs
+    # A declared self-couple: same material both sides, stated rather than assumed.
+    assert ("Carbon_steel_mild", "Carbon_steel_mild") in pairs
+
+
+def test_plastic_pipe_declares_no_couple(demo_elements):
+    """HDPE has no galvanic couple, so no bracket material is declared on it."""
+    assert not [e for e in demo_elements if e.material_a == "HDPE" and e.material_b]
+
+
+def test_couple_helpers_agree_with_the_written_model(demo_elements):
+    """has_couple/secondary_material_for describe the file the generator writes."""
+    expected = sum(
+        1
+        for system in SYSTEMS
+        for i in range(ELEMENTS_PER_SYSTEM)
+        if has_couple(i)
+        and secondary_material_for(system["materials"][i % len(system["materials"])], i)
+        is not None
+    )
+    assert sum(1 for e in demo_elements if e.material_b is not None) == expected
 
 
 # ---------------------------------------------------------------------------

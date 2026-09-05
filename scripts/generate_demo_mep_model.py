@@ -57,6 +57,7 @@ PROPERTY SETS WRITTEN
                                  OuterDiameter
     Pset_BimGuardHydraulics      FlowVelocity, DeadLegLength, IsDeadLeg,
                                  SystemType
+    Pset_BimGuardCouple          SecondaryMaterial
 
     ``OperatingTemperature`` is not a new invention: it is the first entry in
     TEMPERATURE_PROPERTY_KEYS (piping_producer.py:810), so the network path
@@ -70,6 +71,14 @@ PROPERTY SETS WRITTEN
     being smuggled into a standard one under a plausible-looking name. A reader
     can tell at a glance which of these values came from a standard and which
     is this project's own convention.
+
+    SecondaryMaterial gets its own pset for the same reason plus one more: it
+    is not hydraulic data, and it has to vary independently of the hydraulic
+    set. A couple must be able to land on an element carrying no flow data,
+    which sharing one pset would force into writing a half-empty hydraulics
+    block. IFC has no standard property here either — models express contact
+    through geometry, and which bracket a pipe is clamped to is a design
+    statement rather than something derivable from the pipe's own IfcMaterial.
 
 DETERMINISM
 
@@ -138,6 +147,49 @@ def has_hydraulics(index: int) -> bool:
 def has_material(index: int) -> bool:
     """Whether element ``index`` carries an IfcMaterial association."""
     return (index % 20) not in NO_MATERIAL_INDICES
+
+
+def has_couple(index: int) -> bool:
+    """Whether element ``index`` declares a second material at its junction.
+
+    Two of every five, which lands on no element in NO_MATERIAL_INDICES (3 and
+    17, neither of which satisfies ``index % 5 < 2``). A bracket material on an
+    element whose own material is unknown would be a couple with one side
+    missing — GC-001 is refused on those by the material gate anyway, so the
+    property would be unreadable noise.
+    """
+    return index % 5 < 2 and has_material(index)
+
+
+# The second material at the junction: the bracket, hanger or fixing the pipe
+# is clamped to. Chosen per primary material so the pairs are real ones rather
+# than a random draw, and so the demo carries couples a reviewer can check by
+# eye against the galvanic series:
+#
+#   copper on galvanised steel   severe    ~0.85 V apart, zinc is strongly anodic
+#   carbon steel on SS316        severe    passive stainless is strongly cathodic
+#   galvanised steel on copper   severe    the same couple from the other side
+#   copper on brass              benign    both copper-base, ~0.05 V apart
+#   carbon steel on carbon steel none      same material, no couple
+#
+# HDPE is deliberately absent: a plastic pipe has no galvanic couple, so
+# declaring a bracket material against it would state something untrue.
+SECONDARY_MATERIALS: dict[str, tuple[str, ...]] = {
+    "Copper": ("Galvanised Steel", "Brass"),
+    "Carbon Steel": ("Stainless Steel 316", "Carbon Steel"),
+    "Galvanised Steel": ("Copper",),
+    "Stainless Steel 316": ("Carbon Steel",),
+    "Brass": ("Copper",),
+    "HDPE": (),
+}
+
+
+def secondary_material_for(primary: str, index: int) -> str | None:
+    """Return the declared second material for ``primary``, or None."""
+    candidates = SECONDARY_MATERIALS.get(primary, ())
+    if not candidates:
+        return None
+    return candidates[(index // 5) % len(candidates)]
 
 
 # ---------------------------------------------------------------------------
@@ -421,6 +473,16 @@ def build_model() -> ifcopenshell.file:
                     system, index, diameter_mm
                 )
 
+            # A sibling pset rather than another key in Pset_BimGuardHydraulics.
+            # The bracket material is not hydraulic data, and more practically
+            # the two sets have to vary independently: a couple must be able to
+            # appear on an element that carries no flow data, which a shared
+            # pset would prevent without writing a half-empty hydraulics block.
+            if has_couple(index):
+                secondary = secondary_material_for(material_name, index)
+                if secondary is not None:
+                    psets["Pset_BimGuardCouple"] = {"SecondaryMaterial": secondary}
+
             for pset_name, properties in psets.items():
                 pset = ifcopenshell.api.pset.add_pset(
                     file, product=element, name=pset_name
@@ -505,10 +567,23 @@ def main() -> None:
     without_material = sum(
         1 for i in range(ELEMENTS_PER_SYSTEM) if not has_material(i)
     ) * len(SYSTEMS)
+    with_material = total - without_material
+    coupled = sum(
+        1
+        for system in SYSTEMS
+        for i in range(ELEMENTS_PER_SYSTEM)
+        if has_couple(i)
+        and secondary_material_for(system["materials"][i % len(system["materials"])], i)
+        is not None
+    )
     print(f"Wrote {path} ({path.stat().st_size / 1024:.0f} KB)")
     print(f"  elements          {total}")
     print(f"  with hydraulics   {with_hydraulics} ({with_hydraulics / total:.0%})")
     print(f"  without material  {without_material} ({without_material / total:.0%})")
+    print(
+        f"  with couple       {coupled} "
+        f"({coupled / with_material:.0%} of the {with_material} carrying a material)"
+    )
 
 
 if __name__ == "__main__":

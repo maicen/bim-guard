@@ -32,6 +32,15 @@ MATERIAL_SOURCE_IFC = "ifc_metadata"
 MATERIAL_SOURCE_UNMAPPED = "ifc_metadata_unmapped"
 #: The IFC carried no material at all.
 MATERIAL_SOURCE_ABSENT = "absent"
+#: A material was read from an IFC *property* rather than from a material
+#: association, and mapped onto a known key. The second material at a junction
+#: (a bracket, a support, a fixing) is not an IfcMaterial on the pipe — the
+#: pipe has one of those already — so it arrives as a declared property. The
+#: distinct string keeps "the model associates this material with the element"
+#: apart from "someone typed the bracket material into a property".
+MATERIAL_SOURCE_IFC_PROPERTY = "ifc_property"
+#: Read from a property, but matches no known material key.
+MATERIAL_SOURCE_IFC_PROPERTY_UNMAPPED = "ifc_property_unmapped"
 #: The element was authored by the demo generator, not read from a model.
 SOURCE_SYNTHETIC = "synthetic_fixture"
 
@@ -95,6 +104,12 @@ class ServiceElement:
     material_source: str = MATERIAL_SOURCE_ABSENT
     #: CONFIDENCE_* — how far material_a may be trusted as a reading.
     material_confidence: str = CONFIDENCE_NONE
+    #: MATERIAL_SOURCE_* — where material_b came from. Absent by default: an
+    #: element with no declared second material has no couple, which GC-001
+    #: scores as a self-couple rather than as a fault.
+    material_b_source: str = MATERIAL_SOURCE_ABSENT
+    #: CONFIDENCE_* — how far material_b may be trusted as a reading.
+    material_b_confidence: str = CONFIDENCE_NONE
     #: ENVIRONMENT_SOURCE_* — inferred from spatial names, or the indoor default.
     environment_source: str = ENVIRONMENT_SOURCE_DEFAULT
     #: CONFIDENCE_* — how far location_tag may be trusted as a reading.
@@ -422,6 +437,18 @@ def _first_number(properties: dict, keys: tuple[str, ...]) -> Optional[float]:
     return None
 
 
+def _first_text(properties: dict, keys: tuple[str, ...]) -> Optional[str]:
+    """Return the first key holding non-empty, non-boolean text, or None."""
+    for key in keys:
+        value = properties.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
 def _first_bool(properties: dict, keys: tuple[str, ...]) -> Optional[bool]:
     """Return the first key holding a boolean, or None."""
     for key in keys:
@@ -482,6 +509,59 @@ def read_hydraulics(element) -> dict:
     }
 
 
+#: Property names an authoring tool may use to declare the second material at
+#: a bimetallic junction — the bracket, support, hanger or fixing the element
+#: is in contact with. There is no buildingSMART property for this: IFC models
+#: contact through geometry, and the corrosion-relevant pairing is a design
+#: statement rather than something derivable from the pipe's own IfcMaterial.
+SECONDARY_MATERIAL_PROPERTY_KEYS = (
+    "SecondaryMaterial",
+    "SupportMaterial",
+    "BracketMaterial",
+    "FixingMaterial",
+)
+
+
+def read_secondary_material(element) -> dict:
+    """Read the declared second material at this element's junction.
+
+    Args:
+        element: The IFC entity to read.
+
+    Returns:
+        ``material_b``, ``material_b_source`` and ``material_b_confidence``,
+        ready to splat into a :class:`ServiceElement`. The key and confidence
+        come from :func:`resolve_material_name`, exactly as ``material_a``'s
+        do, so one vocabulary and one confidence scale describe both sides of
+        a couple. Only the *source* differs, because this side was read from a
+        property and the other from a material association.
+
+        An absent property yields ``None``. It is not defaulted to the
+        element's own material: GC-001 already treats a missing second
+        material as a self-couple, and inventing one here would put a
+        fabricated pairing behind a real-looking galvanic verdict.
+    """
+    properties = _flatten_psets(element)
+    raw = _first_text(properties, SECONDARY_MATERIAL_PROPERTY_KEYS)
+    if raw is None:
+        return {
+            "material_b": None,
+            "material_b_source": MATERIAL_SOURCE_ABSENT,
+            "material_b_confidence": CONFIDENCE_NONE,
+        }
+
+    key, source, confidence = resolve_material_name(raw)
+    return {
+        "material_b": key,
+        "material_b_source": (
+            MATERIAL_SOURCE_IFC_PROPERTY
+            if source == MATERIAL_SOURCE_IFC
+            else MATERIAL_SOURCE_IFC_PROPERTY_UNMAPPED
+        ),
+        "material_b_confidence": confidence,
+    }
+
+
 def get_system_name(element, ifc_model) -> str:
     """Find MEP system this element belongs to."""
     for rel in ifc_model.get_inverse(element):
@@ -529,7 +609,10 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                 seen_guids.add(guid)
             mat_a_raw = get_material_name(el, model)
             mat_a, mat_a_source, mat_a_confidence = resolve_material_name(mat_a_raw)
-            mat_b = None  # Second material (e.g. bracket material) — extend via Pset
+            # The second material at the junction, when the model declares one.
+            # Absent leaves material_b None, which GC-001 reads as a
+            # self-couple rather than as a fault.
+            secondary = read_secondary_material(el)
 
             floor = get_floor_name(el, model)
             system = get_system_name(el, model)
@@ -556,7 +639,6 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                     ifc_type=ifc_type,
                     description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
                     material_a=mat_a,
-                    material_b=mat_b,
                     location_tag=env,
                     floor=floor,
                     system=system,
@@ -569,6 +651,7 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                     material_confidence=mat_a_confidence,
                     environment_source=env_source,
                     environment_confidence=env_confidence,
+                    **secondary,
                     **read_hydraulics(el),
                 )
             )
