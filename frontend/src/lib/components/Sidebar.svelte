@@ -13,6 +13,7 @@
     ChevronRight,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
+  import { authState } from "../auth.svelte";
 
   interface Props {
     activeView?: string;
@@ -153,7 +154,9 @@
           {@const isActive =
             activeView === item.id || (item.id === "arch" && AUDIT_VIEW_IDS.has(activeView))}
           <a
-            href="/{item.id}"
+            href={authState.activeOrganizationId
+              ? `/${item.id}?org=${authState.activeOrganizationId}`
+              : `/${item.id}`}
             use:link
             onclick={onCloseMobile}
             class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {isActive
@@ -183,7 +186,9 @@
   <div class="space-y-1 border-t border-slate-800/80 bg-slate-950/60 p-2">
     <!-- Settings Link -->
     <a
-      href="/settings"
+      href={authState.activeOrganizationId
+        ? `/settings?org=${authState.activeOrganizationId}`
+        : "/settings"}
       use:link
       onclick={onCloseMobile}
       class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===

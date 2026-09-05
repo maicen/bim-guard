@@ -1,6 +1,7 @@
 <script lang="ts">
   import { BookOpenCheck, Box, BookText, LifeBuoy, ChevronDown, ExternalLink } from "lucide-svelte";
   import { link } from "svelte-spa-router";
+  import { authState } from "../auth.svelte";
 
   interface Props {
     activeView: string;
@@ -51,7 +52,9 @@
     >
       {#each ITEMS as item (item.id)}
         <a
-          href="/{item.id}"
+          href={authState.activeOrganizationId
+            ? `/${item.id}?org=${authState.activeOrganizationId}`
+            : `/${item.id}`}
           use:link
           onclick={() => (open = false)}
           class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors {activeView ===

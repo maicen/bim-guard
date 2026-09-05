@@ -16,21 +16,31 @@ class AuthState {
   profile = $state<CurrentUserResponse | null>(null);
   loading = $state(true);
 
+  #activeOrgIdOverride = $state<number | null>(null);
+
   get user(): User | null {
     return this.session?.user ?? null;
   }
 
+  get isSuperadmin(): boolean {
+    return !!this.profile?.profile?.is_superadmin;
+  }
+
   /**
    * The organization every project-scoped view is currently filtered to.
-   * Backed by `profile.default_organization_id`, not just local state, so it
-   * survives a reload and is the same organization the backend would pick if
-   * asked to default one (see `_primary_organization_id` in
-   * `app/api/projects.py`, which this makes an explicit, saved choice instead
-   * of an implicit "first membership" guess).
+   * Backed by URL or explicit selection (#activeOrgIdOverride), and defaults
+   * to `profile.default_organization_id` so it survives reloads.
    */
   get activeOrganizationId(): number | null {
+    if (this.#activeOrgIdOverride != null) {
+      if (!this.profile || this.isSuperadmin) return this.#activeOrgIdOverride;
+      const orgs = this.profile.organizations ?? [];
+      if (orgs.some((o) => o.organization_id === this.#activeOrgIdOverride)) {
+        return this.#activeOrgIdOverride;
+      }
+    }
     const orgs = this.profile?.organizations ?? [];
-    if (orgs.length === 0) return null;
+    if (orgs.length === 0) return this.#activeOrgIdOverride;
     const saved = this.profile?.profile.default_organization_id;
     if (saved != null && orgs.some((o) => o.organization_id === saved)) return saved;
     return orgs.length === 1 ? orgs[0]!.organization_id : null;
@@ -47,11 +57,14 @@ class AuthState {
     return orgs.length > 1 && this.activeOrganizationId === null;
   }
 
-  /** Persist the caller's chosen organization as their new default. */
-  async setActiveOrganization(organizationId: number): Promise<void> {
+  /** Set the caller's chosen organization, optionally persisting as their new default. */
+  async setActiveOrganization(organizationId: number, persist: boolean = true): Promise<void> {
+    this.#activeOrgIdOverride = organizationId;
     setActiveOrgId(organizationId);
     clearTenantCaches();
-    await this.updateProfile({ default_organization_id: organizationId });
+    if (persist && this.session) {
+      await this.updateProfile({ default_organization_id: organizationId });
+    }
   }
 
   constructor() {
@@ -115,6 +128,7 @@ class AuthState {
   async signOut(): Promise<void> {
     await supabase.auth.signOut();
     setAuthToken(null);
+    this.#activeOrgIdOverride = null;
     setActiveOrgId(null);
     clearTenantCaches();
     this.profile = null;

@@ -150,6 +150,9 @@
     params.set("project_id", String(projectId));
     if (elementGuid) params.set("element_guid", elementGuid);
     if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
     return `/${view}?${params.toString()}`;
   }
 
@@ -167,7 +170,11 @@
   });
 
   function handleSelectView(view: string) {
-    push(`/${view}`);
+    if (authState.activeOrganizationId) {
+      push(`/${view}?org=${authState.activeOrganizationId}`);
+    } else {
+      push(`/${view}`);
+    }
   }
 
   // Routes to the audit view matching the project's own domain rather than
@@ -211,6 +218,38 @@
   ]);
 
   let prevActiveOrgId: number | null = $state(null);
+
+  // 1. URL -> AuthState: when ?org= is in the query string, switch active organization
+  $effect(() => {
+    const orgParam = queryParams.get("org");
+    if (orgParam && /^\d+$/.test(orgParam)) {
+      const parsedOrgId = Number(orgParam);
+      if (parsedOrgId !== authState.activeOrganizationId) {
+        if (
+          !authState.profile ||
+          authState.isSuperadmin ||
+          authState.profile.organizations.some((o) => o.organization_id === parsedOrgId)
+        ) {
+          authState.setActiveOrganization(parsedOrgId, false);
+        }
+      }
+    }
+  });
+
+  // 2. AuthState -> URL: keep URL query param synchronized with active organization
+  $effect(() => {
+    const activeOrgId = authState.activeOrganizationId;
+    if (!activeOrgId || !showAppShell || activeView === "login") return;
+
+    const currentUrlOrg = queryParams.get("org");
+    if (currentUrlOrg !== String(activeOrgId)) {
+      const currentParams = new URLSearchParams(router.querystring || "");
+      currentParams.set("org", String(activeOrgId));
+      const targetView = activeView || "dashboard";
+      replace(`/${targetView}?${currentParams.toString()}`);
+    }
+  });
+
   $effect(() => {
     const currentOrgId = authState.activeOrganizationId;
     if (prevActiveOrgId !== null && prevActiveOrgId !== currentOrgId) {
@@ -218,7 +257,7 @@
         selectedProject = null;
         targetProjectId = null;
         if (PROJECT_SCOPED_VIEWS.has(activeView)) {
-          push(`/${activeView}`);
+          push(`/${activeView}?org=${currentOrgId}`);
         }
       }
     }
