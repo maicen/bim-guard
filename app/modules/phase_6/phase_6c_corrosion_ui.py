@@ -86,7 +86,11 @@ from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_ris
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
 from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
 from app.logging_config import get_logger
-from app.modules.ifc_reader.ifc_parser import ServiceElement
+from app.modules.ifc_reader.ifc_parser import (
+    MATERIAL_SOURCE_UNMAPPED,
+    ServiceElement,
+)
+from app.modules.phase_6.phase_6b_parsing import UNKNOWN_MATERIAL
 from app.modules.comparator import cross_material, material_media
 from app.modules.comparator.issue_adapter import IssueIdAllocator
 from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
@@ -350,6 +354,132 @@ def _mic_citations(result) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Pre-flight gate: refuse to score an element the engines cannot honestly score
+# ---------------------------------------------------------------------------
+#
+# THE DEFECT THIS CLOSES
+#
+#     The three per-element engines each substitute a value when an input is
+#     missing, and each substitution is a real, scoreable value rather than an
+#     absence. On a model carrying no material data the result is a full set of
+#     confident verdicts computed entirely from substitutions:
+#
+#       GC-001  resolve_material() returns "carbon_steel" for an unrecognised or
+#               empty string (bimguard_corrosion_engine.py, both the empty and
+#               the no-match branch). "Unknown" becomes carbon steel on both
+#               sides of the couple, the self-couple scores 0.0, and every
+#               element reports Low -- a clean bill of health for a model that
+#               said nothing.
+#
+#       CC-001  resolve_cc_material() returns None for "Unknown", which the
+#               engine reads as "non-stainless" -- a real material class, not an
+#               absence -- and scores a CCT sub-score of 0.05. With the default
+#               joint and the default environment severity that lands on Medium.
+#
+#       MC-001  _mic_element() supplies no flow velocity, dead-leg length or
+#               operating temperature. classify_flow_velocity(0.0) returns
+#               FV0_STAGNANT at risk 1.0 -- stagnant, the worst class -- and the
+#               two unknowns score 0.5 each, which composites to Critical.
+#
+#     None of those verdicts is wrong arithmetic. They are the engines working
+#     correctly on inputs that were invented for them. The fix is therefore not
+#     in the engines -- they are the validated artefact and are untouched here --
+#     but in refusing to hand them an invented input in the first place.
+#
+# WHY THE GATE DOES NOT CONSULT THE ENGINES' OWN MATERIAL TABLES
+#
+#     The obvious test -- "does this material resolve to a key in the GC-001
+#     galvanic series?" -- is wrong, and measurably so. The parser's canonical
+#     names do not all match the engine's alias table: "SS_316_passive" resolves
+#     to None against that table (the alias "316" is matched on a word boundary,
+#     and the underscores in ss_316_passive are word characters, so it cannot
+#     hit) while resolving correctly against CC-001's. Gating on the GC table
+#     would therefore mark genuine stainless as Undetermined.
+#
+#     So the gate asks the question it actually means: *did the parser identify
+#     a material at all?* That is answered by the value plus the provenance the
+#     parser already records, and it is independent of any engine's vocabulary.
+#
+#     (The vocabulary mismatch is a separate defect -- GC-001 currently scores
+#     every SS_316_passive and Galvanized_steel element as carbon steel. It is
+#     not fixed here because fixing it means changing an engine's table or the
+#     parser's canonical names, and both are out of scope for this gate.)
+
+
+def _material_gate(element: ServiceElement) -> tuple[str, dict[str, Any]] | None:
+    """Return ``(reason, inputs)`` if GC-001/CC-001 must not run, else ``None``.
+
+    Keyed on the value first and the provenance second, deliberately. Keying
+    only on provenance would gate any element built without going through
+    :func:`resolve_material_name` -- a hand-built fixture, say -- even when it
+    carries a perfectly good material string. Keying only on the value cannot
+    catch free text that was read from the IFC but matches no known material,
+    which the engines coerce just as silently as they coerce ``"Unknown"``.
+    """
+    raw = (element.material_a or "").strip()
+    if not raw or raw.casefold() == UNKNOWN_MATERIAL.casefold():
+        return (
+            "the IFC associates no material with this element, and both engines "
+            "substitute a scoreable material for an absent one",
+            {"material_a_raw": element.material_a, "material_source": element.material_source},
+        )
+    if element.material_source == MATERIAL_SOURCE_UNMAPPED:
+        return (
+            f"material {raw!r} was read from the IFC but matches no known "
+            "material key, and GC-001 would score it as carbon steel",
+            {"material_a_raw": element.material_a, "material_source": element.material_source},
+        )
+    return None
+
+
+def _hydraulics_gate(mic_element: MICElement) -> tuple[str, dict[str, Any]] | None:
+    """Return ``(reason, inputs)`` if MC-001 must not run, else ``None``.
+
+    Inspects the built :class:`MICElement` rather than the ``ServiceElement`` so
+    that the gate tests what the engine would actually receive. If
+    :func:`_mic_element` ever learns to populate any of the three, this opens on
+    its own rather than needing to be remembered.
+
+    Partial data is legitimately scorable, so any one of the three present is
+    enough to let the engine run; only the all-absent case is refused.
+    """
+    velocity = mic_element.flow_velocity_ms
+    dead_leg = mic_element.dead_leg_length_m
+    temperature = mic_element.operating_temp_c
+    if velocity is None and dead_leg is None and temperature is None:
+        return (
+            "no flow velocity, dead-leg length or operating temperature is "
+            "available; MC-001 would read the absent velocity as stagnant "
+            "(the worst class) and score the other two as unknown",
+            {
+                "flow_velocity_ms": velocity,
+                "dead_leg_length_m": dead_leg,
+                "operating_temp_c": temperature,
+            },
+        )
+    return None
+
+
+def _preflight(element: ServiceElement, spec: MechanismSpec) -> tuple[str, str, dict] | None:
+    """Return ``(check, reason, inputs)`` if ``spec`` must not run on ``element``.
+
+    The single place that decides an element is Undetermined for a mechanism.
+    Returns ``None`` to mean "the engine has enough to work with".
+    """
+    if spec in (GALVANIC, CREVICE):
+        gated = _material_gate(element)
+        if gated is not None:
+            return ("material_unresolved", *gated)
+        return None
+    if spec is MIC:
+        gated = _hydraulics_gate(_mic_element(element))
+        if gated is not None:
+            return ("hydraulics_unavailable", *gated)
+        return None
+    return None
+
+
 def _assess(element: ServiceElement, spec: MechanismSpec):
     """Run one :data:`ELEMENT_MECHANISMS` mechanism against one element.
 
@@ -582,6 +712,9 @@ def _data_quality_issue(
     spec: MechanismSpec,
     reason: str,
     allocator: IssueIdAllocator,
+    *,
+    check: str = "band_unassessed",
+    inputs: dict[str, Any] | None = None,
 ) -> Issue:
     """Report that a mechanism could not be evaluated for this element.
 
@@ -589,6 +722,16 @@ def _data_quality_issue(
     ``mechanism="data_quality"`` and a populated ``metadata["check"]`` make it
     impossible to mistake for one — the separation
     ``test_data_quality_never_masquerades_as_a_verdict`` asserts.
+
+    Args:
+        check: What was wrong. Defaults to ``"band_unassessed"``, the engine
+            ran and returned nothing usable. The pre-flight gate passes its own
+            value instead, because "we declined to run the engine" and "the
+            engine ran and produced nothing" are different facts and a reviewer
+            triaging a CSV needs to tell them apart.
+        inputs: The values the gate actually saw, merged into the metadata so
+            the CSV and BCF show *why* the element is Undetermined rather than
+            only that it is.
     """
     return make_issue(
         id=allocator.next(spec.prefix),
@@ -605,11 +748,12 @@ def _data_quality_issue(
         assignee_role="BIM coordinator",
         description=f"{spec.code} did not produce a result for this element.",
         metadata={
-            "check": "band_unassessed",
+            "check": check,
             "mechanism_code": spec.code,
             "reason": reason,
             "ifc_type": element.ifc_type,
             "material_a": element.material_a,
+            **(inputs or {}),
             # Often the explanation for the absence: an engine that could not
             # resolve a material usually could not because none was read.
             **_provenance(element),
@@ -744,6 +888,20 @@ def run_corrosion_analysis(
 
     for element in elements:
         for spec in active_elementwise:
+            # Step 0, before step 1: an engine that would have to invent an
+            # input is not asked for a band at all. This runs ahead of _assess
+            # so the engine is never entered, which is the difference between
+            # "no verdict" and "a verdict computed from a substitution".
+            gated = _preflight(element, spec)
+            if gated is not None:
+                check, reason, gate_inputs = gated
+                issues.append(
+                    _data_quality_issue(
+                        element, spec, reason, allocator, check=check, inputs=gate_inputs
+                    )
+                )
+                continue
+
             result, citations, error = _assess(element, spec)
 
             # Step 1: never invent a band.
