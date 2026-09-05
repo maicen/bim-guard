@@ -31,6 +31,7 @@
   import RevitSyncView from "./routes/RevitSyncView.svelte";
   import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
   import SettingsView from "./routes/SettingsView.svelte";
+  import LoginView from "./routes/LoginView.svelte";
 
   import { dashboardApi, projectsApi } from "./lib/api";
   import { viewForAnalysisDomain } from "./lib/analysisDomain";
@@ -289,6 +290,8 @@
           <IfcExportSettingView />
         {:else if activeView === "settings"}
           <SettingsView />
+        {:else if activeView === "login"}
+          <LoginView />
         {/if}
         {#snippet failed(error, reset)}
           <div

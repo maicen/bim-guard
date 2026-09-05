@@ -20,6 +20,7 @@ import type {
   CDESyncResponse,
   CDEUserResponse,
   CDEVersionsResponse,
+  CurrentUserResponse,
   DocumentDetail,
   DocumentItem,
   DocumentSectionsResponse,
@@ -103,6 +104,16 @@ async function handleResponse<T>(res: Response): Promise<T> {
   }
   return res.json();
 }
+
+export const authApi = {
+  /** Fetch the signed-in caller's identity. Requires a Supabase access token. */
+  async me(accessToken: string): Promise<CurrentUserResponse> {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return handleResponse<CurrentUserResponse>(res);
+  },
+};
 
 // ── Standardized Entity Cache Stores (SOLID Architecture) ─────────────────────
 const _projectsStore = new EntityCacheStore<Project, number>((p) => p.id, 60_000, 60_000);

@@ -1837,3 +1837,25 @@ class InspectorResponse(BaseModel):
     project_id: int
     answer: str
     tool_calls: list[InspectorToolCallContract] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Auth / Multi-Tenancy Contracts
+# ---------------------------------------------------------------------------
+
+
+class OrganizationMembership(BaseModel):
+    """One organization the authenticated caller belongs to, and their role in it."""
+
+    organization_id: int
+    name: str
+    slug: str
+    role: Literal["owner", "admin", "member"]
+
+
+class CurrentUserResponse(BaseModel):
+    """The authenticated caller's identity and organization memberships."""
+
+    id: str = Field(..., description="Supabase auth.users.id (uuid)")
+    email: Optional[str] = None
+    organizations: list[OrganizationMembership] = Field(default_factory=list)

@@ -17,6 +17,9 @@ from app.api import (
     analyze as api_analyze,
 )
 from app.api import (
+    auth as api_auth,
+)
+from app.api import (
     bcf_routes as api_bcf,
 )
 from app.api import (
@@ -210,6 +213,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 
 # Register API Gateway routers directly under /api prefix
+app.include_router(api_auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(api_dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(api_projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(

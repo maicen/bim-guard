@@ -23,6 +23,14 @@ RUN --mount=type=cache,target=/root/.npm \
 # Copy frontend source files
 COPY frontend/ ./
 
+# Supabase Auth is browser-side (VITE_ vars get baked into the bundle at
+# build time, not read at runtime) — Render passes dashboard env vars in as
+# matching build args for Docker services. See render.yaml.
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+
 # Build production bundle into /frontend/dist
 RUN npm run build
 

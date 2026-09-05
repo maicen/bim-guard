@@ -1270,3 +1270,18 @@ export interface NamingPreview {
   /** Tokens left literal because nothing supplied a value for them. */
   unresolved_tokens: string[];
 }
+
+/** One organization the authenticated caller belongs to. Mirrors OrganizationMembership. */
+export interface OrganizationMembership {
+  organization_id: number;
+  name: string;
+  slug: string;
+  role: "owner" | "admin" | "member";
+}
+
+/** The signed-in caller's identity. Mirrors CurrentUserResponse. */
+export interface CurrentUserResponse {
+  id: string;
+  email: string | null;
+  organizations: OrganizationMembership[];
+}

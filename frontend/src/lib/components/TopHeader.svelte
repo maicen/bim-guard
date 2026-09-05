@@ -3,6 +3,7 @@
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
   import ProjectSwitcher from "./ProjectSwitcher.svelte";
+  import UserMenu from "./UserMenu.svelte";
   import type { Project } from "../types";
 
   interface Props {
@@ -146,5 +147,7 @@
 
     <!-- Theme Toggle Button -->
     <ThemeToggle />
+
+    <UserMenu />
   </div>
 </header>

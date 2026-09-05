@@ -27,6 +27,12 @@ services:
       - key: SUPABASE_STORAGE_BUCKET
         value: bim-guard-artifacts
 
+      # ── Supabase Auth (browser-side, baked into the frontend bundle) ────────
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+
       # ── AI rule extraction & Agent Providers ────────────────────────────────
       - key: BIM_GUARD_LLM_MODEL
         value: openrouter/auto

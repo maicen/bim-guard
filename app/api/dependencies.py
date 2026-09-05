@@ -12,6 +12,7 @@ from app.services.bsdd_ontology_repository import (
 from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
+from app.services.membership_service import MembershipService
 from app.services.naming_config_service import NamingConfigService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.phase6_service import Phase6Service
@@ -85,3 +86,8 @@ def get_digital_inspector_service() -> DigitalInspectorService:
 def get_parsing_engine_instances_service() -> ParsingEngineInstancesService:
     """Return the configured ParsingEngineInstancesService instance."""
     return get_container().parsing_engine_instances_service
+
+
+def get_membership_service() -> MembershipService:
+    """Return the configured MembershipService instance."""
+    return get_container().membership_service

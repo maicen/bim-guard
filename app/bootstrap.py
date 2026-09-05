@@ -11,6 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.logging_config import get_logger
+from app.modules.comparator.engine_registry import (
+    RuleEngineRegistry,
+    register_default_engines,
+)
 from app.modules.document_parsing.engines.docling_driver import (
     DoclingHostedDriver,
     DoclingLocalDriver,
@@ -19,15 +23,12 @@ from app.modules.document_parsing.engines.unstructured_driver import (
     UnstructuredHostedDriver,
     UnstructuredLocalDriver,
 )
-from app.modules.comparator.engine_registry import (
-    RuleEngineRegistry,
-    register_default_engines,
-)
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.db_adapters import DatabaseAdapter
 from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
+from app.services.membership_service import MembershipService
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.naming_config_service import (
     _SCHEMA as _NAMING_CONFIG_SCHEMA,
@@ -74,6 +75,8 @@ class ApplicationContainer:
     github_repos_repo: DatabaseAdapter
     naming_config_repo: DatabaseAdapter
     parsing_engine_instances_repo: DatabaseAdapter
+    organizations_repo: DatabaseAdapter
+    memberships_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
@@ -83,6 +86,7 @@ class ApplicationContainer:
     github_repo_service: GitHubRepoService
     naming_config_service: NamingConfigService
     parsing_engine_instances_service: ParsingEngineInstancesService
+    membership_service: MembershipService
     analysis_service: AnalysisService
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
@@ -226,6 +230,28 @@ def build_default_container() -> ApplicationContainer:
         _NAMING_CONFIG_SCHEMA,
     )
 
+    organizations_repo = PersistenceService.get_table(
+        "organizations",
+        {
+            "id": int,
+            "name": str,
+            "slug": str,
+            "created_at": str,
+            "updated_at": str,
+        },
+    )
+
+    memberships_repo = PersistenceService.get_table(
+        "memberships",
+        {
+            "id": int,
+            "organization_id": int,
+            "user_id": str,
+            "role": str,
+            "created_at": str,
+        },
+    )
+
     parsing_engine_instances_repo = PersistenceService.get_table(
         "parsing_engine_instances",
         {
@@ -276,6 +302,11 @@ def build_default_container() -> ApplicationContainer:
     github_repo_service = GitHubRepoService(
         github_repos_repo=github_repos_repo,
         projects_service=projects_service,
+    )
+
+    membership_service = MembershipService(
+        memberships_repo=memberships_repo,
+        organizations_repo=organizations_repo,
     )
 
     # Seed default repo if database is empty
@@ -397,6 +428,8 @@ def build_default_container() -> ApplicationContainer:
         github_repos_repo=github_repos_repo,
         naming_config_repo=naming_config_repo,
         parsing_engine_instances_repo=parsing_engine_instances_repo,
+        organizations_repo=organizations_repo,
+        memberships_repo=memberships_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
@@ -406,6 +439,7 @@ def build_default_container() -> ApplicationContainer:
         github_repo_service=github_repo_service,
         naming_config_service=naming_config_service,
         parsing_engine_instances_service=parsing_engine_instances_service,
+        membership_service=membership_service,
         analysis_service=analysis_service,
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,
