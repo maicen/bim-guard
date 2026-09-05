@@ -73,10 +73,9 @@
   let projects: Project[] = $state([]);
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   // Re-syncs when the header's project switcher changes initialProjectId
-  // while this view is already mounted — without this, only the initial
-  // value (read once via untrack above) ever took effect.
-  run(() => {
-    if (initialProjectId && initialProjectId !== selectedProjectId) {
+  // while this view is already mounted.
+  $effect(() => {
+    if (initialProjectId !== undefined && initialProjectId !== selectedProjectId) {
       selectedProjectId = initialProjectId;
       handleProjectChange();
     }
@@ -138,19 +137,6 @@
     try {
       const data = await projectsApi.list();
       projects = data.projects || [];
-      const relevant = projects.filter((p) => {
-        if (activeCategory === "seismic") {
-          return (
-            p.analysis_type === "seismic" ||
-            p.analysis_type === "Seismic" ||
-            p.analysis_type === "Halo"
-          );
-        }
-        return p.analysis_type === "Piping" || p.analysis_type === "Piping (Corrosive)";
-      });
-      if (!selectedProjectId && relevant.length > 0) {
-        selectedProjectId = relevant[0].id;
-      }
       if (selectedProjectId) {
         await Promise.all([fetchResults(), loadInputs()]);
       }
@@ -480,31 +466,7 @@
   // A run with no engine selected assesses nothing, so the button is disabled
   // rather than returning an empty audit that looks like a clean model.
   let engineSelectionEmpty = $derived(activeCategory !== "seismic" && selectedEngines.length === 0);
-  let relevantProjects = $derived(
-    projects.filter((p) => {
-      if (activeCategory === "seismic") {
-        return (
-          p.analysis_type === "seismic" ||
-          p.analysis_type === "Seismic" ||
-          p.analysis_type === "Halo"
-        );
-      }
-      return p.analysis_type === "Piping" || p.analysis_type === "Piping (Corrosive)";
-    }),
-  );
-  let currentRelevantKey = $derived(
-    `${activeCategory}_${relevantProjects.map((p) => p.id).join(",")}`,
-  );
-  run(() => {
-    if (relevantProjects.length > 0 && currentRelevantKey !== prevRelevantKey) {
-      prevRelevantKey = currentRelevantKey;
-      if (!selectedProjectId || !relevantProjects.some((p) => p.id === selectedProjectId)) {
-        selectedProjectId = relevantProjects[0].id;
-        handleProjectChange();
-      }
-    }
-  });
-  let currentProject = $derived(relevantProjects.find((p) => p.id === selectedProjectId) || null);
+  let currentProject = $derived(projects.find((p) => p.id === selectedProjectId) || null);
   // Live progress echoed on the Run button itself, not just the progress
   // panel below — keeps attention anchored at the point of the click. Kept
   // through the pagination merge: it is the global pipeline feature, not part
@@ -633,27 +595,8 @@
       {/if}
     </div>
 
-    <!-- Actions & Project Selector -->
+    <!-- Actions -->
     <div class="flex flex-wrap items-center gap-3">
-      <!-- Project Dropdown -->
-      <div class="relative">
-        <select
-          bind:value={selectedProjectId}
-          onchange={handleProjectChange}
-          class="cursor-pointer appearance-none rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 pr-8 text-xs font-medium text-slate-50 shadow-sm focus:border-accent focus:outline-none"
-        >
-          {#if relevantProjects.length === 0}
-            <option value={null}>No {activeCategory} projects found</option>
-          {:else}
-            {#each relevantProjects as p (p.id)}
-              <option value={p.id}>{p.name} ({p.country})</option>
-            {/each}
-          {/if}
-        </select>
-        <ChevronRight
-          class="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rotate-90 text-slate-400"
-        />
-      </div>
 
       <!-- Run Action Button -->
       <button

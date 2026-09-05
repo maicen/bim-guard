@@ -82,7 +82,23 @@
   });
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
-  let targetProjectId: number | null = $state(null);
+
+  const SELECTED_PROJECT_STORAGE_KEY = "bimguard_selected_project_id";
+
+  function getInitialProjectId(): number | null {
+    // 1. From URL
+    const params = new URLSearchParams(router.querystring || "");
+    const fromUrl = params.get("project_id");
+    if (fromUrl && /^\d+$/.test(fromUrl)) return Number(fromUrl);
+    // 2. From LocalStorage
+    try {
+      const fromStorage = localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY);
+      if (fromStorage && /^\d+$/.test(fromStorage)) return Number(fromStorage);
+    } catch {}
+    return null;
+  }
+
+  let targetProjectId: number | null = $state(getInitialProjectId());
   let targetElementGuid: string | null = $state(null);
   let targetBcfArtifactId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
@@ -114,25 +130,72 @@
   async function loadProjectDetails(projectId: number) {
     try {
       selectedProject = await projectsApi.get(projectId);
+      if (
+        authState.activeOrganizationId &&
+        selectedProject.organization_id &&
+        selectedProject.organization_id !== authState.activeOrganizationId
+      ) {
+        selectedProject = null;
+        targetProjectId = null;
+        try {
+          localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
+        } catch {}
+        ensureProjectSelected();
+      }
     } catch (err) {
       selectedProject = null;
       toasts.fromError(err, "Could not load the selected project.");
     }
   }
 
-  // Every navigation that targets a specific project encodes it as
-  // ?project_id=...&element_guid=...&bcf_artifact_id=... in the URL's query
-  // string (see buildTargetUrl below), so this stays live across refresh,
-  // back/forward, and links shared from elsewhere — not just a one-shot read
-  // on mount. A previous version of this only handled the initial load of
-  // /viewer specifically; this generalizes it to every view.
+  async function ensureProjectSelected() {
+    if (targetProjectId) return;
+    try {
+      const orgId = authState.activeOrganizationId;
+      const res = await projectsApi.list({ organization_id: orgId });
+      const available = res.projects || [];
+      if (available.length > 0) {
+        const firstId = available[0].id;
+        targetProjectId = firstId;
+        try {
+          localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(firstId));
+        } catch {}
+        loadProjectDetails(firstId);
+      }
+    } catch {}
+  }
+
+  // Synchronize targetProjectId <-> URL query parameters and localStorage.
+  // In project-scoped views (Viewer, Arch, Piping, Seismic, Reports, Workflow),
+  // ensure the project persists in the URL query string.
   $effect(() => {
     const params = queryParams;
-    const projectId = Number(params.get("project_id"));
-    if (projectId && projectId !== targetProjectId) {
-      targetProjectId = projectId;
-      loadProjectDetails(projectId);
+    const urlProjectIdStr = params.get("project_id");
+
+    if (urlProjectIdStr && /^\d+$/.test(urlProjectIdStr)) {
+      const parsedId = Number(urlProjectIdStr);
+      if (parsedId !== targetProjectId) {
+        targetProjectId = parsedId;
+        loadProjectDetails(parsedId);
+        try {
+          localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(parsedId));
+        } catch {}
+      }
+    } else if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+      if (targetProjectId) {
+        const currentParams = new URLSearchParams(router.querystring || "");
+        if (currentParams.get("project_id") !== String(targetProjectId)) {
+          currentParams.set("project_id", String(targetProjectId));
+          if (authState.activeOrganizationId) {
+            currentParams.set("org", String(authState.activeOrganizationId));
+          }
+          replace(`/${activeView}?${currentParams.toString()}`);
+        }
+      } else {
+        ensureProjectSelected();
+      }
     }
+
     targetElementGuid = params.get("element_guid");
     const bcfArtifactId = Number(params.get("bcf_artifact_id"));
     targetBcfArtifactId = bcfArtifactId || null;
@@ -161,6 +224,9 @@
     initTheme();
     checkHealth();
     dashboardApi.prefetchAll();
+    if (targetProjectId) {
+      loadProjectDetails(targetProjectId);
+    }
     // Backward compatibility for the one link shape that predates hash
     // routing: a plain (non-hash) /viewer?... URL, e.g. an old bookmark.
     if (window.location.pathname === "/viewer" && !window.location.hash) {
@@ -274,11 +340,21 @@
   });
 
   function handleSwitchProject(projectId: number) {
+    targetProjectId = projectId;
+    loadProjectDetails(projectId);
+    try {
+      localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(projectId));
+    } catch {}
     if (PROJECT_SCOPED_VIEWS.has(activeView)) {
       push(buildTargetUrl(activeView, projectId));
+    }
+  }
+
+  function handleSelectAuditDomain(domain: AnalysisDomainTab) {
+    if (targetProjectId) {
+      push(buildTargetUrl(domain, targetProjectId));
     } else {
-      targetProjectId = projectId;
-      loadProjectDetails(projectId);
+      push(authState.activeOrganizationId ? `/${domain}?org=${authState.activeOrganizationId}` : `/${domain}`);
     }
   }
 </script>
@@ -316,6 +392,7 @@
   {:else}
     <Sidebar
       {activeView}
+      selectedProjectId={targetProjectId}
       mobileOpen={isMobileNavOpen}
       onCloseMobile={() => (isMobileNavOpen = false)}
     />
@@ -327,6 +404,7 @@
     <TopHeader
       {activeView}
       {selectedProject}
+      selectedProjectId={targetProjectId}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
       onSwitchProject={handleSwitchProject}
@@ -374,7 +452,7 @@
              tab strip is how you switch between them without a trip back to
              the sidebar. "analyze" is a legacy alias for "piping". -->
           <div class="space-y-5">
-            <AnalysisDomainTabs active={auditDomain} onSelect={(domain) => push(`/${domain}`)} />
+            <AnalysisDomainTabs active={auditDomain} onSelect={handleSelectAuditDomain} />
             {#if activeView === "arch"}
               <ArchAnalyzeView initialProjectId={targetProjectId} />
             {:else}

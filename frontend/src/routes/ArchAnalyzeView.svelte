@@ -53,12 +53,11 @@
   let projects: Project[] = $state([]);
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   // Re-syncs when the header's project switcher changes initialProjectId
-  // while this view is already mounted — without this, only the initial
-  // value (read once via untrack above) ever took effect.
+  // while this view is already mounted.
   $effect(() => {
-    if (initialProjectId && initialProjectId !== selectedProjectId) {
+    if (initialProjectId !== undefined && initialProjectId !== selectedProjectId) {
       selectedProjectId = initialProjectId;
-      checkEnhancedModel();
+      handleProjectChange();
     }
   });
   let isRunning = $state(false);
@@ -98,15 +97,6 @@
     try {
       const [projectData] = await Promise.all([projectsApi.list(), loadFolders()]);
       projects = projectData.projects || [];
-      const archProjs = projects.filter(
-        (p) =>
-          p.analysis_type === "Arch" ||
-          p.analysis_type === "Architectural" ||
-          p.analysis_type === "Architecture",
-      );
-      if (!selectedProjectId && archProjs.length > 0) {
-        selectedProjectId = archProjs[0].id;
-      }
       // Only check for enhanced model — do not auto-run
       if (selectedProjectId) {
         await checkEnhancedModel();
@@ -423,25 +413,7 @@
     openSections = openSections;
   }
 
-  let relevantProjects = $derived(
-    projects.filter(
-      (p) =>
-        p.analysis_type === "Arch" ||
-        p.analysis_type === "Architectural" ||
-        p.analysis_type === "Architecture",
-    ),
-  );
-  let currentArchKey = $derived(relevantProjects.map((p) => p.id).join(","));
-  run(() => {
-    if (relevantProjects.length > 0 && currentArchKey !== prevArchKey) {
-      prevArchKey = currentArchKey;
-      if (!selectedProjectId || !relevantProjects.some((p) => p.id === selectedProjectId)) {
-        selectedProjectId = relevantProjects[0].id;
-        checkEnhancedModel();
-      }
-    }
-  });
-  let selectedProject = $derived(relevantProjects.find((p) => p.id === selectedProjectId) || null);
+  let selectedProject = $derived(projects.find((p) => p.id === selectedProjectId) || null);
   // ── Reactive derivations ────────────────────────────────────────────────
 
   let summary = $derived(result?.rule_compliance_summary || {});
@@ -522,34 +494,8 @@
     {/if}
   </div>
 
-  <!-- ═══ Project Selector ═══ -->
-  <div
-    class="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-slate-900/50 p-4 sm:flex-row sm:items-center"
-  >
-    <div class="flex shrink-0 items-center gap-2">
-      <Building2 class="h-4 w-4 text-accent" />
-      <span class="text-xs font-bold text-slate-300">Project</span>
-    </div>
-    <div class="relative flex-1 sm:max-w-xs">
-      <select
-        bind:value={selectedProjectId}
-        onchange={handleProjectChange}
-        class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
-      >
-        {#if relevantProjects.length === 0}
-          <option value={null}>No Arch projects found</option>
-        {:else}
-          {#each relevantProjects as project (project.id)}
-            <option value={project.id}>{project.name}</option>
-          {/each}
-        {/if}
-      </select>
-      <ChevronDown
-        class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-      />
-    </div>
-
-    <!-- Compliance Audit / ISO 19650 Check tabs -->
+  <!-- ═══ Audit View Sub-Tabs ═══ -->
+  <div class="flex items-center justify-between gap-3">
     <div class="flex shrink-0 items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/40 p-1">
       <button
         type="button"
@@ -659,7 +605,11 @@
       {/if}
     {:else if !isRunning}
       <div class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500">
-        Select a project and click "Run ISO Check" to inspect ISO 19650 compliance.
+        {#if !selectedProjectId}
+          Please select a project from the top header to inspect ISO 19650 compliance.
+        {:else}
+          Click "Run ISO Check" to inspect ISO 19650 compliance.
+        {/if}
       </div>
     {/if}
   {:else}
@@ -1771,7 +1721,11 @@
     <div
       class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
     >
-      Select a project and click "Run Compliance Test" to inspect building code compliance.
+      {#if !selectedProjectId}
+        Please select a project from the top header to inspect building code compliance.
+      {:else}
+        Click "Run Compliance Test" to inspect building code compliance.
+      {/if}
     </div>
   {/if}
   {/if}

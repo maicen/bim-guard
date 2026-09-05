@@ -22,13 +22,16 @@
   // untrack states that the one-time read is deliberate.
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
 
+  $effect(() => {
+    if (initialProjectId !== undefined && initialProjectId !== selectedProjectId) {
+      selectedProjectId = initialProjectId;
+    }
+  });
+
   onMount(async () => {
     try {
       const data = await projectsApi.list();
       projects = data.projects || [];
-      if (!selectedProjectId && projects.length > 0) {
-        selectedProjectId = projects[0].id;
-      }
     } catch (err) {
       // Without this the user just gets an empty project picker and no reason.
       toasts.fromError(err, "Could not load the project list.");
@@ -51,20 +54,6 @@
         Server-Sent Events (SSE).
       </p>
     </div>
-
-    <!-- Project Selector -->
-    {#if !isLoading && projects.length > 0}
-      <div class="flex items-center gap-2">
-        <select
-          bind:value={selectedProjectId}
-          class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
-        >
-          {#each projects as p (p.id)}
-            <option value={p.id}>{p.name}</option>
-          {/each}
-        </select>
-      </div>
-    {/if}
   </div>
 
   {#if isLoading}
@@ -95,7 +84,7 @@
     <div
       class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
     >
-      Select a project to inspect its live pipeline events.
+      Please select a project from the top header to inspect its live pipeline events.
     </div>
   {/if}
 </div>

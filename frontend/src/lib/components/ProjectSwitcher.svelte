@@ -5,12 +5,13 @@
   import type { Project } from "../types";
 
   interface Props {
-    selectedProject: Project | null;
+    selectedProject?: Project | null;
+    selectedProjectId?: number | null;
     /** Switch the app's current project context. */
     onSwitch: (projectId: number) => void;
   }
 
-  let { selectedProject, onSwitch }: Props = $props();
+  let { selectedProject = null, selectedProjectId = null, onSwitch }: Props = $props();
 
   // Every project-scoped view (Compliance Audit, Reports, Viewer) used to
   // own an independent project dropdown with no shared "current project"
@@ -46,15 +47,15 @@
 </script>
 
 <div
-  class="ml-2 hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-700 lg:inline-flex"
+  class="ml-1 sm:ml-2 flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2 sm:px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-700 shrink-0"
 >
   <Building2 class="h-3.5 w-3.5 shrink-0 text-blue-400" />
   <div class="relative">
     <select
-      value={selectedProject?.id ?? ""}
+      value={selectedProject?.id ?? selectedProjectId ?? ""}
       onchange={handleChange}
       aria-label="Switch current project"
-      class="max-w-[12rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-slate-200 focus:outline-none"
+      class="max-w-[7.5rem] sm:max-w-[11rem] md:max-w-[15rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-slate-200 focus:outline-none"
     >
       <option value="" disabled>Select project…</option>
       {#each projects as p (p.id)}

@@ -14,6 +14,7 @@
   interface Props {
     activeView: string;
     selectedProject?: Project | null;
+    selectedProjectId?: number | null;
     /** Opens the navigation drawer; only rendered below `md`. */
     onOpenMobileNav?: () => void;
     /** Navigate to the Live Workflow view for a tracked project's pipeline. */
@@ -25,6 +26,7 @@
   let {
     activeView,
     selectedProject = null,
+    selectedProjectId = null,
     onOpenMobileNav = () => {},
     onOpenPipeline,
     onSwitchProject,
@@ -83,10 +85,10 @@
     <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
 
     {#if onSwitchProject}
-      <ProjectSwitcher {selectedProject} onSwitch={onSwitchProject} />
+      <ProjectSwitcher {selectedProject} {selectedProjectId} onSwitch={onSwitchProject} />
     {:else if selectedProject}
       <span
-        class="ml-2 hidden items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/60 px-2.5 py-0.5 text-xs font-medium text-slate-300 lg:inline-flex"
+        class="ml-2 hidden items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/60 px-2.5 py-0.5 text-xs font-medium text-slate-300 sm:inline-flex"
       >
         Project: {selectedProject.name}
       </span>

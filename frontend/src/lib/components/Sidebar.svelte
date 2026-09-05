@@ -17,12 +17,18 @@
 
   interface Props {
     activeView?: string;
+    selectedProjectId?: number | null;
     /** Drawer visibility below `md`. Above it the sidebar is always shown. */
     mobileOpen?: boolean;
     onCloseMobile?: () => void;
   }
 
-  let { activeView = "dashboard", mobileOpen = false, onCloseMobile = () => {} }: Props = $props();
+  let {
+    activeView = "dashboard",
+    selectedProjectId = null,
+    mobileOpen = false,
+    onCloseMobile = () => {},
+  }: Props = $props();
 
   let collapsed = $state(false);
 
@@ -30,6 +36,19 @@
   // switching between them happens via the in-page domain tab strip
   // (AnalysisDomainTabs), not a separate sidebar entry per domain.
   const AUDIT_VIEW_IDS = new Set(["arch", "piping", "seismic", "analyze"]);
+  const PROJECT_SCOPED_NAV_IDS = new Set(["arch", "viewer", "reports"]);
+
+  function getNavHref(itemId: string): string {
+    const params = new URLSearchParams();
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    if (selectedProjectId && PROJECT_SCOPED_NAV_IDS.has(itemId)) {
+      params.set("project_id", String(selectedProjectId));
+    }
+    const q = params.toString();
+    return q ? `/${itemId}?${q}` : `/${itemId}`;
+  }
 
   // Grouped by intent (My Home / Model Coordination / Compliance / Rules &
   // Standards) rather than by module — see the Tenant & Workspace Blueprint.
@@ -154,9 +173,7 @@
           {@const isActive =
             activeView === item.id || (item.id === "arch" && AUDIT_VIEW_IDS.has(activeView))}
           <a
-            href={authState.activeOrganizationId
-              ? `/${item.id}?org=${authState.activeOrganizationId}`
-              : `/${item.id}`}
+            href={getNavHref(item.id)}
             use:link
             onclick={onCloseMobile}
             class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {isActive

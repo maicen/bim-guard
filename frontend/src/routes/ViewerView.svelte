@@ -1,8 +1,5 @@
 <script lang="ts">
-  import { untrack } from "svelte";
-  import { run } from "svelte/legacy";
-
-  import { onMount } from "svelte";
+  import { untrack, onMount } from "svelte";
   import { projectsApi } from "../lib/api";
   import type { Project, ProjectIfcFile } from "../lib/types";
   import IfcViewer from "../lib/components/IfcViewer.svelte";
@@ -21,9 +18,6 @@
   }: Props = $props();
 
   let projects: Project[] = $state([]);
-  // These `initial*` props seed local state once. The component is mounted
-  // inside App's view switch, so it remounts whenever the target changes;
-  // untrack states that the one-time read is deliberate.
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   let selectedElementGuid: string | null = $state(untrack(() => initialElementGuid));
   let selectedBcfArtifactId: number | null = $state(untrack(() => initialBcfArtifactId));
@@ -42,27 +36,19 @@
   let selectedFile = $derived(ifcFiles.find((f) => f.id === selectedFileId) ?? ifcFiles[0] ?? null);
 
   async function loadIfcFiles(projectId: number) {
-    // Guarded so the reactive statement below re-fetches on a project change
-    // but not on every unrelated state change that re-runs it.
     if (filesProjectId === projectId) return;
     filesProjectId = projectId;
-    // Cleared before the await, not after: leaving the previous project's rows
-    // in place would briefly pair a new project id with an old file id, and the
-    // viewer would ask for a model that project does not have.
     ifcFiles = [];
     selectedFileId = null;
     filesReady = false;
     try {
       ifcFiles = await projectsApi.listIfcFiles(projectId);
-      // Falls back to the primary, which list_project_ifc_files returns first.
       selectedFileId = ifcFiles.find((f) => f.is_primary)?.id ?? ifcFiles[0]?.id ?? null;
     } catch (err) {
       console.error("Failed to load project IFC files:", err);
       ifcFiles = [];
       selectedFileId = null;
     } finally {
-      // Ready either way: on failure the viewer falls back to the project's
-      // primary, which is what it rendered before there was a picker at all.
       filesReady = true;
     }
   }
@@ -71,9 +57,6 @@
     try {
       const res = await projectsApi.list();
       projects = res.projects.filter((p) => Boolean(p.ifc_file_path));
-      if (!selectedProjectId && projects.length > 0) {
-        selectedProjectId = projects[0].id;
-      }
     } catch (err) {
       console.error("Failed to load projects for viewer:", err);
     }
@@ -83,23 +66,29 @@
     loadProjects();
   });
 
-  run(() => {
-    if (selectedProjectId) {
-      loadIfcFiles(selectedProjectId);
-    }
-  });
-
-  run(() => {
-    if (initialProjectId) {
+  $effect(() => {
+    if (initialProjectId !== undefined && initialProjectId !== selectedProjectId) {
       selectedProjectId = initialProjectId;
     }
   });
-  run(() => {
+
+  $effect(() => {
+    if (selectedProjectId) {
+      loadIfcFiles(selectedProjectId);
+    } else {
+      ifcFiles = [];
+      selectedFileId = null;
+      filesReady = true;
+    }
+  });
+
+  $effect(() => {
     if (initialElementGuid !== undefined) {
       selectedElementGuid = initialElementGuid;
     }
   });
-  run(() => {
+
+  $effect(() => {
     if (initialBcfArtifactId !== undefined) {
       selectedBcfArtifactId = initialBcfArtifactId;
     }
@@ -115,54 +104,33 @@
     </p>
   </div>
 
-  <!-- ═══ Project Selector ═══ -->
-  {#if projects.length > 0}
+  <!-- ═══ Model Selector (if project has multiple IFC files) ═══ -->
+  {#if ifcFiles.length > 1}
     <div
-      class="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-slate-900/50 p-4 sm:flex-row sm:items-center"
+      class="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center"
     >
       <div class="flex shrink-0 items-center gap-2">
-        <Building2 class="h-4 w-4 text-accent" />
-        <span class="text-xs font-bold text-slate-300">Project</span>
+        <Layers class="h-4 w-4 text-accent" />
+        <span class="text-xs font-bold text-slate-300">Viewing Model</span>
       </div>
       <div class="relative flex-1 sm:max-w-xs">
         <select
-          id="viewer-project-select"
-          bind:value={selectedProjectId}
+          id="viewer-file-select"
+          bind:value={selectedFileId}
           class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
         >
-          {#each projects as p (p.id)}
-            <option value={p.id}>{p.name} (#{p.id})</option>
+          {#each ifcFiles as file (file.id)}
+            <option value={file.id}>
+              {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
+                ? " (primary)"
+                : ""}
+            </option>
           {/each}
         </select>
         <ChevronDown
           class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
         />
       </div>
-
-      {#if ifcFiles.length > 1}
-        <div class="flex shrink-0 items-center gap-2 sm:border-l sm:border-slate-800 sm:pl-3">
-          <Layers class="h-4 w-4 text-accent" />
-          <span class="text-xs font-bold text-slate-300">Viewing</span>
-        </div>
-        <div class="relative flex-1 sm:max-w-[260px]">
-          <select
-            id="viewer-file-select"
-            bind:value={selectedFileId}
-            class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
-          >
-            {#each ifcFiles as file (file.id)}
-              <option value={file.id}>
-                {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
-                  ? " (primary)"
-                  : ""}
-              </option>
-            {/each}
-          </select>
-          <ChevronDown
-            class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-          />
-        </div>
-      {/if}
     </div>
   {/if}
 
@@ -200,7 +168,15 @@
     </div>
   {/if}
 
-  {#if projects.length === 0}
+  {#if !selectedProjectId && projects.length > 0}
+    <div
+      class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400"
+    >
+      <span
+        >No project currently selected. Please select a project from the top header above, or open a local IFC file directly in the viewport below.</span
+      >
+    </div>
+  {:else if projects.length === 0}
     <div
       class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400"
     >

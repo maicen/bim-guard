@@ -53,13 +53,17 @@
   let projects: Project[] = $state([]);
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   // Re-syncs when the header's project switcher changes initialProjectId
-  // while this view is already mounted — without this, only the initial
-  // value (read once via untrack above) ever took effect.
+  // while this view is already mounted.
   $effect(() => {
-    if (initialProjectId && initialProjectId !== selectedProjectId) {
+    if (initialProjectId !== undefined && initialProjectId !== selectedProjectId) {
       selectedProjectId = initialProjectId;
-      loadReport();
-      loadBcfTopics();
+      if (selectedProjectId) {
+        loadReport();
+        loadBcfTopics();
+      } else {
+        result = null;
+        bcfTopics = [];
+      }
     }
   });
   let result: AnalysisResult | null = null;
@@ -117,9 +121,6 @@
     try {
       const [data] = await Promise.all([projectsApi.list(), loadBcfArtifacts()]);
       projects = data.projects || [];
-      if (!selectedProjectId && projects.length > 0) {
-        selectedProjectId = projects[0].id;
-      }
       if (selectedProjectId) {
         await Promise.all([loadReport(), loadBcfTopics()]);
       }
@@ -345,24 +346,7 @@
     title="Compliance Reports & Exports"
     subtitle="Generate, track, and download OpenBIM compliance audit deliverables in BCF 2.1, CSV, and JSON."
     icon={FolderArchive}
-  >
-    {#snippet actions()}
-      <div class="flex items-center gap-2">
-        <select
-          bind:value={selectedProjectId}
-          onchange={() => {
-            loadReport();
-            loadBcfTopics();
-          }}
-          class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
-        >
-          {#each projects as p (p.id)}
-            <option value={p.id}>{p.name}</option>
-          {/each}
-        </select>
-      </div>
-    {/snippet}
-  </PageHeader>
+  />
 
   {#if error}
     <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
@@ -905,7 +889,7 @@
     <div
       class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
     >
-      Select a project to generate and export compliance audit deliverables.
+      Please select a project from the top header to generate and export compliance audit deliverables.
     </div>
   {/if}
 </div>
