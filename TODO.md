@@ -262,8 +262,44 @@ Builds on the base Supabase Auth / JWT work in Priority 4.1.
 - [ ] Reflect role-gated actions and views in the Svelte client beyond Org
       Settings (e.g. hide/disable enhancement, rule editing, admin views for
       unauthorized roles project-wide, not just the org member table).
-- [ ] Add tests proving unauthorized roles/organizations cannot invoke
-      restricted API operations (`app/api/organizations.py`, `app/api/projects.py`).
+- [x] Add tests proving unauthorized roles/organizations cannot invoke
+      restricted API operations (`tests/test_rbac_groups_and_rulesets.py`).
+
+### Enterprise RBAC: Groups and Resource Grants
+
+Two matrices, per the multi-tenant/enterprise-grade ask: a superadmin controls
+which rulesets each *organization* may use at all; an org owner controls which
+*projects* each *group* within their org may access. A brand-new project or
+organization starts with nothing bound — "zero bindings unless assigned" is an
+empty grant table, not a flag.
+
+- [x] `organizations` <-> `rulesets` grant (`organization_ruleset_grants`,
+      superadmin-only via `PUT /api/organizations/{id}/ruleset-grants`) — the
+      one platform resource that was genuinely global/shared; projects,
+      models, and documents are already scoped by `organization_id` on the
+      row itself and needed no equivalent grant.
+- [x] `groups` <-> `projects` grant (one group per user per org via
+      `memberships.group_id`; `group_project_grants`, owner/admin via
+      `app/api/organizations.py`'s group endpoints). An org owner/admin still
+      sees every project in their own org; a plain member sees only their
+      group's granted projects, none if ungrouped.
+- [x] `project_ruleset_bindings`: which of an org's granted rulesets are
+      actually bound to one project (owner-controlled, always a subset of the
+      org's grants — `RulesetAccessService.set_project_bindings`). A fresh
+      project has none; `ArchAnalysisService.run_analysis` rejects a
+      `rule_folder` that isn't bound.
+- [x] Backfill: the pre-existing default organization and its projects were
+      grandfathered into full access to every ruleset that existed at
+      migration time, so today's single-tenant behavior didn't regress; only
+      new organizations/projects start with zero bindings.
+- [ ] Frontend: superadmin org<->ruleset matrix UI, owner group management +
+      group<->project matrix UI, and a per-project "Rule Assignments" section
+      — the backend/API surface exists (`app/api/organizations.py`'s group
+      and ruleset-grant endpoints, `app/api/projects.py`'s
+      `/ruleset-bindings`) but nothing in `frontend/` calls it yet.
+- [ ] Reflect group-based project visibility in the Svelte client's own
+      project pickers/switchers (they currently only account for
+      organization scope, not group scope, for a plain member).
 
 Owner: unassigned.
 
