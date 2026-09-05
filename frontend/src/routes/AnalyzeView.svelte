@@ -233,6 +233,25 @@
     };
   }
 
+  /**
+   * Export filters for the BCF download.
+   *
+   * BCF is a coordination format: a topic in it becomes somebody's task in
+   * Revit, Solibri or Navisworks. The rulesets say a Low verdict is "asset
+   * register only — no BCF issue", and a data-quality note reports what could
+   * not be assessed rather than something to fix, so neither belongs in the
+   * archive by default. Both are left to the server's per-format default —
+   * `undefined` omits the query parameter — unless the user has narrowed the
+   * severity dropdown, which is an explicit request this honours as given.
+   *
+   * CSV and JSON keep using {@link getExportFilters}: those two are the asset
+   * register, where an unassessed element is a row worth having.
+   */
+  function getBcfExportFilters(): { bands?: string[]; includeDataQuality?: boolean } {
+    if (severityFilter === "all") return { bands: undefined, includeDataQuality: undefined };
+    return getExportFilters();
+  }
+
   // Lets an in-flight request be abandoned, either by the user or because they
   // switched project or filter while it was still going.
   let runController: AbortController | null = null;
@@ -1012,15 +1031,24 @@
           <div class="flex items-center gap-2">
             {#if selectedProjectId}
               {@const exportFilters = getExportFilters()}
+              {@const bcfExportFilters = getBcfExportFilters()}
+              <!-- BCF carries no include_low / include_data_quality of its own
+                   unless the user has narrowed the severity filter. Omitting
+                   them lets the server apply the ruleset contract — a Low
+                   verdict is "asset register only, no BCF issue", and a
+                   data-quality note is not a coordination task — so the archive
+                   opens in Revit or Solibri as Medium-and-above work. CSV and
+                   JSON below keep passing the page's filters, because those two
+                   are the asset register. -->
               <a
                 href={analyzeApi.getExportUrl(
                   selectedProjectId,
                   selectedSlug,
                   "bcf",
                   requestedEngines,
-                  true,
-                  exportFilters.bands,
-                  exportFilters.includeDataQuality,
+                  undefined,
+                  bcfExportFilters.bands,
+                  bcfExportFilters.includeDataQuality,
                 )}
                 class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
                 title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"

@@ -58,9 +58,11 @@ from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
 
 logger = get_logger(__name__)
 
-#: Label the primary model's elements are attributed to when a project federates
-#: several. Not the file's name: the caller may have none, and the primary is
-#: identified by its role rather than by what it happens to be called.
+#: Fallback label for the primary model's elements when the caller supplies no
+#: file name. Only a fallback: a run started from a project passes
+#: ``primary_label``, because a federated clash report that names one side
+#: "primary model" and the other by file cannot be acted on — the coordinator
+#: cannot tell which model to open.
 PRIMARY_MODEL_LABEL = "primary model"
 
 #: Jurisdiction config shipped with the Blue Halo work. Phase 2 output.
@@ -338,6 +340,7 @@ def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[
 def run_seismic_analysis(
     ifc_bytes: bytes,
     *,
+    primary_label: str = "",
     extra_models: Sequence[tuple[str, bytes]] = (),
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     brace_type: BraceType = BraceType.ANGLE_IRON,
@@ -364,6 +367,13 @@ def run_seismic_analysis(
         ifc_bytes: The primary model, as stored. Read directly rather than via
             ``ParsedIFC`` because clearance envelopes need real geometry and
             ``ServiceElement`` does not carry it.
+        primary_label: File name of the primary model, used to attribute its
+            elements. Every other model is named by its file, so leaving this
+            blank made a federated clash read
+            ``clashing_source_model: "primary model"`` — a role, not something a
+            coordinator can open. Falls back to
+            :data:`PRIMARY_MODEL_LABEL` for a caller that genuinely has no name
+            for the bytes it passed, such as a test fixture.
         extra_models: ``(label, bytes)`` for the project's other models. The
             label names the file in any Issue raised against its elements.
         config_path: Jurisdiction clearance config (Blue Halo Phase 2 output).
@@ -406,7 +416,7 @@ def run_seismic_analysis(
     unread: dict[str, tuple[str, str, str]] = {}
     duplicates = 0
 
-    for label, content in ((PRIMARY_MODEL_LABEL, ifc_bytes), *extra_models):
+    for label, content in ((primary_label.strip() or PRIMARY_MODEL_LABEL, ifc_bytes), *extra_models):
         try:
             model = ifcopenshell.file.from_string(content.decode("utf-8", errors="replace"))
         except Exception as exc:

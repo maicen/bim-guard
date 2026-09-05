@@ -16,7 +16,11 @@ import pytest
 from app.modules.ifc_reader import piping_fixtures as fx
 from app.modules.ifc_reader.piping_schema import EnvironmentClass, PipingElement, PipingSystem
 from app.modules.comparator.issue_schema import RiskBand
-from app.modules.comparator.material_media import compare
+from app.modules.comparator.material_media import (
+    DEFAULT_RULESET_VERSION,
+    compare,
+    ruleset_version,
+)
 
 RULE_PACK_PATH = Path("data/rulesets/mm_001_material_media.json")
 
@@ -302,6 +306,39 @@ class TestOutputShape:
     def test_empty_input_yields_no_issues(self, rule_pack):
         """An empty model is not an error."""
         assert compare([], rule_pack) == []
+
+
+class TestRulesetProvenance:
+    """A scored verdict must name the matrix revision it came from.
+
+    GC-001 and CC-001 already stamped ``ruleset_version`` on every finding;
+    MM-001 did not, so the 2026-09-06 audit could not trace an MM-001 verdict
+    back to the pack that produced it.
+    """
+
+    def test_scored_findings_carry_the_ruleset_version(self, findings, rule_pack):
+        """Every compliance finding names the pack, formatted like the engines'."""
+        expected = ruleset_version(rule_pack)
+        assert findings, "no scored findings to check"
+        for issue in findings.values():
+            assert issue.metadata.get("ruleset_version") == expected
+
+    def test_version_is_built_from_the_pack(self, rule_pack):
+        """The stamp tracks the file rather than a constant that drifts from it."""
+        assert ruleset_version(rule_pack) == "BIMGUARD-MM-001 v1.0.0"
+
+    def test_scored_findings_carry_the_mechanism_code(self, findings):
+        """The reader keys engine grouping on this, as it does for GC/CC/MC."""
+        assert all(i.metadata.get("mechanism_code") == "MM-001" for i in findings.values())
+
+    def test_a_pack_without_identity_falls_back(self, rule_pack):
+        """An unstamped finding is worse than one stamped with the default."""
+        anonymous = {k: v for k, v in rule_pack.items() if k != "ruleset_id"}
+        assert ruleset_version(anonymous) == DEFAULT_RULESET_VERSION
+
+    def test_data_quality_notes_do_not_claim_a_version(self, data_quality):
+        """A note means no cell was selected, so no revision produced it."""
+        assert all("ruleset_version" not in i.metadata for i in data_quality.values())
 
 
 if __name__ == "__main__":

@@ -50,6 +50,11 @@ DATA_QUALITY = "data_quality"
 RULE_ID = "MM-001"
 ID_PREFIX = "MM"
 
+#: Ruleset stamp recorded on every scored MM-001 finding when the pack carries
+#: no identity of its own. Same shape as the corrosion engines' own constants
+#: (``"BIMGUARD-GC-001 v1.0.0"``), so one reader parses all of them.
+DEFAULT_RULESET_VERSION = "BIMGUARD-MM-001 v1.0.0"
+
 #: Pack keys the comparator cannot score without. `kinetics_guard` is
 #: deliberately absent — a pack may omit it, and the guard then does not apply.
 REQUIRED_PARAMETER_KEYS = frozenset(
@@ -87,6 +92,27 @@ def load_rule_pack(*, path: Path | None = None) -> dict:
     pack = json.loads(pack_path.read_text(encoding="utf-8"))
     _require_parameters(pack)
     return pack
+
+
+def ruleset_version(rule_pack: dict) -> str:
+    """Return the ruleset stamp to record on findings scored from ``rule_pack``.
+
+    Built from the pack's own ``ruleset_id`` and ``schema_version`` so it tracks
+    the file rather than a constant that drifts from it, and formatted like the
+    corrosion engines' ``RULESET_VERSION`` (``"BIMGUARD-GC-001 v1.0.0"``).
+
+    GC-001 and CC-001 already stamped every scored finding this way; MM-001 did
+    not, so an MM-001 verdict in an audit could not be traced to the matrix
+    revision that produced it. Falls back to
+    :data:`DEFAULT_RULESET_VERSION` for a pack that names neither field, because
+    an unstamped finding is worse than one stamped with the shipped default.
+    """
+    pack = rule_pack or {}
+    ruleset_id = str(pack.get("ruleset_id") or "").strip()
+    version = str(pack.get("schema_version") or pack.get("version") or "").strip()
+    if not ruleset_id:
+        return DEFAULT_RULESET_VERSION
+    return f"{ruleset_id} v{version}" if version else ruleset_id
 
 
 def _require_parameters(rule_pack: dict) -> dict:
@@ -220,8 +246,16 @@ def _assess(
     element: PipingElement,
     parameters: dict,
     next_id: Callable[[], str],
+    version: str = DEFAULT_RULESET_VERSION,
 ) -> Optional[Issue]:
-    """Score one element, returning its Issue or None when it bands Low."""
+    """Score one element, returning its Issue or None when it bands Low.
+
+    Args:
+        version: Ruleset stamp recorded on a scored finding, from
+            :func:`ruleset_version`. Data-quality notes do not carry it: they
+            report that no cell was selected, so there is no matrix revision
+            behind them to cite.
+    """
     material = getattr(element, "material", None) or "Unknown"
     medium = media_for_system(getattr(element, "system", PipingSystem.UNKNOWN))
 
@@ -377,6 +411,11 @@ def _assess(
         ),
         description=description,
         metadata={
+            # Which revision of the MM-001 matrix produced this score. Carried
+            # for the same reason GC-001 and CC-001 carry it: a verdict that
+            # cannot be traced to the table it came from cannot be re-checked.
+            "mechanism_code": RULE_ID,
+            "ruleset_version": version,
             "material": material,
             "medium": medium,
             "environment_class": _environment_key(element),
@@ -428,10 +467,11 @@ def compare(
     """
     parameters = _require_parameters(rule_pack)
     next_id = _allocator(id_allocator)
+    version = ruleset_version(rule_pack)
 
     issues: list[Issue] = []
     for element in network:
-        issue = _assess(element, parameters, next_id)
+        issue = _assess(element, parameters, next_id, version)
         if issue is not None:
             issues.append(issue)
     return issues

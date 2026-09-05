@@ -28,7 +28,16 @@ DESIGN CONSTRAINTS, AND WHY
     **Bounded and expiring.** ``analyze.py`` keeps results in module-level
     globals (``_last_simple_compliance``) that grow without limit and never
     expire. This holds at most :data:`MAX_ENTRIES`, evicting least-recently-used,
-    and treats anything older than :data:`TTL_SECONDS` as absent.
+    and treats anything older than :data:`TTL_SECONDS` as absent. Both are read
+    from the environment (``BIMGUARD_CACHE_ENTRIES``,
+    ``BIMGUARD_CACHE_TTL_SECONDS``) so a deployment that wants a demo to survive
+    a lunch break and one that wants a small resident set can each say so.
+
+    **Per-process, and that is the miss nobody predicts.** ``ANALYSIS_CACHE``
+    below is a module-level instance, so restarting uvicorn empties it. An
+    analysis computed before a restart and exported after one recomputes, which
+    is exactly what happened in the 2026-09-06 audit: the POST that computed
+    project 1540 ran in one process and the export ran in its successor.
 
     **Not a database.** Results are derived data, reproducible from the model at
     any time. Persisting them would add a schema, a migration and an
@@ -37,6 +46,7 @@ DESIGN CONSTRAINTS, AND WHY
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections import OrderedDict
@@ -47,14 +57,43 @@ from app.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-#: Most results held at once. Each is a list of Issues plus statistics — tens of
-#: KB for a large model — so this bounds the store to a few MB.
-MAX_ENTRIES: int = 32
 
-#: How long an entry stays usable. Long enough to cover a user reading a results
-#: page and downloading all three formats; short enough that a stale process
-#: does not hold results indefinitely.
-TTL_SECONDS: float = 1800.0
+def _env_number(name: str, default: float) -> float:
+    """Return ``name`` from the environment as a positive number, else ``default``.
+
+    A blank, unparseable or non-positive value falls back rather than raising:
+    a mistyped cache setting must not stop the server from booting, and the
+    default is a working configuration in every case.
+    """
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        logger.warning("%s=%r is not a number; using %s", name, raw, default)
+        return default
+    if value <= 0:
+        logger.warning("%s=%r is not positive; using %s", name, raw, default)
+        return default
+    return value
+
+
+#: Most results held at once, from ``BIMGUARD_CACHE_ENTRIES``. Each is a list of
+#: Issues plus statistics — a few MB for a model the size of West Riverside — so
+#: 64 bounds the store to something a demo machine holds comfortably while
+#: leaving room for several projects' worth of engine selections at once. Each
+#: distinct selection is its own entry, so a five-engine catalogue plus the
+#: chip combinations a demo walks through fills the old ceiling of 32 quickly.
+MAX_ENTRIES: int = int(_env_number("BIMGUARD_CACHE_ENTRIES", 64))
+
+#: How long an entry stays usable, from ``BIMGUARD_CACHE_TTL_SECONDS``. A day by
+#: default. The previous 30 minutes was scoped to a single sitting — read the
+#: page, download the three formats — and expired underneath anyone who came
+#: back to a project later, turning a revisit into a full re-run of every
+#: engine. The digest in :class:`CacheKey` is what prevents a stale answer, not
+#: the clock, so a long TTL costs memory rather than correctness.
+TTL_SECONDS: float = _env_number("BIMGUARD_CACHE_TTL_SECONDS", 86400.0)
 
 
 @dataclass(frozen=True)

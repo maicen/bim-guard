@@ -69,6 +69,17 @@ def test_engines_wins_over_rule_ids():
 # ── Export Band Filtering Tests ──────────────────────────────────────────────────
 
 
+#: Element ids are real 22-character IFC GlobalIds, not labels like
+#: "elem_crit_0". bcf_generator only writes a Component's IfcGuid attribute
+#: when is_ifc_guid() accepts the value, so a placeholder id produces markup
+#: with no Components at all -- and "every IfcGuid is valid" would then pass
+#: by finding nothing to check. test_export_bcf_band_filtered asserts the
+#: Components exist for that reason.
+def _element_guid(prefix: str, index: int) -> str:
+    """Return a distinct, schema-legal 22-character IFC GlobalId."""
+    return f"{prefix}{index:02d}".ljust(22, "0")[:22]
+
+
 def _synthetic_analysis_result_for_export_tests():
     """Return dict with 3 Critical, 4 High, 5 Medium, 6 Low, 7 DQ."""
     from app.modules.comparator.issue_schema import Issue, RiskBand
@@ -80,7 +91,7 @@ def _synthetic_analysis_result_for_export_tests():
         issues.append(
             Issue(
                 id=f"BGR-CRIT-{i}",
-                element_id=f"elem_crit_{i}",
+                element_id=_element_guid("3Kf7q8XzR1pPcrit", i),
                 rule_id="GC-001.01",
                 title=f"Critical finding {i+1}",
                 band=RiskBand.CRITICAL,
@@ -95,7 +106,7 @@ def _synthetic_analysis_result_for_export_tests():
         issues.append(
             Issue(
                 id=f"BGR-HIGH-{i}",
-                element_id=f"elem_high_{i}",
+                element_id=_element_guid("3Kf7q8XzR1pPhigh", i),
                 rule_id="CC-001.02",
                 title=f"High finding {i+1}",
                 band=RiskBand.HIGH,
@@ -110,7 +121,7 @@ def _synthetic_analysis_result_for_export_tests():
         issues.append(
             Issue(
                 id=f"BGR-MED-{i}",
-                element_id=f"elem_med_{i}",
+                element_id=_element_guid("3Kf7q8XzR1pPmedm", i),
                 rule_id="GC-001.03",
                 title=f"Medium finding {i+1}",
                 band=RiskBand.MEDIUM,
@@ -125,7 +136,7 @@ def _synthetic_analysis_result_for_export_tests():
         issues.append(
             Issue(
                 id=f"BGR-LOW-{i}",
-                element_id=f"elem_low_{i}",
+                element_id=_element_guid("3Kf7q8XzR1pPlow_", i),
                 rule_id="CC-001.04",
                 title=f"Low finding {i+1}",
                 band=RiskBand.LOW,
@@ -140,7 +151,7 @@ def _synthetic_analysis_result_for_export_tests():
         issues.append(
             Issue(
                 id=f"BGR-DQ-{i}",
-                element_id=f"elem_dq_{i}",
+                element_id=_element_guid("3Kf7q8XzR1pPdqal", i),
                 rule_id="DATA-001.01",
                 title=f"Data quality note {i+1}",
                 band=RiskBand.LOW,
@@ -161,6 +172,14 @@ def _synthetic_analysis_result_for_export_tests():
         "compliance_is_demo": False,
         "cached": False,
     }
+
+
+def _csv_rows(response) -> list[dict]:
+    """Parse an export CSV body into dict rows, header excluded."""
+    import csv
+    import io
+
+    return list(csv.DictReader(io.StringIO(response.text)))
 
 
 def _mock_run_analysis_factory(include_low=True):
@@ -195,6 +214,12 @@ def test_export_csv_without_low():
         assert response.status_code == 200
         lines = response.text.strip().split("\n")
         assert len(lines) == 20
+        # The 6 Low *findings* are gone. The 7 data-quality notes also carry
+        # band=low and are exempt from include_low by design, so the check is
+        # "no Low finding", not "no low band" -- the latter would fail on rows
+        # that are supposed to survive.
+        rows = _csv_rows(response)
+        assert [r for r in rows if r["band"] == "low" and r["is_data_quality"] == "no"] == []
 
 
 def test_export_csv_band_filtered():
@@ -209,6 +234,9 @@ def test_export_csv_band_filtered():
         assert response.status_code == 200
         lines = response.text.strip().split("\n")
         assert len(lines) == 13
+        rows = _csv_rows(response)
+        assert [r for r in rows if r["band"] == "low"] == []
+        assert [r for r in rows if r["is_data_quality"] == "yes"] == []
 
 
 def test_export_csv_exclude_data_quality():
@@ -244,6 +272,8 @@ def test_export_bcf_band_filtered():
     from unittest.mock import patch
     from xml.etree import ElementTree as ET
 
+    from app.modules.reporter.bcf_generator import is_ifc_guid
+
     def mock_run_analysis(slug, project_id, *, engines=None, include_low=True, **kwargs):
         synthetic = _synthetic_analysis_result_for_export_tests()
         return synthetic
@@ -255,13 +285,22 @@ def test_export_bcf_band_filtered():
         assert response.status_code == 200
         bcf_zip = zipfile.ZipFile(io.BytesIO(response.content))
         topic_count = 0
+        ifc_guids = []
         for name in bcf_zip.namelist():
+            content = bcf_zip.read(name).decode("utf-8") if name.endswith((".bcf", ".bcfv")) else ""
             if name.endswith(".bcf"):
-                content = bcf_zip.read(name).decode("utf-8")
-                root = ET.fromstring(content)
-                topics = root.findall(".//Topic")
-                topic_count += len(topics)
+                topic_count += len(ET.fromstring(content).findall(".//Topic"))
+            elif name.endswith(".bcfv"):
+                # Components live in the viewpoint, not the markup: one under
+                # Selection and one under Coloring per topic.
+                for component in ET.fromstring(content).findall(".//Component"):
+                    ifc_guids.append(component.get("IfcGuid"))
         assert topic_count == 12
+        # Guard against a vacuous pass: bcf_generator omits the attribute
+        # entirely for an element id it will not vouch for, so "all valid"
+        # over an empty list would prove nothing.
+        assert len(ifc_guids) == 24
+        assert [g for g in ifc_guids if not is_ifc_guid(g)] == []
 
 
 def test_export_json_critical_only():

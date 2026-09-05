@@ -489,6 +489,7 @@ def run_corrosion(
     project_id: Annotated[int, Form(...)],
     engines: Annotated[list[str] | None, Form()] = None,
     include_low: Annotated[bool, Form()] = True,
+    use_cache: Annotated[bool, Form()] = True,
 ) -> AnalysisResultContract:
     """Run the selected corrosion engines.
 
@@ -496,9 +497,17 @@ def run_corrosion(
     while MM-001 and XM-001 assess the network once. Omitting ``engines`` runs
     every one of them; naming a subset runs only those, and the rest are never
     entered.
+
+    ``use_cache`` defaults to ``True``, matching ``/analyze/run``. This endpoint
+    used to pass ``False`` unconditionally, so pressing Run twice on an
+    unchanged model re-ran every engine and the response always said
+    ``cached=false`` — a 141-second answer to a question already answered, and
+    a report that could differ from the one the page was showing. Send
+    ``use_cache=false`` to force a recompute; that still refreshes the entry
+    rather than bypassing the store.
     """
     raw_result = run_analysis(
-        "corrosion", project_id, use_cache=False, engines=engines, include_low=include_low
+        "corrosion", project_id, use_cache=use_cache, engines=engines, include_low=include_low
     )
     if raw_result.get("compliance_error"):
         raise HTTPException(
@@ -511,9 +520,17 @@ def run_corrosion(
 @router.post("/seismic", summary="Run seismic clearance analysis")
 def run_seismic(
     project_id: Annotated[int, Form(...)],
+    use_cache: Annotated[bool, Form()] = True,
 ) -> AnalysisResultContract:
-    """Run Blue Halo seismic clearance volume validation."""
-    raw_result = run_analysis("seismic", project_id, use_cache=False)
+    """Run Blue Halo seismic clearance volume validation.
+
+    ``use_cache`` defaults to ``True`` for the reason given on
+    :func:`run_corrosion`: a federated clash run over three models is minutes of
+    work, and repeating it for an unchanged set of models answers a question
+    already answered. The cache key covers every attached model's digest, so
+    attaching or replacing one misses and recomputes on its own.
+    """
+    raw_result = run_analysis("seismic", project_id, use_cache=use_cache)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -669,14 +686,14 @@ def export_analysis_report(
     engines: list[str] | None = Query(
         None, description="Engine codes the export covers; omit for every engine"
     ),
-    include_low: bool = Query(
-        True,
+    include_low: bool | None = Query(
+        None,
         description=(
-            "Emit Low-band verdicts. True by default: a Low verdict is an "
-            "assessed finding, and suppressing it made whole engines look "
-            "empty — every GC-001 finding on Clinic Plumbing bands Low. Set "
-            "false for the Medium-and-above view. This selects what the run "
-            "produces, unlike band/mechanism, which narrow what a page returns."
+            "Emit Low-band verdicts. Defaults per format: true for CSV and "
+            "JSON, which are the asset register and carry every assessed "
+            "element; false for BCF, because the rulesets say a Low verdict is "
+            "'asset register only — no BCF issue'. Pass it explicitly to "
+            "override either default."
         ),
     ),
     band: list[IssueBand] | None = Query(
@@ -684,32 +701,65 @@ def export_analysis_report(
         description=(
             "Bands the export is limited to; repeat for several. "
             "`data_quality` selects the notes rather than a verdict band. "
-            "Omit to export all bands (the whole run)."
+            "Omit to export the format's default bands."
         ),
     ),
-    include_data_quality: bool = Query(
-        True, description="Set false to leave data-quality notes out of the export"
+    include_data_quality: bool | None = Query(
+        None,
+        description=(
+            "Keep data-quality notes. Defaults per format: true for CSV and "
+            "JSON, false for BCF — a note saying an element could not be "
+            "assessed is not a coordination issue to assign in Revit or "
+            "Solibri, and 29,183 of them buried the verdicts in the audit."
+        ),
     ),
 ):
     """Export compliance analysis findings into requested format.
 
     ``engines`` must match the selection the page ran, or the export reports a
     different set of findings from the results it was downloaded from.
+
+    ONE RUN, FILTERED THREE WAYS
+
+        The analysis is always requested with ``include_low=True`` and served
+        from the cache when it is there, and ``include_low`` is then applied as
+        a filter over that superset. The alternative — passing the caller's
+        ``include_low`` into the run — forks the cache key, so downloading the
+        Medium-and-above BCF for a page showing every band recomputed the whole
+        analysis instead of reading what the page had just produced. Suppressing
+        Low is a strict subtraction inside the engines (``data_quality`` notes
+        are exempt from it either way), so filtering the superset yields the
+        same issues the narrower run would have, from one cached result.
     """
     if slug not in RUNNABLE_SLUGS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown slug {slug!r}")
 
-    result = run_analysis(slug, project_id, engines=engines, include_low=include_low)
+    # BCF is a coordination format: what lands in it becomes somebody's task.
+    # CSV and JSON are the asset register, where an unassessed element is a row
+    # worth having. Hence the split, rather than one default for all three.
+    wants_bcf = fmt.strip().lower() == "bcf"
+    keep_low = (not wants_bcf) if include_low is None else include_low
+    keep_data_quality = (not wants_bcf) if include_data_quality is None else include_data_quality
+
+    result = run_analysis(
+        slug, project_id, use_cache=True, engines=engines, include_low=True
+    )
     if result.get("compliance_error"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result["compliance_error"])
 
-    # Apply band and data_quality filtering to the export
+    # Apply band, Low and data_quality filtering to the export
     all_issues = result.get("audit_issues", [])
+    if not keep_low:
+        all_issues = [
+            issue
+            for issue in all_issues
+            if _is_data_quality(issue) or _band_of(issue) != "low"
+        ]
     filtered_issues = _select_issues(
         all_issues,
         bands=band,
         mechanisms=None,
-        include_data_quality=include_data_quality,
+        include_data_quality=keep_data_quality,
         query=None,
     )
     result = {
