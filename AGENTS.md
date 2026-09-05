@@ -25,7 +25,7 @@ The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to back
 
 ### Local dev sign-in
 
-Auth is Google OAuth only. For local dev, sign in without the OAuth click-through using the seeded Supabase test account `dev@bim-guard.local`: copy `frontend/.env.example` to `frontend/.env` (already has working `VITE_DEV_AUTH_EMAIL`/`VITE_DEV_AUTH_PASSWORD`), run the frontend, and click "Sign in as dev test user" on the login screen (dev builds only). This is a real password-grant sign-in verified by the backend's normal JWKS check (`app/auth.py`) — not a bypass. The account already exists in the shared Supabase project; re-seed only if needed with `uv run python scripts/seed_dev_auth_user.py`. Because its password is committed in `.env.example`, never grant this account elevated permissions, and never add an unconditional auth-skip flag to the backend. See [CLAUDE.md](CLAUDE.md) for full detail.
+Auth is Google OAuth only. For local dev, sign in without the OAuth click-through using the seeded Supabase test account `dev@bim-guard.local`: copy `.example` to `` (already has working `VITE_DEV_AUTH_EMAIL`/`VITE_DEV_AUTH_PASSWORD`), run the frontend, and click "Sign in as dev test user" on the login screen (dev builds only). This is a real password-grant sign-in verified by the backend's normal JWKS check (`app/auth.py`) — not a bypass. The account already exists in the shared Supabase project; re-seed only if needed with `uv run python scripts/seed_dev_auth_user.py`. Because its password is committed in `.env.example`, never grant this account elevated permissions, and never add an unconditional auth-skip flag to the backend. See [CLAUDE.md](CLAUDE.md) for full detail.
 
 ### Dev server launch configs
 
