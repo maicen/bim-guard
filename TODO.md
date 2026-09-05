@@ -417,21 +417,23 @@ home for reference content that currently lives in the app sidebar.
 - [ ] Tests proving the "last owner" guard in `app/api/organizations.py` and
       org-scoped member/invite endpoints reject cross-organization access.
 
-### Landing page & site structure (new)
+### Landing page & site structure
 
-- [ ] Public landing page (marketing/entry point) shown to signed-out visitors
-      instead of going straight to `LoginView` — product overview, sign-in CTA.
-- [ ] Move the Manuals group (User Manual, Modeling Manual, bSDD Wiki) out of
-      the primary app sidebar into a separate documentation/help destination
-      reachable from the top navbar (e.g. a "Resources" or "Help" menu), so the
-      working sidebar stays focused on project work rather than reference docs.
+- [x] Public landing page (marketing/entry point) shown to signed-out visitors
+      instead of going straight to `LoginView` — product overview, sign-in CTA
+      (`LandingView.svelte`). Renders full-bleed (no sidebar/header chrome),
+      same as `LoginView` now does — see `App.svelte`'s `showAppShell`.
+- [x] Move the Manuals group (User Manual, Modeling Manual, bSDD Wiki) out of
+      the primary app sidebar into a "Resources" menu in the top navbar
+      (`ResourcesMenu.svelte`), reachable from every view. Existing view ids
+      and routes unchanged.
 - [ ] Decide and build out whatever other top-level pages the improved IA calls
       for beyond the landing page and relocated manuals (e.g. a dedicated
       pricing/about page if this becomes customer-facing, a changelog, etc.) —
       scope with the user before building further.
-- [ ] Update `Sidebar.svelte`/`TopHeader.svelte`/`App.svelte` routing once the
-      manuals destination is decided; keep existing view ids stable where
-      possible so deep links don't break.
+- [ ] The landing page's feature copy and CTA are a first pass — revisit once
+      there's real product marketing direction (screenshots, testimonials,
+      pricing) rather than the current text-only feature grid.
 
 Owner: unassigned.
 
