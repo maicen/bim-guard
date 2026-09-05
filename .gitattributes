@@ -1,0 +1,10 @@
+# Force binary handling regardless of core.autocrlf so these file types are
+# never subject to line-ending conversion on commit/checkout.
+*.pdf binary
+*.docx binary
+*.pptx binary
+*.png binary
+*.ico binary
+*.wasm binary
+*.bcf binary
+*.ifc binary
