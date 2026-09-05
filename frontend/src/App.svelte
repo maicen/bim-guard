@@ -452,7 +452,7 @@
       <!-- Gateway/DB health — moved out of the header to keep it uncluttered. -->
       <div class="flex flex-wrap items-center gap-2.5">
         <span
-          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium {apiOnline
+          class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {apiOnline
             ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
             : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
         >
@@ -461,7 +461,7 @@
           {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
         </span>
         <span
-          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium {dbOk
+          class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {dbOk
             ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
             : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
         >

@@ -102,7 +102,7 @@
       type="button"
       disabled={isImporting || !importFile || !importRulesetId.trim()}
       onclick={handleImport}
-      class="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
     >
       <span>{isImporting ? "Importing..." : "Import Rules"}</span>
     </button>

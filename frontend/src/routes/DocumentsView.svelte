@@ -348,7 +348,7 @@
         <button
           type="button"
           onclick={() => (isOpenCdeModalOpen = true)}
-          class="inline-flex items-center gap-1.5 rounded-full border border-blue-800/50 bg-blue-950/40 px-3.5 py-2 text-xs font-semibold text-blue-300 transition-colors hover:bg-blue-900/60"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-blue-800/50 bg-blue-950/40 px-3.5 py-2 text-xs font-semibold text-blue-300 transition-colors hover:bg-blue-900/60"
           title="Sync documents via buildingSMART OpenCDE API"
         >
           <FolderSync class="h-3.5 w-3.5" />
@@ -358,7 +358,7 @@
         <button
           type="button"
           onclick={() => loadDocuments(true)}
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
           title="Refresh document specifications"
         >
           <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
@@ -368,7 +368,7 @@
         <button
           type="button"
           onclick={() => (isDriveImportModalOpen = true)}
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
           title="Import documents from Google Drive share links"
         >
           <CloudDownload class="h-3.5 w-3.5" />
@@ -378,7 +378,7 @@
         <button
           type="button"
           onclick={() => openUploadModal()}
-          class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
         >
           <Upload class="h-3.5 w-3.5" />
           <span>Upload Specification</span>
@@ -721,7 +721,7 @@
                 Upload PDF, Word, Excel, CSV, TXT, or Markdown specifications
               </p>
               <label
-                class="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+                class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
               >
                 <span>Choose File</span>
                 <input
@@ -757,7 +757,7 @@
                 type="button"
                 disabled={!uploadFile || isUploading}
                 onclick={handleUpload}
-                class="rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+                class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
               >
                 {isUploading ? "Extracting Text..." : "Upload & Extract"}
               </button>

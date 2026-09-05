@@ -381,7 +381,7 @@
               buildingSMART BCF Collaboration Hub
             </h2>
             <span
-              class="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold text-slate-300"
+              class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold text-slate-300"
             >
               {activeTab === "live_bcf"
                 ? `${bcfTopics.length} Live Topics`
@@ -834,7 +834,7 @@
                     </td>
                     <td class="px-4 py-3">
                       <span
-                        class="inline-block rounded-full border px-2.5 py-0.5 text-micro font-semibold {artifact.issue_count >
+                        class="inline-block rounded-md border px-2.5 py-0.5 text-micro font-semibold {artifact.issue_count >
                         0
                           ? 'border-rose-800 bg-rose-950/60 text-rose-300'
                           : 'border-emerald-800 bg-emerald-950/60 text-emerald-300'}"

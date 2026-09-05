@@ -126,7 +126,7 @@
             <button
               type="button"
               onclick={() => onNavigate(act.view)}
-              class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all {act.primary
+              class="inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-semibold transition-all {act.primary
                 ? 'bg-accent text-white shadow-sm hover:bg-accent-hover'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-slate-50'}"
             >

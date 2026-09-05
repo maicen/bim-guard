@@ -525,7 +525,7 @@
               <div class="flex items-center gap-2 text-slate-200">
                 <Mail class="h-3.5 w-3.5 text-slate-500" />
                 {invite.email}
-                <span class="rounded-full border border-slate-700 px-2 py-0.5 capitalize text-slate-400"
+                <span class="rounded-md border border-slate-700 px-2 py-0.5 capitalize text-slate-400"
                   >{invite.role}</span
                 >
               </div>

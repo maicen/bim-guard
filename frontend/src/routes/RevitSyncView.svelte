@@ -323,14 +323,14 @@ print(response.read())
 
         <div class="flex items-center gap-3">
           <div
-            class="flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-300"
+            class="flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-300"
           >
             <span
               >Pass: {testResponse.results.reduce((acc, r) => acc + (r.pass_count || 0), 0)}</span
             >
           </div>
           <div
-            class="flex items-center gap-1.5 rounded-full border border-rose-800 bg-rose-950/80 px-3 py-1.5 text-xs font-bold text-rose-400"
+            class="flex items-center gap-1.5 rounded-md border border-rose-800 bg-rose-950/80 px-3 py-1.5 text-xs font-bold text-rose-400"
           >
             <span
               >Fail: {testResponse.results.reduce((acc, r) => acc + (r.fail_count || 0), 0)}</span

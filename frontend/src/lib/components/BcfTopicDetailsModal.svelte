@@ -111,7 +111,7 @@
       <div class="flex items-center gap-2">
         <SeverityBadge severity={topic.topic_status || "Open"} />
         <span
-          class="rounded-full border border-amber-800/60 bg-amber-950/60 px-2 py-0.5 text-xs font-semibold text-amber-400"
+          class="rounded-md border border-amber-800/60 bg-amber-950/60 px-2 py-0.5 text-xs font-semibold text-amber-400"
         >
           {topic.priority || "Normal"}
         </span>

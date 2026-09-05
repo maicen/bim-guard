@@ -452,7 +452,7 @@
             : "Piping System Corrosion Audit"}</span
         >
         <span
-          class="inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-xs font-semibold {activeCategory ===
+          class="inline-flex items-center rounded-md border px-2.5 py-0.5 font-mono text-xs font-semibold {activeCategory ===
           'seismic'
             ? 'border-purple-800/80 bg-purple-950/60 text-purple-300 shadow-sm'
             : 'border-amber-800/80 bg-amber-950/60 text-amber-300 shadow-sm'}"
@@ -461,7 +461,7 @@
         </span>
         {#if result?.cached}
           <span
-            class="inline-flex items-center gap-1 rounded-full border border-blue-800/80 bg-blue-950/80 px-2.5 py-0.5 text-caption font-semibold text-blue-300 shadow-sm"
+            class="inline-flex items-center gap-1 rounded-md border border-blue-800/80 bg-blue-950/80 px-2.5 py-0.5 text-caption font-semibold text-blue-300 shadow-sm"
           >
             <Sparkles class="h-3 w-3 text-blue-400" />
             Cached SHA-256
@@ -530,7 +530,7 @@
           ? "Select at least one engine to run"
           : "Run the audit against the selected engines"}
         onclick={() => handleRun(false)}
-        class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50"
       >
         {#if isRunning}
           <RefreshCw class="h-3.5 w-3.5 animate-spin" />
@@ -545,7 +545,7 @@
         <button
           type="button"
           onclick={handleCancelRun}
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
           title="Abandon the run in progress"
         >
           <span>Cancel</span>
@@ -578,7 +578,7 @@
             >
               {#snippet trigger()}
                 <label
-                  class="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-caption font-semibold transition-colors {selectedEngines.includes(
+                  class="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-caption font-semibold transition-colors {selectedEngines.includes(
                     engine.id,
                   )
                     ? 'border-amber-800/80 bg-amber-950/60 text-amber-300'
@@ -615,7 +615,7 @@
           onclick={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
           aria-label="Force uncached recomputation against the latest IFC digest"
-          class="rounded-full border border-slate-800 bg-slate-900/80 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg border border-slate-800 bg-slate-900/80 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
           <RefreshCw class="h-3.5 w-3.5 {isRunning ? 'animate-spin' : ''}" />
         </button>
@@ -892,7 +892,7 @@
           <div>
             <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
               <span>Audit Findings</span>
-              <span class="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
+              <span class="rounded-md bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
                 {table.totalItems} of {result.audit_issues.length}
               </span>
             </h2>
@@ -912,7 +912,7 @@
                   "bcf",
                   requestedEngines,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
                 title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -925,7 +925,7 @@
                   "csv",
                   requestedEngines,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                 title="Download tabulated audit spreadsheet with lineage and citations"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -938,7 +938,7 @@
                   "json",
                   requestedEngines,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                 title="Download structured machine-readable JSON analysis report"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -1115,35 +1115,35 @@
                         />
                       </td>
 
-                      <!-- Severity Band Pill -->
+                      <!-- Severity Band Tag -->
                       <td class="whitespace-nowrap px-4 py-3.5 align-top">
                         {#if isDq}
                           <span
-                            class="inline-block rounded-full border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-micro font-semibold uppercase text-slate-300"
+                            class="inline-block rounded-md border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-micro font-semibold uppercase text-slate-300"
                           >
                             Data Quality
                           </span>
                         {:else if issue.band === "critical"}
                           <span
-                            class="inline-block rounded-full border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-sm"
+                            class="inline-block rounded-md border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-sm"
                           >
                             Critical
                           </span>
                         {:else if issue.band === "high"}
                           <span
-                            class="inline-block rounded-full border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-sm"
+                            class="inline-block rounded-md border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-sm"
                           >
                             High
                           </span>
                         {:else if issue.band === "medium"}
                           <span
-                            class="inline-block rounded-full border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-sm"
+                            class="inline-block rounded-md border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-sm"
                           >
                             Medium
                           </span>
                         {:else}
                           <span
-                            class="inline-block rounded-full border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-sm"
+                            class="inline-block rounded-md border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-sm"
                           >
                             Low
                           </span>

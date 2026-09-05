@@ -709,7 +709,7 @@
                 discipline — the primary is the one the compliance run analyses.
               </p>
               <label
-                class="inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-xs font-medium text-slate-50 transition-colors hover:bg-slate-700"
+                class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-medium text-slate-50 transition-colors hover:bg-slate-700"
               >
                 <span>Browse Files (.ifc)</span>
                 <input
@@ -1114,7 +1114,7 @@
               errorMessage = "";
               currentStep += 1;
             }}
-            class="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover"
+            class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover"
           >
             <span>Next Step</span>
             <ArrowRight class="h-3.5 w-3.5" />
@@ -1124,7 +1124,7 @@
             type="button"
             disabled={isSubmitting}
             onclick={handleFinish}
-            class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-6 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
           >
             <span>{isSubmitting ? "Creating & launching..." : "Create & Launch Audit"}</span>
             <Check class="h-3.5 w-3.5" />

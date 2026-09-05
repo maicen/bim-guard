@@ -70,7 +70,7 @@
         <button
           type="button"
           onclick={onBack}
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
         >
           <ArrowLeft class="h-3.5 w-3.5" />
           <span>Back to Rules Catalog</span>
@@ -99,7 +99,7 @@
           <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
           {#if domain.computed}
             <span
-              class="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold uppercase text-slate-400"
+              class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold uppercase text-slate-400"
             >
               Computed
             </span>

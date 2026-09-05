@@ -495,7 +495,7 @@
       <div class="mt-3 flex flex-wrap items-center gap-3">
         {#if passRate !== null}
           <span
-            class="inline-block rounded-full border px-3 py-1 text-xs font-bold tracking-wide {passRate >=
+            class="inline-block rounded-md border px-3 py-1 text-xs font-bold tracking-wide {passRate >=
             80
               ? 'border-emerald-800 bg-emerald-950/80 text-emerald-300'
               : passRate >= 50
@@ -581,7 +581,7 @@
         type="button"
         disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
         onclick={handleRunClick}
-        class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >
         <Play class="h-4 w-4" />
         {isRunning
@@ -613,7 +613,7 @@
               <h3 class="text-sm font-bold text-slate-50">ISO 19650 Compliance</h3>
             </div>
             <span
-              class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {isoFailed.length ===
+              class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {isoFailed.length ===
               0
                 ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
                 : isoFailed.some((r) => r.severity === 'critical')
@@ -737,7 +737,7 @@
       type="button"
       disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
       onclick={handleRunClick}
-      class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
     >
       <Play class="h-4 w-4" />
       {isRunning
@@ -924,7 +924,7 @@
                 <div class="flex flex-wrap gap-2">
                   {#each Object.entries(buildingSummary.element_counts).sort( ([a], [b]) => (ELEM_LABELS[a] || a).localeCompare(ELEM_LABELS[b] || b) ) as [k, v] (k)}
                     <span
-                      class="inline-block rounded-full border border-blue-800/60 bg-blue-950/60 px-2.5 py-1 text-xs font-medium text-blue-300"
+                      class="inline-block rounded-md border border-blue-800/60 bg-blue-950/60 px-2.5 py-1 text-xs font-medium text-blue-300"
                     >
                       {ELEM_LABELS[k] || k}: {v}
                     </span>
@@ -940,7 +940,7 @@
                 <div class="flex flex-wrap gap-2">
                   {#each Object.entries(buildingSummary.fixture_counts).sort() as [k, v] (k)}
                     <span
-                      class="inline-block rounded-full border border-cyan-800/60 bg-cyan-950/60 px-2.5 py-1 text-xs font-medium text-cyan-300"
+                      class="inline-block rounded-md border border-cyan-800/60 bg-cyan-950/60 px-2.5 py-1 text-xs font-medium text-cyan-300"
                     >
                       {k}: {v}
                     </span>
@@ -956,7 +956,7 @@
                 <div class="flex flex-wrap gap-2">
                   {#each Object.entries(buildingSummary.alarm_counts).sort() as [k, v] (k)}
                     <span
-                      class="inline-block rounded-full border border-rose-800/60 bg-rose-950/60 px-2.5 py-1 text-xs font-medium text-rose-300"
+                      class="inline-block rounded-md border border-rose-800/60 bg-rose-950/60 px-2.5 py-1 text-xs font-medium text-rose-300"
                     >
                       {k}: {v}
                     </span>
@@ -1033,7 +1033,7 @@
               <Footprints class="h-4 w-4 text-amber-400" />
               <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
               <span
-                class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {eBadge.cls}"
+                class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {eBadge.cls}"
                 >{eBadge.label}</span
               >
             </div>
@@ -1202,7 +1202,7 @@
               <Droplets class="h-4 w-4 text-cyan-400" />
               <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
               <span
-                class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {pBadge.cls}"
+                class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {pBadge.cls}"
                 >{pBadge.label}</span
               >
             </div>
@@ -1215,7 +1215,7 @@
               <div class="flex flex-wrap gap-2">
                 {#each Object.entries(fc).sort() as [k, v] (k)}
                   <span
-                    class="inline-block rounded-full border border-cyan-800/60 bg-cyan-950/60 px-2.5 py-1 text-xs font-medium text-cyan-300"
+                    class="inline-block rounded-md border border-cyan-800/60 bg-cyan-950/60 px-2.5 py-1 text-xs font-medium text-cyan-300"
                     >{k}: {v}</span
                   >
                 {/each}
@@ -1252,7 +1252,7 @@
               <Car class="h-4 w-4 text-slate-300" />
               <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
               <span
-                class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {gBadge.cls}"
+                class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {gBadge.cls}"
                 >{gBadge.label}</span
               >
             </div>
@@ -1357,7 +1357,7 @@
               <FileCheck class="h-4 w-4 text-slate-300" />
               <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
               <span
-                class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {isoBadge.cls}"
+                class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {isoBadge.cls}"
                 >{isoBadge.label}</span
               >
             </div>
@@ -1437,7 +1437,7 @@
               />
               <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
               <span
-                class="inline-block rounded-full border px-2.5 py-0.5 text-caption font-semibold {badge.cls}"
+                class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {badge.cls}"
                 >{badge.label}</span
               >
             </div>
@@ -1622,7 +1622,7 @@
                       <div class="flex flex-wrap gap-2">
                         {#each Object.entries(buildingSummary.alarm_counts).sort() as [k, v] (k)}
                           <span
-                            class="inline-block rounded-full border border-rose-800/60 bg-rose-950/60 px-2.5 py-1 text-xs font-medium text-rose-300"
+                            class="inline-block rounded-md border border-rose-800/60 bg-rose-950/60 px-2.5 py-1 text-xs font-medium text-rose-300"
                             >{k}: {v}</span
                           >
                         {/each}

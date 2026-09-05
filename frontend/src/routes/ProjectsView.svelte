@@ -323,7 +323,7 @@
           <button
             type="button"
             onclick={onOpenWizard}
-            class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+            class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
           >
             <Plus class="h-3.5 w-3.5" />
             <span>New Project</span>
@@ -551,7 +551,7 @@
                   </td>
                   <td class="px-4 py-3">
                     <span
-                      class="inline-block rounded-full border px-2.5 py-0.5 text-micro font-semibold {project.status ===
+                      class="inline-block rounded-md border px-2.5 py-0.5 text-micro font-semibold {project.status ===
                       'Active'
                         ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
                         : project.status === 'Archived'
