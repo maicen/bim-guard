@@ -1,6 +1,6 @@
 # TODO
 
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-05
 
 ## Completed Foundations
 
@@ -251,15 +251,19 @@ Owner: unassigned.
 Deferred until core pipeline, rules, and background-processing priorities stabilize.
 Builds on the base Supabase Auth / JWT work in Priority 4.1.
 
-- [ ] Add OAuth login (e.g. Supabase Auth third-party providers) for FastAPI endpoints
-      and the Svelte 5 SPA.
-- [ ] Define roles (e.g. admin, reviewer, viewer) and map permissions to project,
-      rule, analysis, enhancement, and reporting endpoints.
-- [ ] Enforce Role-Based Access Control (RBAC) via FastAPI dependency injection
-      (`app/api/dependencies.py`) and Supabase Row Level Security policies.
-- [ ] Reflect role-gated actions and views in the Svelte client (e.g. hide/disable
-      enhancement, rule editing, and admin views for unauthorized roles).
-- [ ] Add tests proving unauthorized roles cannot invoke restricted API operations.
+- [x] Add OAuth login (Google via Supabase Auth) for FastAPI endpoints and the
+      Svelte 5 SPA (`app/auth.py`, `frontend/src/lib/supabaseClient.ts`).
+- [x] Define roles (owner, admin, member) and organizations/memberships schema
+      (`supabase/migrations/20260904235344_create_organizations_and_memberships.sql`).
+- [x] Enforce organization-scoped access via FastAPI dependency injection
+      (`get_authorized_project` in `app/api/projects.py`, `MembershipService`).
+      Row Level Security is enabled but locked to `service_role` only — enforcement
+      is entirely at the API layer, not yet via Postgres RLS policies.
+- [ ] Reflect role-gated actions and views in the Svelte client beyond Org
+      Settings (e.g. hide/disable enhancement, rule editing, admin views for
+      unauthorized roles project-wide, not just the org member table).
+- [ ] Add tests proving unauthorized roles/organizations cannot invoke
+      restricted API operations (`app/api/organizations.py`, `app/api/projects.py`).
 
 Owner: unassigned.
 
@@ -377,6 +381,59 @@ Completion evidence (2026-09-02):
   `test_rule_draft_workflow.py`, `test_ids_export.py`, `test_digital_inspector.py`,
   `test_cde_graph.py`; 2 pre-existing IDS tests and 1 settings test updated for
   the corrected schema-valid XML shape and the two new settings keys).
+
+## Priority 11: Enterprise UX — Multi-Tenant Workspace, Landing Page & Site Structure
+
+Follows the Tenant & Workspace Blueprint (UX architecture artifact, 2026-09-05):
+evolving the sidebar-and-breadcrumb shell into role-based workspaces with a
+first-class organization layer, plus a public-facing entry point and a clearer
+home for reference content that currently lives in the app sidebar.
+
+### Multi-tenant workspace (in progress)
+
+- [x] Organization switcher in the header, backed by `profiles.default_organization_id`
+      (`OrgSwitcher.svelte`, `auth.svelte.ts`).
+- [x] Blocking org picker for a multi-org user who hasn't chosen a default yet
+      (`OrgPickerGate.svelte`).
+- [x] Org-scoped project filtering in `ProjectSwitcher.svelte`.
+- [x] Org Settings screen: members (search/sort/bulk role change/remove) and
+      pending invites (create/revoke) (`OrgSettingsView.svelte`,
+      `app/api/organizations.py`).
+- [x] Sidebar regrouped into role-based workspaces (My Home, Model Coordination,
+      Compliance, Rules & Standards, Integrations, Admin) without changing routes.
+- [ ] Customizable "My Home" dashboard: a grid layout (library TBD — no
+      React in this stack, so not literally `react-grid-layout`; evaluate a
+      Svelte-native drag/resize grid) with widgets for Clearance Violations by
+      Severity, Live BCF Issue Feed, Recent IFC Models, and Overdue/Due-in-7-Days.
+      Needs new backend aggregation endpoints — none of these summaries exist yet.
+- [ ] Split-screen coordination view: 3D viewer + issue register side by side,
+      resizable divider, bidirectional selection (`IfcViewer.svelte` + `IssueTable`).
+- [ ] Floating contextual action menu anchored to the current selection (3D
+      element, table row, widget) instead of a single global "Create New" menu.
+- [ ] Slide-out inspector drawer for full compliance-matrix detail, anchored
+      right over the viewer instead of replacing it (`Modal.svelte` variant).
+- [ ] `OrgBadge` component for any list that can span tenants (superadmin
+      "All organizations" view), consistent with `SeverityBadge` sizing.
+- [ ] Tests proving the "last owner" guard in `app/api/organizations.py` and
+      org-scoped member/invite endpoints reject cross-organization access.
+
+### Landing page & site structure (new)
+
+- [ ] Public landing page (marketing/entry point) shown to signed-out visitors
+      instead of going straight to `LoginView` — product overview, sign-in CTA.
+- [ ] Move the Manuals group (User Manual, Modeling Manual, bSDD Wiki) out of
+      the primary app sidebar into a separate documentation/help destination
+      reachable from the top navbar (e.g. a "Resources" or "Help" menu), so the
+      working sidebar stays focused on project work rather than reference docs.
+- [ ] Decide and build out whatever other top-level pages the improved IA calls
+      for beyond the landing page and relocated manuals (e.g. a dedicated
+      pricing/about page if this becomes customer-facing, a changelog, etc.) —
+      scope with the user before building further.
+- [ ] Update `Sidebar.svelte`/`TopHeader.svelte`/`App.svelte` routing once the
+      manuals destination is decided; keep existing view ids stable where
+      possible so deep links don't break.
+
+Owner: unassigned.
 
 ## Validation Gates
 
