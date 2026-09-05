@@ -7,6 +7,11 @@ reported that engine as having found nothing at all. These fix the default at
 "emit them" and pin the two things that make the switch safe -- that it reaches
 ``run_corrosion_analysis``, and that the two answers cannot share a cache entry.
 
+The exports are the exception, and deliberately so: because the two answers
+cannot share an entry, an export that forwarded a request for the
+Medium-and-above view re-ran the whole analysis. They therefore always run the
+superset and subtract from it. See ``TestPlumbing`` below.
+
 Run: uv run pytest tests/test_include_low.py -v
 """
 
@@ -98,16 +103,26 @@ class TestPlumbing:
         client.get(f"/api/analyze/results/{PROJECT_ID}/corrosion?include_low=false")
         assert captured[-1]["include_low"] is False
 
-    def test_export_defaults_to_keeping_lows(self, client, captured):
+    def test_export_always_runs_the_superset(self, client, captured):
+        """The export asks for every band, then filters what it hands back.
+
+        ``include_low`` is part of the cache key, so forwarding a request for
+        the Medium-and-above view into the run forked the entry and recomputed
+        an analysis the page had just produced. Suppressing Low is a strict
+        subtraction inside the engines, so the export takes the superset and
+        subtracts — one run, filtered per download.
+        """
         client.get(f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt=csv")
         assert captured[-1]["include_low"] is True
 
-    def test_export_forwards_an_explicit_false(self, client, captured):
+    def test_an_explicit_false_filters_rather_than_re_running(self, client, captured):
+        """Asking the export to drop Lows must not change what is computed."""
         client.get(
             f"/api/analyze/export?project_id={PROJECT_ID}"
             "&slug=corrosion&fmt=csv&include_low=false"
         )
-        assert captured[-1]["include_low"] is False
+        assert captured[-1]["include_low"] is True
+        assert captured[-1]["use_cache"] is True
 
     def test_run_defaults_to_keeping_lows(self, client, captured):
         client.post("/api/analyze/run", json={"project_id": PROJECT_ID, "slug": "corrosion"})
