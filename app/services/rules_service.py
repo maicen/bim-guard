@@ -1251,6 +1251,83 @@ class RuleService:
             saved += 1
         return saved
 
+    @staticmethod
+    def export_ruleset(ruleset_id: str, rules: list[dict]) -> dict:
+        """Export rules as a canonical JSON ruleset document.
+
+        The inverse of `import_ruleset` — round-trips through it unchanged.
+        """
+
+        def _json_scalar(value: Any) -> Any:
+            """Decode a JSON-encoded scalar column (check_value/value_min/value_max)."""
+            if value in (None, ""):
+                return None
+            try:
+                return json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                return value
+
+        def _json_container(value: Any) -> Any:
+            """Decode a JSON-encoded object/array column, dropping it if empty."""
+            if isinstance(value, (dict, list)):
+                return value or None
+            if not value:
+                return None
+            try:
+                parsed = json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                return None
+            return parsed or None
+
+        out_rules = []
+        for r in rules:
+            entry: dict[str, Any] = {
+                "ref": r.get("reference") or r.get("rule_id") or "",
+                "rule_type": r.get("rule_type") or "numeric_comparison",
+                "rule_category": r.get("rule_category") or "",
+                "desc": r.get("description") or "",
+                "target": r.get("target_ifc_class") or "",
+                "source_text": r.get("source_text") or "",
+                "property_set": r.get("property_set") or "",
+                "property_name": r.get("property_name") or "",
+                "fallback_property": r.get("fallback_property") or "",
+                "operator": r.get("operator") or "",
+                "check_value": _json_scalar(r.get("check_value")),
+                "value_min": _json_scalar(r.get("value_min")),
+                "value_max": _json_scalar(r.get("value_max")),
+                "unit": r.get("unit") or "",
+                "severity": r.get("severity") or "mandatory",
+                "keyword": r.get("keyword") or "",
+                "compliance_type": r.get("compliance_type") or "",
+                "overridden_by": r.get("overridden_by") or "",
+                "extraction_method": r.get("extraction_method") or "",
+                "needs_review": bool(r.get("needs_review", False)),
+                "mechanism": r.get("mechanism") or "",
+                "category": r.get("category") or "",
+            }
+            applies_when = _json_container(r.get("applies_when"))
+            if applies_when:
+                entry["applies_when"] = applies_when
+            exceptions = _json_container(r.get("exceptions"))
+            if exceptions:
+                entry["exceptions"] = exceptions
+            related_refs = _json_container(r.get("related_refs"))
+            if related_refs:
+                entry["related_refs"] = related_refs
+            if r.get("confidence") not in (None, ""):
+                entry["confidence"] = r.get("confidence")
+            # Drop empty/unset scalar fields (but keep explicit 0/false values
+            # and needs_review's own false) so the exported document stays
+            # readable without losing meaningful falsy data.
+            entry = {
+                k: v
+                for k, v in entry.items()
+                if not (v is None or v == "") and not (v is False and k != "needs_review")
+            }
+            out_rules.append(entry)
+
+        return {"ruleset_id": ruleset_id, "rules": out_rules}
+
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _norm_json(self, value: str) -> str:

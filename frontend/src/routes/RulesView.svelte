@@ -23,7 +23,10 @@
     Upload,
     Camera,
     FileText,
+    FileJson,
+    FileCode,
     BookOpen,
+    ChevronDown,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
   import type {
@@ -44,7 +47,7 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import RuleForm from "../lib/components/RuleForm.svelte";
-  import IdsImportForm from "../lib/components/IdsImportForm.svelte";
+  import RulesetImportForm from "../lib/components/RulesetImportForm.svelte";
   import HoverCard from "../lib/components/HoverCard.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
@@ -84,6 +87,22 @@
 
   // Import IDS modal state
   let isImportIdsModalOpen = $state(false);
+
+  // Import/Export dropdown menu state (header actions)
+  let isImportExportMenuOpen = $state(false);
+  let importExportMenuEl: HTMLDivElement | null = $state(null);
+
+  function handleImportExportOutsideClick(event: MouseEvent) {
+    if (importExportMenuEl && !importExportMenuEl.contains(event.target as Node)) {
+      isImportExportMenuOpen = false;
+    }
+  }
+
+  $effect(() => {
+    if (!isImportExportMenuOpen) return;
+    window.addEventListener("click", handleImportExportOutsideClick);
+    return () => window.removeEventListener("click", handleImportExportOutsideClick);
+  });
 
   // Save Snapshot modal state
   let isSaveSnapshotModalOpen = $state(false);
@@ -432,7 +451,7 @@
   }
 
   async function handleIdsImported(res: IdsImportResult) {
-    successMessage = `Imported ${res.created_count} of ${res.total_parsed} rules from IDS file into "${res.ruleset_id}".`;
+    successMessage = `Imported ${res.created_count} of ${res.total_parsed} rules into "${res.ruleset_id}".`;
     isImportIdsModalOpen = false;
     await loadData(true);
   }
@@ -693,17 +712,17 @@
       <button
         type="button"
         onclick={() => loadData(true)}
-        class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
         title="Refresh rules catalog"
       >
         <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
-        <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+        <span class="sr-only">Refresh</span>
       </button>
 
       <button
         type="button"
         onclick={handleSeedRules}
-        class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+        class="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
         title="Seed engine rulesets: GC-001, CC-001, MC-001"
       >
         <Database class="h-3.5 w-3.5 text-emerald-400" />
@@ -711,26 +730,77 @@
       </button>
 
       {#if activeMainTab === "rules"}
-        <button
-          type="button"
-          onclick={openImportIdsModal}
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
-          title="Import rules from a buildingSMART IDS file"
-        >
-          <Upload class="h-3.5 w-3.5 text-emerald-400" />
-          <span>Import IDS</span>
-        </button>
+        <!-- Import/Export: one grouped menu instead of separate IDS/JSON buttons -->
+        <div class="relative" bind:this={importExportMenuEl}>
+          <button
+            type="button"
+            onclick={() => (isImportExportMenuOpen = !isImportExportMenuOpen)}
+            class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+            title="Import or export rules"
+            aria-expanded={isImportExportMenuOpen}
+            aria-haspopup="menu"
+          >
+            <Upload class="h-3.5 w-3.5 text-emerald-400" />
+            <span>Import / Export</span>
+            <ChevronDown
+              class="h-3 w-3 text-slate-400 transition-transform {isImportExportMenuOpen
+                ? 'rotate-180'
+                : ''}"
+            />
+          </button>
+
+          {#if isImportExportMenuOpen}
+            <div
+              role="menu"
+              class="absolute right-0 z-30 mt-2 w-64 space-y-1 rounded-2xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-2xl duration-100 animate-in fade-in slide-in-from-top-1"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onclick={() => {
+                  isImportExportMenuOpen = false;
+                  openImportIdsModal();
+                }}
+                class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 hover:bg-slate-800"
+              >
+                <Upload class="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                <span class="flex-1">Import Ruleset...</span>
+                <span class="text-micro font-normal text-slate-500">IDS / JSON</span>
+              </button>
+
+              <div class="my-1 border-t border-slate-800"></div>
+
+              {#if selectedFolderId}
+                <a
+                  role="menuitem"
+                  href={rulesApi.getIdsExportUrl(selectedFolderId)}
+                  onclick={() => (isImportExportMenuOpen = false)}
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 hover:bg-slate-800"
+                >
+                  <FileCode class="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                  <span class="flex-1">Export as IDS XML</span>
+                  <Download class="h-3 w-3 text-slate-500" />
+                </a>
+                <a
+                  role="menuitem"
+                  href={rulesApi.getJsonExportUrl(selectedFolderId)}
+                  onclick={() => (isImportExportMenuOpen = false)}
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 hover:bg-slate-800"
+                >
+                  <FileJson class="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                  <span class="flex-1">Export as JSON</span>
+                  <Download class="h-3 w-3 text-slate-500" />
+                </a>
+              {:else}
+                <p class="px-3 py-2 text-caption text-slate-500">
+                  Select a ruleset folder on the left to export it.
+                </p>
+              {/if}
+            </div>
+          {/if}
+        </div>
 
         {#if selectedFolderId}
-          <a
-            href={ruleExtractionApi.getIdsExportUrl(selectedFolderId)}
-            class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
-            title="Export current ruleset into buildingSMART IDS XML"
-          >
-            <Download class="h-3.5 w-3.5 text-blue-400" />
-            <span>Export IDS</span>
-          </a>
-
           <button
             type="button"
             onclick={openSaveSnapshotModal}
@@ -2228,9 +2298,9 @@
             <Upload class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">Import IDS File</h2>
+            <h2 class="text-base font-bold tracking-tight text-slate-50">Import Ruleset</h2>
             <p class="text-xs text-slate-400">
-              Parse a buildingSMART IDS (.ids/XML) file into new rules
+              Parse a buildingSMART IDS (.ids/XML) or BIM-Guard JSON ruleset file into new rules
             </p>
           </div>
         </div>
@@ -2244,7 +2314,7 @@
       </div>
 
       <div class="flex-1 overflow-y-auto p-6 text-xs">
-        <IdsImportForm
+        <RulesetImportForm
           defaultRulesetId={selectedFolderId || ""}
           onCancel={() => (isImportIdsModalOpen = false)}
           onImported={handleIdsImported}

@@ -514,11 +514,32 @@ export const rulesApi = {
     return `${API_BASE}/rules/export-ids`;
   },
 
+  getJsonExportUrl(rulesetId?: string): string {
+    if (rulesetId) {
+      return `${API_BASE}/rules/export-json/${encodeURIComponent(rulesetId)}`;
+    }
+    return `${API_BASE}/rules/export-json`;
+  },
+
   async importIds(file: File, rulesetId: string): Promise<IdsImportResult> {
     const form = new FormData();
     form.append("file", file);
     form.append("ruleset_id", rulesetId);
     const res = await fetch(`${API_BASE}/rules/import-ids`, {
+      method: "POST",
+      body: form,
+    });
+    const result = await handleResponse<IdsImportResult>(res);
+    _rulesStore.clear();
+    _ruleFoldersStore.clear();
+    return result;
+  },
+
+  async importJson(file: File, rulesetId: string): Promise<IdsImportResult> {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("ruleset_id", rulesetId);
+    const res = await fetch(`${API_BASE}/rules/import-json`, {
       method: "POST",
       body: form,
     });

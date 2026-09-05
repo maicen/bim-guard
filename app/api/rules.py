@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Annotated, Optional
 
@@ -16,7 +17,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.api.dependencies import get_rules_service
 from app.logging_config import get_logger
@@ -188,6 +189,85 @@ def export_ids_xml(
         xml_content,
         media_type="application/xml",
         headers={"Content-Disposition": f'attachment; filename="{ruleset_id}.ids"'},
+    )
+
+
+@router.get("/export-json", summary="Export active rules as canonical JSON")
+def export_all_json(
+    service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_id: str | None = None,
+):
+    """Export active rules or a specific ruleset into the canonical JSON ruleset format."""
+    if ruleset_id:
+        rules = service.list_by_ruleset(ruleset_id)
+    else:
+        rules = service.list_rules()
+    if not rules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No rules found for JSON export.",
+        )
+    filename = f"{ruleset_id}.json" if ruleset_id else "bimguard_rules.json"
+    payload = RuleService.export_ruleset(ruleset_id or "BIMGUARD_EXPORT", rules)
+    return JSONResponse(
+        payload,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export-json/{ruleset_id}", summary="Export ruleset as canonical JSON")
+def export_json(
+    ruleset_id: str,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+):
+    """Export a ruleset into the canonical JSON ruleset format."""
+    rules = service.list_by_ruleset(ruleset_id)
+    if not rules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No rules found for ruleset {ruleset_id}.",
+        )
+    payload = RuleService.export_ruleset(ruleset_id, rules)
+    return JSONResponse(
+        payload,
+        headers={"Content-Disposition": f'attachment; filename="{ruleset_id}.json"'},
+    )
+
+
+@router.post("/import-json", response_model=IdsImportResponse, summary="Import rules from a canonical JSON ruleset file")
+async def import_json_rules(
+    service: Annotated[RuleService, Depends(get_rules_service)],
+    file: UploadFile = File(...),
+    ruleset_id: str = Form(...),
+) -> IdsImportResponse:
+    """Parse an uploaded canonical JSON ruleset file and save its rules under ruleset_id."""
+    content_bytes = await file.read()
+    try:
+        json_data = json.loads(content_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON file: {exc}") from exc
+    if not isinstance(json_data, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON ruleset must be an object.")
+
+    json_data = {**json_data, "ruleset_id": ruleset_id}
+    rules = json_data.get("rules")
+    total_parsed = len(rules) if isinstance(rules, list) else 0
+    if not total_parsed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No importable rules found in JSON file.",
+        )
+
+    try:
+        created_count = service.import_ruleset(json_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return IdsImportResponse(
+        success=True,
+        created_count=created_count,
+        total_parsed=total_parsed,
+        ruleset_id=ruleset_id,
     )
 
 

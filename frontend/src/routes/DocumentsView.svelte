@@ -38,7 +38,7 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
-  import IdsImportForm from "../lib/components/IdsImportForm.svelte";
+  import RulesetImportForm from "../lib/components/RulesetImportForm.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import GoogleDriveImportModal from "../lib/components/GoogleDriveImportModal.svelte";
 
@@ -75,7 +75,7 @@
 
   // Upload modal state — three ways a rule source can enter the system,
   // sharing one modal: an uploaded document (parsed later in Rule Extraction
-  // Studio), a buildingSMART IDS file, or a hand-typed rule (which routes to
+  // Studio), a buildingSMART IDS or JSON ruleset file, or a hand-typed rule (which routes to
   // the dedicated Manual Rule Editor page instead of rendering here).
   let isUploadModalOpen = $state(false);
   let uploadTab: "document" | "ids" = $state("document");
@@ -130,7 +130,7 @@
   function handleIdsImportedFromUpload(res: IdsImportResult) {
     isUploadModalOpen = false;
     flashSuccess(
-      `Imported ${res.created_count} of ${res.total_parsed} rules from IDS file into "${res.ruleset_id}" — view them in Rules Catalog.`,
+      `Imported ${res.created_count} of ${res.total_parsed} rules into "${res.ruleset_id}" — view them in Rules Catalog.`,
     );
   }
 
@@ -619,7 +619,7 @@
             ? 'bg-accent text-white shadow-sm'
             : 'text-slate-400 hover:bg-slate-900 hover:text-slate-50'}"
         >
-          IDS XML File
+          IDS / JSON Ruleset
         </button>
         <button
           type="button"
@@ -754,7 +754,7 @@
             </div>
           </div>
         {:else}
-          <IdsImportForm
+          <RulesetImportForm
             defaultRulesetId=""
             onCancel={() => (isUploadModalOpen = false)}
             onImported={handleIdsImportedFromUpload}
