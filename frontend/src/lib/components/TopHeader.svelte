@@ -13,6 +13,8 @@
 
   interface Props {
     activeView: string;
+    /** Whether the app shell is currently in project view (see App.svelte). */
+    isProjectView?: boolean;
     selectedProject?: Project | null;
     selectedProjectId?: number | null;
     /** Opens the navigation drawer; only rendered below `md`. */
@@ -21,15 +23,19 @@
     onOpenPipeline?: (projectId: number) => void;
     /** Switch the app's current project context. */
     onSwitchProject?: (projectId: number) => void;
+    /** Leave project view and return to the organization dashboard. */
+    onExitProject?: () => void;
   }
 
   let {
     activeView,
+    isProjectView = false,
     selectedProject = null,
     selectedProjectId = null,
     onOpenMobileNav = () => {},
     onOpenPipeline,
     onSwitchProject,
+    onExitProject,
   }: Props = $props();
 
   const TITLES: Record<string, { section: string; title: string }> = {
@@ -40,6 +46,7 @@
     extract: { section: "Library", title: "Rule Extraction Studio" },
     rules: { section: "Library", title: "Rules Catalog" },
     "manual-rule-editor": { section: "Library", title: "Manual Rule Editor" },
+    models: { section: "Project", title: "Project Models" },
     arch: { section: "Analysis", title: "Architectural Compliance Audit" },
     piping: { section: "Analysis", title: "Piping Corrosion Audit" },
     seismic: { section: "Analysis", title: "Seismic Clearance Audit" },
@@ -59,10 +66,14 @@
   };
 
   let headerInfo = $derived(
-    TITLES[activeView] || {
-      section: "BIM Guard",
-      title: activeView,
-    },
+    // The dashboard title is org-scoped in TITLES; project view renders the
+    // same route with different content, so it needs its own label here.
+    activeView === "dashboard" && isProjectView
+      ? { section: "Project", title: "Project Dashboard" }
+      : TITLES[activeView] || {
+          section: "BIM Guard",
+          title: activeView,
+        },
   );
 </script>
 
@@ -80,9 +91,26 @@
     >
       <Menu class="h-5 w-5" />
     </button>
-    <span class="hidden font-medium text-slate-500 sm:inline">{headerInfo.section}</span>
-    <span class="hidden text-slate-600 sm:inline">/</span>
-    <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
+    {#if isProjectView}
+      <button
+        type="button"
+        onclick={onExitProject}
+        class="hidden font-medium text-slate-500 transition-colors hover:text-slate-300 sm:inline"
+        title="Back to Organization"
+      >
+        Organization
+      </button>
+      <span class="hidden text-slate-600 sm:inline">/</span>
+      <span class="truncate font-semibold text-slate-100"
+        >{selectedProject?.name || "Project"}</span
+      >
+      <span class="hidden text-slate-600 sm:inline">·</span>
+      <span class="hidden text-slate-400 sm:inline">{headerInfo.title}</span>
+    {:else}
+      <span class="hidden font-medium text-slate-500 sm:inline">{headerInfo.section}</span>
+      <span class="hidden text-slate-600 sm:inline">/</span>
+      <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
+    {/if}
 
     {#if onSwitchProject}
       <ProjectSwitcher {selectedProject} {selectedProjectId} onSwitch={onSwitchProject} />

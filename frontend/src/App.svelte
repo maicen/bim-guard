@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { router, push, replace } from "svelte-spa-router";
-  import Sidebar from "./lib/components/Sidebar.svelte";
+  import OrgSidebar from "./lib/components/OrgSidebar.svelte";
+  import ProjectSidebar from "./lib/components/ProjectSidebar.svelte";
   import AdminSidebar from "./lib/components/AdminSidebar.svelte";
   import AnalysisDomainTabs from "./lib/components/AnalysisDomainTabs.svelte";
   import type { AnalysisDomainTab } from "./lib/components/AnalysisDomainTabs.svelte";
@@ -16,6 +17,8 @@
 
   // Routes
   import DashboardView from "./routes/DashboardView.svelte";
+  import ProjectDashboardView from "./routes/ProjectDashboardView.svelte";
+  import ModelsView from "./routes/ModelsView.svelte";
   import ProjectsView from "./routes/ProjectsView.svelte";
   import ViewerView from "./routes/ViewerView.svelte";
   import DocumentsView from "./routes/DocumentsView.svelte";
@@ -282,7 +285,22 @@
     "reports",
     "viewer",
     "workflow",
+    "models",
   ]);
+
+  // Whether the app shell is in "project view" (project-scoped sidebar,
+  // navbar, and dashboard) vs. "organization view". Driven by project_id
+  // actually being present in the URL, not just by a project being
+  // remembered in targetProjectId/localStorage — otherwise a plain visit to
+  // "/" would immediately jump into project view for anyone who last worked
+  // in a project. "dashboard" is deliberately excluded from
+  // PROJECT_SCOPED_VIEWS itself (unlike Viewer/Arch/Reports) so visiting it
+  // never auto-injects project_id into the URL; it only renders the project
+  // dashboard when the URL already carries one.
+  let isProjectView = $derived(
+    PROJECT_SCOPED_VIEWS.has(activeView) ||
+      (activeView === "dashboard" && !!queryParams.get("project_id")),
+  );
 
   const ADMIN_VIEWS = new Set([
     "admin",
@@ -339,6 +357,18 @@
     prevActiveOrgId = currentOrgId;
   });
 
+  // Leaves project view without forgetting the project: targetProjectId and
+  // localStorage are untouched, so re-entering (via ProjectSwitcher or
+  // Existing Projects) lands back in project view for the same project.
+  function handleExitProject() {
+    const params = new URLSearchParams();
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    const q = params.toString();
+    push(q ? `/dashboard?${q}` : "/dashboard");
+  }
+
   function handleSwitchProject(projectId: number) {
     targetProjectId = projectId;
     loadProjectDetails(projectId);
@@ -389,10 +419,17 @@
       mobileOpen={isMobileNavOpen}
       onCloseMobile={() => (isMobileNavOpen = false)}
     />
-  {:else}
-    <Sidebar
+  {:else if isProjectView && targetProjectId}
+    <ProjectSidebar
       {activeView}
+      {selectedProject}
       selectedProjectId={targetProjectId}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+    />
+  {:else}
+    <OrgSidebar
+      {activeView}
       mobileOpen={isMobileNavOpen}
       onCloseMobile={() => (isMobileNavOpen = false)}
     />
@@ -403,11 +440,13 @@
     <!-- Top Header Bar -->
     <TopHeader
       {activeView}
+      {isProjectView}
       {selectedProject}
       selectedProjectId={targetProjectId}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
       onSwitchProject={handleSwitchProject}
+      onExitProject={handleExitProject}
     />
 
     <!-- Viewport Container -->
@@ -420,12 +459,23 @@
         {:else if authGateBlocking}
           <!-- The $effect above is already redirecting to "/"; render
                nothing of the protected view in the meantime. -->
+        {:else if activeView === "dashboard" && isProjectView && targetProjectId}
+          <ProjectDashboardView
+            initialProjectId={targetProjectId}
+            {selectedProject}
+            onNavigate={(view) => push(buildTargetUrl(view, targetProjectId!))}
+          />
         {:else if activeView === "dashboard"}
           <DashboardView
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}
             onOpenWizard={() => (isGlobalWizardOpen = true)}
             onNavigate={handleSelectView}
+          />
+        {:else if activeView === "models"}
+          <ModelsView
+            initialProjectId={targetProjectId}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
           />
         {:else if activeView === "projects"}
           <ProjectsView
