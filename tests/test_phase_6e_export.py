@@ -172,6 +172,23 @@ class TestCsv:
         assert any("GC-001" in m for m in mechanisms)
         assert any("SB-001" in m for m in mechanisms)
 
+    def test_a_seismic_row_carries_the_clash_geometry(self):
+        """The measurement a reviewer wants from an SB-001 row: by how much?"""
+        seismic = issue(
+            id="SB-0001",
+            mechanism="SB-001 seismic bracing",
+            metadata={"overlap_volume_mm3": 41250.0, "clearance_mm": 300.0},
+        )
+        rows = list(csv.DictReader(io.StringIO(to_csv({"audit_issues": [seismic]}))))
+        assert rows[0]["overlap_volume_mm3"] == "41250.0"
+        assert rows[0]["clearance_mm"] == "300.0"
+
+    def test_a_corrosion_row_leaves_the_clash_columns_blank(self):
+        """Blank, not 0: GC-001 did not measure an overlap of nothing."""
+        rows = list(csv.DictReader(io.StringIO(to_csv({"audit_issues": [issue()]}))))
+        assert rows[0]["overlap_volume_mm3"] == ""
+        assert rows[0]["clearance_mm"] == ""
+
     def test_commas_in_text_do_not_break_columns(self):
         result = {"audit_issues": [issue(id="GC-0001")], "issue_stats": {}}
         result["audit_issues"][0].description = "One, two, three"
