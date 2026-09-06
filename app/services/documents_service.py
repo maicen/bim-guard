@@ -5,7 +5,6 @@ from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import (
     cache_db_query,
-    find_row_by_field,
     invalidate_cache,
     now_iso_utc,
     rows_desc_by_id,
@@ -59,7 +58,10 @@ class DocumentService:
 
     def find_by_md5(self, md5_hash: str):
         """Return a document row matching the provided file hash."""
-        return find_row_by_field(self._documents, "md5_hash", md5_hash)
+        # ⚡ Bolt Optimization: Replaced O(N) full-table fetch in Python with an O(1) database-level limit=1 query.
+        # This dramatically reduces memory allocation and network transfer time when checking for duplicate document uploads.
+        rows = self._documents.rows_where("md5_hash = ?", [md5_hash], limit=1)
+        return next(iter(rows), None)
 
     def create_document(
         self,
