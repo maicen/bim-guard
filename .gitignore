@@ -109,3 +109,7 @@ data/federated/
 # scripts/generate_demo_mep_model.py, so the generator is the tracked artefact
 # and the 660 KB of IFC it produces is not.
 data/*_demo.ifc
+
+# Claude Code per-machine settings: a local permission allowlist that differs
+# on every developer's machine. The shared settings live in .claude/settings.json.
+.claude/settings.local.json
