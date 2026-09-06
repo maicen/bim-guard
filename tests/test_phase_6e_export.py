@@ -705,3 +705,92 @@ class TestBCFStructuredDescription:
         )
         markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
         assert not [str(e.reason or e) for e in schema.iter_errors(markup)]
+
+
+class TestBCFDocumentReferences:
+    """Each standard the finding was assessed against becomes a structured reference.
+
+    Before this, the standards appeared only inside prose, so no tool could
+    filter or list the normative references behind a topic.
+    """
+
+    def test_one_reference_per_cited_standard(self):
+        finding = issue(
+            id="GC-0001",
+            citations=[
+                {"standard": "NASA-STD-6012", "clause": "Table 2", "reason": "gap"},
+                {"standard": "EN ISO 15329", "clause": "T1", "reason": "severity"},
+            ],
+        )
+        markup = _markup_for({"audit_issues": [finding]}, "GC-0001")
+        assert markup.count("<DocumentReference ") == 2
+
+    def test_reference_names_the_standard_and_the_clause_applied(self):
+        finding = issue(
+            id="GC-0002",
+            citations=[{"standard": "NASA-STD-6012", "clause": "Table 2", "reason": "gap"}],
+        )
+        markup = _markup_for({"audit_issues": [finding]}, "GC-0002")
+        assert "<Description>NASA-STD-6012 — Table 2</Description>" in markup
+
+    def test_standard_is_named_as_the_constants_catalogue_spells_it(self):
+        """Citations say 'EN ISO 15329'; NOTEBOOK_STANDARDS says 'EN ISO 15329:2007'."""
+        finding = issue(
+            id="CC-0003",
+            citations=[{"standard": "EN ISO 15329", "clause": "T2", "reason": "wetting"}],
+        )
+        markup = _markup_for({"audit_issues": [finding]}, "CC-0003")
+        assert "<Description>EN ISO 15329:2007 — T2</Description>" in markup
+
+    def test_no_referenced_document_is_invented(self):
+        """No URL or DOI exists for these standards, so none may be emitted."""
+        finding = issue(
+            id="GC-0004",
+            citations=[{"standard": "NASA-STD-6012", "clause": "Table 2", "reason": "gap"}],
+        )
+        markup = _markup_for({"audit_issues": [finding]}, "GC-0004")
+        assert "<ReferencedDocument>" not in markup
+        assert 'isExternal="false"' in markup
+
+    def test_duplicate_citations_collapse_to_one_reference(self):
+        finding = issue(
+            id="SB-0005",
+            citations=[
+                {"standard": "EN 1998-1", "clause": "bracing clearance", "reason": "200mm"},
+                {"standard": "EN 1998-1", "clause": "bracing clearance", "reason": "200mm"},
+            ],
+        )
+        markup = _markup_for({"audit_issues": [finding]}, "SB-0005")
+        assert markup.count("<DocumentReference ") == 1
+
+    def test_finding_without_citations_emits_no_reference(self):
+        finding = issue(id="GC-0006", citations=[])
+        markup = _markup_for({"audit_issues": [finding]}, "GC-0006")
+        assert "<DocumentReference" not in markup
+
+    def test_reference_guid_is_stable_across_exports(self):
+        finding = issue(
+            id="GC-0007",
+            citations=[{"standard": "NASA-STD-6012", "clause": "Table 2", "reason": "gap"}],
+        )
+        first = _markup_for({"audit_issues": [finding]}, "GC-0007")
+        second = _markup_for({"audit_issues": [finding]}, "GC-0007")
+        guid_of = lambda m: m.split('<DocumentReference Guid="', 1)[1].split('"', 1)[0]
+        assert guid_of(first) == guid_of(second)
+
+    def test_document_references_are_schema_valid(self):
+        xmlschema = pytest.importorskip("xmlschema")
+        from pathlib import Path
+
+        schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "markup.xsd"
+        )
+        finding = issue(
+            id="GC-0008",
+            citations=[
+                {"standard": "NASA-STD-6012", "clause": "Table 2", "reason": "gap"},
+                {"standard": "EN ISO 15329", "clause": "T1", "reason": "severity"},
+            ],
+        )
+        markup = _markup_for({"audit_issues": [finding]}, "GC-0008")
+        assert not [str(e.reason or e) for e in schema.iter_errors(markup)]

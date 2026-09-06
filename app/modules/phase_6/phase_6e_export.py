@@ -30,8 +30,10 @@ import io
 import json
 import re
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
 
+from app.constants import NOTEBOOK_STANDARDS
 from app.logging_config import get_logger
 from app.modules.comparator.issue_schema import Issue, RiskBand
 from app.modules.reporter.bcf_generator import (
@@ -427,6 +429,65 @@ def _description(issue: Issue) -> str:
     return "\n\n".join(blocks)
 
 
+@lru_cache(maxsize=1)
+def _canonical_standard_names() -> dict[str, str]:
+    """Map a lower-cased standard name to its canonical form from constants.
+
+    Citations spell a standard as the engine happened to write it — ``"EN ISO
+    15329"`` — while ``app.constants.NOTEBOOK_STANDARDS`` holds the normative
+    form, ``"EN ISO 15329:2007"``. Preferring the catalogue's spelling means a
+    document reference names the standard as the thesis cites it.
+
+    Keyed on both the full name and its pre-colon stem so an undated citation
+    still resolves. Built once; the catalogue is a module constant.
+    """
+    mapping: dict[str, str] = {}
+    for entry in NOTEBOOK_STANDARDS:
+        name = str((entry or {}).get("name") or "").strip()
+        if not name:
+            continue
+        mapping.setdefault(name.casefold(), name)
+        mapping.setdefault(name.split(":", 1)[0].strip().casefold(), name)
+    return mapping
+
+
+def _document_references(issue: Issue) -> list[dict]:
+    """Return one document reference per distinct standard ``issue`` cites.
+
+    ``Description`` is ``"<standard> — <clause>"``, the clause being the one
+    the engine actually applied, so the reference says which part of the
+    standard produced the finding rather than just naming the document.
+
+    ``referenced_document`` is left empty. It is a URL, and the repository
+    holds no URL or DOI for any of these standards -- ``NOTEBOOK_STANDARDS``
+    carries name, domain and description only. Emitting a plausible-looking
+    link would be a fabricated citation, so the field is omitted and the gap
+    recorded.
+    """
+    canonical = _canonical_standard_names()
+    references: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for citation in issue.citations or []:
+        if not isinstance(citation, dict):
+            continue
+        standard = str(citation.get("standard") or "").strip()
+        if not standard:
+            continue
+        clause = str(citation.get("clause") or "").strip()
+        key = (standard.casefold(), clause.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        name = canonical.get(standard.casefold(), standard)
+        references.append(
+            {
+                "description": f"{name} — {clause}" if clause else name,
+                "referenced_document": "",
+            }
+        )
+    return references
+
+
 def _source_files(issue: Issue, model_dates: dict[str, str], fallback: list[dict]) -> list[dict]:
     """Return the ``Header/File`` entries naming the model(s) behind ``issue``.
 
@@ -515,6 +576,7 @@ def _bcf_issue(
         creation_author=_creation_author(issue),
         topic_type=_topic_type(issue),
         source_files=_source_files(issue, model_dates or {}, fallback_files or []),
+        document_references=_document_references(issue),
     )
 
 

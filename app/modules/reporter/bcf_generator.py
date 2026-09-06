@@ -64,6 +64,13 @@ class BCFIssue:
     #: omitted where unknown. Empty falls back to
     #: :data:`PLACEHOLDER_MODEL_FILENAME`.
     source_files: list = field(default_factory=list)
+    #: Standards this finding was assessed against, as
+    #: ``[{"description": str, "referenced_document": str}, ...]``. One
+    #: ``Topic/DocumentReference`` is written per entry.
+    #: ``referenced_document`` is a URL and is omitted when empty — the
+    #: repository holds no URL or DOI for any of these standards, and
+    #: inventing one would be a fabricated citation.
+    document_references: list = field(default_factory=list)
 
 
 #: Used when a caller supplies no ``creation_author``. Deliberately generic:
@@ -204,6 +211,41 @@ def _header_xml(issue: "BCFIssue", project_attr: str) -> str:
     return f"  <Header>\n{joined}\n  </Header>"
 
 
+def _document_references_xml(issue: "BCFIssue", topic_guid: str) -> str:
+    """Render ``Topic/DocumentReference`` for each standard the finding cites.
+
+    ``markup.xsd`` places ``DocumentReference`` after ``Description`` and
+    ``BimSnippet`` and before ``RelatedTopic``; the sequence inside it is
+    ``ReferencedDocument, Description``.
+
+    ``ReferencedDocument`` is a URL and is emitted only when the caller has a
+    real one. The repository holds no URL or DOI for any of the standards in
+    ``app.constants.NOTEBOOK_STANDARDS``, so today every reference carries the
+    ``Description`` alone: naming the standard and clause truthfully, rather
+    than pointing at an invented link. ``isExternal`` follows suit — false
+    when nothing external is referenced.
+
+    Guids are derived from the topic and the description so a regenerated
+    archive reuses them instead of churning identifiers on every export.
+    """
+    blocks = []
+    for entry in issue.document_references or []:
+        description = str((entry or {}).get("description") or "").strip()
+        if not description:
+            continue
+        url = str(entry.get("referenced_document") or "").strip()
+        ref_guid = str(uuid.uuid5(_TOPIC_GUID_NAMESPACE, f"{topic_guid}:{description}")).upper()
+        inner = f"      <ReferencedDocument>{_xml_text(url)}</ReferencedDocument>\n" if url else ""
+        blocks.append(
+            f'    <DocumentReference Guid="{_xml_attr(ref_guid)}" '
+            f'isExternal="{"true" if url else "false"}">\n'
+            f"{inner}"
+            f"      <Description>{_xml_text(description)}</Description>\n"
+            f"    </DocumentReference>"
+        )
+    return ("\n".join(blocks) + "\n") if blocks else ""
+
+
 def _markup_xml(
     issue: BCFIssue, index: int, viewpoint_guid: str, topic_guid: str | None = None
 ) -> str:
@@ -279,6 +321,7 @@ def _markup_xml(
     )
 
     header_xml = _header_xml(issue, project_attr)
+    doc_refs_xml = _document_references_xml(issue, topic_guid)
 
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -294,7 +337,7 @@ def _markup_xml(
     <ModifiedDate>{_utc_now()}</ModifiedDate>
 {due_date_xml}    <AssignedTo>{_xml_text(issue.assigned_to)}</AssignedTo>
     <Description>{_xml_text(issue.description)}</Description>
-  </Topic>
+{doc_refs_xml}  </Topic>
   <Comment Guid="{_xml_attr(comment_guid)}">
     <Date>{_utc_now()}</Date>
     <Author>BIMGUARD AI</Author>
