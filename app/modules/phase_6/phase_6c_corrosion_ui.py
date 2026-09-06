@@ -97,6 +97,11 @@ from app.modules.ifc_reader.ifc_parser import (
     _spaced,
 )
 from app.modules.phase_6.phase_6b_parsing import UNKNOWN_MATERIAL
+from app.modules.phase_6.finding_narrative import (
+    build_description,
+    build_mitigations,
+    measurements_for,
+)
 from app.modules.comparator import cross_material, material_media
 from app.modules.comparator.issue_adapter import IssueIdAllocator
 from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
@@ -940,6 +945,50 @@ def _ruleset_data_quality_issues(allocator: IssueIdAllocator) -> list[Issue]:
     ]
 
 
+#: Catalog loaders by mechanism, for the narrative builders. Loaded lazily and
+#: only for mechanisms that actually scored, so a run that selected one engine
+#: does not pull three rulesets it will not read.
+_CATALOG_LOADERS = {
+    "GC-001": "load_gc_catalog",
+    "CC-001": "load_cc_catalog",
+    "MC-001": "load_mc_catalog",
+}
+
+
+#: One loaded catalog per mechanism for the duration of a run. Cleared at the
+#: start of every run, immediately after ``reload_all_catalogs()``, so a rule
+#: edited in the database still takes effect on the next analysis -- but a run
+#: over 420 elements loads each ruleset once rather than once per finding.
+_NARRATIVE_CATALOGS: dict[str, dict] = {}
+
+
+def _reset_narrative_catalogs() -> None:
+    """Drop the per-run catalog cache. Called once per analysis."""
+    _NARRATIVE_CATALOGS.clear()
+
+
+def _narrative_catalog(code: str) -> dict:
+    """Return the rule catalog the narrative needs, or ``{}`` if unavailable.
+
+    A catalog that will not load must not take a finding down with it: the
+    verdict stands on the engine result, and :func:`build_description` falls
+    back to the description the Issue already carries.
+    """
+    if code in _NARRATIVE_CATALOGS:
+        return _NARRATIVE_CATALOGS[code]
+    name = _CATALOG_LOADERS.get(code)
+    if not name:
+        return {}
+    try:
+        from app.services import corrosion_rule_catalog as _crc
+
+        catalog = getattr(_crc, name)() or {}
+    except Exception:  # pragma: no cover - reported by the per-element path
+        catalog = {}
+    _NARRATIVE_CATALOGS[code] = catalog
+    return catalog
+
+
 def _finding_issue(
     element: ServiceElement,
     spec: MechanismSpec,
@@ -950,7 +999,7 @@ def _finding_issue(
 ) -> Issue:
     """Build the Issue for a mechanism that did produce a band."""
     mitigations = list(getattr(result, "mitigations", []) or [])
-    return make_issue(
+    issue = make_issue(
         id=allocator.next(spec.prefix),
         element_id=element.guid,
         rule_id=spec.rule_id,
@@ -978,6 +1027,19 @@ def _finding_issue(
         },
         citations=citations,
     )
+
+    # The narrative is built here, after the Issue exists, because it needs the
+    # finished band and score as well as the element and engine result -- the
+    # raw velocity, temperature and dead-leg length live on the element and
+    # never reach the Issue. Nothing above is rewritten: description was a
+    # restatement of the band, and metadata gains one key.
+    catalog = _narrative_catalog(spec.code)
+    measurements = measurements_for(spec.code, element, result)
+    if spec is GALVANIC:
+        measurements["galvanic_couple"] = _couple_basis(element)
+    issue.description = build_description(issue, catalog, measurements)
+    issue.metadata["mitigations"] = build_mitigations(issue, catalog)
+    return issue
 
 
 def run_corrosion_analysis(
@@ -1028,6 +1090,9 @@ def run_corrosion_analysis(
         reload_all_catalogs()
     except Exception:
         pass
+    # The narrative catalogs are re-read after the reload above, so a rule the
+    # user just edited reaches the description text on this run.
+    _reset_narrative_catalogs()
 
     # Set when MC-001 actually scored something, so the ruleset gap below is
     # reported only where it could have changed a verdict.
@@ -1164,13 +1229,21 @@ def _run_network_mechanisms(
         if error is not None:
             issues.append(_network_data_quality_issue(spec, error, allocator))
             continue
-        issues.extend(
+        kept = [
             issue
             for issue in found
             if include_low
             or issue.band is not RiskBand.LOW
             or issue.mechanism == DATA_QUALITY
-        )
+        ]
+        # MM-001 and XM-001 already author full technical descriptions inside
+        # their comparators, so those are left exactly as the engines wrote
+        # them. What they lack is the resolved mitigation list the Finding
+        # Report renders, so only that is added here.
+        for issue in kept:
+            if issue.mechanism != DATA_QUALITY:
+                issue.metadata["mitigations"] = build_mitigations(issue, {})
+        issues.extend(kept)
 
     return issues
 
