@@ -573,12 +573,12 @@
       <div
         class="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-accent"
       >
-        <span>Analysis Gateway</span>
+        <span>Compliance Audit</span>
         <span>•</span>
         <span class="text-slate-400">
           {activeCategory === "seismic"
-            ? "Seismic Clearance (SB-001)"
-            : "MEP Piping Corrosion (GC/CC/MC/MM/XM)"}
+            ? "Seismic Bracing"
+            : "Piping Services"}
         </span>
       </div>
       <h1
@@ -586,8 +586,8 @@
       >
         <span
           >{activeCategory === "seismic"
-            ? "Seismic Buffer & Bracing Audit"
-            : "Piping System Corrosion Audit"}</span
+            ? "Seismic Bracing Audit"
+            : "Piping Services Audit"}</span
         >
         <span
           class="inline-flex items-center rounded-md border px-2.5 py-0.5 font-mono text-xs font-semibold {activeCategory ===
@@ -611,8 +611,9 @@
           Execute verified Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN 4149) buffer volume
           and bracing audits.
         {:else}
-          Execute verified Galvanic (GC-001), Crevice (CC-001), Microbiological (MC-001),
-          Material-media (MM-001), and Cross-material (XM-001) piping compliance audits.
+          Five corrosion checks — galvanic (GC-001), crevice (CC-001), microbial (MC-001),
+          material–media (MM-001) and cross-material (XM-001) — run against every piping element in
+          the model.
         {/if}
       </p>
 
