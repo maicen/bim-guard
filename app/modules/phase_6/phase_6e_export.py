@@ -577,6 +577,7 @@ def _bcf_issue(
         topic_type=_topic_type(issue),
         source_files=_source_files(issue, model_dates or {}, fallback_files or []),
         document_references=_document_references(issue),
+        snippet_json=json.dumps(_issue_dict(issue), indent=2, default=_encode),
     )
 
 

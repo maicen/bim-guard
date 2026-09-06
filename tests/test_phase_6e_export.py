@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import zipfile
 
 import pytest
@@ -794,3 +795,110 @@ class TestBCFDocumentReferences:
         )
         markup = _markup_for({"audit_issues": [finding]}, "GC-0008")
         assert not [str(e.reason or e) for e in schema.iter_errors(markup)]
+
+
+class TestBCFBimSnippet:
+    """The machine-readable finding travels inside the topic folder."""
+
+    def _archive(self, result):
+        return zipfile.ZipFile(io.BytesIO(to_bcf(result)))
+
+    def test_topic_folder_carries_the_finding_as_json(self):
+        from app.modules.reporter.bcf_generator import bcf_topic_guid
+
+        folder = bcf_topic_guid("GC-0001")
+        with self._archive({"audit_issues": [issue(id="GC-0001")]}) as z:
+            payload = json.loads(z.read(f"{folder}/finding.json").decode("utf-8"))
+        assert payload["id"] == "GC-0001"
+        assert payload["element_id"] == "GUID-01"
+        assert payload["rule_id"] == "GC-001.01"
+        assert payload["band"] == "high"
+
+    def test_snippet_is_declared_on_the_topic(self):
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert '<BimSnippet SnippetType="JSON" isExternal="false">' in markup
+        assert "<Reference>finding.json</Reference>" in markup
+
+    def test_snippet_precedes_document_references_in_the_sequence(self):
+        """markup.xsd orders Topic as ... Description, BimSnippet, DocumentReference."""
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert markup.index("<BimSnippet") < markup.index("<DocumentReference")
+
+    def test_snippet_matches_the_json_export_for_the_same_finding(self):
+        """One record, two containers: the archive must not carry a different truth."""
+        from app.modules.reporter.bcf_generator import bcf_topic_guid
+
+        result = {"audit_issues": [issue(id="GC-0001")]}
+        exported = json.loads(to_json(result))["findings"][0]
+        with self._archive(result) as z:
+            snippet = json.loads(
+                z.read(f"{bcf_topic_guid('GC-0001')}/finding.json").decode("utf-8")
+            )
+        assert snippet == exported
+
+    def test_archive_stays_schema_valid_with_a_snippet(self):
+        xmlschema = pytest.importorskip("xmlschema")
+        from pathlib import Path
+
+        schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "markup.xsd"
+        )
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert not [str(e.reason or e) for e in schema.iter_errors(markup)]
+
+
+class TestBCFExtensionsSchema:
+    """project.bcfp has always declared extensions.xsd; it was never written."""
+
+    def test_extensions_xsd_is_present_in_the_archive(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            assert "extensions.xsd" in z.namelist()
+
+    def test_declared_schema_name_matches_the_file_written(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            bcfp = z.read("project.bcfp").decode("utf-8")
+            declared = bcfp.split("<ExtensionSchema>", 1)[1].split("</ExtensionSchema>", 1)[0]
+            assert declared in z.namelist()
+
+    def test_extensions_is_well_formed_xml_schema(self, mixed_result):
+        xmlschema = pytest.importorskip("xmlschema")
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            text = z.read("extensions.xsd").decode("utf-8")
+        xmlschema.XMLSchema(io.StringIO(text))  # raises if the schema is invalid
+
+    def test_it_enumerates_exactly_the_topic_types_emitted(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            text = z.read("extensions.xsd").decode("utf-8")
+            emitted = set()
+            for name in z.namelist():
+                if name.endswith("markup.bcf"):
+                    markup = z.read(name).decode("utf-8")
+                    emitted.add(markup.split('TopicType="', 1)[1].split('"', 1)[0])
+        block = text.split('name="TopicType"', 1)[1].split("</xs:simpleType>", 1)[0]
+        declared = set(re.findall(r'<xs:enumeration value="([^"]*)"/>', block))
+        assert declared == emitted
+
+    def test_it_declares_the_snippet_type_actually_used(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            text = z.read("extensions.xsd").decode("utf-8")
+        block = text.split('name="SnippetType"', 1)[1].split("</xs:simpleType>", 1)[0]
+        assert '<xs:enumeration value="JSON"/>' in block
+
+    def test_stage_is_declared_with_no_values_because_none_are_published(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            text = z.read("extensions.xsd").decode("utf-8")
+        block = text.split('name="Stage"', 1)[1].split("</xs:simpleType>", 1)[0]
+        assert "<xs:enumeration" not in block
+
+    def test_every_emitted_label_is_declared(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            text = z.read("extensions.xsd").decode("utf-8")
+            emitted = set()
+            for name in z.namelist():
+                if name.endswith("markup.bcf"):
+                    emitted.update(
+                        re.findall(r"<Labels>([^<]*)</Labels>", z.read(name).decode("utf-8"))
+                    )
+        block = text.split('name="TopicLabel"', 1)[1].split("</xs:simpleType>", 1)[0]
+        declared = set(re.findall(r'<xs:enumeration value="([^"]*)"/>', block))
+        assert emitted <= declared

@@ -71,6 +71,11 @@ class BCFIssue:
     #: repository holds no URL or DOI for any of these standards, and
     #: inventing one would be a fabricated citation.
     document_references: list = field(default_factory=list)
+    #: The finding as JSON text. When set, it is written into the topic folder
+    #: as :data:`SNIPPET_FILENAME` and referenced by ``Topic/BimSnippet``, so
+    #: the archive carries the machine-readable record behind the prose and a
+    #: consumer need not re-request the JSON export to get it.
+    snippet_json: str = ""
 
 
 #: Used when a caller supplies no ``creation_author``. Deliberately generic:
@@ -92,6 +97,13 @@ TOPIC_STATUSES: tuple[str, ...] = ("Open",)
 
 #: The complete set of ``Priority`` values BIMGUARD emits, most severe first.
 TOPIC_PRIORITIES: tuple[str, ...] = ("Critical", "Major", "Normal", "Minor")
+
+#: ``BimSnippet/@SnippetType`` for the machine-readable finding record, and the
+#: only snippet type BIMGUARD emits.
+SNIPPET_TYPE = "JSON"
+
+#: Name the snippet takes inside the topic folder.
+SNIPPET_FILENAME = "finding.json"
 
 
 def _utc_now() -> str:
@@ -323,6 +335,20 @@ def _markup_xml(
     header_xml = _header_xml(issue, project_attr)
     doc_refs_xml = _document_references_xml(issue, topic_guid)
 
+    # markup.xsd sequences Topic as ... Description, BimSnippet,
+    # DocumentReference, RelatedTopic -- so the snippet precedes the references.
+    # ReferenceSchema is a required element but no schema is published for this
+    # payload, so it is emitted empty rather than pointing at a URL that does
+    # not exist.
+    snippet_xml = (
+        f'    <BimSnippet SnippetType="{_xml_attr(SNIPPET_TYPE)}" isExternal="false">\n'
+        f"      <Reference>{_xml_text(SNIPPET_FILENAME)}</Reference>\n"
+        f"      <ReferenceSchema></ReferenceSchema>\n"
+        f"    </BimSnippet>\n"
+        if issue.snippet_json
+        else ""
+    )
+
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 {header_xml}
@@ -337,7 +363,7 @@ def _markup_xml(
     <ModifiedDate>{_utc_now()}</ModifiedDate>
 {due_date_xml}    <AssignedTo>{_xml_text(issue.assigned_to)}</AssignedTo>
     <Description>{_xml_text(issue.description)}</Description>
-{doc_refs_xml}  </Topic>
+{snippet_xml}{doc_refs_xml}  </Topic>
   <Comment Guid="{_xml_attr(comment_guid)}">
     <Date>{_utc_now()}</Date>
     <Author>BIMGUARD AI</Author>
@@ -435,6 +461,62 @@ def _placeholder_png() -> bytes:
     return base64.b64decode(b64)
 
 
+def _extensions_xsd(issues: list["BCFIssue"]) -> str:
+    """Build the ``extensions.xsd`` ``project.bcfp`` has always declared.
+
+    ``project.bcfp`` names ``<ExtensionSchema>extensions.xsd</ExtensionSchema>``
+    and the file was never written, so every archive referenced a schema it did
+    not contain.
+
+    BCF 2.1 leaves ``TopicType``, ``TopicStatus``, ``Priority``, ``TopicLabel``,
+    ``SnippetType`` and ``Stage`` as unrestricted strings in ``markup.xsd`` and
+    expects the project's own extension schema to enumerate them. This
+    enumerates exactly the values this archive actually emits — computed from
+    the issues, not a fixed list — so the schema cannot drift from the content.
+
+    ``Stage`` is emitted with no enumerated values: BIMGUARD publishes none,
+    because no project record carries a stage.
+    """
+
+    def enumeration(name: str, values) -> str:
+        body = "\n".join(
+            f'      <xs:enumeration value="{_xml_attr(v)}"/>' for v in values
+        )
+        inner = f"\n{body}\n    " if body else ""
+        return (
+            f'  <xs:simpleType name="{name}">\n'
+            f'    <xs:restriction base="xs:string">{inner}</xs:restriction>\n'
+            f"  </xs:simpleType>"
+        )
+
+    topic_types = sorted({i.topic_type or "Issue" for i in issues}) or list(TOPIC_TYPES)
+    statuses = sorted({i.status for i in issues if i.status}) or list(TOPIC_STATUSES)
+    priorities = sorted(
+        {i.priority for i in issues if i.priority},
+        key=lambda p: TOPIC_PRIORITIES.index(p) if p in TOPIC_PRIORITIES else 99,
+    ) or list(TOPIC_PRIORITIES)
+    labels = sorted({str(label) for i in issues for label in (i.labels or []) if label})
+    snippet_types = sorted({SNIPPET_TYPE for i in issues if i.snippet_json})
+
+    blocks = "\n".join(
+        [
+            enumeration("TopicType", topic_types),
+            enumeration("TopicStatus", statuses),
+            enumeration("Priority", priorities),
+            enumeration("TopicLabel", labels),
+            enumeration("SnippetType", snippet_types),
+            enumeration("Stage", ()),
+        ]
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"'
+        ' elementFormDefault="qualified">\n'
+        f"{blocks}\n"
+        "</xs:schema>"
+    )
+
+
 def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf") -> bytes:
     """
     Generates a BCF 2.1 compliant ZIP archive from a list of BCFIssue objects.
@@ -471,6 +553,10 @@ def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf
 </ProjectExtension>""",
         )
 
+        # The schema project.bcfp has always declared. Written from the values
+        # this archive actually emits, so it cannot drift from the content.
+        zf.writestr("extensions.xsd", _extensions_xsd(issues))
+
         # One folder per issue. The folder name is the topic GUID (BCF 2.1
         # convention), which is derived from issue.guid when that is not
         # already a UUID so that the folder and Topic/@Guid always agree.
@@ -484,6 +570,8 @@ def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf
             )
             zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue, viewpoint_guid))
             zf.writestr(folder + "snapshot.png", _placeholder_png())
+            if issue.snippet_json:
+                zf.writestr(folder + SNIPPET_FILENAME, issue.snippet_json)
 
     return buf.getvalue()
 
