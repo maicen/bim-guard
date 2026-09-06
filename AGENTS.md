@@ -31,6 +31,17 @@ Auth is Google OAuth only. For local dev, sign in without the OAuth click-throug
 
 `.claude/launch.json`, `.antigravity/launch.json`, and `.vscode/launch.json` register the same two dev servers for editor/agent preview and debugging. They are generated — never hand-edit them. Update `scripts/generate_launch_configs.py` (the source of truth) and rerun `uv run python scripts/generate_launch_configs.py` if the run commands, host, or ports change.
 
+### Jules environment setup
+
+Jules (jules.google) has no repo config file for environment setup — it's configured in the Jules dashboard under the repo's **Configuration → Initial Setup** box, then validated with "Run and Snapshot". Use this script:
+
+```bash
+uv sync
+cd frontend && npm install && cd ..
+```
+
+Optionally append `uv run ruff check .` and `uv run pytest tests/` before snapshotting to validate the environment.
+
 ## Repo structure
 
 - `app/api/` — FastAPI routers, dependency injection, and SSE event streaming
