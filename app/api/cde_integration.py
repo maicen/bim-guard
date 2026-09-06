@@ -27,9 +27,11 @@ from app.api.dependencies import get_documents_service, get_projects_service
 from app.api.projects import get_authorized_project
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    CDEAuthConfigResponse,
     CDEDocumentItem,
     CDESyncRequest,
     CDESyncResponse,
+    CDETokenResponse,
     CDEUserResponse,
     CDEVersionItem,
     CDEVersionsResponse,
@@ -140,34 +142,36 @@ def get_cde_user() -> CDEUserResponse:
 
 @router.get(
     "/v1/auth/config",
+    response_model=CDEAuthConfigResponse,
     summary="OpenCDE OAuth2 Configuration Discovery",
-    tags=["OpenCDE Foundation"],
+    tags=["OpenCDE Foundation", "Public"],
 )
-def get_cde_auth_config() -> dict[str, Any]:
+def get_cde_auth_config() -> CDEAuthConfigResponse:
     """Return OpenCDE OAuth2 discovery configuration metadata."""
-    return {
-        "oauth2_auth_url": "/api/cde/v1/auth/authorize",
-        "oauth2_token_url": "/api/cde/v1/auth/token",
-        "supported_scopes": ["foundation.read", "documents.read", "documents.write", "bcf.read", "bcf.write"],
-        "token_type": "Bearer",
-    }
+    return CDEAuthConfigResponse(
+        oauth2_auth_url="/api/cde/v1/auth/authorize",
+        oauth2_token_url="/api/cde/v1/auth/token",
+        supported_scopes=["foundation.read", "documents.read", "documents.write", "bcf.read", "bcf.write"],
+        token_type="Bearer",
+    )
 
 
 @router.post(
     "/v1/auth/token",
+    response_model=CDETokenResponse,
     summary="OpenCDE Token Exchange / Refresh",
-    tags=["OpenCDE Foundation"],
+    tags=["OpenCDE Foundation", "Public"],
 )
-def exchange_cde_token(payload: dict[str, Any]) -> dict[str, Any]:
+def exchange_cde_token(payload: dict[str, Any]) -> CDETokenResponse:
     """Simulate standard OpenCDE OAuth 2.0 Bearer token exchange."""
     grant_type = payload.get("grant_type", "client_credentials")
-    return {
-        "access_token": "bimguard_cde_access_token_demo_2026",
-        "token_type": "Bearer",
-        "expires_in": 86400,
-        "scope": "foundation.read documents.read documents.write bcf.read bcf.write",
-        "grant_type": grant_type,
-    }
+    return CDETokenResponse(
+        access_token="bimguard_cde_access_token_demo_2026",
+        token_type="Bearer",
+        expires_in=86400,
+        scope="foundation.read documents.read documents.write bcf.read bcf.write",
+        grant_type=grant_type,
+    )
 
 
 # ------------------------------------------------------------------------------

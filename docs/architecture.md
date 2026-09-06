@@ -223,3 +223,34 @@ in §6 only ever read rules through `RuleService`.
 - `projects.classification_standard` stores a project's chosen bSDD dictionary
   code; `BsddAutocomplete.svelte` backs Target IFC Class and Property Name
   fields in the rule editor with live bSDD-sourced suggestions.
+
+## 8. Programmatic API (Python Import Surface)
+
+Every BIM-Guard capability is reachable two ways: over HTTP via `/api/*`, or by
+importing the same service/engine classes directly in a Python process (a
+script, a notebook, or an external project such as the `bim-guard-evaluation`
+companion repo referenced in `CLAUDE.md`). Both access modes are guaranteed to
+behave identically because REST route handlers under `app/api/*.py` never
+reimplement logic inline -- they call the exact same classes/functions listed
+below.
+
+**Stable, supported import paths:**
+
+- `from app.services import ProjectsService, RuleService, DocumentService,
+  ArchAnalysisService, BSDDClient, DigitalInspectorService,
+  GitHubRepoService, MembershipService, NamingConfigService,
+  ParsingEngineInstancesService, ProfileService, ReportArtifactService,
+  RuleExtractionService, run_analysis, RUNNABLE_SLUGS` --
+  `app/services/__init__.py` re-exports these; anything else under
+  `app/services/` is internal and carries no compatibility guarantee.
+- `from app.engines import GalvanicCorrosionEngine, CreviceCorrosionEngine,
+  MICEngine, EgressAnalysisEngine, SpatialDaylightEngine` (plus each
+  engine's `GCElement`/`GCResult`-style element/result dataclasses and
+  `assess_*_risk` functions) -- pure-Python compute kernels with no HTTP or
+  database dependency; `app/engines/__init__.py` re-exports these.
+
+**Contract:** a name appearing in one of the two `__all__` lists above is the
+supported programmatic surface and follows the same versioning/deprecation
+policy as the REST API (see `docs/CONVENTIONS.md`'s API Standards section).
+Reaching into an un-exported submodule works today but is not covered by that
+guarantee and may change without notice.

@@ -51,6 +51,7 @@ _TOKEN_RE = re.compile(r"\{(\w+)\}")
     "/catalog",
     response_model=NamingCatalogResponse,
     summary="Get the ISO 19650 naming catalog",
+    tags=["Public"],
 )
 def get_catalog(
     service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
@@ -75,6 +76,7 @@ def get_catalog(
     "/presets",
     response_model=NamingCatalogResponse,
     summary="Get the ISO 19650 naming catalog (alias of /catalog)",
+    tags=["Public"],
 )
 def get_presets(
     service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
@@ -158,6 +160,7 @@ def reset_project_naming_config(
     "/preview",
     response_model=NamingPreviewResponse,
     summary="Render a sample name from an unsaved configuration",
+    tags=["Public"],
 )
 def preview_name(
     payload: NamingPreviewRequest,

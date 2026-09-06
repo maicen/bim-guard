@@ -34,10 +34,12 @@ from app.api.projects import (
 from app.auth import CurrentUser, get_current_user, get_current_user_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    AnalysisQueuedResponse,
     AnalysisResultContract,
     AnalysisRunRequest,
     ArchAnalysisResponse,
     AuditIssueContract,
+    IfcUploadAttachResponse,
     IssueStatsContract,
     ResultPageContract,
     RevitRuleResult,
@@ -444,14 +446,14 @@ def _paginate_result(
     return narrowed, page
 
 
-@router.post("/upload", summary="Attach an IFC model to a project")
+@router.post("/upload", response_model=IfcUploadAttachResponse, summary="Attach an IFC model to a project")
 async def analyze_upload_ifc(
     project_id: Annotated[int, Form(...)],
     ifc_file: Annotated[UploadFile, File(...)],
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
     phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
-) -> dict:
+) -> IfcUploadAttachResponse:
     """Upload and attach an IFC model to a project."""
     project_access(project_id)
     if not ifc_file.filename or not ifc_file.filename.lower().endswith(".ifc"):
@@ -471,21 +473,25 @@ async def analyze_upload_ifc(
         )
 
     projects_service.attach_ifc(project_id, response.ref.storage_ref)
-    return {
-        "success": True,
-        "filename": response.ref.filename,
-        "size_bytes": response.ref.size_bytes,
-        "sha256": response.ref.file_hash_sha256,
-    }
+    return IfcUploadAttachResponse(
+        success=True,
+        filename=response.ref.filename,
+        size_bytes=response.ref.size_bytes,
+        sha256=response.ref.file_hash_sha256,
+    )
 
 
-@router.post("/run", summary="Trigger compliance analysis")
+@router.post(
+    "/run",
+    response_model=AnalysisResultContract | AnalysisQueuedResponse,
+    summary="Trigger compliance analysis",
+)
 def run_analysis_endpoint(
     payload: AnalysisRunRequest,
     background_tasks: BackgroundTasks,
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     background: bool = Query(False, description="Run in background task if true"),
-) -> AnalysisResultContract | dict:
+) -> AnalysisResultContract | AnalysisQueuedResponse:
     """Execute analysis (corrosion or seismic) for a project."""
     project_access(payload.project_id)
     slug = payload.slug.lower()
@@ -506,12 +512,12 @@ def run_analysis_endpoint(
             engines=engines,
             include_low=payload.include_low,
         )
-        return {
-            "status": "queued",
-            "project_id": payload.project_id,
-            "slug": slug,
-            "message": "Analysis started in background.",
-        }
+        return AnalysisQueuedResponse(
+            status="queued",
+            project_id=payload.project_id,
+            slug=slug,
+            message="Analysis started in background.",
+        )
 
     raw_result = run_analysis(
         slug,
@@ -944,13 +950,13 @@ def download_latest_bcf(project_id: int, project: Annotated[dict, Depends(get_au
     )
 
 
-@router.get("/bcf/list", summary="List all persisted BCF artifacts")
+@router.get("/bcf/list", response_model=list[dict[str, Any]], summary="List all persisted BCF artifacts")
 def list_bcf_artifacts(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List persisted BCF report artifacts ordered newest first.
 
     A superadmin sees every artifact; everyone else only the ones whose

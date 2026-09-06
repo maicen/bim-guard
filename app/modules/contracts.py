@@ -2085,3 +2085,109 @@ class ProjectDocumentBindingsUpdateRequest(BaseModel):
     """Replace a project's entire set of bound documents."""
 
     document_ids: list[int] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# API Standards: Strict Contracts For Previously Untyped Endpoints
+# ---------------------------------------------------------------------------
+
+
+class IfcUploadAttachResponse(BaseModel):
+    """Result of attaching one uploaded IFC model to a project."""
+
+    success: bool
+    filename: str
+    size_bytes: int
+    sha256: str
+
+
+class AnalysisQueuedResponse(BaseModel):
+    """Acknowledgement that a background analysis run was queued, not completed inline."""
+
+    status: Literal["queued"]
+    project_id: int
+    slug: str
+    message: str
+
+
+class ModelEnhancementResponse(BaseModel):
+    """Outcome of running the IFC model-quality enhancement pipeline."""
+
+    model_config = ConfigDict(extra="allow")
+
+    success: bool = True
+
+
+class IsoNamingValidationResponse(BaseModel):
+    """Result of validating a filename against the ISO 19650 National Annex format."""
+
+    is_valid: bool
+    fields: dict[str, Any] = Field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class RuleExtractionResponse(BaseModel):
+    """Rules extracted from an uploaded document or raw text via LLM."""
+
+    rules: list[dict[str, Any]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    count: int
+
+
+class RuleSeedResponse(BaseModel):
+    """Outcome of (re)seeding the platform's built-in engine rulesets."""
+
+    success: bool
+    seeded_rulesets: dict[str, int] = Field(default_factory=dict)
+    total_rules: int
+
+
+class RuleBulkCreateResponse(BaseModel):
+    """Outcome of a bulk compliance-rule insert."""
+
+    success: bool
+    created_count: int
+    total_requested: int
+
+
+class RuleFolderDeleteResponse(BaseModel):
+    """Outcome of deleting a ruleset folder and its member rules."""
+
+    success: bool
+    ruleset_id: str
+    deleted_rules: int
+
+
+class CDEAuthConfigResponse(BaseModel):
+    """OpenCDE OAuth2 discovery configuration metadata."""
+
+    oauth2_auth_url: str
+    oauth2_token_url: str
+    supported_scopes: list[str]
+    token_type: str
+
+
+class HealthCheckResponse(BaseModel):
+    """API gateway liveness/readiness probe result."""
+
+    status: str
+    service: str
+    version: str
+
+
+class ErrorResponse(BaseModel):
+    """Standard shape for every error response raised via HTTPException."""
+
+    detail: str = Field(..., description="Human-readable error message")
+    code: int = Field(..., description="HTTP status code")
+
+
+class CDETokenResponse(BaseModel):
+    """OpenCDE OAuth2 Bearer token exchange/refresh result."""
+
+    access_token: str
+    token_type: str
+    expires_in: int
+    scope: str
+    grant_type: str

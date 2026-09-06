@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import time
+from typing import Annotated
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 
+from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import DashboardStatsResponse
 from app.services.persistence import PersistenceService
@@ -42,7 +44,10 @@ def _probe_db_health() -> bool:
 
 
 @router.get("/stats", response_model=DashboardStatsResponse, summary="Get dashboard summary stats")
-def get_dashboard_stats(response: Response) -> DashboardStatsResponse:
+def get_dashboard_stats(
+    response: Response,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> DashboardStatsResponse:
     """Return high-level counts for projects, documents, rules, and connectivity."""
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=15"
     db_ok = _probe_db_health()

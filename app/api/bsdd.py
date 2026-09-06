@@ -9,7 +9,7 @@ through one shared HTTP surface instead of talking to bSDD directly.
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -30,6 +30,7 @@ router = APIRouter()
     "/dictionaries",
     response_model=list[BSDDDictionaryItem],
     summary="List available bSDD classification dictionaries",
+    tags=["Public"],
 )
 def list_dictionaries(
     client: Annotated[BSDDClient, Depends(get_bsdd_client)],
@@ -46,6 +47,7 @@ def list_dictionaries(
     "/classes/search",
     response_model=BSDDClassSearchResponse,
     summary="Search bSDD classes by text",
+    tags=["Public"],
 )
 def search_classes(
     client: Annotated[BSDDClient, Depends(get_bsdd_client)],
@@ -69,6 +71,7 @@ def search_classes(
     "/properties/search",
     response_model=BSDDPropertySearchResponse,
     summary="Search bSDD properties by text",
+    tags=["Public"],
 )
 def search_properties(
     client: Annotated[BSDDClient, Depends(get_bsdd_client)],
@@ -93,6 +96,7 @@ def search_properties(
     "/classes/{class_code}",
     response_model=BSDDClassItem,
     summary="Get a bSDD class definition and its properties",
+    tags=["Public"],
 )
 def get_class(
     class_code: str,
@@ -125,11 +129,13 @@ def get_class(
 
 @router.get(
     "/ontology/classes",
+    response_model=list[dict[str, Any]],
     summary="List every class in the local bSDD ontology cache",
+    tags=["Public"],
 )
 def list_ontology_classes(
     ontology: Annotated[BSDDOntologyRepository, Depends(get_bsdd_ontology)],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Lightweight rows (uri/code/name/parent) for browsing -- backs the bSDD wiki's class tree."""
     return ontology.list_classes()
 
@@ -138,6 +144,7 @@ def list_ontology_classes(
     "/ontology/class",
     response_model=BSDDClassItem,
     summary="Full detail for one class in the local ontology, by URI",
+    tags=["Public"],
 )
 def get_ontology_class(
     ontology: Annotated[BSDDOntologyRepository, Depends(get_bsdd_ontology)],
@@ -151,12 +158,14 @@ def get_ontology_class(
 
 @router.get(
     "/ontology/property",
+    response_model=dict[str, Any],
     summary="Full detail for one property in the local ontology, by URI, plus which classes use it",
+    tags=["Public"],
 )
 def get_ontology_property(
     ontology: Annotated[BSDDOntologyRepository, Depends(get_bsdd_ontology)],
     uri: str = Query(..., description="Full bSDD property URI"),
-) -> dict:
+) -> dict[str, Any]:
     result = ontology.get_property_by_uri(uri)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"'{uri}' is not in the local ontology cache.")

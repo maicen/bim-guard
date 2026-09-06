@@ -64,6 +64,7 @@ from app.api import (
 )
 from app.environment import load_env_file
 from app.logging_config import configure_logging, get_logger
+from app.modules.contracts import HealthCheckResponse
 
 try:
     import fcntl
@@ -164,6 +165,43 @@ _schedule_seed_library_once_per_host()
 # ==============================================================================
 # Main FastAPI Gateway & Routing
 # ==============================================================================
+#
+# OpenAPI tag catalog -- every tag passed to include_router()/a route decorator
+# below is registered here with a description, so /api/docs groups routes with
+# real explanations instead of bare names. "Public" marks routes that
+# deliberately carry no auth dependency (see docs/CONVENTIONS.md's API
+# Standards section) -- tests/test_api_contracts.py enforces that every route
+# either depends on one of app.auth's CurrentUser dependencies or carries this
+# tag, so an unauthenticated route is always a declared decision, not a gap.
+TAGS_METADATA = [
+    {"name": "Health", "description": "Liveness/readiness probe for the API gateway."},
+    {"name": "Auth", "description": "The authenticated caller's own identity and profile."},
+    {"name": "Dashboard", "description": "System-level compliance dashboard statistics."},
+    {"name": "Projects", "description": "Project lifecycle, IFC model attachment, and ISO 19650 CDE state."},
+    {"name": "Organizations", "description": "Organizations, membership, groups, and cross-tenant grants."},
+    {"name": "Digital Inspector", "description": "Natural-language Q&A agent over one project's analysis results."},
+    {"name": "Repositories", "description": "Registered GitHub repositories used as IFC model sources."},
+    {"name": "Rules", "description": "The compliance rule library: CRUD, rulesets, extraction, import/export."},
+    {"name": "Analysis", "description": "Triggering and retrieving corrosion/seismic/architectural compliance runs."},
+    {"name": "Documents", "description": "Uploaded specification documents and LLM-driven rule extraction."},
+    {"name": "OpenCDE", "description": "buildingSMART OpenCDE Documents API compatibility surface."},
+    {"name": "OpenCDE Foundation", "description": "buildingSMART OpenCDE Foundation API: versions, user, OAuth2."},
+    {"name": "OpenCDE Documents", "description": "buildingSMART OpenCDE Documents API: document sync & listing."},
+    {"name": "bSDD", "description": "buildingSMART Data Dictionary lookups (public reference data, proxied and cached)."},
+    {"name": "BCF API", "description": "BCF 2.1 topics, comments, and viewpoints for a project."},
+    {"name": "BCF API v2.1", "description": "BCF 2.1 viewpoint snapshot/bitmap image retrieval."},
+    {"name": "Settings", "description": "Application-wide runtime configuration."},
+    {"name": "ISO 19650 Naming", "description": "ISO 19650 information-container naming catalog and per-project config."},
+    {"name": "Parsing Engines", "description": "Configured external IFC parsing engine instances."},
+    {"name": "Events", "description": "Server-Sent Events streaming of pipeline/engine progress."},
+    {
+        "name": "Public",
+        "description": "Routes that intentionally require no authentication -- public reference "
+        "data, static catalogs, or an OAuth2 handshake step that necessarily precedes "
+        "having a token.",
+    },
+]
+
 app = FastAPI(
     title="BIM Guard",
     description="OpenBIM Compliance Gateway & Decoupled Svelte 5 SPA Architecture",
@@ -171,6 +209,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    openapi_tags=TAGS_METADATA,
 )
 
 # Configure CORS
@@ -246,10 +285,15 @@ app.include_router(api_events.router, prefix="/api", tags=["Events"])
 
 
 
-@app.get("/api/health", tags=["Health"], summary="API Gateway Health Check")
-def health_check() -> dict:
+@app.get(
+    "/api/health",
+    response_model=HealthCheckResponse,
+    tags=["Health", "Public"],
+    summary="API Gateway Health Check",
+)
+def health_check() -> HealthCheckResponse:
     """Return API gateway operational status."""
-    return {"status": "ok", "service": "bim-guard-api", "version": "1.0.0"}
+    return HealthCheckResponse(status="ok", service="bim-guard-api", version="1.0.0")
 
 
 @app.get("/download/{fmt}/{project_id}", tags=["Analysis"], summary="Download report endpoint alias")

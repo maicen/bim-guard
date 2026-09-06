@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -111,7 +111,11 @@ async def _sse_generator(
         unsubscribe_async(project_id, queue)
 
 
-@router.get("/workflow/{project_id}", summary="Get pipeline workflow snapshot JSON")
+@router.get(
+    "/workflow/{project_id}",
+    response_model=dict[str, Any],
+    summary="Get pipeline workflow snapshot JSON",
+)
 def get_workflow_snapshot(
     project_id: int,
     response: Response,

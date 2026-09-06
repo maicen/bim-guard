@@ -19,10 +19,50 @@ When in doubt, `CLAUDE.md` and `.github/instructions/project-specific.instructio
 
 ---
 
+## 1a. API Standards (Enforced by `tests/test_api_contracts.py`)
+
+Every route registered on `app.main.app` is checked automatically by
+`tests/test_api_contracts.py`, which walks the live route table -- this is
+not just a style guide, a failing route breaks `pytest`. When adding a new
+endpoint:
+
+- **Strict response contract**: set `response_model=` (or annotate the
+  return type) to a real Pydantic model/union/generic from
+  `app/modules/contracts.py` -- never a bare `dict`/`list[dict]`. A route
+  that genuinely returns a raw file/stream (`FileResponse`,
+  `StreamingResponse`, `PlainTextResponse`, an image) is exempt; add it to
+  `RESPONSE_MODEL_EXEMPT` in the test file alongside the existing entries.
+- **Auth-or-Public, always a declared decision**: every route must either
+  depend (directly or transitively, e.g. through `get_authorized_project`)
+  on `get_current_user`/`get_current_user_flexible` from `app/auth.py`, or
+  carry the `"Public"` OpenAPI tag if it is deliberately open (public
+  reference data, or an OAuth handshake step that necessarily precedes
+  having a token). There is no silent-gap option.
+- **Tags**: every route needs at least one tag, and every tag used anywhere
+  must be registered with a description in `TAGS_METADATA` in `app/main.py`
+  -- this is what gives `/api/docs` real per-group descriptions instead of
+  bare names.
+- **Summary**: every route needs a `summary=`.
+- **Versioning**: BIM-Guard does not URL-version its API (no `/api/v1`).
+  `app.main.app`'s `version=` is the single source of truth for the
+  deployed API's version; a breaking change bumps it and marks the
+  affected route(s) `deprecated=True` for one release before removal,
+  rather than forking the URL. Only introduce an actual `/api/v1` prefix
+  (as an additive second `APIRouter`) if a breaking change is otherwise
+  unavoidable.
+- **Programmatic API parity**: a route handler must delegate to the same
+  service/engine class or function documented as the programmatic surface
+  in `docs/architecture.md` §8 (`app/services/__init__.py` and
+  `app/engines/__init__.py`'s `__all__`) -- never reimplement logic inline
+  that the programmatic surface also needs, so the two access modes can't
+  drift apart.
+
+---
+
 ## 2. Decoupled Frontend Conventions (`frontend/**`)
 
 - **Svelte 5 Runes**: Use modern runes (`$state`, `$derived`, `$props`, `$effect`). Avoid legacy Svelte 3/4 stores or `export let`.
-- **TypeScript**: Always use `<script lang="ts">`. Keep contracts synchronized with `app/modules/contracts.py` via `frontend/src/lib/types.ts`.
+- **TypeScript**: Always use `<script lang="ts">`. Keep contracts synchronized with `app/modules/contracts.py` via `frontend/src/lib/types.ts`. Run `npm run generate:api-types` (backend dev server must be running) to regenerate `frontend/src/lib/generated/openapi-types.ts` (gitignored, local-only) straight from `/api/openapi.json` and diff it against `types.ts` when checking for drift.
 - **API Client**: Make all HTTP calls through `frontend/src/lib/api.ts`. Never write ad hoc `fetch()` calls in individual components.
 - **Real-Time Updates via SSE**: Connect to `/api/events/{project_id}` using `subscribeToEvents()` from `src/lib/sse.ts` to stream analysis progress without polling.
 - **Styling**: Use Tailwind CSS utility classes following the design tokens in `DESIGN.md`.

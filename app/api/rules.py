@@ -32,18 +32,22 @@ from app.logging_config import get_logger
 from app.modules.contracts import (
     IdsImportResponse,
     RuleBulkActionResponse,
+    RuleBulkCreateResponse,
     RuleBulkDeleteRequest,
     RuleBulkUpdateRequest,
     RuleCreateRequest,
     RuleDraftReviewRequest,
     RuleExtractionDraft,
+    RuleExtractionResponse,
     RuleFolderBulkActionResponse,
     RuleFolderBulkDeleteRequest,
     RuleFolderBulkUpdateRequest,
     RuleFolderCreateRequest,
+    RuleFolderDeleteResponse,
     RuleFolderResponse,
     RuleFolderUpdateRequest,
     RuleResponse,
+    RuleSeedResponse,
     RuleSnapshotCreateRequest,
     RuleSnapshotResponse,
     RuleSourceResponse,
@@ -709,13 +713,14 @@ def update_rule_folder(
 
 @router.delete(
     "/folders/{ruleset_id}",
+    response_model=RuleFolderDeleteResponse,
     summary="Delete a ruleset folder",
 )
 def delete_rule_folder(
     ruleset_id: str,
     service: Annotated[RuleService, Depends(get_rules_service)],
     ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
-) -> dict:
+) -> RuleFolderDeleteResponse:
     """Delete a ruleset folder and all of its associated member rules."""
     ruleset_check(ruleset_id)
     folder = service.get_folder(ruleset_id)
@@ -725,11 +730,11 @@ def delete_rule_folder(
             detail=f"Ruleset folder '{ruleset_id}' not found.",
         )
     deleted_rules = service.delete_folder(ruleset_id)
-    return {
-        "success": True,
-        "ruleset_id": ruleset_id,
-        "deleted_rules": deleted_rules,
-    }
+    return RuleFolderDeleteResponse(
+        success=True,
+        ruleset_id=ruleset_id,
+        deleted_rules=deleted_rules,
+    )
 
 
 @router.post(
@@ -985,11 +990,11 @@ def delete_rule(
     service.delete_rule(rule_id)
 
 
-@router.post("/extract", summary="Extract rules from document text or file")
+@router.post("/extract", response_model=RuleExtractionResponse, summary="Extract rules from document text or file")
 async def extract_rules(
     file: Optional[UploadFile] = File(None),
     raw_text: Optional[str] = Form(None),
-) -> dict:
+) -> RuleExtractionResponse:
     """Extract compliance rules from uploaded document or provided raw text via LLM."""
     text = ""
     if file is not None and file.filename:
@@ -1011,11 +1016,11 @@ async def extract_rules(
 
     extraction_service = RuleExtractionService()
     result = await extraction_service.extract_rules_from_text(text)
-    return {
-        "rules": result.rules,
-        "warnings": result.warnings,
-        "count": len(result.rules),
-    }
+    return RuleExtractionResponse(
+        rules=result.rules,
+        warnings=result.warnings,
+        count=len(result.rules),
+    )
 
 
 @router.patch(
@@ -1050,12 +1055,12 @@ def promote_rule_draft(draft_id: int) -> dict:
     return created
 
 
-@router.post("/seed", summary="Seed rule library with engine rulesets")
+@router.post("/seed", response_model=RuleSeedResponse, summary="Seed rule library with engine rulesets")
 def seed_rules(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[RuleService, Depends(get_rules_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
-) -> dict:
+) -> RuleSeedResponse:
     """Seed corrosion mechanisms GC-001, CC-001, MC-001 into the rule library.
 
     Superadmin only: this reseeds the platform's built-in engine rulesets
@@ -1067,19 +1072,19 @@ def seed_rules(
 
     seeded = seed_engine_rulesets(service)
     total_rules = service.count()
-    return {
-        "success": True,
-        "seeded_rulesets": seeded,
-        "total_rules": total_rules,
-    }
+    return RuleSeedResponse(
+        success=True,
+        seeded_rulesets=seeded,
+        total_rules=total_rules,
+    )
 
 
-@router.post("/bulk", summary="Bulk insert extracted compliance rules")
+@router.post("/bulk", response_model=RuleBulkCreateResponse, summary="Bulk insert extracted compliance rules")
 def bulk_create_rules(
     rules: list[RuleCreateRequest],
     service: Annotated[RuleService, Depends(get_rules_service)],
     ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
-) -> dict:
+) -> RuleBulkCreateResponse:
     """Save a batch of extracted rules into the library.
 
     Grant-checked only for a ``ruleset_id`` that already exists -- see
@@ -1127,10 +1132,10 @@ def bulk_create_rules(
             except Exception as row_exc:
                 logger.warning("Could not bulk create rule %s: %s", payload.rule_id, row_exc)
 
-    return {
-        "success": True,
-        "created_count": created_count,
-        "total_requested": len(rules),
-    }
+    return RuleBulkCreateResponse(
+        success=True,
+        created_count=created_count,
+        total_requested=len(rules),
+    )
 
 

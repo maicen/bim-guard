@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-ssr
+src/lib/generated
 *.local
 .vscode/*
 !.vscode/extensions.json

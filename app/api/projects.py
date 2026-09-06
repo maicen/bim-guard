@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import (
     APIRouter,
@@ -43,6 +43,8 @@ from app.modules.contracts import (
     AnalysisInputItemContract,
     AttachRepoModelsRequest,
     BuildingCodeOption,
+    IsoNamingValidationResponse,
+    ModelEnhancementResponse,
     ProjectBulkActionResponse,
     ProjectBulkDeleteRequest,
     ProjectBulkUpdateRequest,
@@ -711,11 +713,15 @@ def download_project_ifc(
     )
 
 
-@router.get("/{project_id}/enhancements", summary="Get model lineage history")
+@router.get(
+    "/{project_id}/enhancements",
+    response_model=list[dict[str, Any]],
+    summary="Get model lineage history",
+)
 def get_project_enhancements(
     project_id: int,
     project: Annotated[dict, Depends(get_authorized_project)],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Retrieve immutable model lineage versions and quality improvement records."""
     from app.services.model_lineage import SupabaseModelLineageRepository
 
@@ -727,12 +733,16 @@ class EnhanceRequest(BaseModel):
     token: Optional[str] = ""
 
 
-@router.post("/{project_id}/enhance", summary="Trigger IFC model quality improvements")
+@router.post(
+    "/{project_id}/enhance",
+    response_model=ModelEnhancementResponse,
+    summary="Trigger IFC model quality improvements",
+)
 def trigger_project_enhancement(
     project_id: int,
     project: Annotated[dict, Depends(get_authorized_project)],
     payload: Optional[EnhanceRequest] = None,
-) -> dict:
+) -> ModelEnhancementResponse:
     """Execute model enhancement pipeline and persist a new immutable version."""
     from app.services.pipeline_services import execute_model_enhancement
 
@@ -747,7 +757,7 @@ def trigger_project_enhancement(
             project_id=project_id,
             source_reference=project["ifc_file_path"],
         )
-        return result
+        return ModelEnhancementResponse(**result)
     except Exception as exc:
         logger.error("Enhancement failed: %s", exc)
         raise HTTPException(
@@ -1174,17 +1184,21 @@ def approve_project_cde_state(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
-@router.get("/{project_id}/cde/validate-naming", summary="Validate project IFC container ISO 19650 naming")
+@router.get(
+    "/{project_id}/cde/validate-naming",
+    response_model=IsoNamingValidationResponse,
+    summary="Validate project IFC container ISO 19650 naming",
+)
 def validate_project_iso_naming(
     project_id: int,
     project: Annotated[dict, Depends(get_authorized_project)],
-) -> dict:
+) -> IsoNamingValidationResponse:
     """Validate project attached primary model filename against ISO 19650 National Annex."""
     from app.modules.document_parsing.iso_validator import ISO19650Validator
 
     filename = project.get("ifc_file_path", "")
     val = ISO19650Validator.validate_filename(filename)
-    return val.to_dict()
+    return IsoNamingValidationResponse(**val.to_dict())
 
 
 # ---------------------------------------------------------------------------
