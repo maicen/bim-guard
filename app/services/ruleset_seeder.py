@@ -20,6 +20,59 @@ _DEFAULT_CODE_RULESET_FILES = (
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
+# ---------------------------------------------------------------------------
+# MC-001 temperature class bounds
+# ---------------------------------------------------------------------------
+# The ruleset states each temperature class as a human range string ("25–45°C")
+# and nothing else. classify_temperature needs numbers, and the catalog used to
+# supply 0.0 for both bounds when they were absent, so ``t_min <= t <= t_max``
+# was false for every real temperature and every element fell through to the
+# T4_SAFE_HOT fallback -- risk 0.05, the *lowest* of the six. Water sitting at
+# 35 °C in the middle of the Legionella danger zone scored as safely hot.
+#
+# These are transcriptions of the published range strings, not new thresholds:
+#
+#   T0_COLD       "< 20°C"     -273.15 .. 20     open below, so absolute zero
+#   T1_MARGINAL   "20–25°C"          20 .. 25
+#   T2_DANGER     "25–45°C"          25 .. 45
+#   T3_TOLERABLE  "45–55°C"          45 .. 55
+#   T4_SAFE_HOT   "> 55°C"           55 .. 1000  open above, so beyond any
+#                                                building service temperature
+#   T5_UNKNOWN    "Unknown"          no bounds -- it is not a temperature range
+#                                                but the absence of one, and
+#                                                classify_temperature selects it
+#                                                by name rather than by compare
+#
+# Intervals are half-open [t_min, t_max) as classify_temperature evaluates
+# them, so the shared endpoints belong to the warmer class and no temperature
+# matches two rows.
+_TEMPERATURE_BOUNDS: dict[str, tuple[float, float]] = {
+    "T0_COLD": (-273.15, 20.0),
+    "T1_MARGINAL": (20.0, 25.0),
+    "T2_DANGER": (25.0, 45.0),
+    "T3_TOLERABLE": (45.0, 55.0),
+    "T4_SAFE_HOT": (55.0, 1000.0),
+}
+
+
+def _temperature_bounds(class_key: str) -> dict[str, float]:
+    """Return the numeric bounds for an MC-001 temperature class.
+
+    Args:
+        class_key: The class key, e.g. ``"T2_DANGER"``.
+
+    Returns:
+        ``{"t_min": ..., "t_max": ...}``, or ``{}`` for a class that has no
+        range. Empty is meaningful and must not become ``0.0``: the catalog
+        now drops a bounded class that lacks numbers rather than silently
+        giving it a zero-width interval.
+    """
+    bounds = _TEMPERATURE_BOUNDS.get(class_key)
+    if bounds is None:
+        return {}
+    return {"t_min": bounds[0], "t_max": bounds[1]}
+
+
 def _load(filename: str) -> dict:
     asset_key_map = {
         "building_code_part9_ruleset.json": "ruleset:BUILDING-CODE-PART9",
@@ -581,7 +634,9 @@ def _seed_mc001(svc: RuleService) -> int:
             check_value=data["risk"],
             unit="°C",
             source_text=f"Source: {data.get('reference', 'WHO GDWQ / CIBSE TM13')}",
-            parameters=json.dumps({**data, "class_key": t_key}),
+            parameters=json.dumps(
+                {**data, **_temperature_bounds(t_key), "class_key": t_key}
+            ),
         )
 
     # ── Dead-leg classes ──────────────────────────────────────────────────────
