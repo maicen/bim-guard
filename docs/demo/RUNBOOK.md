@@ -110,7 +110,7 @@ uv run python scripts/prewarm_demo.py --piping <PIPING_PROJECT_ID> --seismic <SE
 For the projects used below that is:
 
 ```powershell
-uv run python scripts/prewarm_demo.py --piping 1541 1540 --seismic 1542
+uv run python scripts/prewarm_demo.py --piping 1917 1540 --seismic 1542
 ```
 
 What to expect:
@@ -143,26 +143,46 @@ will not touch, or raise `BIMGUARD_CACHE_ENTRIES` before starting the backend.
 
 ## The walkthrough
 
-### 1. Piping audit on the data-bearing project (1541)
+### 1. Piping audit on the data-bearing project (1917)
 
-Open **Compliance Audit → Piping**, project *FINAL AUDIT Piping MEP Scenario*.
-The page loads its stored result on mount — no need to press Run Audit.
+Open **Compliance Audit → Piping**, project *BIMGUARD Demo — Hospital MEP
+(data)*. The page loads its stored result on mount — no need to press Run Audit.
 
-Expect: **14 findings**, stat cards reading TOTAL FINDINGS 9, CRITICAL 0, HIGH
-RISK 0, MEDIUM RISK 5, LOW RISK 4, DATA QUALITY 5.
+Expect: **1,988 findings** over 420 elements, stat cards reading TOTAL FINDINGS
+1,706, CRITICAL 10, HIGH RISK 168, MEDIUM RISK 1,206, LOW RISK 322, DATA QUALITY
+282.
+
+Per engine (Critical / High / Medium / Low / Data Quality):
+
+| Engine | Crit | High | Medium | Low | DQ | Total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| GC-001 | 0 | 0 | 56 | 322 | 42 | 420 |
+| CC-001 | 0 | 70 | 308 | 0 | 42 | 420 |
+| MC-001 | 10 | 64 | 220 | 0 | 126 | 420 |
+| MM-001 | 0 | 0 | 146 | 0 | 36 | 182 |
+| XM-001 | 0 | 34 | 476 | 0 | 36 | 546 |
 
 - **Five engine chips** (GC-001, CC-001, MC-001, MM-001, XM-001) are lit. Each
   is a separate compliance kernel reading rules from the database.
 - **Untick a chip** — say XM-001 — and the table reloads from cache. Tick it
   back to restore.
-- **Severity filter**: switch to Medium to show only the 5 scored verdicts.
-- **CSV** downloads the asset register: 14 rows, every assessed element plus
-  every data-quality note.
-- **BCF 2.1** downloads **5 topics** — the 4 CC-001 and 1 MM-001 Medium
-  verdicts. BCF carries Medium and above only, because the rulesets define a Low
-  verdict as "asset register only — no BCF issue" and a data-quality note is a
-  modelling gap for the BIM coordinator rather than a coordination task to
+- **Severity filter**: switch to Critical to show the 10 MC-001 verdicts. All
+  ten are Condensate Drain elements, which run at ~30 °C and therefore land in
+  the Legionella danger band `T2_DANGER` (25–45 °C, CIBSE TM13:2013).
+- **CSV** downloads the asset register: **1,988 rows** — 1,706 verdicts plus 282
+  data-quality notes, every assessed element covered.
+- **BCF 2.1** downloads **1,384 topics** — Medium (1,206) + High (168) +
+  Critical (10). BCF carries Medium and above only, because the rulesets define
+  a Low verdict as "asset register only — no BCF issue" and a data-quality note
+  is a modelling gap for the BIM coordinator rather than a coordination task to
   assign in Revit or Solibri.
+
+This is the project to demo GC-001 provenance on: 151 of its 420 elements
+declare a second material in `Pset_BimGuardCouple.SecondaryMaterial`, so their
+findings carry `galvanic_couple = bimetallic_pair_from_model` and a real
+`material_a`/`material_b` pair. The other 227 scored elements show
+`single_material_self_couple`, and 42 are data-quality notes with no couple at
+all.
 
 Open one finding's Details to show the citations and the provenance fields —
 `material_source`, `environment_source`, `ruleset_version` (e.g.
@@ -254,10 +274,12 @@ State these plainly if asked; every one is measured, not estimated.
   does carry them, and the parser reads `FlowVelocity`, `OperatingTemperature`
   and `DeadLegLength` from the Psets — so demonstrate MC-001 on that model, and
   be straight that the data is authored rather than found in the wild.
-- **MC-001 temperature classes are pending a migration.**
+- **MC-001 temperature classes depend on a manually-applied migration.**
   `supabase/migrations/20260905220000_mc001_temperature_bounds.sql` supplies the
-  numeric `t_min`/`t_max` bounds; until it is applied the live catalog exposes
-  only `T5_UNKNOWN` with no bounds, so temperature cannot be classified.
+  numeric `t_min`/`t_max` bounds; without them the live catalog exposes only
+  `T5_UNKNOWN` and temperature cannot be classified. The bounds are live now —
+  all six classes load and `temperature_bounds_missing` is empty.
+  Migration 20260905220000_mc001_temperature_bounds.sql applied manually via the Supabase SQL Editor on 6 Sept 2026; not in Supabase's migration history.
 - **GC-001 scores a real bimetallic couple only where the model declares a
   second material** — the parser reads it from the `SecondaryMaterial` property
   into `material_b`. With one material GC-001 scores a self-couple and records
