@@ -53,12 +53,31 @@ class BCFIssue:
     #: Empty falls back to :data:`DEFAULT_CREATION_AUTHOR` rather than naming
     #: an engine that did not run.
     creation_author: str = ""
+    #: ``Topic/@TopicType``. One of :data:`TOPIC_TYPES`. Defaults to ``Issue``,
+    #: which is right for a compliance verdict; a clash and a data-quality note
+    #: are different kinds of thing and say so.
+    topic_type: str = "Issue"
 
 
 #: Used when a caller supplies no ``creation_author``. Deliberately generic:
 #: naming a specific engine here is what made every archive claim GC-001/CC-001
 #: authorship, seismic clashes included.
 DEFAULT_CREATION_AUTHOR = "BIMGUARD AI"
+
+#: The complete set of ``TopicType`` values BIMGUARD emits, and the only values
+#: ``extensions.xsd`` will declare. A coordinator filtering by type gets three
+#: meaningful buckets rather than one.
+#:
+#:   ``Clash``   a geometric interference — SB-001 seismic bracing clearance
+#:   ``Issue``   a compliance verdict against a scored element
+#:   ``Warning`` a data-quality note: something could not be assessed
+TOPIC_TYPES: tuple[str, ...] = ("Clash", "Issue", "Warning")
+
+#: The complete set of ``TopicStatus`` values BIMGUARD emits.
+TOPIC_STATUSES: tuple[str, ...] = ("Open",)
+
+#: The complete set of ``Priority`` values BIMGUARD emits, most severe first.
+TOPIC_PRIORITIES: tuple[str, ...] = ("Critical", "Major", "Normal", "Minor")
 
 
 def _utc_now() -> str:
@@ -226,7 +245,7 @@ def _markup_xml(
       <Filename>BIMGUARD_AI_Model.ifc</Filename>
     </File>
   </Header>
-  <Topic Guid="{topic_guid}" TopicType="Issue" TopicStatus="{_xml_attr(issue.status)}">
+  <Topic Guid="{topic_guid}" TopicType="{_xml_attr(issue.topic_type or 'Issue')}" TopicStatus="{_xml_attr(issue.status)}">
     <ReferenceLink></ReferenceLink>
     <Title>{_xml_text(issue.title)}</Title>
     <Priority>{_xml_text(issue.priority)}</Priority>

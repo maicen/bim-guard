@@ -271,6 +271,33 @@ def _creation_author(issue: Issue) -> str:
     return f"{DEFAULT_CREATION_AUTHOR} {engine} {revision}"
 
 
+#: Engines whose findings are geometric interferences rather than compliance
+#: verdicts. SB-001 reports one element intruding into another's clearance
+#: halo, which is a clash in every coordination tool's vocabulary.
+_CLASH_ENGINES: frozenset[str] = frozenset({"SB-001"})
+
+
+def _topic_type(issue: Issue) -> str:
+    """Return the BCF ``TopicType`` for ``issue``.
+
+    Three kinds of thing reach the archive and they are not interchangeable:
+
+    * ``Warning`` — a data-quality note. Something could not be assessed; it is
+      a modelling gap for the BIM coordinator, not a defect in the building.
+    * ``Clash`` — a geometric interference (SB-001).
+    * ``Issue`` — a compliance verdict against a scored element.
+
+    Emitting ``Issue`` for all three, as this did before, made 2,937 seismic
+    clashes and every data-quality note indistinguishable from a verdict in
+    any tool that filters on topic type.
+    """
+    if _is_data_quality(issue):
+        return "Warning"
+    if _engine_code(issue) in _CLASH_ENGINES:
+        return "Clash"
+    return "Issue"
+
+
 def _bcf_issue(issue: Issue) -> BCFIssue:
     """Map one :class:`Issue` onto the existing :class:`BCFIssue`.
 
@@ -310,6 +337,7 @@ def _bcf_issue(issue: Issue) -> BCFIssue:
         risk_score=issue.score,
         mitigation=issue.mitigation,
         creation_author=_creation_author(issue),
+        topic_type=_topic_type(issue),
     )
 
 

@@ -391,3 +391,58 @@ class TestBCFRulesetLabels:
         markup = _markup_for({"audit_issues": [bare]}, "XM-0001")
         assert "ruleset:" not in markup
         assert "<Labels>XM-001</Labels>" in markup
+
+
+class TestBCFTopicType:
+    """A clash, a verdict and a data-quality note are different kinds of topic.
+
+    Before this, all 4,321 topics in the demo archives were ``TopicType="Issue"``,
+    so no coordination tool could filter the 2,937 seismic clashes apart from
+    the corrosion verdicts, or either from the data-quality notes.
+    """
+
+    def test_seismic_finding_is_a_clash(self):
+        seismic = issue(id="SB-0001", mechanism="SB-001 seismic bracing")
+        seismic.rule_id = "SB-001.01"
+        assert 'TopicType="Clash"' in _markup_for({"audit_issues": [seismic]}, "SB-0001")
+
+    def test_data_quality_note_is_a_warning(self):
+        markup = _markup_for({"audit_issues": [data_quality_issue()]}, "MC-0009")
+        assert 'TopicType="Warning"' in markup
+
+    def test_corrosion_verdict_stays_an_issue(self):
+        assert 'TopicType="Issue"' in _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+
+    def test_a_seismic_data_quality_note_is_a_warning_not_a_clash(self):
+        """Data quality wins over the engine: nothing was measured to clash."""
+        from app.modules.comparator.issue_schema import make_issue
+
+        note = make_issue(
+            id="SB-0009",
+            element_id="GUID-09",
+            rule_id="SB-001.DQ",
+            title="Bracing could not be evaluated",
+            mechanism=DATA_QUALITY,
+            band=RiskBand.LOW,
+            score=0.0,
+            mitigation="Review the IFC source.",
+            assignee_role="BIM coordinator",
+            metadata={"check": "geometry_unavailable"},
+            citations=[],
+        )
+        assert 'TopicType="Warning"' in _markup_for({"audit_issues": [note]}, "SB-0009")
+
+    def test_every_emitted_type_is_declared_in_the_known_set(self):
+        from app.modules.reporter.bcf_generator import TOPIC_TYPES
+
+        seismic = issue(id="SB-0002", mechanism="SB-001 seismic bracing")
+        seismic.rule_id = "SB-001.01"
+        result = {"audit_issues": [issue(id="GC-0002"), seismic, data_quality_issue()]}
+        with zipfile.ZipFile(io.BytesIO(to_bcf(result))) as zf:
+            found = set()
+            for name in zf.namelist():
+                if name.endswith("markup.bcf"):
+                    text = zf.read(name).decode("utf-8")
+                    found.add(text.split('TopicType="', 1)[1].split('"', 1)[0])
+        assert found == {"Issue", "Clash", "Warning"}
+        assert found <= set(TOPIC_TYPES)
