@@ -76,7 +76,7 @@
           onclick={() => push("/login")}
           class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/50 transition-all hover:scale-[1.02] hover:bg-accent-hover"
         >
-          Sign in with Google
+          Get started
           <ArrowRight class="h-4 w-4" />
         </button>
       </div>

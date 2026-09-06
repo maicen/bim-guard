@@ -1,11 +1,17 @@
 <script lang="ts">
   import { push } from "svelte-spa-router";
-  import { ShieldCheck } from "lucide-svelte";
+  import { ShieldCheck, Mail, Lock } from "lucide-svelte";
   import { authState } from "../lib/auth.svelte";
   import { isAuthConfigured } from "../lib/supabaseClient";
 
+  type Mode = "sign-in" | "sign-up";
+
+  let mode = $state<Mode>("sign-in");
+  let email = $state("");
+  let password = $state("");
   let signingIn = $state(false);
   let error = $state<string | null>(null);
+  let confirmationSent = $state(false);
 
   const devAuthConfigured =
     import.meta.env.DEV &&
@@ -17,6 +23,12 @@
     if (authState.user) push("/");
   });
 
+  function switchMode(next: Mode) {
+    mode = next;
+    error = null;
+    confirmationSent = false;
+  }
+
   async function handleGoogleSignIn() {
     signingIn = true;
     error = null;
@@ -24,6 +36,29 @@
       await authState.signInWithGoogle();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
+      signingIn = false;
+    }
+  }
+
+  async function handleEmailSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    signingIn = true;
+    error = null;
+    confirmationSent = false;
+    try {
+      if (mode === "sign-in") {
+        await authState.signInWithPassword(email, password);
+      } else {
+        const { needsEmailConfirmation } = await authState.signUp(email, password);
+        if (needsEmailConfirmation) {
+          confirmationSent = true;
+        }
+        // Otherwise the project has email confirmation off: signUp already
+        // issued a session, and the $effect above redirects once it lands.
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
       signingIn = false;
     }
   }
@@ -48,8 +83,10 @@
       <ShieldCheck class="h-6 w-6" />
     </div>
     <div>
-      <h1 class="text-lg font-semibold text-slate-100">Sign in to BIM Guard</h1>
-      <p class="mt-1 text-xs text-slate-400">Use your Google account to continue.</p>
+      <h1 class="text-lg font-semibold text-slate-100">
+        {mode === "sign-in" ? "Sign in to BIM Guard" : "Create your BIM Guard account"}
+      </h1>
+      <p class="mt-1 text-xs text-slate-400">Continue with Google or your email.</p>
     </div>
 
     {#if !isAuthConfigured}
@@ -62,6 +99,12 @@
     {#if error}
       <p class="rounded-lg border border-rose-800/60 bg-rose-950/40 px-3 py-2 text-xs text-rose-300">
         {error}
+      </p>
+    {/if}
+
+    {#if confirmationSent}
+      <p class="rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 py-2 text-xs text-emerald-300">
+        Check {email} for a confirmation link, then sign in.
       </p>
     {/if}
 
@@ -91,6 +134,83 @@
       </svg>
       {signingIn ? "Redirecting…" : "Continue with Google"}
     </button>
+
+    <div class="flex items-center gap-3 text-micro font-medium uppercase tracking-wider text-slate-500">
+      <span class="h-px flex-1 bg-slate-800"></span>
+      <span>or</span>
+      <span class="h-px flex-1 bg-slate-800"></span>
+    </div>
+
+    <form class="space-y-3 text-left" onsubmit={handleEmailSubmit}>
+      <div class="space-y-1">
+        <label for="login-email" class="text-caption font-medium text-slate-400">Email</label>
+        <div class="relative">
+          <Mail class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <input
+            id="login-email"
+            type="email"
+            required
+            autocomplete="email"
+            bind:value={email}
+            disabled={signingIn || !isAuthConfigured}
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-none disabled:opacity-60"
+            placeholder="you@company.com"
+          />
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <label for="login-password" class="text-caption font-medium text-slate-400">Password</label>
+        <div class="relative">
+          <Lock class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <input
+            id="login-password"
+            type="password"
+            required
+            minlength="6"
+            autocomplete={mode === "sign-in" ? "current-password" : "new-password"}
+            bind:value={password}
+            disabled={signingIn || !isAuthConfigured}
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-none disabled:opacity-60"
+            placeholder="••••••••"
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={signingIn || !isAuthConfigured}
+        class="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {#if signingIn}
+          {mode === "sign-in" ? "Signing in…" : "Creating account…"}
+        {:else}
+          {mode === "sign-in" ? "Sign in" : "Create account"}
+        {/if}
+      </button>
+    </form>
+
+    <p class="text-xs text-slate-400">
+      {#if mode === "sign-in"}
+        Don't have an account?
+        <button
+          type="button"
+          onclick={() => switchMode("sign-up")}
+          class="font-semibold text-accent hover:underline"
+        >
+          Sign up
+        </button>
+      {:else}
+        Already have an account?
+        <button
+          type="button"
+          onclick={() => switchMode("sign-in")}
+          class="font-semibold text-accent hover:underline"
+        >
+          Sign in
+        </button>
+      {/if}
+    </p>
 
     {#if devAuthConfigured}
       <button

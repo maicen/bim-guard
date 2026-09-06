@@ -1,8 +1,8 @@
 /**
- * Signed-in session state, backed by Supabase Auth (Google OAuth). A single
- * instance is created below and shared everywhere — the browser's Supabase
- * session (not this class) is the actual source of truth; this just mirrors
- * it into runes so components can react to it.
+ * Signed-in session state, backed by Supabase Auth (Google OAuth or
+ * email/password). A single instance is created below and shared everywhere
+ * — the browser's Supabase session (not this class) is the actual source of
+ * truth; this just mirrors it into runes so components can react to it.
  */
 
 import type { Session, User } from "@supabase/supabase-js";
@@ -123,6 +123,35 @@ class AuthState {
       options: { redirectTo: `${window.location.origin}/` },
     });
     if (error) throw error;
+  }
+
+  /** Sign in with an existing email/password account. */
+  async signInWithPassword(email: string, password: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  }
+
+  /**
+   * Create a new account with email and password. Accounts land in this
+   * Supabase project's Auth > Users table, same as a Google sign-in.
+   *
+   * Whether the caller is signed in immediately depends on the project's
+   * "Confirm email" setting: with it on (Supabase's default), `data.session`
+   * comes back null and the caller must click the confirmation link emailed
+   * to them before `signInWithPassword` will work; with it off, a session is
+   * issued right away and `onAuthStateChange` picks it up like any other
+   * sign-in. The returned flag tells the caller which case they're in so the
+   * UI can show a "check your email" message rather than silently doing
+   * nothing.
+   */
+  async signUp(email: string, password: string): Promise<{ needsEmailConfirmation: boolean }> {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/` },
+    });
+    if (error) throw error;
+    return { needsEmailConfirmation: !data.session };
   }
 
   /**

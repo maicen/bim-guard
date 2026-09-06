@@ -120,7 +120,7 @@ uv run pytest -m "not llm"      # skip tests that call an LLM
 
 ## Local Dev Sign-In (Google OAuth bypass without weakening auth)
 
-Frontend auth is Google OAuth only (`frontend/src/lib/auth.svelte.ts`), which normally requires clicking through Google's consent screen. For local development there is a seeded Supabase Auth test account (`dev@bim-guard.local`) that signs in via a real password grant instead — the backend still verifies a genuine Supabase JWT against the JWKS (`app/auth.py`), so nothing about the auth path is bypassed or weakened.
+Frontend auth (`frontend/src/lib/auth.svelte.ts`) supports Google OAuth and email/password (sign-in and self-serve sign-up) against Supabase Auth. New accounts land in this project's Auth > Users table (https://supabase.com/dashboard/project/pmisdhiigakpjfuyxgfb/auth/users) the same as a Google sign-in. For local development there is additionally a seeded Supabase Auth test account (`dev@bim-guard.local`) that signs in via a real password grant instead — the backend verifies a genuine Supabase JWT against the JWKS (`app/auth.py`) regardless of which method produced it, so nothing about the auth path is bypassed or weakened.
 
 **To use it on any machine (no per-device setup needed — the account lives in the shared Supabase project):**
 
