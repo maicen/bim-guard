@@ -124,7 +124,7 @@ Frontend auth is Google OAuth only (`frontend/src/lib/auth.svelte.ts`), which no
 
 **To use it on any machine (no per-device setup needed — the account lives in the shared Supabase project):**
 
-1. Copy `frontend/.env.example` to `frontend/.env` — it already ships working `VITE_DEV_AUTH_EMAIL` / `VITE_DEV_AUTH_PASSWORD` values for the shared dev account.
+1. Copy `frontend/.env.example` to `frontend/.env` — it ships the shared dev account's `VITE_DEV_AUTH_EMAIL` / `VITE_DEV_AUTH_PASSWORD` values, but `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are placeholders you must fill from the team's shared values, or sign-in fails with `401 Invalid API key`.
 2. Run `cd frontend && npm run dev`. A "Sign in as dev test user" button appears on the login screen automatically in dev builds (gated on `import.meta.env.DEV`); click it to sign in as `dev@bim-guard.local`.
 
 **Rules:**
