@@ -163,13 +163,13 @@ class SQLiteTableAdapter(DatabaseAdapter):
         """Insert one row."""
         return self._table.insert(payload)
 
-    def insert_many(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def insert_many(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert multiple rows."""
         if not payloads:
             return []
         try:
-            self._table.insert_all(payloads)
-            return payloads
+            inserted = self._table.insert_all(payloads)
+            return inserted if inserted is not None else payloads
         except Exception:
             return [self.insert(payload) for payload in payloads]
 
