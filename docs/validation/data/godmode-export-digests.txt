@@ -1,0 +1,14 @@
+# God-mode audit export digests — 99cdffc — 2026-09-07
+# Archives are not committed (>1 MB). Digests and topic counts recorded here.
+
+1917-corrosion.bcf  bytes=2597166  sha256=308d7bff6f4cda7cfbae59d6832c144533e5e4eb889a38e7c2a8c62d22cc74ca
+1542-seismic.bcf  bytes=5510727  sha256=87ba16be6485284d404acecaf9e47c0c838ce75b488afe15df2ad4e1607ec6d5
+1917-corrosion.csv  bytes=828244  sha256=466e209df5c58b44050089fd098309a4c988c60078322978b6e29384be2edcc7
+1917-corrosion.json  bytes=3350798  sha256=0d2e4ae3964568e431968856da1960692cbd777bd003f5fed7772a548d72700f
+1542-seismic.csv  bytes=1328453  sha256=f8610e3427b44e3ee15ab31e9615ab50e5ce93b548725e8a9e7f368e4a136b82
+1542-seismic.json  bytes=4943685  sha256=42494666fe3d9918408ae10636071648e0f34517d04e27369a9eeca1a2596b31
+
+BCF topic counts: 1917-corrosion.bcf=1384  1542-seismic.bcf=2937
+XSD validation: 2/2 archives valid, 4321 topics, 0 violations
+Demo IFC: data/test_hospital_mep_demo.ifc bytes=717766 sha256=302dcad174e8b94d7196527365d95aae1596861f90457473ca7d74e451f30b54
+1540 model: bytes=23762808 sha256=bb53f0eb8f7295e91e0fb6ec6b79a30022a2e0e248714aab6bb1a8930c4793dd
