@@ -12,6 +12,7 @@
    * markdown converted to markup by hand, wording untouched.
    */
   import { ChevronDown, BookOpen } from "lucide-svelte";
+  import type { Snippet } from "svelte";
 
   interface Props {
     /** Engine ids currently ticked in the ENGINES chip row, e.g. ["GC", "MC"]. */
@@ -100,7 +101,7 @@
       </section>
 
       <!-- One expandable row per check, in chip order -->
-      {#snippet row(id: string, title: string, body: () => unknown)}
+      {#snippet row(id: string, title: string, body: Snippet)}
         {@const on = isSelected(id)}
         <div
           class="overflow-hidden rounded-xl border transition-colors {on
