@@ -236,14 +236,21 @@ def test_comment_guid_is_an_attribute():
 
 
 def test_visibility_precedes_coloring():
-    """Regression 5: Components sequence is Selection, Visibility, Coloring."""
+    """Regression 5: Components follows the visinfo.xsd sequence.
+
+    The schema orders it ViewSetupHints, Selection, Visibility, Coloring
+    (visinfo.xsd:98-105). ViewSetupHints joined the output when the exporter
+    began declaring SpacesVisible="false"; the ordering invariant this test
+    exists to protect is unchanged, and Visibility still precedes Coloring.
+    """
     import xml.etree.ElementTree as ET
 
     bcf_bytes = generate_bcf([create_test_bcf_issue()])
     root = ET.fromstring(_read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0]))
 
     tags = [child.tag for child in root.find("Components")]
-    assert tags == ["Selection", "Visibility", "Coloring"]
+    assert tags == ["ViewSetupHints", "Selection", "Visibility", "Coloring"]
+    assert tags.index("Visibility") < tags.index("Coloring")
 
 
 def test_synthetic_element_guids_are_valid_ifc_guids():

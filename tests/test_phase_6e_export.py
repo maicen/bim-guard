@@ -982,3 +982,67 @@ class TestBCFTitleConvention:
         odd.rule_id = "not-a-rule-id"
         title = self._title(_markup_for({"audit_issues": [odd]}, "ZZ-0001"))
         assert title == odd.title
+
+
+def _viewpoint_for(result: dict, finding_id: str) -> str:
+    """Return the viewpoint.bcfv text of the topic exported from ``finding_id``."""
+    from app.modules.reporter.bcf_generator import bcf_topic_guid
+
+    folder = bcf_topic_guid(finding_id)
+    with zipfile.ZipFile(io.BytesIO(to_bcf(result))) as zf:
+        return zf.read(f"{folder}/viewpoint.bcfv").decode("utf-8")
+
+
+class TestBCFViewpointTruthfulness:
+    """The viewpoint must colour by band and must not invent a camera."""
+
+    def test_band_colour_is_applied_not_the_grey_fallback(self):
+        """Regression: the colour table was keyed upper-case, Issue.band is lower.
+
+        Every lookup missed, so all 4,321 topics across the 1917 and 1542
+        archives were coloured FF888888.
+        """
+        for band, colour in (
+            (RiskBand.CRITICAL, "FFC00000"),
+            (RiskBand.HIGH, "FFC05000"),
+            (RiskBand.MEDIUM, "FFFF8C00"),
+            (RiskBand.LOW, "FF107C10"),
+        ):
+            finding = issue(id=f"GC-{band.value}", band=band)
+            viewpoint = _viewpoint_for({"audit_issues": [finding]}, f"GC-{band.value}")
+            assert f'<Color Color="{colour}">' in viewpoint, band
+
+    def test_no_topic_is_coloured_the_unknown_fallback(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            for name in z.namelist():
+                if name.endswith("viewpoint.bcfv"):
+                    assert "FF888888" not in z.read(name).decode("utf-8")
+
+    def test_no_camera_is_written_when_no_position_is_known(self):
+        """A constant camera on every topic is a fabricated viewpoint."""
+        viewpoint = _viewpoint_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert "<PerspectiveCamera>" not in viewpoint
+
+    def test_a_caller_supplying_real_coordinates_still_gets_a_camera(self):
+        from app.modules.reporter.bcf_generator import generate_bcf
+
+        from tests.test_bcf_generator import create_test_bcf_issue
+
+        archive = generate_bcf([create_test_bcf_issue()])
+        with zipfile.ZipFile(io.BytesIO(archive)) as z:
+            name = [n for n in z.namelist() if n.endswith("viewpoint.bcfv")][0]
+            assert "<PerspectiveCamera>" in z.read(name).decode("utf-8")
+
+    def test_spaces_are_hidden_by_a_view_setup_hint(self):
+        viewpoint = _viewpoint_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert '<ViewSetupHints SpacesVisible="false"/>' in viewpoint
+
+    def test_viewpoint_without_a_camera_is_schema_valid(self):
+        xmlschema = pytest.importorskip("xmlschema")
+        from pathlib import Path
+
+        schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "visinfo.xsd"
+        )
+        viewpoint = _viewpoint_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert not [str(e.reason or e) for e in schema.iter_errors(viewpoint)]

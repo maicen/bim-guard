@@ -377,6 +377,30 @@ def _markup_xml(
 </Markup>"""
 
 
+#: The dataclass camera defaults. A BCFIssue still carrying all six means the
+#: caller supplied no position, so there is no viewpoint to write.
+_DEFAULT_CAMERA = (0.0, 0.0, 5.0, 0.0, 0.0, 0.0)
+
+
+def _has_real_camera(issue: "BCFIssue") -> bool:
+    """Report whether the caller supplied real camera coordinates.
+
+    ``phase_6e_export`` supplies none, because no finding records the
+    element's position or bounding box — the corrosion engines take a position
+    as input but never write it onto the Issue, and the seismic path records
+    its bounding boxes only inside the clash detector. Until one of those
+    surfaces the geometry, a camera here would be invented.
+    """
+    return (
+        issue.camera_x,
+        issue.camera_y,
+        issue.camera_z,
+        issue.target_x,
+        issue.target_y,
+        issue.target_z,
+    ) != _DEFAULT_CAMERA
+
+
 def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
     """Generate BCF 2.1 viewpoint.bcfv XML with camera position and component selection.
 
@@ -399,19 +423,15 @@ def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
         for guid in guids
     )
     coloring_xml = "\n".join(f"        <Component{_ifc_guid_attr(guid)}/>" for guid in guids)
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<VisualizationInfo Guid="{_xml_attr(viewpoint_guid)}">
-  <Components>
-    <Selection>
-{selection_xml}
-    </Selection>
-    <Visibility DefaultVisibility="true"/>
-    <Coloring>
-      <Color Color="{_risk_colour(issue.risk_band)}">
-{coloring_xml}
-      </Color>
-    </Coloring>
-  </Components>
+
+    # PerspectiveCamera is optional in visinfo.xsd and is written only when the
+    # caller supplied real coordinates. Left at the dataclass defaults it
+    # produced the identical camera -- viewpoint (5, -8, 8) aimed at
+    # (-5, 8, -8) -- on every topic in every archive, a position unrelated to
+    # the element that would send a coordinator to the same spot 4,321 times.
+    # Omitting it lets a viewer frame the selected components itself.
+    camera_xml = (
+        f"""
   <PerspectiveCamera>
     <CameraViewPoint>
       <X>{issue.camera_x + 5.0}</X>
@@ -429,17 +449,50 @@ def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
       <Z>1</Z>
     </CameraUpVector>
     <FieldOfView>60</FieldOfView>
-  </PerspectiveCamera>
+  </PerspectiveCamera>"""
+        if _has_real_camera(issue)
+        else ""
+    )
+
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<VisualizationInfo Guid="{_xml_attr(viewpoint_guid)}">
+  <Components>
+    <ViewSetupHints SpacesVisible="false"/>
+    <Selection>
+{selection_xml}
+    </Selection>
+    <Visibility DefaultVisibility="true"/>
+    <Coloring>
+      <Color Color="{_risk_colour(issue.risk_band)}">
+{coloring_xml}
+      </Color>
+    </Coloring>
+  </Components>{camera_xml}
 </VisualizationInfo>"""
 
 
+#: Band -> ARGB colour for the viewpoint's Coloring block.
+_BAND_COLOURS: dict[str, str] = {
+    "LOW": "FF107C10",
+    "MEDIUM": "FFFF8C00",
+    "HIGH": "FFC05000",
+    "CRITICAL": "FFC00000",
+}
+
+#: Used for a band this table does not know.
+UNKNOWN_BAND_COLOUR = "FF888888"
+
+
 def _risk_colour(band: str) -> str:
-    return {
-        "LOW": "FF107C10",
-        "MEDIUM": "FFFF8C00",
-        "HIGH": "FFC05000",
-        "CRITICAL": "FFC00000",
-    }.get(band, "FF888888")
+    """Return the ARGB colour for ``band``, case-insensitively.
+
+    The case fold is the fix for a silent defect: this table is keyed in upper
+    case while ``Issue.band.value`` — what the exporter passes — is lower case
+    ("medium"), so every lookup missed and every topic in every archive was
+    coloured the grey fallback. Measured before the fix: 4,321 of 4,321 topics
+    across the 1917 and 1542 demo archives were FF888888.
+    """
+    return _BAND_COLOURS.get(str(band or "").strip().upper(), UNKNOWN_BAND_COLOUR)
 
 
 def _priority_int(priority: str) -> str:
