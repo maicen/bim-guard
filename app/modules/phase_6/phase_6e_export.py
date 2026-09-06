@@ -326,7 +326,12 @@ def _bcf_issue(issue: Issue) -> BCFIssue:
         priority=BAND_TO_BCF_PRIORITY[issue.band],
         status="Open",
         assigned_to=issue.assignee_role,
-        due_date=datetime.now(timezone.utc).date().isoformat(),
+        # No due date. Nothing in a project, a rule or a finding carries one,
+        # and this previously emitted the export date -- so every topic in
+        # every archive claimed to be due the day it was downloaded, which is
+        # a fabricated commitment a coordinator could plan against.
+        # ``_markup_xml`` omits the element entirely when this is empty.
+        due_date="",
         labels=labels,
         component_guid=issue.element_id,
         component_name=str(issue.metadata.get("ifc_type", "") or issue.element_id),

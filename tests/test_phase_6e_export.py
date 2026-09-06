@@ -446,3 +446,34 @@ class TestBCFTopicType:
                     found.add(text.split('TopicType="', 1)[1].split('"', 1)[0])
         assert found == {"Issue", "Clash", "Warning"}
         assert found <= set(TOPIC_TYPES)
+
+
+class TestBCFDueDateIsNotFabricated:
+    """No source of truth carries a due date, so no topic may assert one.
+
+    This previously emitted ``datetime.now()``, so all 4,321 topics in the demo
+    archives claimed to be due on the day the archive was downloaded — a
+    commitment a coordinator could schedule against, invented by the exporter.
+    """
+
+    def test_no_topic_carries_a_due_date(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as zf:
+            for name in zf.namelist():
+                if name.endswith("markup.bcf"):
+                    assert "<DueDate>" not in zf.read(name).decode("utf-8")
+
+    def test_the_topic_is_still_schema_valid_without_one(self):
+        """DueDate is optional in markup.xsd; omitting it must not break order."""
+        xmlschema = pytest.importorskip("xmlschema")
+        from pathlib import Path
+
+        schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "markup.xsd"
+        )
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert not [str(e.reason or e) for e in schema.iter_errors(markup)]
+
+    def test_assigned_to_survives_the_removal(self):
+        """DueDate preceded AssignedTo in the sequence; AssignedTo must remain."""
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert "<AssignedTo>Mechanical engineer</AssignedTo>" in markup
