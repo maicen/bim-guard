@@ -1,0 +1,2857 @@
+{
+  "models_requested": [
+    "test-models\\models\\hospital\\Clinic_Architectural.ifc",
+    "test-models\\models\\hospital\\Clinic_Electrical.ifc",
+    "test-models\\models\\hospital\\Clinic_HVAC.ifc",
+    "test-models\\models\\hospital\\Clinic_Plumbing.ifc",
+    "test-models\\models\\hospital\\Clinic_Structural.ifc",
+    "test-models\\models\\hospital\\GVA_Sanitario.ifc",
+    "test-models\\models\\hospital\\west_riverside_hospital_arc_ifc4.ifc",
+    "test-models\\models\\hospital\\west_riverside_hospital_elec_ifc4.ifc",
+    "test-models\\models\\hospital\\west_riverside_hospital_fire_ifc4.ifc",
+    "test-models\\models\\hospital\\west_riverside_hospital_mech_ifc4.ifc",
+    "test-models\\models\\hospital\\west_riverside_hospital_plumb_ifc4.ifc",
+    "test-models\\models\\hospital\\west_riverside_hospital_sprinkle_ifc4.ifc",
+    "test-models\\models\\hospital\\west_riverside_hospital_str_ifc4.ifc",
+    "test-models\\models\\industrial\\aisc_sculpture_brep.ifc",
+    "test-models\\models\\industrial\\aisc_sculpture_param.ifc",
+    "test-models\\models\\industrial\\craslabbim.ifc",
+    "test-models\\models\\office\\AC20-FZK-Haus.ifc",
+    "test-models\\models\\office\\AC20-Institute-Var-2.ifc",
+    "test-models\\models\\office\\DigitalHub_FM-ARC_v2.ifc",
+    "test-models\\models\\office\\DigitalHub_FM-HZG_v2.ifc",
+    "test-models\\models\\office\\DigitalHub_FM-LFT_v2.ifc",
+    "test-models\\models\\office\\DigitalHub_FM-SAN_v2.ifc",
+    "test-models\\models\\office\\Duplex_A_20110907.ifc",
+    "test-models\\models\\office\\Duplex_Electrical_20121207.ifc",
+    "test-models\\models\\office\\Duplex_MEP_20110907.ifc",
+    "test-models\\models\\office\\Duplex_Plumbing_20121113.ifc",
+    "test-models\\models\\office\\GVA_Administrativo.ifc",
+    "test-models\\models\\office\\IFC_Schependomlaan.ifc",
+    "test-models\\models\\office\\Molio_with_URIs.ifc",
+    "test-models\\models\\office\\wbdg_office_arc.ifc",
+    "test-models\\models\\office\\wbdg_office_mep.ifc",
+    "test-models\\models\\office\\wbdg_office_str.ifc",
+    "test-models\\models\\schemas\\west_riverside_hospital_mech_ifc2x3.ifc",
+    "test-models\\models\\schemas\\west_riverside_hospital_plumb_ifc2x3.ifc"
+  ],
+  "include_low": true,
+  "totals": {
+    "models_analysed": 21,
+    "models_without_piping": 13,
+    "models_failed": 0,
+    "coverage": {
+      "piping_elements": 93457,
+      "material_from_ifc": 1780,
+      "material_inferred": 29885,
+      "material_unknown": 61792,
+      "environment_classified": 93457,
+      "environment_unclassified": 0,
+      "temperature_from_ifc": 0,
+      "temperature_inferred": 29968,
+      "temperature_unknown": 63489,
+      "material_coverage_pct": 33.88,
+      "environment_coverage_pct": 100.0,
+      "temperature_coverage_pct": 32.07
+    },
+    "by_engine": {
+      "CC-001": {
+        "findings_total": 537,
+        "findings_excluding_low": 537,
+        "data_quality_total": 93643
+      },
+      "GC-001": {
+        "findings_total": 537,
+        "findings_excluding_low": 0,
+        "data_quality_total": 93643
+      },
+      "MC-001": {
+        "findings_total": 0,
+        "findings_excluding_low": 0,
+        "data_quality_total": 94180
+      },
+      "MM-001": {
+        "findings_total": 13069,
+        "findings_excluding_low": 13069,
+        "data_quality_total": 63489
+      },
+      "XM-001": {
+        "findings_total": 16562,
+        "findings_excluding_low": 16562,
+        "data_quality_total": 4918
+      }
+    },
+    "mm001_findings_by_pairing": {
+      "GalvanisedSteel|stagnant_water": 13068,
+      "CarbonSteel|hot_water": 1
+    },
+    "bcf_archives_valid": 21,
+    "bcf_archives_total": 21
+  },
+  "models": [
+    {
+      "model": "Clinic_Architectural.ifc",
+      "path": "test-models\\models\\hospital\\Clinic_Architectural.ifc",
+      "parse_seconds": 1.62,
+      "element_count": 808,
+      "coverage": {
+        "piping_elements": 102,
+        "material": {
+          "total": 102,
+          "from_ifc": 0,
+          "inferred": 10,
+          "unknown": 92,
+          "coverage_pct": 9.8
+        },
+        "environment": {
+          "total": 102,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 102,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 102,
+          "from_ifc": 0,
+          "inferred": 10,
+          "unknown": 92,
+          "coverage_pct": 9.8
+        }
+      },
+      "analysis_seconds": 5.79,
+      "issues_total": 2526,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 522,
+          "findings_excluding_low": 522,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 522,
+            "low": 0
+          },
+          "data_quality_total": 286,
+          "data_quality_by_check": {
+            "material_unresolved": 286
+          }
+        },
+        "GC-001": {
+          "findings_total": 522,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 522
+          },
+          "data_quality_total": 286,
+          "data_quality_by_check": {
+            "material_unresolved": 286
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 808,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 808
+          }
+        },
+        "MM-001": {
+          "findings_total": 10,
+          "findings_excluding_low": 10,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 10,
+            "low": 0
+          },
+          "data_quality_total": 92,
+          "data_quality_by_check": {
+            "material_normalisation": 92
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {
+          "GalvanisedSteel|stagnant_water": 10
+        },
+        "bands_by_pairing": {
+          "GalvanisedSteel|stagnant_water": {
+            "medium": 10
+          }
+        },
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Clinic_Architectural.bcfzip",
+        "topics": 2526,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Clinic_Electrical.ifc",
+      "path": "test-models\\models\\hospital\\Clinic_Electrical.ifc",
+      "parse_seconds": 7.54,
+      "element_count": 2089,
+      "coverage": {
+        "piping_elements": 2089,
+        "material": {
+          "total": 2089,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 2089,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 2089,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 2089,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 2089,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 2089,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 6.54,
+      "issues_total": 8356,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 2089,
+          "data_quality_by_check": {
+            "material_unresolved": 2089
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 2089,
+          "data_quality_by_check": {
+            "material_unresolved": 2089
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 2089,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 2089
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 2089,
+          "data_quality_by_check": {
+            "material_normalisation": 2089
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Clinic_Electrical.bcfzip",
+        "topics": 8356,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Clinic_HVAC.ifc",
+      "path": "test-models\\models\\hospital\\Clinic_HVAC.ifc",
+      "parse_seconds": 10.94,
+      "element_count": 3704,
+      "coverage": {
+        "piping_elements": 3704,
+        "material": {
+          "total": 3704,
+          "from_ifc": 496,
+          "inferred": 0,
+          "unknown": 3208,
+          "coverage_pct": 13.39
+        },
+        "environment": {
+          "total": 3704,
+          "from_ifc": 0,
+          "spatial": 1,
+          "defaulted": 3703,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 3704,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 3704,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 8.82,
+      "issues_total": 31591,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3704,
+          "data_quality_by_check": {
+            "material_unresolved": 3704
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3704,
+          "data_quality_by_check": {
+            "material_unresolved": 3704
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3704,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 3704
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3704,
+          "data_quality_by_check": {
+            "material_normalisation": 3208,
+            "unmapped_pairing": 496
+          }
+        },
+        "XM-001": {
+          "findings_total": 16268,
+          "findings_excluding_low": 16268,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 16268,
+            "low": 0
+          },
+          "data_quality_total": 507,
+          "data_quality_by_check": {
+            "material_not_in_series": 507
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Clinic_HVAC.bcfzip",
+        "topics": 31591,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Clinic_Plumbing.ifc",
+      "path": "test-models\\models\\hospital\\Clinic_Plumbing.ifc",
+      "parse_seconds": 27.67,
+      "element_count": 6587,
+      "coverage": {
+        "piping_elements": 6587,
+        "material": {
+          "total": 6587,
+          "from_ifc": 528,
+          "inferred": 2035,
+          "unknown": 4024,
+          "coverage_pct": 38.91
+        },
+        "environment": {
+          "total": 6587,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 6587,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 6587,
+          "from_ifc": 0,
+          "inferred": 1693,
+          "unknown": 4894,
+          "coverage_pct": 25.7
+        }
+      },
+      "analysis_seconds": 14.48,
+      "issues_total": 27721,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 6587,
+          "data_quality_by_check": {
+            "material_unresolved": 6587
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 6587,
+          "data_quality_by_check": {
+            "material_unresolved": 6587
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 6587,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 6587
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 4894,
+          "data_quality_by_check": {
+            "material_normalisation": 4024,
+            "unmapped_pairing": 870
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3066,
+          "data_quality_by_check": {
+            "material_not_in_series": 3066
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Clinic_Plumbing.bcfzip",
+        "topics": 27721,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Clinic_Structural.ifc",
+      "path": "test-models\\models\\hospital\\Clinic_Structural.ifc",
+      "parse_seconds": 1.62,
+      "element_count": 0,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "GVA_Sanitario.ifc",
+      "path": "test-models\\models\\hospital\\GVA_Sanitario.ifc",
+      "parse_seconds": 1.09,
+      "element_count": 711,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "west_riverside_hospital_arc_ifc4.ifc",
+      "path": "test-models\\models\\hospital\\west_riverside_hospital_arc_ifc4.ifc",
+      "parse_seconds": 10.78,
+      "element_count": 9333,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "west_riverside_hospital_elec_ifc4.ifc",
+      "path": "test-models\\models\\hospital\\west_riverside_hospital_elec_ifc4.ifc",
+      "parse_seconds": 2.9,
+      "element_count": 1673,
+      "coverage": {
+        "piping_elements": 1673,
+        "material": {
+          "total": 1673,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 1673,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 1673,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 1673,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 1673,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 1673,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 6.42,
+      "issues_total": 6692,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1673,
+          "data_quality_by_check": {
+            "material_unresolved": 1673
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1673,
+          "data_quality_by_check": {
+            "material_unresolved": 1673
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1673,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 1673
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1673,
+          "data_quality_by_check": {
+            "material_normalisation": 1673
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\west_riverside_hospital_elec_ifc4.bcfzip",
+        "topics": 6692,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "west_riverside_hospital_fire_ifc4.ifc",
+      "path": "test-models\\models\\hospital\\west_riverside_hospital_fire_ifc4.ifc",
+      "parse_seconds": 1.35,
+      "element_count": 861,
+      "coverage": {
+        "piping_elements": 861,
+        "material": {
+          "total": 861,
+          "from_ifc": 0,
+          "inferred": 354,
+          "unknown": 507,
+          "coverage_pct": 41.11
+        },
+        "environment": {
+          "total": 861,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 861,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 861,
+          "from_ifc": 0,
+          "inferred": 354,
+          "unknown": 507,
+          "coverage_pct": 41.11
+        }
+      },
+      "analysis_seconds": 6.03,
+      "issues_total": 3444,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 861,
+          "data_quality_by_check": {
+            "material_unresolved": 861
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 861,
+          "data_quality_by_check": {
+            "material_unresolved": 861
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 861,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 861
+          }
+        },
+        "MM-001": {
+          "findings_total": 354,
+          "findings_excluding_low": 354,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 354,
+            "low": 0
+          },
+          "data_quality_total": 507,
+          "data_quality_by_check": {
+            "material_normalisation": 507
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {
+          "GalvanisedSteel|stagnant_water": 354
+        },
+        "bands_by_pairing": {
+          "GalvanisedSteel|stagnant_water": {
+            "medium": 354
+          }
+        },
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\west_riverside_hospital_fire_ifc4.bcfzip",
+        "topics": 3444,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "west_riverside_hospital_mech_ifc4.ifc",
+      "path": "test-models\\models\\hospital\\west_riverside_hospital_mech_ifc4.ifc",
+      "parse_seconds": 33.82,
+      "element_count": 17424,
+      "coverage": {
+        "piping_elements": 17424,
+        "material": {
+          "total": 17424,
+          "from_ifc": 0,
+          "inferred": 1893,
+          "unknown": 15531,
+          "coverage_pct": 10.86
+        },
+        "environment": {
+          "total": 17424,
+          "from_ifc": 0,
+          "spatial": 198,
+          "defaulted": 17226,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 17424,
+          "from_ifc": 0,
+          "inferred": 1893,
+          "unknown": 15531,
+          "coverage_pct": 10.86
+        }
+      },
+      "analysis_seconds": 53.1,
+      "issues_total": 67806,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 17424,
+          "data_quality_by_check": {
+            "material_unresolved": 17424
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 17424,
+          "data_quality_by_check": {
+            "material_unresolved": 17424
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 17424,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 17424
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 15531,
+          "data_quality_by_check": {
+            "material_normalisation": 15531
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3,
+          "data_quality_by_check": {
+            "material_not_in_series": 3
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\west_riverside_hospital_mech_ifc4.bcfzip",
+        "topics": 67806,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc4.ifc",
+      "path": "test-models\\models\\hospital\\west_riverside_hospital_plumb_ifc4.ifc",
+      "parse_seconds": 14.59,
+      "element_count": 8539,
+      "coverage": {
+        "piping_elements": 8539,
+        "material": {
+          "total": 8539,
+          "from_ifc": 0,
+          "inferred": 4976,
+          "unknown": 3563,
+          "coverage_pct": 58.27
+        },
+        "environment": {
+          "total": 8539,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 8539,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 8539,
+          "from_ifc": 0,
+          "inferred": 4976,
+          "unknown": 3563,
+          "coverage_pct": 58.27
+        }
+      },
+      "analysis_seconds": 16.5,
+      "issues_total": 29181,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 8539,
+          "data_quality_by_check": {
+            "material_unresolved": 8539
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 8539,
+          "data_quality_by_check": {
+            "material_unresolved": 8539
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 8539,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 8539
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3563,
+          "data_quality_by_check": {
+            "material_normalisation": 3563
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1,
+          "data_quality_by_check": {
+            "material_not_in_series": 1
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\west_riverside_hospital_plumb_ifc4.bcfzip",
+        "topics": 29181,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "west_riverside_hospital_sprinkle_ifc4.ifc",
+      "path": "test-models\\models\\hospital\\west_riverside_hospital_sprinkle_ifc4.ifc",
+      "parse_seconds": 23.78,
+      "element_count": 13490,
+      "coverage": {
+        "piping_elements": 13490,
+        "material": {
+          "total": 13490,
+          "from_ifc": 2,
+          "inferred": 12397,
+          "unknown": 1091,
+          "coverage_pct": 91.91
+        },
+        "environment": {
+          "total": 13490,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 13490,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 13490,
+          "from_ifc": 0,
+          "inferred": 12399,
+          "unknown": 1091,
+          "coverage_pct": 91.91
+        }
+      },
+      "analysis_seconds": 31.57,
+      "issues_total": 53966,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 2,
+          "findings_excluding_low": 2,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 2,
+            "low": 0
+          },
+          "data_quality_total": 13488,
+          "data_quality_by_check": {
+            "material_unresolved": 13488
+          }
+        },
+        "GC-001": {
+          "findings_total": 2,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 2
+          },
+          "data_quality_total": 13488,
+          "data_quality_by_check": {
+            "material_unresolved": 13488
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 13490,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 13490
+          }
+        },
+        "MM-001": {
+          "findings_total": 12397,
+          "findings_excluding_low": 12397,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 12397,
+            "low": 0
+          },
+          "data_quality_total": 1091,
+          "data_quality_by_check": {
+            "material_normalisation": 1091
+          }
+        },
+        "XM-001": {
+          "findings_total": 4,
+          "findings_excluding_low": 4,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 4,
+            "low": 0
+          },
+          "data_quality_total": 4,
+          "data_quality_by_check": {
+            "material_not_in_series": 4
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {
+          "GalvanisedSteel|stagnant_water": 12397
+        },
+        "bands_by_pairing": {
+          "GalvanisedSteel|stagnant_water": {
+            "medium": 12397
+          }
+        },
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\west_riverside_hospital_sprinkle_ifc4.bcfzip",
+        "topics": 53966,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "west_riverside_hospital_str_ifc4.ifc",
+      "path": "test-models\\models\\hospital\\west_riverside_hospital_str_ifc4.ifc",
+      "parse_seconds": 0.55,
+      "element_count": 5,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "aisc_sculpture_brep.ifc",
+      "path": "test-models\\models\\industrial\\aisc_sculpture_brep.ifc",
+      "parse_seconds": 0.2,
+      "element_count": 315,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "aisc_sculpture_param.ifc",
+      "path": "test-models\\models\\industrial\\aisc_sculpture_param.ifc",
+      "parse_seconds": 0.18,
+      "element_count": 315,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "craslabbim.ifc",
+      "path": "test-models\\models\\industrial\\craslabbim.ifc",
+      "parse_seconds": 5.47,
+      "element_count": 0,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "AC20-FZK-Haus.ifc",
+      "path": "test-models\\models\\office\\AC20-FZK-Haus.ifc",
+      "parse_seconds": 0.22,
+      "element_count": 42,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "AC20-Institute-Var-2.ifc",
+      "path": "test-models\\models\\office\\AC20-Institute-Var-2.ifc",
+      "parse_seconds": 0.88,
+      "element_count": 0,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "DigitalHub_FM-ARC_v2.ifc",
+      "path": "test-models\\models\\office\\DigitalHub_FM-ARC_v2.ifc",
+      "parse_seconds": 0.69,
+      "element_count": 105,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "DigitalHub_FM-HZG_v2.ifc",
+      "path": "test-models\\models\\office\\DigitalHub_FM-HZG_v2.ifc",
+      "parse_seconds": 5.92,
+      "element_count": 1795,
+      "coverage": {
+        "piping_elements": 1795,
+        "material": {
+          "total": 1795,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 1795,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 1795,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 1795,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 1795,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 1795,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 6.66,
+      "issues_total": 7180,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1795,
+          "data_quality_by_check": {
+            "material_unresolved": 1795
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1795,
+          "data_quality_by_check": {
+            "material_unresolved": 1795
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1795,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 1795
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1795,
+          "data_quality_by_check": {
+            "material_normalisation": 1795
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\DigitalHub_FM-HZG_v2.bcfzip",
+        "topics": 7180,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "DigitalHub_FM-LFT_v2.ifc",
+      "path": "test-models\\models\\office\\DigitalHub_FM-LFT_v2.ifc",
+      "parse_seconds": 4.97,
+      "element_count": 1310,
+      "coverage": {
+        "piping_elements": 1310,
+        "material": {
+          "total": 1310,
+          "from_ifc": 0,
+          "inferred": 14,
+          "unknown": 1296,
+          "coverage_pct": 1.07
+        },
+        "environment": {
+          "total": 1310,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 1310,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 1310,
+          "from_ifc": 0,
+          "inferred": 14,
+          "unknown": 1296,
+          "coverage_pct": 1.07
+        }
+      },
+      "analysis_seconds": 6.17,
+      "issues_total": 5268,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1310,
+          "data_quality_by_check": {
+            "material_unresolved": 1310
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1310,
+          "data_quality_by_check": {
+            "material_unresolved": 1310
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1310,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 1310
+          }
+        },
+        "MM-001": {
+          "findings_total": 14,
+          "findings_excluding_low": 14,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 14,
+            "low": 0
+          },
+          "data_quality_total": 1296,
+          "data_quality_by_check": {
+            "material_normalisation": 1296
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 28,
+          "data_quality_by_check": {
+            "material_not_in_series": 28
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {
+          "GalvanisedSteel|stagnant_water": 13,
+          "CarbonSteel|hot_water": 1
+        },
+        "bands_by_pairing": {
+          "GalvanisedSteel|stagnant_water": {
+            "medium": 13
+          },
+          "CarbonSteel|hot_water": {
+            "medium": 1
+          }
+        },
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\DigitalHub_FM-LFT_v2.bcfzip",
+        "topics": 5268,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "DigitalHub_FM-SAN_v2.ifc",
+      "path": "test-models\\models\\office\\DigitalHub_FM-SAN_v2.ifc",
+      "parse_seconds": 4.01,
+      "element_count": 1010,
+      "coverage": {
+        "piping_elements": 1010,
+        "material": {
+          "total": 1010,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 1010,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 1010,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 1010,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 1010,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 1010,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 6.03,
+      "issues_total": 4040,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1010,
+          "data_quality_by_check": {
+            "material_unresolved": 1010
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1010,
+          "data_quality_by_check": {
+            "material_unresolved": 1010
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1010,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 1010
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 1010,
+          "data_quality_by_check": {
+            "material_normalisation": 1010
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\DigitalHub_FM-SAN_v2.bcfzip",
+        "topics": 4040,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Duplex_A_20110907.ifc",
+      "path": "test-models\\models\\office\\Duplex_A_20110907.ifc",
+      "parse_seconds": 0.21,
+      "element_count": 4,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "Duplex_Electrical_20121207.ifc",
+      "path": "test-models\\models\\office\\Duplex_Electrical_20121207.ifc",
+      "parse_seconds": 0.41,
+      "element_count": 99,
+      "coverage": {
+        "piping_elements": 99,
+        "material": {
+          "total": 99,
+          "from_ifc": 0,
+          "inferred": 3,
+          "unknown": 96,
+          "coverage_pct": 3.03
+        },
+        "environment": {
+          "total": 99,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 99,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 99,
+          "from_ifc": 0,
+          "inferred": 3,
+          "unknown": 96,
+          "coverage_pct": 3.03
+        }
+      },
+      "analysis_seconds": 5.84,
+      "issues_total": 394,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 99,
+          "data_quality_by_check": {
+            "material_unresolved": 99
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 99,
+          "data_quality_by_check": {
+            "material_unresolved": 99
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 99,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 99
+          }
+        },
+        "MM-001": {
+          "findings_total": 1,
+          "findings_excluding_low": 1,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 1,
+            "low": 0
+          },
+          "data_quality_total": 96,
+          "data_quality_by_check": {
+            "material_normalisation": 96
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {
+          "GalvanisedSteel|stagnant_water": 1
+        },
+        "bands_by_pairing": {
+          "GalvanisedSteel|stagnant_water": {
+            "medium": 1
+          }
+        },
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Duplex_Electrical_20121207.bcfzip",
+        "topics": 394,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Duplex_MEP_20110907.ifc",
+      "path": "test-models\\models\\office\\Duplex_MEP_20110907.ifc",
+      "parse_seconds": 3.72,
+      "element_count": 926,
+      "coverage": {
+        "piping_elements": 926,
+        "material": {
+          "total": 926,
+          "from_ifc": 0,
+          "inferred": 222,
+          "unknown": 704,
+          "coverage_pct": 23.97
+        },
+        "environment": {
+          "total": 926,
+          "from_ifc": 0,
+          "spatial": 1,
+          "defaulted": 925,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 926,
+          "from_ifc": 0,
+          "inferred": 148,
+          "unknown": 778,
+          "coverage_pct": 15.98
+        }
+      },
+      "analysis_seconds": 5.83,
+      "issues_total": 3717,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 926,
+          "data_quality_by_check": {
+            "material_unresolved": 926
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 926,
+          "data_quality_by_check": {
+            "material_unresolved": 926
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 926,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 926
+          }
+        },
+        "MM-001": {
+          "findings_total": 1,
+          "findings_excluding_low": 1,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 1,
+            "low": 0
+          },
+          "data_quality_total": 778,
+          "data_quality_by_check": {
+            "material_normalisation": 704,
+            "unmapped_pairing": 74
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 160,
+          "data_quality_by_check": {
+            "material_not_in_series": 160
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {
+          "GalvanisedSteel|stagnant_water": 1
+        },
+        "bands_by_pairing": {
+          "GalvanisedSteel|stagnant_water": {
+            "medium": 1
+          }
+        },
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Duplex_MEP_20110907.bcfzip",
+        "topics": 3717,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Duplex_Plumbing_20121113.ifc",
+      "path": "test-models\\models\\office\\Duplex_Plumbing_20121113.ifc",
+      "parse_seconds": 3.8,
+      "element_count": 498,
+      "coverage": {
+        "piping_elements": 498,
+        "material": {
+          "total": 498,
+          "from_ifc": 46,
+          "inferred": 173,
+          "unknown": 279,
+          "coverage_pct": 43.98
+        },
+        "environment": {
+          "total": 498,
+          "from_ifc": 0,
+          "spatial": 3,
+          "defaulted": 495,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 498,
+          "from_ifc": 0,
+          "inferred": 157,
+          "unknown": 341,
+          "coverage_pct": 31.53
+        }
+      },
+      "analysis_seconds": 5.87,
+      "issues_total": 2070,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 498,
+          "data_quality_by_check": {
+            "material_unresolved": 498
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 498,
+          "data_quality_by_check": {
+            "material_unresolved": 498
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 498,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 498
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 341,
+          "data_quality_by_check": {
+            "material_normalisation": 279,
+            "unmapped_pairing": 62
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 235,
+          "data_quality_by_check": {
+            "material_not_in_series": 235
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Duplex_Plumbing_20121113.bcfzip",
+        "topics": 2070,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "GVA_Administrativo.ifc",
+      "path": "test-models\\models\\office\\GVA_Administrativo.ifc",
+      "parse_seconds": 0.78,
+      "element_count": 363,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "IFC_Schependomlaan.ifc",
+      "path": "test-models\\models\\office\\IFC_Schependomlaan.ifc",
+      "parse_seconds": 4.21,
+      "element_count": 82,
+      "coverage": {
+        "piping_elements": 73,
+        "material": {
+          "total": 73,
+          "from_ifc": 13,
+          "inferred": 0,
+          "unknown": 60,
+          "coverage_pct": 17.81
+        },
+        "environment": {
+          "total": 73,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 73,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 73,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 73,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 5.8,
+      "issues_total": 319,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 13,
+          "findings_excluding_low": 13,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 13,
+            "low": 0
+          },
+          "data_quality_total": 69,
+          "data_quality_by_check": {
+            "material_unresolved": 69
+          }
+        },
+        "GC-001": {
+          "findings_total": 13,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 13
+          },
+          "data_quality_total": 69,
+          "data_quality_by_check": {
+            "material_unresolved": 69
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 82,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 82
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 73,
+          "data_quality_by_check": {
+            "material_normalisation": 60,
+            "unmapped_pairing": 13
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\IFC_Schependomlaan.bcfzip",
+        "topics": 319,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "Molio_with_URIs.ifc",
+      "path": "test-models\\models\\office\\Molio_with_URIs.ifc",
+      "parse_seconds": 5.98,
+      "element_count": 48,
+      "coverage": {
+        "piping_elements": 48,
+        "material": {
+          "total": 48,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 48,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 48,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 48,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 48,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 48,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 5.71,
+      "issues_total": 192,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 48,
+          "data_quality_by_check": {
+            "material_unresolved": 48
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 48,
+          "data_quality_by_check": {
+            "material_unresolved": 48
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 48,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 48
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 48,
+          "data_quality_by_check": {
+            "material_normalisation": 48
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\Molio_with_URIs.bcfzip",
+        "topics": 192,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "wbdg_office_arc.ifc",
+      "path": "test-models\\models\\office\\wbdg_office_arc.ifc",
+      "parse_seconds": 0.41,
+      "element_count": 39,
+      "coverage": {
+        "piping_elements": 31,
+        "material": {
+          "total": 31,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 31,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 31,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 31,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 31,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 31,
+          "coverage_pct": 0.0
+        }
+      },
+      "analysis_seconds": 5.67,
+      "issues_total": 148,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 39,
+          "data_quality_by_check": {
+            "material_unresolved": 39
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 39,
+          "data_quality_by_check": {
+            "material_unresolved": 39
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 39,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 39
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 31,
+          "data_quality_by_check": {
+            "material_normalisation": 31
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\wbdg_office_arc.bcfzip",
+        "topics": 148,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "wbdg_office_mep.ifc",
+      "path": "test-models\\models\\office\\wbdg_office_mep.ifc",
+      "parse_seconds": 24.96,
+      "element_count": 5697,
+      "coverage": {
+        "piping_elements": 5697,
+        "material": {
+          "total": 5697,
+          "from_ifc": 695,
+          "inferred": 793,
+          "unknown": 4209,
+          "coverage_pct": 26.12
+        },
+        "environment": {
+          "total": 5697,
+          "from_ifc": 0,
+          "spatial": 347,
+          "defaulted": 5350,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 5697,
+          "from_ifc": 0,
+          "inferred": 1306,
+          "unknown": 4391,
+          "coverage_pct": 22.92
+        }
+      },
+      "analysis_seconds": 11.32,
+      "issues_total": 22924,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 5697,
+          "data_quality_by_check": {
+            "material_unresolved": 5697
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 5697,
+          "data_quality_by_check": {
+            "material_unresolved": 5697
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 5697,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 5697
+          }
+        },
+        "MM-001": {
+          "findings_total": 292,
+          "findings_excluding_low": 292,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 292,
+            "low": 0
+          },
+          "data_quality_total": 4391,
+          "data_quality_by_check": {
+            "material_normalisation": 4209,
+            "unmapped_pairing": 182
+          }
+        },
+        "XM-001": {
+          "findings_total": 290,
+          "findings_excluding_low": 290,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 290,
+            "low": 0
+          },
+          "data_quality_total": 860,
+          "data_quality_by_check": {
+            "material_not_in_series": 860
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {
+          "GalvanisedSteel|stagnant_water": 292
+        },
+        "bands_by_pairing": {
+          "GalvanisedSteel|stagnant_water": {
+            "medium": 292
+          }
+        },
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\wbdg_office_mep.bcfzip",
+        "topics": 22924,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "wbdg_office_str.ifc",
+      "path": "test-models\\models\\office\\wbdg_office_str.ifc",
+      "parse_seconds": 0.86,
+      "element_count": 0,
+      "coverage": {
+        "piping_elements": 0,
+        "material": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        },
+        "environment": {
+          "total": 0,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 0,
+          "unclassified": 0,
+          "coverage_pct": 0.0
+        },
+        "temperature": {
+          "total": 0,
+          "from_ifc": 0,
+          "inferred": 0,
+          "unknown": 0,
+          "coverage_pct": 0.0
+        }
+      },
+      "skipped": "no piping elements"
+    },
+    {
+      "model": "west_riverside_hospital_mech_ifc2x3.ifc",
+      "path": "test-models\\models\\schemas\\west_riverside_hospital_mech_ifc2x3.ifc",
+      "parse_seconds": 34.7,
+      "element_count": 18488,
+      "coverage": {
+        "piping_elements": 18488,
+        "material": {
+          "total": 18488,
+          "from_ifc": 0,
+          "inferred": 1895,
+          "unknown": 16593,
+          "coverage_pct": 10.25
+        },
+        "environment": {
+          "total": 18488,
+          "from_ifc": 0,
+          "spatial": 233,
+          "defaulted": 18255,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 18488,
+          "from_ifc": 0,
+          "inferred": 1895,
+          "unknown": 16593,
+          "coverage_pct": 10.25
+        }
+      },
+      "analysis_seconds": 62.04,
+      "issues_total": 72061,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 18488,
+          "data_quality_by_check": {
+            "material_unresolved": 18488
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 18488,
+          "data_quality_by_check": {
+            "material_unresolved": 18488
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 18488,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 18488
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 16593,
+          "data_quality_by_check": {
+            "material_normalisation": 16593
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 4,
+          "data_quality_by_check": {
+            "material_not_in_series": 4
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\west_riverside_hospital_mech_ifc2x3.bcfzip",
+        "topics": 72061,
+        "valid": true,
+        "errors": {}
+      }
+    },
+    {
+      "model": "west_riverside_hospital_plumb_ifc2x3.ifc",
+      "path": "test-models\\models\\schemas\\west_riverside_hospital_plumb_ifc2x3.ifc",
+      "parse_seconds": 80.72,
+      "element_count": 9013,
+      "coverage": {
+        "piping_elements": 9013,
+        "material": {
+          "total": 9013,
+          "from_ifc": 0,
+          "inferred": 5120,
+          "unknown": 3893,
+          "coverage_pct": 56.81
+        },
+        "environment": {
+          "total": 9013,
+          "from_ifc": 0,
+          "spatial": 0,
+          "defaulted": 9013,
+          "unclassified": 0,
+          "coverage_pct": 100.0
+        },
+        "temperature": {
+          "total": 9013,
+          "from_ifc": 0,
+          "inferred": 5120,
+          "unknown": 3893,
+          "coverage_pct": 56.81
+        }
+      },
+      "analysis_seconds": 43.16,
+      "issues_total": 30982,
+      "by_engine": {
+        "CC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 9013,
+          "data_quality_by_check": {
+            "material_unresolved": 9013
+          }
+        },
+        "GC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 9013,
+          "data_quality_by_check": {
+            "material_unresolved": 9013
+          }
+        },
+        "MC-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 9013,
+          "data_quality_by_check": {
+            "hydraulics_unavailable": 9013
+          }
+        },
+        "MM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 3893,
+          "data_quality_by_check": {
+            "material_normalisation": 3893
+          }
+        },
+        "XM-001": {
+          "findings_total": 0,
+          "findings_excluding_low": 0,
+          "findings_by_band": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "data_quality_total": 50,
+          "data_quality_by_check": {
+            "material_not_in_series": 50
+          }
+        }
+      },
+      "mm001": {
+        "findings_by_pairing": {},
+        "bands_by_pairing": {},
+        "kinetics_guard_applied_count": 0
+      },
+      "bcf": {
+        "archive": "C:\\Users\\ShaneHaines\\AppData\\Local\\Temp\\claude\\d--Zigurat-Masters-bim-guard\\05625313-005a-42e6-bff5-16e5f6df4c53\\scratchpad\\run2\\bcf\\west_riverside_hospital_plumb_ifc2x3.bcfzip",
+        "topics": 30982,
+        "valid": true,
+        "errors": {}
+      }
+    }
+  ]
+}
