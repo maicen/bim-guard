@@ -185,6 +185,10 @@ class ProjectsService:
             logger.warning("Rejected empty IFC upload filename=%s", filename)
             return "", ""
 
+        if not content.lstrip(b"\xef\xbb\xbf \t\n\r").startswith(b"ISO-10303-21;"):
+            logger.warning("Rejected IFC upload with invalid signature filename=%s", filename)
+            return "", ""
+
         ifc_md5_hash = md5_hex(content)
         storage_ref = self._storage.save_upload(filename, content, "uploads/ifc")
         logger.info("IFC upload prepared filename=%s bytes=%d", filename, len(content))
