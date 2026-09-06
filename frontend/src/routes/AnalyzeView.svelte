@@ -37,6 +37,7 @@
   import { isAbortError, analyzeApi, projectsApi, rulesApi } from "../lib/api";
   import type { ApiError, IssueBand, IssueSort, ResultPageQuery } from "../lib/api";
   import HoverCard from "../lib/components/HoverCard.svelte";
+  import PipingChecksExplainer from "../lib/components/PipingChecksExplainer.svelte";
   import { describeMechanism } from "../lib/glossary";
   import type {
     AnalysisResult,
@@ -742,6 +743,12 @@
       {/if}
     </div>
   </div>
+
+  <!-- Plain-English explainer, directly under the Run Audit / ENGINES block so it
+       reads as part of engine selection. Piping only; seismic is a single kernel. -->
+  {#if activeCategory !== "seismic"}
+    <PipingChecksExplainer {selectedEngines} />
+  {/if}
 
   <!-- Project Readiness & Lineage Section (Session A / B) -->
   {#if currentProject}
