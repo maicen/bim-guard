@@ -105,6 +105,10 @@ class DatabaseAdapter(abc.ABC):
         """Delete row by primary key."""
 
     @abc.abstractmethod
+    def delete_many(self, pk_values: list[Any]) -> None:
+        """Delete multiple rows by primary keys."""
+
+    @abc.abstractmethod
     def rows_where(
         self,
         where_sql: str,
@@ -155,10 +159,19 @@ class SQLiteTableAdapter(DatabaseAdapter):
         except Exception:
             return None
 
-
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert one row."""
         return self._table.insert(payload)
+
+    def insert_many(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Insert multiple rows."""
+        if not payloads:
+            return []
+        try:
+            self._table.insert_all(payloads)
+            return payloads
+        except Exception:
+            return [self.insert(payload) for payload in payloads]
 
     def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
         """Update one row by primary key."""
@@ -171,6 +184,19 @@ class SQLiteTableAdapter(DatabaseAdapter):
         except Exception:
             pass
 
+    def delete_many(self, pk_values: list[Any]) -> None:
+        """Delete multiple rows by primary keys."""
+        if not pk_values:
+            return
+
+        try:
+            placeholders = ",".join(["?"] * len(pk_values))
+            # fastlite assumes the first PK if we don't have multiple
+            pk_col = self._table.pks[0]
+            self._table.delete_where(f"{pk_col} IN ({placeholders})", pk_values)
+        except Exception:
+            for pk_value in pk_values:
+                self.delete(pk_value)
 
     def rows_where(
         self,
@@ -237,16 +263,19 @@ class SupabaseTableAdapter(DatabaseAdapter):
         """Get one row by primary key."""
         if self._use_memory_fallback:
             return next(
-                (r for r in self._memory_rows if r.get(self._pk) == pk_value or str(r.get(self._pk)) == str(pk_value)),
+                (
+                    r
+                    for r in self._memory_rows
+                    if r.get(self._pk) == pk_value or str(r.get(self._pk)) == str(pk_value)
+                ),
                 None,
             )
 
         try:
             response = execute_with_retry(
-                lambda: self._client.table(self._table_name)
-                .select("*")
-                .eq(self._pk, pk_value)
-                .limit(1)
+                lambda: (
+                    self._client.table(self._table_name).select("*").eq(self._pk, pk_value).limit(1)
+                )
             )
             rows = response.data or []
             return rows[0] if rows else None
@@ -261,7 +290,9 @@ class SupabaseTableAdapter(DatabaseAdapter):
         if self._use_memory_fallback:
             row = dict(payload)
             if self._pk not in row:
-                row[self._pk] = max((int(r.get(self._pk, 0)) for r in self._memory_rows), default=0) + 1
+                row[self._pk] = (
+                    max((int(r.get(self._pk, 0)) for r in self._memory_rows), default=0) + 1
+                )
             self._memory_rows.append(row)
             return dict(row)
 
@@ -335,7 +366,8 @@ class SupabaseTableAdapter(DatabaseAdapter):
         """Delete one row by primary key."""
         if self._use_memory_fallback:
             self._memory_rows[:] = [
-                r for r in self._memory_rows
+                r
+                for r in self._memory_rows
                 if not (r.get(self._pk) == pk_value or str(r.get(self._pk)) == str(pk_value))
             ]
             return
@@ -348,6 +380,29 @@ class SupabaseTableAdapter(DatabaseAdapter):
             if self._is_missing_table_error(exc):
                 self._use_memory_fallback = True
                 self.delete(pk_value)
+                return
+            raise
+
+    def delete_many(self, pk_values: list[Any]) -> None:
+        """Delete multiple rows by primary keys in as few PostgREST round-trips as possible."""
+        if not pk_values:
+            return
+
+        if self._use_memory_fallback:
+            pk_set = {str(pk) for pk in pk_values}
+            self._memory_rows[:] = [
+                r for r in self._memory_rows if str(r.get(self._pk)) not in pk_set
+            ]
+            return
+
+        try:
+            execute_with_retry(
+                lambda: self._client.table(self._table_name).delete().in_(self._pk, pk_values)
+            )
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._use_memory_fallback = True
+                self.delete_many(pk_values)
                 return
             raise
 
@@ -365,7 +420,10 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 val = row.get(expr.field)
                 if expr.operator == "eq" and (val == expr.value or str(val) == str(expr.value)):
                     matching.append(row)
-                elif expr.operator == "like" and str(expr.value).lower().replace("%", "") in str(val or "").lower():
+                elif (
+                    expr.operator == "like"
+                    and str(expr.value).lower().replace("%", "") in str(val or "").lower()
+                ):
                     matching.append(row)
             return matching[:limit] if limit is not None else matching
 
@@ -437,7 +495,6 @@ class SupabaseTableAdapter(DatabaseAdapter):
         msg = str(getattr(exc, "message", "") or getattr(exc, "details", "") or "")
         return code in {"PGRST205", "42P01"} or "schema cache" in msg or "does not exist" in msg
 
-
     def _should_retry_insert_with_pk(self, exc: APIError, payload: dict[str, Any]) -> bool:
         """Return True when an insert failed due to duplicate primary key without explicit PK."""
         if self._pk in payload:
@@ -450,10 +507,12 @@ class SupabaseTableAdapter(DatabaseAdapter):
     def _next_numeric_pk(self) -> int:
         """Compute the next integer primary key value for fallback inserts."""
         response = execute_with_retry(
-            lambda: self._client.table(self._table_name)
-            .select(self._pk)
-            .order(self._pk, desc=True)
-            .limit(1)
+            lambda: (
+                self._client.table(self._table_name)
+                .select(self._pk)
+                .order(self._pk, desc=True)
+                .limit(1)
+            )
         )
         rows = response.data or []
         if not rows:
