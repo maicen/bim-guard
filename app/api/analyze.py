@@ -19,9 +19,19 @@ from fastapi import (
 
 from app.api.dependencies import (
     get_arch_analysis_service,
+    get_membership_service,
     get_phase6_service,
+    get_profile_service,
     get_projects_service,
 )
+from app.api.projects import (
+    ProjectAccessChecker,
+    _can_access_project,
+    get_project_access_checker,
+    get_project_access_checker_flexible,
+    require_project_access,
+)
+from app.auth import CurrentUser, get_current_user, get_current_user_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
     AnalysisResultContract,
@@ -38,13 +48,48 @@ from app.modules.contracts import (
 from app.modules.phase_6.phase_6e_export import export
 from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
 from app.services.arch_analysis_service import ArchAnalysisService
+from app.services.membership_service import MembershipService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_tracker import snapshot
+from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def get_authorized_project_for_analyze(
+    project_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> dict:
+    """Path-param project authorization for this router's own GET routes.
+
+    Behaviourally identical to app.api.projects.get_authorized_project (same
+    require_project_access call), but a distinct function object so tests can
+    override it independently -- see tests/conftest.py's note on why this
+    router's pagination/status routes need a permissive override that
+    app.api.projects's own 404-for-a-nonexistent-project tests must not get.
+    """
+    return require_project_access(project_id, current_user, service, memberships, profiles)
+
+
+def get_authorized_project_for_analyze_flexible(
+    project_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user_flexible)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> dict:
+    """Like :func:`get_authorized_project_for_analyze`, but also accepts a query token.
+
+    For the ``download_latest_bcf`` link, which the frontend opens via a
+    plain ``<a href>`` rather than an authenticated ``fetch``.
+    """
+    return require_project_access(project_id, current_user, service, memberships, profiles)
 
 
 #: Corrosion engine codes a corrosion run may be narrowed to, matching the
@@ -403,10 +448,12 @@ def _paginate_result(
 async def analyze_upload_ifc(
     project_id: Annotated[int, Form(...)],
     ifc_file: Annotated[UploadFile, File(...)],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
     phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
 ) -> dict:
     """Upload and attach an IFC model to a project."""
+    project_access(project_id)
     if not ifc_file.filename or not ifc_file.filename.lower().endswith(".ifc"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -436,9 +483,11 @@ async def analyze_upload_ifc(
 def run_analysis_endpoint(
     payload: AnalysisRunRequest,
     background_tasks: BackgroundTasks,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     background: bool = Query(False, description="Run in background task if true"),
 ) -> AnalysisResultContract | dict:
     """Execute analysis (corrosion or seismic) for a project."""
+    project_access(payload.project_id)
     slug = payload.slug.lower()
     if slug not in RUNNABLE_SLUGS:
         raise HTTPException(
@@ -487,6 +536,7 @@ def run_analysis_endpoint(
 @router.post("/corrosion", summary="Run corrosion analysis")
 def run_corrosion(
     project_id: Annotated[int, Form(...)],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     engines: Annotated[list[str] | None, Form()] = None,
     include_low: Annotated[bool, Form()] = True,
     use_cache: Annotated[bool, Form()] = True,
@@ -506,6 +556,7 @@ def run_corrosion(
     ``use_cache=false`` to force a recompute; that still refreshes the entry
     rather than bypassing the store.
     """
+    project_access(project_id)
     raw_result = run_analysis(
         "corrosion", project_id, use_cache=use_cache, engines=engines, include_low=include_low
     )
@@ -520,6 +571,7 @@ def run_corrosion(
 @router.post("/seismic", summary="Run seismic clearance analysis")
 def run_seismic(
     project_id: Annotated[int, Form(...)],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     use_cache: Annotated[bool, Form()] = True,
 ) -> AnalysisResultContract:
     """Run Blue Halo seismic clearance volume validation.
@@ -530,6 +582,7 @@ def run_seismic(
     already answered. The cache key covers every attached model's digest, so
     attaching or replacing one misses and recomputes on its own.
     """
+    project_access(project_id)
     raw_result = run_analysis("seismic", project_id, use_cache=use_cache)
     if raw_result.get("compliance_error"):
         raise HTTPException(
@@ -543,6 +596,7 @@ def run_seismic(
 def get_analysis_results(
     project_id: int,
     slug: str,
+    project: Annotated[dict, Depends(get_authorized_project_for_analyze)],
     use_cache: bool = Query(True, description="Whether to read from cache"),
     engines: list[str] | None = Query(
         None, description="Engine codes to run; omit to run every engine"
@@ -665,7 +719,9 @@ def get_analysis_results(
 
 
 @router.get("/status/{project_id}", response_model=WorkflowStatusContract)
-def get_workflow_status(project_id: int) -> WorkflowStatusContract:
+def get_workflow_status(
+    project_id: int, project: Annotated[dict, Depends(get_authorized_project_for_analyze)]
+) -> WorkflowStatusContract:
     """Get the current live workflow stages and metrics for a project."""
     snap = snapshot(project_id)
     raw_engines = snap.get("engines", {})
@@ -680,7 +736,8 @@ def get_workflow_status(project_id: int) -> WorkflowStatusContract:
 
 @router.get("/export", summary="Export analysis report as BCF, CSV, or JSON")
 def export_analysis_report(
-    project_id: int = Query(...),
+    project_id: Annotated[int, Query(...)],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
     slug: str = Query("corrosion"),
     fmt: str = Query("bcf", description="Export format: bcf, csv, or json"),
     engines: list[str] | None = Query(
@@ -731,6 +788,7 @@ def export_analysis_report(
         are exempt from it either way), so filtering the superset yields the
         same issues the narrower run would have, from one cached result.
     """
+    project_access(project_id)
     if slug not in RUNNABLE_SLUGS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown slug {slug!r}")
 
@@ -783,10 +841,12 @@ def export_analysis_report(
 @router.post("/arch", response_model=ArchAnalysisResponse, summary="Run architectural compliance analysis")
 def run_arch_analysis(
     project_id: Annotated[int, Form(...)],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     rule_folder: Annotated[str, Form()] = "",
     arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
 ) -> ArchAnalysisResponse:
     """Run architectural compliance checks (egress, daylight, fire separations, clearances) against the active building-code ruleset."""
+    project_access(project_id)
     try:
         return arch_service.run_analysis(project_id=project_id, rule_folder=rule_folder)
     except ValueError as exc:
@@ -799,10 +859,17 @@ def run_arch_analysis(
 @router.get("/arch/{project_id}", response_model=ArchAnalysisResponse, summary="Get architectural compliance results")
 def get_arch_analysis(
     project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project_for_analyze)],
     arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
 ) -> ArchAnalysisResponse:
     """Retrieve architectural compliance findings for a project."""
-    return run_arch_analysis(project_id=project_id, arch_service=arch_service)
+    try:
+        return arch_service.run_analysis(project_id=project_id, rule_folder="")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -811,7 +878,10 @@ def get_arch_analysis(
 
 
 @router.get("/bcf/artifacts/{artifact_id}", summary="Download BCF artifact by ID")
-def download_bcf_artifact(artifact_id: int):
+def download_bcf_artifact(
+    artifact_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
+):
     """Download a stored BCF 2.1 report archive by artifact primary key."""
     from fastapi.responses import FileResponse
 
@@ -824,6 +894,10 @@ def download_bcf_artifact(artifact_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"BCF artifact {artifact_id} not found.",
         )
+    # 404 (not 403) if the artifact's project isn't the caller's: an artifact
+    # id is a small guessable integer, and confirming an inaccessible one
+    # exists is exactly the information get_authorized_project also withholds.
+    project_access(artifact["project_id"])
 
     bcf_path = report_svc.materialize(artifact)
     if bcf_path is None or not bcf_path.exists():
@@ -841,7 +915,7 @@ def download_bcf_artifact(artifact_id: int):
 
 
 @router.get("/bcf/latest/{project_id}", summary="Download latest BCF for a project")
-def download_latest_bcf(project_id: int):
+def download_latest_bcf(project_id: int, project: Annotated[dict, Depends(get_authorized_project_for_analyze_flexible)]):
     """Retrieve the latest BCF 2.1 archive generated for a project."""
     from fastapi.responses import FileResponse
 
@@ -871,19 +945,56 @@ def download_latest_bcf(project_id: int):
 
 
 @router.get("/bcf/list", summary="List all persisted BCF artifacts")
-def list_bcf_artifacts() -> list[dict]:
-    """List all persisted BCF report artifacts ordered newest first."""
+def list_bcf_artifacts(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> list[dict]:
+    """List persisted BCF report artifacts ordered newest first.
+
+    A superadmin sees every artifact; everyone else only the ones whose
+    project they can access, matching how ``/projects`` itself is scoped.
+    """
     from app.services.report_artifacts import ReportArtifactService
 
-    return ReportArtifactService().list_bcf()
+    artifacts = ReportArtifactService().list_bcf()
+    if profiles.is_superadmin(current_user.id):
+        return artifacts
+
+    accessible_projects: dict[int, bool] = {}
+
+    def _is_accessible(pid: int | None) -> bool:
+        if pid is None:
+            return False
+        if pid not in accessible_projects:
+            project = projects_service.get_project(pid)
+            accessible_projects[pid] = bool(
+                project and _can_access_project(project, current_user.id, memberships)
+            )
+        return accessible_projects[pid]
+
+    return [a for a in artifacts if _is_accessible(a.get("project_id"))]
 
 
 @router.delete("/bcf/artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete BCF artifact by ID")
-def delete_bcf_artifact(artifact_id: int) -> None:
+def delete_bcf_artifact(
+    artifact_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+) -> None:
     """Delete a persisted BCF report artifact."""
     from app.services.report_artifacts import ReportArtifactService
 
-    deleted = ReportArtifactService().delete_bcf(artifact_id)
+    report_svc = ReportArtifactService()
+    artifact = report_svc.get_bcf(artifact_id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"BCF artifact {artifact_id} not found.",
+        )
+    project_access(artifact["project_id"])
+
+    deleted = report_svc.delete_bcf(artifact_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -898,8 +1009,16 @@ def delete_bcf_artifact(artifact_id: int) -> None:
 
 
 @router.post("/revit-sync", response_model=RevitSyncResponse, summary="Direct Revit pyRevit synchronization")
-def sync_revit_elements(payload: RevitSyncRequest) -> RevitSyncResponse:
-    """Accept element data pushed directly from Revit/pyRevit, run compliance checks, and return verdicts."""
+def sync_revit_elements(
+    payload: RevitSyncRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> RevitSyncResponse:
+    """Accept element data pushed directly from Revit/pyRevit, run compliance checks, and return verdicts.
+
+    Not project-scoped: the payload is ad-hoc element data validated against
+    the active ruleset, not read from or written to a stored project, so
+    there is nothing beyond "is this a signed-in caller" to check.
+    """
     from app.services.pipeline_services import PipelineOrchestratorService
     from app.services.revit_sync_service import RevitSyncService
 

@@ -1,4 +1,5 @@
 import type { PipelineEvent, WorkflowStatus } from "./types";
+import { getAuthToken } from "./authToken";
 
 export interface SSESubscriptionOptions {
   onStatus?: (status: WorkflowStatus) => void;
@@ -13,7 +14,13 @@ export function subscribeToPipelineEvents(
   options: SSESubscriptionOptions = {},
 ): () => void {
   const API_BASE = import.meta.env.VITE_API_URL || "/api";
-  const url = `${API_BASE}/events/${projectId}`;
+  // EventSource can't set an Authorization header, so the token rides along
+  // as a query param instead -- app/api/events.py's dependency accepts
+  // either. This is a snapshot taken at subscribe time: if the token expires
+  // over a very long-lived stream, EventSource's automatic reconnect will
+  // retry with the same (now stale) URL and 401 until the caller resubscribes.
+  const token = getAuthToken();
+  const url = `${API_BASE}/events/${projectId}${token ? `?token=${encodeURIComponent(token)}` : ""}`;
   const es = new EventSource(url);
 
   es.addEventListener("status", (e: MessageEvent) => {

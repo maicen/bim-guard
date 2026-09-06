@@ -20,8 +20,14 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from app.api.dependencies import get_rules_service, get_ruleset_access_service
-from app.auth import get_current_user
+from app.api.dependencies import (
+    get_membership_service,
+    get_profile_service,
+    get_rules_service,
+    get_ruleset_access_service,
+)
+from app.api.organizations import _require_superadmin
+from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     IdsImportResponse,
@@ -43,6 +49,8 @@ from app.modules.contracts import (
     RuleSourceResponse,
     RuleUpdateRequest,
 )
+from app.services.membership_service import MembershipService
+from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rule_snapshot_service import RuleSnapshotService
 from app.services.rules_service import RuleService
@@ -68,6 +76,89 @@ def _rule_response(row: dict) -> RuleResponse:
     if not row.get("rule_id"):
         row = {**row, "rule_id": row.get("reference")}
     return RuleResponse(**row)
+
+
+def _require_ruleset_grant(
+    ruleset_id: Optional[str],
+    current_user: CurrentUser,
+    memberships: MembershipService,
+    ruleset_access: RulesetAccessService,
+    profiles: ProfileService,
+) -> None:
+    """Raise 403 unless *current_user* may mutate rules in *ruleset_id*.
+
+    Reads (``list_rules``, ``list_rule_folders``) already narrow themselves
+    to an organization's grants when the caller passes one, but that filter
+    was never required — nothing stopped a signed-in user from any
+    organization creating, editing, deleting, or bulk-importing over any
+    ruleset in the platform, including ones never granted to their org.
+    Mutations go through here instead: a superadmin (authority over every
+    organization) bypasses it, and everyone else needs at least one of their
+    organizations to hold a grant for this exact ruleset via
+    ``organization_ruleset_grants`` -- the same grant ``list_rules``'s
+    ``organization_id`` filter and the org's ruleset-grants admin screen
+    already read from.
+
+    A missing ``ruleset_id`` (a rule/import call that omitted it, or a bulk
+    action naming no rulesets) has nothing to check against and is let
+    through -- the underlying service call is what actually enforces whether
+    that is valid.
+    """
+    if not ruleset_id:
+        return
+    if profiles.is_superadmin(current_user.id):
+        return
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    for org_id in org_ids:
+        if ruleset_id in ruleset_access.list_org_grants(org_id):
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Your organization has not been granted access to ruleset '{ruleset_id}'.",
+    )
+
+
+class RulesetAccessChecker:
+    """Callable wrapper around :func:`_require_ruleset_grant`.
+
+    ``ruleset_id`` on these routes comes from a path segment, a ``Form``
+    field, a JSON body field, or a list of either -- never uniformly a path
+    parameter -- so it can't be resolved as a FastAPI sub-dependency the way
+    ``get_authorized_project`` resolves ``project_id`` in app/api/projects.py.
+    Bundling everything *except* ruleset_id behind one dependency, and taking
+    ruleset_id as a plain call argument once the handler has parsed it,
+    keeps this overridable via ``app.dependency_overrides`` in tests instead
+    of becoming a bare function call no override can reach.
+    """
+
+    def __init__(
+        self,
+        current_user: CurrentUser,
+        memberships: MembershipService,
+        ruleset_access: RulesetAccessService,
+        profiles: ProfileService,
+    ) -> None:
+        """Capture the per-request identity and services this checker calls will use."""
+        self._current_user = current_user
+        self._memberships = memberships
+        self._ruleset_access = ruleset_access
+        self._profiles = profiles
+
+    def __call__(self, ruleset_id: Optional[str]) -> None:
+        """Raise 403 unless the caller may mutate rules in *ruleset_id*."""
+        _require_ruleset_grant(
+            ruleset_id, self._current_user, self._memberships, self._ruleset_access, self._profiles
+        )
+
+
+def get_ruleset_access_checker(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> RulesetAccessChecker:
+    """Dependency factory for :class:`RulesetAccessChecker`."""
+    return RulesetAccessChecker(current_user, memberships, ruleset_access, profiles)
 
 
 @router.get("", response_model=list[RuleResponse], summary="List rules with optional filters")
@@ -267,10 +358,19 @@ def export_json(
 @router.post("/import-json", response_model=IdsImportResponse, summary="Import rules from a canonical JSON ruleset file")
 async def import_json_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
     file: UploadFile = File(...),
     ruleset_id: str = Form(...),
 ) -> IdsImportResponse:
-    """Parse an uploaded canonical JSON ruleset file and save its rules under ruleset_id."""
+    """Parse an uploaded canonical JSON ruleset file and save its rules under ruleset_id.
+
+    Grant-checked only when ``ruleset_id`` already names an existing
+    ruleset -- importing into a brand-new one is the same "create a custom
+    ruleset" case ``create_rule_folder`` leaves ungated, since there is no
+    existing grant boundary to violate yet.
+    """
+    if service.get_folder(ruleset_id):
+        ruleset_check(ruleset_id)
     content_bytes = await file.read()
     try:
         json_data = json.loads(content_bytes.decode("utf-8"))
@@ -304,10 +404,17 @@ async def import_json_rules(
 @router.post("/import-ids", response_model=IdsImportResponse, summary="Import rules from a buildingSMART IDS XML file")
 async def import_ids_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
     file: UploadFile = File(...),
     ruleset_id: str = Form(...),
 ) -> IdsImportResponse:
-    """Parse an uploaded IDS (.ids/XML) file and save its rules under ruleset_id."""
+    """Parse an uploaded IDS (.ids/XML) file and save its rules under ruleset_id.
+
+    Grant-checked only when ``ruleset_id`` already exists -- see
+    :func:`import_json_rules`.
+    """
+    if service.get_folder(ruleset_id):
+        ruleset_check(ruleset_id)
     content_bytes = await file.read()
     xml_text = content_bytes.decode("utf-8", errors="replace")
     try:
@@ -438,7 +545,14 @@ def create_rule_folder(
     payload: RuleFolderCreateRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
 ) -> RuleFolderResponse:
-    """Create a new ruleset folder category."""
+    """Create a new ruleset folder category.
+
+    Not grant-gated like the update/delete/bulk routes below: this mints a
+    brand-new ``ruleset_id`` that by definition has no
+    ``organization_ruleset_grants`` row yet, so there is nothing to check a
+    grant against without also blocking the ordinary "create a custom
+    ruleset" flow for every non-superadmin.
+    """
     norm_cat = service.normalize_category(payload.category)
     created = service.create_folder(
         ruleset_id=payload.ruleset_id,
@@ -482,8 +596,11 @@ def create_rule_folder(
 def bulk_update_rule_folders(
     payload: RuleFolderBulkUpdateRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleFolderBulkActionResponse:
     """Update category and/or mechanism scope for multiple ruleset folders."""
+    for ruleset_id in payload.ruleset_ids:
+        ruleset_check(ruleset_id)
     updates = {}
     if payload.category is not None:
         updates["category"] = payload.category
@@ -506,8 +623,11 @@ def bulk_update_rule_folders(
 def bulk_delete_rule_folders(
     payload: RuleFolderBulkDeleteRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleFolderBulkActionResponse:
     """Delete multiple ruleset folders along with all member rules."""
+    for ruleset_id in payload.ruleset_ids:
+        ruleset_check(ruleset_id)
     deleted_ids, deleted_rules = service.bulk_delete_folders(payload.ruleset_ids)
     return RuleFolderBulkActionResponse(
         success_count=len(deleted_ids),
@@ -555,8 +675,10 @@ def update_rule_folder(
     ruleset_id: str,
     payload: RuleFolderUpdateRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleFolderResponse:
     """Update metadata and category for a ruleset folder."""
+    ruleset_check(ruleset_id)
     updated = service.update_folder_metadata(
         ruleset_id=ruleset_id,
         display_name=payload.display_name,
@@ -592,8 +714,10 @@ def update_rule_folder(
 def delete_rule_folder(
     ruleset_id: str,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> dict:
     """Delete a ruleset folder and all of its associated member rules."""
+    ruleset_check(ruleset_id)
     folder = service.get_folder(ruleset_id)
     if not folder:
         raise HTTPException(
@@ -616,8 +740,19 @@ def delete_rule_folder(
 def bulk_update_rules(
     payload: RuleBulkUpdateRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleBulkActionResponse:
     """Update ruleset folder, category, mechanism, severity, property set, or review status across multiple rules."""
+    affected_ruleset_ids = {
+        row.get("ruleset_id") for row in (service.get_rule(rid) for rid in payload.rule_ids) if row
+    }
+    for ruleset_id in affected_ruleset_ids:
+        ruleset_check(ruleset_id)
+    if payload.ruleset_id is not None:
+        # Moving rules into a different ruleset needs a grant on the
+        # destination too, not just the ones they're leaving.
+        ruleset_check(payload.ruleset_id)
+
     updates = {}
     if payload.ruleset_id is not None:
         updates["ruleset_id"] = payload.ruleset_id
@@ -647,8 +782,14 @@ def bulk_update_rules(
 def bulk_delete_rules(
     payload: RuleBulkDeleteRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleBulkActionResponse:
     """Delete multiple compliance rules by integer primary key IDs."""
+    affected_ruleset_ids = {
+        row.get("ruleset_id") for row in (service.get_rule(rid) for rid in payload.rule_ids) if row
+    }
+    for ruleset_id in affected_ruleset_ids:
+        ruleset_check(ruleset_id)
     deleted_count = service.delete_rules(payload.rule_ids)
     return RuleBulkActionResponse(
         success_count=deleted_count,
@@ -765,8 +906,10 @@ def get_rule_source(
 def create_rule(
     payload: RuleCreateRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleResponse:
     """Create a new compliance rule entry in the database."""
+    ruleset_check(payload.ruleset_id)
     try:
         created = service.create_rule(
             rule_id=payload.rule_id,
@@ -807,6 +950,7 @@ def update_rule(
     rule_id: int,
     payload: RuleUpdateRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleResponse:
     """Update fields on an existing compliance rule."""
     existing = service.get_rule(rule_id)
@@ -815,6 +959,9 @@ def update_rule(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Rule with ID {rule_id} not found.",
         )
+    # RuleUpdateRequest has no ruleset_id field -- a rule's ruleset can't be
+    # changed via this endpoint, so only the existing ruleset needs a grant.
+    ruleset_check(existing.get("ruleset_id"))
 
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
     updated = service.update_rule(rule_id, **updates)
@@ -825,6 +972,7 @@ def update_rule(
 def delete_rule(
     rule_id: int,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> None:
     """Delete a rule by primary key ID."""
     existing = service.get_rule(rule_id)
@@ -833,6 +981,7 @@ def delete_rule(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Rule with ID {rule_id} not found.",
         )
+    ruleset_check(existing.get("ruleset_id"))
     service.delete_rule(rule_id)
 
 
@@ -903,9 +1052,17 @@ def promote_rule_draft(draft_id: int) -> dict:
 
 @router.post("/seed", summary="Seed rule library with engine rulesets")
 def seed_rules(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[RuleService, Depends(get_rules_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> dict:
-    """Seed corrosion mechanisms GC-001, CC-001, MC-001 into the rule library."""
+    """Seed corrosion mechanisms GC-001, CC-001, MC-001 into the rule library.
+
+    Superadmin only: this reseeds the platform's built-in engine rulesets
+    (shared by every organization), not a per-org content ruleset, so a
+    per-org grant check doesn't apply the way it does for the routes above.
+    """
+    _require_superadmin(current_user, profiles)
     from app.services.ruleset_seeder import seed_engine_rulesets
 
     seeded = seed_engine_rulesets(service)
@@ -921,8 +1078,17 @@ def seed_rules(
 def bulk_create_rules(
     rules: list[RuleCreateRequest],
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> dict:
-    """Save a batch of extracted rules into the library."""
+    """Save a batch of extracted rules into the library.
+
+    Grant-checked only for a ``ruleset_id`` that already exists -- see
+    :func:`import_json_rules`; a batch that only targets brand-new rulesets
+    needs no grant, the same as creating one via ``create_rule_folder``.
+    """
+    for ruleset_id in {r.ruleset_id for r in rules if r.ruleset_id}:
+        if service.get_folder(ruleset_id):
+            ruleset_check(ruleset_id)
     kwargs_list = [
         dict(
             rule_id=payload.rule_id,

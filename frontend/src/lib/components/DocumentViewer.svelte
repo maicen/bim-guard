@@ -12,6 +12,7 @@
     FileText as FileIcon,
   } from "lucide-svelte";
   import { documentsApi } from "../api";
+  import { authHeaders } from "../authToken";
 
   interface Props {
     documentId: number;
@@ -90,7 +91,7 @@
 
     try {
       const url = documentsApi.getFileUrl(documentId);
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: authHeaders() });
       if (!res.ok) throw new Error(`Failed to load document file (HTTP ${res.status})`);
       const contentType = res.headers.get("content-type") || "";
       const disposition = res.headers.get("content-disposition") || "";

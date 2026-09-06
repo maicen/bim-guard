@@ -10,9 +10,10 @@ from __future__ import annotations
 import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
-from app.api.dependencies import get_naming_config_service, get_projects_service
+from app.api.dependencies import get_naming_config_service
+from app.api.projects import get_authorized_project
 from app.logging_config import get_logger
 from app.modules.contracts import (
     NamingCatalogResponseContract as NamingCatalogResponse,
@@ -38,32 +39,12 @@ from app.services.naming_config_service import (
     SEPARATORS,
     NamingConfigService,
 )
-from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
 
 router = APIRouter()
 
 _TOKEN_RE = re.compile(r"\{(\w+)\}")
-
-
-def _require_project(service: ProjectsService, project_id: int) -> None:
-    """Raise 404 unless the project exists.
-
-    Args:
-        service: The projects service to look the project up in.
-        project_id: ``projects.id`` being addressed.
-
-    Raises:
-        HTTPException: 404 if no such project exists. A project that exists but
-            has saved no naming configuration is not a 404 -- being
-            unconfigured is a state, not a missing resource.
-    """
-    if service.get_project(project_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found.",
-        )
 
 
 @router.get(
@@ -115,14 +96,14 @@ def get_presets(
 def get_project_naming_config(
     project_id: int,
     service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
-    projects: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
 ) -> NamingConfig:
     """Return one project's naming setup, or the defaults if it has none.
 
     Raises:
-        HTTPException: 404 if the project does not exist.
+        HTTPException: 404 if the project does not exist or is not the
+            caller's to access.
     """
-    _require_project(projects, project_id)
     return NamingConfig(**service.get_for_project(project_id))
 
 
@@ -135,7 +116,7 @@ def save_project_naming_config(
     project_id: int,
     payload: NamingConfigUpdate,
     service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
-    projects: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
 ) -> NamingConfig:
     """Create or update one project's naming setup and return it.
 
@@ -143,9 +124,9 @@ def save_project_naming_config(
     of the form leaves the rest as they were.
 
     Raises:
-        HTTPException: 404 if the project does not exist.
+        HTTPException: 404 if the project does not exist or is not the
+            caller's to access.
     """
-    _require_project(projects, project_id)
     saved = service.save_for_project(project_id, payload.model_dump(exclude_unset=True))
     return NamingConfig(**saved)
 
@@ -158,7 +139,7 @@ def save_project_naming_config(
 def reset_project_naming_config(
     project_id: int,
     service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
-    projects: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
 ) -> NamingConfig:
     """Drop a project's saved configuration and return the defaults it falls back to.
 
@@ -166,9 +147,9 @@ def reset_project_naming_config(
     the caller asked for -- this project is unconfigured -- already holds.
 
     Raises:
-        HTTPException: 404 if the project does not exist.
+        HTTPException: 404 if the project does not exist or is not the
+            caller's to access.
     """
-    _require_project(projects, project_id)
     service.delete_for_project(project_id)
     return NamingConfig(**service.get_for_project(project_id))
 

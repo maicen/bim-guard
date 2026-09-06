@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.api.dependencies import get_github_repo_service
+from app.auth import get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     GitHubRepoCreateRequest,
@@ -18,7 +19,14 @@ from app.services.github_repo_service import GitHubRepoService
 
 logger = get_logger(__name__)
 
-router = APIRouter()
+# Registered repos carry no credentials (a public repo URL/branch/description
+# only -- see GitHubRepoCreateRequest/Response) and every route here, reads
+# and writes alike, is used from ProjectsView.svelte by any signed-in user
+# managing their own project's model source, not an admin screen. So this
+# only needs "is this a signed-in caller", unlike parsing_engines.py and
+# settings.py where writes touch real credentials/instance-wide config and
+# are superadmin-only.
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=list[GitHubRepoResponse], summary="List registered GitHub repositories")

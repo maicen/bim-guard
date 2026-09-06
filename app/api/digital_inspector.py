@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_digital_inspector_service
+from app.api.projects import get_authorized_project
 from app.modules.contracts import InspectorQueryRequest, InspectorResponse
 from app.services.digital_inspector_service import DigitalInspectorService
 
@@ -15,6 +16,7 @@ router = APIRouter()
 async def inspect_project(
     project_id: int,
     payload: InspectorQueryRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[DigitalInspectorService, Depends(get_digital_inspector_service)],
 ) -> InspectorResponse:
     """Run a natural-language query through the Digital Inspector agent.

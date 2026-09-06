@@ -6,8 +6,9 @@ import os
 from pathlib import Path
 from threading import Thread
 from time import perf_counter
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -255,10 +256,12 @@ def health_check() -> dict:
 def download_report_alias(
     fmt: str,
     project_id: int,
+    project: Annotated[dict, Depends(api_projects.get_authorized_project)],
     slug: str = "corrosion",
 ):
     """Download analysis report in CSV, JSON, or BCF format."""
     from fastapi import Response
+
     from app.modules.phase_6.phase_6e_export import export
     from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
 

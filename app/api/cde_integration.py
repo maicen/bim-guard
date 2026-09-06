@@ -21,9 +21,10 @@ import json
 from datetime import datetime, timezone
 from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 
 from app.api.dependencies import get_documents_service, get_projects_service
+from app.api.projects import get_authorized_project
 from app.logging_config import get_logger
 from app.modules.contracts import (
     CDEDocumentItem,
@@ -184,6 +185,7 @@ def list_cde_documents(
     project_id: int,
     request: Request,
     response: Response,
+    _project_auth: Annotated[dict, Depends(get_authorized_project)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
     documents_service: Annotated[DocumentService, Depends(get_documents_service)],
     filter: Optional[str] = Query(None, alias="$filter", description="OData filter expression"),
@@ -280,13 +282,9 @@ def list_cde_documents(
 def sync_external_cde_documents(
     project_id: int,
     payload: CDESyncRequest,
-    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    project: Annotated[dict, Depends(get_authorized_project)],
 ) -> CDESyncResponse:
     """Pull & link external CDE documents/models into BIMGuard project."""
-    project = projects_service.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
-
     synced_files = []
     for doc_id in payload.document_ids or ["DOC-001"]:
         synced_files.append(f"{payload.cde_server_url}/documents/{doc_id}.ifc")
@@ -316,7 +314,17 @@ def handle_cde_webhook(
     payload: CDEWebhookPayload,
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
 ) -> dict[str, Any]:
-    """Process incoming OpenCDE webhook event to automatically ingest updated IFC models and documents."""
+    """Process incoming OpenCDE webhook event to automatically ingest updated IFC models and documents.
+
+    Deliberately left without a ``get_current_user`` dependency: a webhook is
+    called by an external CDE system, not a signed-in browser session, so it
+    can never carry a Supabase bearer token. It is also inert today -- it
+    only logs and echoes the payload back, with no database read or write --
+    so there is nothing here for the missing auth to actually protect.
+    Wiring it up for real (persisting ingested models/documents) should come
+    with its own verification (a shared webhook secret or signature header),
+    not a user JWT.
+    """
     logger.info(
         "Received OpenCDE webhook event=%s doc=%s ext_project=%s",
         payload.event_type,

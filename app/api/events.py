@@ -5,22 +5,47 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.responses import StreamingResponse
 
+from app.api.dependencies import get_membership_service, get_profile_service, get_projects_service
+from app.api.projects import require_project_access
+from app.auth import CurrentUser, get_current_user_flexible
 from app.logging_config import get_logger
+from app.services.membership_service import MembershipService
 from app.services.pipeline_tracker import (
     PipelineEvent,
     snapshot,
     subscribe_async,
     unsubscribe_async,
 )
+from app.services.profile_service import ProfileService
+from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def get_authorized_project_for_sse(
+    project_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user_flexible)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> dict:
+    """Authorize project-scoped access for both plain fetches and SSE streams.
+
+    ``get_current_user_flexible`` covers the native browser ``EventSource``
+    client here: it cannot set an ``Authorization`` header, so it connects
+    with the token as a ``?token=`` query parameter instead. Whichever is
+    present is subjected to the same project-ownership check as every other
+    project-scoped route.
+    """
+    return require_project_access(project_id, current_user, service, memberships, profiles)
 
 
 async def _sse_generator(
@@ -87,7 +112,11 @@ async def _sse_generator(
 
 
 @router.get("/workflow/{project_id}", summary="Get pipeline workflow snapshot JSON")
-def get_workflow_snapshot(project_id: int, response: Response):
+def get_workflow_snapshot(
+    project_id: int,
+    response: Response,
+    project: Annotated[dict, Depends(get_authorized_project_for_sse)],
+):
     """Return every engine's current stage and metrics as JSON."""
     response.headers["Cache-Control"] = "no-store"
     if project_id <= 0:
@@ -104,6 +133,7 @@ def get_workflow_snapshot(project_id: int, response: Response):
 async def sse_pipeline_events(
     project_id: int,
     request: Request,
+    project: Annotated[dict, Depends(get_authorized_project_for_sse)],
     max_events: int | None = None,
 ) -> StreamingResponse:
     """Stream real-time compliance pipeline progress and metrics via Server-Sent Events.

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 
@@ -74,6 +74,33 @@ def get_current_user(
             detail="Missing bearer token",
         )
     return _verify(credentials.credentials)
+
+
+def get_current_user_flexible(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    token: str | None = Query(
+        None,
+        description="Bearer token as a query parameter, for links the frontend "
+        "opens via direct browser navigation (<a href>, window.location) rather "
+        "than fetch -- those can't set an Authorization header.",
+    ),
+) -> CurrentUser:
+    """Require a valid Supabase bearer token from either the header or `?token=`.
+
+    A handful of downloads (report exports, BCF artifacts, document files) are
+    wired up in the SPA as plain `<a href>`/`window.location.href` navigations
+    rather than an authenticated `fetch`, precisely so the browser handles the
+    save-file flow itself -- and a browser navigation cannot carry a custom
+    `Authorization` header. Those routes use this instead of
+    `get_current_user` so securing them doesn't silently break the download.
+    """
+    raw_token = credentials.credentials if credentials else token
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing bearer token",
+        )
+    return _verify(raw_token)
 
 
 def get_current_user_optional(

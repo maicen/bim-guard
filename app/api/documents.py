@@ -24,6 +24,7 @@ from app.api.dependencies import (
     get_documents_service,
     get_parsing_engine_instances_service,
 )
+from app.auth import get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     DocumentDetailResponse,
@@ -47,7 +48,12 @@ from app.utils import safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
 
-router = APIRouter()
+# Documents are a shared global library gated by organization grants (see
+# DocumentAccessService), the same shape as the rules catalog -- not a
+# per-user or per-project owned resource. So, like app/api/rules.py, this
+# requires sign-in at the router level rather than resource-by-resource
+# ownership checks that don't fit the data model.
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=list[DocumentResponse], summary="List all uploaded specification documents")

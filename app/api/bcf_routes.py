@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response as RawResponse
 
 from app.api.dependencies import get_projects_service
+from app.auth import get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     BCFCommentCreatePayload,
@@ -29,7 +30,14 @@ from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
 
-router = APIRouter()
+# ``project_id`` here is the BCF spec's opaque string id, not necessarily one
+# of our own numeric project ids (see get_bcf_project's fallback), so this
+# can't reuse projects.py's per-project ownership dependency the way
+# analyze.py and naming_config.py do. Requiring sign-in at the router level
+# closes the "anyone, unauthenticated" gap this API previously had; scoping
+# it further to "signed-in users may only touch their own project's BCF
+# topics" is a follow-up, not attempted here.
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 def get_bcf_sync_service() -> BCFSyncService:

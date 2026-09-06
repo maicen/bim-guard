@@ -28,7 +28,7 @@ from app.api.dependencies import (
     get_projects_service,
     get_ruleset_access_service,
 )
-from app.auth import CurrentUser, get_current_user
+from app.auth import CurrentUser, get_current_user, get_current_user_flexible
 from app.constants import (
     ANALYSIS_TYPES,
     BUILDING_CODES,
@@ -88,14 +88,23 @@ def _can_access_project(project: dict, user_id: str, memberships: MembershipServ
     return any(memberships.member_can_access_project(org_id, user_id, project["id"]) for org_id in shared)
 
 
-def get_authorized_project(
+def require_project_access(
     project_id: int,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    current_user: CurrentUser,
+    service: ProjectsService,
+    memberships: MembershipService,
+    profiles: ProfileService,
 ) -> dict:
-    """Return *project_id* if the caller may access it.
+    """Return *project_id* if the caller may access it, however it was resolved.
+
+    The plain-function twin of :func:`get_authorized_project`: other routers
+    whose ``project_id`` doesn't come from a path parameter (a multipart
+    ``Form`` field, a JSON body field, a query parameter) can't use that
+    function as a ``Depends`` sub-dependency — FastAPI would need it to
+    resolve ``project_id`` from a path segment that doesn't exist on their
+    route. Those routers instead resolve ``project_id`` themselves and call
+    this directly, after their own ``Depends(get_current_user)`` and service
+    dependencies.
 
     A superadmin (``profiles.is_superadmin``) bypasses the check entirely —
     that flag means authority over every organization's data, not just their
@@ -119,6 +128,101 @@ def get_authorized_project(
             detail=f"Project with ID {project_id} not found.",
         )
     return project
+
+
+def get_authorized_project(
+    project_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> dict:
+    """FastAPI dependency form of :func:`require_project_access`.
+
+    For routes that declare ``project_id`` as a path parameter.
+    """
+    return require_project_access(project_id, current_user, service, memberships, profiles)
+
+
+def get_authorized_project_flexible(
+    project_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user_flexible)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> dict:
+    """Like :func:`get_authorized_project`, but also accepts a query token.
+
+    For path-param routes the frontend downloads via a plain
+    ``<a href>``/``window.location.href`` navigation rather than an
+    authenticated ``fetch``, which cannot carry a custom header.
+    """
+    return require_project_access(project_id, current_user, service, memberships, profiles)
+
+
+class ProjectAccessChecker:
+    """Callable that authorizes a ``project_id`` resolved outside FastAPI's path system.
+
+    ``get_authorized_project``/``get_authorized_project_flexible`` work as a
+    ``Depends`` sub-dependency only because their ``project_id`` comes from
+    the same path segment FastAPI already parses for the route. A route whose
+    ``project_id`` is a multipart ``Form`` field, a JSON body field, or a
+    plain ``Query`` can't reuse them the same way -- but bundling everything
+    *except* ``project_id`` behind one dependency, and taking ``project_id``
+    as a plain call argument once the handler has parsed it itself, keeps
+    this overridable in tests via ``app.dependency_overrides`` the same way
+    the two functions above are, instead of becoming a bare function call
+    that override can never reach.
+    """
+
+    def __init__(
+        self,
+        current_user: CurrentUser,
+        service: ProjectsService,
+        memberships: MembershipService,
+        profiles: ProfileService,
+    ) -> None:
+        """Capture the per-request identity and services this checker calls will use."""
+        self._current_user = current_user
+        self._service = service
+        self._memberships = memberships
+        self._profiles = profiles
+
+    def __call__(self, project_id: int) -> dict:
+        """Return *project_id* if the caller may access it, else raise 404."""
+        return require_project_access(
+            project_id, self._current_user, self._service, self._memberships, self._profiles
+        )
+
+
+def get_project_access_checker(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> ProjectAccessChecker:
+    """Dependency factory for :class:`ProjectAccessChecker`.
+
+    Inject this, then call the result with whatever ``project_id`` the route
+    parsed from its Form/Body/Query -- e.g.
+    ``checker: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)]``
+    then ``checker(payload.project_id)`` in the handler body.
+    """
+    return ProjectAccessChecker(current_user, service, memberships, profiles)
+
+
+def get_project_access_checker_flexible(
+    current_user: Annotated[CurrentUser, Depends(get_current_user_flexible)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> ProjectAccessChecker:
+    """Like :func:`get_project_access_checker`, but also accepts a query token.
+
+    For Form/Body/Query-``project_id`` routes the frontend downloads via a
+    plain ``<a href>``/``window.location.href`` navigation.
+    """
+    return ProjectAccessChecker(current_user, service, memberships, profiles)
 
 
 def _owned_project_ids(

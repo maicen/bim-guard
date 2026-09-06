@@ -49,7 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # file — authenticates all of them as one fixed fake user. FastAPI applies a
 # dependency override transitively, so this also covers get_authorized_project
 # and anywhere else get_current_user appears in a dependency chain.
-from app.auth import CurrentUser, get_current_user  # noqa: E402
+from app.auth import CurrentUser, get_current_user, get_current_user_flexible  # noqa: E402
 from app.main import app  # noqa: E402
 
 TEST_USER = CurrentUser(
@@ -64,6 +64,101 @@ def _override_get_current_user() -> CurrentUser:
 
 
 app.dependency_overrides[get_current_user] = _override_get_current_user
+# get_current_user_flexible is a separate callable (not get_current_user
+# wrapped), for routes the frontend downloads via <a href>/window.location
+# rather than fetch (report exports, BCF artifacts, SSE) and so accept the
+# token via ?token= too. It needs its own override for the same reason.
+app.dependency_overrides[get_current_user_flexible] = _override_get_current_user
+
+# app.api.projects.get_authorized_project (and its ?token= sibling
+# get_authorized_project_flexible) do a REAL DB lookup and are deliberately
+# left un-overridden: app.api.projects's and app.api.naming_config's own
+# tests assert a genuine 404 for a project TEST_USER doesn't own or that
+# doesn't exist, and that must keep working.
+#
+# app.api.analyze defines its OWN distinct functions for this
+# (get_authorized_project_for_analyze / _flexible), and events.py has its own
+# get_authorized_project_for_sse, precisely so those can be overridden here
+# independently of app.api.projects's. Many pre-existing tests of those two
+# routers (pagination, export defaults, pipeline-tracker, SSE) key a
+# synthetic run off a project_id that was never a real row to begin with
+# (e.g. PROJECT_ID = 4242) -- they predate either router having an ownership
+# check at all, and were never testing authorization, only the route's own
+# logic downstream of it. Overriding these two to a stand-in dict rather than
+# a real, owned project keeps that pre-existing "run as one all-powerful fake
+# user" test philosophy intact for them, without weakening the real check
+# app.api.projects's and app.api.naming_config's own tests depend on.
+from app.api.projects import (  # noqa: E402
+    ProjectAccessChecker,
+    get_project_access_checker,
+    get_project_access_checker_flexible,
+)
+
+
+def _override_get_authorized_project(project_id: int) -> dict:
+    return {"id": project_id, "name": f"Test Project {project_id}", "organization_id": None}
+
+
+try:
+    from app.api.analyze import (  # noqa: E402
+        get_authorized_project_for_analyze,
+        get_authorized_project_for_analyze_flexible,
+    )
+
+    app.dependency_overrides[get_authorized_project_for_analyze] = _override_get_authorized_project
+    app.dependency_overrides[get_authorized_project_for_analyze_flexible] = _override_get_authorized_project
+except ImportError:
+    pass
+
+try:
+    from app.api.events import get_authorized_project_for_sse  # noqa: E402
+
+    app.dependency_overrides[get_authorized_project_for_sse] = _override_get_authorized_project
+except ImportError:
+    pass
+
+
+# analyze.py's own project_id (a Form/Body/Query field, not a path segment)
+# can't reuse get_authorized_project as a Depends sub-dependency, so it goes
+# through ProjectAccessChecker instead -- see get_project_access_checker's
+# docstring. Overriding its factory to hand back a checker that never raises
+# keeps the same "run as an all-powerful fake user" philosophy for these
+# routes too.
+class _PermissiveProjectAccessChecker(ProjectAccessChecker):
+    def __init__(self) -> None:  # noqa: D107 - trivial, no real deps needed
+        pass
+
+    def __call__(self, project_id: int) -> dict:
+        return _override_get_authorized_project(project_id)
+
+
+def _override_get_project_access_checker() -> ProjectAccessChecker:
+    return _PermissiveProjectAccessChecker()
+
+
+app.dependency_overrides[get_project_access_checker] = _override_get_project_access_checker
+app.dependency_overrides[get_project_access_checker_flexible] = _override_get_project_access_checker
+
+# Same idea for app.api.rules's ruleset-grant checks (create/update/delete
+# rule, folder CRUD, bulk ops, imports): ruleset_id there is likewise a path
+# segment, Form field, or list, not uniformly a path parameter, so it goes
+# through RulesetAccessChecker rather than a bare Depends(project_id).
+try:
+    from app.api.rules import RulesetAccessChecker, get_ruleset_access_checker  # noqa: E402
+
+    class _PermissiveRulesetAccessChecker(RulesetAccessChecker):
+        def __init__(self) -> None:  # noqa: D107 - trivial, no real deps needed
+            pass
+
+        def __call__(self, ruleset_id) -> None:  # noqa: ANN001 - matches base signature
+            return None
+
+    def _override_get_ruleset_access_checker() -> RulesetAccessChecker:
+        return _PermissiveRulesetAccessChecker()
+
+    app.dependency_overrides[get_ruleset_access_checker] = _override_get_ruleset_access_checker
+except ImportError:
+    pass
 
 # Membership auto-provisioning lands a first-time signer as a plain 'member',
 # which the group-based RBAC layer (MembershipService.member_can_access_project)

@@ -6,7 +6,9 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.dependencies import get_parsing_engine_instances_service
+from app.api.dependencies import get_parsing_engine_instances_service, get_profile_service
+from app.api.organizations import _require_superadmin
+from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     ParsingEngineInstanceCreateRequest,
@@ -17,9 +19,19 @@ from app.modules.contracts import (
 )
 from app.modules.document_parsing.engines import ParsingEngineRegistry
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
+from app.services.profile_service import ProfileService
 
 logger = get_logger(__name__)
 
+# These instances hold live api_key/api_url credentials server-side and can
+# be repointed at an arbitrary URL (test_instance makes an outbound request
+# to whatever api_url an instance carries), so registering, editing, deleting
+# or connectivity-testing one is superadmin-only, matching how
+# app/api/organizations.py gates other platform-wide config. Listing/reading
+# stays open to any signed-in user: the document upload flow (any user, any
+# org) reads this list to populate its parsing-engine picker, and the
+# response never includes the actual api_key (see _to_response's
+# has_api_key).
 router = APIRouter()
 
 
@@ -44,7 +56,7 @@ def _to_response(row: dict[str, Any]) -> ParsingEngineInstanceResponse:
     response_model=list[ParsingEngineKindResponse],
     summary="List registered parsing engine kinds",
 )
-def list_kinds() -> list[ParsingEngineKindResponse]:
+def list_kinds(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> list[ParsingEngineKindResponse]:
     """Return metadata for every registered parsing-engine driver.
 
     The Settings UI renders its "Kind" selector from this list instead of a
@@ -67,6 +79,7 @@ def list_kinds() -> list[ParsingEngineKindResponse]:
 
 @router.get("", response_model=list[ParsingEngineInstanceResponse], summary="List configured parsing engines")
 def list_instances(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> list[ParsingEngineInstanceResponse]:
     """Return all configured parsing-engine instances."""
@@ -81,9 +94,12 @@ def list_instances(
 )
 def create_instance(
     payload: ParsingEngineInstanceCreateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> ParsingEngineInstanceResponse:
     """Register a new parsing-engine instance of any registered kind."""
+    _require_superadmin(current_user, profiles)
     try:
         created = service.create_instance(
             name=payload.name,
@@ -103,6 +119,7 @@ def create_instance(
 @router.get("/{instance_id}", response_model=ParsingEngineInstanceResponse, summary="Get a parsing engine instance")
 def get_instance(
     instance_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> ParsingEngineInstanceResponse:
     """Retrieve a single configured parsing-engine instance by ID."""
@@ -119,9 +136,12 @@ def get_instance(
 def update_instance(
     instance_id: int,
     payload: ParsingEngineInstanceUpdateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> ParsingEngineInstanceResponse:
     """Update metadata for an existing configured parsing-engine instance."""
+    _require_superadmin(current_user, profiles)
     try:
         updated = service.update_instance(
             instance_id,
@@ -146,9 +166,12 @@ def update_instance(
 @router.delete("/{instance_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a parsing engine instance")
 def delete_instance(
     instance_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> None:
     """Delete a configured parsing-engine instance by ID."""
+    _require_superadmin(current_user, profiles)
     if not service.get_instance(instance_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -164,6 +187,8 @@ def delete_instance(
 )
 def test_instance(
     instance_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> ParsingEngineInstanceTestResponse:
     """Ping a configured instance to confirm it is reachable and responding.
@@ -171,6 +196,7 @@ def test_instance(
     Delegates to the instance's driver (ParsingEngineRegistry.get(kind)
     .test_connection(...)) — this endpoint has no per-kind branching itself.
     """
+    _require_superadmin(current_user, profiles)
     row = service.get_instance(instance_id)
     if not row:
         raise HTTPException(
