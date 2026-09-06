@@ -47,6 +47,18 @@ class BCFIssue:
     #: galvanic couple). They are selected and coloured in the viewpoint
     #: alongside ``component_guid``; blanks and duplicates are dropped.
     related_component_guids: list = field(default_factory=list)
+    #: ``Topic/CreationAuthor``. Names the engine that raised the finding and,
+    #: where the finding carries one, its ruleset revision, so a coordinator
+    #: can tell which kernel and which rule revision produced the topic.
+    #: Empty falls back to :data:`DEFAULT_CREATION_AUTHOR` rather than naming
+    #: an engine that did not run.
+    creation_author: str = ""
+
+
+#: Used when a caller supplies no ``creation_author``. Deliberately generic:
+#: naming a specific engine here is what made every archive claim GC-001/CC-001
+#: authorship, seismic clashes included.
+DEFAULT_CREATION_AUTHOR = "BIMGUARD AI"
 
 
 def _utc_now() -> str:
@@ -221,7 +233,7 @@ def _markup_xml(
     <Index>{index}</Index>
 {labels_xml}
     <CreationDate>{_utc_now()}</CreationDate>
-    <CreationAuthor>BIMGUARD AI — GC-001/CC-001 v1.0.0</CreationAuthor>
+    <CreationAuthor>{_xml_text(issue.creation_author or DEFAULT_CREATION_AUTHOR)}</CreationAuthor>
     <ModifiedDate>{_utc_now()}</ModifiedDate>
 {due_date_xml}    <AssignedTo>{_xml_text(issue.assigned_to)}</AssignedTo>
     <Description>{_xml_text(issue.description)}</Description>

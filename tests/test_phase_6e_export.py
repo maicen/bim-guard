@@ -315,3 +315,79 @@ class TestExportDispatch:
         with pytest.raises(ValueError) as excinfo:
             export(mixed_result, "pdf")
         assert "csv" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------------------
+# BCF provenance — CreationAuthor and ruleset labels (god-mode audit, step 1)
+# ---------------------------------------------------------------------------
+
+
+def _markup_for(result: dict, finding_id: str) -> str:
+    """Return the markup.bcf text of the topic exported from ``finding_id``."""
+    from app.modules.reporter.bcf_generator import bcf_topic_guid
+
+    folder = bcf_topic_guid(finding_id)
+    with zipfile.ZipFile(io.BytesIO(to_bcf(result))) as zf:
+        return zf.read(f"{folder}/markup.bcf").decode("utf-8")
+
+
+class TestBCFCreationAuthor:
+    """Every topic must name the engine that raised it, not a fixed string.
+
+    Before this, all 4,321 topics across the 1917 and 1542 demo archives —
+    seismic clashes included — claimed ``BIMGUARD AI - GC-001/CC-001 v1.0.0``.
+    """
+
+    def test_author_names_the_engine_and_its_ruleset_revision(self):
+        result = {
+            "audit_issues": [
+                issue(id="MC-0001", metadata={"ruleset_version": "BIMGUARD-MC-001 v1.0.0"})
+            ]
+        }
+        result["audit_issues"][0].rule_id = "MC-001.01"
+        markup = _markup_for(result, "MC-0001")
+        assert "<CreationAuthor>BIMGUARD AI MC-001 v1.0.0</CreationAuthor>" in markup
+
+    def test_engine_without_a_ruleset_version_omits_the_revision(self):
+        """XM-001 and SB-001 record no ruleset_version; inventing one is fabrication."""
+        seismic = issue(id="SB-0001", mechanism="SB-001 seismic bracing", metadata={})
+        seismic.rule_id = "SB-001.01"
+        markup = _markup_for({"audit_issues": [seismic]}, "SB-0001")
+        assert "<CreationAuthor>BIMGUARD AI SB-001</CreationAuthor>" in markup
+        assert "GC-001/CC-001" not in markup
+
+    def test_no_topic_claims_gc_cc_authorship_for_another_engine(self):
+        mic = issue(id="MC-0002", mechanism="MC-001 microbiological", metadata={})
+        mic.rule_id = "MC-001.01"
+        markup = _markup_for({"audit_issues": [mic]}, "MC-0002")
+        assert "GC-001" not in markup and "CC-001" not in markup
+
+    def test_unshaped_rule_id_falls_back_to_the_generic_author(self):
+        odd = issue(id="ZZ-0001")
+        odd.rule_id = "not-a-rule-id"
+        markup = _markup_for({"audit_issues": [odd]}, "ZZ-0001")
+        assert "<CreationAuthor>BIMGUARD AI</CreationAuthor>" in markup
+
+
+class TestBCFRulesetLabels:
+    def test_engine_and_ruleset_are_labels_on_the_topic(self):
+        result = {
+            "audit_issues": [
+                issue(id="GC-0007", metadata={"ruleset_version": "BIMGUARD-GC-001 v1.0.0"})
+            ]
+        }
+        markup = _markup_for(result, "GC-0007")
+        assert "<Labels>GC-001</Labels>" in markup
+        assert "<Labels>ruleset:BIMGUARD-GC-001 v1.0.0</Labels>" in markup
+
+    def test_data_quality_check_is_labelled_with_its_prefix(self):
+        markup = _markup_for({"audit_issues": [data_quality_issue()]}, "MC-0009")
+        assert "<Labels>check:band_unassessed</Labels>" in markup
+        assert "<Labels>data-quality</Labels>" in markup
+
+    def test_no_ruleset_label_when_the_finding_records_no_version(self):
+        bare = issue(id="XM-0001", mechanism="XM-001 cross-material", metadata={})
+        bare.rule_id = "XM-001.01"
+        markup = _markup_for({"audit_issues": [bare]}, "XM-0001")
+        assert "ruleset:" not in markup
+        assert "<Labels>XM-001</Labels>" in markup

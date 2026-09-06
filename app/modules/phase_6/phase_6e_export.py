@@ -28,14 +28,24 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 
 from app.logging_config import get_logger
 from app.modules.comparator.issue_schema import Issue, RiskBand
-from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import (
+    DEFAULT_CREATION_AUTHOR,
+    BCFIssue,
+    generate_bcf,
+)
 
 logger = get_logger(__name__)
+
+#: Engine ids as they appear at the head of a ``rule_id``: two letters, a dash
+#: and three digits (``GC-001``, ``SB-001``). Anchored so a malformed rule id
+#: yields no engine rather than a fragment.
+_ENGINE_CODE_RE = re.compile(r"^[A-Z]{2}-\d{3}$")
 
 #: Mechanism string marking a non-verdict Issue. Must match Sessions C and D.
 DATA_QUALITY = "data_quality"
@@ -222,6 +232,45 @@ def _encode(obj: Any) -> Any:
 # ---------------------------------------------------------------------------
 
 
+def _engine_code(issue: Issue) -> str:
+    """Return the engine id that raised ``issue``, e.g. ``"GC-001"``.
+
+    Read from ``rule_id`` rather than ``metadata["mechanism_code"]`` because
+    only ``rule_id`` is populated on every finding: XM-001's 510 verdicts and
+    the MM-001/XM-001 data-quality notes carry no ``mechanism_code``, while
+    every finding — verdict or note, corrosion or seismic — has a ``rule_id``
+    of the form ``"<ENGINE>.<rule>"``.
+
+    Returns an empty string if ``rule_id`` is missing or unshaped, so callers
+    fall back to a generic author rather than inventing an engine.
+    """
+    head = str(issue.rule_id or "").split(".", 1)[0].strip()
+    return head if _ENGINE_CODE_RE.match(head) else ""
+
+
+def _creation_author(issue: Issue) -> str:
+    """Return ``Topic/CreationAuthor`` for ``issue``.
+
+    ``"BIMGUARD AI <ENGINE> <revision>"`` where the finding records a ruleset
+    version, ``"BIMGUARD AI <ENGINE>"`` where it does not. XM-001 and SB-001
+    carry no ``ruleset_version``, so they take the shorter form: naming a
+    revision they never recorded would be a fabricated value.
+
+    The stored ``ruleset_version`` is a full label such as
+    ``"BIMGUARD-MC-001 v1.0.0"``, which already contains the engine id. Only
+    the revision token is appended, so the author reads
+    ``"BIMGUARD AI MC-001 v1.0.0"`` rather than repeating the engine twice.
+    """
+    engine = _engine_code(issue)
+    if not engine:
+        return DEFAULT_CREATION_AUTHOR
+    version = str(issue.metadata.get("ruleset_version", "") or "").strip()
+    if not version:
+        return f"{DEFAULT_CREATION_AUTHOR} {engine}"
+    revision = version.rsplit(" ", 1)[-1] if version.startswith(f"BIMGUARD-{engine}") else version
+    return f"{DEFAULT_CREATION_AUTHOR} {engine} {revision}"
+
+
 def _bcf_issue(issue: Issue) -> BCFIssue:
     """Map one :class:`Issue` onto the existing :class:`BCFIssue`.
 
@@ -234,7 +283,14 @@ def _bcf_issue(issue: Issue) -> BCFIssue:
         labels.append("data-quality")
         check = issue.metadata.get("check", "")
         if check:
-            labels.append(check)
+            labels.append(f"check:{check}")
+
+    engine = _engine_code(issue)
+    if engine:
+        labels.append(engine)
+    ruleset_version = str(issue.metadata.get("ruleset_version", "") or "").strip()
+    if ruleset_version:
+        labels.append(f"ruleset:{ruleset_version}")
 
     return BCFIssue(
         guid=issue.id,
@@ -253,6 +309,7 @@ def _bcf_issue(issue: Issue) -> BCFIssue:
         mechanism=issue.mechanism,
         risk_score=issue.score,
         mitigation=issue.mitigation,
+        creation_author=_creation_author(issue),
     )
 
 
