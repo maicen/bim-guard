@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import {
     BookOpen,
     Plus,
@@ -154,7 +154,12 @@
 
   $effect(() => {
     const _orgId = authState.activeOrganizationId;
-    loadDocuments(true);
+    // loadDocuments synchronously reads `documents.length` before its first
+    // await; without untrack that read makes this effect depend on
+    // `documents`, and the subsequent `documents = ...` assignment (both the
+    // direct one and the one from the cache-subscribe callback) re-triggers
+    // the effect — an infinite fetch loop that floods the network.
+    untrack(() => loadDocuments(true));
   });
 
   async function loadDocuments(force = false) {

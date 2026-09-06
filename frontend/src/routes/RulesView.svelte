@@ -1,7 +1,7 @@
 <script lang="ts">
   import { run, stopPropagation } from "svelte/legacy";
 
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import {
     ListChecks,
     Search,
@@ -205,7 +205,11 @@
 
   $effect(() => {
     const _orgId = authState.activeOrganizationId;
-    loadData(true);
+    // loadData reads/writes `rules` synchronously before its first await;
+    // without untrack, that read gets tracked as a dependency of this
+    // effect, and the later write to `rules` (including from the
+    // cache-subscribe callback) re-fires it, causing an unbounded refetch loop.
+    untrack(() => loadData(true));
   });
 
   async function loadData(force = false) {

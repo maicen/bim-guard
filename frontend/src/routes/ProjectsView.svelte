@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import {
     Plus,
     Search,
@@ -98,7 +98,11 @@
 
   $effect(() => {
     const _orgId = authState.activeOrganizationId;
-    loadProjects(true);
+    // loadProjects reads/writes `projects` synchronously before its first
+    // await; without untrack, that read gets tracked as a dependency of this
+    // effect, and the later write to `projects` (including from the
+    // cache-subscribe callback) re-fires it, causing an unbounded refetch loop.
+    untrack(() => loadProjects(true));
   });
 
   // Search, filter, sort, paginate and select — all owned by the shared state.

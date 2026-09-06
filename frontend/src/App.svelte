@@ -147,6 +147,17 @@
       }
     } catch (err) {
       selectedProject = null;
+      if ((err as { status?: number })?.status === 404) {
+        // The stored/URL project id points at a project that's gone (deleted,
+        // or moved to another org) — clear it and pick a real one instead of
+        // leaving the app stuck pointing at a dead id forever.
+        targetProjectId = null;
+        try {
+          localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
+        } catch {}
+        ensureProjectSelected();
+        return;
+      }
       toasts.fromError(err, "Could not load the selected project.");
     }
   }
