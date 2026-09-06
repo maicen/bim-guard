@@ -51,11 +51,23 @@ class RulesetAccessService:
         """
         existing = {r["ruleset_id"]: r for r in self._org_grants.rows_where("organization_id = ?", [organization_id])}
         wanted = set(ruleset_ids)
-        for ruleset_id, row in existing.items():
-            if ruleset_id not in wanted:
-                self._org_grants.delete(row["id"])
-        for ruleset_id in wanted - set(existing.keys()):
-            self._org_grants.insert({"organization_id": organization_id, "ruleset_id": ruleset_id})
+        to_delete = [row["id"] for ruleset_id, row in existing.items() if ruleset_id not in wanted]
+        if to_delete:
+            if hasattr(self._org_grants, "delete_many"):
+                self._org_grants.delete_many(to_delete)
+            else:
+                for pk in to_delete:
+                    self._org_grants.delete(pk)
+        to_insert = [
+            {"organization_id": organization_id, "ruleset_id": ruleset_id}
+            for ruleset_id in wanted - set(existing.keys())
+        ]
+        if to_insert:
+            if hasattr(self._org_grants, "insert_many"):
+                self._org_grants.insert_many(to_insert)
+            else:
+                for row in to_insert:
+                    self._org_grants.insert(row)
 
     # -- Project bindings (owner/admin) ----------------------------------------
 
@@ -88,11 +100,23 @@ class RulesetAccessService:
             )
 
         existing = {r["ruleset_id"]: r for r in self._project_bindings.rows_where("project_id = ?", [project_id])}
-        for ruleset_id, row in existing.items():
-            if ruleset_id not in requested:
-                self._project_bindings.delete(row["id"])
-        for ruleset_id in requested - set(existing.keys()):
-            self._project_bindings.insert({"project_id": project_id, "ruleset_id": ruleset_id})
+        to_delete = [row["id"] for ruleset_id, row in existing.items() if ruleset_id not in requested]
+        if to_delete:
+            if hasattr(self._project_bindings, "delete_many"):
+                self._project_bindings.delete_many(to_delete)
+            else:
+                for pk in to_delete:
+                    self._project_bindings.delete(pk)
+        to_insert = [
+            {"project_id": project_id, "ruleset_id": ruleset_id}
+            for ruleset_id in requested - set(existing.keys())
+        ]
+        if to_insert:
+            if hasattr(self._project_bindings, "insert_many"):
+                self._project_bindings.insert_many(to_insert)
+            else:
+                for row in to_insert:
+                    self._project_bindings.insert(row)
 
     def project_can_use_ruleset(self, project_id: int, ruleset_id: str) -> bool:
         """Whether *project_id* has *ruleset_id* bound."""

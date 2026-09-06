@@ -303,11 +303,23 @@ class MembershipService:
         """Replace *group_id*'s entire set of granted projects."""
         existing = {r["project_id"]: r for r in self._group_project_grants.rows_where("group_id = ?", [group_id])}
         wanted = set(project_ids)
-        for project_id, row in existing.items():
-            if project_id not in wanted:
-                self._group_project_grants.delete(row["id"])
-        for project_id in wanted - set(existing.keys()):
-            self._group_project_grants.insert({"group_id": group_id, "project_id": project_id})
+        to_delete = [row["id"] for project_id, row in existing.items() if project_id not in wanted]
+        if to_delete:
+            if hasattr(self._group_project_grants, "delete_many"):
+                self._group_project_grants.delete_many(to_delete)
+            else:
+                for pk in to_delete:
+                    self._group_project_grants.delete(pk)
+        to_insert = [
+            {"group_id": group_id, "project_id": project_id}
+            for project_id in wanted - set(existing.keys())
+        ]
+        if to_insert:
+            if hasattr(self._group_project_grants, "insert_many"):
+                self._group_project_grants.insert_many(to_insert)
+            else:
+                for row in to_insert:
+                    self._group_project_grants.insert(row)
 
     def member_can_access_project(self, organization_id: int, user_id: str, project_id: int) -> bool:
         """Whether a confirmed member of *organization_id* may access *project_id*.
@@ -360,11 +372,23 @@ class MembershipService:
             r["project_id"]: r for r in self._org_project_grants.rows_where("organization_id = ?", [organization_id])
         }
         wanted = set(project_ids)
-        for project_id, row in existing.items():
-            if project_id not in wanted:
-                self._org_project_grants.delete(row["id"])
-        for project_id in wanted - set(existing.keys()):
-            self._org_project_grants.insert({"organization_id": organization_id, "project_id": project_id})
+        to_delete = [row["id"] for project_id, row in existing.items() if project_id not in wanted]
+        if to_delete:
+            if hasattr(self._org_project_grants, "delete_many"):
+                self._org_project_grants.delete_many(to_delete)
+            else:
+                for pk in to_delete:
+                    self._org_project_grants.delete(pk)
+        to_insert = [
+            {"organization_id": organization_id, "project_id": project_id}
+            for project_id in wanted - set(existing.keys())
+        ]
+        if to_insert:
+            if hasattr(self._org_project_grants, "insert_many"):
+                self._org_project_grants.insert_many(to_insert)
+            else:
+                for row in to_insert:
+                    self._org_project_grants.insert(row)
 
     def granting_organizations_for_project(self, project_id: int) -> list[int]:
         """Organizations (other than the owner) granted access to *project_id*."""
