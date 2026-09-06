@@ -298,6 +298,135 @@ def _topic_type(issue: Issue) -> str:
     return "Issue"
 
 
+def _fmt(value: Any) -> str:
+    """Render a metadata value for the description, thousands-separated."""
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, float):
+        return f"{value:,.4f}".rstrip("0").rstrip(".") if abs(value) < 1000 else f"{value:,.1f}"
+    if isinstance(value, int):
+        return f"{value:,}"
+    return str(value)
+
+
+def _line(label: str, value: Any, unit: str = "") -> str | None:
+    """Return ``"  Label: value unit"``, or ``None`` when there is no value.
+
+    Returning ``None`` for an absent value is the whole point: a description
+    that prints ``Material: `` for an element with no material asserts an empty
+    material, where saying nothing asserts nothing.
+    """
+    if value is None or value == "":
+        return None
+    rendered = _fmt(value)
+    return f"  {label}: {rendered}{unit}"
+
+
+#: Description sections, in render order, as
+#: ``(heading, [(label, metadata key, unit), ...])``. Only keys the finding
+#: actually carries are rendered, so an engine that records none of a
+#: section's keys drops the whole section rather than printing empty labels.
+_DESCRIPTION_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str], ...]], ...] = (
+    (
+        "INPUTS",
+        (
+            ("Material", "material", ""),
+            ("Material (anode)", "anode_material", ""),
+            ("Material (cathode)", "cathode_material", ""),
+            ("Material source", "material_source", ""),
+            ("Material confidence", "material_confidence", ""),
+            ("Medium", "medium", ""),
+            ("Environment class", "environment_class", ""),
+            ("Environment source", "environment_source", ""),
+            ("Environment confidence", "environment_confidence", ""),
+            ("Environment severity", "environment_severity", ""),
+            ("Operating temperature", "operating_temperature_c", " °C"),
+            ("Galvanic couple basis", "galvanic_couple", ""),
+            ("Voltage gap", "voltage_gap_v", " V"),
+            ("Separation", "separation", ""),
+            ("Nominal diameter (assumed)", "assumed_nominal_diameter_m", " m"),
+        ),
+    ),
+    (
+        "CLASH GEOMETRY",
+        (
+            ("Halo element", "halo_id", ""),
+            ("Clashing element", "clashing_element_id", ""),
+            ("Clashing element class", "clashing_element_class", ""),
+            ("Overlap volume", "overlap_volume_mm3", " mm³"),
+            ("Required clearance", "clearance_mm", " mm"),
+            ("Brace type", "brace_type", ""),
+            ("Rule variant", "rule_variant", ""),
+            ("Jurisdiction", "jurisdiction", ""),
+            ("Source model", "source_model", ""),
+            ("Clashing source model", "clashing_source_model", ""),
+        ),
+    ),
+)
+
+
+def _description(issue: Issue) -> str:
+    """Render a structured, self-contained ``Topic/Description``.
+
+    A coordinator opening a topic in Revit or Solibri sees only this text. It
+    previously read, in full, "MC-001 assessed this element as medium." —
+    which names no element, no input, no threshold and no standard, so the
+    topic could not be acted on without going back to the web UI.
+
+    Every line is drawn from what the finding actually recorded. Absent values
+    produce no line and an entirely absent section produces no heading, so the
+    description never asserts a value the engine did not measure.
+
+    Sections, in order: the engine's own sentence, ELEMENT, INPUTS, CLASH
+    GEOMETRY (seismic only), ASSESSMENT, STANDARDS, MITIGATION.
+    """
+    meta = issue.metadata or {}
+    blocks: list[str] = []
+
+    headline = (issue.description or "").strip()
+    if headline:
+        blocks.append(headline)
+
+    element = [
+        _line("Type", meta.get("ifc_type")),
+        _line("GUID", issue.element_id),
+        _line("System", meta.get("system")),
+        _line("Floor", meta.get("floor")),
+    ]
+    element = [line for line in element if line]
+    if element:
+        blocks.append("ELEMENT\n" + "\n".join(element))
+
+    for heading, fields in _DESCRIPTION_SECTIONS:
+        lines = [_line(label, meta.get(key), unit) for label, key, unit in fields]
+        lines = [line for line in lines if line]
+        if lines:
+            blocks.append(f"{heading}\n" + "\n".join(lines))
+
+    assessment = [
+        _line("Band", issue.band.value),
+        _line("Score", round(float(issue.score or 0.0), 4)),
+        _line("Ruleset", meta.get("ruleset_version")),
+        _line("Check", meta.get("check")),
+    ]
+    assessment = [line for line in assessment if line]
+    if assessment:
+        blocks.append("ASSESSMENT\n" + "\n".join(assessment))
+
+    citations = [
+        f"  {c.get('standard', '')} — {c.get('clause', '')}: {c.get('reason', '')}".rstrip(": ")
+        for c in (issue.citations or [])
+        if isinstance(c, dict) and c.get("standard")
+    ]
+    if citations:
+        blocks.append("STANDARDS\n" + "\n".join(citations))
+
+    if (issue.mitigation or "").strip():
+        blocks.append("MITIGATION\n  " + issue.mitigation.strip())
+
+    return "\n\n".join(blocks)
+
+
 def _source_files(issue: Issue, model_dates: dict[str, str], fallback: list[dict]) -> list[dict]:
     """Return the ``Header/File`` entries naming the model(s) behind ``issue``.
 
@@ -364,7 +493,7 @@ def _bcf_issue(
     return BCFIssue(
         guid=issue.id,
         title=issue.title,
-        description=issue.description or issue.mitigation or issue.title,
+        description=_description(issue) or issue.title,
         priority=BAND_TO_BCF_PRIORITY[issue.band],
         status="Open",
         assigned_to=issue.assignee_role,

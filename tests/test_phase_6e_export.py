@@ -576,3 +576,132 @@ class TestBCFHeaderNamesTheRealModel:
         """Harness scripts and pre-existing cached results omit source_files."""
         markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
         assert "<Filename>BIMGUARD_AI_Model.ifc</Filename>" in markup
+
+
+def _description(markup: str) -> str:
+    """Return the topic's Description, XML entities resolved."""
+    raw = markup.split("<Description>", 1)[1].split("</Description>", 1)[0]
+    return (
+        raw.replace("&#10;", "\n")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&amp;", "&")
+    )
+
+
+class TestBCFStructuredDescription:
+    """The Description is the only text a coordinator sees in Revit or Solibri.
+
+    It previously read, in full, "MC-001 assessed this element as medium." — no
+    element, no input, no threshold, no standard — so a topic could not be
+    acted on without going back to the web UI.
+    """
+
+    def test_description_names_the_element_and_its_context(self):
+        finding = issue(
+            id="GC-0001",
+            metadata={"ifc_type": "IfcValve", "system": "LTHW Heating", "floor": "Level 00"},
+        )
+        text = _description(_markup_for({"audit_issues": [finding]}, "GC-0001"))
+        assert "ELEMENT" in text
+        assert "Type: IfcValve" in text
+        assert "GUID: GUID-01" in text
+        assert "System: LTHW Heating" in text
+        assert "Floor: Level 00" in text
+
+    def test_description_carries_input_provenance(self):
+        finding = issue(
+            id="GC-0002",
+            metadata={
+                "material_source": "ifc_metadata",
+                "material_confidence": "high",
+                "environment_source": "inferred from spatial names",
+                "galvanic_couple": "bimetallic_pair_from_model",
+            },
+        )
+        text = _description(_markup_for({"audit_issues": [finding]}, "GC-0002"))
+        assert "Material source: ifc_metadata" in text
+        assert "Material confidence: high" in text
+        assert "Environment source: inferred from spatial names" in text
+        assert "Galvanic couple basis: bimetallic_pair_from_model" in text
+
+    def test_description_states_band_score_and_ruleset(self):
+        finding = issue(id="CC-0003", metadata={"ruleset_version": "BIMGUARD-CC-001 v1.0.0"})
+        text = _description(_markup_for({"audit_issues": [finding]}, "CC-0003"))
+        assert "Band: high" in text
+        assert "Score: 0.71" in text
+        assert "Ruleset: BIMGUARD-CC-001 v1.0.0" in text
+
+    def test_description_traces_each_standard_to_its_clause(self):
+        finding = issue(
+            id="GC-0004",
+            citations=[
+                {"standard": "NASA-STD-6012", "clause": "Table 2", "reason": "gap 0.27V"},
+                {"standard": "EN ISO 15329", "clause": "T1", "reason": "severity 0.2"},
+            ],
+        )
+        text = _description(_markup_for({"audit_issues": [finding]}, "GC-0004"))
+        assert "STANDARDS" in text
+        assert "NASA-STD-6012 — Table 2: gap 0.27V" in text
+        assert "EN ISO 15329 — T1: severity 0.2" in text
+
+    def test_seismic_description_carries_the_clash_geometry_and_both_models(self):
+        from app.modules.comparator.issue_schema import make_issue
+
+        clash = make_issue(
+            id="SB-0001",
+            element_id="GUID-A",
+            rule_id="SB-001.01",
+            title="Bracing clearance clash",
+            mechanism="SB-001 seismic bracing",
+            band=RiskBand.CRITICAL,
+            score=0.9,
+            mitigation="Relocate.",
+            assignee_role="Mechanical engineer",
+            metadata={
+                "clashing_element_id": "GUID-B",
+                "clashing_element_class": "IfcBeam",
+                "overlap_volume_mm3": 131822370.75,
+                "clearance_mm": 200.0,
+                "source_model": "plumb.ifc",
+                "clashing_source_model": "str.ifc",
+                "jurisdiction": "EN 1998-1:2020 + DIN 4149:2022",
+            },
+            citations=[],
+        )
+        text = _description(_markup_for({"audit_issues": [clash]}, "SB-0001"))
+        assert "CLASH GEOMETRY" in text
+        assert "Clashing element: GUID-B" in text
+        assert "Overlap volume: 131,822,370.8 mm" in text
+        assert "Required clearance: 200 mm" in text
+        assert "Source model: plumb.ifc" in text
+        assert "Clashing source model: str.ifc" in text
+        assert "Jurisdiction: EN 1998-1:2020 + DIN 4149:2022" in text
+
+    def test_absent_values_produce_no_line_rather_than_an_empty_one(self):
+        """An empty 'Material: ' asserts an empty material; silence asserts nothing."""
+        finding = issue(id="GC-0005", metadata={"ifc_type": "IfcPipeSegment"})
+        text = _description(_markup_for({"audit_issues": [finding]}, "GC-0005"))
+        assert "Material source:" not in text
+        assert "System:" not in text
+        assert "Floor:" not in text
+        assert "CLASH GEOMETRY" not in text
+
+    def test_corrosion_finding_has_no_clash_section(self):
+        text = _description(_markup_for({"audit_issues": [issue(id="GC-0006")]}, "GC-0006"))
+        assert "CLASH GEOMETRY" not in text
+
+    def test_data_quality_note_states_the_failed_check(self):
+        text = _description(_markup_for({"audit_issues": [data_quality_issue()]}, "MC-0009"))
+        assert "Check: band_unassessed" in text
+
+    def test_description_stays_schema_valid(self):
+        xmlschema = pytest.importorskip("xmlschema")
+        from pathlib import Path
+
+        schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "markup.xsd"
+        )
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert not [str(e.reason or e) for e in schema.iter_errors(markup)]
