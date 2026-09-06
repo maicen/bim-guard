@@ -32,6 +32,15 @@ MATERIAL_SOURCE_IFC = "ifc_metadata"
 MATERIAL_SOURCE_UNMAPPED = "ifc_metadata_unmapped"
 #: The IFC carried no material at all.
 MATERIAL_SOURCE_ABSENT = "absent"
+#: A material was read from an IFC *property* rather than from a material
+#: association, and mapped onto a known key. The second material at a junction
+#: (a bracket, a support, a fixing) is not an IfcMaterial on the pipe — the
+#: pipe has one of those already — so it arrives as a declared property. The
+#: distinct string keeps "the model associates this material with the element"
+#: apart from "someone typed the bracket material into a property".
+MATERIAL_SOURCE_IFC_PROPERTY = "ifc_property"
+#: Read from a property, but matches no known material key.
+MATERIAL_SOURCE_IFC_PROPERTY_UNMAPPED = "ifc_property_unmapped"
 #: The element was authored by the demo generator, not read from a model.
 SOURCE_SYNTHETIC = "synthetic_fixture"
 
@@ -39,6 +48,17 @@ SOURCE_SYNTHETIC = "synthetic_fixture"
 ENVIRONMENT_SOURCE_SPATIAL = "inferred from spatial names"
 #: Nothing matched, so DEFAULT_ENVIRONMENT was assumed.
 ENVIRONMENT_SOURCE_DEFAULT = "default_indoor"
+
+#: A hydraulic value was read from an IFC property set. Deliberately the same
+#: string as piping_producer.TEMPERATURE_SOURCE_IFC: both producers read the
+#: same property off the same element, and one reviewer-facing vocabulary is
+#: the point of the note at the top of this block.
+HYDRAULIC_SOURCE_IFC = "ifc_property"
+#: No property set on the element carried the value. There is deliberately no
+#: inference counterpart: MC-001's pre-flight gate exists precisely because a
+#: substituted hydraulic input scores as a real one, so a value this parser
+#: cannot read stays None and the gate refuses the element.
+HYDRAULIC_SOURCE_ABSENT = "absent"
 
 CONFIDENCE_HIGH = "high"
 CONFIDENCE_MEDIUM = "medium"
@@ -84,10 +104,38 @@ class ServiceElement:
     material_source: str = MATERIAL_SOURCE_ABSENT
     #: CONFIDENCE_* — how far material_a may be trusted as a reading.
     material_confidence: str = CONFIDENCE_NONE
+    #: MATERIAL_SOURCE_* — where material_b came from. Absent by default: an
+    #: element with no declared second material has no couple, which GC-001
+    #: scores as a self-couple rather than as a fault.
+    material_b_source: str = MATERIAL_SOURCE_ABSENT
+    #: CONFIDENCE_* — how far material_b may be trusted as a reading.
+    material_b_confidence: str = CONFIDENCE_NONE
     #: ENVIRONMENT_SOURCE_* — inferred from spatial names, or the indoor default.
     environment_source: str = ENVIRONMENT_SOURCE_DEFAULT
     #: CONFIDENCE_* — how far location_tag may be trusted as a reading.
     environment_confidence: str = CONFIDENCE_LOW
+
+    # --- Hydraulics -------------------------------------------------------
+    # The three inputs MC-001 scores flow, temperature and stagnation from.
+    # Every one is Optional and defaults to None, which is load-bearing: the
+    # pre-flight gate in phase_6c distinguishes "absent" from "zero", and 0.0
+    # m/s is not a missing velocity but the worst one (FV0_STAGNANT, risk 1.0).
+    # A default of 0.0 here would silently score every element that carries no
+    # property set as stagnant, which is the exact failure the gate was added
+    # to stop. Anything this parser cannot read stays None.
+    #: Flow velocity in m/s, or None when no property set stated one.
+    flow_velocity_ms: Optional[float] = None
+    #: Operating temperature in Celsius, or None.
+    operating_temp_c: Optional[float] = None
+    #: Dead-leg length in metres, or None. 0.0 means "measured, and it is a
+    #: through-flow element" — a different fact from None.
+    dead_leg_length_m: Optional[float] = None
+    #: HYDRAULIC_SOURCE_* — read from an IFC property set, or absent.
+    velocity_source: str = HYDRAULIC_SOURCE_ABSENT
+    #: HYDRAULIC_SOURCE_* — read from an IFC property set, or absent.
+    temperature_source: str = HYDRAULIC_SOURCE_ABSENT
+    #: HYDRAULIC_SOURCE_* — read from an IFC property set, or absent.
+    dead_leg_source: str = HYDRAULIC_SOURCE_ABSENT
 
 
 # Mapping from IFC type to plain English service category
@@ -299,6 +347,221 @@ def get_floor_name(element, ifc_model) -> str:
     return "Unknown floor"
 
 
+# ---------------------------------------------------------------------------
+# Hydraulics
+# ---------------------------------------------------------------------------
+# Property names are matched against every Pset on the element, flattened, so
+# an authoring tool's choice of property-set name does not matter. That mirrors
+# piping_producer._all_property_values, which already reads the temperature
+# this way; reading the same value by a different route would let the two
+# producers disagree about the same element.
+#
+# The temperature keys are piping_producer.TEMPERATURE_PROPERTY_KEYS verbatim
+# rather than a second list that has to be kept in step with it.
+
+#: Property names an authoring tool may use for flow velocity, in m/s. IFC4
+#: defines no flow-velocity property for a pipe segment, so there is no
+#: buildingSMART name to prefer here; these are the conventions seen in
+#: practice plus the one this repo's generator writes.
+VELOCITY_PROPERTY_KEYS = (
+    "FlowVelocity",
+    "Velocity",
+    "FluidVelocity",
+    "DesignFlowVelocity",
+    "AverageVelocity",
+)
+
+#: Property names for the operating temperature, in Celsius. Shared with the
+#: PipingElement path so both read the same property.
+TEMPERATURE_PROPERTY_KEYS = (
+    "OperatingTemperature",
+    "WorkingTemperature",
+    "FluidTemperature",
+    "DesignTemperature",
+    "MediumTemperature",
+)
+
+#: Property names for a dead-leg length, in metres.
+DEAD_LEG_PROPERTY_KEYS = (
+    "DeadLegLength",
+    "StagnationLength",
+    "DeadLegLengthM",
+)
+
+#: Boolean property names that flag an element as a dead leg without giving a
+#: length. See _read_hydraulics for why a bare True is not turned into a length.
+DEAD_LEG_FLAG_KEYS = (
+    "IsDeadLeg",
+    "Stagnant",
+    "IsStagnant",
+)
+
+
+def _flatten_psets(element) -> dict:
+    """Flatten every property set on an element into one dict.
+
+    Both the bare property name and ``"Pset.Property"`` are keyed, so a caller
+    can match loosely or exactly. Returns ``{}`` when the psets cannot be read,
+    rather than propagating: an unreadable pset is an absent value, and the
+    caller's provenance already says so.
+    """
+    try:
+        psets = ifcopenshell.util.element.get_psets(element) or {}
+    except Exception:
+        return {}
+
+    flattened: dict = {}
+    for pset_name, props in psets.items():
+        if not isinstance(props, dict):
+            continue
+        for key, value in props.items():
+            if key == "id":
+                continue
+            flattened[key] = value
+            flattened[f"{pset_name}.{key}"] = value
+    return flattened
+
+
+def _first_number(properties: dict, keys: tuple[str, ...]) -> Optional[float]:
+    """Return the first key holding a finite, non-boolean number, or None."""
+    for key in keys:
+        value = properties.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if number == number and abs(number) != float("inf"):  # finite
+            return number
+    return None
+
+
+def _first_text(properties: dict, keys: tuple[str, ...]) -> Optional[str]:
+    """Return the first key holding non-empty, non-boolean text, or None."""
+    for key in keys:
+        value = properties.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
+def _first_bool(properties: dict, keys: tuple[str, ...]) -> Optional[bool]:
+    """Return the first key holding a boolean, or None."""
+    for key in keys:
+        value = properties.get(key)
+        if isinstance(value, bool):
+            return value
+    return None
+
+
+def read_hydraulics(element) -> dict:
+    """Read the three MC-001 hydraulic inputs off an element's property sets.
+
+    Args:
+        element: The IFC entity to read.
+
+    Returns:
+        A dict of the six ``ServiceElement`` hydraulic fields, ready to splat
+        into the constructor. A value absent from every property set is
+        ``None`` with its ``*_source`` set to :data:`HYDRAULIC_SOURCE_ABSENT`;
+        it is never defaulted to a number. See the note on the dataclass
+        fields for why that matters.
+
+        A dead-leg *flag* of ``True`` with no length is reported as a source
+        reading with a ``None`` length: the element is known to be a dead leg,
+        but MC-001 classifies dead legs by length-to-diameter ratio and there
+        is no honest length to give it. Inventing one would be the substitution
+        the pre-flight gate exists to prevent. A flag of ``False`` does yield
+        0.0, because "not a dead leg" is a measurement of through flow —
+        exactly what DL0_THROUGH means.
+    """
+    properties = _flatten_psets(element)
+
+    velocity = _first_number(properties, VELOCITY_PROPERTY_KEYS)
+    temperature = _first_number(properties, TEMPERATURE_PROPERTY_KEYS)
+
+    dead_leg = _first_number(properties, DEAD_LEG_PROPERTY_KEYS)
+    dead_leg_source = (
+        HYDRAULIC_SOURCE_IFC if dead_leg is not None else HYDRAULIC_SOURCE_ABSENT
+    )
+    if dead_leg is None:
+        flag = _first_bool(properties, DEAD_LEG_FLAG_KEYS)
+        if flag is False:
+            dead_leg, dead_leg_source = 0.0, HYDRAULIC_SOURCE_IFC
+        elif flag is True:
+            dead_leg_source = HYDRAULIC_SOURCE_IFC
+
+    return {
+        "flow_velocity_ms": velocity,
+        "operating_temp_c": temperature,
+        "dead_leg_length_m": dead_leg,
+        "velocity_source": (
+            HYDRAULIC_SOURCE_IFC if velocity is not None else HYDRAULIC_SOURCE_ABSENT
+        ),
+        "temperature_source": (
+            HYDRAULIC_SOURCE_IFC if temperature is not None else HYDRAULIC_SOURCE_ABSENT
+        ),
+        "dead_leg_source": dead_leg_source,
+    }
+
+
+#: Property names an authoring tool may use to declare the second material at
+#: a bimetallic junction — the bracket, support, hanger or fixing the element
+#: is in contact with. There is no buildingSMART property for this: IFC models
+#: contact through geometry, and the corrosion-relevant pairing is a design
+#: statement rather than something derivable from the pipe's own IfcMaterial.
+SECONDARY_MATERIAL_PROPERTY_KEYS = (
+    "SecondaryMaterial",
+    "SupportMaterial",
+    "BracketMaterial",
+    "FixingMaterial",
+)
+
+
+def read_secondary_material(element) -> dict:
+    """Read the declared second material at this element's junction.
+
+    Args:
+        element: The IFC entity to read.
+
+    Returns:
+        ``material_b``, ``material_b_source`` and ``material_b_confidence``,
+        ready to splat into a :class:`ServiceElement`. The key and confidence
+        come from :func:`resolve_material_name`, exactly as ``material_a``'s
+        do, so one vocabulary and one confidence scale describe both sides of
+        a couple. Only the *source* differs, because this side was read from a
+        property and the other from a material association.
+
+        An absent property yields ``None``. It is not defaulted to the
+        element's own material: GC-001 already treats a missing second
+        material as a self-couple, and inventing one here would put a
+        fabricated pairing behind a real-looking galvanic verdict.
+    """
+    properties = _flatten_psets(element)
+    raw = _first_text(properties, SECONDARY_MATERIAL_PROPERTY_KEYS)
+    if raw is None:
+        return {
+            "material_b": None,
+            "material_b_source": MATERIAL_SOURCE_ABSENT,
+            "material_b_confidence": CONFIDENCE_NONE,
+        }
+
+    key, source, confidence = resolve_material_name(raw)
+    return {
+        "material_b": key,
+        "material_b_source": (
+            MATERIAL_SOURCE_IFC_PROPERTY
+            if source == MATERIAL_SOURCE_IFC
+            else MATERIAL_SOURCE_IFC_PROPERTY_UNMAPPED
+        ),
+        "material_b_confidence": confidence,
+    }
+
+
 def get_system_name(element, ifc_model) -> str:
     """Find MEP system this element belongs to."""
     for rel in ifc_model.get_inverse(element):
@@ -346,7 +609,10 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                 seen_guids.add(guid)
             mat_a_raw = get_material_name(el, model)
             mat_a, mat_a_source, mat_a_confidence = resolve_material_name(mat_a_raw)
-            mat_b = None  # Second material (e.g. bracket material) — extend via Pset
+            # The second material at the junction, when the model declares one.
+            # Absent leaves material_b None, which GC-001 reads as a
+            # self-couple rather than as a fault.
+            secondary = read_secondary_material(el)
 
             floor = get_floor_name(el, model)
             system = get_system_name(el, model)
@@ -373,7 +639,6 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                     ifc_type=ifc_type,
                     description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
                     material_a=mat_a,
-                    material_b=mat_b,
                     location_tag=env,
                     floor=floor,
                     system=system,
@@ -386,6 +651,8 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                     material_confidence=mat_a_confidence,
                     environment_source=env_source,
                     environment_confidence=env_confidence,
+                    **secondary,
+                    **read_hydraulics(el),
                 )
             )
 
