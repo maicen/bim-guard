@@ -477,3 +477,102 @@ class TestBCFDueDateIsNotFabricated:
         """DueDate preceded AssignedTo in the sequence; AssignedTo must remain."""
         markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
         assert "<AssignedTo>Mechanical engineer</AssignedTo>" in markup
+
+
+def _header(markup: str) -> str:
+    """Return just the Markup/Header block.
+
+    Scoped deliberately: ``<Date>`` also appears inside ``Comment``, so an
+    assertion about the model's upload date has to look only at the Header.
+    """
+    return markup.split("<Header>", 1)[1].split("</Header>", 1)[0]
+
+
+class TestBCFHeaderNamesTheRealModel:
+    """Header/File must name the model the finding came from.
+
+    Every topic in every archive previously named ``BIMGUARD_AI_Model.ifc``,
+    a file that does not exist, while project 1542's 886 cross-model clashes
+    already recorded both real filenames in their metadata.
+    """
+
+    def _seismic(self, source: str, clashing: str):
+        from app.modules.comparator.issue_schema import make_issue
+
+        return make_issue(
+            id="SB-0001",
+            element_id="GUID-01",
+            rule_id="SB-001.01",
+            title="Bracing clearance clash",
+            mechanism="SB-001 seismic bracing",
+            band=RiskBand.CRITICAL,
+            score=0.9,
+            mitigation="Relocate.",
+            assignee_role="Mechanical engineer",
+            metadata={"source_model": source, "clashing_source_model": clashing},
+            citations=[],
+        )
+
+    def test_cross_model_clash_names_both_files(self):
+        result = {
+            "audit_issues": [self._seismic("plumb.ifc", "str.ifc")],
+            "source_files": [
+                {"filename": "plumb.ifc", "date": "2026-09-05T20:03:55+00:00"},
+                {"filename": "str.ifc", "date": "2026-09-05T20:04:54+00:00"},
+            ],
+        }
+        markup = _markup_for(result, "SB-0001")
+        assert _header(markup).count("<Filename>") == 2
+        assert "<Filename>plumb.ifc</Filename>" in markup
+        assert "<Filename>str.ifc</Filename>" in markup
+        assert "BIMGUARD_AI_Model.ifc" not in markup
+
+    def test_intra_model_clash_names_one_file_not_two(self):
+        result = {
+            "audit_issues": [self._seismic("plumb.ifc", "plumb.ifc")],
+            "source_files": [{"filename": "plumb.ifc", "date": "2026-09-05T20:03:55+00:00"}],
+        }
+        markup = _markup_for(result, "SB-0001")
+        assert _header(markup).count("<Filename>") == 1
+
+    def test_corrosion_finding_takes_the_projects_model(self):
+        result = {
+            "audit_issues": [issue(id="GC-0001")],
+            "source_files": [
+                {"filename": "test_hospital_mep_demo.ifc", "date": "2026-09-06T08:06:16+00:00"}
+            ],
+        }
+        markup = _markup_for(result, "GC-0001")
+        assert "<Filename>test_hospital_mep_demo.ifc</Filename>" in markup
+        assert "<Date>2026-09-06T08:06:16+00:00</Date>" in markup
+
+    def test_upload_date_is_omitted_when_unknown_rather_than_invented(self):
+        result = {
+            "audit_issues": [issue(id="GC-0001")],
+            "source_files": [{"filename": "model.ifc", "date": ""}],
+        }
+        markup = _markup_for(result, "GC-0001")
+        assert "<Filename>model.ifc</Filename>" in markup
+        assert "<Date>" not in _header(markup)
+
+    def test_multi_file_header_is_schema_valid(self):
+        xmlschema = pytest.importorskip("xmlschema")
+        from pathlib import Path
+
+        schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "markup.xsd"
+        )
+        result = {
+            "audit_issues": [self._seismic("plumb.ifc", "str.ifc")],
+            "source_files": [
+                {"filename": "plumb.ifc", "date": "2026-09-05T20:03:55+00:00"},
+                {"filename": "str.ifc", "date": "2026-09-05T20:04:54+00:00"},
+            ],
+        }
+        markup = _markup_for(result, "SB-0001")
+        assert not [str(e.reason or e) for e in schema.iter_errors(markup)]
+
+    def test_caller_supplying_no_models_still_exports(self):
+        """Harness scripts and pre-existing cached results omit source_files."""
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert "<Filename>BIMGUARD_AI_Model.ifc</Filename>" in markup

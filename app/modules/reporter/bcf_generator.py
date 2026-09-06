@@ -57,6 +57,13 @@ class BCFIssue:
     #: which is right for a compliance verdict; a clash and a data-quality note
     #: are different kinds of thing and say so.
     topic_type: str = "Issue"
+    #: Source models this finding came from, as
+    #: ``[{"filename": str, "date": str}, ...]``. One ``Header/File`` is
+    #: written per entry, so a cross-model clash names both models instead of
+    #: one placeholder. ``date`` is the model's upload timestamp and is
+    #: omitted where unknown. Empty falls back to
+    #: :data:`PLACEHOLDER_MODEL_FILENAME`.
+    source_files: list = field(default_factory=list)
 
 
 #: Used when a caller supplies no ``creation_author``. Deliberately generic:
@@ -164,6 +171,39 @@ def _xml_attr(value) -> str:
     return _escape(str(value), {'"': "&quot;"})
 
 
+#: Emitted when a caller supplies no ``source_files``. Kept only so callers
+#: that predate the field still produce a well-formed Header; every live path
+#: names the real model.
+PLACEHOLDER_MODEL_FILENAME = "BIMGUARD_AI_Model.ifc"
+
+
+def _header_xml(issue: "BCFIssue", project_attr: str) -> str:
+    """Render ``Markup/Header`` naming the model(s) the finding came from.
+
+    ``markup.xsd`` declares ``File`` with ``maxOccurs="unbounded"``, so a
+    cross-model finding names both models rather than picking one. The
+    sequence inside ``File`` is ``Filename, Date, Reference``; ``Date`` is an
+    ``xs:dateTime`` and is emitted only when the caller supplied one, since an
+    invented upload time is a fabricated value.
+    """
+    files = [f for f in (issue.source_files or []) if (f or {}).get("filename")]
+    if not files:
+        files = [{"filename": PLACEHOLDER_MODEL_FILENAME}]
+
+    blocks = []
+    for entry in files:
+        date = str(entry.get("date") or "").strip()
+        date_xml = f"\n      <Date>{_xml_text(date)}</Date>" if date else ""
+        blocks.append(
+            f"    <File{project_attr}>\n"
+            f"      <Filename>{_xml_text(entry['filename'])}</Filename>"
+            f"{date_xml}\n"
+            f"    </File>"
+        )
+    joined = "\n".join(blocks)
+    return f"  <Header>\n{joined}\n  </Header>"
+
+
 def _markup_xml(
     issue: BCFIssue, index: int, viewpoint_guid: str, topic_guid: str | None = None
 ) -> str:
@@ -238,13 +278,11 @@ def _markup_xml(
         f' IfcProject="{_xml_attr(issue.project_code)}"' if is_ifc_guid(issue.project_code) else ""
     )
 
+    header_xml = _header_xml(issue, project_attr)
+
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Header>
-    <File{project_attr}>
-      <Filename>BIMGUARD_AI_Model.ifc</Filename>
-    </File>
-  </Header>
+{header_xml}
   <Topic Guid="{topic_guid}" TopicType="{_xml_attr(issue.topic_type or 'Issue')}" TopicStatus="{_xml_attr(issue.status)}">
     <ReferenceLink></ReferenceLink>
     <Title>{_xml_text(issue.title)}</Title>

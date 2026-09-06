@@ -298,11 +298,53 @@ def _topic_type(issue: Issue) -> str:
     return "Issue"
 
 
-def _bcf_issue(issue: Issue) -> BCFIssue:
+def _source_files(issue: Issue, model_dates: dict[str, str], fallback: list[dict]) -> list[dict]:
+    """Return the ``Header/File`` entries naming the model(s) behind ``issue``.
+
+    Seismic findings record which model each side of the clash came from, in
+    ``metadata["source_model"]`` and ``metadata["clashing_source_model"]``, so
+    a cross-model clash names both files — on project 1542 that is 886 of
+    2,937 findings. Corrosion findings carry no per-finding model, so they take
+    the project's attached model(s) as supplied by the caller.
+
+    Args:
+        issue: The finding being exported.
+        model_dates: ``{filename: upload timestamp}`` for the project, used to
+            date a per-finding model. A filename absent from the map is still
+            named, just without a date.
+        fallback: Entries to use when the finding names no model of its own.
+
+    Returns:
+        Entries in ``[{"filename": ..., "date": ...}]`` shape, the finding's
+        own model first, de-duplicated and order-preserving.
+    """
+    names: list[str] = []
+    for key in ("source_model", "clashing_source_model"):
+        value = str(issue.metadata.get(key, "") or "").strip()
+        if value and value not in names:
+            names.append(value)
+    if not names:
+        return list(fallback)
+    return [
+        {"filename": name, "date": model_dates.get(name, "")}
+        for name in names
+    ]
+
+
+def _bcf_issue(
+    issue: Issue,
+    model_dates: dict[str, str] | None = None,
+    fallback_files: list[dict] | None = None,
+) -> BCFIssue:
     """Map one :class:`Issue` onto the existing :class:`BCFIssue`.
 
     A data-quality entry is labelled and titled so a coordinator opening the
     archive sees a data fix, not a remediation instruction.
+
+    Args:
+        model_dates: ``{filename: upload timestamp}`` for the project.
+        fallback_files: ``Header/File`` entries for findings that name no model
+            of their own — every corrosion finding.
     """
     data_quality = _is_data_quality(issue)
     labels = [issue.mechanism, issue.band.value]
@@ -343,6 +385,7 @@ def _bcf_issue(issue: Issue) -> BCFIssue:
         mitigation=issue.mitigation,
         creation_author=_creation_author(issue),
         topic_type=_topic_type(issue),
+        source_files=_source_files(issue, model_dates or {}, fallback_files or []),
     )
 
 
@@ -358,15 +401,33 @@ def to_bcf(result: dict, *, include_data_quality: bool = True) -> bytes:
 
     Returns:
         The archive as bytes, ready to write or offer as a download.
+
+    ``result["source_files"]`` — ``[{"filename": ..., "date": ...}, ...]`` for
+    the project's attached models — names the model in each topic's
+    ``Header``. It is optional: a caller that omits it gets the placeholder
+    filename rather than an error, which keeps the harness scripts and the
+    cached results computed before this field existed working.
     """
     issues = sort_issues(result.get("audit_issues", []))
     if not include_data_quality:
         issues = [i for i in issues if not _is_data_quality(i)]
 
+    source_files = [
+        entry for entry in (result.get("source_files") or []) if (entry or {}).get("filename")
+    ]
+    model_dates = {
+        str(entry["filename"]): str(entry.get("date") or "") for entry in source_files
+    }
+
     logger.info(
-        "BCF export issues=%d data_quality_included=%s", len(issues), include_data_quality
+        "BCF export issues=%d data_quality_included=%s models=%d",
+        len(issues),
+        include_data_quality,
+        len(source_files),
     )
-    return generate_bcf([_bcf_issue(i) for i in issues])
+    return generate_bcf(
+        [_bcf_issue(i, model_dates, source_files) for i in issues]
+    )
 
 
 def to_ids(result: dict) -> str:

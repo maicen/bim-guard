@@ -232,6 +232,34 @@ IssueBand = Literal["critical", "high", "medium", "low", "data_quality"]
 DATA_QUALITY_TOKEN = "DATA_QUALITY"
 
 
+def _source_files_for(project_id: int) -> list[dict]:
+    """Return the project's attached models for a BCF export's ``Header``.
+
+    ``[{"filename": ..., "date": ...}, ...]`` naming each attached IFC and when
+    it was uploaded, so a topic's ``Header/File`` names the model it was
+    actually computed from instead of the placeholder
+    ``BIMGUARD_AI_Model.ifc``. Seismic findings override this per finding from
+    their own ``source_model``; corrosion findings, which record no model of
+    their own, take this list.
+
+    A project whose models cannot be resolved yields an empty list rather than
+    raising: a Header that names no file is a smaller failure than an export
+    that does not happen.
+    """
+    try:
+        resolved, _missing = ProjectsService().resolve_ifc_file_paths(project_id)
+    except Exception:
+        logger.warning("Could not resolve model filenames for project %s", project_id)
+        return []
+    files: list[dict] = []
+    for row, _path in resolved:
+        name = str((row or {}).get("file_name") or "").strip()
+        if not name:
+            continue
+        files.append({"filename": name, "date": str((row or {}).get("uploaded_at") or "")})
+    return files
+
+
 def _band_of(issue: Any) -> str:
     """Return an issue's band as a lowercase string, enum or not."""
     return getattr(issue.band, "value", str(issue.band)).lower()
@@ -765,6 +793,7 @@ def export_analysis_report(
     result = {
         **result,
         "audit_issues": filtered_issues,
+        "source_files": _source_files_for(project_id),
     }
 
     try:
