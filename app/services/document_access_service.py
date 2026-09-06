@@ -44,14 +44,23 @@ class DocumentAccessService:
         own bindings are the source of truth for what it lists as relevant.
         """
         existing = {
-            r["document_id"]: r for r in self._org_grants.rows_where("organization_id = ?", [organization_id])
+            r["document_id"]: r
+            for r in self._org_grants.rows_where("organization_id = ?", [organization_id])
         }
         wanted = set(document_ids)
-        for document_id, row in existing.items():
-            if document_id not in wanted:
-                self._org_grants.delete(row["id"])
-        for document_id in wanted - set(existing.keys()):
-            self._org_grants.insert({"organization_id": organization_id, "document_id": document_id})
+
+        # Batch deletes
+        to_delete = [row["id"] for doc_id, row in existing.items() if doc_id not in wanted]
+        if to_delete:
+            self._org_grants.delete_many(to_delete)
+
+        # Batch inserts
+        to_insert = [
+            {"organization_id": organization_id, "document_id": doc_id}
+            for doc_id in wanted - set(existing.keys())
+        ]
+        if to_insert:
+            self._org_grants.insert_many(to_insert)
 
     # -- Project bindings (owner/admin) ----------------------------------------
 
@@ -84,13 +93,22 @@ class DocumentAccessService:
             )
 
         existing = {
-            r["document_id"]: r for r in self._project_bindings.rows_where("project_id = ?", [project_id])
+            r["document_id"]: r
+            for r in self._project_bindings.rows_where("project_id = ?", [project_id])
         }
-        for document_id, row in existing.items():
-            if document_id not in requested:
-                self._project_bindings.delete(row["id"])
-        for document_id in requested - set(existing.keys()):
-            self._project_bindings.insert({"project_id": project_id, "document_id": document_id})
+
+        # Batch deletes
+        to_delete = [row["id"] for doc_id, row in existing.items() if doc_id not in requested]
+        if to_delete:
+            self._project_bindings.delete_many(to_delete)
+
+        # Batch inserts
+        to_insert = [
+            {"project_id": project_id, "document_id": doc_id}
+            for doc_id in requested - set(existing.keys())
+        ]
+        if to_insert:
+            self._project_bindings.insert_many(to_insert)
 
     def project_can_use_document(self, project_id: int, document_id: int) -> bool:
         """Whether *project_id* has *document_id* bound."""
