@@ -383,7 +383,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 return
             raise
 
-    def delete_many(self, pk_values: list[Any]) -> None:
+def delete_many(self, pk_values: list[Any]) -> None:
         """Delete multiple rows by primary keys in as few PostgREST round-trips as possible."""
         if not pk_values:
             return
@@ -395,10 +395,13 @@ class SupabaseTableAdapter(DatabaseAdapter):
             ]
             return
 
+        chunk_size = 500
         try:
-            execute_with_retry(
-                lambda: self._client.table(self._table_name).delete().in_(self._pk, pk_values)
-            )
+            for start in range(0, len(pk_values), chunk_size):
+                chunk = pk_values[start : start + chunk_size]
+                execute_with_retry(
+                    lambda chunk=chunk: self._client.table(self._table_name).delete().in_(self._pk, chunk)
+                )
         except APIError as exc:
             if self._is_missing_table_error(exc):
                 self._use_memory_fallback = True
