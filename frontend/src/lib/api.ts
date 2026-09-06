@@ -911,9 +911,17 @@ export type IssueBand = "critical" | "high" | "medium" | "low" | "data_quality";
  * `band_then_score` is the default and matches the analyse table's own
  * ordering — criticals first — with score then id as tiebreaks. `score_desc`
  * ignores bands; `natural` keeps the run's own order, which is what an
- * unpaginated response lists.
+ * unpaginated response lists. `band_asc` and `score_asc` are the ascending
+ * counterparts, and are not reversals: data-quality notes sort last in both,
+ * so an ascending page opens on the mildest verdict rather than on the
+ * elements no engine could score.
  */
-export type IssueSort = "band_then_score" | "score_desc" | "natural";
+export type IssueSort =
+  | "band_then_score"
+  | "score_desc"
+  | "natural"
+  | "band_asc"
+  | "score_asc";
 
 /**
  * Optional server-side paging and filtering of `audit_issues`.

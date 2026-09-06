@@ -176,7 +176,40 @@
   let searchTerm = $state("");
   let severityFilter = $state("all");
   let mechanismFilter = $state("all");
-  let sortMode: IssueSort = $state("band_then_score");
+  /**
+   * The column the user explicitly sorted by; ``null`` is the endpoint's own
+   * default order.
+   *
+   * This has to be tracked separately from the API value below. The default
+   * order *is* band_then_score, so deriving "is Severity the active sort?"
+   * from the API value alone cannot tell "the user chose severity" from "the
+   * user chose nothing" — which is why clicking Severity used to do nothing
+   * visible: it assigned the value the state already held.
+   */
+  let activeSortColumn: "band" | "score" | null = $state(null);
+
+  /** Direction of the active column. Meaningless while none is active. */
+  let sortAscending = $state(false);
+
+  /**
+   * The ``sort`` the results endpoint is asked for.
+   *
+   * Each column offers descending and ascending; no active column means the
+   * endpoint's own default. The ascending orders put data-quality notes last
+   * rather than first, so an ascending page opens on the mildest verdict and
+   * not on the elements the engines refused to score.
+   */
+  let sortMode: IssueSort = $derived(
+    activeSortColumn === null
+      ? "band_then_score"
+      : activeSortColumn === "score"
+        ? sortAscending
+          ? "score_asc"
+          : "score_desc"
+        : sortAscending
+          ? "band_asc"
+          : "band_then_score",
+  );
   let isPageLoading = $state(false);
   /** Set after a rejected page query, so the table falls back to one request. */
   let pagingUnavailable = $state(false);
@@ -386,7 +419,24 @@
   }
 
   function setSort(column: string) {
-    sortMode = column === "score" ? "score_desc" : "band_then_score";
+    const next: "band" | "score" = column === "score" ? "score" : "band";
+    // One column cycles descending, ascending, then back to the default, so
+    // every order a click can reach is also one a click can leave. Taking up a
+    // new column always starts descending, and drops the old one: the endpoint
+    // sorts on one key, so two active headers could not both be honoured.
+    if (activeSortColumn !== next) {
+      activeSortColumn = next;
+      sortAscending = false;
+    } else if (!sortAscending) {
+      sortAscending = true;
+    } else {
+      activeSortColumn = null;
+      sortAscending = false;
+    }
+    // The table is paginated server-side, so the new order has to be cut by
+    // the endpoint: re-ordering the 50 rows in hand would sort the page, not
+    // the run. Page 1 because row 51 under one order is not row 51 under
+    // another.
     pageIndex = 1;
     reloadNow();
   }
@@ -413,6 +463,8 @@
     error = "";
     result = null;
     pageIndex = 1;
+    activeSortColumn = null;
+    sortAscending = false;
     selectedIds.clear();
     await Promise.all([fetchPage(), loadInputs()]);
   }
@@ -1215,8 +1267,8 @@
                     </th>
                     <SortHeader
                       column="band"
-                      sortField={sortMode === "score_desc" ? "score" : "band"}
-                      sortAsc={false}
+                      sortField={activeSortColumn ?? ""}
+                      sortAsc={sortAscending}
                       onSort={setSort}
                       customClass="px-4 py-3.5"
                     >
@@ -1239,8 +1291,8 @@
                     </th>
                     <SortHeader
                       column="score"
-                      sortField={sortMode === "score_desc" ? "score" : "band"}
-                      sortAsc={false}
+                      sortField={activeSortColumn ?? ""}
+                      sortAsc={sortAscending}
                       onSort={setSort}
                       align="center"
                       customClass="px-4 py-3.5"
