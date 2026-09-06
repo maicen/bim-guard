@@ -7,13 +7,12 @@ Imported by rule_generator.py, rule_converter.py, and seed-rule loaders.
 import os
 
 from app.environment import load_env_file
-from app.services.persistence import PersistenceService
 
 load_env_file()
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Supabase is the sole runtime database backend.
-DB_BACKEND = PersistenceService.DB_BACKEND
+DB_BACKEND = "supabase"
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
