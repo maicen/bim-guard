@@ -316,3 +316,153 @@ def test_export_json_critical_only():
         assert response.status_code == 200
         data = response.json()
         assert len(data.get("findings", [])) == 3
+
+
+# ── Ascending sort orders ────────────────────────────────────────────────────
+#
+# ``band_asc`` and ``score_asc`` are the ascending counterparts of the two
+# descending orders the page already had. The property worth pinning is not
+# "the list is reversed" — it is that data-quality notes stay at the end of
+# both. The notes carry the Low band, so an ordering that sorted on band alone
+# would open an ascending page with the elements the engines refused to score.
+
+
+def _sortable_issues():
+    """Three verdicts spanning three bands, plus one data-quality note."""
+    from app.modules.comparator.issue_schema import Issue, RiskBand
+
+    return [
+        Issue(
+            id="BGR-0001",
+            element_id="GUID-1",
+            rule_id="GC-001.01",
+            title="critical finding",
+            band=RiskBand.CRITICAL,
+            score=0.90,
+            mechanism="GC-001 galvanic",
+            mitigation="",
+        ),
+        Issue(
+            id="BGR-0002",
+            element_id="GUID-2",
+            rule_id="CC-001.01",
+            title="medium finding",
+            band=RiskBand.MEDIUM,
+            score=0.40,
+            mechanism="CC-001 crevice",
+            mitigation="",
+        ),
+        Issue(
+            id="BGR-0003",
+            element_id="GUID-3",
+            rule_id="MC-001.01",
+            title="low finding",
+            band=RiskBand.LOW,
+            score=0.20,
+            mechanism="MC-001 microbiological",
+            mitigation="",
+        ),
+        Issue(
+            id="BGR-DQ-1",
+            element_id="GUID-4",
+            rule_id="MC-001.DATA",
+            title="unassessable element",
+            band=RiskBand.LOW,
+            score=0.10,
+            mechanism="data_quality",
+            mitigation="",
+        ),
+    ]
+
+
+def test_band_asc_orders_mildest_verdict_first():
+    from app.api.analyze import _sort_issues
+
+    ordered = _sort_issues(_sortable_issues(), "band_asc")
+    assert [i.id for i in ordered] == ["BGR-0003", "BGR-0002", "BGR-0001", "BGR-DQ-1"]
+
+
+def test_score_asc_orders_lowest_score_first():
+    from app.api.analyze import _sort_issues
+
+    ordered = _sort_issues(_sortable_issues(), "score_asc")
+    assert [i.id for i in ordered] == ["BGR-0003", "BGR-0002", "BGR-0001", "BGR-DQ-1"]
+
+
+def test_data_quality_notes_sort_last_in_both_ascending_orders():
+    """The note has the lowest score of all four, and must still not lead."""
+    from app.api.analyze import _sort_issues
+
+    for sort in ("band_asc", "score_asc"):
+        ordered = _sort_issues(_sortable_issues(), sort)
+        assert ordered[-1].id == "BGR-DQ-1", sort
+        assert ordered[0].id != "BGR-DQ-1", sort
+
+
+def test_ascending_orders_are_not_merely_the_descending_ones_reversed():
+    """Reversing band_then_score would put the note first; band_asc does not."""
+    from app.api.analyze import _sort_issues
+
+    issues = _sortable_issues()
+    descending = [i.id for i in _sort_issues(issues, "band_then_score")]
+    ascending = [i.id for i in _sort_issues(issues, "band_asc")]
+    assert descending[-1] == "BGR-DQ-1"
+    assert ascending != list(reversed(descending))
+    assert ascending[-1] == "BGR-DQ-1"
+
+
+def test_ascending_sorts_break_ties_on_id():
+    """Two issues equal on every other key keep a reproducible order."""
+    from app.api.analyze import _sort_issues
+    from app.modules.comparator.issue_schema import Issue, RiskBand
+
+    def twin(issue_id: str) -> Issue:
+        return Issue(
+            id=issue_id,
+            element_id="GUID-T",
+            rule_id="GC-001.01",
+            title="tie",
+            band=RiskBand.MEDIUM,
+            score=0.5,
+            mechanism="GC-001 galvanic",
+            mitigation="",
+        )
+
+    pair = [twin("BGR-0009"), twin("BGR-0004")]
+    for sort in ("band_asc", "score_asc"):
+        assert [i.id for i in _sort_issues(pair, sort)] == ["BGR-0004", "BGR-0009"], sort
+
+
+def test_results_endpoint_accepts_the_ascending_sort_values():
+    """The route must not 422 the two new values."""
+    from unittest.mock import patch
+
+    from app.api.analyze import _issue_stats
+
+    issues = _sortable_issues()
+
+    def mock_run_analysis(*args, **kwargs):
+        return {
+            "audit_issues": issues,
+            "issue_stats": _issue_stats(issues),
+            "ifc_element_count": 4,
+            "compliance_error": None,
+            "compliance_is_demo": False,
+            "cached": False,
+        }
+
+    with patch("app.api.analyze.run_analysis", side_effect=mock_run_analysis):
+        for sort, first in (("band_asc", "BGR-0003"), ("score_asc", "BGR-0003")):
+            response = client.get(
+                f"/api/analyze/results/4242/corrosion?limit=10&sort={sort}"
+            )
+            assert response.status_code == 200, (sort, response.text)
+            body = response.json()
+            assert body["audit_issues"][0]["id"] == first, sort
+            assert body["audit_issues"][-1]["id"] == "BGR-DQ-1", sort
+
+
+def test_results_endpoint_still_rejects_an_unknown_sort():
+    """The Literal must stay closed, or a typo would silently sort by default."""
+    response = client.get("/api/analyze/results/4242/corrosion?limit=10&sort=sideways")
+    assert response.status_code == 422

@@ -263,7 +263,21 @@ _BAND_WEIGHT: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 #: second request can reproduce, so score descending is the tiebreak here.
 #: ``natural`` is the escape hatch for a caller that wants the run's own order
 #: sliced verbatim, exactly as the unpaginated body would have listed it.
-PageSort = Literal["band_then_score", "score_desc", "natural"]
+#:
+#: ``band_asc`` and ``score_asc`` are the ascending counterparts, added so the
+#: analyse page's column headers can offer a direction rather than a single
+#: fixed order. In both, data-quality notes sort *last* rather than first: a
+#: plain reversal would open the table with the elements the engines refused to
+#: score, which reads as "here are your least severe findings" when it is not a
+#: finding list at all. Least-severe-first means the mildest verdict first, and
+#: the notes still trail it.
+PageSort = Literal[
+    "band_then_score",
+    "score_desc",
+    "natural",
+    "band_asc",
+    "score_asc",
+]
 
 #: Bands a page may be filtered to.
 #:
@@ -386,6 +400,21 @@ def _sort_issues(issues: list, sort: PageSort) -> list:
         return issues
     if sort == "score_desc":
         return sorted(issues, key=lambda i: (-(i.score or 0.0), i.id))
+    if sort == "band_asc":
+        # ``_is_data_quality`` leads the key so the notes land after every
+        # verdict: they carry the Low band, so sorting on band alone would
+        # bring them to the front of an ascending page.
+        return sorted(
+            issues,
+            key=lambda i: (
+                _is_data_quality(i),
+                _BAND_WEIGHT.get(_band_of(i), 0),
+                i.score or 0.0,
+                i.id,
+            ),
+        )
+    if sort == "score_asc":
+        return sorted(issues, key=lambda i: (_is_data_quality(i), i.score or 0.0, i.id))
     return sorted(
         issues,
         key=lambda i: (-_BAND_WEIGHT.get(_band_of(i), 0), -(i.score or 0.0), i.id),
