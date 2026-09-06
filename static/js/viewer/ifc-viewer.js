@@ -838,7 +838,7 @@ export async function initViewer(containerOrId) {
     // starts clean after the first one has actually finished attaching its
     // model, regardless of what triggered the double call upstream.
     let activeLoad = Promise.resolve();
-    async function loadIfc(urlOrFile) {
+    async function loadIfc(urlOrFile, headers) {
         const previous = activeLoad;
         let release;
         activeLoad = new Promise((resolve) => { release = resolve; });
@@ -846,7 +846,7 @@ export async function initViewer(containerOrId) {
             await previous;
             await clearModels();
             const file = typeof urlOrFile === "string"
-                ? await fetch(urlOrFile).then(async (response) => {
+                ? await fetch(urlOrFile, { headers }).then(async (response) => {
                     if (!response.ok) throw new Error(`IFC request failed (${response.status})`);
                     return new File([await response.blob()], "project.ifc");
                 })
@@ -877,10 +877,10 @@ export async function initViewer(containerOrId) {
         return null;
     }
 
-    async function loadBcf(urlOrFile, elementGuid) {
+    async function loadBcf(urlOrFile, elementGuid, headers) {
         try {
             const file = typeof urlOrFile === "string"
-                ? await fetch(urlOrFile).then(async (response) => {
+                ? await fetch(urlOrFile, { headers }).then(async (response) => {
                     if (!response.ok) throw new Error(`BCF request failed (${response.status})`);
                     return new File([await response.blob()], "report.bcf");
                 })

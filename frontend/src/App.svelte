@@ -226,10 +226,6 @@
   onMount(() => {
     initTheme();
     checkHealth();
-    dashboardApi.prefetchAll();
-    if (targetProjectId) {
-      loadProjectDetails(targetProjectId);
-    }
     // Backward compatibility for the one link shape that predates hash
     // routing: a plain (non-hash) /viewer?... URL, e.g. an old bookmark.
     if (window.location.pathname === "/viewer" && !window.location.hash) {
@@ -237,6 +233,24 @@
     }
     const interval = setInterval(checkHealth, 20000);
     return () => clearInterval(interval);
+  });
+
+  // dashboardApi.prefetchAll() and loadProjectDetails() hit auth-required
+  // endpoints (/api/projects, /api/rules, ...). Firing them straight from
+  // onMount races the async Supabase session lookup that sets the bearer
+  // token, so the very first load of the app always 401'd on these calls.
+  // Waiting for authState.loading to clear ensures the token (if any) is
+  // already set before the first request goes out.
+  let hasPrefetched = false;
+  $effect(() => {
+    if (authState.loading) return;
+    if (isAuthConfigured && !authState.user) return;
+    if (hasPrefetched) return;
+    hasPrefetched = true;
+    dashboardApi.prefetchAll();
+    if (targetProjectId) {
+      loadProjectDetails(targetProjectId);
+    }
   });
 
   function handleSelectView(view: string) {

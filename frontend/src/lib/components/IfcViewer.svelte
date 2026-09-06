@@ -4,6 +4,7 @@
   import { onMount, onDestroy } from "svelte";
   import { Loader2, AlertCircle, RefreshCw, UploadCloud, Layers } from "lucide-svelte";
   import { projectsApi, analyzeApi } from "../api";
+  import { authHeaders } from "../authToken";
 
   interface Props {
     projectId?: number | null;
@@ -81,7 +82,7 @@
         targetFileId === null
           ? projectsApi.getIfcUrl(id)
           : projectsApi.getIfcFileUrl(id, targetFileId);
-      await viewerAPI.loadIfc(ifcUrl);
+      await viewerAPI.loadIfc(ifcUrl, authHeaders());
       loadedProjectId = id;
       loadedFileId = targetFileId;
 
@@ -90,7 +91,7 @@
       if (bcfArtifactId) {
         loadingMessage = "Loading BCF viewpoints...";
         const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
-        await viewerAPI.loadBcf(bcfUrl, elementGuid);
+        await viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders());
         loadedBcfArtifactId = bcfArtifactId;
       } else if (elementGuid) {
         const topic = viewerAPI.findTopicByElementGuid(elementGuid);
@@ -149,7 +150,7 @@
     if (viewerAPI && bcfArtifactId && bcfArtifactId !== loadedBcfArtifactId && loadedProjectId) {
       loadedBcfArtifactId = bcfArtifactId;
       const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
-      viewerAPI.loadBcf(bcfUrl, elementGuid);
+      viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders());
     }
   });
 
