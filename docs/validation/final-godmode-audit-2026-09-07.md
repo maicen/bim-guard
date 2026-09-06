@@ -859,3 +859,285 @@ Note that `47cf29b` ("require authentication on every previously-open API
 route") post-dates this audit's commit, so the runbook's known limitation
 "`/api/analyze/*` has no authentication" is accurate **at `99cdffc`** and has
 since been addressed on `main`.
+
+---
+---
+
+# Part B — BCF 2.1 conformance gap matrix
+
+Read-only. Nothing in this section was changed; it is the plan Part C works to.
+
+## B1. Writer inventory — what is live, what is dead
+
+| Module | Lines | Status | Called by |
+| --- | ---: | --- | --- |
+| `app/modules/reporter/bcf_generator.py` | 475 | **LIVE — the only writer that produces the demo's archives** | `phase_6e_export.py:36`; also imported by the three corrosion engines (`bimguard_corrosion_engine.py:37`, `bimguard_crevice_engine.py:36`, `bimguard_mic_engine.py:36`), `report_artifacts.py:10`, `blue_halo_bcf_exporter.py:43`, `reporter/__init__.py:17` |
+| `app/modules/phase_6/phase_6e_export.py` (`_bcf_issue`, `to_bcf`) | — | **LIVE — the mapping layer the UI's Export BCF 2.1 button reaches** | `app/api/analyze.py` export endpoint |
+| `app/services/report_artifacts.py` | 166 | **LIVE, separate path** — persists BCF artefacts to storage and serves `/api/analyze/bcf/*`. Builds its own `BCFIssue` list from stored topic dicts (`_topic_to_issue`, line 118) rather than from `Issue` objects, so it is a **second, independently-drifting mapping** of the same target schema. | `analyze.py:818,848,876,884`, `arch_analysis_service.py:17` |
+| `app/services/bcf_sync_service.py` | 364 | **LIVE as an API, but purely in-memory.** Despite the docstring "In-memory & persistent store", state lives in three plain dicts on the instance (`bcf_sync_service.py:41-44`) with no database or storage backing. Status and assignment changes do not survive a restart and never reach the export path. | `app/api/bcf_routes.py:27` |
+| `app/api/bcf_routes.py` | 335 | **LIVE** — registered in `app/main.py:23`. REST surface over `BCFSyncService`. | FastAPI app |
+| `app/services/bcf_exporter.py` | 538 | **DEAD for the product.** No importer anywhere in `app/`. Used only by `scripts/run_full_pipeline.py:52`, `scripts/run_seismic_matrix.py:68` and `tests/test_bcf_exporter.py:14`. | harness scripts + its own test |
+| `app/modules/reporter/blue_halo_bcf_exporter.py` | 218 | **DEAD for the product.** No importer in `app/`; referenced only by `scripts/validate_blue_halo.py:70`. The seismic BCF the demo downloads comes from `phase_6e_export.to_bcf`, not from here. | one validation script |
+
+**Consequence for Part C:** all conformance work belongs in `bcf_generator.py`
+and `phase_6e_export._bcf_issue`. `report_artifacts._topic_to_issue` is a
+second mapping that will drift unless it is fed from the same helper; it is
+called out per-row where relevant. The two dead exporters are deliberately left
+alone — changing them would alter no archive the demo produces.
+
+## B2. Measured "before" state, whole-archive
+
+Counted across every topic in both freshly generated archives:
+
+| Property | 1917 (1,384 topics) | 1542 (2,937 topics) |
+| --- | --- | --- |
+| `TopicType` | `Issue` x1,384 | `Issue` x2,937 — **including every SB-001 clash** |
+| `CreationAuthor` | `BIMGUARD AI — GC-001/CC-001 v1.0.0` x1,384 | same string x2,937 — **on seismic topics** |
+| Viewpoint `Color` | `FF888888` x1,384 | `FF888888` x2,937 |
+| `Component` per viewpoint | 2 (1 selection + 1 coloring) x1,384 | 2 x2,937 |
+| `extensions.xsd` in archive | **absent** (declared by `project.bcfp`) | **absent** |
+| Root entries | `bcf.version`, `project.bcfp` | same |
+
+**Two defects fall straight out of that table and were not previously recorded:**
+
+- **B-DEF-1 — every topic in every archive is coloured grey.**
+  `_risk_colour` (`bcf_generator.py:298-305`) keys on `"LOW"/"MEDIUM"/"HIGH"/"CRITICAL"`
+  (upper case) but `_bcf_issue` passes `risk_band=issue.band.value`,
+  which is lower case (`"medium"`). Every lookup misses and returns the
+  `FF888888` default. Measured: **4,321 of 4,321 topics grey.** The band
+  colouring has never worked in any archive this path produced.
+- **B-DEF-2 — `project.bcfp` declares `ExtensionSchema extensions.xsd`
+  but `generate_bcf` never writes that file** (`bcf_generator.py:348-359`
+  writes only `bcf.version` and `project.bcfp` at the root). Every archive
+  references a schema it does not contain. It validates today only because the
+  corpus validator checks `markup.xsd`/`visinfo.xsd` and does not resolve the
+  extension schema reference.
+
+## B3. Data availability — proof from real records
+
+**One real 1917 finding** (`MC-0391`, the topic dumped in B5):
+
+```json
+{"id": "MC-0391", "element_id": "1tcMzQAf1O$QGXNveYm5Cf",
+ "rule_id": "MC-001.01", "band": "medium", "score": 0.297,
+ "mechanism": "MC-001 microbiologically influenced corrosion",
+ "assignee_role": "Mechanical engineer",
+ "metadata": {"mechanism_code": "MC-001",
+              "ruleset_version": "BIMGUARD-MC-001 v1.0.0",
+              "floor": "Level 00 Basement", "system": "LTHW Heating",
+              "ifc_type": "IfcValve",
+              "material_source": "...", "environment_source": "...",
+              "assumed_nominal_diameter_m": 0.1},
+ "citations": [{"standard": "ASTM G-187", "clause": "...", "reason": "flow class ..."},
+               {"standard": "EN ISO 9308-1", "clause": "...", "reason": "..."},
+               {"standard": "BIMGUARD-MC-001 v1.0.0", "clause": "Composite scoring", "reason": "..."}]}
+```
+
+**One real 1542 clash** (`SB-0002`):
+
+```json
+{"metadata": {"mechanism_code": "SB-001",
+  "halo_id": "ad20a6b4-...",
+  "clashing_element_id": "3W4UPvPfv6vOSdYhV7_PW$",
+  "clashing_element_class": "IfcBeam",
+  "source_model": "west_riverside_hospital_plumb_ifc4.ifc",
+  "clashing_source_model": "west_riverside_hospital_str_ifc4.ifc",
+  "overlap_volume_mm3": 131822370.75410318,
+  "clearance_mm": 200.0,
+  "brace_type": "angle_iron", "rule_variant": "angle_fire",
+  "jurisdiction": "EN 1998-1:2020 + DIN 4149:2022"}}
+```
+
+Every field the matrix below calls "available" is a key in one of those two
+records, in `projects` (section 1.1 schema dump), or in `app/constants.py`.
+
+## B4. The matrix
+
+Legend for (a): `file:line` of what writes it today, or **absent**.
+Hours are implementation + tests + one regeneration/validation cycle.
+
+### Topic
+
+| Field | (a) written today | (b) where the data already is | (c) gap | hrs |
+| --- | --- | --- | --- | ---: |
+| `Guid` | `bcf_generator.py:150,220` — `bcf_topic_guid(issue.guid)`, deterministic UUIDv5 from the finding id; folder name and attribute always agree | `Issue.id` | **none** | 0 |
+| `Title` | `:221` from `issue.title` | `Issue.title`; engine, floor, system in `metadata` | Convention `{DOMAIN}-{ENGINE}-{FLOOR}-{seq:04d} {problem}` not applied. Seismic titles truncate the GUID to 8 chars ("clash on 19FnYm9E") and name no element. Floor is empty on all 2,937 seismic findings, so `{FLOOR}` needs a fallback token rather than an empty segment | 3 |
+| `TopicType` | `:220` — **hardcoded `"Issue"`** | `Issue.mechanism` (`data_quality`), `metadata.mechanism_code` (`SB-001`) | All 4,321 topics say `Issue`. Needs Clash for SB-001, Warning for data-quality, Issue for verdicts — and the three values declared in `extensions.xsd` | 2 |
+| `TopicStatus` | `:220` from `issue.status`, always `"Open"` | — | **none** (Open is correct for a freshly exported finding) | 0 |
+| `Priority` | `:223` from `BAND_TO_BCF_PRIORITY[issue.band]` giving Critical/Major/Normal/Minor | `Issue.band` | Values are BCF-conventional but **undeclared** in `extensions.xsd`, and the band-to-priority mapping is documented nowhere. Also note `_priority_int` (`:307`) defines a *second*, unused mapping | 1 |
+| `Index` | `:224` from enumeration order | — | **none** | 0 |
+| `Labels` | `:190` from `issue.mechanism`, `issue.band`, plus `data-quality` and `check` for DQ (`phase_6e_export.py:232-237`); ISO tags appended at `:152-159` | `metadata.mechanism_code`, `.system`, `.floor`, `.ruleset_version`; `source_model`; `metadata.check` | Missing: engine id as its own label, mechanism, system, floor, source model filename, `ruleset:{ruleset_version}`. The `check:` prefix is not applied to the DQ label. Today only two labels on a verdict topic | 3 |
+| `Stage` | **absent** | `projects` has no stage column (section 1.1: 31 columns, none is `stage`) | **Omit — no real source.** Recorded here as a deliberate omission, per the no-fabrication rule | 0 |
+| `CreationDate` | `:227` from `_utc_now()` | — | **none** | 0 |
+| `CreationAuthor` | `:228` — **hardcoded `"BIMGUARD AI — GC-001/CC-001 v1.0.0"`** | `metadata.mechanism_code` + `metadata.ruleset_version` | Wrong on every MC/MM/XM/SB topic (4,321 of 4,321 carry the GC/CC string). Target `BIMGUARD AI {ENGINE} {ruleset_version}`. **Blocked for XM-001 and SB-001**, which carry no `ruleset_version` at all (F4) — those must either gain the field upstream or omit the version half | 2 |
+| `ModifiedDate` | `:229` — **always emitted**, `_utc_now()`, on a topic that has never been edited | `BCFSyncService` topic dicts carry `modified_date`/`modified_author` (`bcf_sync_service.py:85-86`) but are in-memory only and never reach the exporter | Emit only when a real edit exists; today it asserts an edit that did not happen | 1 |
+| `ModifiedAuthor` | **absent** | as above | Pair with ModifiedDate | 0.5 |
+| `DueDate` | `phase_6e_export.py:246` — **`datetime.now()`**, i.e. the export date, on every topic | no project or rule field carries a due date | **Fabricated. Remove.** `bcf_generator.py:164-169` already omits the element when `due_date` is falsy, so this is a one-line deletion in the mapper | 0.5 |
+| `AssignedTo` | `:230` from `issue.assignee_role` | `Issue.assignee_role` | **none** | 0 |
+| `Description` | `:231` from `issue.description or issue.mitigation or issue.title` | all inputs, scores, thresholds, citations in `metadata` + `citations` | Corrosion descriptions are one sentence ("MC-001 assessed this element as medium.") carrying no element identity, no inputs, no provenance, no threshold, no clause. Seismic is materially better — it already names both elements, the overlap volume and the percentage. Target is the structured block in the brief | 6 |
+| `ReferenceLink` | `:222` — **emitted empty** | project id known; route verified in section 11 to accept `?project_id=` | Route accepts `project_id` (confirmed live) but **there is no `finding` parameter** — `AnalyzeView` reads only `project_id` off the querystring. Deep-linking to a *finding* requires a frontend change, so this is a genuine gap, not a link to invent. Two options: link to the project view only (honest, cheap), or add `&finding=` handling first | 1 project-level / +4 finding-level |
+| `DocumentReference` | **absent** | `app/constants.py` holds the standards with URLs/DOIs; citations name the exact clause per finding | One `DocumentReference` per standard the ruleset cites, `Description` = clause, `ReferencedDocument` = the constant's URL | 3 |
+| `RelatedTopics` | **absent** | XM-001: `anode_id`/`cathode_id`; SB-001: `clashing_element_id` + `halo_id` | Needs a second pass over the finding set to resolve a partner finding's topic GUID. Deterministic GUIDs (`bcf_topic_guid`) make this cheap once the pairing is known | 4 |
+| `BimSnippet` | **absent** | the whole finding dict is already serialised for the JSON export | Write `finding.json` into the topic folder, reference it as `BimSnippet` with `SnippetType="JSON"`, declare `JSON` in `extensions.xsd` | 3 |
+
+### Comment
+
+| Field | (a) | (b) | (c) | hrs |
+| --- | --- | --- | --- | ---: |
+| Auto comment | `:232-236` — one comment, GUID + date + author `BIMGUARD AI` + body | — | Body says "corrosion compliance engine" **on seismic topics**, and prints an empty `Service type:` and `Floor/zone:` for all 2,937 (neither is populated for SB-001) | 1 |
+| Status/assignment audit trail | **absent** | `BCFSyncService._topics_by_project` / `_comments_by_topic` | **Blocked.** The sync service is in-memory only (B1), so there is no durable record to turn into comments. Persisting it is a schema change — outside the export-layer-only constraint of Part C | out of scope |
+
+### Viewpoint
+
+| Field | (a) | (b) | (c) | hrs |
+| --- | --- | --- | --- | ---: |
+| `PerspectiveCamera` | `:276-296` — camera `(camera_*+5, -8, +3)`, direction toward `target_*`, up `0,0,1`, FOV 60 | `ServiceElement.position_x/y/z` (`phase_6c_corrosion_ui.py:248-250`); `ifc_geometry` bboxes for SB-001 and the 3D isolate | Structure is correct and already XSD-valid, but `_bcf_issue` never sets `camera_*`/`target_*`, so the dataclass defaults apply and **every topic in both archives has the identical camera** at `(5, -8, 8)` looking at `(-5, 8, -8)`. Up-vector and FOV already match the target | 4 |
+| `Components/Selection` | `:255-262` — one `Component` per id from `_component_guids`, with `OriginatingSystem` and `AuthoringToolId`; `IfcGuid` only when it is a real 22-char GlobalId | `metadata.clashing_element_id` (SB-001), `anode_id`/`cathode_id` (XM-001) | Shape is exactly right; the **partners are never passed**. `_bcf_issue` does not set `related_component_guids`, so all 4,321 viewpoints select one element. Wiring the partner in is a mapper change, not a generator change | 2 |
+| `Visibility` | `:265` — `DefaultVisibility="true"` | — | **none** | 0 |
+| `ViewSetupHints SpacesVisible=false` | **absent** | — | Add inside `Components`, before `Selection` (XSD sequence order) | 0.5 |
+| `Coloring` | `:266-270` — `Color` per band over the component list | `Issue.band` | **Broken — always grey** (B-DEF-1). One-line case fix, plus a second colour for the partner once partners are selected | 1 |
+| `ClippingPlanes` | **absent** | bbox where it exists | Optional +/-2 m section box; only where a bbox is available, else omit | 3 |
+| `Snapshot` | `:311-324` — a 1x1 red PNG placeholder, written to every topic | no rendered view exists server-side | **Gap named, not closed.** A real snapshot needs headless rendering, which is not an export-layer change | out of scope |
+
+### Container
+
+| Field | (a) | (b) | (c) | hrs |
+| --- | --- | --- | --- | ---: |
+| `bcf.version` | `:340-346` — `VersionId="2.1"`, `DetailedVersion 2.1` | — | **none** | 0 |
+| `project.bcfp` `ProjectId` | `:350,354` — **a fresh random UUID per export** | `projects.id` (1917 / 1542) | Carries no relationship to the project | 0.5 |
+| `project.bcfp` `Name` | `:355` — constant `"BIMGUARD AI — Corrosion Compliance Report"` | `projects.name` (e.g. "BIMGUARD Demo — Hospital MEP (data)") | Constant, and wrong for seismic | 0.5 |
+| `extensions.xsd` | **declared at `:357`, never written** | the emitted TopicType / TopicStatus / Priority / Label / SnippetType / Stage values | **B-DEF-2.** Must be written, and must list exactly what BIMGUARD emits | 2 |
+| `Header/File/Filename` | `:217` — hardcoded `BIMGUARD_AI_Model.ifc` | `projects.ifc_file_path`; `metadata.source_model` and `.clashing_source_model` per seismic finding | Wrong on every topic. Cross-model seismic topics need **two** `File` entries — the data is present on all 886 | 3 |
+| `Header/File/@IfcProject` | `:206-208` — emitted only when `project_code` is a 22-char IFC GUID; 1917's `project_code` is `""`, so **never emitted** | `IfcOpenShell` `by_type("IfcProject")[0].GlobalId` — requires reading the model | Needs the parser to surface the IfcProject GlobalId onto the result. The guard at `:206` is correct and should stay | 3 |
+| `Header/File/@Date` | **absent** | `projects.created_at` / `updated_at` (both populated: `2026-09-06T07:50:03+00:00`) | Model upload timestamp | 1 |
+
+### Totals
+
+| Group | Hours |
+| --- | ---: |
+| Topic | 29.0 (+4 optional for finding-level deep links) |
+| Comment | 1.0 |
+| Viewpoint | 10.5 |
+| Container | 10.0 |
+| **Total** | **50.5** (+4 optional) |
+
+Excluded as outside the export layer: real snapshots, and a durable
+status/assignment audit trail — both need work beyond `bcf_generator` and
+`_bcf_issue`.
+
+## B5. One topic, before — 1917
+
+Topic folder `006A2816-44CF-545F-B3FD-D516EE2A4F3D`, finding `MC-0391`.
+
+```xml
+<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Header>
+    <File>
+      <Filename>BIMGUARD_AI_Model.ifc</Filename>
+    </File>
+  </Header>
+  <Topic Guid="006A2816-44CF-545F-B3FD-D516EE2A4F3D" TopicType="Issue" TopicStatus="Open">
+    <ReferenceLink></ReferenceLink>
+    <Title>Microbiologically influenced corrosion risk on LTHW-065 LTHW Plant Room DN108</Title>
+    <Priority>Normal</Priority>
+    <Index>743</Index>
+    <Labels>MC-001 microbiologically influenced corrosion</Labels>
+    <Labels>medium</Labels>
+    <CreationDate>2026-09-06T21:31:47.597000Z</CreationDate>
+    <CreationAuthor>BIMGUARD AI — GC-001/CC-001 v1.0.0</CreationAuthor>
+    <ModifiedDate>2026-09-06T21:31:47.597000Z</ModifiedDate>
+    <DueDate>2026-09-06T00:00:00Z</DueDate>
+    <AssignedTo>Mechanical engineer</AssignedTo>
+    <Description>MC-001 assessed this element as medium.</Description>
+  </Topic>
+  <Comment Guid="105A1ABA-B555-4A44-9313-4ACB85D63551">
+    <Date>2026-09-06T21:31:47.597000Z</Date>
+    <Author>BIMGUARD AI</Author>
+    <Comment>Issue automatically generated by BIMGUARD AI corrosion compliance engine.
+Source finding id: MC-0391
+Mechanism: MC-001 microbiologically influenced corrosion | Risk score: 0.2970 | Band: medium
+Component: IfcValve (1tcMzQAf1O$QGXNveYm5Cf)
+Service type: LTHW Heating | Floor/zone: Level 00 Basement
+Mitigation: MIT-MIC-009</Comment>
+  </Comment>
+  <Viewpoints Guid="7F215461-3472-4F03-A3B4-7B073E23E0A3">
+    <Viewpoint>viewpoint.bcfv</Viewpoint>
+    <Snapshot>snapshot.png</Snapshot>
+    <Index>0</Index>
+  </Viewpoints>
+</Markup>
+```
+
+```xml
+<VisualizationInfo Guid="7F215461-3472-4F03-A3B4-7B073E23E0A3">
+  <Components>
+    <Selection>
+      <Component IfcGuid="1tcMzQAf1O$QGXNveYm5Cf">
+        <OriginatingSystem>BIMGUARD AI</OriginatingSystem>
+        <AuthoringToolId>1tcMzQAf1O$QGXNveYm5Cf</AuthoringToolId>
+      </Component>
+    </Selection>
+    <Visibility DefaultVisibility="true"/>
+    <Coloring>
+      <Color Color="FF888888">
+        <Component IfcGuid="1tcMzQAf1O$QGXNveYm5Cf"/>
+      </Color>
+    </Coloring>
+  </Components>
+  <PerspectiveCamera>
+    <CameraViewPoint><X>5.0</X><Y>-8.0</Y><Z>8.0</Z></CameraViewPoint>
+    <CameraDirection><X>-5.0</X><Y>8.0</Y><Z>-8.0</Z></CameraDirection>
+    <CameraUpVector><X>0</X><Y>0</Y><Z>1</Z></CameraUpVector>
+    <FieldOfView>60</FieldOfView>
+  </PerspectiveCamera>
+</VisualizationInfo>
+```
+
+## B6. One topic, before — 1542
+
+Topic folder `000240C7-2F50-5242-A8DE-E09A93C9AFD5`, finding `SB-0337`.
+
+```xml
+<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Header>
+    <File>
+      <Filename>BIMGUARD_AI_Model.ifc</Filename>
+    </File>
+  </Header>
+  <Topic Guid="000240C7-2F50-5242-A8DE-E09A93C9AFD5" TopicType="Issue" TopicStatus="Open">
+    <ReferenceLink></ReferenceLink>
+    <Title>Seismic bracing clearance clash on 19FnYm9E</Title>
+    <Priority>Major</Priority>
+    <Index>935</Index>
+    <Labels>SB-001 seismic bracing</Labels>
+    <Labels>high</Labels>
+    <CreationDate>2026-09-06T21:39:20.282430Z</CreationDate>
+    <CreationAuthor>BIMGUARD AI — GC-001/CC-001 v1.0.0</CreationAuthor>
+    <ModifiedDate>2026-09-06T21:39:20.282430Z</ModifiedDate>
+    <DueDate>2026-09-06T00:00:00Z</DueDate>
+    <AssignedTo>Mechanical engineer</AssignedTo>
+    <Description>IfcPipeFitting (19FnYm9EH0DhpCzeZN3XNH) intrudes into the seismic bracing clearance halo of IfcPipeSegment (19FnYm9EH0DhpCzeZN3XNC) by 4,624,067 mm^3 (6.4% of the halo volume).</Description>
+  </Topic>
+  <Comment Guid="F71B70A6-88B0-4319-94DA-456FA757DABA">
+    <Date>2026-09-06T21:39:20.282430Z</Date>
+    <Author>BIMGUARD AI</Author>
+    <Comment>Issue automatically generated by BIMGUARD AI corrosion compliance engine.
+Source finding id: SB-0337
+Mechanism: SB-001 seismic bracing | Risk score: 0.7000 | Band: high
+Component: 19FnYm9EH0DhpCzeZN3XNC (19FnYm9EH0DhpCzeZN3XNC)
+Service type:  | Floor/zone:
+Mitigation: Relocate 19FnYm9E or re-route the braced service to restore 200.0mm clearance.</Comment>
+  </Comment>
+  <Viewpoints Guid="17140ED1-4338-46E2-84C0-C223867E53E7">
+    <Viewpoint>viewpoint.bcfv</Viewpoint>
+    <Snapshot>snapshot.png</Snapshot>
+    <Index>0</Index>
+  </Viewpoints>
+</Markup>
+```
+
+Note on this topic specifically: the archive knows from `metadata` that the
+clashing element is `19FnYm9EH0DhpCzeZN3XNH` and which model each element came
+from, yet the `Header` names a file that does not exist, the viewpoint selects
+only one of the two elements, and the auto-comment calls a seismic clash a
+"corrosion compliance engine" result with an empty service type and floor.
