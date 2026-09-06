@@ -837,8 +837,26 @@ export async function initViewer(containerOrId) {
     // stomp on each other. Serializing here means the second call always
     // starts clean after the first one has actually finished attaching its
     // model, regardless of what triggered the double call upstream.
+    // `getHeaders` is a live callback (not a pre-computed headers object):
+    // the host page's Supabase session can still be settling when this
+    // module's first fetch goes out (e.g. a direct deep link straight into
+    // the viewer), so a snapshot taken at call time can be stale before the
+    // token exists. Re-reading it on a 401 and retrying once picks up a
+    // token that has since landed instead of leaving the model unloadable.
+    async function fetchWithAuthRetry(url, getHeaders) {
+        const initial = typeof getHeaders === "function" ? getHeaders() : getHeaders;
+        const response = await fetch(url, { headers: initial });
+        if (response.status === 401 && typeof getHeaders === "function") {
+            const retry = getHeaders();
+            if (retry && retry.Authorization && retry.Authorization !== initial?.Authorization) {
+                return fetch(url, { headers: retry });
+            }
+        }
+        return response;
+    }
+
     let activeLoad = Promise.resolve();
-    async function loadIfc(urlOrFile, headers) {
+    async function loadIfc(urlOrFile, getHeaders) {
         const previous = activeLoad;
         let release;
         activeLoad = new Promise((resolve) => { release = resolve; });
@@ -846,7 +864,7 @@ export async function initViewer(containerOrId) {
             await previous;
             await clearModels();
             const file = typeof urlOrFile === "string"
-                ? await fetch(urlOrFile, { headers }).then(async (response) => {
+                ? await fetchWithAuthRetry(urlOrFile, getHeaders).then(async (response) => {
                     if (!response.ok) throw new Error(`IFC request failed (${response.status})`);
                     return new File([await response.blob()], "project.ifc");
                 })
@@ -877,10 +895,10 @@ export async function initViewer(containerOrId) {
         return null;
     }
 
-    async function loadBcf(urlOrFile, elementGuid, headers) {
+    async function loadBcf(urlOrFile, elementGuid, getHeaders) {
         try {
             const file = typeof urlOrFile === "string"
-                ? await fetch(urlOrFile, { headers }).then(async (response) => {
+                ? await fetchWithAuthRetry(urlOrFile, getHeaders).then(async (response) => {
                     if (!response.ok) throw new Error(`BCF request failed (${response.status})`);
                     return new File([await response.blob()], "report.bcf");
                 })

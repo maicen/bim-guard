@@ -82,7 +82,7 @@
         targetFileId === null
           ? projectsApi.getIfcUrl(id)
           : projectsApi.getIfcFileUrl(id, targetFileId);
-      await viewerAPI.loadIfc(ifcUrl, authHeaders());
+      await viewerAPI.loadIfc(ifcUrl, authHeaders);
       loadedProjectId = id;
       loadedFileId = targetFileId;
 
@@ -91,7 +91,7 @@
       if (bcfArtifactId) {
         loadingMessage = "Loading BCF viewpoints...";
         const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
-        await viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders());
+        await viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders);
         loadedBcfArtifactId = bcfArtifactId;
       } else if (elementGuid) {
         const topic = viewerAPI.findTopicByElementGuid(elementGuid);
@@ -150,7 +150,7 @@
     if (viewerAPI && bcfArtifactId && bcfArtifactId !== loadedBcfArtifactId && loadedProjectId) {
       loadedBcfArtifactId = bcfArtifactId;
       const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
-      viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders());
+      viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders);
     }
   });
 
