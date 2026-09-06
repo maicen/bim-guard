@@ -6,16 +6,11 @@
       "runtimeExecutable": "uv",
       "runtimeArgs": [
         "run",
-        "uvicorn",
-        "main:app",
-        "--reload",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "8000"
+        "python",
+        "main.py"
       ],
       "port": 8000,
-      "url": "http://127.0.0.1:8000"
+      "autoPort": true
     },
     {
       "name": "frontend",

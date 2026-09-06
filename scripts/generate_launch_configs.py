@@ -19,10 +19,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 BACKEND = {
     "name": "backend",
+    # "python main.py" rather than the uvicorn CLI: main.py reads the PORT
+    # env var (defaulting to 8000) via os.environ, so a launcher that assigns
+    # a different free port (autoPort) can pass it along without needing
+    # shell-level env-var expansion in runtimeArgs, which this array doesn't get.
     "runtimeExecutable": "uv",
-    "runtimeArgs": ["run", "uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+    "runtimeArgs": ["run", "python", "main.py"],
     "port": 8000,
-    "url": "http://127.0.0.1:8000",
+    "autoPort": True,
 }
 
 FRONTEND = {
