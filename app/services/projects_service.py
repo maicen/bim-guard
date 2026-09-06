@@ -185,7 +185,8 @@ class ProjectsService:
             logger.warning("Rejected empty IFC upload filename=%s", filename)
             return "", ""
 
-        if not content.lstrip(b"\xef\xbb\xbf \t\n\r").startswith(b"ISO-10303-21;"):
+        header_probe = content[:256].lstrip(b"\xef\xbb\xbf \t\n\r")
+        if not header_probe.startswith(b"ISO-10303-21;"):
             logger.warning("Rejected IFC upload with invalid signature filename=%s", filename)
             return "", ""
 
