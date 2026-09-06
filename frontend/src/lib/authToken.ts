@@ -9,6 +9,24 @@
 let currentToken: string | null = null;
 let currentOrgId: number | null = null;
 
+/**
+ * Resolves once the initial Supabase session lookup has settled (or auth
+ * isn't configured at all), i.e. once `currentToken` reflects reality rather
+ * than "not checked yet". Callers that need auth on their very first request
+ * (api.ts's apiFetch, the IFC/BCF viewer) await this instead of firing
+ * immediately: that lookup is async, and a request fired before it resolves
+ * would race it into a guaranteed "missing bearer token" 401 with no token to
+ * retry with.
+ */
+let markAuthReady: () => void;
+export const authReady: Promise<void> = new Promise((resolve) => {
+  markAuthReady = resolve;
+});
+
+export function setAuthReady(): void {
+  markAuthReady();
+}
+
 export function setAuthToken(token: string | null): void {
   currentToken = token;
 }

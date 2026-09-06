@@ -86,7 +86,7 @@ import {
   type SWROptions,
   type Unsubscribe,
 } from "./cache";
-import { authHeaders, getActiveOrgId } from "./authToken";
+import { authHeaders, authReady, getActiveOrgId } from "./authToken";
 import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -136,23 +136,19 @@ async function handleResponse<T>(res: Response): Promise<T> {
  * along automatically. Endpoints that don't require auth simply ignore the
  * header; projects/rules (the ones that do) need it on every request.
  *
- * A dashboard-warmup call can fire in the brief window before Supabase has
- * restored the session into authToken.ts (e.g. eager prefetch running
- * concurrently with the initial getSession() promise), sending no
- * Authorization header at all. If a token has since landed by the time the
- * 401 comes back, retry once with it rather than surfacing a spurious
- * "missing bearer token" error for a request nothing else depends on.
+ * Awaiting `authReady` first closes the startup race: the initial Supabase
+ * session lookup is async, and a request fired before it resolves would go
+ * out with no Authorization header at all -- a guaranteed 401 with nothing
+ * to retry, since no token exists yet at that instant. `authReady` resolves
+ * (once, synchronously with `setAuthToken`) as soon as that lookup settles,
+ * so by the time this awaits past it the token -- if any -- is already set;
+ * after startup the promise is long since resolved and this await is a
+ * same-microtask no-op.
  */
 async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  await authReady;
   const headers = { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) };
-  const res = await fetch(input, { ...init, headers });
-  if (res.status === 401 && !headers.Authorization) {
-    const retryHeaders = { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) };
-    if (retryHeaders.Authorization) {
-      return fetch(input, { ...init, headers: retryHeaders });
-    }
-  }
-  return res;
+  return fetch(input, { ...init, headers });
 }
 
 export const authApi = {

@@ -7,7 +7,7 @@
 
 import type { Session, User } from "@supabase/supabase-js";
 import { authApi, clearTenantCaches } from "./api";
-import { setAuthToken, setActiveOrgId } from "./authToken";
+import { setAuthToken, setActiveOrgId, setAuthReady } from "./authToken";
 import { isAuthConfigured, supabase } from "./supabaseClient";
 import type { CurrentUserResponse, ProfileUpdatePayload } from "./types";
 
@@ -70,6 +70,7 @@ class AuthState {
   constructor() {
     if (!isAuthConfigured) {
       this.loading = false;
+      setAuthReady();
       return;
     }
 
@@ -78,6 +79,11 @@ class AuthState {
       setAuthToken(data.session?.access_token ?? null);
       this.loading = false;
       this.#loadProfile();
+      // Only the very first resolution marks readiness: it's the one a
+      // request fired at page load could otherwise race. Later token
+      // refreshes go through onAuthStateChange below and don't need to
+      // gate anything -- callers awaiting authReady have long since moved on.
+      setAuthReady();
     });
 
     supabase.auth.onAuthStateChange((_event, session) => {

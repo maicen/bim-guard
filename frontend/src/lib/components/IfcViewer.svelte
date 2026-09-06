@@ -4,7 +4,7 @@
   import { onMount, onDestroy } from "svelte";
   import { Loader2, AlertCircle, RefreshCw, UploadCloud, Layers } from "lucide-svelte";
   import { projectsApi, analyzeApi } from "../api";
-  import { authHeaders } from "../authToken";
+  import { authHeaders, authReady } from "../authToken";
 
   interface Props {
     projectId?: number | null;
@@ -71,6 +71,14 @@
         ? `Loading ${fileName}...`
         : `Loading IFC geometry for Project #${id}...`;
       error = null;
+
+      // This module's own fetch (in the static viewer bundle) doesn't go
+      // through api.ts's apiFetch, so it doesn't get that choke point's wait
+      // for the initial Supabase session lookup for free. A direct deep link
+      // into the viewer can reach here before that lookup settles; wait for
+      // it explicitly so the first request carries a real token instead of
+      // racing into a "missing bearer token" 401.
+      await authReady;
 
       // Only when swapping one model of a project for another. Coming to a
       // project fresh should frame that model, not inherit a viewpoint chosen
