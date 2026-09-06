@@ -76,6 +76,9 @@ class BCFIssue:
     #: the archive carries the machine-readable record behind the prose and a
     #: consumer need not re-request the JSON export to get it.
     snippet_json: str = ""
+    #: Topic GUIDs of other topics about the same elements, written as
+    #: ``Topic/RelatedTopic``. Already-resolved GUIDs, not finding ids.
+    related_topic_guids: list = field(default_factory=list)
 
 
 #: Used when a caller supplies no ``creation_author``. Deliberately generic:
@@ -335,6 +338,15 @@ def _markup_xml(
     header_xml = _header_xml(issue, project_attr)
     doc_refs_xml = _document_references_xml(issue, topic_guid)
 
+    # RelatedTopic closes the Topic sequence in markup.xsd, after
+    # DocumentReference. Self-links are dropped so a topic never points at
+    # itself.
+    related_xml = "".join(
+        f'    <RelatedTopic Guid="{_xml_attr(guid)}"/>\n'
+        for guid in dict.fromkeys(issue.related_topic_guids or [])
+        if guid and guid != topic_guid
+    )
+
     # markup.xsd sequences Topic as ... Description, BimSnippet,
     # DocumentReference, RelatedTopic -- so the snippet precedes the references.
     # ReferenceSchema is a required element but no schema is published for this
@@ -363,7 +375,7 @@ def _markup_xml(
     <ModifiedDate>{_utc_now()}</ModifiedDate>
 {due_date_xml}    <AssignedTo>{_xml_text(issue.assigned_to)}</AssignedTo>
     <Description>{_xml_text(issue.description)}</Description>
-{snippet_xml}{doc_refs_xml}  </Topic>
+{snippet_xml}{doc_refs_xml}{related_xml}  </Topic>
   <Comment Guid="{_xml_attr(comment_guid)}">
     <Date>{_utc_now()}</Date>
     <Author>BIMGUARD AI</Author>
@@ -422,7 +434,23 @@ def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
         f"      </Component>"
         for guid in guids
     )
-    coloring_xml = "\n".join(f"        <Component{_ifc_guid_attr(guid)}/>" for guid in guids)
+    # The subject is coloured by its band; the partners implicated in the
+    # finding -- the other side of a clash, the other half of a couple -- take
+    # a second colour, so a viewer shows which element is being assessed and
+    # which it is being assessed against.
+    primary, partners = guids[:1], guids[1:]
+    colour_blocks = [
+        f'      <Color Color="{_risk_colour(issue.risk_band)}">\n'
+        + "\n".join(f"        <Component{_ifc_guid_attr(g)}/>" for g in primary)
+        + "\n      </Color>"
+    ]
+    if partners:
+        colour_blocks.append(
+            f'      <Color Color="{PARTNER_COLOUR}">\n'
+            + "\n".join(f"        <Component{_ifc_guid_attr(g)}/>" for g in partners)
+            + "\n      </Color>"
+        )
+    coloring_xml = "\n".join(colour_blocks)
 
     # PerspectiveCamera is optional in visinfo.xsd and is written only when the
     # caller supplied real coordinates. Left at the dataclass defaults it
@@ -463,9 +491,7 @@ def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
     </Selection>
     <Visibility DefaultVisibility="true"/>
     <Coloring>
-      <Color Color="{_risk_colour(issue.risk_band)}">
 {coloring_xml}
-      </Color>
     </Coloring>
   </Components>{camera_xml}
 </VisualizationInfo>"""
@@ -481,6 +507,11 @@ _BAND_COLOURS: dict[str, str] = {
 
 #: Used for a band this table does not know.
 UNKNOWN_BAND_COLOUR = "FF888888"
+
+#: Colour for the partner elements a finding implicates -- the other side of
+#: a clash, the other half of a galvanic couple. Distinct from every band
+#: colour so the subject and its counterpart are told apart at a glance.
+PARTNER_COLOUR = "FF0070C0"
 
 
 def _risk_colour(band: str) -> str:

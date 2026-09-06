@@ -39,6 +39,7 @@ from app.modules.comparator.issue_schema import Issue, RiskBand
 from app.modules.reporter.bcf_generator import (
     DEFAULT_CREATION_AUTHOR,
     BCFIssue,
+    bcf_topic_guid,
     generate_bcf,
 )
 
@@ -366,6 +367,76 @@ def _title(issue: Issue, sequence: int) -> str:
     return f"{prefix} {issue.title}"
 
 
+#: Metadata keys naming another element the finding implicates: the other side
+#: of a seismic clash, and both poles of an XM-001 couple. Selected and
+#: coloured in the viewpoint alongside the subject.
+_PARTNER_KEYS: tuple[str, ...] = (
+    "clashing_element_id",
+    "anode_id",
+    "cathode_id",
+)
+
+
+def _partner_guids(issue: Issue) -> list[str]:
+    """Return the other elements this finding implicates, subject excluded.
+
+    Every SB-001 finding names the element it clashed with, and every XM-001
+    finding names both poles of the couple. Neither reached the viewpoint
+    before, so all 4,321 topics selected exactly one element and a coordinator
+    opening a clash saw only one side of it.
+    """
+    meta = issue.metadata or {}
+    guids: list[str] = []
+    for key in _PARTNER_KEYS:
+        value = str(meta.get(key, "") or "").strip()
+        if value and value != issue.element_id and value not in guids:
+            guids.append(value)
+    return guids
+
+
+def _related_topic_index(issues: list[Issue]) -> dict[str, list[str]]:
+    """Map each element id to the topic GUIDs of every finding about it.
+
+    Used to cross-link topics that concern the same element, so a coordinator
+    opening the GC-001 topic for an element can reach the CC-001 and MC-001
+    topics for the same element, and a clash can reach the other topics about
+    either element involved.
+
+    NOT a reciprocal-pair index, because no reciprocal pairs exist. Measured
+    on this corpus: of 2,937 SB-001 clashes on project 1542, 0 have a
+    reciprocal clash recorded from the other element's side, and of 510 XM-001
+    couples on 1917, 0 have a mirrored (cathode, anode) partner. Each clash and
+    each couple is recorded exactly once, from one side, so linking "the
+    reciprocal topic" would mean inventing one.
+    """
+    index: dict[str, list[str]] = {}
+    for issue in issues:
+        guid = bcf_topic_guid(issue.id)
+        for element in [issue.element_id, *_partner_guids(issue)]:
+            if element:
+                index.setdefault(element, []).append(guid)
+    return index
+
+
+#: Ceiling on RelatedTopic links per topic. Measured maxima are 9 topics on one
+#: element for 1917 and 14 for 1542, so this does not bite today; it stops a
+#: pathological model turning one topic into thousands of links.
+_MAX_RELATED_TOPICS = 24
+
+
+def _related_topic_guids(issue: Issue, index: dict[str, list[str]]) -> list[str]:
+    """Return topic GUIDs related to ``issue``, self excluded."""
+    own = bcf_topic_guid(issue.id)
+    related: list[str] = []
+    for element in [issue.element_id, *_partner_guids(issue)]:
+        for guid in index.get(element, ()):
+            if guid != own and guid not in related:
+                related.append(guid)
+                if len(related) >= _MAX_RELATED_TOPICS:
+                    return related
+    return related
+
+
 def _fmt(value: Any) -> str:
     """Render a metadata value for the description, thousands-separated."""
     if isinstance(value, bool):
@@ -592,6 +663,7 @@ def _bcf_issue(
     model_dates: dict[str, str] | None = None,
     fallback_files: list[dict] | None = None,
     sequence: int = 0,
+    related_index: dict[str, list[str]] | None = None,
 ) -> BCFIssue:
     """Map one :class:`Issue` onto the existing :class:`BCFIssue`.
 
@@ -647,6 +719,8 @@ def _bcf_issue(
         source_files=_source_files(issue, model_dates or {}, fallback_files or []),
         document_references=_document_references(issue),
         snippet_json=json.dumps(_issue_dict(issue), indent=2, default=_encode),
+        related_component_guids=_partner_guids(issue),
+        related_topic_guids=_related_topic_guids(issue, related_index or {}),
     )
 
 
@@ -686,9 +760,10 @@ def to_bcf(result: dict, *, include_data_quality: bool = True) -> bytes:
         include_data_quality,
         len(source_files),
     )
+    related_index = _related_topic_index(issues)
     return generate_bcf(
         [
-            _bcf_issue(i, model_dates, source_files, sequence)
+            _bcf_issue(i, model_dates, source_files, sequence, related_index)
             for sequence, i in enumerate(issues, start=1)
         ]
     )

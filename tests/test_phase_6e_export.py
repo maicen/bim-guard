@@ -1046,3 +1046,107 @@ class TestBCFViewpointTruthfulness:
         )
         viewpoint = _viewpoint_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
         assert not [str(e.reason or e) for e in schema.iter_errors(viewpoint)]
+
+
+class TestBCFRelatedTopicsAndPartners:
+    """A clash has two sides; a couple has two poles. Both must reach the archive.
+
+    Reciprocal linking is deliberately NOT what this does. Measured on the
+    corpus: 0 of 2,937 SB-001 clashes on 1542 have a reciprocal clash from the
+    other element's side, and 0 of 510 XM-001 couples on 1917 have a mirrored
+    (cathode, anode) partner. Each is recorded once, from one side, so a
+    "reciprocal topic" link would have to be invented. Topics are linked by the
+    elements they share instead, which is a relation the data actually holds.
+    """
+
+    def _clash(self, id: str, element: str, partner: str):
+        from app.modules.comparator.issue_schema import make_issue
+
+        return make_issue(
+            id=id,
+            element_id=element,
+            rule_id="SB-001.01",
+            title="Bracing clearance clash",
+            mechanism="SB-001 seismic bracing",
+            band=RiskBand.CRITICAL,
+            score=0.9,
+            mitigation="Relocate.",
+            assignee_role="Mechanical engineer",
+            metadata={"clashing_element_id": partner},
+            citations=[],
+        )
+
+    def test_clash_partner_is_selected_in_the_viewpoint(self):
+        result = {"audit_issues": [self._clash("SB-0001", "GUID-A", "GUID-B")]}
+        viewpoint = _viewpoint_for(result, "SB-0001")
+        assert "<AuthoringToolId>GUID-A</AuthoringToolId>" in viewpoint
+        assert "<AuthoringToolId>GUID-B</AuthoringToolId>" in viewpoint
+
+    def test_partner_is_coloured_differently_from_the_subject(self):
+        from app.modules.reporter.bcf_generator import PARTNER_COLOUR
+
+        result = {"audit_issues": [self._clash("SB-0001", "GUID-A", "GUID-B")]}
+        viewpoint = _viewpoint_for(result, "SB-0001")
+        assert viewpoint.count("<Color Color=") == 2
+        assert f'<Color Color="{PARTNER_COLOUR}">' in viewpoint
+
+    def test_xm_couple_selects_both_poles(self):
+        finding = issue(
+            id="XM-0001",
+            metadata={"anode_id": "GUID-ANODE", "cathode_id": "GUID-CATHODE"},
+        )
+        finding.rule_id = "XM-001.01"
+        viewpoint = _viewpoint_for({"audit_issues": [finding]}, "XM-0001")
+        assert "<AuthoringToolId>GUID-ANODE</AuthoringToolId>" in viewpoint
+        assert "<AuthoringToolId>GUID-CATHODE</AuthoringToolId>" in viewpoint
+
+    def test_topics_about_the_same_element_are_linked(self):
+        """GC, CC and MC each raise a topic on one element; each links the others."""
+        from app.modules.reporter.bcf_generator import bcf_topic_guid
+
+        gc = issue(id="GC-0001", element_id="GUID-X")
+        cc = issue(id="CC-0002", element_id="GUID-X", mechanism="CC-001 crevice")
+        cc.rule_id = "CC-001.01"
+        markup = _markup_for({"audit_issues": [gc, cc]}, "GC-0001")
+        assert f'<RelatedTopic Guid="{bcf_topic_guid("CC-0002")}"/>' in markup
+
+    def test_a_topic_never_links_to_itself(self):
+        from app.modules.reporter.bcf_generator import bcf_topic_guid
+
+        markup = _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
+        assert bcf_topic_guid("GC-0001") not in markup.split("<RelatedTopic", 1)[-1] or (
+            "<RelatedTopic" not in markup
+        )
+
+    def test_unrelated_elements_are_not_linked(self):
+        gc = issue(id="GC-0001", element_id="GUID-X")
+        other = issue(id="GC-0002", element_id="GUID-Y")
+        markup = _markup_for({"audit_issues": [gc, other]}, "GC-0001")
+        assert "<RelatedTopic" not in markup
+
+    def test_a_clash_links_topics_about_the_element_it_hit(self):
+        from app.modules.reporter.bcf_generator import bcf_topic_guid
+
+        clash = self._clash("SB-0001", "GUID-A", "GUID-B")
+        other = self._clash("SB-0002", "GUID-B", "GUID-C")
+        markup = _markup_for({"audit_issues": [clash, other]}, "SB-0001")
+        assert f'<RelatedTopic Guid="{bcf_topic_guid("SB-0002")}"/>' in markup
+
+    def test_related_topics_and_partner_colouring_stay_schema_valid(self):
+        xmlschema = pytest.importorskip("xmlschema")
+        from pathlib import Path
+
+        markup_schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "markup.xsd"
+        )
+        visinfo_schema = xmlschema.XMLSchema(
+            Path(__file__).parent / "schemas" / "bcf21" / "visinfo.xsd"
+        )
+        result = {
+            "audit_issues": [
+                self._clash("SB-0001", "GUID-A", "GUID-B"),
+                self._clash("SB-0002", "GUID-B", "GUID-C"),
+            ]
+        }
+        assert not [str(e.reason or e) for e in markup_schema.iter_errors(_markup_for(result, "SB-0001"))]
+        assert not [str(e.reason or e) for e in visinfo_schema.iter_errors(_viewpoint_for(result, "SB-0001"))]
