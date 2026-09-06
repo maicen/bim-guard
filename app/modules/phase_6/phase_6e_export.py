@@ -300,6 +300,72 @@ def _topic_type(issue: Issue) -> str:
     return "Issue"
 
 
+#: Engine id -> the domain segment of a topic title. Corrosion engines all
+#: assess pipework; SB-001 assesses seismic bracing.
+_ENGINE_DOMAIN: dict[str, str] = {
+    "GC-001": "PIP",
+    "CC-001": "PIP",
+    "MC-001": "PIP",
+    "MM-001": "PIP",
+    "XM-001": "PIP",
+    "SB-001": "SEI",
+}
+
+#: Title segment used where a finding records no floor. An explicit marker of
+#: absence, not a guess at a level: every SB-001 finding on project 1542 has an
+#: empty floor, and inventing "L00" for them would place 2,937 clashes on a
+#: storey nothing measured.
+_NO_FLOOR = "NA"
+
+_LEVEL_RE = re.compile(r"(?:level|floor|storey|story)\s*(-?\d+)", re.IGNORECASE)
+
+
+def _floor_code(floor: str) -> str:
+    """Abbreviate a floor name to a title segment: ``"Level 03 Roof"`` -> ``"L03"``.
+
+    Falls back to the first alphanumeric run, upper-cased and truncated, for a
+    floor that names no level number ("Roof", "Basement"), and to
+    :data:`_NO_FLOOR` when there is no floor at all.
+    """
+    text = (floor or "").strip()
+    if not text:
+        return _NO_FLOOR
+    match = _LEVEL_RE.search(text)
+    if match:
+        number = int(match.group(1))
+        return f"L{number:02d}" if number >= 0 else f"LB{abs(number):02d}"
+    word = re.sub(r"[^A-Za-z0-9]", "", text)[:4].upper()
+    return word or _NO_FLOOR
+
+
+def _title(issue: Issue, sequence: int) -> str:
+    """Return the title in the ``{DOMAIN}-{ENGINE}-{FLOOR}-{seq}`` convention.
+
+    A coordinator sorting a BCF by title gets topics grouped by domain, then
+    engine, then storey, with a stable per-archive sequence — where before the
+    titles began with free prose and sorted into no useful order.
+
+    The seismic title also names both elements. It previously read "Seismic
+    bracing clearance clash on 19FnYm9E": one element, and its GUID truncated
+    to eight characters, so the topic did not say what clashed with what.
+
+    Falls back to the engine's own title unchanged when the finding carries no
+    recognisable engine, rather than emitting a malformed prefix.
+    """
+    engine = _engine_code(issue)
+    if not engine:
+        return issue.title
+    domain = _ENGINE_DOMAIN.get(engine, "GEN")
+    short_engine = engine.split("-", 1)[0]
+    floor = _floor_code(str((issue.metadata or {}).get("floor", "") or ""))
+    prefix = f"{domain}-{short_engine}-{floor}-{sequence:04d}"
+
+    partner = str((issue.metadata or {}).get("clashing_element_id", "") or "")
+    if partner:
+        return f"{prefix} Bracing clearance clash {issue.element_id} vs {partner}"
+    return f"{prefix} {issue.title}"
+
+
 def _fmt(value: Any) -> str:
     """Render a metadata value for the description, thousands-separated."""
     if isinstance(value, bool):
@@ -525,6 +591,7 @@ def _bcf_issue(
     issue: Issue,
     model_dates: dict[str, str] | None = None,
     fallback_files: list[dict] | None = None,
+    sequence: int = 0,
 ) -> BCFIssue:
     """Map one :class:`Issue` onto the existing :class:`BCFIssue`.
 
@@ -535,6 +602,8 @@ def _bcf_issue(
         model_dates: ``{filename: upload timestamp}`` for the project.
         fallback_files: ``Header/File`` entries for findings that name no model
             of their own — every corrosion finding.
+        sequence: This finding's position in the export, for the title's
+            ``{seq:04d}`` segment. Stable because ``sort_issues`` is.
     """
     data_quality = _is_data_quality(issue)
     labels = [issue.mechanism, issue.band.value]
@@ -553,7 +622,7 @@ def _bcf_issue(
 
     return BCFIssue(
         guid=issue.id,
-        title=issue.title,
+        title=_title(issue, sequence),
         description=_description(issue) or issue.title,
         priority=BAND_TO_BCF_PRIORITY[issue.band],
         status="Open",
@@ -618,7 +687,10 @@ def to_bcf(result: dict, *, include_data_quality: bool = True) -> bytes:
         len(source_files),
     )
     return generate_bcf(
-        [_bcf_issue(i, model_dates, source_files) for i in issues]
+        [
+            _bcf_issue(i, model_dates, source_files, sequence)
+            for sequence, i in enumerate(issues, start=1)
+        ]
     )
 
 

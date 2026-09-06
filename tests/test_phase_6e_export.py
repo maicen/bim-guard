@@ -902,3 +902,83 @@ class TestBCFExtensionsSchema:
         block = text.split('name="TopicLabel"', 1)[1].split("</xs:simpleType>", 1)[0]
         declared = set(re.findall(r'<xs:enumeration value="([^"]*)"/>', block))
         assert emitted <= declared
+
+
+class TestBCFTitleConvention:
+    """Titles follow {DOMAIN}-{ENGINE}-{FLOOR}-{seq} so an archive sorts usefully.
+
+    Seismic titles previously read "Seismic bracing clearance clash on 19FnYm9E"
+    — one element, GUID truncated to eight characters — so the topic did not
+    say what clashed with what.
+    """
+
+    def _title(self, markup: str) -> str:
+        return markup.split("<Title>", 1)[1].split("</Title>", 1)[0]
+
+    def test_corrosion_title_carries_domain_engine_floor_and_sequence(self):
+        finding = issue(id="GC-0001", metadata={"floor": "Level 03 Roof"})
+        title = self._title(_markup_for({"audit_issues": [finding]}, "GC-0001"))
+        assert title.startswith("PIP-GC-L03-0001 ")
+
+    def test_basement_level_is_numbered_not_named(self):
+        finding = issue(id="MC-0001", metadata={"floor": "Level 00 Basement"})
+        finding.rule_id = "MC-001.01"
+        title = self._title(_markup_for({"audit_issues": [finding]}, "MC-0001"))
+        assert title.startswith("PIP-MC-L00-0001 ")
+
+    def test_seismic_title_uses_the_seismic_domain_and_names_both_elements(self):
+        from app.modules.comparator.issue_schema import make_issue
+
+        clash = make_issue(
+            id="SB-0001",
+            element_id="GUID-A",
+            rule_id="SB-001.01",
+            title="Seismic bracing clearance clash on GUID-A",
+            mechanism="SB-001 seismic bracing",
+            band=RiskBand.CRITICAL,
+            score=0.9,
+            mitigation="Relocate.",
+            assignee_role="Mechanical engineer",
+            metadata={"clashing_element_id": "GUID-B"},
+            citations=[],
+        )
+        title = self._title(_markup_for({"audit_issues": [clash]}, "SB-0001"))
+        assert title == "SEI-SB-NA-0001 Bracing clearance clash GUID-A vs GUID-B"
+
+    def test_absent_floor_is_marked_not_invented(self):
+        """Every SB-001 finding on 1542 has an empty floor; L00 would be a guess."""
+        finding = issue(id="XM-0001", metadata={})
+        finding.rule_id = "XM-001.01"
+        title = self._title(_markup_for({"audit_issues": [finding]}, "XM-0001"))
+        assert title.startswith("PIP-XM-NA-0001 ")
+
+    def test_floor_without_a_level_number_uses_its_name(self):
+        finding = issue(id="GC-0002", metadata={"floor": "Roof"})
+        title = self._title(_markup_for({"audit_issues": [finding]}, "GC-0002"))
+        assert title.startswith("PIP-GC-ROOF-0001 ")
+
+    def test_sequence_is_stable_across_two_exports_of_one_result(self):
+        result = {
+            "audit_issues": [
+                issue(id="GC-0001", band=RiskBand.MEDIUM),
+                issue(id="CC-0002", mechanism="CC-001 crevice", band=RiskBand.CRITICAL),
+            ]
+        }
+        first = self._title(_markup_for(result, "GC-0001"))
+        second = self._title(_markup_for(result, "GC-0001"))
+        assert first == second
+
+    def test_sequence_is_unique_within_an_archive(self, mixed_result):
+        with zipfile.ZipFile(io.BytesIO(to_bcf(mixed_result))) as z:
+            seqs = []
+            for name in z.namelist():
+                if name.endswith("markup.bcf"):
+                    title = z.read(name).decode("utf-8").split("<Title>", 1)[1]
+                    seqs.append(title.split(" ", 1)[0].rsplit("-", 1)[-1])
+        assert len(seqs) == len(set(seqs))
+
+    def test_unrecognisable_engine_keeps_its_own_title(self):
+        odd = issue(id="ZZ-0001")
+        odd.rule_id = "not-a-rule-id"
+        title = self._title(_markup_for({"audit_issues": [odd]}, "ZZ-0001"))
+        assert title == odd.title
