@@ -89,13 +89,6 @@ def rows_desc_by_id(table) -> list[dict]:
     return sorted(list(table.rows), key=lambda row: row["id"], reverse=True)
 
 
-def find_row_by_field(table, field_name: str, value):
-    for row in table.rows:
-        if row.get(field_name) == value:
-            return row
-    return None
-
-
 from app.services.cache import (  # noqa: E402
     cache_db_query,
     cache_stats,
@@ -111,7 +104,6 @@ __all__ = [
     "cache_db_query",
     "cache_stats",
     "clear_cache",
-    "find_row_by_field",
     "get_cache",
     "invalidate_cache",
     "is_likely_text_content",
