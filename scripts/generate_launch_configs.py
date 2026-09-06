@@ -31,9 +31,13 @@ BACKEND = {
 
 FRONTEND = {
     "name": "frontend",
+    # vite.config.ts reads PORT from the environment (falling back to 5173),
+    # same reasoning as BACKEND above -- no hardcoded --port flag here for
+    # autoPort to fight with.
     "runtimeExecutable": "npm",
     "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
     "port": 5173,
+    "autoPort": True,
 }
 
 
