@@ -1449,7 +1449,7 @@
   {@const isDq = isDataQuality(inspectedIssue)}
   <Modal
     isOpen={true}
-    title={inspectedIssue.title}
+    title="Finding Report"
     subtitle={`${inspectedIssue.id} · ${inspectedIssue.rule_id}`}
     maxWidth="max-w-2xl"
     onClose={() => (inspectedIssue = null)}
@@ -1459,12 +1459,18 @@
     {/snippet}
 
     <div class="space-y-6">
-      <!-- Title & Mechanism -->
-      <!-- The title now lives in the dialog header, so only the mechanism
-             needs restating here. -->
-      <p class="text-xs text-slate-400">
-        Mechanism: <strong class="text-slate-200">{inspectedIssue.mechanism}</strong>
-      </p>
+      <!-- Report header. The dialog chrome now names the document ("Finding
+           Report"), so the finding's own title, band and rule id are restated
+           here where they read as the subject of the report. -->
+      <div class="space-y-1.5">
+        <h3 class="text-sm font-bold leading-snug text-slate-50">{inspectedIssue.title}</h3>
+        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+          <SeverityBadge severity={isDq ? "data_quality" : inspectedIssue.band} />
+          <span class="font-mono text-caption text-slate-300">{inspectedIssue.rule_id}</span>
+          <span class="text-slate-600">•</span>
+          <span>Mechanism: <strong class="text-slate-200">{inspectedIssue.mechanism}</strong></span>
+        </div>
+      </div>
 
       <!-- Element Context Card -->
       <div class="space-y-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-4">
@@ -1502,7 +1508,7 @@
       {#if inspectedIssue.description}
         <div class="space-y-1">
           <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Finding Description
+            Why this element failed
           </h4>
           <p
             class="rounded-xl border border-slate-800/60 bg-slate-950/40 p-3 text-xs text-slate-300"
@@ -1512,10 +1518,47 @@
         </div>
       {/if}
 
-      {#if inspectedIssue.mitigation}
+      <!-- Recommended mitigations. The backend resolves each MIT code against
+           the ruleset's mitigation catalogue into {code, title, description}
+           and, where the catalogue's wording identifies it, the score term it
+           addresses. A backend that has not been restarted yet still sends only
+           the raw semicolon-joined codes, so that is rendered as the fallback
+           rather than showing nothing. -->
+      {#if inspectedIssue.details?.mitigations?.length}
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400">
+            Recommended mitigations
+          </h4>
+          <div class="space-y-2">
+            {#each inspectedIssue.details.mitigations as mit (mit.code || mit.title)}
+              <div class="rounded-xl border border-emerald-800/40 bg-emerald-950/30 p-3 text-xs">
+                <div class="flex flex-wrap items-center gap-2">
+                  {#if mit.code}
+                    <span
+                      class="rounded border border-emerald-700/60 bg-emerald-950/60 px-1.5 py-0.5 font-mono text-micro font-semibold text-emerald-300"
+                      >{mit.code}</span
+                    >
+                  {/if}
+                  <span class="font-semibold text-emerald-200">{mit.title}</span>
+                  {#if mit.addresses}
+                    <span class="font-mono text-micro text-emerald-400/80"
+                      >addresses: {mit.addresses}</span
+                    >
+                  {/if}
+                </div>
+                {#if mit.description}
+                  <p class="mt-1 text-caption leading-relaxed text-emerald-100/80">
+                    {mit.description}
+                  </p>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else if inspectedIssue.mitigation}
         <div class="space-y-1">
           <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400">
-            Engineering Mitigation Guidance
+            Recommended mitigations
           </h4>
           <p
             class="rounded-xl border border-emerald-800/40 bg-emerald-950/30 p-3 text-xs text-emerald-200"
@@ -1551,17 +1594,19 @@
 
       <!-- Raw Metadata Details -->
       {#if inspectedIssue.details && Object.keys(inspectedIssue.details).length > 0}
-        <div class="space-y-1">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+        <details class="space-y-1">
+          <summary
+            class="cursor-pointer text-xs font-bold uppercase tracking-wider text-slate-400 transition-colors hover:text-slate-200"
+          >
             Metadata Parameters
-          </h4>
+          </summary>
           <pre
             class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption text-slate-400">{JSON.stringify(
               inspectedIssue.details,
               null,
               2,
             )}</pre>
-        </div>
+        </details>
       {/if}
     </div>
 
