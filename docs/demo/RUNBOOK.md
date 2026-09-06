@@ -248,16 +248,21 @@ State these plainly if asked; every one is measured, not estimated.
 
 - **MC-001 produces no verdicts without hydraulic data.** 8,539 of 8,539
   elements on West Riverside and 4 of 4 on the MEP scenario returned
-  `hydraulics_unavailable`; no IFC in the corpus carries flow velocity, dead-leg
-  length or operating temperature.
+  `hydraulics_unavailable`. No *real-world* model in the corpus carries flow
+  velocity, dead-leg length or operating temperature. The generated demo model
+  (`scripts/generate_demo_mep_model.py` → `data/test_hospital_mep_demo.ifc`)
+  does carry them, and the parser reads `FlowVelocity`, `OperatingTemperature`
+  and `DeadLegLength` from the Psets — so demonstrate MC-001 on that model, and
+  be straight that the data is authored rather than found in the wild.
 - **MC-001 temperature classes are pending a migration.**
   `supabase/migrations/20260905220000_mc001_temperature_bounds.sql` supplies the
   numeric `t_min`/`t_max` bounds; until it is applied the live catalog exposes
   only `T5_UNKNOWN` with no bounds, so temperature cannot be classified.
 - **GC-001 scores a real bimetallic couple only where the model declares a
-  second material** on the element (`material_b`). With one material it scores
-  a self-couple and records that basis as `single_material_self_couple`, rather
-  than staying silent.
+  second material** — the parser reads it from the `SecondaryMaterial` property
+  into `material_b`. With one material GC-001 scores a self-couple and records
+  that basis as `single_material_self_couple` rather than staying silent; the
+  generated demo model declares secondary materials, the real models do not.
 - **The seismic score is a band-derived placeholder** — Critical 0.9, High 0.7,
   Medium 0.4, Low 0.1. The band is the finding; the score is not an independent
   measurement.
