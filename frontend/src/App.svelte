@@ -61,7 +61,7 @@
     activeView === "arch" ? "arch" : activeView === "seismic" ? "seismic" : "piping",
   );
   let queryParams = $derived(new URLSearchParams(router.querystring || ""));
-  // Rule Extraction Studio, opened in a new tab from the "Run Compliance Test"
+  // Rule Extraction Studio, opened in a new tab from the "Run Compliance Audit"
   // wizard with ?doc_id=...&from=quick-test so it pre-selects that document
   // and offers to send the user back once rules are saved.
   let targetDocId: number | null = $derived.by(() => {

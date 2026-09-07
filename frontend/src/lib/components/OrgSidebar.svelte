@@ -42,7 +42,7 @@
       title: "My Home",
       items: [
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { id: "run-compliance-test", label: "Run Compliance Test", icon: PlayCircle, highlight: true },
+        { id: "run-compliance-test", label: "Run Compliance Audit", icon: PlayCircle, highlight: true },
       ],
     },
     {

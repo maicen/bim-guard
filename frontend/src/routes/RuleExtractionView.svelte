@@ -37,7 +37,7 @@
   import { createTableState } from "../lib/tableState.svelte";
 
   interface Props {
-    /** Pre-selects this document, e.g. when opened from the "Run Compliance Test" wizard. */
+    /** Pre-selects this document, e.g. when opened from the "Run Compliance Audit" wizard. */
     initialDocId?: number | null;
     /** When true, saving rules offers to send the user back to the tab that opened this page. */
     fromQuickTest?: boolean;
@@ -752,7 +752,7 @@
   onClose={() => (showReturnPrompt = false)}
 >
   <p class="text-slate-300">
-    You can switch back to the Run Compliance Test tab now — it will pick up this ruleset
+    You can switch back to the Run Compliance Audit tab now — it will pick up this ruleset
     automatically.
   </p>
   {#snippet footer()}

@@ -168,7 +168,7 @@
 <div class="mx-auto max-w-4xl space-y-6">
   <PageHeader
     category="Quick Start"
-    title="Run Compliance Test"
+    title="Run Compliance Audit"
     subtitle="Create a project, attach a model and a ruleset, then run your first Architectural compliance audit — all from one guided flow."
     icon={PlayCircle}
   />
@@ -361,7 +361,7 @@
   >
     <div class="flex items-center gap-2.5">
       <Circle class="h-5 w-5 shrink-0 text-accent" />
-      <h2 class="text-base font-bold tracking-tight text-slate-50">3. Run the test</h2>
+      <h2 class="text-base font-bold tracking-tight text-slate-50">3. Run the audit</h2>
     </div>
 
     {#if runError}
@@ -384,7 +384,7 @@
         Running…
       {:else}
         <PlayCircle class="h-4 w-4" />
-        Run Compliance Test
+        Run Compliance Audit
       {/if}
     </button>
   </div>
