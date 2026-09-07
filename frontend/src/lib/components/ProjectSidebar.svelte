@@ -3,7 +3,7 @@
     LayoutDashboard,
     Boxes,
     ScanEye,
-    LayoutList,
+    PlayCircle,
     FileText,
     Activity,
     Settings,
@@ -71,7 +71,7 @@
     {
       title: "Compliance",
       items: [
-        { id: "arch", label: "Run Compliance Audit", icon: LayoutList, highlight: true },
+        { id: "arch", label: "Run Compliance Audit", icon: PlayCircle, highlight: true },
         { id: "reports", label: "Reports & Exports", icon: FileText },
       ],
     },
