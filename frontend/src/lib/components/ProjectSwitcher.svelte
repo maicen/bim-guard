@@ -9,9 +9,16 @@
     selectedProjectId?: number | null;
     /** Switch the app's current project context. */
     onSwitch: (projectId: number) => void;
+    /** Clear the app's current project context ("None" selected). */
+    onClear?: () => void;
   }
 
-  let { selectedProject = null, selectedProjectId = null, onSwitch }: Props = $props();
+  let {
+    selectedProject = null,
+    selectedProjectId = null,
+    onSwitch,
+    onClear,
+  }: Props = $props();
 
   // Every project-scoped view (Compliance Audit, Reports, Viewer) used to
   // own an independent project dropdown with no shared "current project"
@@ -41,7 +48,12 @@
   });
 
   function handleChange(e: Event) {
-    const id = Number((e.target as HTMLSelectElement).value);
+    const value = (e.target as HTMLSelectElement).value;
+    if (!value) {
+      onClear?.();
+      return;
+    }
+    const id = Number(value);
     if (id) onSwitch(id);
   }
 </script>
@@ -57,7 +69,7 @@
       aria-label="Switch current project"
       class="max-w-[7.5rem] sm:max-w-[11rem] md:max-w-[15rem] cursor-pointer appearance-none truncate bg-transparent py-0.5 pl-0.5 pr-4 text-xs font-medium text-slate-200 focus:outline-none"
     >
-      <option value="" disabled>Select project…</option>
+      <option value="">None</option>
       {#each projects as p (p.id)}
         <option value={p.id}>{p.name}</option>
       {/each}

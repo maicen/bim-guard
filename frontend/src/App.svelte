@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { router, push, replace } from "svelte-spa-router";
   import OrgSidebar from "./lib/components/OrgSidebar.svelte";
   import ProjectSidebar from "./lib/components/ProjectSidebar.svelte";
@@ -182,32 +182,45 @@
   // Synchronize targetProjectId <-> URL query parameters and localStorage.
   // In project-scoped views (Viewer, Arch, Piping, Seismic, Reports, Workflow),
   // ensure the project persists in the URL query string.
+  //
+  // The targetProjectId reads/writes below are wrapped in untrack() so this
+  // effect only re-fires on an actual queryParams/activeView change, never
+  // just because targetProjectId changed elsewhere (handleSwitchProject,
+  // handleClearProject, ...). Those already push/replace the correct URL
+  // themselves; without untrack, this effect would see the still-stale URL
+  // (push/replace await a tick before touching the hash) and immediately
+  // re-derive the old targetProjectId from it -- the same race that used to
+  // revert OrgSwitcher's selection (see the URL <-> AuthState effects above).
   $effect(() => {
     const params = queryParams;
     const urlProjectIdStr = params.get("project_id");
 
     if (urlProjectIdStr && /^\d+$/.test(urlProjectIdStr)) {
       const parsedId = Number(urlProjectIdStr);
-      if (parsedId !== targetProjectId) {
-        targetProjectId = parsedId;
-        loadProjectDetails(parsedId);
-        try {
-          localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(parsedId));
-        } catch {}
-      }
-    } else if (PROJECT_SCOPED_VIEWS.has(activeView)) {
-      if (targetProjectId) {
-        const currentParams = new URLSearchParams(router.querystring || "");
-        if (currentParams.get("project_id") !== String(targetProjectId)) {
-          currentParams.set("project_id", String(targetProjectId));
-          if (authState.activeOrganizationId) {
-            currentParams.set("org", String(authState.activeOrganizationId));
-          }
-          replace(`/${activeView}?${currentParams.toString()}`);
+      untrack(() => {
+        if (parsedId !== targetProjectId) {
+          targetProjectId = parsedId;
+          loadProjectDetails(parsedId);
+          try {
+            localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(parsedId));
+          } catch {}
         }
-      } else {
-        ensureProjectSelected();
-      }
+      });
+    } else if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+      untrack(() => {
+        if (targetProjectId) {
+          const currentParams = new URLSearchParams(router.querystring || "");
+          if (currentParams.get("project_id") !== String(targetProjectId)) {
+            currentParams.set("project_id", String(targetProjectId));
+            if (authState.activeOrganizationId) {
+              currentParams.set("org", String(authState.activeOrganizationId));
+            }
+            replace(`/${activeView}?${currentParams.toString()}`);
+          }
+        } else {
+          ensureProjectSelected();
+        }
+      });
     }
 
     targetElementGuid = params.get("element_guid");
@@ -337,20 +350,30 @@
 
   let prevActiveOrgId: number | null = $state(null);
 
-  // 1. URL -> AuthState: when ?org= is in the query string, switch active organization
+  // 1. URL -> AuthState: when ?org= is in the query string, switch active organization.
+  // Depends ONLY on queryParams (i.e. an actual URL change) -- the authState
+  // reads below are wrapped in untrack() so that this effect never re-fires
+  // just because activeOrganizationId changed. Without that, switching orgs
+  // via OrgSwitcher would race effect #2 below: this effect would see the
+  // still-stale URL (effect #2 hasn't written the new org to it yet, since
+  // svelte-spa-router's replace() awaits a tick before touching the hash)
+  // and immediately revert the freshly-chosen organization back to whatever
+  // the URL used to say.
   $effect(() => {
     const orgParam = queryParams.get("org");
     if (orgParam && /^\d+$/.test(orgParam)) {
       const parsedOrgId = Number(orgParam);
-      if (parsedOrgId !== authState.activeOrganizationId) {
-        if (
-          !authState.profile ||
-          authState.isSuperadmin ||
-          authState.profile.organizations.some((o) => o.organization_id === parsedOrgId)
-        ) {
-          authState.setActiveOrganization(parsedOrgId, false);
+      untrack(() => {
+        if (parsedOrgId !== authState.activeOrganizationId) {
+          if (
+            !authState.profile ||
+            authState.isSuperadmin ||
+            authState.profile.organizations.some((o) => o.organization_id === parsedOrgId)
+          ) {
+            authState.setActiveOrganization(parsedOrgId, false);
+          }
         }
-      }
+      });
     }
   });
 
@@ -392,6 +415,20 @@
     }
     const q = params.toString();
     push(q ? `/dashboard?${q}` : "/dashboard");
+  }
+
+  // "None" selected in the header's ProjectSwitcher: forget the project
+  // entirely (unlike handleExitProject, which leaves project view but keeps
+  // targetProjectId/localStorage so re-entering lands back on the same one).
+  function handleClearProject() {
+    selectedProject = null;
+    targetProjectId = null;
+    try {
+      localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
+    } catch {}
+    if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+      handleExitProject();
+    }
   }
 
   function handleSwitchProject(projectId: number) {
@@ -471,6 +508,7 @@
       onOpenMobileNav={() => (isMobileNavOpen = true)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
       onSwitchProject={handleSwitchProject}
+      onClearProject={handleClearProject}
       onExitProject={handleExitProject}
     />
 

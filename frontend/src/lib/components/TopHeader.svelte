@@ -23,6 +23,8 @@
     onOpenPipeline?: (projectId: number) => void;
     /** Switch the app's current project context. */
     onSwitchProject?: (projectId: number) => void;
+    /** Clear the app's current project context ("None" selected). */
+    onClearProject?: () => void;
     /** Leave project view and return to the organization dashboard. */
     onExitProject?: () => void;
   }
@@ -35,6 +37,7 @@
     onOpenMobileNav = () => {},
     onOpenPipeline,
     onSwitchProject,
+    onClearProject,
     onExitProject,
   }: Props = $props();
 
@@ -113,7 +116,12 @@
     {/if}
 
     {#if onSwitchProject}
-      <ProjectSwitcher {selectedProject} {selectedProjectId} onSwitch={onSwitchProject} />
+      <ProjectSwitcher
+        {selectedProject}
+        {selectedProjectId}
+        onSwitch={onSwitchProject}
+        onClear={onClearProject}
+      />
     {:else if selectedProject}
       <span
         class="ml-2 hidden items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/60 px-2.5 py-0.5 text-xs font-medium text-slate-300 sm:inline-flex"
