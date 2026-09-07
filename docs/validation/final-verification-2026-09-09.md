@@ -558,3 +558,103 @@ Two defects found, neither repaired:
 2. **246 data-quality notes without `ruleset_version`** in the JSON export.
    `app/modules/phase_6/phase_6c_corrosion_ui.py:857-880`; XM-001 exempt because
    of the bulk stamp at `:790-792`.
+
+---
+
+# Freeze spot-check of the repaired tree — 2026-09-08
+
+Both defects above are fixed and pushed. This section re-verifies the demo path
+on the freeze candidate `a55b70a`, on the same `:8001` / `:5174` pair.
+
+| | |
+| --- | --- |
+| Freeze candidate | `a55b70a` |
+| Part 1 fix | `9e37275` `fix(export): send the session token on export download URLs` |
+| Part 2 fix | `a55b70a` `fix(provenance): ruleset_version on data-quality notes` |
+| Suite | 1891 passed, 15 skipped, 4 xfailed, **0 failed** (`uv run pytest -n 4 -q`) |
+| Backend | `:8001`, PID 48724, log `docs/validation/verify-backend-2.log` |
+| Frontend | `:5174`, PID 36652 |
+| FALLBACK gate | `Select-String -Quiet … "Using hardcoded fallback ruleset"` → **False** — PASS |
+
+## Capture method
+
+The browser demonstrated the defect and the fix: `&token=` on every export
+href, eight `/api/analyze/export` requests, eight 200s, zero 401s. Byte sizes,
+row counts and topic counts were taken by an authenticated fetch of the
+identical URLs with the same session token.
+
+A real save-file click is recorded on Thursday during rehearsal on the demo
+worktree.
+
+## Counts and exports
+
+| Project | Check | Expected | Measured | Verdict |
+| --- | --- | --- | --- | ---: |
+| 1917 | table | 1,988 | 1,988 of 1,988 | **MATCH** |
+| 1917 | CSV | 1,988 rows | `bimguard-corrosion-project-1917.csv`, 1,236,815 B, 1,988 rows | **MATCH** |
+| 1917 | JSON | downloads | `bimguard-corrosion-project-1917.json`, 4,509,641 B | **MATCH** |
+| 1917 | BCF | 1,384 topics, 0 violations | `bimguard-corrosion-project-1917.bcf`, 5,120,756 B, 1,384 topics, 0 violations | **MATCH** |
+| 1540 | table | 29,181 or 29,183, verdicts 0 | 29,181 of 29,181, TOTAL FINDINGS 0 | **MATCH** |
+| 1540 | CSV | downloads | `bimguard-corrosion-project-1540.csv`, 11,439,771 B, 29,181 rows | **MATCH** |
+| 1542 | table | 2,937 | 2,937 of 2,937 | **MATCH** |
+| 1542 | bands | 783 / 314 / 1,840 | 783 critical / 314 high / 1,840 medium | **MATCH** |
+| 1542 | cross-model filenames | present | 2,937 of 2,937 rows carry `source_model` and `clashing_source_model`; 886 cross (`…_str_ifc4.ifc`), 2,051 intra (`…_plumb_ifc4.ifc`) | **MATCH** |
+| 1542 | BCF | 2,937 topics, 0 violations | `bimguard-seismic-project-1542.bcf`, 9,949,760 B, 2,937 topics, 0 violations | **MATCH** |
+
+`scripts/validate_bcf_corpus.py` over both archives: 2/2 valid, 4,321 topics
+validated, 0 violations, 0 empty.
+
+`ruleset_version` over the full 1917 export — 1,706 findings **plus** the 282
+data-quality notes, 1,988 rows — **0 missing**, closing the MISMATCH in §3.
+Every row carries its engine's own stamp: GC 420, CC 420, MC 420, MM 182,
+XM 546, each reading `BIMGUARD-<engine> v1.0.0`. The 1542 export is likewise
+0 missing over 2,937 rows.
+
+## Screenshots
+
+`docs/validation/screenshots/freeze-2026-09-08/`, each framed on the finding
+counts and the three export controls:
+
+| File | Shows |
+| --- | --- |
+| `1917-piping-results.png` | Audit Findings 1,988 of 1,988; Export BCF 2.1 / CSV / JSON |
+| `1540-piping-results.png` | TOTAL FINDINGS 0, DATA QUALITY 29181, Audit Findings 29,181 of 29,181 |
+| `1542-seismic-results.png` | TOTAL FINDINGS 2937, CRITICAL 783, HIGH 314, MEDIUM 1840 |
+
+## MISMATCH: `/api/dashboard/stats` is polled, and it is slow
+
+The runbook line drafted for this freeze asserted that stats is "fetched once
+when the Dashboard mounts and again only on organisation switch; it is not
+polled, so it costs nothing once inside a project". The log contradicts it, so
+the runbook says only "known slow on entry".
+
+Counted from `docs/validation/verify-backend-2.log` over the 80-minute session
+(23:12–00:32):
+
+| Measure | Value |
+| --- | ---: |
+| `/api/dashboard/stats` requests | **142** (123 × 200, 19 × 401 during sign-in) |
+| Fired while the browser was on a **non-Dashboard** route | **111**, all 200 |
+| Median interval between calls | **40 s** |
+| `duration_ms` min / median / max | **5,672 / 6,764 / 13,088** |
+
+The browser left the organisation Dashboard at ~23:24 and spent the rest of the
+session on `#/piping` and `#/seismic`. Polling continued unbroken to 00:32:47,
+so the cost does **not** stop on entering a project. The slowest samples
+(10–13 s) coincide with the 1540 and 1542 analysis runs.
+
+`386ff7b` claims a dashboard fix; on this build the endpoint is not fast.
+Reported, not repaired — it is outside the two parts this session was scoped to
+and the tree is a freeze candidate.
+
+## Observation: the export token is captured at render time
+
+`getExportUrl` reads the access token from a non-reactive module variable, so
+the `&token=` value is a snapshot taken when the row rendered. A Supabase access
+token lasts about an hour. During this session a captured URL returned 401 after
+the token rotated, and refreshing it restored 200. Any interaction that
+re-renders the results row rebuilds the link with the current token, which is
+why the demo path is unaffected in practice — but a session that signs in, runs
+an audit, then leaves the page untouched for an hour before clicking Export can
+still see a 401. Not repaired: outside this session's scope, and the tree is
+frozen.
