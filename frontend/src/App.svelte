@@ -140,19 +140,20 @@
 
   async function loadProjectDetails(projectId: number) {
     try {
+      // No client-side "does this project's organization_id match the active
+      // org" gate here on purpose: a project can be legitimately visible in
+      // the active org via organization_project_grants (cross-org sharing)
+      // without its owning organization_id ever changing, and
+      // ensureProjectSelected() below picks straight from that same
+      // org-scoped, grant-aware list. Rejecting on owning-org mismatch
+      // treated every shared-in project as foreign, which sent this function
+      // straight back into ensureProjectSelected(), which picked the same
+      // shared-in project again (it's genuinely first in that org's list),
+      // which came back here to be rejected again -- an unconditional loop,
+      // not a race, that pegged the backend on /api/projects/{id}/files
+      // forever. The backend's own access check (get_authorized_project) is
+      // the real gate; a project it serves here is one this user may see.
       selectedProject = await projectsApi.get(projectId);
-      if (
-        authState.activeOrganizationId &&
-        selectedProject.organization_id &&
-        selectedProject.organization_id !== authState.activeOrganizationId
-      ) {
-        selectedProject = null;
-        targetProjectId = null;
-        try {
-          localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
-        } catch {}
-        ensureProjectSelected();
-      }
     } catch (err) {
       selectedProject = null;
       if ((err as { status?: number })?.status === 404) {
@@ -273,10 +274,27 @@
   // token, so the very first load of the app always 401'd on these calls.
   // Waiting for authState.loading to clear ensures the token (if any) is
   // already set before the first request goes out.
+  //
+  // Also wait for authState.profile, AND for a ?org= in the URL to have
+  // actually been applied to activeOrganizationId (the "URL -> AuthState"
+  // effect below does that, but asynchronously relative to this one).
+  // Firing loadProjectDetails() before that lands reads activeOrganizationId
+  // as whatever it defaulted to (profile.default_organization_id, or null),
+  // not the URL's org -- so a project_id/org combination that's a genuine
+  // mismatch (project belongs to a different org) reads as consistent,
+  // loadProjectDetails accepts it, and then the *next* tick, once the URL's
+  // org finally applies, an org-mismatch cleanup effect discovers the now-
+  // stale selectedProject, clears it, and this whole resolution restarts --
+  // repeating for as long as anything here still races that effect. Waiting
+  // for the two to already agree closes that race instead of restarting
+  // through it.
   let hasPrefetched = false;
   $effect(() => {
     if (authState.loading) return;
     if (isAuthConfigured && !authState.user) return;
+    if (isAuthConfigured && authState.profile == null) return;
+    const urlOrgParam = queryParams.get("org");
+    if (urlOrgParam && String(authState.activeOrganizationId) !== urlOrgParam) return;
     if (hasPrefetched) return;
     hasPrefetched = true;
     dashboardApi.prefetchAll();
@@ -343,9 +361,19 @@
   // PROJECT_SCOPED_VIEWS itself (unlike Viewer/Arch/Reports) so visiting it
   // never auto-injects project_id into the URL; it only renders the project
   // dashboard when the URL already carries one.
+  //
+  // The dashboard branch additionally requires targetProjectId: a project_id
+  // in the URL that doesn't resolve to an accessible project (wrong org,
+  // deleted, or an org with no projects at all) leaves targetProjectId null
+  // after loadProjectDetails/ensureProjectSelected give up, but the stale
+  // query param itself is never cleaned up for "dashboard" (it isn't in
+  // PROJECT_SCOPED_VIEWS, so the URL-fixup effect below never touches it).
+  // Without this, isProjectView stayed permanently true off that stale
+  // param, stranding the header/sidebar in a "Project Dashboard" state with
+  // no project ever backing it.
   let isProjectView = $derived(
     PROJECT_SCOPED_VIEWS.has(activeView) ||
-      (activeView === "dashboard" && !!queryParams.get("project_id")),
+      (activeView === "dashboard" && !!queryParams.get("project_id") && !!targetProjectId),
   );
 
   const ADMIN_VIEWS = new Set([

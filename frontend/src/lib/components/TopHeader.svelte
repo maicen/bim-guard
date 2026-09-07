@@ -85,7 +85,7 @@
     >
       <Menu class="h-5 w-5" />
     </button>
-    {#if isProjectView}
+    {#if isProjectView && selectedProject}
       <button
         type="button"
         onclick={onExitProject}
@@ -95,30 +95,24 @@
         Organization
       </button>
       <span class="hidden text-slate-600 sm:inline">/</span>
-      <span class="truncate font-semibold text-slate-100"
-        >{selectedProject?.short_name || selectedProject?.name || "Project"}</span
+      <!-- Project identity (short name + ISO 19650 code) appears exactly
+           once here -- it replaced the old header project switcher and must
+           not also repeat as a separate badge. -->
+      <span
+        class="truncate font-semibold text-slate-100"
+        title={selectedProject.name}
       >
+        {selectedProject.short_name || selectedProject.name}
+        {#if selectedProject.project_code}
+          <span class="font-normal text-slate-500">· {selectedProject.project_code}</span>
+        {/if}
+      </span>
       <span class="hidden text-slate-600 sm:inline">·</span>
       <span class="hidden text-slate-400 sm:inline">{headerInfo.title}</span>
     {:else}
       <span class="hidden font-medium text-slate-500 sm:inline">{headerInfo.section}</span>
       <span class="hidden text-slate-600 sm:inline">/</span>
       <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
-    {/if}
-
-    <!-- Persistent project identity: a short name plus its ISO 19650 project
-         code, kept on screen wherever a project is selected instead of the
-         switcher dropdown this replaced. -->
-    {#if selectedProject}
-      <span
-        class="ml-2 hidden items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/60 px-2.5 py-0.5 text-xs font-medium text-slate-300 sm:inline-flex"
-        title={selectedProject.name}
-      >
-        {selectedProject.short_name || selectedProject.name}
-        {#if selectedProject.project_code}
-          <span class="text-slate-500">· {selectedProject.project_code}</span>
-        {/if}
-      </span>
     {/if}
   </div>
 

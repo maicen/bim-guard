@@ -124,8 +124,19 @@
     }
   }
 
+  // App.svelte's targetProjectId can bounce back to a previously-seen id
+  // while the active organization is still settling (see the
+  // profile-readiness comment on App.svelte's prefetch effect); without this
+  // guard each bounce re-fires this effect and piles another listIfcFiles
+  // request on top of ones already in flight. Scoped to this effect alone --
+  // the explicit loadFiles(initialProjectId) calls elsewhere (after
+  // set-primary, delete, repo attach) must still re-fetch the same id.
+  let lastEffectProjectId: number | null = null;
   $effect(() => {
-    if (initialProjectId) loadFiles(initialProjectId);
+    if (initialProjectId && initialProjectId !== lastEffectProjectId) {
+      lastEffectProjectId = initialProjectId;
+      loadFiles(initialProjectId);
+    }
   });
 
   onMount(() => {

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import {
     Boxes,
     ScanEye,
@@ -28,8 +27,16 @@
   // targetProjectId can briefly resolve to a stale project before its
   // URL-sync effect corrects it, and responses can arrive out of order.
   let loadToken = 0;
+  // Guards against re-fetching a project this component already has (or
+  // already has in flight): targetProjectId in App.svelte can bounce back to
+  // a previously-seen id while the active organization is still settling
+  // (see the profile-readiness comment on App.svelte's prefetch effect), and
+  // without this, each bounce re-triggers this $effect and piles up another
+  // listIfcFiles request on top of ones still in flight.
+  let lastRequestedProjectId: number | null = null;
 
   async function loadFiles(projectId: number) {
+    lastRequestedProjectId = projectId;
     const token = ++loadToken;
     isLoadingFiles = true;
     try {
@@ -44,12 +51,10 @@
     }
   }
 
-  onMount(() => {
-    if (initialProjectId) loadFiles(initialProjectId);
-  });
-
   $effect(() => {
-    if (initialProjectId) loadFiles(initialProjectId);
+    if (initialProjectId && initialProjectId !== lastRequestedProjectId) {
+      loadFiles(initialProjectId);
+    }
   });
 
   let primaryFile = $derived(ifcFiles.find((f) => f.is_primary) || ifcFiles[0] || null);
