@@ -43,7 +43,7 @@
       })
       .catch(() => {
         // Silent: this is a convenience switcher, not the primary project
-        // list — ProjectsView surfaces its own load errors.
+        // list — the Dashboard's registry surfaces its own load errors.
       });
   });
 

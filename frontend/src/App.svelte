@@ -19,7 +19,6 @@
   import DashboardView from "./routes/DashboardView.svelte";
   import ProjectDashboardView from "./routes/ProjectDashboardView.svelte";
   import ModelsView from "./routes/ModelsView.svelte";
-  import ProjectsView from "./routes/ProjectsView.svelte";
   import ViewerView from "./routes/ViewerView.svelte";
   import DocumentsView from "./routes/DocumentsView.svelte";
   import RuleExtractionView from "./routes/RuleExtractionView.svelte";
@@ -534,6 +533,7 @@
           <DashboardView
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}
+            onSelectProjectForDashboard={(projectId) => push(buildTargetUrl("dashboard", projectId))}
             onOpenWizard={() => (isGlobalWizardOpen = true)}
             onNavigate={handleSelectView}
           />
@@ -541,15 +541,6 @@
           <ModelsView
             initialProjectId={targetProjectId}
             onSelectProjectForViewer={handleSelectProjectForViewer}
-          />
-        {:else if activeView === "projects"}
-          <ProjectsView
-            onSelectProjectForAudit={handleSelectProjectForAudit}
-            onSelectProjectForViewer={handleSelectProjectForViewer}
-            onSelectProjectForDashboard={(projectId) => push(buildTargetUrl("dashboard", projectId))}
-            {selectedProject}
-            onModelsAttached={(projectId) => push(buildTargetUrl("models", projectId))}
-            onOpenWizard={() => (isGlobalWizardOpen = true)}
           />
         {:else if activeView === "viewer"}
           <ViewerView

@@ -27,7 +27,7 @@
         "Create a project record, specify project name, description, country jurisdiction, and upload the IFC 2x3 or IFC4 model. The project becomes the shared source for the 3D viewer, rule evaluations, and reports.",
       result:
         "Result: The project appears in the project registry with its IFC file attached and parsed.",
-      actions: [{ label: "View Projects", view: "projects", primary: true }],
+      actions: [{ label: "View Projects", view: "dashboard", primary: true }],
     },
     {
       step: 2,
