@@ -1,14 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from "svelte";
   import {
-    FolderOpen,
     BookOpen,
     ListChecks,
     AlertTriangle,
-    Plus,
     ScanEye,
-    Cpu,
-    ArrowRight,
     Sparkles,
     CheckCircle2,
     XCircle,
@@ -41,16 +37,12 @@
     onSelectProjectForAudit: (projectId: number, analysisType?: string | null) => void;
     onSelectProjectForViewer: (projectId: number) => void;
     onSelectProjectForDashboard: (projectId: number) => void;
-    onOpenWizard: () => void;
-    onNavigate: (view: string) => void;
   }
 
   let {
     onSelectProjectForAudit,
     onSelectProjectForViewer,
     onSelectProjectForDashboard,
-    onOpenWizard,
-    onNavigate,
   }: Props = $props();
 
   const cachedStats = dashboardApi.getCachedStats();
@@ -239,9 +231,6 @@
     }
   });
 
-  function scrollToRegistry() {
-    document.getElementById("project-registry")?.scrollIntoView({ behavior: "smooth" });
-  }
 </script>
 
 <div class="mx-auto space-y-8">
@@ -250,21 +239,7 @@
     category="Overview"
     title="Compliance Dashboard"
     subtitle="High-level OpenBIM metrics and project compliance readiness."
-  >
-    {#snippet actions()}
-      <div class="flex items-center gap-3">
-        <!-- New Project CTA -->
-        <button
-          type="button"
-          onclick={onOpenWizard}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
-        >
-          <Plus class="h-3.5 w-3.5" />
-          <span>New Project</span>
-        </button>
-      </div>
-    {/snippet}
-  </PageHeader>
+  />
 
   {#if !stats.db_ok}
     <div
@@ -278,107 +253,8 @@
     </div>
   {/if}
 
-  <!-- Bento Stats Grid -->
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <!-- Total Projects -->
-    <button
-      type="button"
-      onclick={scrollToRegistry}
-      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-    >
-      <div class="flex items-center justify-between text-slate-400">
-        <span
-          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
-          >Total Projects</span
-        >
-        <FolderOpen class="h-4 w-4 text-blue-400 transition-transform group-hover:scale-110" />
-      </div>
-      <div class="text-3xl font-bold tracking-tight text-slate-50">
-        {stats.total_projects}
-      </div>
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span>Active in project registry</span>
-        <ArrowRight
-          class="h-3.5 w-3.5 -translate-x-1 text-blue-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
-        />
-      </div>
-    </button>
-
-    <!-- Documents -->
-    <button
-      type="button"
-      onclick={() => onNavigate("documents")}
-      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-    >
-      <div class="flex items-center justify-between text-slate-400">
-        <span
-          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
-          >Documents</span
-        >
-        <BookOpen class="h-4 w-4 text-emerald-400 transition-transform group-hover:scale-110" />
-      </div>
-      <div class="text-3xl font-bold tracking-tight text-slate-50">
-        {stats.total_documents}
-      </div>
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span>Uploaded specifications</span>
-        <ArrowRight
-          class="h-3.5 w-3.5 -translate-x-1 text-emerald-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
-        />
-      </div>
-    </button>
-
-    <!-- Rules Defined -->
-    <button
-      type="button"
-      onclick={() => onNavigate("rules")}
-      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-    >
-      <div class="flex items-center justify-between text-slate-400">
-        <span
-          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
-          >Rules Library</span
-        >
-        <ListChecks class="h-4 w-4 text-purple-400 transition-transform group-hover:scale-110" />
-      </div>
-      <div class="text-3xl font-bold tracking-tight text-slate-50">
-        {stats.total_rules}
-      </div>
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span>Compliance rules active</span>
-        <ArrowRight
-          class="h-3.5 w-3.5 -translate-x-1 text-purple-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
-        />
-      </div>
-    </button>
-
-    <!-- Issues Tracked -->
-    <button
-      type="button"
-      onclick={() => onNavigate("reports")}
-      class="group w-full cursor-pointer space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:scale-[1.01] hover:border-slate-700 hover:bg-slate-900/80 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-    >
-      <div class="flex items-center justify-between text-slate-400">
-        <span
-          class="text-xs font-semibold uppercase tracking-wider transition-colors group-hover:text-slate-300"
-          >Issues Identified</span
-        >
-        <AlertTriangle class="h-4 w-4 text-amber-400 transition-transform group-hover:scale-110" />
-      </div>
-      <div class="text-3xl font-bold tracking-tight text-amber-400">
-        {stats.issues_found}
-      </div>
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span>Across current models</span>
-        <ArrowRight
-          class="h-3.5 w-3.5 -translate-x-1 text-amber-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
-        />
-      </div>
-    </button>
-  </div>
-
   <!-- Project Registry -->
-  <div id="project-registry" class="space-y-4 scroll-mt-6">
+  <div class="space-y-4">
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-base font-bold tracking-tight text-slate-50">Project Registry</h2>
@@ -685,65 +561,6 @@
         />
       {/if}
     </div>
-  </div>
-
-  <!-- Workflow Quick Guides -->
-  <div class="grid grid-cols-1 gap-4 pt-2 md:grid-cols-3">
-    <button
-      type="button"
-      onclick={() => onNavigate("extract")}
-      class="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left transition-all hover:border-slate-700"
-    >
-      <div
-        class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400 transition-transform group-hover:scale-110"
-      >
-        <Sparkles class="h-4 w-4" />
-      </div>
-      <h3 class="text-sm font-semibold text-slate-50 transition-colors group-hover:text-purple-300">
-        Rule Extraction Studio
-      </h3>
-      <p class="mt-1 text-xs text-slate-400">
-        Translate building code specifications into executable OpenBIM rules using AI.
-      </p>
-    </button>
-
-    <button
-      type="button"
-      onclick={() => onNavigate("viewer")}
-      class="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left transition-all hover:border-slate-700"
-    >
-      <div
-        class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 transition-transform group-hover:scale-110"
-      >
-        <ScanEye class="h-4 w-4" />
-      </div>
-      <h3 class="text-sm font-semibold text-slate-50 transition-colors group-hover:text-cyan-300">
-        OpenBIM 3D Viewer
-      </h3>
-      <p class="mt-1 text-xs text-slate-400">
-        Inspect spatial geometry, component properties, and BCF viewpoint bookmarks.
-      </p>
-    </button>
-
-    <button
-      type="button"
-      onclick={() => onNavigate("arch")}
-      class="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left transition-all hover:border-slate-700"
-    >
-      <div
-        class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 transition-transform group-hover:scale-110"
-      >
-        <Cpu class="h-4 w-4" />
-      </div>
-      <h3
-        class="text-sm font-semibold text-slate-50 transition-colors group-hover:text-emerald-300"
-      >
-        Architectural Audit
-      </h3>
-      <p class="mt-1 text-xs text-slate-400">
-        Check daylight, fire, egress and clearance compliance against any loaded building-code ruleset.
-      </p>
-    </button>
   </div>
 </div>
 

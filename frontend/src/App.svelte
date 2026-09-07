@@ -7,7 +7,6 @@
   import AnalysisDomainTabs from "./lib/components/AnalysisDomainTabs.svelte";
   import type { AnalysisDomainTab } from "./lib/components/AnalysisDomainTabs.svelte";
   import TopHeader from "./lib/components/TopHeader.svelte";
-  import ProjectWizardModal from "./lib/components/ProjectWizardModal.svelte";
   import Toaster from "./lib/components/Toaster.svelte";
   import Modal from "./lib/components/Modal.svelte";
   import PipelineProgress from "./lib/components/PipelineProgress.svelte";
@@ -17,6 +16,7 @@
 
   // Routes
   import DashboardView from "./routes/DashboardView.svelte";
+  import NewProjectView from "./routes/NewProjectView.svelte";
   import RunComplianceTestView from "./routes/RunComplianceTestView.svelte";
   import ProjectDashboardView from "./routes/ProjectDashboardView.svelte";
   import ModelsView from "./routes/ModelsView.svelte";
@@ -114,7 +114,6 @@
   let targetElementGuid: string | null = $state(null);
   let targetBcfArtifactId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
-  let isGlobalWizardOpen = $state(false);
   // Clicking the header's running-pipeline badge opens the live tracker in a
   // drawer rather than navigating to a dedicated page — the same information
   // was previously duplicated across an inline panel, a standalone page, and
@@ -547,9 +546,9 @@
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}
             onSelectProjectForDashboard={(projectId) => push(buildTargetUrl("dashboard", projectId))}
-            onOpenWizard={() => (isGlobalWizardOpen = true)}
-            onNavigate={handleSelectView}
           />
+        {:else if activeView === "new-project"}
+          <NewProjectView onCancel={() => push("/")} onProjectCreated={handleProjectCreated} />
         {:else if activeView === "run-compliance-test"}
           <RunComplianceTestView />
         {:else if activeView === "models"}
@@ -687,13 +686,6 @@
 {/if}
 
 <Toaster />
-
-<!-- Global Wizard Modal (can be triggered from anywhere) -->
-<ProjectWizardModal
-  isOpen={isGlobalWizardOpen}
-  onClose={() => (isGlobalWizardOpen = false)}
-  onProjectCreated={handleProjectCreated}
-/>
 
 <!-- Live pipeline detail, opened from the header's running-pipeline badge -->
 <Modal

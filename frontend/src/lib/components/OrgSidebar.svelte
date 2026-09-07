@@ -8,6 +8,7 @@
     ChevronLeft,
     ChevronRight,
     PlayCircle,
+    Plus,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -19,7 +20,11 @@
     onCloseMobile?: () => void;
   }
 
-  let { activeView = "dashboard", mobileOpen = false, onCloseMobile = () => {} }: Props = $props();
+  let {
+    activeView = "dashboard",
+    mobileOpen = false,
+    onCloseMobile = () => {},
+  }: Props = $props();
 
   let collapsed = $state(false);
 
@@ -164,6 +169,28 @@
               <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r bg-white"></span>
             {/if}
           </a>
+
+          {#if item.id === "dashboard"}
+            <a
+              href={getNavHref("new-project")}
+              use:link
+              onclick={onCloseMobile}
+              class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
+              'new-project'
+                ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
+                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+              title={collapsed ? "New Project" : undefined}
+            >
+              <Plus
+                class="h-4 w-4 shrink-0 {activeView === 'new-project'
+                  ? 'text-slate-50'
+                  : 'text-slate-400 group-hover:text-slate-200'}"
+              />
+              {#if !collapsed}
+                <span class="truncate text-left">New Project</span>
+              {/if}
+            </a>
+          {/if}
         {/each}
       </div>
     {/each}
