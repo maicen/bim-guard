@@ -209,7 +209,7 @@
 
     try {
       const [statsData, projectsData] = await Promise.all([
-        dashboardApi.getStats({ forceRefresh: force }),
+        dashboardApi.getStats({ forceRefresh: force, organization_id: requestOrgId }),
         projectsApi.list({ forceRefresh: force, organization_id: requestOrgId }),
       ]);
       if (authState.activeOrganizationId !== requestOrgId) return;

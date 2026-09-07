@@ -1164,15 +1164,20 @@ export const analyzeApi = {
 };
 
 export const dashboardApi = {
-  getCachedStats(): any | null {
-    return _dashboardStatsStore.getCached("__stats__") || null;
+  getCachedStats(orgId?: number | null): any | null {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
+    return _dashboardStatsStore.getCached(key) || null;
   },
 
-  async getStats(options: SWROptions = {}): Promise<any> {
+  async getStats(options: SWROptions & { organization_id?: number | null } = {}): Promise<any> {
+    const effectiveOrg = options.organization_id !== undefined ? options.organization_id : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
     return _dashboardStatsStore.execute(
-      "__stats__",
+      key,
       async () => {
-        const res = await apiFetch(`${API_BASE}/dashboard/stats`);
+        const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+        const res = await apiFetch(`${API_BASE}/dashboard/stats${query}`);
         return handleResponse<any>(res);
       },
       options,

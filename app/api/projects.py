@@ -270,6 +270,61 @@ def _primary_organization_id(current_user: CurrentUser, memberships: MembershipS
     return next(iter(org_ids))
 
 
+def visible_project_rows(
+    all_rows: list[dict[str, Any]],
+    *,
+    user_id: str,
+    organization_id: Optional[int],
+    memberships: MembershipService,
+    profiles: ProfileService,
+) -> list[dict[str, Any]]:
+    """Filter project rows to the ones a user may see, optionally scoped to one org.
+
+    Shared by the project list endpoint and the dashboard stats endpoint so
+    the two never disagree about which projects are "visible" to a caller.
+    A superadmin sees every organization's projects when no filter is applied;
+    everyone else sees only projects owned by or granted to their orgs.
+    """
+    if profiles.is_superadmin(user_id):
+        if organization_id is not None:
+            shared_in = set(memberships.list_org_project_grants(organization_id))
+            return [
+                row for row in all_rows
+                if row.get("organization_id") == organization_id or row.get("id") in shared_in
+            ]
+        return all_rows
+
+    user_org_ids = memberships.org_ids_for_user(user_id)
+    if organization_id is not None:
+        if organization_id not in user_org_ids:
+            return []
+        target_orgs = {organization_id}
+    else:
+        target_orgs = user_org_ids
+
+    accessible_by_org: dict[int, set[int] | None] = {
+        org_id: memberships.accessible_project_ids(org_id, user_id) for org_id in target_orgs
+    }
+    granted_in_by_org: dict[int, set[int]] = {
+        org_id: set(memberships.list_org_project_grants(org_id))
+        for org_id, accessible in accessible_by_org.items()
+        if accessible is None
+    }
+
+    def _visible(row: dict) -> bool:
+        pid = row.get("id")
+        owning_org = row.get("organization_id")
+        for org_id, accessible in accessible_by_org.items():
+            if accessible is None:
+                if owning_org == org_id or pid in granted_in_by_org[org_id]:
+                    return True
+            elif pid in accessible:
+                return True
+        return False
+
+    return [row for row in all_rows if _visible(row)]
+
+
 @router.get("", response_model=ProjectListResponse, summary="List all projects")
 def list_projects(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -293,45 +348,13 @@ def list_projects(
     if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
         effective_org_id = int(x_org_id.strip())
 
-    if profiles.is_superadmin(current_user.id):
-        if effective_org_id is not None:
-            shared_in = set(memberships.list_org_project_grants(effective_org_id))
-            rows = [
-                row for row in all_rows
-                if row.get("organization_id") == effective_org_id or row.get("id") in shared_in
-            ]
-        else:
-            rows = all_rows
-    else:
-        user_org_ids = memberships.org_ids_for_user(current_user.id)
-        if effective_org_id is not None:
-            if effective_org_id not in user_org_ids:
-                return ProjectListResponse(total=0, projects=[])
-            target_orgs = {effective_org_id}
-        else:
-            target_orgs = user_org_ids
-
-        accessible_by_org: dict[int, set[int] | None] = {
-            org_id: memberships.accessible_project_ids(org_id, current_user.id) for org_id in target_orgs
-        }
-        granted_in_by_org: dict[int, set[int]] = {
-            org_id: set(memberships.list_org_project_grants(org_id))
-            for org_id, accessible in accessible_by_org.items()
-            if accessible is None
-        }
-
-        def _visible(row: dict) -> bool:
-            pid = row.get("id")
-            owning_org = row.get("organization_id")
-            for org_id, accessible in accessible_by_org.items():
-                if accessible is None:
-                    if owning_org == org_id or pid in granted_in_by_org[org_id]:
-                        return True
-                elif pid in accessible:
-                    return True
-            return False
-
-        rows = [row for row in all_rows if _visible(row)]
+    rows = visible_project_rows(
+        all_rows,
+        user_id=current_user.id,
+        organization_id=effective_org_id,
+        memberships=memberships,
+        profiles=profiles,
+    )
     projects = [ProjectResponse(**row) for row in rows]
     return ProjectListResponse(total=len(projects), projects=projects)
 
