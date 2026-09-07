@@ -47,6 +47,66 @@ class BCFIssue:
     #: galvanic couple). They are selected and coloured in the viewpoint
     #: alongside ``component_guid``; blanks and duplicates are dropped.
     related_component_guids: list = field(default_factory=list)
+    #: ``Topic/CreationAuthor``. Names the engine that raised the finding and,
+    #: where the finding carries one, its ruleset revision, so a coordinator
+    #: can tell which kernel and which rule revision produced the topic.
+    #: Empty falls back to :data:`DEFAULT_CREATION_AUTHOR` rather than naming
+    #: an engine that did not run.
+    creation_author: str = ""
+    #: ``Topic/@TopicType``. One of :data:`TOPIC_TYPES`. Defaults to ``Issue``,
+    #: which is right for a compliance verdict; a clash and a data-quality note
+    #: are different kinds of thing and say so.
+    topic_type: str = "Issue"
+    #: Source models this finding came from, as
+    #: ``[{"filename": str, "date": str}, ...]``. One ``Header/File`` is
+    #: written per entry, so a cross-model clash names both models instead of
+    #: one placeholder. ``date`` is the model's upload timestamp and is
+    #: omitted where unknown. Empty falls back to
+    #: :data:`PLACEHOLDER_MODEL_FILENAME`.
+    source_files: list = field(default_factory=list)
+    #: Standards this finding was assessed against, as
+    #: ``[{"description": str, "referenced_document": str}, ...]``. One
+    #: ``Topic/DocumentReference`` is written per entry.
+    #: ``referenced_document`` is a URL and is omitted when empty — the
+    #: repository holds no URL or DOI for any of these standards, and
+    #: inventing one would be a fabricated citation.
+    document_references: list = field(default_factory=list)
+    #: The finding as JSON text. When set, it is written into the topic folder
+    #: as :data:`SNIPPET_FILENAME` and referenced by ``Topic/BimSnippet``, so
+    #: the archive carries the machine-readable record behind the prose and a
+    #: consumer need not re-request the JSON export to get it.
+    snippet_json: str = ""
+    #: Topic GUIDs of other topics about the same elements, written as
+    #: ``Topic/RelatedTopic``. Already-resolved GUIDs, not finding ids.
+    related_topic_guids: list = field(default_factory=list)
+
+
+#: Used when a caller supplies no ``creation_author``. Deliberately generic:
+#: naming a specific engine here is what made every archive claim GC-001/CC-001
+#: authorship, seismic clashes included.
+DEFAULT_CREATION_AUTHOR = "BIMGUARD AI"
+
+#: The complete set of ``TopicType`` values BIMGUARD emits, and the only values
+#: ``extensions.xsd`` will declare. A coordinator filtering by type gets three
+#: meaningful buckets rather than one.
+#:
+#:   ``Clash``   a geometric interference — SB-001 seismic bracing clearance
+#:   ``Issue``   a compliance verdict against a scored element
+#:   ``Warning`` a data-quality note: something could not be assessed
+TOPIC_TYPES: tuple[str, ...] = ("Clash", "Issue", "Warning")
+
+#: The complete set of ``TopicStatus`` values BIMGUARD emits.
+TOPIC_STATUSES: tuple[str, ...] = ("Open",)
+
+#: The complete set of ``Priority`` values BIMGUARD emits, most severe first.
+TOPIC_PRIORITIES: tuple[str, ...] = ("Critical", "Major", "Normal", "Minor")
+
+#: ``BimSnippet/@SnippetType`` for the machine-readable finding record, and the
+#: only snippet type BIMGUARD emits.
+SNIPPET_TYPE = "JSON"
+
+#: Name the snippet takes inside the topic folder.
+SNIPPET_FILENAME = "finding.json"
 
 
 def _utc_now() -> str:
@@ -133,6 +193,74 @@ def _xml_attr(value) -> str:
     return _escape(str(value), {'"': "&quot;"})
 
 
+#: Emitted when a caller supplies no ``source_files``. Kept only so callers
+#: that predate the field still produce a well-formed Header; every live path
+#: names the real model.
+PLACEHOLDER_MODEL_FILENAME = "BIMGUARD_AI_Model.ifc"
+
+
+def _header_xml(issue: "BCFIssue", project_attr: str) -> str:
+    """Render ``Markup/Header`` naming the model(s) the finding came from.
+
+    ``markup.xsd`` declares ``File`` with ``maxOccurs="unbounded"``, so a
+    cross-model finding names both models rather than picking one. The
+    sequence inside ``File`` is ``Filename, Date, Reference``; ``Date`` is an
+    ``xs:dateTime`` and is emitted only when the caller supplied one, since an
+    invented upload time is a fabricated value.
+    """
+    files = [f for f in (issue.source_files or []) if (f or {}).get("filename")]
+    if not files:
+        files = [{"filename": PLACEHOLDER_MODEL_FILENAME}]
+
+    blocks = []
+    for entry in files:
+        date = str(entry.get("date") or "").strip()
+        date_xml = f"\n      <Date>{_xml_text(date)}</Date>" if date else ""
+        blocks.append(
+            f"    <File{project_attr}>\n"
+            f"      <Filename>{_xml_text(entry['filename'])}</Filename>"
+            f"{date_xml}\n"
+            f"    </File>"
+        )
+    joined = "\n".join(blocks)
+    return f"  <Header>\n{joined}\n  </Header>"
+
+
+def _document_references_xml(issue: "BCFIssue", topic_guid: str) -> str:
+    """Render ``Topic/DocumentReference`` for each standard the finding cites.
+
+    ``markup.xsd`` places ``DocumentReference`` after ``Description`` and
+    ``BimSnippet`` and before ``RelatedTopic``; the sequence inside it is
+    ``ReferencedDocument, Description``.
+
+    ``ReferencedDocument`` is a URL and is emitted only when the caller has a
+    real one. The repository holds no URL or DOI for any of the standards in
+    ``app.constants.NOTEBOOK_STANDARDS``, so today every reference carries the
+    ``Description`` alone: naming the standard and clause truthfully, rather
+    than pointing at an invented link. ``isExternal`` follows suit — false
+    when nothing external is referenced.
+
+    Guids are derived from the topic and the description so a regenerated
+    archive reuses them instead of churning identifiers on every export.
+    """
+    blocks = []
+    for entry in issue.document_references or []:
+        description = str((entry or {}).get("description") or "").strip()
+        if not description:
+            continue
+        url = str(entry.get("referenced_document") or "").strip()
+        ref_guid = str(uuid.uuid5(_TOPIC_GUID_NAMESPACE, f"{topic_guid}:{description}")).upper()
+        inner = f"      <ReferencedDocument>{_xml_text(url)}</ReferencedDocument>\n" if url else ""
+        blocks.append(
+            f'    <DocumentReference Guid="{_xml_attr(ref_guid)}" '
+            f'isExternal="{"true" if url else "false"}">\n'
+            f"{inner}"
+            f"      <Description>{_xml_text(description)}</Description>\n"
+            f"    </DocumentReference>"
+        )
+    return ("\n".join(blocks) + "\n") if blocks else ""
+
+
 def _markup_xml(
     issue: BCFIssue, index: int, viewpoint_guid: str, topic_guid: str | None = None
 ) -> str:
@@ -207,25 +335,47 @@ def _markup_xml(
         f' IfcProject="{_xml_attr(issue.project_code)}"' if is_ifc_guid(issue.project_code) else ""
     )
 
+    header_xml = _header_xml(issue, project_attr)
+    doc_refs_xml = _document_references_xml(issue, topic_guid)
+
+    # RelatedTopic closes the Topic sequence in markup.xsd, after
+    # DocumentReference. Self-links are dropped so a topic never points at
+    # itself.
+    related_xml = "".join(
+        f'    <RelatedTopic Guid="{_xml_attr(guid)}"/>\n'
+        for guid in dict.fromkeys(issue.related_topic_guids or [])
+        if guid and guid != topic_guid
+    )
+
+    # markup.xsd sequences Topic as ... Description, BimSnippet,
+    # DocumentReference, RelatedTopic -- so the snippet precedes the references.
+    # ReferenceSchema is a required element but no schema is published for this
+    # payload, so it is emitted empty rather than pointing at a URL that does
+    # not exist.
+    snippet_xml = (
+        f'    <BimSnippet SnippetType="{_xml_attr(SNIPPET_TYPE)}" isExternal="false">\n'
+        f"      <Reference>{_xml_text(SNIPPET_FILENAME)}</Reference>\n"
+        f"      <ReferenceSchema></ReferenceSchema>\n"
+        f"    </BimSnippet>\n"
+        if issue.snippet_json
+        else ""
+    )
+
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Header>
-    <File{project_attr}>
-      <Filename>BIMGUARD_AI_Model.ifc</Filename>
-    </File>
-  </Header>
-  <Topic Guid="{topic_guid}" TopicType="Issue" TopicStatus="{_xml_attr(issue.status)}">
+{header_xml}
+  <Topic Guid="{topic_guid}" TopicType="{_xml_attr(issue.topic_type or 'Issue')}" TopicStatus="{_xml_attr(issue.status)}">
     <ReferenceLink></ReferenceLink>
     <Title>{_xml_text(issue.title)}</Title>
     <Priority>{_xml_text(issue.priority)}</Priority>
     <Index>{index}</Index>
 {labels_xml}
     <CreationDate>{_utc_now()}</CreationDate>
-    <CreationAuthor>BIMGUARD AI — GC-001/CC-001 v1.0.0</CreationAuthor>
+    <CreationAuthor>{_xml_text(issue.creation_author or DEFAULT_CREATION_AUTHOR)}</CreationAuthor>
     <ModifiedDate>{_utc_now()}</ModifiedDate>
 {due_date_xml}    <AssignedTo>{_xml_text(issue.assigned_to)}</AssignedTo>
     <Description>{_xml_text(issue.description)}</Description>
-  </Topic>
+{snippet_xml}{doc_refs_xml}{related_xml}  </Topic>
   <Comment Guid="{_xml_attr(comment_guid)}">
     <Date>{_utc_now()}</Date>
     <Author>BIMGUARD AI</Author>
@@ -237,6 +387,30 @@ def _markup_xml(
     <Index>0</Index>
   </Viewpoints>
 </Markup>"""
+
+
+#: The dataclass camera defaults. A BCFIssue still carrying all six means the
+#: caller supplied no position, so there is no viewpoint to write.
+_DEFAULT_CAMERA = (0.0, 0.0, 5.0, 0.0, 0.0, 0.0)
+
+
+def _has_real_camera(issue: "BCFIssue") -> bool:
+    """Report whether the caller supplied real camera coordinates.
+
+    ``phase_6e_export`` supplies none, because no finding records the
+    element's position or bounding box — the corrosion engines take a position
+    as input but never write it onto the Issue, and the seismic path records
+    its bounding boxes only inside the clash detector. Until one of those
+    surfaces the geometry, a camera here would be invented.
+    """
+    return (
+        issue.camera_x,
+        issue.camera_y,
+        issue.camera_z,
+        issue.target_x,
+        issue.target_y,
+        issue.target_z,
+    ) != _DEFAULT_CAMERA
 
 
 def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
@@ -260,20 +434,32 @@ def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
         f"      </Component>"
         for guid in guids
     )
-    coloring_xml = "\n".join(f"        <Component{_ifc_guid_attr(guid)}/>" for guid in guids)
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<VisualizationInfo Guid="{_xml_attr(viewpoint_guid)}">
-  <Components>
-    <Selection>
-{selection_xml}
-    </Selection>
-    <Visibility DefaultVisibility="true"/>
-    <Coloring>
-      <Color Color="{_risk_colour(issue.risk_band)}">
-{coloring_xml}
-      </Color>
-    </Coloring>
-  </Components>
+    # The subject is coloured by its band; the partners implicated in the
+    # finding -- the other side of a clash, the other half of a couple -- take
+    # a second colour, so a viewer shows which element is being assessed and
+    # which it is being assessed against.
+    primary, partners = guids[:1], guids[1:]
+    colour_blocks = [
+        f'      <Color Color="{_risk_colour(issue.risk_band)}">\n'
+        + "\n".join(f"        <Component{_ifc_guid_attr(g)}/>" for g in primary)
+        + "\n      </Color>"
+    ]
+    if partners:
+        colour_blocks.append(
+            f'      <Color Color="{PARTNER_COLOUR}">\n'
+            + "\n".join(f"        <Component{_ifc_guid_attr(g)}/>" for g in partners)
+            + "\n      </Color>"
+        )
+    coloring_xml = "\n".join(colour_blocks)
+
+    # PerspectiveCamera is optional in visinfo.xsd and is written only when the
+    # caller supplied real coordinates. Left at the dataclass defaults it
+    # produced the identical camera -- viewpoint (5, -8, 8) aimed at
+    # (-5, 8, -8) -- on every topic in every archive, a position unrelated to
+    # the element that would send a coordinator to the same spot 4,321 times.
+    # Omitting it lets a viewer frame the selected components itself.
+    camera_xml = (
+        f"""
   <PerspectiveCamera>
     <CameraViewPoint>
       <X>{issue.camera_x + 5.0}</X>
@@ -291,17 +477,53 @@ def _viewpoint_xml(issue: BCFIssue, viewpoint_guid: str) -> str:
       <Z>1</Z>
     </CameraUpVector>
     <FieldOfView>60</FieldOfView>
-  </PerspectiveCamera>
+  </PerspectiveCamera>"""
+        if _has_real_camera(issue)
+        else ""
+    )
+
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<VisualizationInfo Guid="{_xml_attr(viewpoint_guid)}">
+  <Components>
+    <ViewSetupHints SpacesVisible="false"/>
+    <Selection>
+{selection_xml}
+    </Selection>
+    <Visibility DefaultVisibility="true"/>
+    <Coloring>
+{coloring_xml}
+    </Coloring>
+  </Components>{camera_xml}
 </VisualizationInfo>"""
 
 
+#: Band -> ARGB colour for the viewpoint's Coloring block.
+_BAND_COLOURS: dict[str, str] = {
+    "LOW": "FF107C10",
+    "MEDIUM": "FFFF8C00",
+    "HIGH": "FFC05000",
+    "CRITICAL": "FFC00000",
+}
+
+#: Used for a band this table does not know.
+UNKNOWN_BAND_COLOUR = "FF888888"
+
+#: Colour for the partner elements a finding implicates -- the other side of
+#: a clash, the other half of a galvanic couple. Distinct from every band
+#: colour so the subject and its counterpart are told apart at a glance.
+PARTNER_COLOUR = "FF0070C0"
+
+
 def _risk_colour(band: str) -> str:
-    return {
-        "LOW": "FF107C10",
-        "MEDIUM": "FFFF8C00",
-        "HIGH": "FFC05000",
-        "CRITICAL": "FFC00000",
-    }.get(band, "FF888888")
+    """Return the ARGB colour for ``band``, case-insensitively.
+
+    The case fold is the fix for a silent defect: this table is keyed in upper
+    case while ``Issue.band.value`` — what the exporter passes — is lower case
+    ("medium"), so every lookup missed and every topic in every archive was
+    coloured the grey fallback. Measured before the fix: 4,321 of 4,321 topics
+    across the 1917 and 1542 demo archives were FF888888.
+    """
+    return _BAND_COLOURS.get(str(band or "").strip().upper(), UNKNOWN_BAND_COLOUR)
 
 
 def _priority_int(priority: str) -> str:
@@ -321,6 +543,62 @@ def _placeholder_png() -> bytes:
         "HgAHggJ/PchI6QAAAABJRU5ErkJggg=="
     )
     return base64.b64decode(b64)
+
+
+def _extensions_xsd(issues: list["BCFIssue"]) -> str:
+    """Build the ``extensions.xsd`` ``project.bcfp`` has always declared.
+
+    ``project.bcfp`` names ``<ExtensionSchema>extensions.xsd</ExtensionSchema>``
+    and the file was never written, so every archive referenced a schema it did
+    not contain.
+
+    BCF 2.1 leaves ``TopicType``, ``TopicStatus``, ``Priority``, ``TopicLabel``,
+    ``SnippetType`` and ``Stage`` as unrestricted strings in ``markup.xsd`` and
+    expects the project's own extension schema to enumerate them. This
+    enumerates exactly the values this archive actually emits — computed from
+    the issues, not a fixed list — so the schema cannot drift from the content.
+
+    ``Stage`` is emitted with no enumerated values: BIMGUARD publishes none,
+    because no project record carries a stage.
+    """
+
+    def enumeration(name: str, values) -> str:
+        body = "\n".join(
+            f'      <xs:enumeration value="{_xml_attr(v)}"/>' for v in values
+        )
+        inner = f"\n{body}\n    " if body else ""
+        return (
+            f'  <xs:simpleType name="{name}">\n'
+            f'    <xs:restriction base="xs:string">{inner}</xs:restriction>\n'
+            f"  </xs:simpleType>"
+        )
+
+    topic_types = sorted({i.topic_type or "Issue" for i in issues}) or list(TOPIC_TYPES)
+    statuses = sorted({i.status for i in issues if i.status}) or list(TOPIC_STATUSES)
+    priorities = sorted(
+        {i.priority for i in issues if i.priority},
+        key=lambda p: TOPIC_PRIORITIES.index(p) if p in TOPIC_PRIORITIES else 99,
+    ) or list(TOPIC_PRIORITIES)
+    labels = sorted({str(label) for i in issues for label in (i.labels or []) if label})
+    snippet_types = sorted({SNIPPET_TYPE for i in issues if i.snippet_json})
+
+    blocks = "\n".join(
+        [
+            enumeration("TopicType", topic_types),
+            enumeration("TopicStatus", statuses),
+            enumeration("Priority", priorities),
+            enumeration("TopicLabel", labels),
+            enumeration("SnippetType", snippet_types),
+            enumeration("Stage", ()),
+        ]
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"'
+        ' elementFormDefault="qualified">\n'
+        f"{blocks}\n"
+        "</xs:schema>"
+    )
 
 
 def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf") -> bytes:
@@ -359,6 +637,10 @@ def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf
 </ProjectExtension>""",
         )
 
+        # The schema project.bcfp has always declared. Written from the values
+        # this archive actually emits, so it cannot drift from the content.
+        zf.writestr("extensions.xsd", _extensions_xsd(issues))
+
         # One folder per issue. The folder name is the topic GUID (BCF 2.1
         # convention), which is derived from issue.guid when that is not
         # already a UUID so that the folder and Topic/@Guid always agree.
@@ -372,6 +654,8 @@ def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf
             )
             zf.writestr(folder + "viewpoint.bcfv", _viewpoint_xml(issue, viewpoint_guid))
             zf.writestr(folder + "snapshot.png", _placeholder_png())
+            if issue.snippet_json:
+                zf.writestr(folder + SNIPPET_FILENAME, issue.snippet_json)
 
     return buf.getvalue()
 

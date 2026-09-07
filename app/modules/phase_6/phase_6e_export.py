@@ -28,14 +28,27 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
 
+from app.constants import NOTEBOOK_STANDARDS
 from app.logging_config import get_logger
 from app.modules.comparator.issue_schema import Issue, RiskBand
-from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
+from app.modules.reporter.bcf_generator import (
+    DEFAULT_CREATION_AUTHOR,
+    BCFIssue,
+    bcf_topic_guid,
+    generate_bcf,
+)
 
 logger = get_logger(__name__)
+
+#: Engine ids as they appear at the head of a ``rule_id``: two letters, a dash
+#: and three digits (``GC-001``, ``SB-001``). Anchored so a malformed rule id
+#: yields no engine rather than a fragment.
+_ENGINE_CODE_RE = re.compile(r"^[A-Z]{2}-\d{3}$")
 
 #: Mechanism string marking a non-verdict Issue. Must match Sessions C and D.
 DATA_QUALITY = "data_quality"
@@ -222,11 +235,447 @@ def _encode(obj: Any) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def _bcf_issue(issue: Issue) -> BCFIssue:
+def _engine_code(issue: Issue) -> str:
+    """Return the engine id that raised ``issue``, e.g. ``"GC-001"``.
+
+    Read from ``rule_id`` rather than ``metadata["mechanism_code"]`` because
+    only ``rule_id`` is populated on every finding: XM-001's 510 verdicts and
+    the MM-001/XM-001 data-quality notes carry no ``mechanism_code``, while
+    every finding — verdict or note, corrosion or seismic — has a ``rule_id``
+    of the form ``"<ENGINE>.<rule>"``.
+
+    Returns an empty string if ``rule_id`` is missing or unshaped, so callers
+    fall back to a generic author rather than inventing an engine.
+    """
+    head = str(issue.rule_id or "").split(".", 1)[0].strip()
+    return head if _ENGINE_CODE_RE.match(head) else ""
+
+
+def _creation_author(issue: Issue) -> str:
+    """Return ``Topic/CreationAuthor`` for ``issue``.
+
+    ``"BIMGUARD AI <ENGINE> <revision>"`` where the finding records a ruleset
+    version, ``"BIMGUARD AI <ENGINE>"`` where it does not. XM-001 and SB-001
+    carry no ``ruleset_version``, so they take the shorter form: naming a
+    revision they never recorded would be a fabricated value.
+
+    The stored ``ruleset_version`` is a full label such as
+    ``"BIMGUARD-MC-001 v1.0.0"``, which already contains the engine id. Only
+    the revision token is appended, so the author reads
+    ``"BIMGUARD AI MC-001 v1.0.0"`` rather than repeating the engine twice.
+    """
+    engine = _engine_code(issue)
+    if not engine:
+        return DEFAULT_CREATION_AUTHOR
+    version = str(issue.metadata.get("ruleset_version", "") or "").strip()
+    if not version:
+        return f"{DEFAULT_CREATION_AUTHOR} {engine}"
+    revision = version.rsplit(" ", 1)[-1] if version.startswith(f"BIMGUARD-{engine}") else version
+    return f"{DEFAULT_CREATION_AUTHOR} {engine} {revision}"
+
+
+#: Engines whose findings are geometric interferences rather than compliance
+#: verdicts. SB-001 reports one element intruding into another's clearance
+#: halo, which is a clash in every coordination tool's vocabulary.
+_CLASH_ENGINES: frozenset[str] = frozenset({"SB-001"})
+
+
+def _topic_type(issue: Issue) -> str:
+    """Return the BCF ``TopicType`` for ``issue``.
+
+    Three kinds of thing reach the archive and they are not interchangeable:
+
+    * ``Warning`` — a data-quality note. Something could not be assessed; it is
+      a modelling gap for the BIM coordinator, not a defect in the building.
+    * ``Clash`` — a geometric interference (SB-001).
+    * ``Issue`` — a compliance verdict against a scored element.
+
+    Emitting ``Issue`` for all three, as this did before, made 2,937 seismic
+    clashes and every data-quality note indistinguishable from a verdict in
+    any tool that filters on topic type.
+    """
+    if _is_data_quality(issue):
+        return "Warning"
+    if _engine_code(issue) in _CLASH_ENGINES:
+        return "Clash"
+    return "Issue"
+
+
+#: Engine id -> the domain segment of a topic title. Corrosion engines all
+#: assess pipework; SB-001 assesses seismic bracing.
+_ENGINE_DOMAIN: dict[str, str] = {
+    "GC-001": "PIP",
+    "CC-001": "PIP",
+    "MC-001": "PIP",
+    "MM-001": "PIP",
+    "XM-001": "PIP",
+    "SB-001": "SEI",
+}
+
+#: Title segment used where a finding records no floor. An explicit marker of
+#: absence, not a guess at a level: every SB-001 finding on project 1542 has an
+#: empty floor, and inventing "L00" for them would place 2,937 clashes on a
+#: storey nothing measured.
+_NO_FLOOR = "NA"
+
+_LEVEL_RE = re.compile(r"(?:level|floor|storey|story)\s*(-?\d+)", re.IGNORECASE)
+
+
+def _floor_code(floor: str) -> str:
+    """Abbreviate a floor name to a title segment: ``"Level 03 Roof"`` -> ``"L03"``.
+
+    Falls back to the first alphanumeric run, upper-cased and truncated, for a
+    floor that names no level number ("Roof", "Basement"), and to
+    :data:`_NO_FLOOR` when there is no floor at all.
+    """
+    text = (floor or "").strip()
+    if not text:
+        return _NO_FLOOR
+    match = _LEVEL_RE.search(text)
+    if match:
+        number = int(match.group(1))
+        return f"L{number:02d}" if number >= 0 else f"LB{abs(number):02d}"
+    word = re.sub(r"[^A-Za-z0-9]", "", text)[:4].upper()
+    return word or _NO_FLOOR
+
+
+def _title(issue: Issue, sequence: int) -> str:
+    """Return the title in the ``{DOMAIN}-{ENGINE}-{FLOOR}-{seq}`` convention.
+
+    A coordinator sorting a BCF by title gets topics grouped by domain, then
+    engine, then storey, with a stable per-archive sequence — where before the
+    titles began with free prose and sorted into no useful order.
+
+    The seismic title also names both elements. It previously read "Seismic
+    bracing clearance clash on 19FnYm9E": one element, and its GUID truncated
+    to eight characters, so the topic did not say what clashed with what.
+
+    Falls back to the engine's own title unchanged when the finding carries no
+    recognisable engine, rather than emitting a malformed prefix.
+    """
+    engine = _engine_code(issue)
+    if not engine:
+        return issue.title
+    domain = _ENGINE_DOMAIN.get(engine, "GEN")
+    short_engine = engine.split("-", 1)[0]
+    floor = _floor_code(str((issue.metadata or {}).get("floor", "") or ""))
+    prefix = f"{domain}-{short_engine}-{floor}-{sequence:04d}"
+
+    partner = str((issue.metadata or {}).get("clashing_element_id", "") or "")
+    if partner:
+        return f"{prefix} Bracing clearance clash {issue.element_id} vs {partner}"
+    return f"{prefix} {issue.title}"
+
+
+#: Metadata keys naming another element the finding implicates: the other side
+#: of a seismic clash, and both poles of an XM-001 couple. Selected and
+#: coloured in the viewpoint alongside the subject.
+_PARTNER_KEYS: tuple[str, ...] = (
+    "clashing_element_id",
+    "anode_id",
+    "cathode_id",
+)
+
+
+def _partner_guids(issue: Issue) -> list[str]:
+    """Return the other elements this finding implicates, subject excluded.
+
+    Every SB-001 finding names the element it clashed with, and every XM-001
+    finding names both poles of the couple. Neither reached the viewpoint
+    before, so all 4,321 topics selected exactly one element and a coordinator
+    opening a clash saw only one side of it.
+    """
+    meta = issue.metadata or {}
+    guids: list[str] = []
+    for key in _PARTNER_KEYS:
+        value = str(meta.get(key, "") or "").strip()
+        if value and value != issue.element_id and value not in guids:
+            guids.append(value)
+    return guids
+
+
+def _related_topic_index(issues: list[Issue]) -> dict[str, list[str]]:
+    """Map each element id to the topic GUIDs of every finding about it.
+
+    Used to cross-link topics that concern the same element, so a coordinator
+    opening the GC-001 topic for an element can reach the CC-001 and MC-001
+    topics for the same element, and a clash can reach the other topics about
+    either element involved.
+
+    NOT a reciprocal-pair index, because no reciprocal pairs exist. Measured
+    on this corpus: of 2,937 SB-001 clashes on project 1542, 0 have a
+    reciprocal clash recorded from the other element's side, and of 510 XM-001
+    couples on 1917, 0 have a mirrored (cathode, anode) partner. Each clash and
+    each couple is recorded exactly once, from one side, so linking "the
+    reciprocal topic" would mean inventing one.
+    """
+    index: dict[str, list[str]] = {}
+    for issue in issues:
+        guid = bcf_topic_guid(issue.id)
+        for element in [issue.element_id, *_partner_guids(issue)]:
+            if element:
+                index.setdefault(element, []).append(guid)
+    return index
+
+
+#: Ceiling on RelatedTopic links per topic. Measured maxima are 9 topics on one
+#: element for 1917 and 14 for 1542, so this does not bite today; it stops a
+#: pathological model turning one topic into thousands of links.
+_MAX_RELATED_TOPICS = 24
+
+
+def _related_topic_guids(issue: Issue, index: dict[str, list[str]]) -> list[str]:
+    """Return topic GUIDs related to ``issue``, self excluded."""
+    own = bcf_topic_guid(issue.id)
+    related: list[str] = []
+    for element in [issue.element_id, *_partner_guids(issue)]:
+        for guid in index.get(element, ()):
+            if guid != own and guid not in related:
+                related.append(guid)
+                if len(related) >= _MAX_RELATED_TOPICS:
+                    return related
+    return related
+
+
+def _fmt(value: Any) -> str:
+    """Render a metadata value for the description, thousands-separated."""
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, float):
+        return f"{value:,.4f}".rstrip("0").rstrip(".") if abs(value) < 1000 else f"{value:,.1f}"
+    if isinstance(value, int):
+        return f"{value:,}"
+    return str(value)
+
+
+def _line(label: str, value: Any, unit: str = "") -> str | None:
+    """Return ``"  Label: value unit"``, or ``None`` when there is no value.
+
+    Returning ``None`` for an absent value is the whole point: a description
+    that prints ``Material: `` for an element with no material asserts an empty
+    material, where saying nothing asserts nothing.
+    """
+    if value is None or value == "":
+        return None
+    rendered = _fmt(value)
+    return f"  {label}: {rendered}{unit}"
+
+
+#: Description sections, in render order, as
+#: ``(heading, [(label, metadata key, unit), ...])``. Only keys the finding
+#: actually carries are rendered, so an engine that records none of a
+#: section's keys drops the whole section rather than printing empty labels.
+_DESCRIPTION_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str], ...]], ...] = (
+    (
+        "INPUTS",
+        (
+            ("Material", "material", ""),
+            ("Material (anode)", "anode_material", ""),
+            ("Material (cathode)", "cathode_material", ""),
+            ("Material source", "material_source", ""),
+            ("Material confidence", "material_confidence", ""),
+            ("Medium", "medium", ""),
+            ("Environment class", "environment_class", ""),
+            ("Environment source", "environment_source", ""),
+            ("Environment confidence", "environment_confidence", ""),
+            ("Environment severity", "environment_severity", ""),
+            ("Operating temperature", "operating_temperature_c", " °C"),
+            ("Galvanic couple basis", "galvanic_couple", ""),
+            ("Voltage gap", "voltage_gap_v", " V"),
+            ("Separation", "separation", ""),
+            ("Nominal diameter (assumed)", "assumed_nominal_diameter_m", " m"),
+        ),
+    ),
+    (
+        "CLASH GEOMETRY",
+        (
+            ("Halo element", "halo_id", ""),
+            ("Clashing element", "clashing_element_id", ""),
+            ("Clashing element class", "clashing_element_class", ""),
+            ("Overlap volume", "overlap_volume_mm3", " mm³"),
+            ("Required clearance", "clearance_mm", " mm"),
+            ("Brace type", "brace_type", ""),
+            ("Rule variant", "rule_variant", ""),
+            ("Jurisdiction", "jurisdiction", ""),
+            ("Source model", "source_model", ""),
+            ("Clashing source model", "clashing_source_model", ""),
+        ),
+    ),
+)
+
+
+def _description(issue: Issue) -> str:
+    """Render a structured, self-contained ``Topic/Description``.
+
+    A coordinator opening a topic in Revit or Solibri sees only this text. It
+    previously read, in full, "MC-001 assessed this element as medium." —
+    which names no element, no input, no threshold and no standard, so the
+    topic could not be acted on without going back to the web UI.
+
+    Every line is drawn from what the finding actually recorded. Absent values
+    produce no line and an entirely absent section produces no heading, so the
+    description never asserts a value the engine did not measure.
+
+    Sections, in order: the engine's own sentence, ELEMENT, INPUTS, CLASH
+    GEOMETRY (seismic only), ASSESSMENT, STANDARDS, MITIGATION.
+    """
+    meta = issue.metadata or {}
+    blocks: list[str] = []
+
+    headline = (issue.description or "").strip()
+    if headline:
+        blocks.append(headline)
+
+    element = [
+        _line("Type", meta.get("ifc_type")),
+        _line("GUID", issue.element_id),
+        _line("System", meta.get("system")),
+        _line("Floor", meta.get("floor")),
+    ]
+    element = [line for line in element if line]
+    if element:
+        blocks.append("ELEMENT\n" + "\n".join(element))
+
+    for heading, fields in _DESCRIPTION_SECTIONS:
+        lines = [_line(label, meta.get(key), unit) for label, key, unit in fields]
+        lines = [line for line in lines if line]
+        if lines:
+            blocks.append(f"{heading}\n" + "\n".join(lines))
+
+    assessment = [
+        _line("Band", issue.band.value),
+        _line("Score", round(float(issue.score or 0.0), 4)),
+        _line("Ruleset", meta.get("ruleset_version")),
+        _line("Check", meta.get("check")),
+    ]
+    assessment = [line for line in assessment if line]
+    if assessment:
+        blocks.append("ASSESSMENT\n" + "\n".join(assessment))
+
+    citations = [
+        f"  {c.get('standard', '')} — {c.get('clause', '')}: {c.get('reason', '')}".rstrip(": ")
+        for c in (issue.citations or [])
+        if isinstance(c, dict) and c.get("standard")
+    ]
+    if citations:
+        blocks.append("STANDARDS\n" + "\n".join(citations))
+
+    if (issue.mitigation or "").strip():
+        blocks.append("MITIGATION\n  " + issue.mitigation.strip())
+
+    return "\n\n".join(blocks)
+
+
+@lru_cache(maxsize=1)
+def _canonical_standard_names() -> dict[str, str]:
+    """Map a lower-cased standard name to its canonical form from constants.
+
+    Citations spell a standard as the engine happened to write it — ``"EN ISO
+    15329"`` — while ``app.constants.NOTEBOOK_STANDARDS`` holds the normative
+    form, ``"EN ISO 15329:2007"``. Preferring the catalogue's spelling means a
+    document reference names the standard as the thesis cites it.
+
+    Keyed on both the full name and its pre-colon stem so an undated citation
+    still resolves. Built once; the catalogue is a module constant.
+    """
+    mapping: dict[str, str] = {}
+    for entry in NOTEBOOK_STANDARDS:
+        name = str((entry or {}).get("name") or "").strip()
+        if not name:
+            continue
+        mapping.setdefault(name.casefold(), name)
+        mapping.setdefault(name.split(":", 1)[0].strip().casefold(), name)
+    return mapping
+
+
+def _document_references(issue: Issue) -> list[dict]:
+    """Return one document reference per distinct standard ``issue`` cites.
+
+    ``Description`` is ``"<standard> — <clause>"``, the clause being the one
+    the engine actually applied, so the reference says which part of the
+    standard produced the finding rather than just naming the document.
+
+    ``referenced_document`` is left empty. It is a URL, and the repository
+    holds no URL or DOI for any of these standards -- ``NOTEBOOK_STANDARDS``
+    carries name, domain and description only. Emitting a plausible-looking
+    link would be a fabricated citation, so the field is omitted and the gap
+    recorded.
+    """
+    canonical = _canonical_standard_names()
+    references: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for citation in issue.citations or []:
+        if not isinstance(citation, dict):
+            continue
+        standard = str(citation.get("standard") or "").strip()
+        if not standard:
+            continue
+        clause = str(citation.get("clause") or "").strip()
+        key = (standard.casefold(), clause.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        name = canonical.get(standard.casefold(), standard)
+        references.append(
+            {
+                "description": f"{name} — {clause}" if clause else name,
+                "referenced_document": "",
+            }
+        )
+    return references
+
+
+def _source_files(issue: Issue, model_dates: dict[str, str], fallback: list[dict]) -> list[dict]:
+    """Return the ``Header/File`` entries naming the model(s) behind ``issue``.
+
+    Seismic findings record which model each side of the clash came from, in
+    ``metadata["source_model"]`` and ``metadata["clashing_source_model"]``, so
+    a cross-model clash names both files — on project 1542 that is 886 of
+    2,937 findings. Corrosion findings carry no per-finding model, so they take
+    the project's attached model(s) as supplied by the caller.
+
+    Args:
+        issue: The finding being exported.
+        model_dates: ``{filename: upload timestamp}`` for the project, used to
+            date a per-finding model. A filename absent from the map is still
+            named, just without a date.
+        fallback: Entries to use when the finding names no model of its own.
+
+    Returns:
+        Entries in ``[{"filename": ..., "date": ...}]`` shape, the finding's
+        own model first, de-duplicated and order-preserving.
+    """
+    names: list[str] = []
+    for key in ("source_model", "clashing_source_model"):
+        value = str(issue.metadata.get(key, "") or "").strip()
+        if value and value not in names:
+            names.append(value)
+    if not names:
+        return list(fallback)
+    return [
+        {"filename": name, "date": model_dates.get(name, "")}
+        for name in names
+    ]
+
+
+def _bcf_issue(
+    issue: Issue,
+    model_dates: dict[str, str] | None = None,
+    fallback_files: list[dict] | None = None,
+    sequence: int = 0,
+    related_index: dict[str, list[str]] | None = None,
+) -> BCFIssue:
     """Map one :class:`Issue` onto the existing :class:`BCFIssue`.
 
     A data-quality entry is labelled and titled so a coordinator opening the
     archive sees a data fix, not a remediation instruction.
+
+    Args:
+        model_dates: ``{filename: upload timestamp}`` for the project.
+        fallback_files: ``Header/File`` entries for findings that name no model
+            of their own — every corrosion finding.
+        sequence: This finding's position in the export, for the title's
+            ``{seq:04d}`` segment. Stable because ``sort_issues`` is.
     """
     data_quality = _is_data_quality(issue)
     labels = [issue.mechanism, issue.band.value]
@@ -234,16 +683,28 @@ def _bcf_issue(issue: Issue) -> BCFIssue:
         labels.append("data-quality")
         check = issue.metadata.get("check", "")
         if check:
-            labels.append(check)
+            labels.append(f"check:{check}")
+
+    engine = _engine_code(issue)
+    if engine:
+        labels.append(engine)
+    ruleset_version = str(issue.metadata.get("ruleset_version", "") or "").strip()
+    if ruleset_version:
+        labels.append(f"ruleset:{ruleset_version}")
 
     return BCFIssue(
         guid=issue.id,
-        title=issue.title,
-        description=issue.description or issue.mitigation or issue.title,
+        title=_title(issue, sequence),
+        description=_description(issue) or issue.title,
         priority=BAND_TO_BCF_PRIORITY[issue.band],
         status="Open",
         assigned_to=issue.assignee_role,
-        due_date=datetime.now(timezone.utc).date().isoformat(),
+        # No due date. Nothing in a project, a rule or a finding carries one,
+        # and this previously emitted the export date -- so every topic in
+        # every archive claimed to be due the day it was downloaded, which is
+        # a fabricated commitment a coordinator could plan against.
+        # ``_markup_xml`` omits the element entirely when this is empty.
+        due_date="",
         labels=labels,
         component_guid=issue.element_id,
         component_name=str(issue.metadata.get("ifc_type", "") or issue.element_id),
@@ -253,6 +714,13 @@ def _bcf_issue(issue: Issue) -> BCFIssue:
         mechanism=issue.mechanism,
         risk_score=issue.score,
         mitigation=issue.mitigation,
+        creation_author=_creation_author(issue),
+        topic_type=_topic_type(issue),
+        source_files=_source_files(issue, model_dates or {}, fallback_files or []),
+        document_references=_document_references(issue),
+        snippet_json=json.dumps(_issue_dict(issue), indent=2, default=_encode),
+        related_component_guids=_partner_guids(issue),
+        related_topic_guids=_related_topic_guids(issue, related_index or {}),
     )
 
 
@@ -268,15 +736,37 @@ def to_bcf(result: dict, *, include_data_quality: bool = True) -> bytes:
 
     Returns:
         The archive as bytes, ready to write or offer as a download.
+
+    ``result["source_files"]`` — ``[{"filename": ..., "date": ...}, ...]`` for
+    the project's attached models — names the model in each topic's
+    ``Header``. It is optional: a caller that omits it gets the placeholder
+    filename rather than an error, which keeps the harness scripts and the
+    cached results computed before this field existed working.
     """
     issues = sort_issues(result.get("audit_issues", []))
     if not include_data_quality:
         issues = [i for i in issues if not _is_data_quality(i)]
 
+    source_files = [
+        entry for entry in (result.get("source_files") or []) if (entry or {}).get("filename")
+    ]
+    model_dates = {
+        str(entry["filename"]): str(entry.get("date") or "") for entry in source_files
+    }
+
     logger.info(
-        "BCF export issues=%d data_quality_included=%s", len(issues), include_data_quality
+        "BCF export issues=%d data_quality_included=%s models=%d",
+        len(issues),
+        include_data_quality,
+        len(source_files),
     )
-    return generate_bcf([_bcf_issue(i) for i in issues])
+    related_index = _related_topic_index(issues)
+    return generate_bcf(
+        [
+            _bcf_issue(i, model_dates, source_files, sequence, related_index)
+            for sequence, i in enumerate(issues, start=1)
+        ]
+    )
 
 
 def to_ids(result: dict) -> str:
