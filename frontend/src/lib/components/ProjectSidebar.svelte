@@ -71,7 +71,7 @@
     {
       title: "Compliance",
       items: [
-        { id: "arch", label: "Compliance Audit", icon: LayoutList, highlight: true },
+        { id: "arch", label: "Run Compliance Audit", icon: LayoutList, highlight: true },
         { id: "reports", label: "Reports & Exports", icon: FileText },
       ],
     },
