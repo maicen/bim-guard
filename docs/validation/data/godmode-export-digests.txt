@@ -12,3 +12,8 @@ BCF topic counts: 1917-corrosion.bcf=1384  1542-seismic.bcf=2937
 XSD validation: 2/2 archives valid, 4321 topics, 0 violations
 Demo IFC: data/test_hospital_mep_demo.ifc bytes=717766 sha256=302dcad174e8b94d7196527365d95aae1596861f90457473ca7d74e451f30b54
 1540 model: bytes=23762808 sha256=bb53f0eb8f7295e91e0fb6ec6b79a30022a2e0e248714aab6bb1a8930c4793dd
+
+## Part C final archives (not committed, >1 MB)
+1917-corrosion.bcf  bytes=4653834  sha256=ce461194f21c7f9c329552267abf3b9855281835c9a9bd31a4b409ae65e2ae32
+1542-seismic.bcf  bytes=9795553  sha256=484342a7233d48a91b39946ccb6579864d0c6dae27dd97119d770b68fe27eb33
+Topic counts after Part C: 1917=1384  1542=2937   XSD violations=0

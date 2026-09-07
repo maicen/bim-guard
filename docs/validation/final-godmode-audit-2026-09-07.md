@@ -1141,3 +1141,283 @@ clashing element is `19FnYm9EH0DhpCzeZN3XNH` and which model each element came
 from, yet the `Header` names a file that does not exist, the viewpoint selects
 only one of the two elements, and the auto-comment calls a seismic clash a
 "corrosion compliance engine" result with an empty service type and floor.
+
+---
+---
+
+# Part C — BCF 2.1 conformance implementation
+
+Branch `audit/godmode-2026-09-07`, **not merged, not on main**. Each numbered
+step is its own commit with tests, so a partial run is still mergeable.
+
+Constraints honoured throughout: export and reporter layer only; no engine,
+ruleset, threshold or scoring change; no fabricated values; XSD-valid after
+every step; existing tests keep passing.
+
+## C1. Steps completed
+
+After every step: regenerate 1917 (Medium and above) and 1542, then
+`uv run python scripts/validate_bcf_corpus.py --roots <both archives>`.
+
+| # | Step | Commit | 1917 topics | 1542 topics | Violations |
+| --- | --- | --- | ---: | ---: | ---: |
+| — | baseline at `99cdffc` | — | 1,384 | 2,937 | **0** |
+| 1 | per-engine `CreationAuthor` + ruleset label | `1a21ab1` | 1,384 | 2,937 | **0** |
+| 2 | `TopicType` by finding class | `b56aa65` | 1,384 | 2,937 | **0** |
+| 3 | remove fabricated `DueDate` | `1418282` | 1,384 | 2,937 | **0** |
+| 4 | real `Header/File` filenames + dates | `b9735db` | 1,384 | 2,937 | **0** |
+| 5 | structured `Description` | `1f7cada` | 1,384 | 2,937 | **0** |
+| 6 | `DocumentReference` per standard | `58fc4b4` | 1,384 | 2,937 | **0** |
+| 7 | `BimSnippet` finding.json + `extensions.xsd` | `ae4a556` | 1,384 | 2,937 | **0** |
+| 8 | title convention | `ab3f0bb` | 1,384 | 2,937 | **0** |
+| 9 | band colouring, camera, `ViewSetupHints` | `d1dc1bd` | 1,384 | 2,937 | **0** |
+| 10 | partner components + `RelatedTopics` | `7b0a84b` | 1,384 | 2,937 | **0** |
+
+Topic counts are unchanged at every step, which is the point: this is an
+export-layer change and it must not alter what is found. The band split behind
+those counts is unchanged too, and step 9's colouring proves it independently —
+the viewpoint colours reproduce 1917's 10/168/1,206 and 1542's 783/314/1,840
+exactly.
+
+**Regression suite:** `uv run pytest -n 4 -q` → **1801 passed, 0 failed, 15
+skipped, 4 xfailed** in 354.01 s. Baseline at `99cdffc` was 1,721 passed with
+8 failed; the 8 were the missing-`frontend/dist` SPA tests (F11) and pass once
+the SPA is built. The 80 additional passes are the tests added by these steps.
+
+**Lint:** `ruff` reports the same 6 errors in `bcf_generator.py` before and
+after — all pre-existing docstring-style findings (D205/D400/D401) present at
+`99cdffc`. `phase_6e_export.py` and `analyze.py` report 0. No new lint errors
+were introduced. Note that `uv run ruff check .` across the repository reports
+395 errors at `99cdffc` and is not a clean gate today.
+
+## C2. Steps not reached, and why
+
+| # | Step | Why not | What it needs |
+| --- | --- | --- | --- |
+| 4b | `Header/File/@IfcProject` | The IfcProject GlobalId is never surfaced by the parser onto the analysis result, and reading the IFC to get it is outside the export layer. The existing guard at `bcf_generator.py:206-208` correctly refuses to write an ISO 19650 project code into an `IfcGuid`-typed attribute, and 1917's `project_code` is `""`. | `parse_ifc_bytes` to record `by_type("IfcProject")[0].GlobalId` on the result; then one line in the mapper. ~3 h. |
+| 9b | Camera from the element's real bbox | **No finding records a position or a bounding box.** The corrosion engines take `position_x/y/z` as *input* (`phase_6c_corrosion_ui.py:248-250`) but never write it onto the `Issue`; the seismic path holds `bbox_mm` only inside the clash detector (`phase_6d_seismic.py:317-332`). Verified against the exports: 1542's finding metadata has 11 keys and none is a position or bbox. Rather than keep the constant camera, step 9 removed it — see C3. | The engines to record the centroid or bbox on the finding. ~4 h once present. |
+| 11 | Status-change Comments from `bcf_sync_service` | **There is no durable audit trail to render.** `BCFSyncService` stores topics, comments and viewpoints in three plain dicts on the instance (`bcf_sync_service.py:41-44`) despite its "In-memory & persistent store" docstring. Nothing survives a restart and nothing reaches the exporter. | Persisting the sync service — a schema change, outside the export-layer-only constraint. |
+| 12 | `ClippingPlanes` | Blocked by the same absence as 9b: a ±2 m section box needs a centroid, and no bbox reaches the export layer. The brief scopes this as "only if bbox exists". | As 9b. ~3 h after it. |
+| — | Real `Snapshot` | Needs headless rendering; every topic still carries the 1×1 PNG placeholder. Named in Part B as out of the export layer. | Out of scope. |
+
+## C3. Fields deliberately omitted rather than fabricated
+
+Every one of these is a field the target asks for, where no real source exists.
+Listing them is the point — an omission recorded is honest, an invented value
+is not.
+
+| Field | Omitted because |
+| --- | --- |
+| `DueDate` | No project, rule or finding carries a due date. It previously emitted the export date, so all 4,321 topics claimed to be due the day they were downloaded. |
+| `Stage` | `projects` has 31 columns and none is a stage. `extensions.xsd` declares `Stage` with **no enumerated values**, stating the absence rather than filling it. |
+| `DocumentReference/ReferencedDocument` | `app/constants.py` holds **no URL or DOI** for any standard — `NOTEBOOK_STANDARDS` carries name, domain and description only. `isExternal` is `false` to match. |
+| `BimSnippet/ReferenceSchema` | Required by the schema, so it is emitted, but empty: no schema is published for the `finding.json` payload. |
+| `PerspectiveCamera` | See 9b. A camera at a constant position on every topic is a fabricated viewpoint; the element is still selected and coloured, so a viewer frames it itself. |
+| `ModifiedDate` / `ModifiedAuthor` | Still emitted as today (`ModifiedDate` = creation time). **Not fixed** — gating it on a real edit needs the durable edit record that step 11 is blocked on. Recorded here as a known remaining fabrication. |
+| `ReferenceLink` | Still empty. The piping route accepts `?project_id=` (verified live in §11) but **no `finding` parameter exists** — `AnalyzeView` reads only `project_id` off the querystring — so a per-finding deep link cannot be built without a frontend change. |
+| Reciprocal `RelatedTopics` | Measured: 0 of 2,937 SB-001 clashes have a reciprocal clash from the other side, and 0 of 510 XM-001 couples have a mirrored pair. Topics are linked by shared element instead, which is a relation the data holds. |
+
+## C4. Two defects found while building the matrix, both fixed
+
+- **B-DEF-1 — every topic in every archive was coloured grey.** `_risk_colour`
+  keyed on `"MEDIUM"` while the exporter passed `"medium"`, so every lookup
+  missed and returned the `FF888888` fallback. Measured before: **4,321 of
+  4,321 topics grey.** After: the colours reproduce the real band
+  distributions exactly (1917 Critical 10 / High 168 / Medium 1,206; 1542
+  783 / 314 / 1,840). Fixed in `d1dc1bd`.
+- **B-DEF-2 — `extensions.xsd` was declared but never written.**
+  `project.bcfp` has always named `<ExtensionSchema>extensions.xsd</ExtensionSchema>`
+  while `generate_bcf` wrote only `bcf.version` and `project.bcfp` at the root,
+  so every archive referenced a schema it did not contain. Fixed in `ae4a556`,
+  and built from the values the archive actually emits so it cannot drift.
+
+## C5. One topic, after — 1917
+
+Same topic as B5: folder `006A2816-44CF-545F-B3FD-D516EE2A4F3D`, finding
+`MC-0391`. (Its citations differ from the B5 dump because that finding's
+`Index` position is stable but the earlier dump was taken from a different
+export ordering; the topic GUID and element are the same.)
+
+```xml
+<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Header>
+    <File>
+      <Filename>test_hospital_mep_demo.ifc</Filename>
+      <Date>2026-09-06T08:06:16+00:00</Date>
+    </File>
+  </Header>
+  <Topic Guid="006A2816-44CF-545F-B3FD-D516EE2A4F3D" TopicType="Issue" TopicStatus="Open">
+    <ReferenceLink></ReferenceLink>
+    <Title>PIP-MC-L00-0744 Microbiologically influenced corrosion risk on LTHW-065 LTHW Plant Room DN108</Title>
+    <Priority>Normal</Priority>
+    <Index>743</Index>
+    <Labels>MC-001 microbiologically influenced corrosion</Labels>
+    <Labels>medium</Labels>
+    <Labels>MC-001</Labels>
+    <Labels>ruleset:BIMGUARD-MC-001 v1.0.0</Labels>
+    <CreationDate>2026-09-06T23:50:48.600027Z</CreationDate>
+    <CreationAuthor>BIMGUARD AI MC-001 v1.0.0</CreationAuthor>
+    <ModifiedDate>2026-09-06T23:50:48.600027Z</ModifiedDate>
+    <AssignedTo>Mechanical engineer</AssignedTo>
+    <Description>MC-001 assessed this element as medium.
+
+ELEMENT
+  Type: IfcValve
+  GUID: 1tcMzQAf1O$QGXNveYm5Cf
+  System: LTHW Heating
+  Floor: Level 00 Basement
+
+INPUTS
+  Material source: ifc_metadata
+  Material confidence: high
+  Environment source: inferred from spatial names
+  Environment confidence: medium
+  Nominal diameter (assumed): 0.1 m
+
+ASSESSMENT
+  Band: medium
+  Score: 0.297
+  Ruleset: BIMGUARD-MC-001 v1.0.0
+
+STANDARDS
+  ASTM G-187 — MIC assessment standard practice: flow class FV5_TURBULENT
+  EN ISO 9308-1 — Microbiological water quality: temperature class T4_SAFE_HOT
+  BIMGUARD-MC-001 v1.0.0 — Composite scoring: dead-leg class DL0_THROUGH
+
+MITIGATION
+  MIT-MIC-009</Description>
+    <BimSnippet SnippetType="JSON" isExternal="false">
+      <Reference>finding.json</Reference>
+      <ReferenceSchema></ReferenceSchema>
+    </BimSnippet>
+    <DocumentReference Guid="32FBC718-4FEB-52C4-BD4B-1D1122E8D26C" isExternal="false">
+      <Description>ASTM G-187 — MIC assessment standard practice</Description>
+    </DocumentReference>
+    <DocumentReference Guid="C33A87DC-00D2-52FA-8048-7986E3CD7665" isExternal="false">
+      <Description>EN ISO 9308-1 — Microbiological water quality</Description>
+    </DocumentReference>
+    <DocumentReference Guid="7039C277-D847-5367-9E59-9AFAF049A288" isExternal="false">
+      <Description>BIMGUARD-MC-001 v1.0.0 — Composite scoring</Description>
+    </DocumentReference>
+    <RelatedTopic Guid="750F594C-B030-5BA3-8E86-30B6783AFB3C"/>
+    <RelatedTopic Guid="26C7F3FC-5257-5085-B1D6-2649295238CE"/>
+    <RelatedTopic Guid="E9DB44AB-6CD2-5915-9BC6-3263273C713C"/>
+    <RelatedTopic Guid="317EFFB5-5F3D-5A5E-85EF-E9A09202AE81"/>
+    <RelatedTopic Guid="05684872-544C-5BF7-8533-55D89696BB79"/>
+  </Topic>
+  ...
+</Markup>
+```
+
+```xml
+<VisualizationInfo Guid="E26C33D1-CAF5-4511-8DB9-70189BA1E25D">
+  <Components>
+    <ViewSetupHints SpacesVisible="false"/>
+    <Selection>
+      <Component IfcGuid="1tcMzQAf1O$QGXNveYm5Cf">
+        <OriginatingSystem>BIMGUARD AI</OriginatingSystem>
+        <AuthoringToolId>1tcMzQAf1O$QGXNveYm5Cf</AuthoringToolId>
+      </Component>
+    </Selection>
+    <Visibility DefaultVisibility="true"/>
+    <Coloring>
+      <Color Color="FFFF8C00">
+        <Component IfcGuid="1tcMzQAf1O$QGXNveYm5Cf"/>
+      </Color>
+    </Coloring>
+  </Components>
+</VisualizationInfo>
+```
+
+Against B5: the Header names the real model and its upload date instead of
+`BIMGUARD_AI_Model.ifc`; the title sorts; the author names MC-001 instead of
+GC-001/CC-001; the fabricated `DueDate` is gone; the Description carries the
+element, its input provenance, the score, the ruleset and three clauses
+instead of one sentence; the machine-readable finding travels with the topic;
+three standards are structured references; five sibling topics are linked; and
+the colour is Medium orange rather than the grey every topic used to be.
+
+## C6. One topic, after — 1542
+
+Same topic as B6: folder `000240C7-2F50-5242-A8DE-E09A93C9AFD5`, finding
+`SB-0337`.
+
+```xml
+<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Header>
+    <File>
+      <Filename>west_riverside_hospital_plumb_ifc4.ifc</Filename>
+      <Date>2026-09-05T20:03:55+00:00</Date>
+    </File>
+  </Header>
+  <Topic Guid="000240C7-2F50-5242-A8DE-E09A93C9AFD5" TopicType="Clash" TopicStatus="Open">
+    <ReferenceLink></ReferenceLink>
+    <Title>SEI-SB-NA-0936 Bracing clearance clash 19FnYm9EH0DhpCzeZN3XNC vs 19FnYm9EH0DhpCzeZN3XNH</Title>
+    <Priority>Major</Priority>
+    <Index>935</Index>
+    <Labels>SB-001 seismic bracing</Labels>
+    <Labels>high</Labels>
+    <Labels>SB-001</Labels>
+    <CreationDate>2026-09-06T23:53:56.916549Z</CreationDate>
+    <CreationAuthor>BIMGUARD AI SB-001</CreationAuthor>
+    <ModifiedDate>2026-09-06T23:53:56.916549Z</ModifiedDate>
+    <AssignedTo>Mechanical engineer</AssignedTo>
+    <Description>IfcPipeFitting (19FnYm9EH0DhpCzeZN3XNH) intrudes into the seismic
+bracing clearance halo of IfcPipeSegment (19FnYm9EH0DhpCzeZN3XNC) by
+4,624,067 mm^3 (6.4% of the halo volume).
+
+ELEMENT
+  GUID: 19FnYm9EH0DhpCzeZN3XNC
+
+CLASH GEOMETRY
+  Halo element: ...
+  Clashing element: 19FnYm9EH0DhpCzeZN3XNH
+  Clashing element class: IfcPipeFitting
+  Overlap volume: 4,624,067.0 mm³
+  Required clearance: 200 mm
+  Brace type: angle_iron
+  Rule variant: angle_fire
+  Jurisdiction: EN 1998-1:2020 + DIN 4149:2022
+  Source model: west_riverside_hospital_plumb_ifc4.ifc
+
+ASSESSMENT
+  Band: high
+  Score: 0.7
+
+STANDARDS
+  EN 1998-1 — EN 1998-1:2020 + DIN 4149:2022 bracing clearance: 200.0mm ...
+  DIN 4149 — EN 1998-1:2020 + DIN 4149:2022 bracing clearance: 200.0mm ...
+
+MITIGATION
+  Relocate 19FnYm9E or re-route the braced service to restore 200.0mm clearance.</Description>
+    <BimSnippet SnippetType="JSON" isExternal="false">
+      <Reference>finding.json</Reference>
+      <ReferenceSchema></ReferenceSchema>
+    </BimSnippet>
+    <DocumentReference Guid="8471A423-266C-5668-9E6D-6F929B53EE19" isExternal="false">
+      <Description>EN 1998-1 — EN 1998-1:2020 + DIN 4149:2022 bracing clearance</Description>
+    </DocumentReference>
+    ...
+    <RelatedTopic .../>
+  </Topic>
+  ...
+</Markup>
+```
+
+This is an **intra-model** clash, so its Header names one file; the 886
+cross-model topics name both, verified in step 4. `TopicType` is now `Clash`,
+the title names both elements in full rather than a truncated eight-character
+GUID, and the author names SB-001 rather than the corrosion engines.
+
+## C7. Archive size
+
+Richer topics cost bytes. Both remain well inside anything a coordination tool
+handles, and both export from a warm cache in under a second.
+
+| Archive | Before (`99cdffc`) | After | Topics |
+| --- | ---: | ---: | ---: |
+| 1917 corrosion, Medium+ | 2.60 MB | 4.65 MB | 1,384 |
+| 1542 seismic | 5.51 MB | 9.80 MB | 2,937 |
+
+Neither is committed — both exceed the 1 MB limit. Digests and topic counts
+are recorded in `docs/validation/data/godmode-export-digests.txt`.
