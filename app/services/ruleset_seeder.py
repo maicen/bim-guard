@@ -7,8 +7,12 @@ The seeding operations are idempotent: each routine checks whether its
 import json
 from pathlib import Path
 
+from app.logging_config import get_logger
+from app.services.corrosion_rule_catalog import band_lower_bound
 from app.services.rules_service import RuleService
 from app.services.static_data_service import StaticDataService
+
+logger = get_logger(__name__)
 
 _RULESET_DIR = Path(__file__).resolve().parents[2] / "data" / "rulesets"
 
@@ -116,12 +120,12 @@ def _existing_references(svc: RuleService, ruleset_id: str) -> set[str]:
     Insertion is one network round trip per row, so a seeding run that is
     interrupted part-way leaves the ruleset present but incomplete. Callers use
     this to resume: skip the references already written, insert the rest.
+
+    Reads the table rather than the cached ``list_by_ruleset`` -- see
+    :meth:`RuleService.references_for_ruleset` for why a cached answer let a
+    duplicate set of band rows through on 2026-09-06.
     """
-    return {
-        str(row.get("reference") or "").strip()
-        for row in svc.list_by_ruleset(ruleset_id)
-        if str(row.get("reference") or "").strip()
-    }
+    return svc.references_for_ruleset(ruleset_id)
 
 
 def _rule_key(reference: str, target: str, prop: str) -> tuple[str, str, str]:
@@ -154,7 +158,7 @@ def _seed_json_ruleset(svc: RuleService, filename: str) -> int:
             str(row.get("target_ifc_class") or ""),
             str(row.get("property_name") or ""),
         )
-        for row in svc.list_by_ruleset(ruleset_id)
+        for row in svc.rows_for_ruleset(ruleset_id)
     }
 
     pending = []
@@ -283,10 +287,7 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
             "severity": "recommended",
         })
 
-    existing_refs = {
-        str(r.get("reference") or "")
-        for r in svc.list_rules()
-    }
+    existing_refs = svc.all_references()
 
     for item in rules_to_seed:
         if item["reference"] not in existing_refs:
@@ -327,16 +328,20 @@ def _seed_risk_bands(
             # table and, carrying no mechanism, were being swept up by
             # RuleService.list_code_rules() as if they were building-code rules.
             continue
-        existing.add(f"{prefix}.BAND.{band_name.upper()}")
-        range_text = str((band_data or {}).get("range") or "")
-        threshold = None
-        if "-" in range_text:
-            threshold = range_text.split("-", 1)[0].strip().strip("<>")
-        elif ">" in range_text:
-            threshold = range_text.replace(">", "").strip()
+        reference = f"{prefix}.BAND.{band_name.upper()}"
+        existing.add(reference)
+        # A float, never the string it was parsed out of. check_value is stored
+        # JSON-encoded, so a string threshold lands in the column as the seven
+        # characters "0.85" -- quotes included -- which every reader of the row
+        # then failed to coerce (audit F1).
+        try:
+            threshold = band_lower_bound(str((band_data or {}).get("range") or ""))
+        except ValueError as exc:
+            logger.error("Not seeding %s: %s", reference, exc)
+            continue
         _create(
             svc,
-            reference=f"{prefix}.BAND.{band_name.upper()}",
+            reference=reference,
             rule_type="risk_band",
             rule_category="threshold_band",
             description=band_data.get("bcf_action", band_name),
@@ -784,7 +789,7 @@ def seed_seismic_rules(svc: RuleService) -> int:
     ]
 
     count = 0
-    existing_refs = {str(r.get("reference") or "") for r in svc.list_rules()}
+    existing_refs = svc.all_references()
     for item in rules_to_seed:
         if item["reference"] not in existing_refs:
             _create(svc, **item)

@@ -835,6 +835,64 @@ class RuleService:
             return []
         return list(self._rules.rows_where("ruleset_id = ?", [normalized]))
 
+    def references_for_ruleset(self, ruleset_id: str) -> set[str]:
+        """Return the references currently stored for a ruleset, read uncached.
+
+        WHY THIS DOES NOT CALL list_by_ruleset
+
+            :meth:`list_by_ruleset` is wrapped in a 24-hour TTL cache that is
+            per process and invalidated only by writes made through this
+            process. Rows written by anyone else -- another uvicorn worker
+            (``run_production_server`` runs several, and every worker runs the
+            startup seeder), another instance, a migration, the SQL editor --
+            do not invalidate it, so a caller that asks "does this row already
+            exist?" through the cache can be told "no" for up to a day after it
+            started existing.
+
+            That is what the ruleset seeder asks, and answering it from a
+            cached snapshot is how a second copy of every GC-001, CC-001 and
+            MC-001 band row reached the table on 2026-09-06, after the
+            existence guard was in place and after migration
+            ``20260903100400_dedupe_seeded_rules`` had removed the earlier
+            duplicates (audit F1). An idempotency check has to read the table.
+
+        Args:
+            ruleset_id: The ruleset to read, whitespace-normalized.
+
+        Returns:
+            The stripped, non-empty ``reference`` values stored for it.
+        """
+        return {
+            str(row.get("reference") or "").strip()
+            for row in self.rows_for_ruleset(ruleset_id)
+            if str(row.get("reference") or "").strip()
+        }
+
+    def rows_for_ruleset(self, ruleset_id: str) -> list[dict]:
+        """Return a ruleset's rows read straight from the table, uncached.
+
+        The read behind :meth:`references_for_ruleset`, for callers that need
+        more of the row than its reference. Same reason for bypassing
+        :meth:`list_by_ruleset`: an idempotency check has to see writes this
+        process did not make.
+        """
+        normalized = self.normalize_ruleset_id(ruleset_id)
+        if not normalized:
+            return []
+        return list(self._rules.rows_where("ruleset_id = ?", [normalized]))
+
+    def all_references(self) -> set[str]:
+        """Return every reference in the rules table, read uncached.
+
+        The table-wide counterpart of :meth:`references_for_ruleset`, for the
+        seeders whose rows span more than one ruleset.
+        """
+        return {
+            str(row.get("reference") or "").strip()
+            for row in self._rules.rows
+            if str(row.get("reference") or "").strip()
+        }
+
     @cache_db_query(key_prefix="bimguard:rules:folders")
     def list_folders(self, category: str | None = None) -> list[dict]:
         """Return folder rows with current rule counts, ordered by ruleset_id."""

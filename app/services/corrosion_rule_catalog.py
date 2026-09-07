@@ -22,7 +22,9 @@ PRECEDENCE, HIGHEST FIRST
 
 from __future__ import annotations
 
+import importlib
 import json
+import re
 from typing import Any
 
 from app.logging_config import get_logger
@@ -30,6 +32,95 @@ from app.services.rules_service import RuleService
 from app.services.static_data_service import StaticDataService
 
 logger = get_logger(__name__)
+
+
+class RulesetIncompleteError(RuntimeError):
+    """A ruleset reached the engines without every band boundary it needs.
+
+    Raised by the catalog loaders, which are the lookup layer, so that a
+    missing boundary is a loud failure here rather than a silent substitution
+    of a literal inside an engine.
+    """
+
+
+#: Characters a stored band range may use between its two bounds. The MC-001
+#: payload writes an en dash (U+2013) where GC-001 and CC-001 write an ASCII
+#: hyphen (U+002D); an em dash (U+2014) is the third form a transcribed
+#: standard plausibly arrives in. Every parser in this repository previously
+#: split on U+002D alone, so MC-001's Medium and High lower bounds read as
+#: absent and the MIC engine substituted its own literals for them -- the
+#: database was not authoritative for those two numbers (audit F1).
+_RANGE_SEPARATOR = re.compile(r"\s*[-–—]\s*")
+
+
+def parse_band_range(range_text: str) -> tuple[float | None, float | None]:
+    """Return the ``(lower, upper)`` bounds of a risk-band range string.
+
+    The one place in the repository that reads a band range. Accepts the three
+    forms the stored rulesets use, in any of the three dash characters listed
+    on :data:`_RANGE_SEPARATOR`:
+
+        ``"0.25 - 0.50"`` / ``"0.25 – 0.50"``  ->  ``(0.25, 0.50)``
+        ``"> 0.75"``                            ->  ``(0.75, None)``
+        ``"< 0.25"``                            ->  ``(None, 0.25)``
+
+    Args:
+        range_text: The ``range`` string from a ``risk_bands`` entry.
+
+    Returns:
+        The lower and upper bounds. Exactly one is ``None`` for an open-ended
+        range; both are numbers for a closed one.
+
+    Raises:
+        ValueError: If the string names no number the caller can use. A
+            malformed range must not read as an absent one: that is the
+            distinction this whole function exists to keep, so it never
+            returns ``None`` for text it failed to parse.
+    """
+    text = str(range_text or "").strip()
+    if not text:
+        raise ValueError("Band range is empty")
+
+    parts = [part for part in _RANGE_SEPARATOR.split(text) if part.strip()]
+    if len(parts) >= 2:
+        lower = _parse_bound(parts[0], text)
+        upper = _parse_bound(parts[1], text)
+        return lower, upper
+
+    stripped = text.lstrip("<>=≤≥").strip()
+    value = _parse_bound(stripped, text)
+    if text.startswith("<") or text.startswith("≤"):
+        return None, value
+    return value, None
+
+
+def band_lower_bound(range_text: str) -> float:
+    """Return the lower bound of a band range, which every band must name.
+
+    Args:
+        range_text: The ``range`` string from a ``risk_bands`` entry.
+
+    Returns:
+        The lower bound as a float.
+
+    Raises:
+        ValueError: If the range is malformed, or is upper-bounded only
+            (``"< 0.25"``) and so has no lower bound to return.
+    """
+    lower, _ = parse_band_range(range_text)
+    if lower is None:
+        raise ValueError(f"Band range {range_text!r} states no lower bound")
+    return lower
+
+
+def _parse_bound(text: str, whole: str) -> float:
+    """Return one side of a range as a float, or raise naming the whole range."""
+    cleaned = str(text).strip().strip("<>=≤≥").strip()
+    try:
+        return float(cleaned)
+    except (TypeError, ValueError):
+        raise ValueError(f"Band range {whole!r} is not numeric") from None
+
 
 _FALLBACK_RULESETS: dict[str, dict[str, Any]] = {
     "galvanic_corrosion_ruleset.json": {
@@ -94,14 +185,77 @@ _FALLBACK_RULESETS: dict[str, dict[str, Any]] = {
 }
 
 
-def _coerce_float(value: Any, default: float | None = None) -> float | None:
-    """Return ``value`` as ``float`` when possible, otherwise ``default``."""
+#: Sentinel for "json.loads gave something that is not a number", kept distinct
+#: from a decoded ``null``, which means the row simply has no value.
+_UNDECODABLE = object()
+
+
+def _coerce_float(
+    value: Any, default: float | None = None, *, reference: str = ""
+) -> float | None:
+    """Return ``value`` as ``float`` when possible, otherwise ``default``.
+
+    ``rules.check_value`` is stored JSON-encoded (``RuleService._build_rule_row``
+    calls ``json.dumps`` on it), so a threshold written as a string arrives as
+    the seven characters ``"0.85"`` -- quotes included -- which ``float()``
+    rejects. Every GC-001, CC-001 and MC-001 band row in the database is stored
+    that way, so before this decode step the seeded rows contributed nothing at
+    all and the thresholds came from the JSON payload fallback instead (audit
+    F1). One JSON decode recovers the number without loosening what counts as a
+    number: ``'"abc"'`` still returns ``default``.
+
+    Args:
+        value: The raw column value.
+        default: Returned when no number can be recovered.
+        reference: The rule reference, named in the log line so an
+            unusable value can be traced to the row that holds it.
+
+    Returns:
+        The value as a float, or ``default``.
+    """
     if value is None:
         return default
     try:
         return float(value)
     except (TypeError, ValueError):
-        return default
+        pass
+
+    if isinstance(value, (str, bytes, bytearray)):
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            decoded = _UNDECODABLE
+        else:
+            # A stored JSON null is an absent value, not a corrupt one: it is
+            # reported by the loader's completeness check, not here.
+            if decoded is None:
+                return default
+            if isinstance(decoded, bool):
+                decoded = _UNDECODABLE
+            elif isinstance(decoded, (int, float)):
+                return float(decoded)
+            elif isinstance(decoded, str):
+                try:
+                    return float(decoded.strip())
+                except (TypeError, ValueError):
+                    decoded = _UNDECODABLE
+            else:
+                decoded = _UNDECODABLE
+        if decoded is _UNDECODABLE:
+            logger.warning(
+                "Rule %s holds a check_value that is not a number: %r",
+                reference or "(unidentified)",
+                value,
+            )
+            return default
+
+    logger.warning(
+        "Rule %s holds a check_value that is not a number: %r",
+        reference or "(unidentified)",
+        value,
+    )
+    return default
+
 
 
 def _decode_json(value: Any) -> dict[str, Any]:
@@ -200,27 +354,88 @@ def _risk_band_thresholds(
         band = str(params.get("band") or row.get("keyword") or "").strip().lower()
         if band not in {"medium", "high", "critical"}:
             continue
-        value = _coerce_float(row.get("check_value"))
+        value = _coerce_float(
+            row.get("check_value"), reference=str(row.get("reference") or "")
+        )
         if value is not None:
             thresholds[band] = value
 
-    if thresholds:
-        return thresholds
-
+    # Per band, not all-or-nothing. This previously returned as soon as the
+    # rows produced anything at all, so one unreadable row took its siblings
+    # down with it and the JSON payload was never consulted for them
+    # (audit F1, second note on _risk_band_thresholds).
     risk_bands = json_data.get("risk_bands") or {}
     for band_name, band_data in risk_bands.items():
         band_key = str(band_name).strip().lower()
-        if band_key not in {"medium", "high", "critical"}:
+        if band_key not in _REQUIRED_BANDS or band_key in thresholds:
             continue
         range_text = str((band_data or {}).get("range") or "")
-        if "-" in range_text:
-            lower = range_text.split("-", 1)[0].strip().strip("<>")
-        else:
-            lower = range_text.replace(">", "").replace("<", "").strip()
-        value = _coerce_float(lower)
-        if value is not None:
-            thresholds[band_key] = value
+        try:
+            thresholds[band_key] = band_lower_bound(range_text)
+        except ValueError as exc:
+            logger.warning(
+                "Ruleset %s band %s has no usable range: %s",
+                json_data.get("ruleset_id") or "(unnamed)",
+                band_name,
+                exc,
+            )
+            continue
+        logger.warning(
+            "Ruleset %s band %s came from the stored JSON payload, not a rule row",
+            json_data.get("ruleset_id") or "(unnamed)",
+            band_name,
+        )
     return thresholds
+
+
+#: The three band boundaries every scoring engine needs. Low has no lower
+#: bound of its own -- it is everything below Medium.
+_REQUIRED_BANDS = ("medium", "high", "critical")
+
+
+def _require_complete_bands(engine: str, thresholds: dict[str, float]) -> dict[str, float]:
+    """Return ``thresholds``, or raise naming the engine and the missing bands.
+
+    The lookup layer's contract with the engines: a catalog either carries
+    every band boundary or it does not load. Without it a boundary the database
+    failed to supply is filled by a literal inside the engine
+    (``bimguard_mic_engine.classify_mic_risk``), which reads as a working
+    default while meaning the database is not authoritative for that number.
+
+    Args:
+        engine: Mechanism code, named in the error so the failure identifies
+            which catalog is incomplete.
+        thresholds: The band map built from rows and the JSON payload.
+
+    Returns:
+        The same mapping, once it is complete.
+
+    Raises:
+        RulesetIncompleteError: If any of medium, high or critical is absent.
+    """
+    missing = [band for band in _REQUIRED_BANDS if thresholds.get(band) is None]
+    if missing:
+        raise RulesetIncompleteError(
+            f"{engine} risk_band_thresholds is missing {', '.join(missing)}; "
+            "seed the band rows or repair the stored ruleset payload"
+        )
+    return thresholds
+
+
+def _synthesised_band_lower(range_text: str, reference: str) -> float | None:
+    """Return the lower bound for a synthesised band row, or ``None``.
+
+    ``None`` here means the band genuinely has no lower bound -- ``"< 0.35"``,
+    the Low band, which is everything under Medium and is never read as a
+    threshold. A range that could not be parsed at all is logged against its
+    reference rather than being folded into the same ``None``.
+    """
+    try:
+        lower, _ = parse_band_range(range_text)
+    except ValueError as exc:
+        logger.warning("Synthesised row %s: %s", reference, exc)
+        return None
+    return lower
 
 
 def _ordered_band_rows(rows: list[dict[str, Any]], rule_type: str) -> list[dict[str, Any]]:
@@ -350,16 +565,14 @@ def load_gc_catalog() -> dict[str, Any]:
                 }
             )
         for band_name, band_data in (json_data.get("risk_bands") or {}).items():
-            range_text = str((band_data or {}).get("range") or "")
-            lower_bound = None
-            if "-" in range_text:
-                lower_bound = _coerce_float(range_text.split("-", 1)[0].strip().strip("<>"))
-            elif ">" in range_text:
-                lower_bound = _coerce_float(range_text.replace(">", "").strip())
+            reference = f"GC-001.BAND.{band_name.upper()}"
+            lower_bound = _synthesised_band_lower(
+                str((band_data or {}).get("range") or ""), reference
+            )
             rows.append(
                 {
                     "rule_type": "risk_band",
-                    "reference": f"GC-001.BAND.{band_name.upper()}",
+                    "reference": reference,
                     "description": band_data.get("bcf_action", band_name),
                     "check_value": lower_bound,
                     "keyword": band_name,
@@ -469,7 +682,9 @@ def load_gc_catalog() -> dict[str, Any]:
         "area_ratio_bands": _build_area_ratio_bands(rows, json_data),
         "pren_thresholds": pren_thresholds,
         "pren_values": pren_values,
-        "risk_band_thresholds": _risk_band_thresholds(rows, json_data),
+        "risk_band_thresholds": _require_complete_bands(
+            "GC-001", _risk_band_thresholds(rows, json_data)
+        ),
         "mitigations": {
             row["reference"]: row.get("description", "")
             for row in rows
@@ -486,30 +701,32 @@ def load_gc_catalog() -> dict[str, Any]:
 
 
 def reload_all_catalogs() -> None:
-    """Reload all in-memory corrosion engine catalogs from the database."""
-    try:
-        from app.engines import bimguard_corrosion_engine
+    """Reload all in-memory corrosion engine catalogs from the database.
 
-        if hasattr(bimguard_corrosion_engine, "reload_rules"):
-            bimguard_corrosion_engine.reload_rules()
-    except Exception:
-        pass
-
-    try:
-        from app.engines import bimguard_crevice_engine
-
-        if hasattr(bimguard_crevice_engine, "reload_rules"):
-            bimguard_crevice_engine.reload_rules()
-    except Exception:
-        pass
-
-    try:
-        from app.engines import bimguard_mic_engine
-
-        if hasattr(bimguard_mic_engine, "reload_rules"):
-            bimguard_mic_engine.reload_rules()
-    except Exception:
-        pass
+    Called at the start of every analysis run so a rule edited in Supabase
+    takes effect without a restart. A reload that fails leaves the engine on
+    the tables it already holds, which is the safe behaviour -- but it is
+    logged at ERROR naming the engine, because an incomplete ruleset
+    (:class:`RulesetIncompleteError`) arrives here and a run scored from stale
+    or fallback tables must not be indistinguishable from a clean one.
+    """
+    for module_name in (
+        "bimguard_corrosion_engine",
+        "bimguard_crevice_engine",
+        "bimguard_mic_engine",
+    ):
+        try:
+            module = importlib.import_module(f"app.engines.{module_name}")
+            reload_rules = getattr(module, "reload_rules", None)
+            if callable(reload_rules):
+                reload_rules()
+        except Exception:
+            logger.error(
+                "Catalog reload failed for %s; it keeps the tables it already "
+                "holds and this run is not scored from the current database",
+                module_name,
+                exc_info=True,
+            )
 
 
 def load_cc_catalog() -> dict[str, Any]:
@@ -565,16 +782,14 @@ def load_cc_catalog() -> dict[str, Any]:
                 }
             )
         for band_name, band_data in (json_data.get("risk_bands") or {}).items():
-            range_text = str((band_data or {}).get("range") or "")
-            lower_bound = None
-            if "-" in range_text:
-                lower_bound = _coerce_float(range_text.split("-", 1)[0].strip().strip("<>"))
-            elif ">" in range_text:
-                lower_bound = _coerce_float(range_text.replace(">", "").strip())
+            reference = f"CC-001.BAND.{band_name.upper()}"
+            lower_bound = _synthesised_band_lower(
+                str((band_data or {}).get("range") or ""), reference
+            )
             rows.append(
                 {
                     "rule_type": "risk_band",
-                    "reference": f"CC-001.BAND.{band_name.upper()}",
+                    "reference": reference,
                     "description": band_data.get("bcf_action", band_name),
                     "check_value": lower_bound,
                     "keyword": band_name,
@@ -640,7 +855,7 @@ def load_cc_catalog() -> dict[str, Any]:
                     "chloride_mgl": params.get("chloride_mgl", ""),
                 }
 
-    band_thresholds = _risk_band_thresholds(rows, json_data)
+    band_thresholds = _require_complete_bands("CC-001", _risk_band_thresholds(rows, json_data))
     return {
         "ruleset_id": json_data["ruleset_id"],
         "ruleset_version": json_data.get("ruleset_version", "1.0.0"),
@@ -747,16 +962,14 @@ def load_mc_catalog() -> dict[str, Any]:
                 }
             )
         for band_name, band_data in (json_data.get("risk_bands") or {}).items():
-            range_text = str((band_data or {}).get("range") or "")
-            lower_bound = None
-            if "-" in range_text:
-                lower_bound = _coerce_float(range_text.split("-", 1)[0].strip().strip("<>"))
-            elif ">" in range_text:
-                lower_bound = _coerce_float(range_text.replace(">", "").strip())
+            reference = f"MC-001.BAND.{band_name.upper()}"
+            lower_bound = _synthesised_band_lower(
+                str((band_data or {}).get("range") or ""), reference
+            )
             rows.append(
                 {
                     "rule_type": "risk_band",
-                    "reference": f"MC-001.BAND.{band_name.upper()}",
+                    "reference": reference,
                     "description": band_data.get("bcf_action", band_name),
                     "check_value": lower_bound,
                     "keyword": band_name,
@@ -872,7 +1085,7 @@ def load_mc_catalog() -> dict[str, Any]:
     if "unknown" not in material_susceptibility:
         material_susceptibility["unknown"] = (0.5, "Unknown", "Unknown material")
 
-    band_thresholds = _risk_band_thresholds(rows, json_data)
+    band_thresholds = _require_complete_bands("MC-001", _risk_band_thresholds(rows, json_data))
     return {
         "ruleset_id": json_data["ruleset_id"],
         "ruleset_version": json_data.get("ruleset_version", "1.0.0"),
