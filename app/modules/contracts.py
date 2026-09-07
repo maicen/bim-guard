@@ -973,7 +973,7 @@ class DashboardStatsResponse(BaseModel):
     total_projects: int = Field(0, description="Total registered projects")
     total_documents: int = Field(0, description="Total processed documents")
     total_rules: int = Field(0, description="Total active compliance rules")
-    issues_found: int = Field(34, description="Count of identified non-compliances")
+    issues_found: int = Field(0, description="Count of identified non-compliances")
     db_ok: bool = Field(True, description="Database connection health status")
     db_backend: str = Field("SUPABASE", description="Primary database backend (SUPABASE)")
 

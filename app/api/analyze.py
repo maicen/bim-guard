@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Optional
 
 from fastapi import (
     APIRouter,
@@ -10,6 +10,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Response,
@@ -54,6 +55,7 @@ from app.services.membership_service import MembershipService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_tracker import snapshot
 from app.services.profile_service import ProfileService
+from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
@@ -1014,15 +1016,40 @@ def list_bcf_artifacts(
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> list[dict[str, Any]]:
     """List persisted BCF report artifacts ordered newest first.
 
-    A superadmin sees every artifact; everyone else only the ones whose
-    project they can access, matching how ``/projects`` itself is scoped.
+    With no organization_id, a superadmin sees every artifact and everyone
+    else sees only the ones whose project they can access across all their
+    orgs. When organization_id is given (via query or X-Organization-Id
+    header), results are further narrowed to that org's visible projects
+    using the same rules as GET /api/projects, so the Reports page and the
+    dashboard's "Issues Identified" count never disagree about which
+    projects' reports are in view for a given org.
     """
     from app.services.report_artifacts import ReportArtifactService
 
     artifacts = ReportArtifactService().list_bcf()
+
+    effective_org_id: Optional[int] = organization_id
+    if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        effective_org_id = int(x_org_id.strip())
+
+    if effective_org_id is not None:
+        visible_ids = {
+            row.get("id")
+            for row in visible_project_rows(
+                projects_service.list_projects(),
+                user_id=current_user.id,
+                organization_id=effective_org_id,
+                memberships=memberships,
+                profiles=profiles,
+            )
+        }
+        return [a for a in artifacts if a.get("project_id") in visible_ids]
+
     if profiles.is_superadmin(current_user.id):
         return artifacts
 

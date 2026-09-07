@@ -1150,8 +1150,10 @@ export const analyzeApi = {
     return handleResponse<any>(res);
   },
 
-  async listBcfArtifacts(): Promise<BcfArtifact[]> {
-    const res = await apiFetch(`${API_BASE}/analyze/bcf/list`);
+  async listBcfArtifacts(organizationId?: number | null): Promise<BcfArtifact[]> {
+    const effectiveOrg = organizationId !== undefined ? organizationId : getActiveOrgId();
+    const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+    const res = await apiFetch(`${API_BASE}/analyze/bcf/list${query}`);
     return handleResponse<BcfArtifact[]>(res);
   },
 

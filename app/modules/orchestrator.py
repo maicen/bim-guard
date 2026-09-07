@@ -19,20 +19,99 @@ class BIMGuard_App:
     full IFC + compliance analysis.
     """
 
-    def run_dashboard(self) -> dict:
-        """Return summary counts for the dashboard page."""
+    def run_dashboard(
+        self,
+        *,
+        organization_id: int | None = None,
+        user_id: str | None = None,
+        memberships=None,
+        profiles=None,
+        ruleset_access=None,
+        document_access=None,
+    ) -> dict:
+        """Return summary counts for the dashboard page.
+
+        With no org context (the keyword args left as None), every count is
+        the raw platform-wide total -- the historical behavior. Passing
+        organization_id along with the matching service(s) narrows each
+        count to what that org can actually see, using the same
+        relationships their own list endpoints use: project visibility
+        (ownership + grants, see project_visibility.visible_project_rows),
+        per-org document grants (DocumentAccessService), and per-org
+        ruleset grants (RulesetAccessService) -- `documents` and `rules`
+        have no organization_id column of their own, so grants are the real
+        (and only) per-org relationship available for them.
+        """
         from app.services.documents_service import DocumentService
         from app.services.projects_service import ProjectsService
+        from app.services.report_artifacts import ReportArtifactService
         from app.services.rules_service import RuleService
 
         projects_svc = ProjectsService()
         documents_svc = DocumentService()
         rules_svc = RuleService()
 
+        all_projects = projects_svc.list_projects()
+        all_documents = documents_svc.list_documents()
+        all_rules = rules_svc.list_rules()
+
+        if organization_id is not None and user_id is not None and memberships is not None and profiles is not None:
+            from app.services.project_visibility import visible_project_rows
+
+            visible_projects = visible_project_rows(
+                all_projects,
+                user_id=user_id,
+                organization_id=organization_id,
+                memberships=memberships,
+                profiles=profiles,
+            )
+        else:
+            visible_projects = all_projects
+        total_projects = len(visible_projects)
+
+        if organization_id is not None and document_access is not None:
+            allowed_doc_ids = set(document_access.list_org_grants(organization_id))
+            total_documents = sum(1 for row in all_documents if row.get("id") in allowed_doc_ids)
+        else:
+            total_documents = len(all_documents)
+
+        if organization_id is not None and ruleset_access is not None:
+            allowed_rulesets = set(ruleset_access.list_org_grants(organization_id))
+            total_rules = sum(
+                1 for row in all_rules if (row.get("ruleset_id") or "") in allowed_rulesets
+            )
+        else:
+            total_rules = len(all_rules)
+
+        # "Issues Identified": each visible project's most recent
+        # architectural-analysis run persists one report_artifacts row with
+        # a real issue_count (see ArchAnalysisService.run_analysis). Sum the
+        # latest per project. Projects never analyzed, and corrosion-engine
+        # findings (which don't persist a report artifact), aren't
+        # reflected -- this is real analysis history, not a live recount of
+        # every engine, but it responds to actual data and to the same org
+        # scope as everything else above, instead of being a constant.
+        issues_found = 0
+        try:
+            visible_project_ids = {row.get("id") for row in visible_projects}
+            latest_issue_count_by_project: dict[int, int] = {}
+            for artifact in ReportArtifactService().list_bcf():  # newest first
+                pid = artifact.get("project_id")
+                if pid not in latest_issue_count_by_project:
+                    latest_issue_count_by_project[pid] = int(artifact.get("issue_count") or 0)
+            issues_found = sum(
+                count
+                for pid, count in latest_issue_count_by_project.items()
+                if pid in visible_project_ids
+            )
+        except Exception:
+            logger.exception("Could not compute issues_found from report artifacts")
+
         summary = {
-            "total_projects": projects_svc.total_projects(),
-            "total_documents": len(documents_svc.list_documents()),
-            "total_rules": rules_svc.count(),
+            "total_projects": total_projects,
+            "total_documents": total_documents,
+            "total_rules": total_rules,
+            "issues_found": issues_found,
         }
         logger.debug("Dashboard summary loaded %s", summary)
         return summary

@@ -8,20 +8,20 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, Header, Query, Response
 
 from app.api.dependencies import (
+    get_document_access_service,
     get_membership_service,
     get_profile_service,
-    get_projects_service,
+    get_ruleset_access_service,
 )
-from app.api.projects import visible_project_rows
 from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import DashboardStatsResponse
+from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
 from app.services.persistence import PersistenceService
 from app.services.pipeline_services import PipelineOrchestratorService
 from app.services.profile_service import ProfileService
-from app.services.projects_service import ProjectsService
-from app.services.report_artifacts import ReportArtifactService
+from app.services.ruleset_access_service import RulesetAccessService
 
 logger = get_logger(__name__)
 
@@ -57,82 +57,54 @@ def _probe_db_health() -> bool:
 def get_dashboard_stats(
     response: Response,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
     organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
     x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> DashboardStatsResponse:
     """Return high-level counts for projects, documents, rules, and connectivity.
 
-    total_documents and total_rules are platform-wide: the `documents` and
-    `rules` tables carry no organization_id or project_id, so there is no
-    real per-org relationship to scope them by (adding one would need a
-    schema migration, not just a query change).
-
-    total_projects and issues_found ARE scoped to the caller's visible
-    projects -- and, when an organization_id is given (via query or
-    X-Organization-Id header), further narrowed to that org -- using the
-    same visibility rules as GET /api/projects, so none of these ever
-    disagree about which projects are in view.
+    The actual counting lives in BIMGuard_App.run_dashboard() (the same
+    orchestrator every analysis pipeline goes through) -- this route just
+    resolves the effective org and hands the request-scoped services down to
+    it, so there's one place that decides what "visible to this org" means
+    for projects (ownership + grants), documents (per-org document grants),
+    and rules (per-org ruleset grants), instead of that logic living
+    separately in each route that happens to need a count.
     """
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=15"
     db_ok = _probe_db_health()
     backend = PersistenceService.DB_BACKEND.upper()
 
-    stats = {
-        "total_projects": 0,
-        "total_documents": 0,
-        "total_rules": 0,
-    }
-    try:
-        stats = PipelineOrchestratorService.get_dashboard_stats()
-    except Exception as exc:
-        logger.warning("Could not fetch dashboard stats from orchestrator: %s", exc)
-
     effective_org_id: Optional[int] = organization_id
     if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
         effective_org_id = int(x_org_id.strip())
 
-    visible_rows = visible_project_rows(
-        service.list_projects(),
-        user_id=current_user.id,
-        organization_id=effective_org_id,
-        memberships=memberships,
-        profiles=profiles,
-    )
-    total_projects = len(visible_rows)
-
-    # "Issues Identified" is the sum of each visible project's most recent
-    # architectural-analysis run (BCF export persists one report_artifacts
-    # row with a real issue_count every time run_analysis() executes -- see
-    # ArchAnalysisService.run_analysis). Projects never analyzed, or issues
-    # from corrosion engines (which don't persist a report artifact),
-    # aren't reflected -- this is real analysis history, not a live
-    # recount of every engine, but it replaces what used to be a constant
-    # that never changed regardless of org, project, or analysis results.
-    issues_found = 0
+    stats = {
+        "total_projects": 0,
+        "total_documents": 0,
+        "total_rules": 0,
+        "issues_found": 0,
+    }
     try:
-        visible_project_ids = {row.get("id") for row in visible_rows}
-        latest_issue_count_by_project: dict[int, int] = {}
-        for artifact in ReportArtifactService().list_bcf():  # newest first
-            pid = artifact.get("project_id")
-            if pid not in latest_issue_count_by_project:
-                latest_issue_count_by_project[pid] = int(artifact.get("issue_count") or 0)
-        issues_found = sum(
-            count
-            for pid, count in latest_issue_count_by_project.items()
-            if pid in visible_project_ids
+        stats = PipelineOrchestratorService.get_dashboard_stats(
+            organization_id=effective_org_id,
+            user_id=current_user.id,
+            memberships=memberships,
+            profiles=profiles,
+            ruleset_access=ruleset_access,
+            document_access=document_access,
         )
     except Exception as exc:
-        logger.warning("Could not compute issues_found from report artifacts: %s", exc)
+        logger.warning("Could not fetch dashboard stats from orchestrator: %s", exc)
 
     return DashboardStatsResponse(
-        total_projects=total_projects,
+        total_projects=stats.get("total_projects", 0),
         total_documents=stats.get("total_documents", 0),
         total_rules=stats.get("total_rules", 0),
-        issues_found=issues_found,
+        issues_found=stats.get("issues_found", 0),
         db_ok=db_ok,
         db_backend=backend,
     )
-

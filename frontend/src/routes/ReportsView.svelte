@@ -25,6 +25,7 @@
     Search,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, bcfApi, rulesApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import type { Project, AnalysisResult, BcfArtifact, BCFTopicResponse } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
@@ -117,15 +118,31 @@
   let isTopicBulkEditModalOpen = $state(false);
   let isTopicBulkDeleteModalOpen = $state(false);
 
+  // Projects and BCF artifacts are both fundamentally project-owned
+  // resources -- an org never tags either directly, so "this org's
+  // reports" always means "reports whose project belongs to this org"
+  // (enforced server-side; see visible_project_rows / GET /analyze/bcf/list).
+  // Re-fetch both whenever the active org changes, matching the guard
+  // pattern in DashboardView: a slower response for a previously active org
+  // must not resolve after (and overwrite) the current org's data.
+  $effect(() => {
+    const orgId = authState.activeOrganizationId;
+    untrack(() => {
+      loadBcfArtifacts(orgId);
+      projectsApi.list({ organization_id: orgId }).then((data) => {
+        if (authState.activeOrganizationId !== orgId) return;
+        projects = data.projects || [];
+      });
+    });
+  });
+
   onMount(async () => {
-    try {
-      const [data] = await Promise.all([projectsApi.list(), loadBcfArtifacts()]);
-      projects = data.projects || [];
-      if (selectedProjectId) {
+    if (selectedProjectId) {
+      try {
         await Promise.all([loadReport(), loadBcfTopics()]);
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
   });
 
@@ -141,14 +158,16 @@
     }
   }
 
-  async function loadBcfArtifacts() {
+  async function loadBcfArtifacts(orgId: number | null = authState.activeOrganizationId) {
     isBcfLoading = true;
     try {
-      bcfArtifacts = await analyzeApi.listBcfArtifacts();
+      const artifacts = await analyzeApi.listBcfArtifacts(orgId);
+      if (authState.activeOrganizationId !== orgId) return;
+      bcfArtifacts = artifacts;
     } catch {
-      bcfArtifacts = [];
+      if (authState.activeOrganizationId === orgId) bcfArtifacts = [];
     } finally {
-      isBcfLoading = false;
+      if (authState.activeOrganizationId === orgId) isBcfLoading = false;
     }
   }
 
