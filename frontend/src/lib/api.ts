@@ -90,7 +90,7 @@ import {
   type SWROptions,
   type Unsubscribe,
 } from "./cache";
-import { authHeaders, authReady, getActiveOrgId } from "./authToken";
+import { authHeaders, authReady, getActiveOrgId, withAuthToken } from "./authToken";
 import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -1127,15 +1127,17 @@ export const analyzeApi = {
     if (includeDataQuality !== undefined) {
       url += `&include_data_quality=${includeDataQuality}`;
     }
-    return url;
+    // The page navigates to this URL rather than fetching it, so the token has
+    // to travel in the URL -- see withAuthToken.
+    return withAuthToken(url);
   },
 
   getBcfArtifactUrl(artifactId: number): string {
-    return `${API_BASE}/analyze/bcf/artifacts/${artifactId}`;
+    return withAuthToken(`${API_BASE}/analyze/bcf/artifacts/${artifactId}`);
   },
 
   getLatestBcfUrl(projectId: number): string {
-    return `${API_BASE}/analyze/bcf/latest/${projectId}`;
+    return withAuthToken(`${API_BASE}/analyze/bcf/latest/${projectId}`);
   },
 
   async runArch(projectId: number, ruleFolder = ""): Promise<any> {
