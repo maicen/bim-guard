@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     LayoutDashboard,
-    FolderOpen,
     BookOpen,
     Sparkles,
     ListChecks,
@@ -30,19 +29,17 @@
 
   // Org-level nav only — everything scoped to a single project (Viewer,
   // Compliance Audit, Reports, Models, Live Pipeline) lives in
-  // ProjectSidebar instead, shown once a project is selected. Reference
-  // material (User Manual, Modeling Manual, bSDD Wiki) and Integrations
-  // (Revit Sync, IFC Export Setting) are in the navbar's Resources and
-  // Integrations menus instead (ResourcesMenu.svelte, IntegrationsMenu.svelte).
-  // Organization Settings is reachable from the user menu (UserMenu.svelte).
+  // ProjectSidebar instead, shown once a project is selected. The project
+  // registry itself lives on the Dashboard (org homepage), not a separate
+  // nav item. Reference material (User Manual, Modeling Manual, bSDD Wiki)
+  // and Integrations (Revit Sync, IFC Export Setting) are in the navbar's
+  // Resources and Integrations menus instead (ResourcesMenu.svelte,
+  // IntegrationsMenu.svelte). Organization Settings is reachable from the
+  // user menu (UserMenu.svelte).
   const NAV_SECTIONS = [
     {
       title: "My Home",
       items: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }],
-    },
-    {
-      title: "Model Coordination",
-      items: [{ id: "projects", label: "Existing Projects", icon: FolderOpen }],
     },
     {
       title: "Rules & Standards",
