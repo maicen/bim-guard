@@ -11,6 +11,7 @@
     FolderGit2,
     Share2,
     Settings,
+    Trash2,
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
@@ -21,6 +22,7 @@
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
   import ProjectGroupAccessModal from "../lib/components/ProjectGroupAccessModal.svelte";
+  import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { organizationsApi, projectsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
@@ -55,6 +57,22 @@
 
   // Project modal for group access
   let managingProject = $state<Project | null>(null);
+
+  // Delete confirmation
+  let deletingProject = $state<Project | null>(null);
+
+  async function confirmDeleteProject() {
+    if (!deletingProject) return;
+    try {
+      await projectsApi.delete(deletingProject.id);
+      toasts.success(`Project "${deletingProject.name}" deleted.`);
+      projects = projects.filter((p) => p.id !== deletingProject!.id);
+    } catch (err) {
+      toasts.fromError(err, "Could not delete project.");
+    } finally {
+      deletingProject = null;
+    }
+  }
 
   async function load() {
     loading = true;
@@ -521,6 +539,9 @@
                 <th class="min-w-[14rem] px-4 py-3">Group Access (RBAC)</th>
                 <th class="w-24 px-4 py-3 text-center">Manage</th>
               {/if}
+              {#if isSuperadmin}
+                <th class="w-16 px-4 py-3 text-center">Delete</th>
+              {/if}
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
@@ -629,6 +650,18 @@
                     </button>
                   </td>
                 {/if}
+                {#if isSuperadmin}
+                  <td class="px-4 py-3 text-center">
+                    <button
+                      type="button"
+                      onclick={() => (deletingProject = project)}
+                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                      title="Delete project"
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </button>
+                  </td>
+                {/if}
               </tr>
             {/each}
           </tbody>
@@ -718,4 +751,16 @@
       onSaved={() => currentTargetOrg && loadGroupsForOrg(currentTargetOrg.id)}
     />
   {/if}
+
+  <!-- Delete Confirmation -->
+  <ConfirmModal
+    isOpen={deletingProject !== null}
+    title="Delete project?"
+    message={deletingProject
+      ? `This permanently deletes "${deletingProject.name}" and everything analyzed under it. This cannot be undone.`
+      : ""}
+    confirmText="Delete Project"
+    onConfirm={confirmDeleteProject}
+    onCancel={() => (deletingProject = null)}
+  />
 </div>

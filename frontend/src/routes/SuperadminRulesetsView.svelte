@@ -9,7 +9,9 @@
     Eye,
     Layers,
     Info,
+    Trash2,
   } from "lucide-svelte";
+  import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
@@ -52,6 +54,22 @@
 
   // Inspection modal
   let inspectingRuleset = $state<RuleFolder | null>(null);
+
+  // Delete confirmation
+  let deletingRuleset = $state<RuleFolder | null>(null);
+
+  async function confirmDeleteRuleset() {
+    if (!deletingRuleset) return;
+    try {
+      await rulesApi.deleteFolder(deletingRuleset.ruleset_id);
+      toasts.success(`Ruleset "${deletingRuleset.display_name}" deleted.`);
+      rulesets = rulesets.filter((r) => r.ruleset_id !== deletingRuleset!.ruleset_id);
+    } catch (err) {
+      toasts.fromError(err, "Could not delete ruleset.");
+    } finally {
+      deletingRuleset = null;
+    }
+  }
 
   async function load() {
     loading = true;
@@ -521,7 +539,7 @@
               {/if}
 
               <!-- Actions Column -->
-              <th class="w-16 px-4 py-3 text-center">Details</th>
+              <th class="w-20 px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
@@ -636,16 +654,28 @@
                   </td>
                 {/if}
 
-                <!-- Inspect Button -->
+                <!-- Row Actions -->
                 <td class="px-4 py-3 text-center">
-                  <button
-                    type="button"
-                    onclick={() => (inspectingRuleset = ruleset)}
-                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
-                    title="Inspect ruleset rules and metadata"
-                  >
-                    <Eye class="h-4 w-4" />
-                  </button>
+                  <div class="flex items-center justify-center gap-1">
+                    <button
+                      type="button"
+                      onclick={() => (inspectingRuleset = ruleset)}
+                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+                      title="Inspect ruleset rules and metadata"
+                    >
+                      <Eye class="h-4 w-4" />
+                    </button>
+                    {#if isSuperadmin}
+                      <button
+                        type="button"
+                        onclick={() => (deletingRuleset = ruleset)}
+                        class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                        title="Delete ruleset"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                      </button>
+                    {/if}
+                  </div>
                 </td>
               </tr>
             {/each}
@@ -712,5 +742,17 @@
       ? (grants[(displayOrgs[0] || orgs[0])!.id]?.has(inspectingRuleset.ruleset_id) ?? false)
       : false}
     onClose={() => (inspectingRuleset = null)}
+  />
+
+  <!-- Delete Confirmation -->
+  <ConfirmModal
+    isOpen={deletingRuleset !== null}
+    title="Delete ruleset?"
+    message={deletingRuleset
+      ? `This permanently deletes "${deletingRuleset.display_name}" and every rule in it, for every organization. This cannot be undone.`
+      : ""}
+    confirmText="Delete Ruleset"
+    onConfirm={confirmDeleteRuleset}
+    onCancel={() => (deletingRuleset = null)}
   />
 </div>

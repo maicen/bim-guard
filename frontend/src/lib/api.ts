@@ -37,8 +37,10 @@ import type {
   NamingConfig,
   NamingConfigPayload,
   NamingPreview,
+  AddMemberPayload,
   GroupListResponse,
   GroupProjectGrantsResponse,
+  OrganizationCreatePayload,
   OrganizationDocumentGrantsResponse,
   OrganizationInviteCreatePayload,
   OrganizationInviteListResponse,
@@ -47,6 +49,8 @@ import type {
   OrganizationMemberListResponse,
   OrganizationProjectGrantsResponse,
   OrganizationRulesetGrantsResponse,
+  OrganizationSummary,
+  UserListResponse,
   ParsingEngineInstance,
   ParsingEngineInstanceCreatePayload,
   ParsingEngineInstanceTestResult,
@@ -224,6 +228,51 @@ export const organizationsApi = {
   async listAll(): Promise<OrganizationListResponse> {
     const res = await apiFetch(`${API_BASE}/organizations`);
     return handleResponse<OrganizationListResponse>(res);
+  },
+
+  /** Create a new organization. Superadmin only. */
+  async create(payload: OrganizationCreatePayload): Promise<OrganizationSummary> {
+    const res = await apiFetch(`${API_BASE}/organizations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<OrganizationSummary>(res);
+  },
+
+  /** Permanently delete an organization. Superadmin only. */
+  async deleteOrganization(organizationId: number): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
+  },
+
+  /** Every user who has ever signed in, platform-wide. Superadmin only. */
+  async listAllUsers(): Promise<UserListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/users`);
+    return handleResponse<UserListResponse>(res);
+  },
+
+  /** Directly add an existing user to an organization, bypassing the invite flow. Superadmin only. */
+  async addMember(
+    organizationId: number,
+    payload: AddMemberPayload,
+  ): Promise<OrganizationMemberListResponse> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<OrganizationMemberListResponse>(res);
+  },
+
+  /** Permanently delete a user's account. Superadmin only. */
+  async deleteUser(userId: string): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/organizations/users/${userId}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
   },
 
   async listGroups(organizationId: number): Promise<GroupListResponse> {

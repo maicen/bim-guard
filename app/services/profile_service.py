@@ -64,6 +64,24 @@ class ProfileService:
         """
         return {uid: profile for uid in user_ids if (profile := self.get(uid)) is not None}
 
+    def list_all(self) -> list[dict[str, Any]]:
+        """Return every profile on the platform (every user who has ever signed in).
+
+        Used only by the superadmin user directory.
+        """
+        return list(self._profiles.rows)
+
+    def clear_default_organization(self, organization_id: int) -> None:
+        """Null out every profile's cached default org that points at *organization_id*.
+
+        Called before deleting an organization: ``profiles.default_organization_id``
+        has no ``ON DELETE CASCADE`` (see
+        ``supabase/migrations/20260905091058_create_profiles.sql``), so a stale
+        default would otherwise block the delete with a foreign-key violation.
+        """
+        for row in self._profiles.rows_where("default_organization_id = ?", [organization_id]):
+            self._profiles.update(updates={"default_organization_id": None}, pk_values=row["id"])
+
     def is_superadmin(self, user_id: str) -> bool:
         """Return whether *user_id* bypasses organization-membership checks entirely.
 

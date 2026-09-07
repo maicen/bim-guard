@@ -23,6 +23,7 @@ from app.services.projects_service import ProjectsService
 from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
 from app.services.settings_service import SettingsService
+from app.services.user_admin_service import UserAdminService
 
 
 def get_projects_service() -> ProjectsService:
@@ -109,3 +110,8 @@ def get_ruleset_access_service() -> RulesetAccessService:
 def get_document_access_service() -> DocumentAccessService:
     """Return the configured DocumentAccessService instance."""
     return get_container().document_access_service
+
+
+def get_user_admin_service() -> UserAdminService:
+    """Return the configured UserAdminService instance."""
+    return get_container().user_admin_service

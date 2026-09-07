@@ -1962,6 +1962,44 @@ class OrganizationListResponse(BaseModel):
     organizations: list[OrganizationSummary] = Field(default_factory=list)
 
 
+class OrganizationCreateRequest(BaseModel):
+    """A new organization to create. Superadmin only."""
+
+    name: str = Field(..., min_length=1, max_length=200)
+
+
+class AddMemberRequest(BaseModel):
+    """Directly add an existing user to an organization, bypassing the invite flow."""
+
+    user_id: str
+    role: Literal["owner", "admin", "member"] = "member"
+
+
+class UserOrganizationSummary(BaseModel):
+    """One organization a user belongs to, for the platform user directory."""
+
+    organization_id: int
+    name: str
+    role: Literal["owner", "admin", "member"]
+
+
+class UserSummary(BaseModel):
+    """One user on the platform, as listed for the superadmin user directory."""
+
+    id: str = Field(..., description="Supabase auth.users.id (uuid)")
+    email: str = ""
+    full_name: str = ""
+    avatar_url: str = ""
+    is_superadmin: bool = False
+    organizations: list[UserOrganizationSummary] = Field(default_factory=list)
+
+
+class UserListResponse(BaseModel):
+    """Every user who has ever signed in, platform-wide. Superadmin only."""
+
+    users: list[UserSummary] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # RBAC: Groups and Resource Grants
 # ---------------------------------------------------------------------------

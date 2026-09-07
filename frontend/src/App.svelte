@@ -39,6 +39,7 @@
   import SuperadminRulesetsView from "./routes/SuperadminRulesetsView.svelte";
   import SuperadminProjectGrantsView from "./routes/SuperadminProjectGrantsView.svelte";
   import SuperadminDocumentGrantsView from "./routes/SuperadminDocumentGrantsView.svelte";
+  import SuperadminUsersView from "./routes/SuperadminUsersView.svelte";
   import LoginView from "./routes/LoginView.svelte";
   import LandingView from "./routes/LandingView.svelte";
   import OrgPickerGate from "./lib/components/OrgPickerGate.svelte";
@@ -346,6 +347,7 @@
     "superadmin-rulesets",
     "superadmin-project-grants",
     "superadmin-document-grants",
+    "superadmin-users",
   ]);
 
   let prevActiveOrgId: number | null = $state(null);
@@ -611,6 +613,8 @@
           <SuperadminProjectGrantsView />
         {:else if activeView === "superadmin-document-grants"}
           <SuperadminDocumentGrantsView />
+        {:else if activeView === "superadmin-users"}
+          <SuperadminUsersView />
         {:else if activeView === "login"}
           <LoginView />
         {/if}

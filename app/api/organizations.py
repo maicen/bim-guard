@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from postgrest.exceptions import APIError
 
 from app.api.dependencies import (
     get_document_access_service,
@@ -12,9 +13,11 @@ from app.api.dependencies import (
     get_profile_service,
     get_projects_service,
     get_ruleset_access_service,
+    get_user_admin_service,
 )
 from app.auth import CurrentUser, get_current_user
 from app.modules.contracts import (
+    AddMemberRequest,
     GroupCreateRequest,
     GroupListResponse,
     GroupProjectGrantsResponse,
@@ -22,6 +25,7 @@ from app.modules.contracts import (
     GroupResponse,
     MemberGroupUpdateRequest,
     MemberRoleUpdateRequest,
+    OrganizationCreateRequest,
     OrganizationDocumentGrantsResponse,
     OrganizationDocumentGrantsUpdateRequest,
     OrganizationInviteCreateRequest,
@@ -35,12 +39,16 @@ from app.modules.contracts import (
     OrganizationRulesetGrantsResponse,
     OrganizationRulesetGrantsUpdateRequest,
     OrganizationSummary,
+    UserListResponse,
+    UserOrganizationSummary,
+    UserSummary,
 )
 from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.ruleset_access_service import RulesetAccessService
+from app.services.user_admin_service import UserAdminService
 
 router = APIRouter()
 
@@ -73,6 +81,126 @@ def list_organizations(
     return OrganizationListResponse(
         organizations=[OrganizationSummary(**o) for o in memberships.list_all_organizations()]
     )
+
+
+@router.post(
+    "",
+    response_model=OrganizationSummary,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new organization",
+)
+def create_organization(
+    payload: OrganizationCreateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> OrganizationSummary:
+    """Create a new organization. Superadmin only."""
+    _require_superadmin(current_user, profiles)
+    try:
+        org = memberships.create_organization(payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return OrganizationSummary(**org)
+
+
+@router.delete(
+    "/{organization_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an organization",
+)
+def delete_organization(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> None:
+    """Permanently delete an organization and everything scoped to it.
+
+    Memberships, invites, groups, and grants all cascade automatically.
+    Superadmin only. Refuses while the organization still owns any projects
+    -- delete or reassign those first, since ``projects.organization_id`` has
+    no cascade and would otherwise fail this as a raw foreign-key violation.
+    """
+    _require_superadmin(current_user, profiles)
+    owned = [
+        p for p in projects_service.list_projects() if p.get("organization_id") == organization_id
+    ]
+    if owned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"This organization still owns {len(owned)} project(s). Delete or reassign them first.",
+        )
+    profiles.clear_default_organization(organization_id)
+    try:
+        memberships.delete_organization(organization_id)
+    except APIError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.get(
+    "/users",
+    response_model=UserListResponse,
+    summary="List every user on the platform",
+)
+def list_all_users(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+) -> UserListResponse:
+    """Return every user who has ever signed in, with their org memberships. Superadmin only."""
+    _require_superadmin(current_user, profiles)
+    orgs_by_id = {o["id"]: o for o in memberships.list_all_organizations()}
+    memberships_by_user: dict[str, list[UserOrganizationSummary]] = {}
+    for row in memberships.list_all_memberships():
+        org = orgs_by_id.get(row["organization_id"])
+        if org is None:
+            continue
+        memberships_by_user.setdefault(row["user_id"], []).append(
+            UserOrganizationSummary(organization_id=org["id"], name=org["name"], role=row["role"])
+        )
+    return UserListResponse(
+        users=[
+            UserSummary(
+                id=p["id"],
+                email=p.get("email") or "",
+                full_name=p.get("full_name") or "",
+                avatar_url=p.get("avatar_url") or "",
+                is_superadmin=bool(p.get("is_superadmin")),
+                organizations=memberships_by_user.get(p["id"], []),
+            )
+            for p in profiles.list_all()
+        ]
+    )
+
+
+@router.delete(
+    "/users/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Permanently delete a user's account",
+)
+def delete_user(
+    user_id: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    user_admin: Annotated[UserAdminService, Depends(get_user_admin_service)],
+) -> None:
+    """Permanently delete a user's Supabase Auth account. Superadmin only.
+
+    Cascades to ``profiles`` and every ``memberships`` row automatically
+    (both FK ``on delete cascade`` to ``auth.users``).
+    """
+    _require_superadmin(current_user, profiles)
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own account.",
+        )
+    try:
+        user_admin.delete_user(user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not delete user: {exc}")
 
 
 def _require_membership(
@@ -215,6 +343,30 @@ def remove_member(
             detail="An organization must always have at least one owner.",
         )
     memberships.remove_member(organization_id, user_id)
+    return list_members(organization_id, current_user, memberships, profiles)
+
+
+@router.post(
+    "/{organization_id}/members",
+    response_model=OrganizationMemberListResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Directly add a user to an organization",
+)
+def add_member(
+    organization_id: int,
+    payload: AddMemberRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> OrganizationMemberListResponse:
+    """Add an existing user straight into an organization, bypassing the invite flow.
+
+    Superadmin only -- this backs the platform user directory's "assign"
+    action, for users who already have an account. Inviting someone who
+    hasn't signed in yet still goes through ``POST .../invites``.
+    """
+    _require_superadmin(current_user, profiles)
+    memberships.add_member(organization_id, payload.user_id, payload.role)
     return list_members(organization_id, current_user, memberships, profiles)
 
 

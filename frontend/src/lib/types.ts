@@ -1354,6 +1354,39 @@ export interface OrganizationListResponse {
   organizations: OrganizationSummary[];
 }
 
+/** Mirrors OrganizationCreateRequest. */
+export interface OrganizationCreatePayload {
+  name: string;
+}
+
+/** Mirrors AddMemberRequest. */
+export interface AddMemberPayload {
+  user_id: string;
+  role: "owner" | "admin" | "member";
+}
+
+/** One organization a user belongs to. Mirrors UserOrganizationSummary. */
+export interface UserOrganizationSummary {
+  organization_id: number;
+  name: string;
+  role: "owner" | "admin" | "member";
+}
+
+/** One user on the platform, as listed for the superadmin user directory. Mirrors UserSummary. */
+export interface UserSummary {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  is_superadmin: boolean;
+  organizations: UserOrganizationSummary[];
+}
+
+/** Mirrors UserListResponse. */
+export interface UserListResponse {
+  users: UserSummary[];
+}
+
 /** One user group within an organization. Mirrors GroupResponse. */
 export interface Group {
   id: number;

@@ -11,6 +11,7 @@ legacy (pre-multi-tenant) projects.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -129,6 +130,58 @@ class MembershipService:
         else needs to enumerate organizations outside the caller's own.
         """
         return sorted(self._organizations.rows, key=lambda o: o["id"], reverse=True)
+
+    def create_organization(self, name: str) -> dict[str, Any]:
+        """Create a new organization with a unique, slugified name.
+
+        Raises:
+            ValueError: if *name* is blank.
+        """
+        clean_name = (name or "").strip()
+        if not clean_name:
+            raise ValueError("An organization name is required.")
+        base_slug = re.sub(r"[^a-z0-9]+", "-", clean_name.lower()).strip("-") or "organization"
+        existing_slugs = {o["slug"] for o in self._organizations.rows}
+        slug = base_slug
+        suffix = 2
+        while slug in existing_slugs:
+            slug = f"{base_slug}-{suffix}"
+            suffix += 1
+        return self._organizations.insert({"name": clean_name, "slug": slug})
+
+    def delete_organization(self, organization_id: int) -> None:
+        """Permanently delete an organization.
+
+        Memberships, invites, groups, and grant rows all cascade automatically
+        (every one of those tables' ``organization_id`` FK is ``on delete
+        cascade`` -- see ``supabase/migrations/20260904235344_...`` and the
+        RBAC/grants migrations that followed it). Callers must otherwise clear
+        anything with a non-cascading FK first: projects still owned by this
+        organization (``projects.organization_id`` has no cascade) and any
+        profile's cached default org (see
+        :meth:`ProfileService.clear_default_organization`) -- both would
+        otherwise surface as a raw foreign-key violation here.
+        """
+        self._organizations.delete(organization_id)
+
+    def add_member(self, organization_id: int, user_id: str, role: str) -> dict[str, Any]:
+        """Directly add *user_id* to *organization_id*, bypassing the invite flow.
+
+        If already a member, updates their role instead of erroring -- this
+        backs the superadmin user directory's "assign" action, which should
+        be safe to click again.
+        """
+        existing = self._membership_row(organization_id, user_id)
+        if existing is not None:
+            self._memberships.update(updates={"role": role}, pk_values=existing["id"])
+            return {**existing, "role": role}
+        return self._memberships.insert(
+            {"organization_id": organization_id, "user_id": user_id, "role": role}
+        )
+
+    def list_all_memberships(self) -> list[dict[str, Any]]:
+        """Return every membership row on the platform, for the superadmin user directory."""
+        return list(self._memberships.rows)
 
     def role_for_user(self, organization_id: int, user_id: str) -> str | None:
         """Return *user_id*'s role in *organization_id*, or None if not a member."""

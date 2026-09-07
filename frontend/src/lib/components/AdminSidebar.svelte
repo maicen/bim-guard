@@ -4,6 +4,7 @@
     ShieldCheck,
     FolderGit2,
     BookOpen,
+    Users,
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
@@ -29,6 +30,13 @@
       icon: Building2,
       path: "/org-settings",
       description: "Members, roles, invites & groups",
+    },
+    {
+      id: "superadmin-users",
+      label: "Users & organizations",
+      icon: Users,
+      path: "/superadmin-users",
+      description: "Platform users, orgs & assignments",
     },
     {
       id: "superadmin-rulesets",

@@ -9,6 +9,7 @@
     FileText,
     Eye,
     Tag,
+    Trash2,
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
@@ -20,6 +21,7 @@
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import Modal from "../lib/components/Modal.svelte";
+  import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { organizationsApi, documentsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
@@ -52,6 +54,22 @@
 
   // Document preview modal
   let previewDocId = $state<number | null>(null);
+
+  // Delete confirmation
+  let deletingDoc = $state<DocumentItem | null>(null);
+
+  async function confirmDeleteDocument() {
+    if (!deletingDoc) return;
+    try {
+      await documentsApi.delete(deletingDoc.id);
+      toasts.success(`Document "${deletingDoc.filename}" deleted.`);
+      documents = documents.filter((d) => d.id !== deletingDoc!.id);
+    } catch (err) {
+      toasts.fromError(err, "Could not delete document.");
+    } finally {
+      deletingDoc = null;
+    }
+  }
 
   async function load() {
     loading = true;
@@ -476,7 +494,7 @@
                   {/if}
                 </th>
               {/if}
-              <th class="w-16 px-4 py-3 text-center">Preview</th>
+              <th class="w-20 px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
@@ -573,16 +591,28 @@
                   </td>
                 {/if}
 
-                <!-- Preview / Inspect Document -->
+                <!-- Row Actions -->
                 <td class="px-4 py-3 text-center">
-                  <button
-                    type="button"
-                    onclick={() => (previewDocId = doc.id)}
-                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
-                    title="Preview specification document"
-                  >
-                    <Eye class="h-4 w-4" />
-                  </button>
+                  <div class="flex items-center justify-center gap-1">
+                    <button
+                      type="button"
+                      onclick={() => (previewDocId = doc.id)}
+                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+                      title="Preview specification document"
+                    >
+                      <Eye class="h-4 w-4" />
+                    </button>
+                    {#if isSuperadmin}
+                      <button
+                        type="button"
+                        onclick={() => (deletingDoc = doc)}
+                        class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                        title="Delete document"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                      </button>
+                    {/if}
+                  </div>
                 </td>
               </tr>
             {/each}
@@ -665,4 +695,16 @@
       {/snippet}
     </Modal>
   {/if}
+
+  <!-- Delete Confirmation -->
+  <ConfirmModal
+    isOpen={deletingDoc !== null}
+    title="Delete document?"
+    message={deletingDoc
+      ? `This permanently deletes "${deletingDoc.filename}" and its extracted text for every organization. This cannot be undone.`
+      : ""}
+    confirmText="Delete Document"
+    onConfirm={confirmDeleteDocument}
+    onCancel={() => (deletingDoc = null)}
+  />
 </div>

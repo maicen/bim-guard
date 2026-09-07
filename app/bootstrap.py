@@ -57,6 +57,7 @@ from app.services.static_data_service import (
     _STATIC_ASSET_SCHEMA,
     StaticDataService,
 )
+from app.services.user_admin_service import UserAdminService
 
 logger = get_logger(__name__)
 
@@ -100,6 +101,7 @@ class ApplicationContainer:
     parsing_engine_instances_service: ParsingEngineInstancesService
     membership_service: MembershipService
     profile_service: ProfileService
+    user_admin_service: UserAdminService
     ruleset_access_service: RulesetAccessService
     document_access_service: DocumentAccessService
     analysis_service: AnalysisService
@@ -438,6 +440,8 @@ def build_default_container() -> ApplicationContainer:
 
     profile_service = ProfileService(profiles_repo=profiles_repo)
 
+    user_admin_service = UserAdminService(PersistenceService.get_db())
+
     # Seed default repo if database is empty
     try:
         if not github_repo_service.list_repos():
@@ -580,6 +584,7 @@ def build_default_container() -> ApplicationContainer:
         parsing_engine_instances_service=parsing_engine_instances_service,
         membership_service=membership_service,
         profile_service=profile_service,
+        user_admin_service=user_admin_service,
         ruleset_access_service=ruleset_access_service,
         document_access_service=document_access_service,
         analysis_service=analysis_service,
