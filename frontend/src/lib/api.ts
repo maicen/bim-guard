@@ -422,8 +422,10 @@ export const projectsApi = {
     };
   },
 
-  subscribe(listener: (projects: Project[]) => void): Unsubscribe {
-    return _projectsStore.subscribe(listener);
+  subscribe(listener: (projects: Project[]) => void, orgId?: number | null): Unsubscribe {
+    const effectiveOrg = orgId !== undefined ? orgId : getActiveOrgId();
+    const key = `org:${effectiveOrg ?? "all"}`;
+    return _projectsStore.subscribe(listener, key);
   },
 
   clearCache(): void {

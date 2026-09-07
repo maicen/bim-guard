@@ -374,9 +374,9 @@
     if (orgParam && /^\d+$/.test(orgParam)) {
       const parsedOrgId = Number(orgParam);
       untrack(() => {
+        if (authState.loading || !authState.profile) return;
         if (parsedOrgId !== authState.activeOrganizationId) {
           if (
-            !authState.profile ||
             authState.isSuperadmin ||
             authState.profile.organizations.some((o) => o.organization_id === parsedOrgId)
           ) {

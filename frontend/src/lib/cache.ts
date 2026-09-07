@@ -95,10 +95,12 @@ export interface SWROptions {
 /**
  * Stale-While-Revalidate (SWR) Coordinator with Promise Deduplication (SRP & DIP)
  */
+export type KeyedListener<K, V> = (data: V, key: K) => void;
+
 export class SWRStore<K, V> implements ISubscribable<V> {
   protected readonly storage: ICacheStorage<K, V>;
   protected readonly inFlight = new Map<K, Promise<V>>();
-  protected readonly listeners = new Set<Listener<V>>();
+  protected readonly listeners = new Set<KeyedListener<K, V>>();
   public readonly ttlMs: number;
 
   constructor(storage: ICacheStorage<K, V> = new InMemoryCache<K, V>(), ttlMs: number = 60_000) {
@@ -111,14 +113,25 @@ export class SWRStore<K, V> implements ISubscribable<V> {
   }
 
   subscribe(listener: Listener<V>): Unsubscribe {
+    const wrapped: KeyedListener<K, V> = (data) => listener(data);
+    this.listeners.add(wrapped);
+    return () => this.listeners.delete(wrapped);
+  }
+
+  // Like subscribe(), but the listener also receives the key that produced
+  // the notification -- needed so callers (e.g. EntityCacheStore) can filter
+  // out notifications for a *different* query key (a different org/filter)
+  // than the one they care about, instead of blindly overwriting their state
+  // with whatever key happened to resolve last.
+  subscribeKeyed(listener: KeyedListener<K, V>): Unsubscribe {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  protected notify(data: V): void {
+  protected notify(key: K, data: V): void {
     this.listeners.forEach((listener) => {
       try {
-        listener(data);
+        listener(data, key);
       } catch (err) {
         console.error("Error in cache listener:", err);
       }
@@ -148,7 +161,7 @@ export class SWRStore<K, V> implements ISubscribable<V> {
         try {
           const freshData = await fetcher();
           this.storage.set(key, freshData);
-          this.notify(freshData);
+          this.notify(key, freshData);
           return freshData;
         } finally {
           this.inFlight.delete(key);
@@ -163,7 +176,7 @@ export class SWRStore<K, V> implements ISubscribable<V> {
       try {
         const freshData = await fetcher();
         this.storage.set(key, freshData);
-        this.notify(freshData);
+        this.notify(key, freshData);
         return freshData;
       } finally {
         this.inFlight.delete(key);
@@ -176,7 +189,7 @@ export class SWRStore<K, V> implements ISubscribable<V> {
 
   set(key: K, value: V): void {
     this.storage.set(key, value);
-    this.notify(value);
+    this.notify(key, value);
   }
 
   delete(key: K): boolean {
@@ -218,9 +231,15 @@ export class EntityCacheStore<TItem, TId extends string | number = number> imple
     return this.itemStore.getCached(id);
   }
 
-  subscribe(listener: Listener<TItem[]>): Unsubscribe {
-    const unsub = this.listStore.subscribe(listener);
-    const current = this.listStore.getCached("__default__");
+  // queryKey scopes the subscription: only notifications for that exact
+  // list (e.g. a specific org's project list) are forwarded, so a background
+  // prefetch resolving a *different* key can't clobber this subscriber's
+  // state (see notify()/subscribeKeyed() in SWRStore).
+  subscribe(listener: Listener<TItem[]>, queryKey: string = "__default__"): Unsubscribe {
+    const unsub = this.listStore.subscribeKeyed((data, key) => {
+      if (key === queryKey) listener(data);
+    });
+    const current = this.listStore.getCached(queryKey);
     if (current) {
       listener(current);
     }

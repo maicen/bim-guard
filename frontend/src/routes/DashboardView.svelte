@@ -206,7 +206,7 @@
     unsubscribeProjects = projectsApi.subscribe((updatedProjects) => {
       projects = updatedProjects;
       stats = { ...stats, total_projects: updatedProjects.length };
-    });
+    }, authState.activeOrganizationId);
 
     // Load fresh data
     refreshDashboard();
