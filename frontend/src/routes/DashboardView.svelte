@@ -170,12 +170,26 @@
   }
 
   $effect(() => {
-    const _orgId = authState.activeOrganizationId;
+    const orgId = authState.activeOrganizationId;
     // refreshDashboard reads/writes `projects` synchronously before its
     // first await; without untrack, that read gets tracked as a dependency
     // of this effect, and the later write to `projects` re-fires it,
     // causing an unbounded refetch loop.
-    untrack(() => refreshDashboard(true));
+    untrack(() => {
+      // The cache subscription is keyed by org (see EntityCacheStore.subscribe
+      // in lib/cache.ts) -- it must be re-created whenever the active org
+      // changes, or it stays locked to whichever org was active when it was
+      // first created (e.g. null/"all" before the profile even finished
+      // loading) and later notifications for that stale key (like the
+      // unfiltered prefetchAll() list) silently overwrite the correctly
+      // org-scoped `projects` state.
+      unsubscribeProjects?.();
+      unsubscribeProjects = projectsApi.subscribe((updatedProjects) => {
+        projects = updatedProjects;
+        stats = { ...stats, total_projects: updatedProjects.length };
+      }, orgId);
+      refreshDashboard(true);
+    });
   });
 
   async function refreshDashboard(force = false) {
@@ -185,29 +199,35 @@
       isRefreshing = true;
     }
 
+    // Successive org switches each kick off their own refreshDashboard call;
+    // their responses can resolve out of order over the network, so the org
+    // this particular call was fetching for must be checked against the
+    // still-current org before applying its result -- otherwise a slower,
+    // now-stale response for a previously active org can land after (and
+    // overwrite) the correct, current org's data.
+    const requestOrgId = authState.activeOrganizationId;
+
     try {
       const [statsData, projectsData] = await Promise.all([
         dashboardApi.getStats({ forceRefresh: force }),
-        projectsApi.list({ forceRefresh: force, organization_id: authState.activeOrganizationId }),
+        projectsApi.list({ forceRefresh: force, organization_id: requestOrgId }),
       ]);
+      if (authState.activeOrganizationId !== requestOrgId) return;
       stats = statsData;
       projects = projectsData.projects || [];
     } catch {
       // Keep cached or fallback
     } finally {
-      isLoading = false;
-      isRefreshing = false;
+      if (authState.activeOrganizationId === requestOrgId) {
+        isLoading = false;
+        isRefreshing = false;
+      }
     }
   }
 
   onMount(() => {
-    unsubscribeProjects = projectsApi.subscribe((updatedProjects) => {
-      projects = updatedProjects;
-      stats = { ...stats, total_projects: updatedProjects.length };
-    }, authState.activeOrganizationId);
-
-    // Load fresh data
-    refreshDashboard();
+    // Subscription + initial fetch are handled by the $effect above, which
+    // runs immediately on mount (activeOrganizationId is a dependency).
 
     // Proactively warm up and prefetch all other pages from the dashboard
     dashboardApi.prefetchAll();

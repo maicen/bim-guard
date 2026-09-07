@@ -361,24 +361,28 @@
   let prevActiveOrgId: number | null = $state(null);
 
   // 1. URL -> AuthState: when ?org= is in the query string, switch active organization.
-  // Depends ONLY on queryParams (i.e. an actual URL change) -- the authState
-  // reads below are wrapped in untrack() so that this effect never re-fires
-  // just because activeOrganizationId changed. Without that, switching orgs
-  // via OrgSwitcher would race effect #2 below: this effect would see the
-  // still-stale URL (effect #2 hasn't written the new org to it yet, since
-  // svelte-spa-router's replace() awaits a tick before touching the hash)
-  // and immediately revert the freshly-chosen organization back to whatever
-  // the URL used to say.
+  // Depends on queryParams (URL changes) AND on the profile finishing loading --
+  // both are read outside untrack() so the effect re-fires once the profile
+  // arrives and can revisit an org param that came in before it did (e.g. a
+  // deep link loaded with the profile still in flight). Only the
+  // activeOrganizationId read/write below is wrapped in untrack(), so this
+  // effect never re-fires just because activeOrganizationId itself changed --
+  // switching orgs via OrgSwitcher would otherwise race effect #2 below: this
+  // effect would see the still-stale URL (effect #2 hasn't written the new
+  // org to it yet, since svelte-spa-router's replace() awaits a tick before
+  // touching the hash) and immediately revert the freshly-chosen organization
+  // back to whatever the URL used to say.
   $effect(() => {
     const orgParam = queryParams.get("org");
+    const profileReady = !authState.loading && authState.profile != null;
+    if (!profileReady) return;
     if (orgParam && /^\d+$/.test(orgParam)) {
       const parsedOrgId = Number(orgParam);
       untrack(() => {
-        if (authState.loading || !authState.profile) return;
         if (parsedOrgId !== authState.activeOrganizationId) {
           if (
             authState.isSuperadmin ||
-            authState.profile.organizations.some((o) => o.organization_id === parsedOrgId)
+            authState.profile!.organizations.some((o) => o.organization_id === parsedOrgId)
           ) {
             authState.setActiveOrganization(parsedOrgId, false);
           }
