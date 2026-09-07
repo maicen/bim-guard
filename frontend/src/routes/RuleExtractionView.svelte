@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import {
     Sparkles,
@@ -27,6 +27,7 @@
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import Modal from "../lib/components/Modal.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import SortHeader from "../lib/components/SortHeader.svelte";
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
@@ -35,8 +36,18 @@
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
+  interface Props {
+    /** Pre-selects this document, e.g. when opened from the "Run Compliance Test" wizard. */
+    initialDocId?: number | null;
+    /** When true, saving rules offers to send the user back to the tab that opened this page. */
+    fromQuickTest?: boolean;
+  }
+
+  let { initialDocId = null, fromQuickTest = false }: Props = $props();
+
   let documents: DocumentItem[] = $state([]);
-  let selectedDocId: number | null = $state(null);
+  let selectedDocId: number | null = $state(untrack(() => initialDocId));
+  let showReturnPrompt = $state(false);
   let rawText = $state("");
   let selectedModel = $state("gemini-2.5-flash");
   let viewingDraftRule: ExtractedRule | null = $state(null);
@@ -307,6 +318,7 @@
       successMessage = `Successfully saved ${res.created_count} rules into the compliance library.`;
       extractedRules = [];
       table.clearSelection();
+      if (fromQuickTest) showReturnPrompt = true;
     } catch (err: any) {
       error = err.message || "Failed to save rules to library.";
     } finally {
@@ -730,6 +742,29 @@
     </div>
   {/if}
 </div>
+
+<!-- Saved-from-quick-test: prompt to switch back to the wizard tab -->
+<Modal
+  isOpen={showReturnPrompt}
+  title="Rules saved"
+  subtitle={`Saved to "${formRulesetId}"`}
+  icon={CheckCircle2}
+  onClose={() => (showReturnPrompt = false)}
+>
+  <p class="text-slate-300">
+    You can switch back to the Run Compliance Test tab now — it will pick up this ruleset
+    automatically.
+  </p>
+  {#snippet footer()}
+    <button
+      type="button"
+      onclick={() => (showReturnPrompt = false)}
+      class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+    >
+      Got it
+    </button>
+  {/snippet}
+</Modal>
 
 <!-- Inspect Draft Rule Modal -->
 {#if viewingDraftRule}

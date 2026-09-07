@@ -17,6 +17,7 @@
 
   // Routes
   import DashboardView from "./routes/DashboardView.svelte";
+  import RunComplianceTestView from "./routes/RunComplianceTestView.svelte";
   import ProjectDashboardView from "./routes/ProjectDashboardView.svelte";
   import ModelsView from "./routes/ModelsView.svelte";
   import ViewerView from "./routes/ViewerView.svelte";
@@ -60,6 +61,14 @@
     activeView === "arch" ? "arch" : activeView === "seismic" ? "seismic" : "piping",
   );
   let queryParams = $derived(new URLSearchParams(router.querystring || ""));
+  // Rule Extraction Studio, opened in a new tab from the "Run Compliance Test"
+  // wizard with ?doc_id=...&from=quick-test so it pre-selects that document
+  // and offers to send the user back once rules are saved.
+  let targetDocId: number | null = $derived.by(() => {
+    const raw = queryParams.get("doc_id");
+    return raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  });
+  let fromQuickTest = $derived(queryParams.get("from") === "quick-test");
   // Signing in is required once Supabase Auth is actually configured (see
   // supabaseClient.ts) -- everything the app does reads through /api/projects
   // or /api/rules, both of which now require a bearer token. Left ungated
@@ -537,6 +546,8 @@
             onOpenWizard={() => (isGlobalWizardOpen = true)}
             onNavigate={handleSelectView}
           />
+        {:else if activeView === "run-compliance-test"}
+          <RunComplianceTestView />
         {:else if activeView === "models"}
           <ModelsView
             initialProjectId={targetProjectId}
@@ -551,7 +562,7 @@
         {:else if activeView === "documents"}
           <DocumentsView onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
         {:else if activeView === "extract"}
-          <RuleExtractionView />
+          <RuleExtractionView initialDocId={targetDocId} {fromQuickTest} />
         {:else if activeView === "rules"}
           <RulesView />
         {:else if activeView === "manual-rule-editor"}

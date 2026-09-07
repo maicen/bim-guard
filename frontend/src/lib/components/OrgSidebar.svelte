@@ -7,6 +7,7 @@
     Settings,
     ChevronLeft,
     ChevronRight,
+    PlayCircle,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -39,7 +40,10 @@
   const NAV_SECTIONS = [
     {
       title: "My Home",
-      items: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }],
+      items: [
+        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { id: "run-compliance-test", label: "Run Compliance Test", icon: PlayCircle, highlight: true },
+      ],
     },
     {
       title: "Rules & Standards",
@@ -136,15 +140,19 @@
             href={getNavHref(item.id)}
             use:link
             onclick={onCloseMobile}
-            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {isActive
-              ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
-              : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {isActive
+              ? 'bg-accent font-medium text-white shadow-sm shadow-blue-600/30'
+              : item.highlight
+                ? 'font-bold text-accent hover:bg-slate-900/60'
+                : 'font-medium text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
             title={collapsed ? item.label : undefined}
           >
             <item.icon
               class="h-4 w-4 shrink-0 {isActive
                 ? 'text-slate-50'
-                : 'text-slate-400 group-hover:text-slate-200'}"
+                : item.highlight
+                  ? 'text-accent'
+                  : 'text-slate-400 group-hover:text-slate-200'}"
             />
             {#if !collapsed}
               <span class="truncate text-left">{item.label}</span>

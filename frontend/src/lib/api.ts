@@ -1407,7 +1407,13 @@ export const ruleExtractionApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rules),
     });
-    return handleResponse<any>(res);
+    const result = await handleResponse<any>(res);
+    // A bulk save can implicitly create a new rule folder (RuleService._ensure_folder
+    // server-side) for a ruleset_id that didn't exist yet -- clear the cached folder
+    // list so it shows up on the next `rulesApi.folders()` call instead of waiting
+    // out the SWR TTL.
+    _ruleFoldersStore.clear();
+    return result;
   },
 
   async seed(): Promise<any> {
