@@ -72,16 +72,14 @@
   let error = $state("");
   let unsubscribeProjects: (() => void) | null = null;
 
-  let orgScopedProjects = $derived(
-    authState.activeOrganizationId == null
-      ? projects || []
-      : (projects || []).filter((p) => p.organization_id === authState.activeOrganizationId),
-  );
-
   // Search, filter, sort, paginate and select for the project registry table.
+  // `projects` is already org-scoped server-side (including projects shared
+  // into this org, whose own organization_id points to the owning org) --
+  // re-filtering here by strict organization_id equality would drop those
+  // shared-in projects even though the API correctly returned them.
   const table = $state(
     createTableState<Project, number>({
-      rows: () => orgScopedProjects,
+      rows: () => projects || [],
       getId: (p) => p.id,
       searchFields: (p) => [p.name, p.description],
       filters: {
