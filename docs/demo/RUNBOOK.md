@@ -70,17 +70,17 @@ they would be scored from the wrong table.
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Confirm it came up on the database rather than the fallback — the second number
-must be 0:
+Confirm it came up on the database rather than the fallback — check the logs for
+any `Using hardcoded fallback ruleset` line. The demo may proceed only if none
+appears:
 
 ```powershell
-curl.exe -s http://127.0.0.1:8000/api/health
+Select-String -Quiet -Path docs\validation\demo-backend.log -Pattern "Using hardcoded fallback ruleset"
 ```
 
-Watch the startup log for lines reading
-`static_data_assets?...asset_key=eq.ruleset:BIMGUARD-GC-001 ... 200 OK`. A line
-reading `Using hardcoded fallback ruleset` means the backend cannot see the
-database: stop, fix `.env`, start again.
+This returns `True` if the fallback was used (stop, fix `.env`, start again) or
+`False` if the database is reachable. Alternatively watch the startup log for
+lines reading `static_data_assets?...asset_key=eq.ruleset:BIMGUARD-GC-001 ... 200 OK`.
 
 **Frontend — from `frontend\`:**
 
@@ -206,7 +206,8 @@ nothing above Low to coordinate.
 ### 3. Seismic on 1542
 
 Switch to the **Seismic** tab, project *FINAL AUDIT Seismic WR Federated*. It
-loads its stored result on mount.
+loads its stored result on mount once the cache is warm; on a cold backend it
+shows Run Audit — this is why pre-warm precedes the demo.
 
 Expect: **2,937 clashes** — 783 Critical, 314 High, 1,840 Medium. The federation
 is two models, `west_riverside_hospital_plumb_ifc4.ifc` and
@@ -306,3 +307,20 @@ State these plainly if asked; every one is measured, not estimated.
   West Riverside, 0 on the 4-element MEP scenario.
 - **The federated clash count is not comparable to the previously recorded
   19,552**, which covered three buildings; this federation is two models.
+- **Parser non-determinism on West Riverside (1540)** — two elements may flip
+  material assignment between identical runs; measured as MM-001 DQ count
+  variation 29,181 / 29,183 / 29,181 across three sequential parses (audit F2).
+- **`resolve_material` does not normalise underscores** — keys like
+  `SS_316_passive` resolve to `carbon_steel` instead of their series entries.
+  Latent on the demo corpus (0 affected of 420 elements on 1917; audit F3).
+- **MC-001 issues Critical verdicts when material is absent** — the gate passes
+  elements with no material, so they score with `material_source: absent` and
+  `material_confidence: none`. By design; wording in the report should flag it
+  (audit F6).
+- **Absent flow velocity is scored as stagnant** — elements with temperature but
+  no velocity coerce to 0.0 m/s and then to the worst class. Structurally
+  reachable but 0 occurrences on this corpus (audit F8).
+- **BCF export does not implement steps 11–12** — camera frame from bounding
+  box and status-change comments are not generated.
+- **"Missing bearer token" appears when viewing an audit with no project
+  selected** — select a project name from the dropdown to recover.

@@ -1,3 +1,5 @@
+SUPERSEDED — figures in this file were retracted; see docs/validation/final-godmode-audit-2026-09-07.md §8.
+
 # BIMGUARD AI — Project Continuity Prompt (Updated September 2026)
 ## Copy and paste this entire document into a new chat to continue the project
 

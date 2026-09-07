@@ -1,3 +1,5 @@
+SUPERSEDED — figures in this file were retracted; see docs/validation/final-godmode-audit-2026-09-07.md §8.
+
 # FMP Submission Candidate Build — HEAD ac55b0b
 
 **Date:** 2026-09-05  
