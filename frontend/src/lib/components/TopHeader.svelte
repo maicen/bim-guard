@@ -5,7 +5,6 @@
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
   import OrgSwitcher from "./OrgSwitcher.svelte";
-  import ProjectSwitcher from "./ProjectSwitcher.svelte";
   import ResourcesMenu from "./ResourcesMenu.svelte";
   import IntegrationsMenu from "./IntegrationsMenu.svelte";
   import UserMenu from "./UserMenu.svelte";
@@ -16,15 +15,10 @@
     /** Whether the app shell is currently in project view (see App.svelte). */
     isProjectView?: boolean;
     selectedProject?: Project | null;
-    selectedProjectId?: number | null;
     /** Opens the navigation drawer; only rendered below `md`. */
     onOpenMobileNav?: () => void;
     /** Navigate to the Live Workflow view for a tracked project's pipeline. */
     onOpenPipeline?: (projectId: number) => void;
-    /** Switch the app's current project context. */
-    onSwitchProject?: (projectId: number) => void;
-    /** Clear the app's current project context ("None" selected). */
-    onClearProject?: () => void;
     /** Leave project view and return to the organization dashboard. */
     onExitProject?: () => void;
   }
@@ -33,11 +27,8 @@
     activeView,
     isProjectView = false,
     selectedProject = null,
-    selectedProjectId = null,
     onOpenMobileNav = () => {},
     onOpenPipeline,
-    onSwitchProject,
-    onClearProject,
     onExitProject,
   }: Props = $props();
 
@@ -105,7 +96,7 @@
       </button>
       <span class="hidden text-slate-600 sm:inline">/</span>
       <span class="truncate font-semibold text-slate-100"
-        >{selectedProject?.name || "Project"}</span
+        >{selectedProject?.short_name || selectedProject?.name || "Project"}</span
       >
       <span class="hidden text-slate-600 sm:inline">·</span>
       <span class="hidden text-slate-400 sm:inline">{headerInfo.title}</span>
@@ -115,18 +106,18 @@
       <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
     {/if}
 
-    {#if onSwitchProject}
-      <ProjectSwitcher
-        {selectedProject}
-        {selectedProjectId}
-        onSwitch={onSwitchProject}
-        onClear={onClearProject}
-      />
-    {:else if selectedProject}
+    <!-- Persistent project identity: a short name plus its ISO 19650 project
+         code, kept on screen wherever a project is selected instead of the
+         switcher dropdown this replaced. -->
+    {#if selectedProject}
       <span
         class="ml-2 hidden items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/60 px-2.5 py-0.5 text-xs font-medium text-slate-300 sm:inline-flex"
+        title={selectedProject.name}
       >
-        Project: {selectedProject.name}
+        {selectedProject.short_name || selectedProject.name}
+        {#if selectedProject.project_code}
+          <span class="text-slate-500">· {selectedProject.project_code}</span>
+        {/if}
       </span>
     {/if}
   </div>

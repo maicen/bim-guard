@@ -3,6 +3,13 @@
 
   import { X, Check, Pencil, AlertTriangle } from "lucide-svelte";
   import { bsddApi, projectsApi } from "../api";
+  import {
+    PROJECT_CODE_MAX_LENGTH,
+    PROJECT_CODE_MIN_LENGTH,
+    PROJECT_CODE_PATTERN,
+    SHORT_NAME_MAX_LENGTH,
+    SHORT_NAME_MIN_LENGTH,
+  } from "../types";
   import type { BSDDDictionaryItem, Project } from "../types";
 
   interface Props {
@@ -15,6 +22,8 @@
   let { isOpen = false, project = null, onClose, onProjectUpdated }: Props = $props();
 
   let name = $state("");
+  let shortName = $state("");
+  let projectCode = $state("");
   let description = $state("");
   let status = $state("Active");
   let country = $state("Canada");
@@ -37,6 +46,8 @@
   run(() => {
     if (isOpen && project) {
       name = project.name || "";
+      shortName = project.short_name || "";
+      projectCode = project.project_code || "";
       description = project.description || "";
       status = project.status || "Active";
       country = project.country || "Canada";
@@ -46,10 +57,26 @@
     }
   });
 
+  /** Mirrors the required-field checks the New Project wizard runs on step 1. */
+  function validationError(): string {
+    if (!name.trim()) return "Project name is required.";
+    if (!shortName.trim() || shortName.trim().length < SHORT_NAME_MIN_LENGTH) {
+      return `Short name must be at least ${SHORT_NAME_MIN_LENGTH} characters.`;
+    }
+    if (!projectCode.trim() || projectCode.trim().length < PROJECT_CODE_MIN_LENGTH) {
+      return `Project code must be at least ${PROJECT_CODE_MIN_LENGTH} alphanumeric characters.`;
+    }
+    if (!PROJECT_CODE_PATTERN.test(projectCode.trim())) {
+      return "Project code may only contain letters and numbers.";
+    }
+    return "";
+  }
+
   async function handleSave() {
     if (!project) return;
-    if (!name.trim()) {
-      errorMessage = "Project name is required.";
+    const error = validationError();
+    if (error) {
+      errorMessage = error;
       return;
     }
 
@@ -58,6 +85,8 @@
     try {
       const updated = await projectsApi.update(project.id, {
         name: name.trim(),
+        short_name: shortName.trim(),
+        project_code: projectCode.trim().toUpperCase(),
         description: description.trim(),
         status,
         country,
@@ -125,6 +154,35 @@
             placeholder="e.g. Waterfront Commercial Tower"
             class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
           />
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="space-y-1.5">
+            <label for="edit-proj-short-name" class="block text-xs font-semibold text-slate-300">
+              Short Name <span class="text-rose-400">*</span>
+            </label>
+            <input
+              id="edit-proj-short-name"
+              type="text"
+              bind:value={shortName}
+              maxlength={SHORT_NAME_MAX_LENGTH}
+              placeholder="e.g. Waterfront Tower"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <label for="edit-proj-code" class="block text-xs font-semibold text-slate-300">
+              Project Code <span class="text-rose-400">*</span>
+            </label>
+            <input
+              id="edit-proj-code"
+              type="text"
+              bind:value={projectCode}
+              maxlength={PROJECT_CODE_MAX_LENGTH}
+              placeholder="e.g. WFT"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs uppercase text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            />
+          </div>
         </div>
 
         <div class="space-y-1.5">
@@ -221,7 +279,7 @@
         </button>
         <button
           type="button"
-          disabled={isSaving || !name.trim()}
+          disabled={isSaving || !!validationError()}
           onclick={handleSave}
           class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50 disabled:hover:scale-100"
         >

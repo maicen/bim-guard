@@ -193,8 +193,8 @@
   //
   // The targetProjectId reads/writes below are wrapped in untrack() so this
   // effect only re-fires on an actual queryParams/activeView change, never
-  // just because targetProjectId changed elsewhere (handleSwitchProject,
-  // handleClearProject, ...). Those already push/replace the correct URL
+  // just because targetProjectId changed elsewhere (loadProjectDetails,
+  // handleExitProject, ...). Those already push/replace the correct URL
   // themselves; without untrack, this effect would see the still-stale URL
   // (push/replace await a tick before touching the hash) and immediately
   // re-derive the old targetProjectId from it -- the same race that used to
@@ -319,10 +319,10 @@
     push(buildTargetUrl(viewForAnalysisDomain(project.analysis_type), project.id));
   }
 
-  // Views that read a project from targetProjectId/query string. Switching
-  // context from the header's ProjectSwitcher while on one of these re-runs
-  // that same view against the new project; from anywhere else it just
-  // updates the context so the next project-scoped view you open has it.
+  // Views that read a project from targetProjectId/query string. Picking a
+  // different project from the Dashboard's registry while on one of these
+  // re-runs that same view against the new project; from anywhere else it
+  // just updates the context so the next project-scoped view you open has it.
   const PROJECT_SCOPED_VIEWS = new Set([
     "arch",
     "piping",
@@ -419,8 +419,8 @@
   });
 
   // Leaves project view without forgetting the project: targetProjectId and
-  // localStorage are untouched, so re-entering (via ProjectSwitcher or
-  // Existing Projects) lands back in project view for the same project.
+  // localStorage are untouched, so re-entering (via Existing Projects) lands
+  // back in project view for the same project.
   function handleExitProject() {
     const params = new URLSearchParams();
     if (authState.activeOrganizationId) {
@@ -428,31 +428,6 @@
     }
     const q = params.toString();
     push(q ? `/dashboard?${q}` : "/dashboard");
-  }
-
-  // "None" selected in the header's ProjectSwitcher: forget the project
-  // entirely (unlike handleExitProject, which leaves project view but keeps
-  // targetProjectId/localStorage so re-entering lands back on the same one).
-  function handleClearProject() {
-    selectedProject = null;
-    targetProjectId = null;
-    try {
-      localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
-    } catch {}
-    if (PROJECT_SCOPED_VIEWS.has(activeView)) {
-      handleExitProject();
-    }
-  }
-
-  function handleSwitchProject(projectId: number) {
-    targetProjectId = projectId;
-    loadProjectDetails(projectId);
-    try {
-      localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(projectId));
-    } catch {}
-    if (PROJECT_SCOPED_VIEWS.has(activeView)) {
-      push(buildTargetUrl(activeView, projectId));
-    }
   }
 
   function handleSelectAuditDomain(domain: AnalysisDomainTab) {
@@ -517,11 +492,8 @@
       {activeView}
       {isProjectView}
       {selectedProject}
-      selectedProjectId={targetProjectId}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
-      onSwitchProject={handleSwitchProject}
-      onClearProject={handleClearProject}
       onExitProject={handleExitProject}
     />
 

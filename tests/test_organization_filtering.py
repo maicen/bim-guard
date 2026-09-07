@@ -94,6 +94,8 @@ def test_create_project_organization_rbac_and_persistence():
     # 1. TEST_USER is in Org 1, not Org 2. Trying to create in Org 2 should fail with 403.
     unauth_resp = client.post("/api/projects", json={
         "name": "Unauthorized Org Project",
+        "short_name": "UnauthOrg",
+        "project_code": "UNA",
         "description": "Should be forbidden",
         "country": "Canada",
         "analysis_type": "Arch",
@@ -104,6 +106,8 @@ def test_create_project_organization_rbac_and_persistence():
     # 2. Creating in Org 1 (which TEST_USER owns) succeeds.
     create_resp = client.post("/api/projects", json={
         "name": "Org1 Scoped Test Project",
+        "short_name": "Org1 Test",
+        "project_code": "ORG1",
         "description": "Integration test for org-scoped project creation",
         "country": "Canada",
         "analysis_type": "Arch",

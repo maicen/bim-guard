@@ -60,6 +60,7 @@ class ProjectsService:
                 {
                     "id": int,
                     "name": str,
+                    "short_name": str,
                     "description": str,
                     "status": str,
                     "country": str,
@@ -248,6 +249,7 @@ class ProjectsService:
     def create_project(
         self,
         name: str,
+        short_name: str = "",
         description: str = "",
         status: str = "Draft",
         ifc_file_path: str = "",
@@ -276,6 +278,11 @@ class ProjectsService:
 
         Args:
             name: Project name. Required; a blank name is rejected.
+            short_name: Short display nickname shown in the header and
+                breadcrumbs instead of the full name. Required by the
+                ``POST /api/projects`` contract; left optional here since
+                other internal callers (tests, the legacy multipart upload
+                endpoint) do not all set one.
             description: Optional free-text description.
             status: Workflow status.
             ifc_file_path: Storage reference for the uploaded IFC model.
@@ -301,7 +308,9 @@ class ProjectsService:
                 constraint from being the first thing to notice a bad value.
         """
         name = name.strip()
+        short_name = short_name.strip()
         country = country.strip()
+        project_code = project_code.strip().upper()
         analysis_type = normalize_analysis_type(analysis_type.strip())
         if not name:
             raise ValueError("Project name is required")
@@ -321,6 +330,7 @@ class ProjectsService:
         now = now_iso_utc()
         row = {
             "name": name,
+            "short_name": short_name,
             "description": description.strip(),
             "status": status,
             "country": country,
@@ -377,6 +387,7 @@ class ProjectsService:
         self,
         project_id: int,
         name: str,
+        short_name: str | None = None,
         description: str = "",
         status: str = "Draft",
         country: str = "",
@@ -400,12 +411,14 @@ class ProjectsService:
             "status": status,
             "updated_at": now_iso_utc(),
         }
+        if short_name is not None:
+            updates["short_name"] = short_name.strip()
         if country:
             updates["country"] = country.strip()
         if analysis_type:
             updates["analysis_type"] = normalize_analysis_type(analysis_type.strip())
         if project_code is not None:
-            updates["project_code"] = project_code.strip()
+            updates["project_code"] = project_code.strip().upper()
         if originator is not None:
             updates["originator"] = originator.strip()
         if volume_system is not None:

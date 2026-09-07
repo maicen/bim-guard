@@ -40,6 +40,11 @@ from app.constants import (
 )
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    PROJECT_CODE_MAX_LENGTH,
+    PROJECT_CODE_MIN_LENGTH,
+    PROJECT_CODE_PATTERN,
+    SHORT_NAME_MAX_LENGTH,
+    SHORT_NAME_MIN_LENGTH,
     AnalysisInputItemContract,
     AttachRepoModelsRequest,
     BuildingCodeOption,
@@ -457,6 +462,7 @@ def create_project(
     try:
         created = service.create_project(
             name=payload.name,
+            short_name=payload.short_name,
             organization_id=target_org_id,
             description=payload.description or "",
             status=payload.status,
@@ -499,6 +505,9 @@ def create_project(
 )
 async def create_project_with_ifc(
     name: Annotated[str, Form(..., min_length=1)],
+    short_name: Annotated[
+        str, Form(..., min_length=SHORT_NAME_MIN_LENGTH, max_length=SHORT_NAME_MAX_LENGTH)
+    ],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
@@ -517,6 +526,17 @@ async def create_project_with_ifc(
     document_ids: Annotated[list[int], Form()] = [],
     standards_codes: Annotated[list[str], Form()] = [],
     classification_standard: Annotated[Optional[str], Form()] = None,
+    # Explicit override for when the IFC filename isn't ISO 19650-formed (or
+    # no model is attached yet) and so has no project_code to derive one from.
+    project_code_override: Annotated[
+        Optional[str],
+        Form(
+            alias="project_code",
+            min_length=PROJECT_CODE_MIN_LENGTH,
+            max_length=PROJECT_CODE_MAX_LENGTH,
+            pattern=PROJECT_CODE_PATTERN,
+        ),
+    ] = None,
     ifc_file: Optional[UploadFile] = File(None),
 ) -> ProjectResponse:
     """Create a project and optionally attach an uploaded IFC model."""
@@ -561,9 +581,21 @@ async def create_project_with_ifc(
             suitability_code = val.fields.get("suitability_code", "S0")
             revision_code = val.fields.get("revision_code", "P01.01")
 
+    if project_code_override:
+        project_code = project_code_override
+    if not project_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "project_code is required: attach an ISO 19650-named IFC file "
+                "or pass project_code explicitly."
+            ),
+        )
+
     try:
         created = service.create_project(
             name=name,
+            short_name=short_name,
             organization_id=target_org_id,
             description=description,
             status=status_field,
@@ -623,8 +655,9 @@ def update_project(
         updated = service.update_project(
             project_id,
             name,
-            description,
-            status_val,
+            short_name=payload.short_name,
+            description=description,
+            status=status_val,
             country=country,
             analysis_type=analysis_type,
             project_code=payload.project_code,

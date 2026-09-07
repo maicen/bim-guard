@@ -15,18 +15,24 @@ def cde_test_project():
     These tests exercise the real projects API/DB, so without teardown every
     run left an orphaned "OpenCDE ..." project behind.
     """
+    created_ids: list[int] = []
 
     def _create(name: str, country: str, analysis_type: str) -> int:
         resp = client.post(
             "/api/projects",
-            json={"name": name, "country": country, "analysis_type": analysis_type},
+            json={
+                "name": name,
+                "short_name": name[:24],
+                "project_code": f"CDE{len(created_ids)}",
+                "country": country,
+                "analysis_type": analysis_type,
+            },
         )
         assert resp.status_code == 201
         project_id = resp.json()["id"]
         created_ids.append(project_id)
         return project_id
 
-    created_ids: list[int] = []
     yield _create
     for project_id in created_ids:
         client.delete(f"/api/projects/{project_id}")

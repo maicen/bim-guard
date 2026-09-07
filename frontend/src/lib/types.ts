@@ -51,6 +51,8 @@ export type AnalysisDomain = "Arch" | "Piping" | "seismic";
 export interface Project {
   id: number;
   name: string;
+  /** Short display nickname shown in the header/breadcrumbs instead of the full name. */
+  short_name?: string;
   organization_id?: number | null;
   description?: string;
   status: string;
@@ -80,6 +82,23 @@ export interface Project {
   /** bSDD dictionary code (e.g. uniclass_2015, omniclass_2020) this project is classified against. */
   classification_standard?: string | null;
 }
+
+/**
+ * ISO 19650 container naming keeps the project code segment short -- 2-6
+ * alphanumeric characters, no separators. Mirrors PROJECT_CODE_MIN_LENGTH /
+ * PROJECT_CODE_MAX_LENGTH / PROJECT_CODE_PATTERN in app/modules/contracts.py.
+ */
+export const PROJECT_CODE_MIN_LENGTH = 2;
+export const PROJECT_CODE_MAX_LENGTH = 6;
+export const PROJECT_CODE_PATTERN = /^[A-Za-z0-9]+$/;
+
+/**
+ * The short name is a human-readable nickname (not an ISO 19650 field), kept
+ * short enough for the header and breadcrumbs that display it. Mirrors
+ * SHORT_NAME_MIN_LENGTH / SHORT_NAME_MAX_LENGTH in app/modules/contracts.py.
+ */
+export const SHORT_NAME_MIN_LENGTH = 2;
+export const SHORT_NAME_MAX_LENGTH = 24;
 
 /**
  * Discipline/role an attached IFC model carries.
@@ -126,6 +145,8 @@ export interface ProjectListResponse {
 
 export interface ProjectCreatePayload {
   name: string;
+  /** Required: short display nickname shown in the header/breadcrumbs. 2-24 characters. */
+  short_name: string;
   organization_id?: number | null;
   description?: string;
   status?: string;
@@ -138,7 +159,8 @@ export interface ProjectCreatePayload {
   floors_count?: number | null;
   document_ids?: number[];
   standards_codes?: string[];
-  project_code?: string;
+  /** Required: ISO 19650 project code, 2-6 alphanumeric characters. */
+  project_code: string;
   originator?: string;
   volume_system?: string;
   level?: string;
@@ -182,6 +204,7 @@ export interface ProjectOptions {
 
 export interface ProjectUpdatePayload {
   name?: string;
+  short_name?: string;
   description?: string;
   status?: string;
   country?: string;

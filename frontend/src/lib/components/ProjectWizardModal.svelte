@@ -6,7 +6,14 @@
   import { X, Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from "lucide-svelte";
   import { bsddApi, projectsApi, documentsApi, namingConfigApi } from "../api";
   import { authState } from "../auth.svelte";
-  import { IFC_FILE_ROLES } from "../types";
+  import {
+    IFC_FILE_ROLES,
+    PROJECT_CODE_MAX_LENGTH,
+    PROJECT_CODE_MIN_LENGTH,
+    PROJECT_CODE_PATTERN,
+    SHORT_NAME_MAX_LENGTH,
+    SHORT_NAME_MIN_LENGTH,
+  } from "../types";
   import type {
     BSDDDictionaryItem,
     Project,
@@ -30,6 +37,8 @@
 
   // Form State
   let name = $state("");
+  let shortName = $state("");
+  let projectCode = $state("");
   let description = $state("");
   let status = $state("Active");
   let country = $state("Canada");
@@ -327,20 +336,39 @@
     }
   }
 
+  /** Step 1 requires a name plus a short name and ISO 19650 project code. */
+  function step1ValidationError(): string {
+    if (!name.trim()) return "Please provide a project name.";
+    if (!shortName.trim() || shortName.trim().length < SHORT_NAME_MIN_LENGTH) {
+      return `Short name must be at least ${SHORT_NAME_MIN_LENGTH} characters.`;
+    }
+    if (!projectCode.trim() || projectCode.trim().length < PROJECT_CODE_MIN_LENGTH) {
+      return `Project code must be at least ${PROJECT_CODE_MIN_LENGTH} alphanumeric characters.`;
+    }
+    if (!PROJECT_CODE_PATTERN.test(projectCode.trim())) {
+      return "Project code may only contain letters and numbers.";
+    }
+    return "";
+  }
+
   function goToStep(stepNum: number) {
     if (stepNum === currentStep) return;
-    if (stepNum > 1 && !name.trim()) {
-      errorMessage = "Please provide a project name first.";
-      currentStep = 1;
-      return;
+    if (stepNum > 1) {
+      const error = step1ValidationError();
+      if (error) {
+        errorMessage = error;
+        currentStep = 1;
+        return;
+      }
     }
     errorMessage = "";
     currentStep = stepNum;
   }
 
   async function handleFinish() {
-    if (!name.trim()) {
-      errorMessage = "Project name is required.";
+    const step1Error = step1ValidationError();
+    if (step1Error) {
+      errorMessage = step1Error;
       currentStep = 1;
       return;
     }
@@ -360,6 +388,8 @@
           ? await projectsApi.get(createdProjectId)
           : await projectsApi.create({
               name,
+              short_name: shortName.trim(),
+              project_code: projectCode.trim().toUpperCase(),
               description,
               status,
               country,
@@ -418,6 +448,8 @@
   function handleClose() {
     currentStep = 1;
     name = "";
+    shortName = "";
+    projectCode = "";
     description = "";
     status = "Active";
     country = "Canada";
@@ -541,6 +573,50 @@
                 class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
               />
             </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  for="wizard-short-name"
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300"
+                >
+                  Short Name *
+                </label>
+                <input
+                  id="wizard-short-name"
+                  type="text"
+                  bind:value={shortName}
+                  maxlength={SHORT_NAME_MAX_LENGTH}
+                  placeholder="e.g. BG HQ Phase 1"
+                  class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+                />
+                <p class="mt-1 text-caption text-slate-500">
+                  Shown in the header instead of the full name ({SHORT_NAME_MIN_LENGTH}-{SHORT_NAME_MAX_LENGTH}
+                  characters).
+                </p>
+              </div>
+              <div>
+                <label
+                  for="wizard-project-code"
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300"
+                >
+                  Project Code *
+                </label>
+                <input
+                  id="wizard-project-code"
+                  type="text"
+                  bind:value={projectCode}
+                  maxlength={PROJECT_CODE_MAX_LENGTH}
+                  placeholder="e.g. BGHQ1"
+                  class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm uppercase text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+                />
+                <p class="mt-1 text-caption text-slate-500">
+                  ISO 19650 container naming code: {PROJECT_CODE_MIN_LENGTH}-{PROJECT_CODE_MAX_LENGTH}
+                  alphanumeric characters.
+                </p>
+              </div>
+            </div>
+
             <div>
               <label
                 for="wizard-desc"
@@ -1027,6 +1103,12 @@
                 <span class="font-semibold text-slate-50">{name}</span>
               </div>
               <div class="flex justify-between border-b border-slate-800 py-1">
+                <span class="font-medium text-slate-400">Short Name / Code:</span>
+                <span class="font-semibold text-slate-50"
+                  >{shortName} / {projectCode.toUpperCase()}</span
+                >
+              </div>
+              <div class="flex justify-between border-b border-slate-800 py-1">
                 <span class="font-medium text-slate-400">Status:</span>
                 <span class="font-semibold text-slate-50">{status}</span>
               </div>
@@ -1107,9 +1189,12 @@
           <button
             type="button"
             onclick={() => {
-              if (currentStep === 1 && !name.trim()) {
-                errorMessage = "Please provide a project name.";
-                return;
+              if (currentStep === 1) {
+                const error = step1ValidationError();
+                if (error) {
+                  errorMessage = error;
+                  return;
+                }
               }
               errorMessage = "";
               currentStep += 1;

@@ -125,10 +125,30 @@ class CDEState(str, Enum):
     ARCHIVED = "ARCHIVED"
 
 
+#: ISO 19650 container naming keeps the project code segment short --
+#: 2-6 uppercase/lowercase alphanumeric characters, no separators (the
+#: hyphen is the field delimiter itself; see iso_validator.py).
+PROJECT_CODE_MIN_LENGTH = 2
+PROJECT_CODE_MAX_LENGTH = 6
+PROJECT_CODE_PATTERN = r"^[A-Za-z0-9]+$"
+
+#: The short name is a human-readable nickname (not an ISO 19650 field), kept
+#: short enough to fit in the header and breadcrumbs that now display it
+#: instead of the full project name.
+SHORT_NAME_MIN_LENGTH = 2
+SHORT_NAME_MAX_LENGTH = 24
+
+
 class ProjectCreateRequest(BaseModel):
     """Payload for creating a project."""
 
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
+    short_name: str = Field(
+        ...,
+        min_length=SHORT_NAME_MIN_LENGTH,
+        max_length=SHORT_NAME_MAX_LENGTH,
+        description="Short display nickname shown in the header and breadcrumbs",
+    )
     description: Optional[str] = Field(default="", description="Optional description")
     status: str = Field(default="Draft", description="Workflow status")
     country: str = Field(..., description="Jurisdiction governing code applicability")
@@ -153,7 +173,13 @@ class ProjectCreateRequest(BaseModel):
     )
 
     # ISO 19650 Container Naming & CDE Metadata
-    project_code: Optional[str] = Field(default="", description="ISO 19650 Project Code")
+    project_code: str = Field(
+        ...,
+        min_length=PROJECT_CODE_MIN_LENGTH,
+        max_length=PROJECT_CODE_MAX_LENGTH,
+        pattern=PROJECT_CODE_PATTERN,
+        description="ISO 19650 Project Code (2-6 alphanumeric characters)",
+    )
     originator: Optional[str] = Field(default="", description="ISO 19650 Originator Code")
     volume_system: Optional[str] = Field(default="", description="ISO 19650 Volume/System Breakdown")
     level: Optional[str] = Field(default="", description="ISO 19650 Level/Location Breakdown")
@@ -183,13 +209,21 @@ class ProjectUpdateRequest(BaseModel):
     """Payload for updating an existing project."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+    short_name: Optional[str] = Field(
+        None, min_length=SHORT_NAME_MIN_LENGTH, max_length=SHORT_NAME_MAX_LENGTH
+    )
     description: Optional[str] = None
     status: Optional[str] = None
     country: Optional[str] = None
     analysis_type: Optional[str] = None
 
     # ISO 19650 Container Naming & CDE Metadata
-    project_code: Optional[str] = None
+    project_code: Optional[str] = Field(
+        None,
+        min_length=PROJECT_CODE_MIN_LENGTH,
+        max_length=PROJECT_CODE_MAX_LENGTH,
+        pattern=PROJECT_CODE_PATTERN,
+    )
     originator: Optional[str] = None
     volume_system: Optional[str] = None
     level: Optional[str] = None
@@ -246,6 +280,7 @@ class ProjectResponse(BaseModel):
 
     id: int
     name: str
+    short_name: Optional[str] = ""
     organization_id: Optional[int] = None
     description: Optional[str] = ""
     status: Optional[str] = "Draft"

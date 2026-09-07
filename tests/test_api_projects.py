@@ -80,6 +80,8 @@ def test_create_project_rejects_unknown_building_code():
         "/api/projects",
         json={
             "name": "Unknown code project",
+            "short_name": "UnkCode",
+            "project_code": "UNK",
             "country": "Canada",
             "analysis_type": "Arch",
             "building_code": "NOT-A-CODE",
@@ -97,6 +99,8 @@ def test_create_project_persists_building_code():
         "/api/projects",
         json={
             "name": "Building code round-trip",
+            "short_name": "BldgCode",
+            "project_code": "BCRT",
             "country": "Canada",
             "analysis_type": "Arch",
             "building_code": "OBC-PART9",
@@ -116,7 +120,13 @@ def test_create_project_without_building_code_is_allowed():
 
     response = client.post(
         "/api/projects",
-        json={"name": "Corrosion, no code", "country": "Canada", "analysis_type": "Piping"},
+        json={
+            "name": "Corrosion, no code",
+            "short_name": "NoCode",
+            "project_code": "NOC",
+            "country": "Canada",
+            "analysis_type": "Piping",
+        },
     )
     assert response.status_code == 201
     created = response.json()
@@ -134,6 +144,8 @@ def test_create_project_persists_classification_standard():
         "/api/projects",
         json={
             "name": "Classification standard round-trip",
+            "short_name": "ClassStd",
+            "project_code": "CLS",
             "country": "Canada",
             "analysis_type": "Arch",
             "classification_standard": "uniclass_2015",
