@@ -1,5 +1,7 @@
 {
   "metadata": {
+    "ruleset_id": "BIMGUARD-SB-001",
+    "schema_version": "1.0.0",
     "jurisdiction": "EN 1998-1:2020 + DIN 4149:2022",
     "region": "EU / Germany",
     "created_by": "hermes_config_expanded.py",

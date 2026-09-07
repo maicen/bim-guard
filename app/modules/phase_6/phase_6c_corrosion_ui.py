@@ -710,6 +710,31 @@ def _xm_compatibility_thresholds() -> dict:
     return thresholds
 
 
+def _pack_ruleset_version(rule_pack: dict, mechanism_code: str) -> str:
+    """Return the stamp to record on findings scored from ``rule_pack``.
+
+    Built from the pack's own ``ruleset_id`` and ``schema_version``, so it
+    names the revision this run actually loaded rather than a constant that can
+    drift from it, and formatted like the corrosion engines' own
+    ``RULESET_VERSION`` ("BIMGUARD-GC-001 v1.0.0") so one reader parses all of
+    them. Same construction MM-001 uses
+    (:func:`material_media.ruleset_version`).
+
+    Args:
+        rule_pack: The pack the comparator was handed.
+        mechanism_code: Fallback identity for a pack that names none, e.g.
+            ``"XM-001"``. A stamp that names only the mechanism is still worth
+            more than an unstamped finding.
+
+    Returns:
+        The ruleset stamp.
+    """
+    pack = rule_pack or {}
+    ruleset_id = str(pack.get("ruleset_id") or "").strip() or mechanism_code
+    version = str(pack.get("schema_version") or pack.get("version") or "").strip()
+    return f"{ruleset_id} v{version}" if version else ruleset_id
+
+
 def _assess_mm001(elements: list, spec: MechanismSpec, allocator: IssueIdAllocator):
     """Run MM-001 over the piping network.
 
@@ -741,6 +766,13 @@ def _assess_xm001(elements: list, spec: MechanismSpec, allocator: IssueIdAllocat
     voltages; both are injected from the GC-001 catalog so that no galvanic
     constant exists twice in the repository.
 
+    Every returned Issue is stamped with the version of the pack that produced
+    it, here rather than inside the comparator, for the reason MM-001 was
+    stamped in commit 1ec7a76: a verdict that cannot be traced to the ruleset
+    revision behind it cannot be re-checked. XM-001's own data-quality notes
+    are stamped too -- unlike MM-001's, they are produced from a loaded pack,
+    against a couple the comparator did assess.
+
     Args:
         elements: The ``PipingElement`` network.
         spec: The XM-001 mechanism spec, for the id prefix and logging.
@@ -755,6 +787,9 @@ def _assess_xm001(elements: list, spec: MechanismSpec, allocator: IssueIdAllocat
             compatibility_thresholds=_xm_compatibility_thresholds(),
         )
         issues = cross_material.compare(elements, rule_pack, allocator)
+        version = _pack_ruleset_version(rule_pack, XM.code)
+        for issue in issues:
+            issue.metadata["ruleset_version"] = version
         return issues, None
     except Exception as exc:
         logger.warning("Mechanism did not run mechanism=%s error=%s", spec.code, exc)

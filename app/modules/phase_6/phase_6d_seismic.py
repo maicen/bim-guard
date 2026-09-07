@@ -143,6 +143,37 @@ def _citations(config: ClearanceConfig, halo: HaloVolume) -> list[dict]:
     return citations
 
 
+def _ruleset_version(config: ClearanceConfig) -> str:
+    """Return the stamp to record on every finding this config produced.
+
+    Built from the loaded config's own ``metadata.ruleset_id`` and
+    ``metadata.schema_version`` rather than a constant in this module, so it
+    names the jurisdiction file the run actually read, and formatted like the
+    corrosion engines' ``RULESET_VERSION`` ("BIMGUARD-GC-001 v1.0.0") so one
+    reader parses all six mechanisms. Same construction MM-001 got in commit
+    1ec7a76; SB-001's 2,937 findings on project 1542 carried no version at all
+    (audit F4).
+
+    The config carried neither field until 2026-09-08, when both were added to
+    ``data/rulesets/config_en_1998_1_din_4149.json`` -- ``schema_version``
+    "1.0.0" matching the MM-001 and XM-001 packs, which are the same generation
+    of shipped ruleset. Read from the file, not written inline here: a version
+    the code invents is not provenance.
+
+    Args:
+        config: The loaded jurisdiction config. ``raw`` is its full parsed
+            JSON, kept by the loader for exactly this kind of audit read.
+
+    Returns:
+        The ruleset stamp, falling back to the bare mechanism code for a config
+        that names neither field -- an unstamped finding is worse.
+    """
+    metadata = (config.raw or {}).get("metadata") or {}
+    ruleset_id = str(metadata.get("ruleset_id") or "").strip() or MECHANISM_CODE
+    version = str(metadata.get("schema_version") or metadata.get("version") or "").strip()
+    return f"{ruleset_id} v{version}" if version else ruleset_id
+
+
 def _data_quality_issue(
     element_id: str,
     ifc_class: str,
@@ -520,6 +551,14 @@ def run_seismic_analysis(
         sum(1 for i in issues if i.mechanism == DATA_QUALITY),
         duplicates,
     )
+    # Which revision of the jurisdiction config produced these verdicts.
+    # Stamped here, over everything the run built, rather than in the two Issue
+    # builders: a data-quality note is as much a statement about this ruleset as
+    # a clash is, and one place cannot miss a branch the other added.
+    version = _ruleset_version(config)
+    for issue in issues:
+        issue.metadata["ruleset_version"] = version
+
     # Bracing scope stays in the log rather than the result: a seismic result
     # and a corrosion result must carry identical keys to be interchangeable
     # downstream, which tests/test_phase_6d_seismic.py pins.
