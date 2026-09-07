@@ -1,0 +1,44 @@
+{
+  "title": "9.8  STAIRS, LANDINGS, GUARDS AND HANDRAILS",
+  "notice": "FICTIONAL TEST CODE -- generated for BIM-Guard's automated test suite only. This document is not a reproduction of, and carries no authority under, any real building code; every clause number, dimension and requirement below is invented purely to exercise document parsing and rule extraction.",
+  "blocks": [
+    { "type": "heading", "number": "9.8.1", "title": "Scope" },
+    { "type": "clause", "text": "9.8.1.1.  This Subsection applies to interior and exterior stairs, ramps, landings, guards and handrails serving as part of a required means of egress or public stairway within a building." },
+
+    { "type": "heading", "number": "9.8.2", "title": "Stair Width and Headroom Clearance" },
+    { "type": "clause", "text": "9.8.2.1.  Except as provided in Sentence 9.8.2.1.(2), the clear width of a required exit stair, measured between wall faces or guards, shall not be less than 900 mm." },
+    { "type": "clause", "text": "9.8.2.1.(2)  A stair serving a single dwelling unit shall have a clear width of not less than 860 mm." },
+    { "type": "clause", "text": "9.8.2.2.  Headroom clearance over a stairway shall be measured vertically from a straight line tangent to the tread and landing nosings to the lowest point of any obstruction above, and shall not be less than 2 050 mm." },
+
+    { "type": "heading", "number": "9.8.3", "title": "Riser and Tread Dimensions" },
+    { "type": "clause", "text": "9.8.3.1.  The rise and run of a stair, measured as the vertical nosing-to-nosing distance for rise and the horizontal nosing-to-nosing distance for run, shall conform to Table 9.8.3.1." },
+    {
+      "type": "table",
+      "header": ["Stair Type", "Max. Rise (mm)", "Min. Rise (mm)", "Max. Run (mm)", "Min. Run (mm)"],
+      "rows": [
+        ["Private stairs", "200", "125", "355", "255"],
+        ["Public stairs", "180", "125", "no limit", "280"],
+        ["Service stairs", "no limit", "125", "355", "no limit"]
+      ]
+    },
+    { "type": "clause", "text": "9.8.3.2.  Except as permitted by Sentence 9.8.3.2.(2), risers in any one flight shall be of uniform height, with a maximum tolerance of 10 mm between the tallest and shortest riser in the flight." },
+    { "type": "clause", "text": "9.8.3.2.(2)  Treads shall have a uniform run with a maximum tolerance of 10 mm between the deepest and shallowest tread in a flight." },
+    { "type": "clause", "text": "9.8.3.3.  A nosing shall project not more than 25 mm beyond the face of the riser below it, and every open riser shall be deemed non-compliant unless the flight serves an unoccupied service space." },
+
+    { "type": "heading", "number": "9.8.4", "title": "Landings" },
+    { "type": "clause", "text": "9.8.4.1.  A landing provided at the top or bottom of a flight shall have a clear length, measured in the direction of travel, of not less than the required width of the stair, and need not exceed 1 100 mm." },
+    { "type": "clause", "text": "9.8.4.2.  The clear width of a landing shall not be less than the clear width of the stair it serves." },
+    { "type": "clause", "text": "9.8.4.3.  A flight shall not rise more than 3.7 m between landings without an intermediate landing being provided." },
+    { "type": "clause", "text": "9.8.4.4.  The slope of a landing's walking surface shall not exceed 1 in 50." },
+
+    { "type": "heading", "number": "9.8.5", "title": "Guards and Handrails" },
+    { "type": "clause", "text": "9.8.5.1.  A guard protecting the open side of a stair, landing or ramp shall have a height of not less than 900 mm, measured vertically from the tread nosing or landing surface to the top of the guard." },
+    { "type": "clause", "text": "9.8.5.2.  A guard shall be constructed so that no opening within it permits the passage of a sphere having a diameter of more than 100 mm, except that the triangular opening formed by a stair, a riser and the bottom rail of a guard is permitted to admit a sphere having a diameter of not more than 200 mm." },
+    { "type": "clause", "text": "9.8.5.3.  At least one handrail shall be provided on every required exit stair, and shall be located not less than 865 mm and not more than 965 mm above the line of the tread nosings." },
+    { "type": "clause", "text": "9.8.5.4.  A handrail shall be continuous throughout the length of a flight, without interruption by newel posts or other obstructions, and shall extend horizontally not less than 300 mm beyond the top and bottom risers of the flight it serves." },
+
+    { "type": "heading", "number": "9.8.6", "title": "Winders and Curved Flights" },
+    { "type": "clause", "text": "9.8.6.1.  Winders forming part of a flight shall turn through an angle of not more than 90 degrees between adjacent floor levels, and individual winder treads shall turn through an angle of not less than 30 degrees." },
+    { "type": "clause", "text": "9.8.6.2.  The run of a winder tread, measured at a point 300 mm from the centre line of the inside handrail, shall conform to the minimum run specified in Table 9.8.3.1. for the applicable stair type." }
+  ]
+}
