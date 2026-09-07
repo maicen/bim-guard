@@ -48,7 +48,6 @@ app/modules/
 │   ├── ifc_seismic.py              — seismic clearance element extraction
 │   ├── ifc_supports.py             — support/bracing element extraction
 │   ├── ifc_penetrations.py         — penetration/fire-separation extraction
-│   ├── iso19650_check.py           — ISO 19650 GUID, containment, and coverage checks
 │   ├── piping_schema.py            — Module 2 → Module 4 piping data contract
 │   ├── piping_fixtures.py          — plumbing fixture extraction
 │   ├── piping_producer.py          — piping element/segment extraction
