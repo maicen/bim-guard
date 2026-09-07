@@ -1291,6 +1291,8 @@ export interface OrganizationMembership {
   organization_id: number;
   name: string;
   slug: string;
+  /** ISO 19650 Originator Code for this organization. */
+  org_code: string;
   role: "owner" | "admin" | "member";
 }
 
@@ -1360,6 +1362,8 @@ export interface OrganizationSummary {
   id: number;
   name: string;
   slug: string;
+  /** ISO 19650 Originator Code for this organization. */
+  org_code: string;
 }
 
 /** Mirrors OrganizationListResponse. */
@@ -1370,6 +1374,8 @@ export interface OrganizationListResponse {
 /** Mirrors OrganizationCreateRequest. */
 export interface OrganizationCreatePayload {
   name: string;
+  /** Required: ISO 19650 Originator Code, 2-6 alphanumeric characters. */
+  org_code: string;
 }
 
 /** Mirrors AddMemberRequest. */

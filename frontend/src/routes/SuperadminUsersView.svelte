@@ -10,6 +10,7 @@
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import type { OrganizationSummary, UserSummary } from "../lib/types";
+  import { PROJECT_CODE_MAX_LENGTH, PROJECT_CODE_MIN_LENGTH } from "../lib/types";
 
   let orgs = $state.raw<OrganizationSummary[]>([]);
   let users = $state.raw<UserSummary[]>([]);
@@ -71,17 +72,20 @@
 
   let isCreateOrgOpen = $state(false);
   let newOrgName = $state("");
+  let newOrgCode = $state("");
   let isCreatingOrg = $state(false);
 
   async function submitCreateOrg() {
     const name = newOrgName.trim();
-    if (!name) return;
+    const orgCode = newOrgCode.trim();
+    if (!name || orgCode.length < PROJECT_CODE_MIN_LENGTH) return;
     isCreatingOrg = true;
     try {
-      await organizationsApi.create({ name });
+      await organizationsApi.create({ name, org_code: orgCode.toUpperCase() });
       toasts.success(`Organization "${name}" created.`);
       isCreateOrgOpen = false;
       newOrgName = "";
+      newOrgCode = "";
       await load();
     } catch (err) {
       toasts.fromError(err, "Could not create organization.");
@@ -220,6 +224,7 @@
                 <tr class="border-b border-slate-800 bg-slate-950/80">
                   <th class="px-4 py-3 font-semibold text-slate-300">Name</th>
                   <th class="px-4 py-3 font-semibold text-slate-300">Slug</th>
+                  <th class="px-4 py-3 font-semibold text-slate-300">Org Code</th>
                   <th class="px-4 py-3 text-center font-semibold text-slate-300">Members</th>
                   <th class="w-16 px-4 py-3 text-center font-semibold text-slate-300">Delete</th>
                 </tr>
@@ -229,6 +234,7 @@
                   <tr class="transition-colors hover:bg-slate-800/40">
                     <td class="px-4 py-3 font-semibold text-slate-100">{org.name}</td>
                     <td class="px-4 py-3 font-mono text-micro text-slate-400">{org.slug}</td>
+                    <td class="px-4 py-3 font-mono text-micro text-slate-400">{org.org_code}</td>
                     <td class="px-4 py-3 text-center font-mono text-slate-300">
                       {memberCounts[org.id] ?? 0}
                     </td>
@@ -385,16 +391,33 @@
     onClose={() => (isCreateOrgOpen = false)}
   >
     {#snippet children()}
-      <label class="block space-y-1.5" for="new-org-name">
-        <span class="text-xs font-semibold text-slate-300">Organization name</span>
-        <input
-          id="new-org-name"
-          type="text"
-          bind:value={newOrgName}
-          placeholder="e.g. Acme Engineering"
-          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
-        />
-      </label>
+      <div class="space-y-4">
+        <label class="block space-y-1.5" for="new-org-name">
+          <span class="text-xs font-semibold text-slate-300">Organization name</span>
+          <input
+            id="new-org-name"
+            type="text"
+            bind:value={newOrgName}
+            placeholder="e.g. Acme Engineering"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
+          />
+        </label>
+        <label class="block space-y-1.5" for="new-org-code">
+          <span class="text-xs font-semibold text-slate-300">Organization code *</span>
+          <input
+            id="new-org-code"
+            type="text"
+            bind:value={newOrgCode}
+            maxlength={PROJECT_CODE_MAX_LENGTH}
+            placeholder="e.g. ACME"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm uppercase text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
+          />
+          <span class="block text-caption text-slate-500">
+            ISO 19650 Originator code, {PROJECT_CODE_MIN_LENGTH}-{PROJECT_CODE_MAX_LENGTH} alphanumeric
+            characters. Every project or document this organization owns defaults to this code.
+          </span>
+        </label>
+      </div>
     {/snippet}
     {#snippet footer()}
       <button
@@ -407,7 +430,7 @@
       <button
         type="button"
         onclick={submitCreateOrg}
-        disabled={isCreatingOrg || !newOrgName.trim()}
+        disabled={isCreatingOrg || !newOrgName.trim() || newOrgCode.trim().length < PROJECT_CODE_MIN_LENGTH}
         class="h-9 rounded-xl bg-violet-600 px-4 text-xs font-semibold text-white shadow-lg shadow-violet-950/50 transition-all hover:bg-violet-500 disabled:opacity-50"
       >
         {isCreatingOrg ? "Creating…" : "Create"}

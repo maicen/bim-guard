@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse
 from app.api.dependencies import (
     get_document_access_service,
     get_documents_service,
+    get_membership_service,
     get_parsing_engine_instances_service,
 )
 from app.auth import get_current_user
@@ -42,6 +43,7 @@ from app.modules.contracts import (
 from app.modules.document_parsing.section_chunker import SectionChunker
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
+from app.services.membership_service import MembershipService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.utils import safe_upload_name, validate_document_upload
@@ -239,6 +241,7 @@ async def upload_document(
         ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)
     ] = None,
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)] = None,
+    memberships: Annotated[MembershipService, Depends(get_membership_service)] = None,
 ) -> DocumentDetailResponse:
     """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and extract text."""
     if service is None:
@@ -264,6 +267,18 @@ async def upload_document(
     if error_msg:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
 
+    target_org_id = organization_id
+    if target_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        target_org_id = int(x_org_id.strip())
+
+    # ISO 19650 Originator: default to the target organization's own code
+    # when the caller didn't specify one explicitly, same as project
+    # creation -- see app/api/projects.py create_project.
+    resolved_originator = originator or ""
+    if not resolved_originator and target_org_id is not None and memberships is not None:
+        org = memberships.get_organization(target_org_id)
+        resolved_originator = (org or {}).get("org_code", "") or ""
+
     clean_parser = (parser or "auto").strip().lower()
     try:
         # The Unstructured path runs an async job under the hood (several to
@@ -275,7 +290,7 @@ async def upload_document(
             content,
             doc_type=doc_type,
             project_code=project_code,
-            originator=originator,
+            originator=resolved_originator,
             suitability_code=suitability_code,
             revision_code=revision_code,
             parser=clean_parser,
@@ -283,10 +298,6 @@ async def upload_document(
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    target_org_id = organization_id
-    if target_org_id is None and x_org_id and x_org_id.strip().isdigit():
-        target_org_id = int(x_org_id.strip())
 
     if target_org_id is not None and document_access is not None and row and "id" in row:
         try:

@@ -98,7 +98,7 @@ def create_organization(
     """Create a new organization. Superadmin only."""
     _require_superadmin(current_user, profiles)
     try:
-        org = memberships.create_organization(payload.name)
+        org = memberships.create_organization(payload.name, payload.org_code)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return OrganizationSummary(**org)

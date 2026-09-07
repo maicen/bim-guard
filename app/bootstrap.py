@@ -253,6 +253,7 @@ def build_default_container() -> ApplicationContainer:
             "id": int,
             "name": str,
             "slug": str,
+            "org_code": str,
             "created_at": str,
             "updated_at": str,
         },

@@ -85,6 +85,7 @@
           id: o.organization_id,
           name: o.name,
           slug: o.slug,
+          org_code: o.org_code,
         }));
       }
       orgs = loadedOrgs;

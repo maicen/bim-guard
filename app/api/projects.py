@@ -459,6 +459,15 @@ def create_project(
     else:
         target_org_id = _primary_organization_id(current_user, memberships)
 
+    # ISO 19650 Originator: default to the owning organization's own code when
+    # the caller didn't specify one explicitly, so every project's container
+    # naming carries an organization code without asking the wizard for one
+    # it can already derive.
+    originator = payload.originator or ""
+    if not originator:
+        org = memberships.get_organization(target_org_id)
+        originator = (org or {}).get("org_code", "") or ""
+
     try:
         created = service.create_project(
             name=payload.name,
@@ -474,7 +483,7 @@ def create_project(
             buildings_count=payload.buildings_count,
             floors_count=payload.floors_count,
             project_code=payload.project_code or "",
-            originator=payload.originator or "",
+            originator=originator,
             volume_system=payload.volume_system or "",
             level=payload.level or "",
             type=payload.type or "",
@@ -591,6 +600,13 @@ async def create_project_with_ifc(
                 "or pass project_code explicitly."
             ),
         )
+
+    # Same organization-code fallback as the JSON create route: an IFC
+    # filename with no ISO 19650 originator segment still gets one from the
+    # owning organization rather than leaving it blank.
+    if not originator:
+        org = memberships.get_organization(target_org_id)
+        originator = (org or {}).get("org_code", "") or ""
 
     try:
         created = service.create_project(

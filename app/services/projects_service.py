@@ -747,6 +747,8 @@ class ProjectsService:
         file_name: str = "",
         role: str = "context",
         is_primary: bool = False,
+        project_code: str | None = None,
+        originator: str | None = None,
     ) -> dict:
         """Attach one IFC model to a project and return the row written.
 
@@ -759,6 +761,13 @@ class ProjectsService:
             is_primary: Whether this becomes the model an analysis run starts
                 from. Any previous primary is demoted first, and
                 ``projects.ifc_file_path`` is repointed so the two agree.
+            project_code: ISO 19650 project code for this model's container
+                naming. Defaults to the owning project's own ``project_code``
+                when not given, so every attached model carries one without
+                the upload form asking for it again.
+            originator: ISO 19650 originator code. Defaults to the owning
+                project's own ``originator`` (itself defaulted from the
+                organization's code at project-creation time) when not given.
 
         Returns:
             The inserted row.
@@ -775,6 +784,13 @@ class ProjectsService:
         if is_primary:
             self._demote_primary_ifc_files(project_id)
 
+        if project_code is None or originator is None:
+            parent = self.get_project(project_id) or {}
+            if project_code is None:
+                project_code = parent.get("project_code", "")
+            if originator is None:
+                originator = parent.get("originator", "")
+
         row = {
             "project_id": project_id,
             "file_path": file_path,
@@ -782,6 +798,8 @@ class ProjectsService:
             "is_primary": bool(is_primary),
             "role": (role or "").strip() or "context",
             "uploaded_at": now_iso_utc(),
+            "project_code": project_code or "",
+            "originator": originator or "",
         }
         inserted = self._ifc_files.insert(row)
         self._invalidate_ifc_files(project_id)

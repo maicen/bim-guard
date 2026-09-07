@@ -1897,6 +1897,9 @@ class OrganizationMembership(BaseModel):
     organization_id: int
     name: str
     slug: str
+    org_code: str = Field(
+        default="", description="ISO 19650 Originator Code for this organization"
+    )
     role: Literal["owner", "admin", "member"]
 
 
@@ -1988,6 +1991,9 @@ class OrganizationSummary(BaseModel):
     id: int
     name: str
     slug: str
+    org_code: str = Field(
+        default="", description="ISO 19650 Originator Code for this organization"
+    )
 
 
 class OrganizationListResponse(BaseModel):
@@ -2000,6 +2006,17 @@ class OrganizationCreateRequest(BaseModel):
     """A new organization to create. Superadmin only."""
 
     name: str = Field(..., min_length=1, max_length=200)
+    # ISO 19650 Originator Code -- shares the project code's length/pattern
+    # convention (a short alphanumeric segment in container naming); every
+    # project and document this organization owns defaults its own
+    # `originator` field from this when none is given explicitly.
+    org_code: str = Field(
+        ...,
+        min_length=PROJECT_CODE_MIN_LENGTH,
+        max_length=PROJECT_CODE_MAX_LENGTH,
+        pattern=PROJECT_CODE_PATTERN,
+        description="ISO 19650 Originator Code (2-6 alphanumeric characters)",
+    )
 
 
 class AddMemberRequest(BaseModel):

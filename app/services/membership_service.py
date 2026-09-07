@@ -53,6 +53,7 @@ class MembershipService:
                     "organization_id": org["id"],
                     "name": org["name"],
                     "slug": org["slug"],
+                    "org_code": org.get("org_code", ""),
                     "role": membership["role"],
                 }
             )
@@ -131,15 +132,18 @@ class MembershipService:
         """
         return sorted(self._organizations.rows, key=lambda o: o["id"], reverse=True)
 
-    def create_organization(self, name: str) -> dict[str, Any]:
+    def create_organization(self, name: str, org_code: str) -> dict[str, Any]:
         """Create a new organization with a unique, slugified name.
 
         Raises:
-            ValueError: if *name* is blank.
+            ValueError: if *name* or *org_code* is blank.
         """
         clean_name = (name or "").strip()
         if not clean_name:
             raise ValueError("An organization name is required.")
+        clean_org_code = (org_code or "").strip().upper()
+        if not clean_org_code:
+            raise ValueError("An organization code is required.")
         base_slug = re.sub(r"[^a-z0-9]+", "-", clean_name.lower()).strip("-") or "organization"
         existing_slugs = {o["slug"] for o in self._organizations.rows}
         slug = base_slug
@@ -147,7 +151,9 @@ class MembershipService:
         while slug in existing_slugs:
             slug = f"{base_slug}-{suffix}"
             suffix += 1
-        return self._organizations.insert({"name": clean_name, "slug": slug})
+        return self._organizations.insert(
+            {"name": clean_name, "slug": slug, "org_code": clean_org_code}
+        )
 
     def delete_organization(self, organization_id: int) -> None:
         """Permanently delete an organization.
