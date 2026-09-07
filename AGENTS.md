@@ -13,7 +13,7 @@ BIM-Guard uses a modern, decoupled architecture:
 - Install optional ML pipeline: `uv sync --group ml-pipeline`
 - Run backend locally: `uv run uvicorn main:app --reload`
 - Lint backend: `uv run ruff check .`
-- Run backend tests: `uv run pytest tests/`
+- Run backend tests (default fast path; skip slow tests unless strictly required): `uv run pytest tests/ -m 'not slow'`
 - Install frontend dependencies: `cd frontend && npm install`
 - Run frontend locally: `cd frontend && npm run dev`
 - Build frontend: `cd frontend && npm run build`
@@ -40,7 +40,7 @@ uv sync
 cd frontend && npm install && cd ..
 ```
 
-Optionally append `uv run ruff check .` and `uv run pytest tests/` before snapshotting to validate the environment.
+Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'` before snapshotting to validate the environment.
 
 ## Repo structure
 
@@ -78,6 +78,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/` before snapsh
 - **ISO 19650 & CDE Governance**: Ensure all project and document entities carry ISO 19650 metadata (`project_code`, `originator`, `volume_system`, `level`, `type`, `role`, `number`, `suitability_code`, `revision_code`, `cde_state`). State transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) must be governed by `CDEStateMachine`.
 - **Database-Driven Rules**: Never hardcode engineering cutoffs, scoring weights, or rule classifications in Python engines. Rules must be read dynamically from the database via `RuleService` and `corrosion_rule_catalog.py`.
 - **Real-Time Streaming**: Use Server-Sent Events (`/api/events/{project_id}`) for pipeline progress; avoid polling loops.
+- **Default validation rule**: Skip slow tests by default; only run them when the task is explicitly about slow pipeline/engine behavior or when there is no reliable fast-path validation. Routine verification should use `uv run pytest tests/ -m 'not slow'`.
 - **Root Directory Protection**: NEVER create or place new files (code, tests, reports, data, JSON manifests, scratch files) in the repository root. Always use the appropriate subdirectories (`app/`, `frontend/`, `tests/`, `scripts/`, `docs/`, `data/`, `supabase/migrations/`).
 - **Quality & Docs**: For public modules, classes, and functions, add or update PEP 257 docstrings.
 - **Universal Data Table UX Standards**: All data tables across the platform (Projects, Documents, Reports & BCF Topics/Deliverables, Rules Catalog, Extracted Rules Review, Audit Findings/Issues, Revit Sync, etc.) MUST provide rich, interactive, and user-friendly features following modern UX best practices:
@@ -113,6 +114,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/` before snapsh
 ## Quality bar
 
 - Build features consistent with the decoupled FastAPI + Svelte 5 architecture while preserving framework-agnostic compute engine interfaces.
-- Validate backend: `uv run ruff check .` and `uv run pytest tests/`.
+- Validate backend by default: `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`.
+- Run `uv run pytest -m slow` or `uv run pytest -m ""` only when the task explicitly requires slow pipeline/engine coverage or can only be validated with the full suite.
 - Validate frontend: `cd frontend && npm run build`.
 

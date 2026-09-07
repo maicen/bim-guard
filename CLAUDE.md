@@ -107,12 +107,11 @@ run_production_server.bat   # Windows
 
 # Run automated tests and lint
 uv run ruff check .
-uv run pytest tests/ -v
+uv run pytest tests/ -m 'not slow' -v
 
-# Test suite is grouped by pytest markers (slow, llm, integration) and runs
-# in parallel by default (pytest-xdist, addopts = "-n auto -m 'not slow'").
-# Default `pytest` already excludes slow tests — no extra flags needed for
-# everyday runs.
+# Slow tests are intentionally excluded by default. Only run them when the
+# task is specifically about slow pipeline/engine behavior or a fast validation
+# path is not sufficient.
 uv run pytest -m slow          # only the slow tests (full engine/pipeline runs)
 uv run pytest -m ""             # everything, including slow tests
 uv run pytest -m "not llm"      # skip tests that call an LLM
@@ -162,8 +161,10 @@ Useful commands:
 
 ```bash
 uv run ruff check .
-uv run pytest tests/test_api_*.py -v
+uv run pytest tests/test_api_*.py -m 'not slow' -v
 ```
+
+Default rule: skip slow tests unless a task is explicitly about slow engine/pipeline behavior or a fast-path validation is not possible.
 
 ## Architecture & Decoupled Stack
 

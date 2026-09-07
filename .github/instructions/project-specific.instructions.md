@@ -182,10 +182,10 @@ All compliance and corrosion analysis workflows are strictly database-driven:
 Automated testing is active and required for all changes:
 
 ### Backend Testing
-- **Test execution**: `uv run pytest tests/`
+- **Default test execution**: `uv run pytest tests/ -m 'not slow'` — skip slow tests unless the task is explicitly about slow engine/pipeline behavior or a fast-path validation is not possible.
 - **Linting**: `uv run ruff check .`
 - **API Tests**: Validate endpoint request/response payloads against Pydantic models (`tests/test_api_*.py`).
-- **Engine Tests**: Validate physics and compliance rules pull dynamically from the database without hardcoded cutoffs (`tests/test_db_rules_workflow.py`).
+- **Engine Tests**: Validate physics and compliance rules pull dynamically from the database without hardcoded cutoffs (`tests/test_db_rules_workflow.py`). Run slow-engine/full-suite tests only when the task truly requires them.
 
 ### Frontend Testing & Verification
 - **Build validation**: `cd frontend && npm run build` (verifies TypeScript types and Vite bundle)
