@@ -140,11 +140,13 @@
             href={getNavHref(item.id)}
             use:link
             onclick={onCloseMobile}
-            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {isActive
-              ? 'bg-accent font-medium text-white shadow-sm shadow-blue-600/30'
+            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {item.highlight
+              ? 'font-bold'
+              : 'font-medium'} {isActive
+              ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
               : item.highlight
-                ? 'font-bold text-accent hover:bg-slate-900/60'
-                : 'font-medium text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+                ? 'text-accent hover:bg-slate-900/60'
+                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
             title={collapsed ? item.label : undefined}
           >
             <item.icon
