@@ -28,6 +28,9 @@
   let ifcFiles: ProjectIfcFile[] = $state([]);
   let isModelModalOpen = $state(false);
   let isCheckingModel = $state(false);
+  let existingProjects: Project[] = $state([]);
+  let isLoadingProjects = $state(false);
+  let selectedExistingProjectId: number | null = $state(null);
 
   // Step 2: ruleset (pick existing, or extract a new one in another tab).
   let ruleFolders: RuleFolder[] = $state([]);
@@ -50,6 +53,25 @@
     isWizardOpen = false;
     toasts.success("Project saved — find it later under Project Registry on the Dashboard.");
     await refreshModels();
+  }
+
+  async function loadExistingProjects() {
+    isLoadingProjects = true;
+    try {
+      const res = await projectsApi.list();
+      existingProjects = res.projects;
+    } catch {
+      existingProjects = [];
+    } finally {
+      isLoadingProjects = false;
+    }
+  }
+
+  function handleSelectExistingProject() {
+    const found = existingProjects.find((p) => p.id === selectedExistingProjectId) ?? null;
+    if (!found) return;
+    project = found;
+    refreshModels();
   }
 
   async function refreshModels() {
@@ -94,6 +116,7 @@
 
   onMount(() => {
     loadFolders();
+    loadExistingProjects();
     window.addEventListener("focus", handleWindowFocus);
     return () => window.removeEventListener("focus", handleWindowFocus);
   });
@@ -158,21 +181,57 @@
       {:else}
         <Circle class="h-5 w-5 shrink-0 text-accent" />
       {/if}
-      <h2 class="text-base font-bold tracking-tight text-slate-50">1. Create your project</h2>
+      <h2 class="text-base font-bold tracking-tight text-slate-50">1. Choose a project</h2>
     </div>
 
     {#if !project}
-      <p class="text-xs text-slate-400">
-        Give it a name, country and analysis type — you can attach the IFC model in the same
-        step.
-      </p>
-      <button
-        type="button"
-        onclick={() => (isWizardOpen = true)}
-        class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
-      >
-        Create New Project
-      </button>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <!-- Choose existing -->
+        <div class="space-y-2.5 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+          <span class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+            <FolderOpen class="h-3.5 w-3.5 text-accent" />
+            Choose Existing Project
+          </span>
+          <div class="relative">
+            <select
+              bind:value={selectedExistingProjectId}
+              onchange={handleSelectExistingProject}
+              disabled={isLoadingProjects}
+              class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none disabled:opacity-60"
+            >
+              <option value={null}
+                >{isLoadingProjects ? "Loading…" : "-- Select a project --"}</option
+              >
+              {#each existingProjects as p (p.id)}
+                <option value={p.id}>{p.name}</option>
+              {/each}
+            </select>
+            <ChevronDown
+              class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+            />
+          </div>
+          <p class="text-micro text-slate-500">Pick up where you left off on a saved project.</p>
+        </div>
+
+        <!-- Create new -->
+        <div class="space-y-2.5 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+          <span class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+            <PlayCircle class="h-3.5 w-3.5 text-accent" />
+            Create New Project
+          </span>
+          <p class="text-micro text-slate-500">
+            Give it a name, country and analysis type — you can attach the IFC model in the same
+            step.
+          </p>
+          <button
+            type="button"
+            onclick={() => (isWizardOpen = true)}
+            class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-accent-hover"
+          >
+            Create New Project
+          </button>
+        </div>
+      </div>
     {:else}
       <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-3.5">
         <div class="min-w-0">
