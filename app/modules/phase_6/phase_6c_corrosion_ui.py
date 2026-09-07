@@ -82,6 +82,11 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
+from app.engines import (
+    bimguard_corrosion_engine,
+    bimguard_crevice_engine,
+    bimguard_mic_engine,
+)
 from app.engines.bimguard_corrosion_engine import (
     MATERIAL_ALIASES,
     GCElement,
@@ -710,6 +715,43 @@ def _xm_compatibility_thresholds() -> dict:
     return thresholds
 
 
+#: The engine module behind each per-element mechanism. Its RULESET_VERSION is
+#: the default of the ``ruleset_version`` field on every result those engines
+#: return, so reading it here is reading the same value the verdict findings
+#: carry rather than a second copy of it that can drift.
+_ENGINE_MODULES = {
+    "GC-001": bimguard_corrosion_engine,
+    "CC-001": bimguard_crevice_engine,
+    "MC-001": bimguard_mic_engine,
+}
+
+
+def _engine_ruleset_version(spec: MechanismSpec) -> str:
+    """Return the stamp this mechanism's verdict findings carry.
+
+    A data-quality note says a named engine could not reach a verdict on an
+    element. Which revision of that engine's ruleset was loaded when it could
+    not is exactly as much a part of the record as it is on a verdict -- the
+    note is re-checkable only against the ruleset that produced it. 246 of the
+    282 notes on project 1917 carried no stamp at all (MISMATCH 2 of
+    docs/validation/final-verification-2026-09-09.md).
+
+    Resolved from the engine module rather than written out here, so the note
+    and the verdict cannot say different things: ``_finding_issue`` reads
+    ``result.ruleset_version``, whose default is the same attribute.
+
+    Args:
+        spec: The mechanism the note is about.
+
+    Returns:
+        The stamp, e.g. ``"BIMGUARD-GC-001 v1.0.0"``, or ``""`` for a mechanism
+        with no engine module -- the network comparators, which stamp their own
+        Issues from the pack they loaded.
+    """
+    module = _ENGINE_MODULES.get(spec.code)
+    return str(getattr(module, "RULESET_VERSION", "") or "") if module else ""
+
+
 def _pack_ruleset_version(rule_pack: dict, mechanism_code: str) -> str:
     """Return the stamp to record on findings scored from ``rule_pack``.
 
@@ -753,6 +795,13 @@ def _assess_mm001(elements: list, spec: MechanismSpec, allocator: IssueIdAllocat
         # calls .next() with its own "MM" prefix, which keeps these ids inside
         # the run's numbering instead of a sequence of the engine's own.
         issues = material_media.compare(elements, rule_pack, allocator)
+        # material_media stamps the findings it scores but not the notes it
+        # raises for a cell it could not select. Both came out of this pack, so
+        # both say so -- read from the comparator's own helper, which is what
+        # stamped the findings, so the two cannot disagree.
+        version = material_media.ruleset_version(rule_pack)
+        for issue in issues:
+            issue.metadata.setdefault("ruleset_version", version)
         return issues, None
     except Exception as exc:
         logger.warning("Mechanism did not run mechanism=%s error=%s", spec.code, exc)
@@ -870,6 +919,10 @@ def _data_quality_issue(
         metadata={
             "check": check,
             "mechanism_code": spec.code,
+            # The same stamp this engine's verdicts carry. A note about an
+            # element that could not be assessed is still a statement made
+            # under a particular ruleset revision.
+            "ruleset_version": _engine_ruleset_version(spec),
             "reason": reason,
             "ifc_type": element.ifc_type,
             "material_a": element.material_a,
