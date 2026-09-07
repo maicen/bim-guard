@@ -9,24 +9,36 @@ stairs, railings).
 - **`IFC_Export_Setting.json`** — a Revit IFC export setup profile. Import it
   once per project via Revit: **File → Export → IFC → Modify Setup... →
   Load existing setup...**
-- **`BIMGuard_UserDefinedPsets.txt`** — a companion property mapping file for
-  the handful of fields BIM Guard checks that have no standard IFC property
-  (door `ClearWidth`; window `ClearOpeningArea/Height/Width`; stair flight
-  `Width`, `FlightHeight`, winder angles; railing `Height`/`HandrailHeight`;
-  slab `HeadroomClearance`). It only takes effect if you've also created
-  matching Shared Parameters on the Door, Window, Stair, Stair Component and
-  Railing categories in the Revit project — the mapping file just tells the
-  exporter which Revit parameter feeds which IFC property, it doesn't create
-  the parameters for you.
+- **`BIMGuard_UserDefinedPsets.txt`** — **optional.** A companion property
+  mapping file for the handful of fields BIM Guard checks that have no
+  standard IFC property (door `ClearWidth`; window
+  `ClearOpeningArea/Height/Width`; stair flight `Width`, `FlightHeight`,
+  winder angles; railing `Height`/`HandrailHeight`; slab
+  `HeadroomClearance`). It only takes effect if you've also created matching
+  Shared Parameters on the Door, Window, Stair, Stair Component and Railing
+  categories in the Revit project — the mapping file just tells the exporter
+  which Revit parameter feeds which IFC property, it doesn't create the
+  parameters for you. Skip it if you're not maintaining those Shared
+  Parameters: the rules that read those specific fields will resolve as
+  `MISSING_DATA` instead of failing, and nothing else is affected.
 
 ## How to use it
 
-1. Download both files.
-2. In Revit's Modify Setup dialog, under **Property Sets → User-defined
-   Property Sets**, point the file path at wherever you saved
-   `BIMGuard_UserDefinedPsets.txt` on your machine, then save/load
-   `IFC_Export_Setting.json` as the active setup.
-3. Export to IFC as normal.
+1. Download `IFC_Export_Setting.json`. Download
+   `BIMGuard_UserDefinedPsets.txt` too only if you're using the optional
+   Shared Parameters mapping above.
+2. Load `IFC_Export_Setting.json` as the active setup in Revit's Modify
+   Setup dialog. If you downloaded the `.txt` file, also go to
+   **Property Sets → User-defined Property Sets** and point the file path
+   at wherever you saved it — the JSON ships with that path hard-coded to
+   the machine it was authored on
+   (`C:\Users\Malak\OneDrive\Desktop\BIMGuard_UserDefinedPsets.txt`), which
+   won't exist on yours. If you're skipping the `.txt` file, un-tick
+   **Export user-defined property sets** in that same panel rather than
+   leaving it pointed at a path that doesn't resolve.
+3. In the Modify Setup dialog, set **Phase to export** to the phase you're
+   auditing (see below — this can't be baked into the shared JSON).
+4. Export to IFC as normal.
 
 Before relying on the `.txt` mapping, cross-check its header syntax against
 the sample template shipped with your installed Revit's IFC exporter
@@ -53,6 +65,34 @@ dialog — confirm it reads "IFC4 Design Transfer View [IFC4DTV]" and not
 Design Transfer View and re-save the setup (this rewrites the setting
 correctly from Revit's own UI, which is safer than hand-editing the number
 in the JSON).
+
+## Phase to export: pick it per-project, it isn't baked in
+
+The profile ships with **`ActivePhaseId: -1`** ("Default Phase"), not a
+specific phase — Revit phases are project-specific, so there's no value that
+would be safe to hard-code into a shared setup file. Before every export,
+confirm the **Phase to export** dropdown in Revit's Modify Setup dialog is
+set to the phase you're actually auditing, not whatever the model happened
+to default to. Exporting the wrong phase won't error or show `MISSING_DATA`
+— it just silently audits a different set of elements than the one you
+meant to check.
+
+## Material Property Sets: needed for seismic mass, not for material ID
+
+**Property Sets → Export material property sets** must stay ticked. It's
+easy to assume this only affects the corrosion engines' material matching
+(galvanic couples, crevice risk) — it doesn't. That matching reads the
+element's material *name*, which Revit exports via `IfcRelAssociatesMaterial`
+regardless of this checkbox.
+
+What this checkbox actually controls is the material's **density**
+(`Pset_MaterialCommon` / `IfcMaterialProperties.MassDensity`). The seismic
+engine's mass check uses an element's own `NetMass`/`Weight`/`NominalMass`
+quantity when present, and falls back to **Volume × Density** when it isn't
+— and density only exists in the IFC file if this checkbox was on at export
+time. Turning it off doesn't just skip an unused extra; it removes the data
+that fallback needs, and elements without an explicit mass quantity will
+show `MISSING_DATA` on seismic weight checks instead of a computed value.
 
 ## Linked Revit files are NOT exported by default
 

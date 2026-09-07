@@ -57,7 +57,7 @@
     workflow: { section: "Analysis", title: "Live Pipeline Tracker" },
     reports: { section: "Analysis", title: "Compliance Reports & Exports" },
     "revit-sync": { section: "Integrations", title: "Autodesk Revit Direct Sync" },
-    "ifc-export-setting": { section: "Integrations", title: "IFC Export Setting" },
+    "ifc-export-setting": { section: "Integrations", title: "IFC Export Setting for Architectural Model" },
     "user-manual": { section: "Manuals", title: "User Workflow Manual" },
     "modeling-manual": { section: "Manuals", title: "3D Modeling Reference" },
     settings: { section: "System", title: "Application Settings" },

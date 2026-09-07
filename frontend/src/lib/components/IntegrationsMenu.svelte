@@ -17,7 +17,7 @@
   // don't need a permanent sidebar section.
   const ITEMS = [
     { id: "revit-sync", label: "Revit Direct Sync", icon: RefreshCw },
-    { id: "ifc-export-setting", label: "IFC Export Setting", icon: Download },
+    { id: "ifc-export-setting", label: "IFC Export Setting for Architectural Model", icon: Download },
   ];
 
   let isActive = $derived(ITEMS.some((item) => item.id === activeView));

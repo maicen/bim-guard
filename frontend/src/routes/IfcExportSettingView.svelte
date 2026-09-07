@@ -1,94 +1,66 @@
 <script lang="ts">
-  import { Download, FileText, CheckCircle2, Boxes, Layers } from "lucide-svelte";
+  import { Download, FileText, CheckCircle2, Layers } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import BentoBox from "../lib/components/BentoBox.svelte";
 
   const CHECKLIST = [
     "Internal Revit and IFC common property sets exported",
-    "Base quantities and material property sets included",
     "Steel elements included, 2D elements excluded",
-    "Stable IFC GUIDs stored for reliable re-audits",
     "Max tessellation detail and solid model representation for accurate stair/railing mesh geometry",
-    "Custom BIM Guard property sets for door, window, stair flight, railing and landing fields with no standard IFC home",
+    "Stable IFC GUIDs stored for reliable re-audits",
   ];
 </script>
 
 <div class="mx-auto space-y-6">
   <PageHeader
     category="Live Native Integrations"
-    title="IFC Export Setting"
+    title="IFC Export Setting for Architectural Model"
     subtitle="A preconfigured Revit IFC4 export profile tuned for BIM Guard audits — consistent property sets, base quantities, and GUIDs on every export."
     icon={FileText}
   />
 
   <!-- Bento Grid Overview -->
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+  <div class="mx-auto w-full max-w-xs">
     <BentoBox title="IFC Version" value="IFC4" icon={Layers} description="Design Transfer View exchange" />
-    <BentoBox
-      title="Space Boundaries"
-      value="1st Level"
-      icon={Boxes}
-      description="Room / space geometry preserved"
-    />
-    <BentoBox
-      title="Base Quantities"
-      value="Included"
-      icon={CheckCircle2}
-      description="Exported for every element"
-    />
   </div>
 
   <!-- Download -->
-  <div
-    class="flex flex-col justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 sm:flex-row sm:items-center"
-  >
+  <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-center">
+    <a
+      href="/downloads/IFC_Export_Setting.json"
+      download="IFC_Export_Setting.json"
+      class="inline-flex shrink-0 items-center gap-3 rounded-xl bg-accent px-8 py-4 text-2xl font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+    >
+      <Download class="h-7 w-7" />
+      <span>Download IFC Export Setting</span>
+    </a>
+
     <div>
-      <h2 class="text-base font-bold tracking-tight text-slate-50">Download the Export Setting</h2>
-      <p class="max-w-xl text-xs text-slate-400">
+      <p class="mx-auto max-w-xl text-xs text-slate-400">
         Import this .json profile into Revit's IFC export setup dialog (Modify Setup → Load
         existing setup...) so every export from this project uses the property sets, quantities,
         and GUID handling BIM Guard expects.
       </p>
     </div>
-
-    <a
-      href="/downloads/IFC_Export_Setting.json"
-      download="IFC_Export_Setting.json"
-      class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
-    >
-      <Download class="h-3.5 w-3.5" />
-      <span>Download IFC Export Setting</span>
-    </a>
   </div>
 
-  <!-- User-Defined Property Sets -->
-  <div
-    class="flex flex-col justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 sm:flex-row sm:items-center"
-  >
+  <!-- Setup Guide -->
+  <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-center">
+    <a
+      href="/downloads/README.md"
+      download="IFC_Export_Setting_README.md"
+      class="inline-flex shrink-0 items-center gap-3 rounded-xl bg-accent px-8 py-4 text-2xl font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+    >
+      <Download class="h-7 w-7" />
+      <span>Download Setup Guide</span>
+    </a>
+
     <div>
-      <h2 class="text-base font-bold tracking-tight text-slate-50">
-        Download the Custom Property Set Mapping
-      </h2>
-      <p class="max-w-xl text-xs text-slate-400">
-        A handful of fields BIM Guard checks (stair flight width, winder angles, railing height,
-        clear opening dimensions) have no standard IFC property — Revit can only emit them via
-        Shared Parameters mapped through a user-defined property set file. Import this .txt in
-        Revit's IFC export setup (Property Sets → User-defined Property Sets), then create
-        matching Shared Parameters on the Door, Window, Stair, Stair Component and Railing
-        categories before exporting. Verify the header syntax against the template shipped with
-        your Revit version's IFC exporter first — the format is undocumented enough that it's
-        worth a quick sanity check before relying on it.
+      <p class="mx-auto max-w-xl text-xs text-slate-400">
+        Covers picking the phase to export per project, why Export Material Psets must stay
+        ticked for seismic mass checks, and how to include linked Revit files.
       </p>
     </div>
-
-    <a
-      href="/downloads/BIMGuard_UserDefinedPsets.txt"
-      download="BIMGuard_UserDefinedPsets.txt"
-      class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
-    >
-      <Download class="h-3.5 w-3.5" />
-      <span>Download Property Set Mapping</span>
-    </a>
   </div>
 
   <!-- What's Included -->
