@@ -627,3 +627,11 @@ Owner: unassigned.
 ## Status
 
 Verification blocked: The open_browser_url tool failed multiple times because the Playwright environment driver could not be installed (HTTP 404 from playwright.azureedge.net).
+
+
+## Priority: Logging Improvements
+
+- [ ] Implement Request IDs (Correlation IDs) using `contextvars` to trace requests through the system.
+- [ ] Transition from plain text logging to structured JSON logging for production environments to improve aggregator parsing.
+- [ ] Elevate `RequestLoggingMiddleware` API request logs to `INFO` level to capture traffic baselines in production.
+- [ ] Consider migrating to `structlog` for easier contextual binds throughout the codebase.
