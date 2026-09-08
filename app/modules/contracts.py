@@ -139,6 +139,46 @@ SHORT_NAME_MIN_LENGTH = 2
 SHORT_NAME_MAX_LENGTH = 24
 
 
+class IsoGovernanceFieldsRequired(BaseModel):
+    """ISO 19650/CDE metadata block shared by response-style models.
+
+    `project_code` is excluded -- its required-ness and validation constraints
+    vary by call site.
+    """
+
+    originator: Optional[str] = Field(default="", description="ISO 19650 Originator Code")
+    volume_system: Optional[str] = Field(default="", description="ISO 19650 Volume/System Breakdown")
+    level: Optional[str] = Field(default="", description="ISO 19650 Level/Location Breakdown")
+    type: Optional[str] = Field(default="", description="ISO 19650 Type Code")
+    role: Optional[str] = Field(default="", description="ISO 19650 Role/Discipline Code")
+    number: Optional[str] = Field(default="", description="ISO 19650 Sequential Number")
+    suitability_code: Optional[str] = Field(default="S0", description="ISO 19650 Suitability Code (S0-S4, A1-A4)")
+    revision_code: Optional[str] = Field(default="P01.01", description="ISO 19650 Revision Code (P01.01, C01)")
+    cde_state: CDEState = Field(default=CDEState.WIP, description="CDE State (WIP, SHARED, PUBLISHED, ARCHIVED)")
+
+
+class IsoGovernanceFieldsOptional(BaseModel):
+    """Same ISO 19650/CDE fields as `IsoGovernanceFieldsRequired`, all-None for partial-update payloads."""
+
+    project_code: Optional[str] = None
+    originator: Optional[str] = None
+    volume_system: Optional[str] = None
+    level: Optional[str] = None
+    type: Optional[str] = None
+    role: Optional[str] = None
+    number: Optional[str] = None
+    suitability_code: Optional[str] = None
+    revision_code: Optional[str] = None
+    cde_state: Optional[CDEState] = None
+
+
+class TimestampFields(BaseModel):
+    """Shared `created_at`/`updated_at` pair for response models."""
+
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class ProjectCreateRequest(BaseModel):
     """Payload for creating a project."""
 
@@ -205,7 +245,7 @@ class ProjectCreateRequest(BaseModel):
     )
 
 
-class ProjectUpdateRequest(BaseModel):
+class ProjectUpdateRequest(IsoGovernanceFieldsOptional):
     """Payload for updating an existing project."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -224,15 +264,6 @@ class ProjectUpdateRequest(BaseModel):
         max_length=PROJECT_CODE_MAX_LENGTH,
         pattern=PROJECT_CODE_PATTERN,
     )
-    originator: Optional[str] = None
-    volume_system: Optional[str] = None
-    level: Optional[str] = None
-    type: Optional[str] = None
-    role: Optional[str] = None
-    number: Optional[str] = None
-    suitability_code: Optional[str] = None
-    revision_code: Optional[str] = None
-    cde_state: Optional[CDEState] = None
     classification_standard: Optional[str] = None
 
 
@@ -275,7 +306,7 @@ class ProjectBulkActionResponse(BaseModel):
     affected_ids: list[int] = Field(default_factory=list, description="IDs of affected projects")
 
 
-class ProjectResponse(BaseModel):
+class ProjectResponse(IsoGovernanceFieldsRequired, TimestampFields):
     """Detailed response model for a project."""
 
     id: int
@@ -293,26 +324,15 @@ class ProjectResponse(BaseModel):
     floors_count: Optional[int] = None
     ifc_file_path: Optional[str] = None
     ifc_md5_hash: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
-    originator: Optional[str] = ""
-    volume_system: Optional[str] = ""
-    level: Optional[str] = ""
-    type: Optional[str] = ""
-    role: Optional[str] = ""
-    number: Optional[str] = ""
-    suitability_code: Optional[str] = "S0"
-    revision_code: Optional[str] = "P01.01"
-    cde_state: CDEState = CDEState.WIP
     cde_approved_by: Optional[str] = ""
     cde_approved_at: Optional[str] = None
     classification_standard: Optional[str] = ""
 
 
-class ProjectIfcFileResponse(BaseModel):
+class ProjectIfcFileResponse(IsoGovernanceFieldsRequired):
     """One IFC model attached to a project."""
 
     id: Optional[int] = Field(
@@ -334,14 +354,6 @@ class ProjectIfcFileResponse(BaseModel):
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
-    originator: Optional[str] = ""
-    volume_system: Optional[str] = ""
-    level: Optional[str] = ""
-    type: Optional[str] = ""
-    number: Optional[str] = ""
-    suitability_code: Optional[str] = "S0"
-    revision_code: Optional[str] = "P01.01"
-    cde_state: CDEState = CDEState.WIP
     cde_approved_by: Optional[str] = ""
     cde_approved_at: Optional[str] = None
 
@@ -383,7 +395,7 @@ class DocumentUpdateRequest(BaseModel):
     cde_state: Optional[CDEState] = Field(None, description="CDE State")
 
 
-class DocumentResponse(BaseModel):
+class DocumentResponse(IsoGovernanceFieldsRequired):
     """Summary document item returned in lists."""
 
     id: int
@@ -396,18 +408,9 @@ class DocumentResponse(BaseModel):
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
-    originator: Optional[str] = ""
-    volume_system: Optional[str] = ""
-    level: Optional[str] = ""
-    type: Optional[str] = ""
-    role: Optional[str] = ""
-    number: Optional[str] = ""
-    suitability_code: Optional[str] = "S0"
-    revision_code: Optional[str] = "P01.01"
-    cde_state: CDEState = CDEState.WIP
 
 
-class DocumentDetailResponse(BaseModel):
+class DocumentDetailResponse(IsoGovernanceFieldsRequired):
     """Complete document record including full extracted text."""
 
     id: int
@@ -420,15 +423,6 @@ class DocumentDetailResponse(BaseModel):
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
-    originator: Optional[str] = ""
-    volume_system: Optional[str] = ""
-    level: Optional[str] = ""
-    type: Optional[str] = ""
-    role: Optional[str] = ""
-    number: Optional[str] = ""
-    suitability_code: Optional[str] = "S0"
-    revision_code: Optional[str] = "P01.01"
-    cde_state: CDEState = CDEState.WIP
 
 
 class GoogleDriveImportRequest(BaseModel):
@@ -578,7 +572,7 @@ class RuleUpdateRequest(BaseModel):
     category: Optional[str] = None
 
 
-class RuleResponse(BaseModel):
+class RuleResponse(TimestampFields):
     """Detailed response model for a rule."""
 
     id: int
@@ -613,8 +607,6 @@ class RuleResponse(BaseModel):
     confidence: Optional[str] = None
     extraction_method: Optional[str] = None
     needs_review: Optional[int] = 0
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 
 class RuleDraftStatus(str, Enum):
@@ -1174,7 +1166,7 @@ class GitHubRepoUpdateRequest(BaseModel):
     is_active: Optional[bool] = Field(None, description="Toggle active state")
 
 
-class GitHubRepoResponse(BaseModel):
+class GitHubRepoResponse(TimestampFields):
     """Response contract for a registered GitHub repository."""
 
     id: int
@@ -1184,8 +1176,6 @@ class GitHubRepoResponse(BaseModel):
     branch: str = "main"
     description: str = ""
     is_active: bool = True
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 
 class GitHubRepoItem(BaseModel):
@@ -1274,7 +1264,7 @@ class ParsingEngineInstanceUpdateRequest(BaseModel):
     notes: Optional[str] = Field(None, description="Updated notes")
 
 
-class ParsingEngineInstanceResponse(BaseModel):
+class ParsingEngineInstanceResponse(TimestampFields):
     """Response contract for a registered parsing-engine instance.
 
     The stored api_key is never echoed back — only whether one is set.
@@ -1289,8 +1279,6 @@ class ParsingEngineInstanceResponse(BaseModel):
     is_default: bool = False
     is_enabled: bool = True
     notes: str = ""
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 
 class ParsingEngineInstanceTestResponse(BaseModel):
@@ -1891,6 +1879,8 @@ class InspectorResponse(BaseModel):
 # Auth / Multi-Tenancy Contracts
 # ---------------------------------------------------------------------------
 
+OrgRole = Literal["owner", "admin", "member"]
+
 
 class OrganizationMembership(BaseModel):
     """One organization the authenticated caller belongs to, and their role in it."""
@@ -1901,7 +1891,7 @@ class OrganizationMembership(BaseModel):
     org_code: str = Field(
         default="", description="ISO 19650 Originator Code for this organization"
     )
-    role: Literal["owner", "admin", "member"]
+    role: OrgRole
 
 
 class UserProfile(BaseModel):
@@ -1944,7 +1934,7 @@ class OrganizationMemberResponse(BaseModel):
     email: str = ""
     full_name: str = ""
     avatar_url: str = ""
-    role: Literal["owner", "admin", "member"]
+    role: OrgRole
     group_id: Optional[int] = None
     group_name: Optional[str] = None
 
@@ -1959,7 +1949,7 @@ class OrganizationMemberListResponse(BaseModel):
 class MemberRoleUpdateRequest(BaseModel):
     """New role to assign a member."""
 
-    role: Literal["owner", "admin", "member"]
+    role: OrgRole
 
 
 class OrganizationInviteResponse(BaseModel):
@@ -1968,7 +1958,7 @@ class OrganizationInviteResponse(BaseModel):
     id: int
     organization_id: int
     email: str
-    role: Literal["owner", "admin", "member"]
+    role: OrgRole
     accepted_at: Optional[str] = None
 
 
@@ -1983,7 +1973,7 @@ class OrganizationInviteCreateRequest(BaseModel):
     """A new invite to send for an organization."""
 
     email: str = Field(..., min_length=3, description="Address the invite is addressed to")
-    role: Literal["owner", "admin", "member"] = "member"
+    role: OrgRole = "member"
 
 
 class OrganizationSummary(BaseModel):
@@ -2024,7 +2014,7 @@ class AddMemberRequest(BaseModel):
     """Directly add an existing user to an organization, bypassing the invite flow."""
 
     user_id: str
-    role: Literal["owner", "admin", "member"] = "member"
+    role: OrgRole = "member"
 
 
 class UserOrganizationSummary(BaseModel):
@@ -2032,7 +2022,7 @@ class UserOrganizationSummary(BaseModel):
 
     organization_id: int
     name: str
-    role: Literal["owner", "admin", "member"]
+    role: OrgRole
 
 
 class UserSummary(BaseModel):

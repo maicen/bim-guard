@@ -41,6 +41,49 @@ export interface ISO19650Metadata {
 }
 
 /**
+ * ISO 19650/CDE metadata block shared by response-style interfaces.
+ * Mirrors IsoGovernanceFieldsRequired in app/modules/contracts.py
+ * (`project_code` excluded -- its required-ness varies by call site).
+ */
+export interface IsoGovernanceFieldsRequired {
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+}
+
+/**
+ * Same ISO 19650/CDE fields, for partial-update payloads.
+ * Mirrors IsoGovernanceFieldsOptional in app/modules/contracts.py.
+ */
+export interface IsoGovernanceFieldsOptional {
+  project_code?: string;
+  originator?: string;
+  volume_system?: string;
+  level?: string;
+  type?: string;
+  role?: string;
+  number?: string;
+  suitability_code?: string;
+  revision_code?: string;
+  cde_state?: CDEState;
+}
+
+/** Mirrors TimestampFields in app/modules/contracts.py. */
+export interface Timestamps {
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** Mirrors OrgRole in app/modules/contracts.py. */
+export type OrgRole = "owner" | "admin" | "member";
+
+/**
  * Canonical analysis domains. Mirrors the keys normalised by
  * `normalize_analysis_type` in app/constants.py; legacy stored values
  * ('Architectural', 'Piping (Corrosive)', 'Halo') collapse onto these via
@@ -48,7 +91,7 @@ export interface ISO19650Metadata {
  */
 export type AnalysisDomain = "Arch" | "Piping" | "seismic";
 
-export interface Project {
+export interface Project extends IsoGovernanceFieldsRequired, Timestamps {
   id: number;
   name: string;
   /** Short display nickname shown in the header/breadcrumbs instead of the full name. */
@@ -65,18 +108,7 @@ export interface Project {
   floors_count?: number | null;
   ifc_file_path?: string | null;
   ifc_md5_hash?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
   project_code?: string;
-  originator?: string;
-  volume_system?: string;
-  level?: string;
-  type?: string;
-  role?: string;
-  number?: string;
-  suitability_code?: string;
-  revision_code?: string;
-  cde_state?: CDEState;
   cde_approved_by?: string;
   cde_approved_at?: string | null;
   /** bSDD dictionary code (e.g. uniclass_2015, omniclass_2020) this project is classified against. */
@@ -109,7 +141,7 @@ export const IFC_FILE_ROLES = ["primary", "context"] as const;
 export type IfcFileRole = (typeof IFC_FILE_ROLES)[number];
 
 /** One IFC model attached to a project. Mirrors ProjectIfcFileResponse. */
-export interface ProjectIfcFile {
+export interface ProjectIfcFile extends IsoGovernanceFieldsRequired {
   /** project_ifc_files.id; null for a model attached before that table existed. */
   id: number | null;
   project_id: number;
@@ -119,14 +151,6 @@ export interface ProjectIfcFile {
   role: IfcFileRole | string;
   uploaded_at?: string | null;
   project_code?: string;
-  originator?: string;
-  volume_system?: string;
-  level?: string;
-  type?: string;
-  number?: string;
-  suitability_code?: string;
-  revision_code?: string;
-  cde_state?: CDEState;
   cde_approved_by?: string;
   cde_approved_at?: string | null;
 }
@@ -202,23 +226,13 @@ export interface ProjectOptions {
   building_codes: BuildingCodeOption[];
 }
 
-export interface ProjectUpdatePayload {
+export interface ProjectUpdatePayload extends IsoGovernanceFieldsOptional {
   name?: string;
   short_name?: string;
   description?: string;
   status?: string;
   country?: string;
   analysis_type?: AnalysisDomain | string;
-  project_code?: string;
-  originator?: string;
-  volume_system?: string;
-  level?: string;
-  type?: string;
-  role?: string;
-  number?: string;
-  suitability_code?: string;
-  revision_code?: string;
-  cde_state?: CDEState;
   classification_standard?: string | null;
 }
 
@@ -242,7 +256,7 @@ export const DOCUMENT_TYPES = ["Code", "Specification", "Manual"] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
-export interface DocumentItem {
+export interface DocumentItem extends IsoGovernanceFieldsRequired {
   id: number;
   filename: string;
   doc_type?: string | null;
@@ -251,18 +265,9 @@ export interface DocumentItem {
   extracted_text_preview?: string | null;
   char_count: number;
   project_code?: string;
-  originator?: string;
-  volume_system?: string;
-  level?: string;
-  type?: string;
-  role?: string;
-  number?: string;
-  suitability_code?: string;
-  revision_code?: string;
-  cde_state?: CDEState;
 }
 
-export interface DocumentDetail {
+export interface DocumentDetail extends IsoGovernanceFieldsRequired {
   id: number;
   filename: string;
   doc_type?: string | null;
@@ -271,15 +276,6 @@ export interface DocumentDetail {
   extracted_text: string;
   char_count: number;
   project_code?: string;
-  originator?: string;
-  volume_system?: string;
-  level?: string;
-  type?: string;
-  role?: string;
-  number?: string;
-  suitability_code?: string;
-  revision_code?: string;
-  cde_state?: CDEState;
 }
 
 export interface DocumentSection {
@@ -329,7 +325,7 @@ export interface GoogleDriveImportResponse {
 
 export type RulesetCategory = "Arch" | "Piping" | "seismic";
 
-export interface Rule {
+export interface Rule extends Timestamps {
   id: number;
   rule_id?: string;
   description?: string;
@@ -359,8 +355,6 @@ export interface Rule {
   confidence?: string | null;
   extraction_method?: string | null;
   needs_review?: number;
-  created_at?: string | null;
-  updated_at?: string | null;
 }
 
 export interface RuleSourceResponse {
@@ -774,7 +768,7 @@ export interface RevitSyncResponse {
   results: RevitRuleResult[];
 }
 
-export interface GitHubRepo {
+export interface GitHubRepo extends Timestamps {
   id: number;
   name: string;
   owner: string;
@@ -782,8 +776,6 @@ export interface GitHubRepo {
   branch: string;
   description: string;
   is_active: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
 }
 
 export interface GitHubRepoItem {
@@ -848,7 +840,7 @@ export interface ParsingEngineKind {
   url_placeholder: string;
 }
 
-export interface ParsingEngineInstance {
+export interface ParsingEngineInstance extends Timestamps {
   id: number;
   name: string;
   kind: ParsingEngineKindId;
@@ -858,8 +850,6 @@ export interface ParsingEngineInstance {
   is_default: boolean;
   is_enabled: boolean;
   notes: string;
-  created_at?: string | null;
-  updated_at?: string | null;
 }
 
 export interface ParsingEngineInstanceCreatePayload {
@@ -1289,7 +1279,7 @@ export interface OrganizationMembership {
   slug: string;
   /** ISO 19650 Originator Code for this organization. */
   org_code: string;
-  role: "owner" | "admin" | "member";
+  role: OrgRole;
 }
 
 /** Editable identity/preferences layered on auth.users. Mirrors UserProfile. */
@@ -1321,7 +1311,7 @@ export interface OrganizationMember {
   email: string;
   full_name: string;
   avatar_url: string;
-  role: "owner" | "admin" | "member";
+  role: OrgRole;
   group_id: number | null;
   group_name: string | null;
 }
@@ -1337,7 +1327,7 @@ export interface OrganizationInvite {
   id: number;
   organization_id: number;
   email: string;
-  role: "owner" | "admin" | "member";
+  role: OrgRole;
   accepted_at: string | null;
 }
 
@@ -1350,7 +1340,7 @@ export interface OrganizationInviteListResponse {
 /** Mirrors OrganizationInviteCreateRequest. */
 export interface OrganizationInviteCreatePayload {
   email: string;
-  role: "owner" | "admin" | "member";
+  role: OrgRole;
 }
 
 /** One organization, as listed for the platform superadmin. Mirrors OrganizationSummary. */
@@ -1377,14 +1367,14 @@ export interface OrganizationCreatePayload {
 /** Mirrors AddMemberRequest. */
 export interface AddMemberPayload {
   user_id: string;
-  role: "owner" | "admin" | "member";
+  role: OrgRole;
 }
 
 /** One organization a user belongs to. Mirrors UserOrganizationSummary. */
 export interface UserOrganizationSummary {
   organization_id: number;
   name: string;
-  role: "owner" | "admin" | "member";
+  role: OrgRole;
 }
 
 /** One user on the platform, as listed for the superadmin user directory. Mirrors UserSummary. */
