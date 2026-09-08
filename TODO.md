@@ -536,6 +536,7 @@ Owner: unassigned.
 - [ ] Create an LLM-driven Synthetic IFC Data Generator that procedurally creates thousands of edge-case `IfcModel` examples (with predefined clashes or compliance failures) to robustly train and benchmark the physics engines.
 - [ ] Implement a 2D-to-3D Vision-Language Model (VLM) pipeline to extract topological relationships and material specifications directly from P&ID schematics and automatically cross-check them against the 3D IFC model for undocumented deviations.
 - [ ] AI-Powered Semantic bSDD Mapper: Use NLP to automatically map unstandardized local model properties and custom Revit families to the official buildingSMART Data Dictionary (bSDD) classifications (e.g., Uniclass, OmniClass), ensuring global interoperability without manual tagging.
+- [ ] AI-Powered Title Block OCR for ISO 19650 Compliance: Use computer vision and LLMs to automatically extract document numbering, originators, suitability codes, and revisions directly from 2D drawing title blocks upon CDE upload, enforcing ISO 19650 naming conventions automatically.
 
 Owner: unassigned.
 
