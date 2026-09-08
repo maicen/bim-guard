@@ -17,6 +17,7 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:
 BACKEND_HOST="${HOST:-0.0.0.0}"
 BACKEND_PORT="${PORT:-8000}"
 WORKERS="${WORKERS:-8}"
+MACHINE_HOSTNAME="$(hostname 2>/dev/null || uname -n)"
 SKIP_BUILD=false
 SKIP_SYNC=false
 FORCE_SYNC=false
@@ -397,8 +398,11 @@ echo ""
 echo -e "${COLOR_GREEN}${COLOR_BOLD}============================================================${COLOR_RESET}"
 echo -e "${COLOR_GREEN}${COLOR_BOLD}  BIM Guard Production Server Starting${COLOR_RESET}"
 echo -e "${COLOR_GREEN}${COLOR_BOLD}============================================================${COLOR_RESET}"
-echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}Production App (SPA):${COLOR_RESET} http://localhost:${BACKEND_PORT}/"
-echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}API Docs:${COLOR_RESET}             http://localhost:${BACKEND_PORT}/api/docs"
+echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}Hostname:${COLOR_RESET}              ${MACHINE_HOSTNAME}"
+echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}App (local):${COLOR_RESET}           http://localhost:${BACKEND_PORT}/"
+echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}App (hostname):${COLOR_RESET}        http://${MACHINE_HOSTNAME}:${BACKEND_PORT}/"
+echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}Docs (local):${COLOR_RESET}          http://localhost:${BACKEND_PORT}/api/docs"
+echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}Docs (hostname):${COLOR_RESET}       http://${MACHINE_HOSTNAME}:${BACKEND_PORT}/api/docs"
 echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}Host / Bind:${COLOR_RESET}          ${BACKEND_HOST}:${BACKEND_PORT}"
 echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}Worker Processes:${COLOR_RESET}     ${WORKERS}"
 echo -e "${COLOR_GREEN}${COLOR_BOLD}============================================================${COLOR_RESET}"

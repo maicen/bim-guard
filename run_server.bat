@@ -9,6 +9,7 @@ echo ============================================================
 REM Add local user path for uv if present
 if exist "%USERPROFILE%\.local\bin" set "PATH=%USERPROFILE%\.local\bin;%PATH%"
 if exist "%USERPROFILE%\.cargo\bin" set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
+set "MACHINE_HOSTNAME=%COMPUTERNAME%"
 
 REM 1. Check uv
 where uv >nul 2>&1
@@ -91,9 +92,13 @@ start "BIM Guard Frontend (Vite)" cmd /k "cd frontend && npm run dev"
 echo.
 echo ============================================================
 echo Development servers started successfully
-echo - Frontend: http://localhost:5173
-echo - Backend:  http://127.0.0.1:8000
-echo - API Docs: http://127.0.0.1:8000/api/docs
+echo - Hostname: %MACHINE_HOSTNAME%
+echo - Frontend (local):    http://localhost:5173
+echo - Frontend (hostname): http://%MACHINE_HOSTNAME%:5173
+echo - Backend (local):     http://127.0.0.1:8000
+echo - Backend (hostname):  http://%MACHINE_HOSTNAME%:8000
+echo - API Docs (local):    http://127.0.0.1:8000/api/docs
+echo - API Docs (hostname): http://%MACHINE_HOSTNAME%:8000/api/docs
 echo ============================================================
 echo Press any key to exit this launcher - servers will remain running.
 pause >nul

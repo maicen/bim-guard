@@ -9,6 +9,7 @@ echo ============================================================
 REM Add local user path for uv if present
 if exist "%USERPROFILE%\.local\bin" set "PATH=%USERPROFILE%\.local\bin;%PATH%"
 if exist "%USERPROFILE%\.cargo\bin" set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
+set "MACHINE_HOSTNAME=%COMPUTERNAME%"
 
 REM 1. Check uv
 where uv >nul 2>&1
@@ -83,7 +84,10 @@ if %ERRORLEVEL% neq 0 (
 cd ..
 
 echo [2/2] Launching production server on http://0.0.0.0:8000 ...
-echo - App / SPA: http://localhost:8000/
-echo - API Docs:  http://localhost:8000/api/docs
+echo - Hostname: %MACHINE_HOSTNAME%
+echo - App / SPA (local):    http://localhost:8000/
+echo - App / SPA (hostname): http://%MACHINE_HOSTNAME%:8000/
+echo - API Docs (local):     http://localhost:8000/api/docs
+echo - API Docs (hostname):  http://%MACHINE_HOSTNAME%:8000/api/docs
 echo.
 uv run uvicorn main:app --host 0.0.0.0 --port 8000 --workers 8
