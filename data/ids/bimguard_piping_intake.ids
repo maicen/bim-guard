@@ -1,0 +1,537 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+    <info>
+        <title>BIMGUARD AI — Piping audit intake requirements</title>
+        <copyright>Aspiring Design 3D Consultancy Ltd</copyright>
+        <version>1.0.0</version>
+        <description>Author: Aspiring Design 3D Consultancy Ltd. Requirements are traceable to app/modules/ifc_reader/piping_producer.py, app/modules/ifc_reader/ifc_parser.py and app/modules/phase_6/phase_6c_corrosion_ui.py.</description>
+        <author>info@aspiringdesign3d.co.nz</author>
+        <date>2026-09-08</date>
+        <purpose>States what an IFC model must carry for the BIMGUARD AI piping corrosion audit (GC-001 galvanic, CC-001 crevice, MC-001 microbiological, MM-001 material-media, XM-001 cross-material) to return verdicts rather than Undetermined. Every requirement is derived from a line of the parser; see docs/reference/piping_intake_sources.md for the citation behind each specification.</purpose>
+        <milestone>Model intake</milestone>
+    </info>
+    <specifications>
+        <specification name="Material association" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-MATERIAL" description="REQUIRED. Each piping element must carry a material, through IfcRelAssociatesMaterial on the occurrence or on its type (IfcMaterial, IfcMaterialLayerSet(Usage), IfcMaterialConstituentSet or IfcMaterialProfileSet are all followed). CONSEQUENCE IF ABSENT: the element is material_unresolved — GC-001 and CC-001 are refused on it and return Undetermined rather than a verdict, and XM-001 raises material_not_in_series instead of scoring a couple. The name must be recognisable text such as 'Copper', 'ASTM B88', '316L', 'Galvanised steel' or 'PVC'; a placeholder such as 'Material', 'Default', 'N/A' or a vendor part code resolves to nothing and counts as absent. ENGINES: GC-001, CC-001, MM-001, XM-001.">
+            <applicability minOccurs="1" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <material cardinality="required" />
+            </requirements>
+        </specification>
+        <specification name="System assignment" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-SYSTEM" description="REQUIRED. Each piping element must be assigned to an IfcSystem or IfcDistributionSystem through IfcRelAssignsToGroup, and that group must be named (for example 'Domestic Hot Water', 'Chilled Water Return', 'Fire Sprinkler', 'Medical Gas — Oxygen'). CONSEQUENCE IF ABSENT: the element falls back to its Name, Description and PredefinedType for classification and, failing those, is PipingSystem.UNKNOWN — which removes the media axis MM-001 scores against and disables the system-based material and temperature fallbacks, so an element with no material and no system cannot be recovered at all. ENGINES: all five.">
+            <applicability minOccurs="1" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <partOf relation="IFCRELASSIGNSTOGROUP" cardinality="required">
+                    <entity>
+                        <name>
+                            <xs:restriction base="xs:string">
+                                <xs:enumeration value="IFCSYSTEM" />
+                                <xs:enumeration value="IFCDISTRIBUTIONSYSTEM" />
+                            </xs:restriction>
+                        </name>
+                    </entity>
+                </partOf>
+            </requirements>
+        </specification>
+        <specification name="Element name" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-NAME" description="REQUIRED. Each piping element must carry a non-empty Name. CONSEQUENCE IF ABSENT: Name is the fallback hint for system classification when no IfcSystem exists, and it is the only input to subtype classification and joint-type classification besides the IFC class and PredefinedType. Without it an element with no system assignment is unclassifiable. ENGINES: all five, indirectly.">
+            <applicability minOccurs="1" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <attribute cardinality="required">
+                    <name>
+                        <simpleValue>Name</simpleValue>
+                    </name>
+                </attribute>
+            </requirements>
+        </specification>
+        <specification name="Material stated as a property" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-MATERIAL-PROPERTY" description="OPTIONAL fallback for the material association above. A property named Material or MaterialName, in any property set. On the models measured for this audit this is the only source that resolves a material on some tools' output, where the material sits in a property set and no IfcRelAssociatesMaterial exists. CONSEQUENCE IF ABSENT: none on its own — this only matters where the material association is also missing, in which case see BG-PIPE-MATERIAL. ENGINES: GC-001, CC-001, MM-001, XM-001. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_BimGuardMaterial. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCLABEL" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_BimGuardMaterial</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="Material" />
+                            <xs:enumeration value="MaterialName" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Flow velocity" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-VELOCITY" description="OPTIONAL. Design or operating flow velocity in m/s, as a property named FlowVelocity, Velocity, FluidVelocity, DesignFlowVelocity or AverageVelocity, in any property set. IFC4 defines no flow-velocity property for a pipe segment, so there is no buildingSMART name to prefer; this repository's own generator writes FlowVelocity in Pset_BimGuardHydraulics. CONSEQUENCE IF ABSENT: the value stays absent and is never defaulted to 0.0, because 0.0 m/s is not a missing velocity but the worst one (stagnant, risk 1.0). MC-001 still runs if a dead-leg length or an operating temperature is present; only when all three are absent is MC-001 refused as hydraulics_unavailable. The engine does not fail — it returns Undetermined. ENGINES: MC-001. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_BimGuardHydraulics. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCREAL" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_BimGuardHydraulics</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="FlowVelocity" />
+                            <xs:enumeration value="Velocity" />
+                            <xs:enumeration value="FluidVelocity" />
+                            <xs:enumeration value="DesignFlowVelocity" />
+                            <xs:enumeration value="AverageVelocity" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Operating temperature" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-TEMPERATURE" description="OPTIONAL. Operating, working, fluid, design or medium temperature in degrees Celsius, as a property named OperatingTemperature, WorkingTemperature, FluidTemperature, DesignTemperature or MediumTemperature, in any property set. OperatingTemperature is the first entry in the real IFC4 Pset_PipeSegmentOccurrence, which is where this repository's generator writes it. CONSEQUENCE IF ABSENT: the network path falls back to a design temperature deduced from the system (60 C for domestic hot water, 6/12 C for chilled flow and return, 82/71 C for heating, and so on), tagged low confidence and warned on; where no convention exists the value stays absent and MM-001 raises temperature_missing. The element-level path has no such fallback. Temperature matters more than a few degrees usually would: above about 60 C the zinc on galvanised steel reverses polarity, which is a step change, not a gradient. ENGINES: MC-001, MM-001. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_PipeSegmentOccurrence. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCREAL" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_PipeSegmentOccurrence</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="OperatingTemperature" />
+                            <xs:enumeration value="WorkingTemperature" />
+                            <xs:enumeration value="FluidTemperature" />
+                            <xs:enumeration value="DesignTemperature" />
+                            <xs:enumeration value="MediumTemperature" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Dead-leg length" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-DEADLEG-LENGTH" description="OPTIONAL. Length of the stagnant branch in metres, as a property named DeadLegLength, StagnationLength or DeadLegLengthM, in any property set. 0.0 is a meaningful value — it states the element is a through-flow run, which is a different fact from the property being absent. CONSEQUENCE IF ABSENT: MC-001 classifies dead legs by length-to-diameter ratio, so without a length that axis is scored as unknown; the engine still runs if a velocity or a temperature is present. ENGINES: MC-001. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_BimGuardHydraulics. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCREAL" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_BimGuardHydraulics</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="DeadLegLength" />
+                            <xs:enumeration value="StagnationLength" />
+                            <xs:enumeration value="DeadLegLengthM" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Dead-leg flag" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-DEADLEG-FLAG" description="OPTIONAL. Boolean IsDeadLeg, Stagnant or IsStagnant, in any property set, for tools that can flag a dead leg but cannot measure one. FALSE is read as a measurement of through flow and yields a length of 0.0. TRUE records that the element is a dead leg but leaves the length absent, because MC-001 classifies by length-to-diameter ratio and no honest length can be invented from a flag. Prefer BG-PIPE-DEADLEG-LENGTH where a length is available. CONSEQUENCE IF ABSENT: as BG-PIPE-DEADLEG-LENGTH. ENGINES: MC-001. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_BimGuardHydraulics. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCBOOLEAN" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_BimGuardHydraulics</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IsDeadLeg" />
+                            <xs:enumeration value="Stagnant" />
+                            <xs:enumeration value="IsStagnant" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Environment class" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-ENVIRONMENT" description="OPTIONAL. The atmosphere around the pipe — not the fluid inside it — as a property named EnvironmentClass, EnvironmentalClass, CorrosivityCategory or AtmosphericEnvironment, in any property set. Accepted values are the class name (T1_indoor_damp), the bare code (T1 through T5, T0 dry) or a code with a descriptor (T3 chloride). The literal 'unclassified' is rejected: a property that says 'unknown' is not a classification. CONSEQUENCE IF ABSENT: the class is inferred from IfcSpace and IfcBuildingStorey names (pool, coastal, plant, basement, roof, kitchen, office and so on) at medium confidence, and failing that defaults to T1 indoor damp at low confidence with a warning. A default is not a measurement, and most MEP discipline models carry no IfcSpace at all. ENGINES: MM-001, XM-001, and CC-001 severity. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_BimGuardEnvironment. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCLABEL" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_BimGuardEnvironment</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="EnvironmentClass" />
+                            <xs:enumeration value="EnvironmentalClass" />
+                            <xs:enumeration value="CorrosivityCategory" />
+                            <xs:enumeration value="AtmosphericEnvironment" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Declared couple — second material at the junction" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-COUPLE" description="OPTIONAL. The material of the bracket, support, hanger or fixing this element is in contact with, as a property named SecondaryMaterial, SupportMaterial, BracketMaterial or FixingMaterial, in any property set; this repository's generator writes SecondaryMaterial in Pset_BimGuardCouple. There is no buildingSMART property for this because IFC models contact through geometry, and the corrosion-relevant pairing is a design statement rather than something derivable from the pipe's own material. CONSEQUENCE IF ABSENT: the second side stays absent and is never defaulted to the element's own material; GC-001 reads a missing second material as a self-couple, which is a real verdict rather than a fault, so the audit is not blocked — it simply cannot see bimetallic junctions the model does not declare. ENGINES: GC-001. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_BimGuardCouple. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCLABEL" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_BimGuardCouple</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="SecondaryMaterial" />
+                            <xs:enumeration value="SupportMaterial" />
+                            <xs:enumeration value="BracketMaterial" />
+                            <xs:enumeration value="FixingMaterial" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Nominal diameter" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-DIAMETER" description="OPTIONAL. Nominal bore in millimetres, as a property named NominalDiameter, NominalDiameterMM, DN or Size, in any property set. CONSEQUENCE IF ABSENT: MC-001 classifies dead legs by length-to-diameter ratio, so an absent diameter degrades that classification even where a dead-leg length is present. The engine still runs. ENGINES: MC-001. PROPERTY SET NAME: the audit reads the property name and ignores the set it sits in, but an IDS facet must name one set, so this specification checks Pset_PipeSegmentOccurrence. If your exporter writes the property under a different set name the audit will still read it and this line may report a false failure.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <property dataType="IFCREAL" cardinality="required">
+                    <propertySet>
+                        <simpleValue>Pset_PipeSegmentOccurrence</simpleValue>
+                    </propertySet>
+                    <baseName>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="NominalDiameter" />
+                            <xs:enumeration value="NominalDiameterMM" />
+                            <xs:enumeration value="DN" />
+                            <xs:enumeration value="Size" />
+                        </xs:restriction>
+                    </baseName>
+                </property>
+            </requirements>
+        </specification>
+        <specification name="Storey containment" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-STOREY" description="OPTIONAL. Each piping element should be contained in an IfcBuildingStorey through IfcRelContainedInSpatialStructure, and the storey should be named. CONSEQUENCE IF ABSENT: the element carries no level, which removes one of the three name hints the environment classifier uses and leaves any finding raised against the element without a floor to report it on. No engine is refused. ENGINES: MM-001, XM-001 indirectly; also the seismic audit, which reports findings per storey.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE" cardinality="required">
+                    <entity>
+                        <name>
+                            <simpleValue>IFCBUILDINGSTOREY</simpleValue>
+                        </name>
+                    </entity>
+                </partOf>
+            </requirements>
+        </specification>
+        <specification name="Space containment" ifcVersion="IFC4 IFC2X3" identifier="BG-PIPE-SPACE" description="OPTIONAL. Containment in a named IfcSpace through IfcRelContainedInSpatialStructure. The space name is the strongest hint the environment classifier has: names containing pool, coastal, marine, plant, basement, kitchen, shower, laundry, external or roof all resolve to a class. CONSEQUENCE IF ABSENT: the environment falls to the storey name and then to the T1 indoor-damp default at low confidence. Most MEP discipline models carry no IfcSpace at all, which is exactly why that default exists. No engine is refused. ENGINES: MM-001, XM-001, CC-001 severity.">
+            <applicability minOccurs="0" maxOccurs="unbounded">
+                <entity>
+                    <name>
+                        <xs:restriction base="xs:string">
+                            <xs:enumeration value="IFCPIPESEGMENT" />
+                            <xs:enumeration value="IFCPIPEFITTING" />
+                            <xs:enumeration value="IFCDUCTSEGMENT" />
+                            <xs:enumeration value="IFCDUCTFITTING" />
+                            <xs:enumeration value="IFCVALVE" />
+                            <xs:enumeration value="IFCPUMP" />
+                            <xs:enumeration value="IFCFILTER" />
+                            <xs:enumeration value="IFCTANK" />
+                            <xs:enumeration value="IFCHEATEXCHANGER" />
+                            <xs:enumeration value="IFCAIRTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSEGMENT" />
+                            <xs:enumeration value="IFCFLOWFITTING" />
+                            <xs:enumeration value="IFCFLOWCONTROLLER" />
+                            <xs:enumeration value="IFCFLOWMOVINGDEVICE" />
+                            <xs:enumeration value="IFCFLOWTERMINAL" />
+                            <xs:enumeration value="IFCFLOWSTORAGEDEVICE" />
+                            <xs:enumeration value="IFCFLOWTREATMENTDEVICE" />
+                            <xs:enumeration value="IFCDISTRIBUTIONELEMENT" />
+                        </xs:restriction>
+                    </name>
+                </entity>
+            </applicability>
+            <requirements>
+                <partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE" cardinality="required">
+                    <entity>
+                        <name>
+                            <simpleValue>IFCSPACE</simpleValue>
+                        </name>
+                    </entity>
+                </partOf>
+            </requirements>
+        </specification>
+    </specifications>
+</ids>
