@@ -534,6 +534,7 @@ Owner: unassigned.
 - [ ] Implement a Predictive Cost & Schedule Impact ML model in `cost_model.py` to replace static CSV lookups, dynamically forecasting remediation costs and programme delays based on issue context and historical resolution data.
 - [ ] Introduce a Natural Language Dashboard Assistant (Text-to-SQL/PostgREST) allowing users to query project analytics conversationally (e.g., "Show me all critical clearance issues on Level 3").
 - [ ] Create an LLM-driven Synthetic IFC Data Generator that procedurally creates thousands of edge-case `IfcModel` examples (with predefined clashes or compliance failures) to robustly train and benchmark the physics engines.
+- [ ] Implement a 2D-to-3D Vision-Language Model (VLM) pipeline to extract topological relationships and material specifications directly from P&ID schematics and automatically cross-check them against the 3D IFC model for undocumented deviations.
 
 Owner: unassigned.
 
