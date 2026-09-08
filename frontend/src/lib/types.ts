@@ -563,10 +563,6 @@ export interface PipelineEvent {
 }
 
 export interface DashboardStats {
-  total_projects: number;
-  total_documents: number;
-  total_rules: number;
-  issues_found: number;
   db_ok: boolean;
   db_backend: string;
 }

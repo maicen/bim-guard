@@ -1,29 +1,15 @@
-"""FastAPI router for high-level compliance dashboard statistics and connectivity."""
+"""FastAPI router for dashboard connectivity status."""
 
 from __future__ import annotations
 
 import time
-from typing import Annotated, Optional
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Query, Response
+from fastapi import APIRouter, Depends, Response
 
-from app.api.dependencies import (
-    get_document_access_service,
-    get_membership_service,
-    get_profile_service,
-    get_ruleset_access_service,
-)
 from app.auth import CurrentUser, get_current_user
-from app.logging_config import get_logger
 from app.modules.contracts import DashboardStatsResponse
-from app.services.document_access_service import DocumentAccessService
-from app.services.membership_service import MembershipService
 from app.services.persistence import PersistenceService
-from app.services.pipeline_services import PipelineOrchestratorService
-from app.services.profile_service import ProfileService
-from app.services.ruleset_access_service import RulesetAccessService
-
-logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -53,58 +39,24 @@ def _probe_db_health() -> bool:
     return ok
 
 
-@router.get("/stats", response_model=DashboardStatsResponse, summary="Get dashboard summary stats")
+@router.get("/stats", response_model=DashboardStatsResponse, summary="Get dashboard connectivity status")
 def get_dashboard_stats(
     response: Response,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
-    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
-    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
-    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
-    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> DashboardStatsResponse:
-    """Return high-level counts for projects, documents, rules, and connectivity.
+    """Return database connectivity status for the dashboard's header chips.
 
-    The actual counting lives in BIMGuard_App.run_dashboard() (the same
-    orchestrator every analysis pipeline goes through) -- this route just
-    resolves the effective org and hands the request-scoped services down to
-    it, so there's one place that decides what "visible to this org" means
-    for projects (ownership + grants), documents (per-org document grants),
-    and rules (per-org ruleset grants), instead of that logic living
-    separately in each route that happens to need a count.
+    This used to also compute org-scoped project/document/rule counts and an
+    "issues found" total (summing report_artifacts across every visible
+    project) -- the single most expensive call on the dashboard, and the
+    dashboard no longer renders any of those numbers (see the removal of the
+    stat tiles from DashboardView.svelte). All that's left reading this
+    response is App.svelte's checkHealth(), which only looks at db_ok and
+    db_backend for the header's gateway/database status chips.
     """
+    del current_user  # dependency enforces auth; the route itself is org-agnostic
     response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=15"
-    db_ok = _probe_db_health()
-    backend = PersistenceService.DB_BACKEND.upper()
-
-    effective_org_id: Optional[int] = organization_id
-    if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
-        effective_org_id = int(x_org_id.strip())
-
-    stats = {
-        "total_projects": 0,
-        "total_documents": 0,
-        "total_rules": 0,
-        "issues_found": 0,
-    }
-    try:
-        stats = PipelineOrchestratorService.get_dashboard_stats(
-            organization_id=effective_org_id,
-            user_id=current_user.id,
-            memberships=memberships,
-            profiles=profiles,
-            ruleset_access=ruleset_access,
-            document_access=document_access,
-        )
-    except Exception as exc:
-        logger.warning("Could not fetch dashboard stats from orchestrator: %s", exc)
-
     return DashboardStatsResponse(
-        total_projects=stats.get("total_projects", 0),
-        total_documents=stats.get("total_documents", 0),
-        total_rules=stats.get("total_rules", 0),
-        issues_found=stats.get("issues_found", 0),
-        db_ok=db_ok,
-        db_backend=backend,
+        db_ok=_probe_db_health(),
+        db_backend=PersistenceService.DB_BACKEND.upper(),
     )

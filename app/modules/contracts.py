@@ -1003,12 +1003,13 @@ class PipelineEventContract(BaseModel):
 
 
 class DashboardStatsResponse(BaseModel):
-    """System-level dashboard metrics and database health."""
+    """Dashboard connectivity/health status.
 
-    total_projects: int = Field(0, description="Total registered projects")
-    total_documents: int = Field(0, description="Total processed documents")
-    total_rules: int = Field(0, description="Total active compliance rules")
-    issues_found: int = Field(0, description="Count of identified non-compliances")
+    Previously also carried total_projects/total_documents/total_rules/
+    issues_found -- dropped along with the dashboard stat tiles that
+    rendered them (see DashboardView.svelte); nothing reads them anymore.
+    """
+
     db_ok: bool = Field(True, description="Database connection health status")
     db_backend: str = Field("SUPABASE", description="Primary database backend (SUPABASE)")
 

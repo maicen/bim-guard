@@ -348,34 +348,6 @@ class PipelineOrchestratorService:
         )
 
     @staticmethod
-    def get_dashboard_stats(
-        *,
-        organization_id: int | None = None,
-        user_id: str | None = None,
-        memberships: Any = None,
-        profiles: Any = None,
-        ruleset_access: Any = None,
-        document_access: Any = None,
-    ) -> dict[str, Any]:
-        """Return dashboard counts and compliance metrics.
-
-        Platform-wide when called with no arguments; scoped to organization_id
-        (using the caller's project visibility, and document/ruleset grants)
-        when the org context is supplied -- see BIMGuard_App.run_dashboard.
-        """
-        from app.modules.orchestrator import BIMGuard_App
-
-        workflow = BIMGuard_App()
-        return workflow.run_dashboard(
-            organization_id=organization_id,
-            user_id=user_id,
-            memberships=memberships,
-            profiles=profiles,
-            ruleset_access=ruleset_access,
-            document_access=document_access,
-        )
-
-    @staticmethod
     def export_bcf(report_data: dict[str, Any], output_path: str | Path) -> str:
         """Export BCF file from report payload via service boundary."""
         from app.modules.reporter import ComplianceReporter

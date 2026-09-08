@@ -48,12 +48,12 @@
   const cachedStats = dashboardApi.getCachedStats();
   const cachedProjects = projectsApi.getCachedList();
 
+  // Only db_ok/db_backend (the "degraded connectivity" banner below) come
+  // from the stats endpoint now -- the project count tiles it used to also
+  // carry were removed from this view; the project list itself still comes
+  // from projectsApi, independent of this.
   let stats: DashboardStats = $state(
     cachedStats || {
-      total_projects: cachedProjects ? cachedProjects.total : 0,
-      total_documents: 0,
-      total_rules: 0,
-      issues_found: 0,
       db_ok: true,
       db_backend: "SUPABASE",
     },
@@ -133,7 +133,6 @@
       await projectsApi.delete(projectToDelete.id);
       projects = projects.filter((p) => p.id !== projectToDelete!.id);
       table.selectedIds.delete(projectToDelete!.id);
-      stats.total_projects = Math.max(0, stats.total_projects - 1);
       projectToDelete = null;
     } catch (err: any) {
       error = `Could not delete project: ${err.message}`;
@@ -178,7 +177,6 @@
       unsubscribeProjects?.();
       unsubscribeProjects = projectsApi.subscribe((updatedProjects) => {
         projects = updatedProjects;
-        stats = { ...stats, total_projects: updatedProjects.length };
       }, orgId);
       refreshDashboard(true);
     });
