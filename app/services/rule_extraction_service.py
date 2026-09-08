@@ -7,11 +7,8 @@ from app.modules import contracts
 from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
 from app.modules.document_parsing.section_chunker import SectionChunker
 from app.modules.rule_builder.llamaindex_rule_generator import LlamaIndexRuleGenerator
-from app.services import pipeline_tracker
 
 logger = get_logger(__name__)
-
-_TRACKER_CODE = "LLAMA-INGEST"
 
 # Comfortably under the LLM provider's ~1MB single-request part limit, so a
 # document with no detected section headings (one giant chunk) or a single
@@ -119,22 +116,16 @@ class RuleExtractionService:
     ) -> list[contracts.DocumentNodeContract]:
         """Ingest document text into clause-annotated nodes with deontic statements.
 
-        Progress is reported through the shared pipeline_tracker so
-        `GET /api/events/{document_id}` shows ingestion/extraction progress
-        the same way an engine run does — a no-op when no tracker is bound
-        for this id (e.g. outside a `pipeline_tracker.tracking()` context).
+        Does not report through the shared pipeline_tracker: that tracker is
+        keyed by project_id against a fixed corrosion-engine registry
+        (GC-001/CC-001/...), so binding it here under a document_id would
+        either collide with an in-flight corrosion run that happens to share
+        the same id, or raise on an engine code ("LLAMA-INGEST") the registry
+        does not know. Document ingestion has no engine-progress contract of
+        its own yet, so this stays plain (unstreamed) for now.
         """
-        with pipeline_tracker.tracking(document_id):
-            pipeline_tracker.emit(_TRACKER_CODE, chars=len(text or ""))
-            nodes = self._ingestor.nodes_from_text(text, source_document_id=document_id)
-            pipeline_tracker.increment(_TRACKER_CODE, nodes=len(nodes))
-
-            try:
-                statements = await self._ingestor.extract_deontic_statements(nodes)
-            except Exception:
-                pipeline_tracker.fail(_TRACKER_CODE, "deontic extraction failed")
-                raise
-            pipeline_tracker.complete(_TRACKER_CODE, deontic_statements=len(statements))
+        nodes = self._ingestor.nodes_from_text(text, source_document_id=document_id)
+        statements = await self._ingestor.extract_deontic_statements(nodes)
 
         logger.info(
             "LlamaIndex ingestion complete document_id=%d nodes=%d deontic_statements=%d",
