@@ -170,3 +170,71 @@ class TestCli:
         assert args.piping == [1540, 1541]
         assert args.seismic == [1542]
         assert args.combinations == "full-only"
+
+
+class TestAuthentication:
+    """Since 47cf29b every /api/analyze route needs a bearer token.
+
+    The HTTP layer is stubbed at ``urlopen`` rather than at ``_post``/``_get``,
+    because the question is what reaches the wire: a script that built the
+    header but never attached it would pass a test written any higher up.
+    """
+
+    def test_every_request_is_authenticated_and_a_401_re_mints_once(self):
+        import json
+        import urllib.error
+        import urllib.request
+
+        import scripts.prewarm_demo as prewarm_demo
+
+        class FakeResponse:
+            """Just enough of an HTTP response for ``json.load``."""
+
+            def __init__(self, payload):
+                self._payload = json.dumps(payload).encode()
+
+            def read(self, *args):
+                return self._payload
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        sent: list[urllib.request.Request] = []
+        minted: list[str] = []
+
+        def fake_mint():
+            minted.append("token-" + str(len(minted) + 1))
+            return minted[-1]
+
+        def fake_urlopen(request, timeout=None):
+            sent.append(request)
+            if len(sent) == 2:  # the verification read finds the token expired
+                raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
+            return FakeResponse({"cached": True, "audit_issues": [], "issue_stats": {}})
+
+        source = prewarm_demo.DevToken(fake_mint)
+        with (
+            patch.object(prewarm_demo, "_token_source", source),
+            patch("urllib.request.urlopen", fake_urlopen),
+        ):
+            report = prewarm_demo.prewarm(
+                "http://x", [1541], [], combinations="full-only", log=lambda _: None
+            )
+
+        # (a) every request that reached the wire carried a non-empty bearer.
+        assert len(sent) == 3, "one warm, one verify, one retry"
+        headers = [request.get_header("Authorization") for request in sent]
+        assert all(h is not None for h in headers), headers
+        assert all(h.startswith("Bearer ") for h in headers), headers
+        assert all(h.removeprefix("Bearer ").strip() for h in headers), headers
+
+        # (b) the 401 caused exactly one re-mint and exactly one retry.
+        assert minted == ["token-1", "token-2"], "one mint at the start, one after the 401"
+        assert source.mints == 2
+        assert headers[0] == "Bearer token-1"
+        assert headers[1] == "Bearer token-1", "the 401 came from the token it was holding"
+        assert headers[2] == "Bearer token-2", "the retry used the freshly minted token"
+        assert report.warnings == [], "the retry succeeded, so the entry verified"

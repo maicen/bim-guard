@@ -30,6 +30,19 @@ MATCHING THE UI'S CACHE KEYS
     Seismic sends no engine selection at all -- it is one kernel with nothing to
     select between -- so it has exactly one entry per project.
 
+AUTHENTICATION
+
+    Every /api/analyze route has required a bearer token since 47cf29b, so this
+    signs in first. It reads VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
+    VITE_DEV_AUTH_EMAIL and VITE_DEV_AUTH_PASSWORD out of frontend/.env and runs
+    the same Supabase password grant as the SPA's "Sign in as dev test user"
+    button, then sends the resulting token on every request. No credential and
+    no token is ever printed.
+
+    Supabase issues a one-hour token; a full 63-entry warm runs longer than
+    that. The token is therefore re-minted every 40 minutes, and again on any
+    401 -- that request is retried once with the fresh token.
+
 USAGE
 
     uv run python scripts/prewarm_demo.py --piping 1541 --seismic 1542
@@ -51,6 +64,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 
 #: Engine chip ids, in the order ``AnalyzeView.svelte`` lists them. The short
 #: form is deliberate: it is what the page sends.
@@ -60,6 +74,137 @@ PIPING_ENGINES: tuple[str, ...] = ("GC", "CC", "MC", "MM", "XM")
 #: West Riverside measured 577 s, so the ceiling is well clear of a real run and
 #: still bounded enough that a hung backend fails the script rather than the demo.
 REQUEST_TIMEOUT = 3600
+
+
+#: Where the dev account's credentials live. The SPA's "Sign in as dev test
+#: user" button reads exactly these four keys out of the same file, so the
+#: script signs in as the same account by the same password grant rather than
+#: inventing a second way in. No value from this file is ever logged.
+DEV_ENV_PATH = Path(__file__).resolve().parents[1] / "frontend" / ".env"
+DEV_ENV_KEYS = ("VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY", "VITE_DEV_AUTH_EMAIL", "VITE_DEV_AUTH_PASSWORD")
+
+#: Re-mint after this much wall-clock. Supabase issues a one-hour token and a
+#: full 63-entry warm outlasts that, so a warm started on a fresh token would
+#: still be answering 401 by the time it reached the last combinations.
+TOKEN_MAX_AGE_S = 40 * 60
+
+#: Seconds the password grant itself is allowed to take.
+TOKEN_TIMEOUT = 60
+
+
+def _read_env_file(path: Path) -> dict[str, str]:
+    """Return the ``KEY=VALUE`` pairs in a dotenv file.
+
+    Leading whitespace and surrounding quotes are stripped, matching what
+    ``python-dotenv`` and Vite both accept. The caller must not log the values.
+    """
+    values: dict[str, str] = {}
+    with open(path, encoding="utf-8-sig") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def mint_dev_token(env_path: Path = DEV_ENV_PATH) -> str:
+    """Sign in as the dev account and return its Supabase access token.
+
+    This is the password grant behind ``signInAsDevUser`` in
+    ``frontend/src/lib/auth.svelte.ts`` -- a real Supabase session, which the
+    backend still verifies against the JWKS. Nothing about authentication is
+    bypassed; the script simply holds a token the way the browser does.
+
+    Raises:
+        RuntimeError: if the credentials file is missing a key, or the grant
+            returns no token. Neither message quotes a credential.
+    """
+    try:
+        env = _read_env_file(env_path)
+    except OSError as exc:
+        raise RuntimeError(f"cannot read {env_path}: {exc.strerror}") from exc
+    missing = [key for key in DEV_ENV_KEYS if not env.get(key)]
+    if missing:
+        raise RuntimeError(f"{env_path} does not define {', '.join(missing)}")
+
+    anon_key = env["VITE_SUPABASE_ANON_KEY"]
+    request = urllib.request.Request(
+        env["VITE_SUPABASE_URL"].rstrip("/") + "/auth/v1/token?grant_type=password",
+        data=json.dumps({"email": env["VITE_DEV_AUTH_EMAIL"], "password": env["VITE_DEV_AUTH_PASSWORD"]}).encode(),
+        headers={"Content-Type": "application/json", "apikey": anon_key, "Authorization": f"Bearer {anon_key}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=TOKEN_TIMEOUT) as response:
+            body = json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"password grant refused with HTTP {exc.code}") from exc
+    token = body.get("access_token")
+    if not token:
+        raise RuntimeError("password grant returned no access_token")
+    return token
+
+
+class DevToken:
+    """Holds one dev access token and re-mints it before Supabase expires it.
+
+    ``value`` is what every request asks for; it mints on first use and again
+    once the held token passes ``max_age_s``. ``refresh`` forces a new one --
+    that is the 401 path, where the token died earlier than the clock said.
+    """
+
+    def __init__(self, mint=mint_dev_token, *, max_age_s: float = TOKEN_MAX_AGE_S, clock=time.monotonic):
+        self._mint = mint
+        self._max_age = max_age_s
+        self._clock = clock
+        self._token = ""
+        self._minted_at = 0.0
+        self.mints = 0
+
+    def value(self) -> str:
+        """Return a token, minting a fresh one if none is held or it has aged out."""
+        if not self._token or self._clock() - self._minted_at >= self._max_age:
+            return self.refresh()
+        return self._token
+
+    def refresh(self) -> str:
+        """Mint a new token unconditionally and return it."""
+        self._token = self._mint()
+        self._minted_at = self._clock()
+        self.mints += 1
+        return self._token
+
+
+_token_source: DevToken | None = None
+
+
+def token_source() -> DevToken:
+    """Return the process-wide token holder, creating it on first use."""
+    global _token_source
+    if _token_source is None:
+        _token_source = DevToken()
+    return _token_source
+
+
+def _authorised(build_request, *, timeout: int = REQUEST_TIMEOUT) -> tuple[dict, float]:
+    """Send a bearer-authenticated request, re-minting once on a 401.
+
+    ``build_request`` takes a token and returns the ``Request`` to send, so the
+    retry carries the new token rather than replaying the dead one. Exactly one
+    re-mint and one retry: a second 401 is a real failure, not an expiry.
+    """
+    source = token_source()
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(build_request(source.value()), timeout=timeout) as response:
+            return json.load(response), time.monotonic() - started
+    except urllib.error.HTTPError as exc:
+        if exc.code != 401:
+            raise
+    with urllib.request.urlopen(build_request(source.refresh()), timeout=timeout) as response:
+        return json.load(response), time.monotonic() - started
 
 
 def engine_combinations(engines: tuple[str, ...] = PIPING_ENGINES, *, full_only: bool = False) -> list[tuple[str, ...]]:
@@ -130,27 +275,32 @@ class Report:
 
 
 def _post(base_url: str, path: str, fields: list[tuple[str, str]]) -> tuple[dict, float]:
-    """POST form-encoded ``fields``; return the decoded body and elapsed seconds."""
+    """POST form-encoded ``fields`` as the dev user; return the body and elapsed seconds."""
     data = urllib.parse.urlencode(fields).encode()
-    request = urllib.request.Request(
-        base_url.rstrip("/") + path,
-        data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    started = time.monotonic()
-    with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-        body = json.load(response)
-    return body, time.monotonic() - started
+    url = base_url.rstrip("/") + path
+
+    def build(token: str) -> urllib.request.Request:
+        return urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": f"Bearer {token}",
+            },
+            method="POST",
+        )
+
+    return _authorised(build)
 
 
 def _get(base_url: str, path: str, params: list[tuple[str, str]]) -> tuple[dict, float]:
-    """GET with repeated query parameters; return the decoded body and elapsed seconds."""
+    """GET with repeated query parameters as the dev user; return body and elapsed seconds."""
     url = f"{base_url.rstrip('/')}{path}?{urllib.parse.urlencode(params)}"
-    started = time.monotonic()
-    with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT) as response:
-        body = json.load(response)
-    return body, time.monotonic() - started
+
+    def build(token: str) -> urllib.request.Request:
+        return urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"}, method="GET")
+
+    return _authorised(build)
 
 
 def warm_corrosion(base_url: str, project_id: int, engines: tuple[str, ...]) -> Warmed:
@@ -218,63 +368,83 @@ def _label(engines: tuple[str, ...]) -> str:
     return ",".join(engines) if engines else "-"
 
 
+def _entry_line(project_id: int, slug: str, index: int, total: int, engines: tuple[str, ...], elapsed: float, status: str) -> str:
+    """One per-entry progress line.
+
+    ``status`` is WARMED when the engines just ran, HIT when the backend served
+    the entry from cache, MISS when a verification read did not.
+    """
+    return (
+        f"  project={project_id} slug={slug} combo={index}/{total} "
+        f"engines={_label(engines)} elapsed={elapsed:.1f}s {status}"
+    )
+
+
+def _log_line(message: str) -> None:
+    """Print a progress line and flush, so a long warm shows movement."""
+    print(message, flush=True)
+
+
 def prewarm(
     base_url: str,
     piping: list[int],
     seismic: list[int],
     *,
     combinations: str = "all",
-    log=print,
+    log=_log_line,
 ) -> Report:
     """Warm every entry a demo will read, then verify each one is a hit."""
     report = Report()
     selections = engine_combinations(full_only=combinations == "full-only")
 
+    total = len(selections)
+
     if piping:
-        log(f"Piping: {len(piping)} project(s) x {len(selections)} engine combination(s)")
+        log(f"Warming piping: {len(piping)} project(s) x {total} engine combination(s)")
     for project_id in piping:
-        for engines in selections:
+        for index, engines in enumerate(selections, start=1):
             warmed = warm_corrosion(base_url, project_id, engines)
             report.warmed.append(warmed)
             if warmed.error:
-                log(f"  project={project_id} slug=corrosion engines={_label(engines)} ERROR {warmed.error}")
+                log(_entry_line(project_id, "corrosion", index, total, engines, 0.0, f"ERROR {warmed.error}"))
                 continue
             log(
-                f"  project={project_id} slug=corrosion engines={_label(engines)} "
-                f"duration={warmed.duration_s:.2f}s cached={str(warmed.cached).lower()} issues={warmed.issues}"
+                _entry_line(
+                    project_id, "corrosion", index, total, engines,
+                    warmed.duration_s, "HIT" if warmed.cached else "WARMED",
+                )
+                + f" issues={warmed.issues}"
             )
 
     if seismic:
-        log(f"Seismic: {len(seismic)} project(s)")
+        log(f"Warming seismic: {len(seismic)} project(s)")
     for project_id in seismic:
         warmed = warm_seismic(base_url, project_id)
         report.warmed.append(warmed)
         if warmed.error:
-            log(f"  project={project_id} slug=seismic engines=- ERROR {warmed.error}")
+            log(_entry_line(project_id, "seismic", 1, 1, (), 0.0, f"ERROR {warmed.error}"))
             continue
         log(
-            f"  project={project_id} slug=seismic engines=- "
-            f"duration={warmed.duration_s:.2f}s cached={str(warmed.cached).lower()} issues={warmed.issues}"
+            _entry_line(project_id, "seismic", 1, 1, (), warmed.duration_s, "HIT" if warmed.cached else "WARMED")
+            + f" issues={warmed.issues}"
         )
 
     log("Verifying (second read of each entry must report cached=true)")
     for project_id in piping:
-        for engines in selections:
+        for index, engines in enumerate(selections, start=1):
             result = verify(base_url, project_id, "corrosion", engines)
             report.verified.append(result)
-            prefix = "  " if result.ok else "  WARN "
             log(
-                f"{prefix}project={project_id} slug=corrosion engines={_label(engines)} "
-                f"cached={str(result.cached).lower()} duration={result.duration_s:.2f}s issues={result.issues}"
+                _entry_line(project_id, "corrosion", index, total, engines, result.duration_s, "HIT" if result.ok else "MISS")
+                + f" issues={result.issues}"
                 + (f" error={result.error}" if result.error else "")
             )
     for project_id in seismic:
         result = verify(base_url, project_id, "seismic", ())
         report.verified.append(result)
-        prefix = "  " if result.ok else "  WARN "
         log(
-            f"{prefix}project={project_id} slug=seismic engines=- "
-            f"cached={str(result.cached).lower()} duration={result.duration_s:.2f}s issues={result.issues}"
+            _entry_line(project_id, "seismic", 1, 1, (), result.duration_s, "HIT" if result.ok else "MISS")
+            + f" issues={result.issues}"
             + (f" error={result.error}" if result.error else "")
         )
 
@@ -316,14 +486,16 @@ def main(argv: list[str] | None = None) -> int:
     elapsed = time.monotonic() - started
 
     failed_warms = [w for w in report.warmed if w.error]
+    hits = len(report.verified) - len(report.warnings)
     print(
-        f"\nWarmed {len(report.warmed)} entr(ies) in {elapsed:.1f}s; "
-        f"verified {len(report.verified)}; warnings {len(report.warnings)}; errors {len(failed_warms)}"
+        f"\nEntries verified {hits}/{len(report.verified)}; misses {len(report.warnings)}; "
+        f"warm errors {len(failed_warms)}; token mints {token_source().mints}; "
+        f"wall-clock {elapsed / 60:.1f} min ({elapsed:.0f}s)"
     )
     if report.warnings:
         print("Not served from cache on the second read:")
         for warning in report.warnings:
-            print(f"  project={warning.project_id} slug={warning.slug} engines={_label(warning.engines)}")
+            print(f"  WARN project={warning.project_id} slug={warning.slug} engines={_label(warning.engines)}")
     return 1 if report.warnings or failed_warms else 0
 
 
