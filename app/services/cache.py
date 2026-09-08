@@ -206,6 +206,17 @@ _default_backend = InMemoryTTLCacheBackend(maxsize=DEFAULT_MAXSIZE, ttl=DEFAULT_
 cache_service = CacheService(_default_backend)
 local_cache = _default_backend.raw_cache
 
+# Short-TTL backend for the raw adapter layer (app.services.db_adapters). This
+# sits beneath every service-level cache above and covers tables nothing else
+# caches (organizations, memberships, grants, profiles, rule_folders/rules
+# rows read outside the decorated entry points, etc). A 20s TTL matches the
+# staleness the dashboard endpoint already advertises via its own
+# Cache-Control header, and bounds cross-worker staleness in a multi-worker
+# production deployment to the same window.
+DEFAULT_ADAPTER_TTL = 20
+_adapter_backend = InMemoryTTLCacheBackend(maxsize=DEFAULT_MAXSIZE, ttl=DEFAULT_ADAPTER_TTL)
+adapter_cache_service = CacheService(_adapter_backend)
+
 
 def get_cache() -> TTLCache:
     """Return the global TTLCache instance for backward compatibility."""

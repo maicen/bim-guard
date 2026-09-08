@@ -11,6 +11,8 @@ from typing import Any, Callable
 from httpx import TransportError
 from postgrest.exceptions import APIError
 
+from app.services.cache import adapter_cache_service
+
 _RETRY_ATTEMPTS = 3
 _RETRY_BASE_DELAY_S = 0.2
 
@@ -268,6 +270,11 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 None,
             )
 
+        cache_key = self._cache_key("get", pk_value)
+        cached = adapter_cache_service.get(cache_key)
+        if cached is not None:
+            return cached[0] if cached else None
+
         try:
             response = execute_with_retry(
                 lambda: self._client.table(self._table_name)
@@ -276,6 +283,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 .limit(1)
             )
             rows = response.data or []
+            adapter_cache_service.set(cache_key, rows)
             return rows[0] if rows else None
         except APIError as exc:
             if self._is_missing_table_error(exc):
@@ -297,6 +305,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 lambda: self._client.table(self._table_name).insert(payload)
             )
             rows = response.data or []
+            self._invalidate_cache()
             return rows[0] if rows else payload
         except APIError as exc:
             if self._is_missing_table_error(exc) or getattr(exc, "code", None) == "23503":
@@ -309,6 +318,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
                     lambda: self._client.table(self._table_name).insert(retry_payload)
                 )
                 rows = response.data or []
+                self._invalidate_cache()
                 return rows[0] if rows else retry_payload
             raise
 
@@ -332,6 +342,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
                     lambda chunk=chunk: self._client.table(self._table_name).insert(chunk)
                 )
                 inserted.extend(response.data or [])
+            self._invalidate_cache()
             return inserted
         except APIError as exc:
             if self._is_missing_table_error(exc):
@@ -351,6 +362,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             execute_with_retry(
                 lambda: self._client.table(self._table_name).update(updates).eq(self._pk, pk_values)
             )
+            self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
                 self._use_memory_fallback = True
@@ -371,6 +383,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             execute_with_retry(
                 lambda: self._client.table(self._table_name).delete().eq(self._pk, pk_value)
             )
+            self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
                 self._use_memory_fallback = True
@@ -398,6 +411,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 execute_with_retry(
                     lambda chunk=chunk: self._client.table(self._table_name).delete().in_(self._pk, chunk)
                 )
+            self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
                 self._use_memory_fallback = True
@@ -428,10 +442,17 @@ class SupabaseTableAdapter(DatabaseAdapter):
                     matching.append(row)
             return matching[:limit] if limit is not None else matching
 
+        expr = parse_where(where_sql, params)
+        cache_key = self._cache_key("where", expr.field, expr.operator, expr.value, limit)
+        cached = adapter_cache_service.get(cache_key)
+        if cached is not None:
+            return list(cached)
+
         try:
-            expr = parse_where(where_sql, params)
             rows = self._select_filtered(expr, limit=limit)
-            return rows[:limit] if limit is not None else rows
+            result = rows[:limit] if limit is not None else rows
+            adapter_cache_service.set(cache_key, result)
+            return result
         except APIError as exc:
             if self._is_missing_table_error(exc):
                 self._use_memory_fallback = True
@@ -439,12 +460,19 @@ class SupabaseTableAdapter(DatabaseAdapter):
             raise
 
     def _select_all(self) -> list[dict[str, Any]]:
-        """Select all rows using paginated range queries."""
+        """Select all rows using paginated range queries, short-TTL cached."""
         if self._use_memory_fallback:
             return list(self._memory_rows)
 
+        cache_key = self._cache_key("all")
+        cached = adapter_cache_service.get(cache_key)
+        if cached is not None:
+            return list(cached)
+
         try:
-            return self._run_select(limit=None, expr=None)
+            rows = self._run_select(limit=None, expr=None)
+            adapter_cache_service.set(cache_key, rows)
+            return rows
         except APIError as exc:
             if self._is_missing_table_error(exc):
                 self._use_memory_fallback = True
@@ -454,6 +482,15 @@ class SupabaseTableAdapter(DatabaseAdapter):
     def _select_filtered(self, expr: _WhereExpr, limit: int | None) -> list[dict[str, Any]]:
         """Select rows matching the expression using paginated queries."""
         return self._run_select(limit=limit, expr=expr)
+
+    def _cache_key(self, op: str, *parts: Any) -> str:
+        """Build a cache key scoped to this table and read operation."""
+        suffix = ":".join(str(p) for p in parts)
+        return f"adapter:{self._table_name}:{op}:{suffix}" if suffix else f"adapter:{self._table_name}:{op}"
+
+    def _invalidate_cache(self) -> None:
+        """Evict every cached read for this table after a write."""
+        adapter_cache_service.invalidate(f"adapter:{self._table_name}:")
 
     def _run_select(self, *, limit: int | None, expr: _WhereExpr | None) -> list[dict[str, Any]]:
         """Execute paginated select queries and collect all rows."""

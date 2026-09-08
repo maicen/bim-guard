@@ -43,9 +43,19 @@ class MembershipService:
     def list_for_user(self, user_id: str) -> list[dict[str, Any]]:
         """Return the organizations *user_id* belongs to, with their role in each."""
         memberships = self._memberships.rows_where("user_id = ?", [user_id])
+        if not memberships:
+            return []
+
+        # One full-table read (short-TTL cached at the adapter layer) instead
+        # of a per-membership `.get(organization_id)` round trip -- a typical
+        # user belongs to 1-3 orgs, but this used to be N separate Supabase
+        # calls (visible in logs as repeated `organizations?...id=eq.N` hits)
+        # on every single request instead of one.
+        orgs_by_id = {o["id"]: o for o in self._organizations.rows}
+
         results: list[dict[str, Any]] = []
         for membership in memberships:
-            org = self._organizations.get(membership["organization_id"])
+            org = orgs_by_id.get(membership["organization_id"])
             if org is None:
                 continue
             results.append(
