@@ -125,6 +125,13 @@
   let apiOnline = $state(true);
 
   async function checkHealth() {
+    // Same race /api/auth/me and prefetchAll() guard against (see the
+    // hasPrefetched effect below): firing this before the Supabase session
+    // lookup has set the bearer token 401s every time, and did so on every
+    // poll tick until a token existed -- not just the first call. Skipping
+    // silently here (instead of surfacing apiOnline = false) avoids flashing
+    // an "API offline" chip during the normal, brief pre-auth window.
+    if (isAuthConfigured && (authState.loading || !authState.user)) return;
     try {
       const stats = await dashboardApi.getStats();
       dbOk = stats.db_ok;
@@ -132,7 +139,7 @@
       apiOnline = true;
     } catch {
       // Deliberately quiet: the header's gateway/database chips are this
-      // check's UI, and it re-runs every 20s. A toast per poll would be noise.
+      // check's UI, and it re-runs on a timer. A toast per poll would be noise.
       apiOnline = false;
       dbOk = false;
     }
@@ -264,7 +271,12 @@
     if (window.location.pathname === "/viewer" && !window.location.hash) {
       replace(`/viewer?${window.location.search.slice(1)}`);
     }
-    const interval = setInterval(checkHealth, 20000);
+    // 45s (was 20s): this only drives the header's gateway/database status
+    // chips, which don't need sub-minute freshness, and every tick is a full
+    // /api/dashboard/stats round trip -- see app/api/dashboard.py's own
+    // Cache-Control (max-age=5, stale-while-revalidate=15) for the backend's
+    // matching staleness budget.
+    const interval = setInterval(checkHealth, 45000);
     return () => clearInterval(interval);
   });
 
