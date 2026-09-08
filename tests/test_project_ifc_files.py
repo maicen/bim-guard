@@ -1,11 +1,11 @@
-"""Tests for the project_ifc_files access layer on ProjectsService.
+"""Tests for the project_ifc_files access layer on ModelsService.
 
 The table itself is verified against a real Postgres by the migration
 (``supabase/migrations/20260830003000_create_project_ifc_files.sql``); what is
 verified here is the read side that sits on top of it:
 
-1. ``get_ifc_files_by_project`` returns a project's models, primary first.
-2. ``get_primary_ifc_file`` resolves the one model an analysis run starts from.
+1. ``list_models`` returns a project's models, primary first.
+2. ``get_primary`` resolves the one model an analysis run starts from.
 3. Both degrade to ``projects.ifc_file_path`` where the child table has no rows
    — a project created before the migration, or a database where it has not
    been applied yet.
@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 
+from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
 
 
@@ -99,15 +100,21 @@ class NoopStorage:
 
 def build_service(
     projects: list[dict], ifc_files: Any, storage: NoopStorage | None = None
-) -> ProjectsService:
-    """Return a ProjectsService wired to in-memory repositories."""
-    return ProjectsService(
+) -> tuple[ModelsService, ProjectsService]:
+    """Return a ``ModelsService`` and its backing ``ProjectsService`` mirror."""
+    storage = storage or NoopStorage()
+    projects_service = ProjectsService(
         projects_repo=FakeTable(projects),
         standards_repo=FakeTable(),
         client_documents_repo=FakeTable(),
-        ifc_files_repo=ifc_files,
-        storage=storage or NoopStorage(),
+        storage=storage,
     )
+    models_service = ModelsService(
+        ifc_files_repo=ifc_files,
+        storage=storage,
+        project_mirror=projects_service,
+    )
+    return models_service, projects_service
 
 
 PROJECTS = [
@@ -128,63 +135,64 @@ IFC_FILES = [
 
 
 @pytest.fixture
-def service() -> ProjectsService:
+def service() -> ModelsService:
     """Build a service holding both child rows and legacy-only projects."""
-    return build_service(PROJECTS, FakeTable(IFC_FILES))
+    models_service, _projects_service = build_service(PROJECTS, FakeTable(IFC_FILES))
+    return models_service
 
 
-def test_lists_every_model_attached_to_the_project(service: ProjectsService) -> None:
-    """get_ifc_files_by_project returns all of a project's rows and no others."""
-    files = service.get_ifc_files_by_project(10)
+def test_lists_every_model_attached_to_the_project(service: ModelsService) -> None:
+    """list_models returns all of a project's rows and no others."""
+    files = service.list_models(10)
 
     assert [row["file_name"] for row in files] == ["plumb.ifc", "arch.ifc", "struct.ifc"]
     assert {row["project_id"] for row in files} == {10}
 
 
-def test_primary_model_sorts_first(service: ProjectsService) -> None:
+def test_primary_model_sorts_first(service: ModelsService) -> None:
     """The primary row leads the list regardless of insertion order."""
-    files = service.get_ifc_files_by_project(10)
+    files = service.list_models(10)
 
     assert files[0]["is_primary"] is True
     assert files[0]["role"] == "primary"
 
 
-def test_primary_ifc_file_resolves_the_analysis_model(service: ProjectsService) -> None:
-    """get_primary_ifc_file returns the row flagged primary."""
-    primary = service.get_primary_ifc_file(10)
+def test_primary_ifc_file_resolves_the_analysis_model(service: ModelsService) -> None:
+    """get_primary returns the row flagged primary."""
+    primary = service.get_primary(10)
 
     assert primary is not None
     assert primary["file_path"] == "sb://m/plumb.ifc"
 
 
-def test_falls_back_to_the_projects_column_when_no_rows_exist(service: ProjectsService) -> None:
+def test_falls_back_to_the_projects_column_when_no_rows_exist(service: ModelsService) -> None:
     """A project migrated before the child table still reports its model."""
-    files = service.get_ifc_files_by_project(11)
+    files = service.list_models(11)
 
     assert len(files) == 1
     assert files[0]["file_path"] == "sb://m/uploads/ifc/abc_Clinic.ifc"
     assert files[0]["file_name"] == "abc_Clinic.ifc"
     assert files[0]["is_primary"] is True
-    assert service.get_primary_ifc_file(11) == files[0]
+    assert service.get_primary(11) == files[0]
 
 
-def test_fallback_derives_file_name_from_a_windows_path(service: ProjectsService) -> None:
+def test_fallback_derives_file_name_from_a_windows_path(service: ModelsService) -> None:
     """Legacy rows may hold local Windows paths rather than storage refs."""
-    primary = service.get_primary_ifc_file(13)
+    primary = service.get_primary(13)
 
     assert primary is not None
     assert primary["file_name"] == "Tower.ifc"
 
 
-def test_project_without_a_model_reports_nothing(service: ProjectsService) -> None:
+def test_project_without_a_model_reports_nothing(service: ModelsService) -> None:
     """No child rows and no ifc_file_path means no files, not a fabricated one."""
-    assert service.get_ifc_files_by_project(12) == []
-    assert service.get_primary_ifc_file(12) is None
+    assert service.list_models(12) == []
+    assert service.get_primary(12) is None
 
 
-def test_rows_with_no_primary_flag_still_resolve_to_a_model(service: ProjectsService) -> None:
+def test_rows_with_no_primary_flag_still_resolve_to_a_model(service: ModelsService) -> None:
     """A project that owns models has a model to analyse."""
-    primary = service.get_primary_ifc_file(14)
+    primary = service.get_primary(14)
 
     assert primary is not None
     assert primary["file_path"] == "sb://m/a.ifc"
@@ -192,46 +200,46 @@ def test_rows_with_no_primary_flag_still_resolve_to_a_model(service: ProjectsSer
 
 def test_missing_table_degrades_to_the_legacy_column() -> None:
     """Reads survive a database where the migration has not been applied."""
-    service = build_service(PROJECTS, MissingTable())
+    service, _projects_service = build_service(PROJECTS, MissingTable())
 
-    files = service.get_ifc_files_by_project(11)
+    files = service.list_models(11)
 
     assert [row["file_path"] for row in files] == ["sb://m/uploads/ifc/abc_Clinic.ifc"]
-    assert service.get_primary_ifc_file(12) is None
+    assert service.get_primary(12) is None
 
 
-# ── delete_ifc_file ──────────────────────────────────────────────────────────
+# ── delete_model ─────────────────────────────────────────────────────────────
 
 
 def test_delete_removes_a_non_primary_file_and_the_stored_bytes() -> None:
     """Deleting a context model drops its row and frees its storage object."""
     storage = NoopStorage()
-    service = build_service(PROJECTS, FakeTable(IFC_FILES), storage=storage)
+    service, _projects_service = build_service(PROJECTS, FakeTable(IFC_FILES), storage=storage)
 
-    deleted = service.delete_ifc_file(10, 1)
+    deleted = service.delete_model(10, 1)
 
     assert deleted is not None
     assert deleted["file_name"] == "arch.ifc"
     assert storage.deleted == ["sb://m/arch.ifc"]
-    remaining = service.get_ifc_files_by_project(10)
+    remaining = service.list_models(10)
     assert [row["file_name"] for row in remaining] == ["plumb.ifc", "struct.ifc"]
     assert remaining[0]["is_primary"] is True
 
 
 def test_delete_of_the_primary_promotes_the_next_remaining_file() -> None:
     """The project keeps a model to analyse as long as one is left."""
-    service = build_service(PROJECTS, FakeTable(IFC_FILES))
+    service, projects_service = build_service(PROJECTS, FakeTable(IFC_FILES))
 
-    deleted = service.delete_ifc_file(10, 2)
+    deleted = service.delete_model(10, 2)
 
     assert deleted is not None
     assert deleted["is_primary"] is True
-    primary = service.get_primary_ifc_file(10)
+    primary = service.get_primary(10)
     assert primary is not None
     assert primary["file_name"] == "arch.ifc"
     assert primary["is_primary"] is True
     # The mirror column follows the newly promoted model.
-    assert service.get_project(10)["ifc_file_path"] == "sb://m/arch.ifc"
+    assert projects_service.get_project(10)["ifc_file_path"] == "sb://m/arch.ifc"
 
 
 def test_delete_of_the_last_file_clears_the_projects_mirror_column() -> None:
@@ -239,20 +247,20 @@ def test_delete_of_the_last_file_clears_the_projects_mirror_column() -> None:
     ifc_files = FakeTable(
         [{"id": 99, "project_id": 12, "file_path": "sb://m/only.ifc", "file_name": "only.ifc", "is_primary": True, "role": "primary"}]
     )
-    service = build_service(PROJECTS, ifc_files)
+    service, projects_service = build_service(PROJECTS, ifc_files)
 
-    deleted = service.delete_ifc_file(12, 99)
+    deleted = service.delete_model(12, 99)
 
     assert deleted is not None
-    assert service.get_ifc_files_by_project(12) == []
-    assert service.get_project(12)["ifc_file_path"] == ""
+    assert service.list_models(12) == []
+    assert projects_service.get_project(12)["ifc_file_path"] == ""
 
 
 def test_delete_of_an_unknown_file_returns_none() -> None:
     """A file_id belonging to another project, or no project, is a no-op."""
-    service = build_service(PROJECTS, FakeTable(IFC_FILES))
+    service, _projects_service = build_service(PROJECTS, FakeTable(IFC_FILES))
 
-    assert service.delete_ifc_file(10, 999) is None
+    assert service.delete_model(10, 999) is None
     # id 4 belongs to project 14, not 10 -- must not be deletable through it.
-    assert service.delete_ifc_file(10, 4) is None
-    assert len(service.get_ifc_files_by_project(14)) == 2
+    assert service.delete_model(10, 4) is None
+    assert len(service.list_models(14)) == 2

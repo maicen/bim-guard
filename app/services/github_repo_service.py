@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from re import match
 from typing import Any, Optional
@@ -16,7 +16,7 @@ from app.modules.contracts import (
     GitHubRepoStructureResponse,
 )
 from app.services.db_adapters import DatabaseAdapter
-from app.services.projects_service import ProjectsService
+from app.services.models_service import ModelsService
 
 logger = get_logger(__name__)
 
@@ -52,11 +52,11 @@ class GitHubRepoService:
     def __init__(
         self,
         github_repos_repo: DatabaseAdapter,
-        projects_service: Optional[ProjectsService] = None,
+        models_service: Optional[ModelsService] = None,
     ):
         """Initialize service with persistence repository adapter."""
         self._repos = github_repos_repo
-        self._projects_service = projects_service
+        self._models_service = models_service
         self._tree_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
     def list_repos(self) -> list[dict[str, Any]]:
@@ -307,12 +307,12 @@ class GitHubRepoService:
             The attached ``project_ifc_files`` rows, in ``file_paths`` order.
 
         Raises:
-            RuntimeError: if this service was built without a ``ProjectsService``.
+            RuntimeError: if this service was built without a ``ModelsService``.
             ValueError: if the repository does not exist, or if
                 ``primary_index`` falls outside ``file_paths``.
         """
-        if not self._projects_service:
-            raise RuntimeError("ProjectsService is not attached to GitHubRepoService.")
+        if not self._models_service:
+            raise RuntimeError("ModelsService is not attached to GitHubRepoService.")
 
         repo = self.get_repo(repo_id)
         if not repo:
@@ -329,7 +329,7 @@ class GitHubRepoService:
         attached: list[dict[str, Any]] = []
         for index, file_path in enumerate(file_paths):
             raw_url = f"https://raw.githubusercontent.com/{owner}/{repo_name}/{branch}/{file_path}"
-            row = self._projects_service.add_ifc_file(
+            row = self._models_service.attach_model(
                 project_id,
                 file_path=raw_url,
                 file_name=Path(file_path).name,

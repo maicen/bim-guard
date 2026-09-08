@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 _REPORT_ARTIFACT_SCHEMA = {
     "id": int,
     "project_id": int,
+    "ifc_file_id": int,
     "artifact_type": str,
     "filename": str,
     "storage_ref": str,
@@ -39,8 +40,23 @@ class ReportArtifactService:
             _REPORT_ARTIFACT_SCHEMA,
         )
 
-    def persist_bcf(self, project_id: int, topics: list[dict[str, Any]]) -> dict[str, Any] | None:
-        """Generate and persist a BCF export, returning its metadata row."""
+    def persist_bcf(
+        self,
+        project_id: int,
+        topics: list[dict[str, Any]],
+        *,
+        ifc_file_id: int | None = None,
+    ) -> dict[str, Any] | None:
+        """Generate and persist a BCF export, returning its metadata row.
+
+        Args:
+            project_id: Owning project.
+            topics: Compliance findings to export.
+            ifc_file_id: ``project_ifc_files.id`` this export was produced
+                from, when the caller knows which single model it covers.
+                Left ``None`` for the common case of a report federated
+                across every model a project holds.
+        """
         if not topics:
             return None
 
@@ -52,6 +68,7 @@ class ReportArtifactService:
             artifact = self._artifacts.insert(
                 {
                     "project_id": project_id,
+                    "ifc_file_id": ifc_file_id,
                     "artifact_type": "bcf",
                     "filename": filename,
                     "storage_ref": storage_ref,

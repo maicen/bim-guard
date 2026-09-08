@@ -14,6 +14,7 @@ from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.membership_service import MembershipService
+from app.services.models_service import ModelsService
 from app.services.naming_config_service import NamingConfigService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.phase6_service import Phase6Service
@@ -29,6 +30,11 @@ from app.services.user_admin_service import UserAdminService
 def get_projects_service() -> ProjectsService:
     """Return the configured ProjectsService instance."""
     return get_container().projects_service
+
+
+def get_models_service() -> ModelsService:
+    """Return the configured ModelsService instance."""
+    return get_container().models_service
 
 
 def get_bsdd_client() -> BSDDClient:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Optional
 
 from fastapi import (
     APIRouter,
@@ -21,9 +21,8 @@ from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
     get_document_access_service,
-    get_github_repo_service,
     get_membership_service,
-    get_phase6_service,
+    get_models_service,
     get_profile_service,
     get_projects_service,
     get_ruleset_access_service,
@@ -46,19 +45,16 @@ from app.modules.contracts import (
     SHORT_NAME_MAX_LENGTH,
     SHORT_NAME_MIN_LENGTH,
     AnalysisInputItemContract,
-    AttachRepoModelsRequest,
     BuildingCodeOption,
     IsoNamingValidationResponse,
     ModelEnhancementResponse,
+    ModelLineageResponse,
     ProjectBulkActionResponse,
     ProjectBulkDeleteRequest,
     ProjectBulkUpdateRequest,
     ProjectCreateRequest,
     ProjectDocumentBindingsResponse,
     ProjectDocumentBindingsUpdateRequest,
-    ProjectIfcFileResponse,
-    ProjectIfcFileUpdateRequest,
-    ProjectIfcUploadResponse,
     ProjectListResponse,
     ProjectOptionsResponse,
     ProjectResponse,
@@ -68,9 +64,8 @@ from app.modules.contracts import (
     StandardOption,
 )
 from app.services.document_access_service import DocumentAccessService
-from app.services.github_repo_service import GitHubRepoService
 from app.services.membership_service import MembershipService
-from app.services.phase6_service import Phase6Service
+from app.services.models_service import ModelsService
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
@@ -520,6 +515,7 @@ async def create_project_with_ifc(
     ],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    models_service: Annotated[ModelsService, Depends(get_models_service)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     organization_id: Annotated[Optional[int], Form()] = None,
@@ -639,9 +635,23 @@ async def create_project_with_ifc(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
+    created_id = int(created["id"])
+    if ifc_file_path:
+        # So a project created with an IFC upload has a project_ifc_files row
+        # from the start, rather than relying on the lazy legacy-adoption
+        # backfill the next time a model is attached.
+        models_service.attach_model(
+            created_id,
+            file_path=ifc_file_path,
+            file_name=(ifc_file.filename if ifc_file is not None else "") or "",
+            is_primary=True,
+            project_code=project_code,
+            originator=originator,
+        )
+
     _link_project_inputs(
         service,
-        int(created["id"]),
+        created_id,
         document_ids=document_ids,
         standards_codes=standards_codes,
     )
@@ -734,18 +744,18 @@ def download_project_ifc(
 
 @router.get(
     "/{project_id}/enhancements",
-    response_model=list[dict[str, Any]],
+    response_model=list[ModelLineageResponse],
     summary="Get model lineage history",
 )
 def get_project_enhancements(
     project_id: int,
     project: Annotated[dict, Depends(get_authorized_project)],
-) -> list[dict[str, Any]]:
+) -> list[ModelLineageResponse]:
     """Retrieve immutable model lineage versions and quality improvement records."""
     from app.services.model_lineage import SupabaseModelLineageRepository
 
     repo = SupabaseModelLineageRepository()
-    return repo.list_for_project(project_id)
+    return [ModelLineageResponse(**row) for row in repo.list_for_project(project_id)]
 
 
 class EnhanceRequest(BaseModel):
@@ -816,423 +826,6 @@ def download_project_enhancement(
         str(local_path),
         media_type="application/octet-stream",
         filename=local_path.name,
-    )
-
-
-#: Role recorded for a model the caller gave no role for. Matches the column
-#: default: a model whose discipline nobody stated is context for the ones that
-#: have one, not a second primary.
-DEFAULT_IFC_ROLE = "context"
-
-
-def _validated_ifc_names(files: list[UploadFile]) -> list[str]:
-    """Return the uploads' filenames, rejecting the set if any is not an IFC.
-
-    Validated as a set before a single byte is stored: a caller uploading the
-    four discipline models of one building wants all four attached or none, not
-    three attached and a message about the fourth.
-
-    Raises:
-        HTTPException: 400 naming the offending file.
-    """
-    if not files:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one .ifc file is required.",
-        )
-
-    names: list[str] = []
-    for upload in files:
-        name = (upload.filename or "").strip()
-        if not name.lower().endswith(".ifc"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{name or 'A file'} is not an .ifc model; nothing was uploaded.",
-            )
-        names.append(name)
-    return names
-
-
-def _roles_for(roles: list[str], count: int, primary_index: int) -> list[str]:
-    """Align the roles list with the files list.
-
-    ``roles`` is parallel to ``files`` when given. Omitting it entirely is the
-    common case -- a caller who has not classified the models yet -- and is not
-    an error; a partial list is, because there is no way to tell which files the
-    roles it does hold were meant for.
-
-    Raises:
-        HTTPException: 400 if a non-empty ``roles`` does not match ``files``.
-    """
-    if roles and len(roles) != count:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"roles has {len(roles)} entries for {count} files; pass one role "
-                "per file, or none at all."
-            ),
-        )
-    if roles:
-        return [(role or "").strip() or DEFAULT_IFC_ROLE for role in roles]
-    return [
-        ProjectsService.PRIMARY_ROLE if index == primary_index else DEFAULT_IFC_ROLE
-        for index in range(count)
-    ]
-
-
-@router.post(
-    "/{project_id}/upload",
-    response_model=ProjectIfcUploadResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Attach one or more IFC models to a project (Multipart)",
-)
-async def upload_project_ifc_files(
-    project_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-    phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
-    files: Annotated[list[UploadFile], File(description="IFC models to attach")],
-    primary_index: Annotated[int, Form()] = 0,
-    roles: Annotated[list[str], Form()] = [],
-) -> ProjectIfcUploadResponse:
-    """Store every uploaded model and record it against the project.
-
-    The model at ``primary_index`` becomes the project's primary: the one a
-    corrosion run analyses, and the one ``projects.ifc_file_path`` keeps
-    pointing at so every reader that predates ``project_ifc_files`` still
-    resolves a model. The rest are attached alongside it, which is what lets a
-    seismic run see the whole building rather than one discipline of it.
-
-    Args:
-        project_id: Project to attach the models to.
-        files: The uploads. Every one must be an ``.ifc``.
-        primary_index: Index into ``files`` of the primary model.
-        roles: Optional discipline per file, parallel to ``files``.
-
-    Raises:
-        HTTPException: 404 if the project does not exist; 400 if the uploads are
-            not all IFC models, if ``primary_index`` is out of range, or if
-            ``roles`` is given with a different length than ``files``; 500 if
-            storage rejects a model, naming it and how many were stored first.
-    """
-    names = _validated_ifc_names(files)
-    if not 0 <= primary_index < len(names):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"primary_index {primary_index} is outside the {len(names)} "
-                "uploaded files; nothing was uploaded."
-            ),
-        )
-    file_roles = _roles_for(roles, len(names), primary_index)
-
-    attached: list[ProjectIfcFileResponse] = []
-    for index, (upload, name) in enumerate(zip(files, names)):
-        content = await upload.read()
-        stored = phase6_service.upload_service.upload(
-            name, content, project_id=project_id, kind="ifc"
-        )
-        if not stored.success or stored.ref is None:
-            # The models stored before this one keep their rows. Rolling them
-            # back would delete bytes that are safely stored and correctly
-            # recorded to undo nothing; the caller is told how far the upload
-            # got so the retry can be the remainder.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    f"{name} could not be stored: {stored.error or 'unknown error'}. "
-                    f"{len(attached)} of {len(names)} models were attached."
-                ),
-            )
-
-        row = service.add_ifc_file(
-            project_id,
-            file_path=stored.ref.storage_ref,
-            file_name=stored.ref.filename,
-            role=file_roles[index],
-            is_primary=index == primary_index,
-        )
-        attached.append(ProjectIfcFileResponse(**{"project_id": project_id, **row}))
-
-    primary = service.get_primary_ifc_file(project_id)
-    logger.info(
-        "Project IFC models attached project_id=%d count=%d primary=%s",
-        project_id,
-        len(attached),
-        (primary or {}).get("file_path"),
-    )
-    return ProjectIfcUploadResponse(
-        success=True,
-        files=attached,
-        primary_id=(primary or {}).get("id"),
-    )
-
-
-@router.post(
-    "/{project_id}/attach-repo-models",
-    response_model=ProjectIfcUploadResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Attach one or more IFC models from a GitHub repository to a project",
-)
-def attach_repo_models(
-    project_id: int,
-    payload: AttachRepoModelsRequest,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    repo_service: Annotated[GitHubRepoService, Depends(get_github_repo_service)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-) -> ProjectIfcUploadResponse:
-    """Attach model file(s) from a registered GitHub repository, by path.
-
-    Unlike ``/upload``, no bytes pass through this request: each model is
-    recorded pointing at the repository's raw-content URL, which
-    ``ObjectStorage`` already knows how to fetch and cache on demand.
-
-    Raises:
-        HTTPException: 404 if the project or repository does not exist; 400 if
-            ``primary_index`` is out of range.
-    """
-    try:
-        rows = repo_service.attach_models_to_project(
-            project_id,
-            repo_id=payload.repo_id,
-            file_paths=payload.file_paths,
-            primary_index=payload.primary_index,
-        )
-    except ValueError as exc:
-        detail = str(exc)
-        code = status.HTTP_404_NOT_FOUND if "Repository" in detail else status.HTTP_400_BAD_REQUEST
-        raise HTTPException(status_code=code, detail=detail)
-
-    attached = [ProjectIfcFileResponse(**{"project_id": project_id, **row}) for row in rows]
-    primary = service.get_primary_ifc_file(project_id)
-    logger.info(
-        "Project IFC models attached from repo project_id=%d repo_id=%d count=%d",
-        project_id,
-        payload.repo_id,
-        len(attached),
-    )
-    return ProjectIfcUploadResponse(
-        success=True,
-        files=attached,
-        primary_id=(primary or {}).get("id"),
-    )
-
-
-@router.get(
-    "/{project_id}/files",
-    response_model=list[ProjectIfcFileResponse],
-    summary="List the IFC models attached to a project",
-)
-def list_project_ifc_files(
-    project_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-) -> list[ProjectIfcFileResponse]:
-    """Return a project's attached models, primary first.
-
-    A project whose model predates ``project_ifc_files`` reports that model as a
-    single primary entry with no ``id``, so a client renders one shape either
-    side of the migration.
-
-    Raises:
-        HTTPException: 404 if the project does not exist. An existing project
-            with no model is an empty list, not a 404 -- having no model yet is
-            a state, not a missing resource.
-    """
-    return [
-        ProjectIfcFileResponse(**{"project_id": project_id, **row})
-        for row in service.get_ifc_files_by_project(project_id)
-    ]
-
-
-@router.post(
-    "/{project_id}/files/{file_id}/primary",
-    response_model=ProjectIfcFileResponse,
-    summary="Set one of a project's attached IFC models as primary",
-)
-def set_primary_project_ifc_file(
-    project_id: int,
-    file_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-) -> ProjectIfcFileResponse:
-    """Promote one of a project's models to primary, by ``project_ifc_files.id``.
-
-    Raises:
-        HTTPException: 404 if the project does not exist or holds no such model.
-    """
-    row = service.set_primary_ifc_file(project_id, file_id)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {project_id} has no attached model with ID {file_id}.",
-        )
-    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
-
-
-@router.post(
-    "/{project_id}/files/{file_id}/refresh-metadata",
-    response_model=ProjectIfcFileResponse,
-    summary="Re-read schema/authoring-app/storey/element/discipline metadata for an attached model",
-)
-def refresh_project_ifc_file_metadata(
-    project_id: int,
-    file_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-) -> ProjectIfcFileResponse:
-    """Re-extract a model's summary metadata without re-uploading it.
-
-    For a row attached before this feature existed, or one whose extraction
-    ran into a transient storage error the first time. Does not touch the
-    stored model bytes.
-
-    Raises:
-        HTTPException: 404 if the project does not exist or holds no such model.
-    """
-    row = service.refresh_ifc_file_metadata(project_id, file_id)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {project_id} has no attached model with ID {file_id}.",
-        )
-    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
-
-
-@router.patch(
-    "/{project_id}/files/{file_id}",
-    response_model=ProjectIfcFileResponse,
-    summary="Edit an attached model's display name, role, or ISO 19650 fields",
-)
-def update_project_ifc_file(
-    project_id: int,
-    file_id: int,
-    payload: ProjectIfcFileUpdateRequest,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-) -> ProjectIfcFileResponse:
-    """Update naming/ISO 19650 fields on an attached model.
-
-    Every field in the payload is optional; only the ones actually sent are
-    changed. Does not touch the stored model bytes -- see the ``/replace``
-    endpoint for swapping the IFC file itself.
-
-    Raises:
-        HTTPException: 404 if the project does not exist or holds no such model.
-    """
-    row = service.update_ifc_file(project_id, file_id, **payload.model_dump(exclude_unset=True))
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {project_id} has no attached model with ID {file_id}.",
-        )
-    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
-
-
-@router.post(
-    "/{project_id}/files/{file_id}/replace",
-    response_model=ProjectIfcFileResponse,
-    summary="Replace the stored IFC file of an attached model with a new upload",
-)
-async def replace_project_ifc_file(
-    project_id: int,
-    file_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-    file: Annotated[UploadFile, File(description="Replacement IFC model")],
-) -> ProjectIfcFileResponse:
-    """Swap an attached model's bytes for a new upload, in place.
-
-    The row's ``id``, role, and ISO 19650 fields are kept; only the file
-    itself and its derived summary metadata (schema, storey/element counts,
-    discipline breakdown) change. If the replaced model was primary,
-    ``projects.ifc_file_path`` is repointed at the new object.
-
-    Raises:
-        HTTPException: 400 if the upload is not an ``.ifc`` file; 404 if the
-            project does not exist or holds no such model.
-    """
-    [name] = _validated_ifc_names([file])
-    content = await file.read()
-    row = service.replace_ifc_file(project_id, file_id, content=content, file_name=name)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {project_id} has no attached model with ID {file_id}.",
-        )
-    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
-
-
-@router.delete(
-    "/{project_id}/files/{file_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Detach and delete one of a project's attached IFC models",
-)
-def delete_project_ifc_file(
-    project_id: int,
-    file_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-) -> None:
-    """Remove one of a project's models, by ``project_ifc_files.id``.
-
-    Deleting the primary model promotes the next remaining one; deleting a
-    project's last model leaves it with none, which is a valid state.
-
-    Raises:
-        HTTPException: 404 if the project does not exist or holds no such model.
-    """
-    deleted = service.delete_ifc_file(project_id, file_id)
-    if deleted is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {project_id} has no attached model with ID {file_id}.",
-        )
-
-
-@router.get(
-    "/{project_id}/files/{file_id}/ifc",
-    summary="Download one of a project's attached IFC models",
-)
-def download_project_ifc_file(
-    project_id: int,
-    file_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
-    service: Annotated[ProjectsService, Depends(get_projects_service)],
-):
-    """Retrieve the bytes of one attached model, by ``project_ifc_files.id``.
-
-    ``GET /{project_id}/ifc`` resolves through ``projects.ifc_file_path`` and so
-    always serves the primary. A viewer offering the project's models as a list
-    needs to fetch the one the user picked, which is what this addresses.
-
-    Args:
-        project_id: Project owning the model.
-        file_id: ``project_ifc_files.id`` of the model to download.
-
-    Raises:
-        HTTPException: 404 if the project does not exist or holds no such model;
-            502 if the row names bytes that storage cannot produce.
-    """
-    resolved, missing = service.resolve_ifc_file_paths(project_id)
-    for row, local_path in resolved:
-        if row.get("id") == file_id and local_path.exists():
-            return FileResponse(
-                str(local_path),
-                media_type="application/octet-stream",
-                filename=row.get("file_name") or f"model-{file_id}.ifc",
-            )
-
-    # Separated so "storage is down" does not read to the caller as "you asked
-    # for a model this project never had".
-    if any(row.get("id") == file_id for row in missing):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not retrieve the IFC file from storage.",
-        )
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Project {project_id} has no attached model with ID {file_id}.",
     )
 
 

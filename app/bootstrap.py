@@ -31,6 +31,7 @@ from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.membership_service import MembershipService
 from app.services.model_lineage import SupabaseModelLineageRepository
+from app.services.models_service import ModelsService
 from app.services.naming_config_service import (
     _SCHEMA as _NAMING_CONFIG_SCHEMA,
 )
@@ -70,6 +71,7 @@ class ApplicationContainer:
     projects_repo: DatabaseAdapter
     standards_repo: DatabaseAdapter
     client_documents_repo: DatabaseAdapter
+    ifc_files_repo: DatabaseAdapter
     documents_repo: DatabaseAdapter
     rules_repo: DatabaseAdapter
     folders_repo: DatabaseAdapter
@@ -93,6 +95,7 @@ class ApplicationContainer:
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
+    models_service: ModelsService
     rules_service: RuleService
     documents_service: DocumentService
     settings_service: SettingsService
@@ -165,6 +168,30 @@ def build_default_container() -> ApplicationContainer:
             "tags": str,
             "upload_date": str,
             "updated_at": str,
+        },
+    )
+
+    ifc_files_repo = PersistenceService.get_table(
+        "project_ifc_files",
+        {
+            "id": int,
+            "project_id": int,
+            "file_path": str,
+            "file_name": str,
+            "is_primary": bool,
+            "role": str,
+            "uploaded_at": str,
+            "project_code": str,
+            "originator": str,
+            "volume_system": str,
+            "level": str,
+            "type": str,
+            "number": str,
+            "suitability_code": str,
+            "revision_code": str,
+            "cde_state": str,
+            "cde_approved_by": str,
+            "cde_approved_at": str,
         },
     )
 
@@ -393,13 +420,20 @@ def build_default_container() -> ApplicationContainer:
     )
 
     # 4. Domain Services
+    models_service = ModelsService(
+        ifc_files_repo=ifc_files_repo,
+        storage=storage,
+        lineage=lineage,
+    )
+
     projects_service = ProjectsService(
         projects_repo=projects_repo,
         standards_repo=standards_repo,
         client_documents_repo=client_documents_repo,
         storage=storage,
-        lineage=lineage,
+        models_service=models_service,
     )
+    models_service.bind_project_mirror(projects_service)
 
     rules_service = RuleService(
         rules_repo=rules_repo,
@@ -417,7 +451,7 @@ def build_default_container() -> ApplicationContainer:
 
     github_repo_service = GitHubRepoService(
         github_repos_repo=github_repos_repo,
-        projects_service=projects_service,
+        models_service=models_service,
     )
 
     membership_service = MembershipService(
@@ -554,6 +588,7 @@ def build_default_container() -> ApplicationContainer:
         projects_repo=projects_repo,
         standards_repo=standards_repo,
         client_documents_repo=client_documents_repo,
+        ifc_files_repo=ifc_files_repo,
         documents_repo=documents_repo,
         rules_repo=rules_repo,
         folders_repo=folders_repo,
@@ -577,6 +612,7 @@ def build_default_container() -> ApplicationContainer:
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
+        models_service=models_service,
         rules_service=rules_service,
         documents_service=documents_service,
         settings_service=settings_service,

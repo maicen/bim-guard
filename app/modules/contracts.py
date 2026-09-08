@@ -332,7 +332,7 @@ class ProjectResponse(IsoGovernanceFieldsRequired, TimestampFields):
     classification_standard: Optional[str] = ""
 
 
-class ProjectIfcFileResponse(IsoGovernanceFieldsRequired):
+class ModelResponse(IsoGovernanceFieldsRequired):
     """One IFC model attached to a project."""
 
     id: Optional[int] = Field(
@@ -376,7 +376,7 @@ class ProjectIfcFileResponse(IsoGovernanceFieldsRequired):
     cde_approved_at: Optional[str] = None
 
 
-class ProjectIfcFileUpdateRequest(BaseModel):
+class ModelUpdateRequest(BaseModel):
     """Payload for editing an attached model's naming/ISO 19650 fields.
 
     Every field is optional and independently applied: a caller sends only
@@ -396,14 +396,38 @@ class ProjectIfcFileUpdateRequest(BaseModel):
     revision_code: Optional[str] = Field(default=None, description="ISO 19650 Revision Code (P01.01, C01)")
 
 
-class ProjectIfcUploadResponse(BaseModel):
+class ModelUploadResponse(BaseModel):
     """Outcome of attaching one or more IFC models to a project."""
 
     success: bool = True
-    files: list[ProjectIfcFileResponse] = Field(default_factory=list)
+    files: list[ModelResponse] = Field(default_factory=list)
     primary_id: Optional[int] = Field(
         default=None, description="id of the model the analysis runs start from"
     )
+
+
+class ModelListResponse(BaseModel):
+    """A project's attached IFC models."""
+
+    project_id: int
+    models: list[ModelResponse] = Field(default_factory=list)
+
+
+class ModelLineageResponse(BaseModel):
+    """One immutable model-enhancement lineage record."""
+
+    id: int
+    project_id: int
+    ifc_file_id: Optional[int] = Field(
+        default=None, description="project_ifc_files.id this version was produced from, when known"
+    )
+    source_reference: str = ""
+    output_reference: str = ""
+    version: int
+    source_version: Optional[int] = 0
+    source_sha256: Optional[str] = ""
+    summary: dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
 
 
 class ProjectListResponse(BaseModel):
@@ -2234,6 +2258,9 @@ class ModelEnhancementResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     success: bool = True
+    ifc_file_id: Optional[int] = Field(
+        default=None, description="project_ifc_files.id the enhancement was produced from, when known"
+    )
 
 
 class IsoNamingValidationResponse(BaseModel):

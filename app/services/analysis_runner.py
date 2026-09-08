@@ -37,6 +37,7 @@ from app.modules.phase_6.phase_6c_corrosion_ui import (
 )
 from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
 from app.services.analysis_cache import ANALYSIS_CACHE, CacheKey
+from app.services.models_service import ModelsService
 from app.services.pipeline_tracker import (
     CC_ENGINE,
     GC_ENGINE,
@@ -51,6 +52,7 @@ from app.services.projects_service import ProjectsService
 logger = get_logger(__name__)
 
 _projects_service = ProjectsService()
+_models_service = ModelsService(project_mirror=_projects_service)
 
 #: The engines a corrosion run drives and therefore reports stages for. MC-001
 #: also runs (see ``phase_6c_corrosion_ui.MECHANISMS``) but is declared
@@ -99,9 +101,9 @@ def model_bytes(project_id: int) -> tuple[bytes | None, str | None]:
     if project is None:
         return None, "That project no longer exists."
 
-    path = _projects_service.resolve_primary_ifc_file(project_id)
+    path = _models_service.resolve_primary_path(project_id)
     if path is None:
-        if not _projects_service.get_ifc_files_by_project(project_id):
+        if not _models_service.list_models(project_id):
             return None, "No IFC model is attached to this project yet."
         return None, "The IFC model could not be retrieved from storage."
     try:
@@ -141,7 +143,7 @@ def model_bytes_all(
     if _projects_service.get_project(project_id) is None:
         return [], "That project no longer exists."
 
-    resolved, missing = _projects_service.resolve_ifc_file_paths(project_id)
+    resolved, missing = _models_service.resolve_all_paths(project_id)
     if missing:
         names = ", ".join(row.get("file_name") or row.get("file_path", "?") for row in missing)
         return [], f"These models could not be retrieved from storage: {names}."

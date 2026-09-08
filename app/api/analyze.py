@@ -21,6 +21,7 @@ from fastapi import (
 from app.api.dependencies import (
     get_arch_analysis_service,
     get_membership_service,
+    get_models_service,
     get_phase6_service,
     get_profile_service,
     get_projects_service,
@@ -52,6 +53,7 @@ from app.modules.phase_6.phase_6e_export import export
 from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.membership_service import MembershipService
+from app.services.models_service import ModelsService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_tracker import snapshot
 from app.services.profile_service import ProfileService
@@ -310,7 +312,9 @@ def _source_files_for(project_id: int) -> list[dict]:
     that does not happen.
     """
     try:
-        resolved, _missing = ProjectsService().resolve_ifc_file_paths(project_id)
+        resolved, _missing = ModelsService(
+            project_mirror=ProjectsService()
+        ).resolve_all_paths(project_id)
     except Exception:
         logger.warning("Could not resolve model filenames for project %s", project_id)
         return []
@@ -510,7 +514,7 @@ async def analyze_upload_ifc(
     project_id: Annotated[int, Form(...)],
     ifc_file: Annotated[UploadFile, File(...)],
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
-    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    models_service: Annotated[ModelsService, Depends(get_models_service)],
     phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
 ) -> IfcUploadAttachResponse:
     """Upload and attach an IFC model to a project."""
@@ -531,7 +535,12 @@ async def analyze_upload_ifc(
             detail=response.error or "Upload failed.",
         )
 
-    projects_service.attach_ifc(project_id, response.ref.storage_ref)
+    models_service.attach_model(
+        project_id,
+        file_path=response.ref.storage_ref,
+        file_name=response.ref.filename,
+        is_primary=True,
+    )
     return IfcUploadAttachResponse(
         success=True,
         filename=response.ref.filename,

@@ -21,6 +21,7 @@ class SupabaseModelLineageRepository:
                 {
                     "id": int,
                     "project_id": int,
+                    "ifc_file_id": int,
                     "source_reference": str,
                     "source_sha256": str,
                     "source_version": int,
@@ -42,11 +43,20 @@ class SupabaseModelLineageRepository:
         output_reference: str,
         version: int,
         summary: dict[str, Any],
+        ifc_file_id: int | None = None,
     ) -> dict[str, Any]:
-        """Append one source-to-output model lineage record."""
+        """Append one source-to-output model lineage record.
+
+        Args:
+            ifc_file_id: ``project_ifc_files.id`` this version was produced
+                from, when the caller knows it. Left ``None`` when the
+                enhancement acted on "the project's primary model" without
+                resolving a specific row.
+        """
         return self._lineage.insert(
             {
                 "project_id": project_id,
+                "ifc_file_id": ifc_file_id,
                 "source_reference": source_reference,
                 "source_sha256": source_sha256,
                 "source_version": source_version,

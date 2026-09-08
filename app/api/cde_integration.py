@@ -23,7 +23,7 @@ from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 
-from app.api.dependencies import get_documents_service, get_projects_service
+from app.api.dependencies import get_documents_service, get_models_service, get_projects_service
 from app.api.projects import get_authorized_project
 from app.logging_config import get_logger
 from app.modules.contracts import (
@@ -38,6 +38,7 @@ from app.modules.contracts import (
     CDEWebhookPayload,
 )
 from app.services.documents_service import DocumentService
+from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
@@ -191,6 +192,7 @@ def list_cde_documents(
     response: Response,
     _project_auth: Annotated[dict, Depends(get_authorized_project)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    models_service: Annotated[ModelsService, Depends(get_models_service)],
     documents_service: Annotated[DocumentService, Depends(get_documents_service)],
     filter: Optional[str] = Query(None, alias="$filter", description="OData filter expression"),
     top: Optional[int] = Query(None, alias="$top", description="OData top page limit"),
@@ -208,7 +210,7 @@ def list_cde_documents(
 
     # 1. IFC Models attached to project
     try:
-        files = projects_service.get_ifc_files_by_project(project_id)
+        files = models_service.list_models(project_id)
     except Exception:
         files = []
     for f in files:

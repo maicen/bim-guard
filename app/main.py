@@ -42,6 +42,9 @@ from app.api import (
     events as api_events,
 )
 from app.api import (
+    models as api_models,
+)
+from app.api import (
     naming_config as api_naming_config,
 )
 from app.api import (
@@ -177,7 +180,8 @@ TAGS_METADATA = [
     {"name": "Health", "description": "Liveness/readiness probe for the API gateway."},
     {"name": "Auth", "description": "The authenticated caller's own identity and profile."},
     {"name": "Dashboard", "description": "System-level compliance dashboard statistics."},
-    {"name": "Projects", "description": "Project lifecycle, IFC model attachment, and ISO 19650 CDE state."},
+    {"name": "Projects", "description": "Project lifecycle and ISO 19650 CDE state."},
+    {"name": "Models", "description": "IFC model attachment, replacement, and lifecycle for a project's models."},
     {"name": "Organizations", "description": "Organizations, membership, groups, and cross-tenant grants."},
     {"name": "Digital Inspector", "description": "Natural-language Q&A agent over one project's analysis results."},
     {"name": "Repositories", "description": "Registered GitHub repositories used as IFC model sources."},
@@ -259,6 +263,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(api_auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(api_dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(api_projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(api_models.router, prefix="/api", tags=["Models"])
 app.include_router(
     api_organizations.router, prefix="/api/organizations", tags=["Organizations"]
 )

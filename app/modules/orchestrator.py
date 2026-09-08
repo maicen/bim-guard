@@ -36,6 +36,8 @@ class BIMGuard_App:
         4. Return a unified result dict consumed by the analyze route
         """
         from app.services.documents_service import DocumentService
+        from app.services.models_service import ModelsService
+        from app.services.pipeline_services import AnalysisService, run_compliance_analysis
         from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
 
@@ -45,7 +47,6 @@ class BIMGuard_App:
             get_schema_compatibility_note,
             parse_ifc_model,
         )
-        from app.services.pipeline_services import AnalysisService, run_compliance_analysis
 
         started_at = time.monotonic()
 
@@ -62,6 +63,7 @@ class BIMGuard_App:
             )
 
         projects_svc = ProjectsService()
+        models_svc = ModelsService(project_mirror=projects_svc)
         documents_svc = DocumentService()
         selected_theme = RuleService.normalize_theme(analysis_theme)
         rule_folder = (rule_folder or "").strip()
@@ -98,7 +100,7 @@ class BIMGuard_App:
 
         # ── IFC parsing ──────────────────────────────────────────────────────
         log_progress(15, "ifc-file-resolution-started")
-        ifc_path, improvement_lineage = projects_svc.resolve_analysis_ifc(project_id)
+        ifc_path, improvement_lineage = models_svc.resolve_analysis(project_id)
         ifc_error = None
         elements = []
         ifc_type_counts: dict = {}

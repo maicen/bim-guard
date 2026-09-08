@@ -2,7 +2,7 @@
 
 Three properties, and the third is the reason the first two exist:
 
-1. **The upload records every model.** ``POST /api/projects/{id}/upload`` stores
+1. **The upload records every model.** ``POST /api/projects/{id}/models`` stores
    each file, writes a ``project_ifc_files`` row for it, and points
    ``projects.ifc_file_path`` at the one marked primary so every reader that
    predates the child table still resolves a model.
@@ -29,9 +29,15 @@ import pytest
 from starlette.testclient import TestClient
 
 import app.services.analysis_runner as runner
-from app.api.dependencies import get_membership_service, get_phase6_service, get_projects_service
+from app.api.dependencies import (
+    get_membership_service,
+    get_models_service,
+    get_phase6_service,
+    get_projects_service,
+)
 from app.main import app
 from app.modules.phase_6.phase_6a_upload import FileUploadService
+from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
 
 #: The fake project below needs an organization_id for app.api.projects'
@@ -172,7 +178,7 @@ SPF = {
 
 
 @pytest.fixture
-def service(tmp_path: Path) -> ProjectsService:
+def projects_service(tmp_path: Path) -> ProjectsService:
     """Build a ProjectsService over in-memory repositories and dict storage."""
     return ProjectsService(
         projects_repo=FakeTable(
@@ -188,30 +194,42 @@ def service(tmp_path: Path) -> ProjectsService:
         ),
         standards_repo=FakeTable(),
         client_documents_repo=FakeTable(),
-        ifc_files_repo=FakeTable(),
         storage=DictStorage(tmp_path),
     )
 
 
 @pytest.fixture
-def client(service: ProjectsService, monkeypatch) -> TestClient:
+def service(projects_service: ProjectsService) -> ModelsService:
+    """Build a ModelsService sharing the fixture project's storage and mirror."""
+    return ModelsService(
+        ifc_files_repo=FakeTable(),
+        storage=projects_service._storage,
+        project_mirror=projects_service,
+    )
+
+
+@pytest.fixture
+def client(projects_service: ProjectsService, service: ModelsService, monkeypatch) -> TestClient:
     """Return a test client whose routes and analysis runner share one service."""
-    uploads = FileUploadService(storage=service._storage, table=FakeTable())
+    uploads = FileUploadService(storage=projects_service._storage, table=FakeTable())
 
     class Phase6Double:
         upload_service = uploads
 
-    app.dependency_overrides[get_projects_service] = lambda: service
+    app.dependency_overrides[get_projects_service] = lambda: projects_service
+    app.dependency_overrides[get_models_service] = lambda: service
     app.dependency_overrides[get_phase6_service] = lambda: Phase6Double()
     app.dependency_overrides[get_membership_service] = lambda: FakeMemberships()
-    # The runner holds a module-level service of its own; point it at the same
-    # one so an upload made through the API is the model the analysis reads.
-    monkeypatch.setattr(runner, "_projects_service", service)
+    # The runner holds module-level services of its own; point them at the same
+    # ones so an upload made through the API is the model the analysis reads.
+    monkeypatch.setattr(runner, "_projects_service", projects_service)
+    monkeypatch.setattr(runner, "_models_service", service)
     yield TestClient(app, raise_server_exceptions=False)
     # Only undo what this fixture set — a bare .clear() would also remove
     # conftest.py's session-wide get_current_user override, breaking every
     # test that runs after this one in the same session.
     del app.dependency_overrides[get_projects_service]
+    del app.dependency_overrides[get_models_service]
     del app.dependency_overrides[get_phase6_service]
     del app.dependency_overrides[get_membership_service]
 
@@ -225,13 +243,13 @@ def upload(client: TestClient, project_id: int = 7, **form: Any):
     ]
     data: dict[str, Any] = {"primary_index": "0", "roles": ["primary", "structural", "architectural"]}
     data.update(form)
-    return client.post(f"/api/projects/{project_id}/upload", files=files, data=data)
+    return client.post(f"/api/projects/{project_id}/models", files=files, data=data)
 
 
 # ── 1. the upload records every model ────────────────────────────────────────
 
 
-def test_three_files_produce_three_rows(client: TestClient, service: ProjectsService) -> None:
+def test_three_files_produce_three_rows(client: TestClient, service: ModelsService) -> None:
     """Uploading three models attaches three, not just the last or the first."""
     response = upload(client)
     assert response.status_code == 201, response.text
@@ -244,86 +262,88 @@ def test_three_files_produce_three_rows(client: TestClient, service: ProjectsSer
         "structural.ifc",
         "architectural.ifc",
     ]
-    assert len(service.get_ifc_files_by_project(7)) == 3
+    assert len(service.list_models(7)) == 3
 
 
-def test_roles_are_recorded_per_file(client: TestClient, service: ProjectsService) -> None:
+def test_roles_are_recorded_per_file(client: TestClient, service: ModelsService) -> None:
     """The roles list is parallel to the files list, not applied to all of them."""
     upload(client)
-    by_name = {row["file_name"]: row for row in service.get_ifc_files_by_project(7)}
+    by_name = {row["file_name"]: row for row in service.list_models(7)}
     assert by_name["structural.ifc"]["role"] == "structural"
     assert by_name["architectural.ifc"]["role"] == "architectural"
 
 
-def test_exactly_one_model_is_primary(client: TestClient, service: ProjectsService) -> None:
+def test_exactly_one_model_is_primary(client: TestClient, service: ModelsService) -> None:
     """primary_index marks one model, and marks only it."""
     upload(client, primary_index="1")
-    files = service.get_ifc_files_by_project(7)
+    files = service.list_models(7)
     assert [f["file_name"] for f in files if f["is_primary"]] == ["structural.ifc"]
 
 
-def test_primary_is_mirrored_onto_the_project(client: TestClient, service: ProjectsService) -> None:
+def test_primary_is_mirrored_onto_the_project(
+    client: TestClient, service: ModelsService, projects_service: ProjectsService
+) -> None:
     """projects.ifc_file_path follows the primary, so old readers still work."""
     upload(client, primary_index="2")
-    primary = service.get_primary_ifc_file(7)
+    primary = service.get_primary(7)
     assert primary["file_name"] == "architectural.ifc"
-    assert service.get_project(7)["ifc_file_path"] == primary["file_path"]
+    assert projects_service.get_project(7)["ifc_file_path"] == primary["file_path"]
 
 
-def test_response_names_the_primary_row(client: TestClient, service: ProjectsService) -> None:
+def test_response_names_the_primary_row(client: TestClient, service: ModelsService) -> None:
     """primary_id identifies the row a caller would promote or analyse."""
     body = upload(client, primary_index="1").json()
-    assert body["primary_id"] == service.get_primary_ifc_file(7)["id"]
+    assert body["primary_id"] == service.get_primary(7)["id"]
 
 
 def test_listing_returns_the_primary_first(client: TestClient) -> None:
-    """GET /files puts the analysis model at the head of the list."""
+    """GET /api/models puts the analysis model at the head of the list."""
     upload(client, primary_index="1")
-    listed = client.get("/api/projects/7/files").json()
+    listed = client.get("/api/models", params={"project_id": 7}).json()["models"]
     assert listed[0]["file_name"] == "structural.ifc"
     assert len(listed) == 3
 
 
 def test_promoting_a_model_moves_the_project_pointer(
-    client: TestClient, service: ProjectsService
+    client: TestClient, service: ModelsService, projects_service: ProjectsService
 ) -> None:
-    """set_primary_ifc_file re-points both the row and the projects column."""
+    """set_primary re-points both the row and the projects column."""
     upload(client, primary_index="0")
-    target = next(f for f in service.get_ifc_files_by_project(7) if f["file_name"] == "structural.ifc")
+    target = next(f for f in service.list_models(7) if f["file_name"] == "structural.ifc")
 
-    promoted = service.set_primary_ifc_file(7, target["id"])
+    promoted = service.set_primary(7, target["id"])
 
     assert promoted["is_primary"] is True
-    assert service.get_primary_ifc_file(7)["file_name"] == "structural.ifc"
-    assert service.get_project(7)["ifc_file_path"] == target["file_path"]
+    assert service.get_primary(7)["file_name"] == "structural.ifc"
+    assert projects_service.get_project(7)["ifc_file_path"] == target["file_path"]
 
 
-def test_promoting_leaves_one_primary(client: TestClient, service: ProjectsService) -> None:
+def test_promoting_leaves_one_primary(client: TestClient, service: ModelsService) -> None:
     """The previous primary is demoted, not left as a second claimant."""
     upload(client, primary_index="0")
-    target = next(f for f in service.get_ifc_files_by_project(7) if f["file_name"] == "structural.ifc")
-    service.set_primary_ifc_file(7, target["id"])
-    assert sum(1 for f in service.get_ifc_files_by_project(7) if f["is_primary"]) == 1
+    target = next(f for f in service.list_models(7) if f["file_name"] == "structural.ifc")
+    service.set_primary(7, target["id"])
+    assert sum(1 for f in service.list_models(7) if f["is_primary"]) == 1
 
 
 def test_a_model_attached_before_the_table_is_kept(
-    client: TestClient, service: ProjectsService
+    client: TestClient, service: ModelsService, projects_service: ProjectsService
 ) -> None:
     """A pre-migration model gets a row of its own rather than dropping out.
 
-    get_ifc_files_by_project reports projects.ifc_file_path only while the child
-    table holds nothing, so the first row written ends that fallback. Without
+    list_models reports projects.ifc_file_path only while the child table
+    holds nothing, so the first row written ends that fallback. Without
     adopting the existing model first, attaching a second one would detach the
     first.
     """
-    service._projects.update(
+    projects_service._projects.update(
         updates={"ifc_file_path": "mem://legacy/original.ifc"}, pk_values=7
     )
-    service._storage.objects["mem://legacy/original.ifc"] = PIPING_MODEL
+    projects_service._storage.objects["mem://legacy/original.ifc"] = PIPING_MODEL
 
     upload(client)
 
-    names = [row["file_name"] for row in service.get_ifc_files_by_project(7)]
+    names = [row["file_name"] for row in service.list_models(7)]
     assert "original.ifc" in names
     assert len(names) == 4
 
@@ -332,11 +352,11 @@ def test_a_model_attached_before_the_table_is_kept(
 
 
 def test_a_non_ifc_file_rejects_the_whole_batch(
-    client: TestClient, service: ProjectsService
+    client: TestClient, service: ModelsService
 ) -> None:
     """All four discipline models attach or none do; three plus a message is worse."""
     response = client.post(
-        "/api/projects/7/upload",
+        "/api/projects/7/models",
         files=[
             ("files", ("plumbing.ifc", PIPING_MODEL, "application/octet-stream")),
             ("files", ("notes.pdf", b"%PDF-1.4", "application/pdf")),
@@ -344,22 +364,22 @@ def test_a_non_ifc_file_rejects_the_whole_batch(
     )
     assert response.status_code == 400
     assert "notes.pdf" in response.json()["detail"]
-    assert service.get_ifc_files_by_project(7) == []
+    assert service.list_models(7) == []
 
 
 def test_primary_index_outside_the_batch_is_rejected(
-    client: TestClient, service: ProjectsService
+    client: TestClient, service: ModelsService
 ) -> None:
     """A primary nobody uploaded would leave the project without one."""
     response = upload(client, primary_index="9")
     assert response.status_code == 400
-    assert service.get_ifc_files_by_project(7) == []
+    assert service.list_models(7) == []
 
 
 def test_partial_roles_are_rejected(client: TestClient) -> None:
     """Two roles for three files names no file in particular."""
     response = client.post(
-        "/api/projects/7/upload",
+        "/api/projects/7/models",
         files=[
             ("files", ("a.ifc", PIPING_MODEL, "application/octet-stream")),
             ("files", ("b.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
@@ -370,17 +390,17 @@ def test_partial_roles_are_rejected(client: TestClient) -> None:
     assert response.status_code == 400
 
 
-def test_roles_may_be_omitted_entirely(client: TestClient, service: ProjectsService) -> None:
+def test_roles_may_be_omitted_entirely(client: TestClient, service: ModelsService) -> None:
     """Not having classified the models yet is a state, not an error."""
     response = client.post(
-        "/api/projects/7/upload",
+        "/api/projects/7/models",
         files=[
             ("files", ("a.ifc", PIPING_MODEL, "application/octet-stream")),
             ("files", ("b.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
         ],
     )
     assert response.status_code == 201
-    roles = {row["file_name"]: row["role"] for row in service.get_ifc_files_by_project(7)}
+    roles = {row["file_name"]: row["role"] for row in service.list_models(7)}
     assert roles == {"a.ifc": "primary", "b.ifc": "context"}
 
 
@@ -390,21 +410,21 @@ def test_upload_to_a_missing_project_is_404(client: TestClient) -> None:
 
 
 def test_listing_a_missing_project_is_404(client: TestClient) -> None:
-    assert client.get("/api/projects/404/files").status_code == 404
+    assert client.get("/api/models", params={"project_id": 404}).status_code == 404
 
 
 def test_a_project_with_no_models_lists_nothing(client: TestClient) -> None:
     """No model yet is an empty list, not a missing resource."""
-    response = client.get("/api/projects/7/files")
+    response = client.get("/api/models", params={"project_id": 7})
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["models"] == []
 
 
 # ── serving one attached model to the viewer ─────────────────────────────────
 #
-# GET /{id}/ifc resolves through projects.ifc_file_path and so always serves the
-# primary. A viewer offering the project's models as a list has to be able to
-# fetch the one the user picked, which is what these cover.
+# GET /api/projects/{id}/ifc resolves through projects.ifc_file_path and so
+# always serves the primary. A viewer offering the project's models as a list
+# has to be able to fetch the one the user picked, which is what these cover.
 
 
 def test_each_attached_model_downloads_its_own_bytes(client: TestClient) -> None:
@@ -412,8 +432,8 @@ def test_each_attached_model_downloads_its_own_bytes(client: TestClient) -> None
     attached = upload(client).json()["files"]
     by_name = {f["file_name"]: f["id"] for f in attached}
 
-    piping = client.get(f"/api/projects/7/files/{by_name['plumbing.ifc']}/ifc")
-    structural = client.get(f"/api/projects/7/files/{by_name['structural.ifc']}/ifc")
+    piping = client.get(f"/api/models/{by_name['plumbing.ifc']}/download", params={"project_id": 7})
+    structural = client.get(f"/api/models/{by_name['structural.ifc']}/download", params={"project_id": 7})
 
     assert piping.status_code == 200
     assert structural.status_code == 200
@@ -429,7 +449,7 @@ def test_downloaded_model_is_named_after_its_row(client: TestClient) -> None:
     attached = upload(client).json()["files"]
     file_id = next(f["id"] for f in attached if f["file_name"] == "architectural.ifc")
 
-    response = client.get(f"/api/projects/7/files/{file_id}/ifc")
+    response = client.get(f"/api/models/{file_id}/download", params={"project_id": 7})
 
     assert response.status_code == 200
     assert "architectural.ifc" in response.headers["content-disposition"]
@@ -441,28 +461,28 @@ def test_download_rejects_a_file_belonging_to_no_project_of_that_id(
     """An id the project does not hold is 404, not another project's model."""
     upload(client)
 
-    response = client.get("/api/projects/7/files/9999/ifc")
+    response = client.get("/api/models/9999/download", params={"project_id": 7})
 
     assert response.status_code == 404
     assert "9999" in response.json()["detail"]
 
 
 def test_download_reports_storage_failure_apart_from_a_missing_model(
-    client: TestClient, service: ProjectsService
+    client: TestClient, projects_service: ProjectsService
 ) -> None:
     """Bytes storage cannot produce are a 502; the row still exists."""
     attached = upload(client).json()["files"]
     target = attached[1]
-    service._storage.delete(target["file_path"])
+    projects_service._storage.delete(target["file_path"])
 
-    response = client.get(f"/api/projects/7/files/{target['id']}/ifc")
+    response = client.get(f"/api/models/{target['id']}/download", params={"project_id": 7})
 
     assert response.status_code == 502
 
 
 def test_download_from_an_unknown_project_is_404(client: TestClient) -> None:
     """A missing project is reported as such before any row is looked up."""
-    response = client.get("/api/projects/404/files/1/ifc")
+    response = client.get("/api/models/1/download", params={"project_id": 404})
 
     assert response.status_code == 404
     assert "404" in response.json()["detail"]
@@ -471,7 +491,7 @@ def test_download_from_an_unknown_project_is_404(client: TestClient) -> None:
 # ── 2. corrosion reads the primary only ──────────────────────────────────────
 
 
-def test_corrosion_reads_the_primary_model(client: TestClient, service: ProjectsService) -> None:
+def test_corrosion_reads_the_primary_model(client: TestClient, service: ModelsService) -> None:
     """model_bytes hands the corrosion engines one model: the primary."""
     upload(client, primary_index="0")
     content, error = runner.model_bytes(7)
@@ -480,12 +500,12 @@ def test_corrosion_reads_the_primary_model(client: TestClient, service: Projects
 
 
 def test_corrosion_follows_a_change_of_primary(
-    client: TestClient, service: ProjectsService
+    client: TestClient, service: ModelsService
 ) -> None:
     """Promoting another model changes which one the engines assess."""
     upload(client, primary_index="0")
-    target = next(f for f in service.get_ifc_files_by_project(7) if f["file_name"] == "structural.ifc")
-    service.set_primary_ifc_file(7, target["id"])
+    target = next(f for f in service.list_models(7) if f["file_name"] == "structural.ifc")
+    service.set_primary(7, target["id"])
 
     content, error = runner.model_bytes(7)
     assert error is None
@@ -592,21 +612,23 @@ def test_one_element_federated_twice_is_assessed_once(client: TestClient) -> Non
 
 
 def test_a_model_that_cannot_be_fetched_fails_the_run(
-    client: TestClient, service: ProjectsService
+    client: TestClient, service: ModelsService, projects_service: ProjectsService
 ) -> None:
     """A partial federation would report clearance where it stopped looking."""
     upload(client)
     secondary = next(
-        f for f in service.get_ifc_files_by_project(7) if f["file_name"] == "structural.ifc"
+        f for f in service.list_models(7) if f["file_name"] == "structural.ifc"
     )
-    service._storage.objects.pop(secondary["file_path"])
+    projects_service._storage.objects.pop(secondary["file_path"])
 
     models, error = runner.model_bytes_all(7)
     assert models == []
     assert "structural.ifc" in error
 
 
-def test_seismic_cache_key_covers_every_model(client: TestClient, service: ProjectsService) -> None:
+def test_seismic_cache_key_covers_every_model(
+    client: TestClient, service: ModelsService, projects_service: ProjectsService
+) -> None:
     """Attaching a model must miss the entry the primary alone produced."""
     from app.services.analysis_cache import ANALYSIS_CACHE
 
@@ -614,8 +636,8 @@ def test_seismic_cache_key_covers_every_model(client: TestClient, service: Proje
     upload(client, primary_index="0")
     before, _ = runner.model_bytes_all(7)
 
-    service.add_ifc_file(
-        7, file_path=service._storage.save_upload("extra.ifc", ARCHITECTURAL_MODEL, "x"),
+    service.attach_model(
+        7, file_path=projects_service._storage.save_upload("extra.ifc", ARCHITECTURAL_MODEL, "x"),
         file_name="extra.ifc", role="context",
     )
     after, _ = runner.model_bytes_all(7)
