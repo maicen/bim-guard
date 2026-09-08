@@ -7,6 +7,7 @@ from app.modules import contracts
 from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
 from app.modules.document_parsing.section_chunker import SectionChunker
 from app.modules.rule_builder.llamaindex_rule_generator import LlamaIndexRuleGenerator
+from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
 
 logger = get_logger(__name__)
 
@@ -67,10 +68,51 @@ class RuleExtractionService:
         *,
         provider: RuleExtractionProvider | None = None,
         ingestor: LlamaIndexIngestor | None = None,
+        bsdd_client: BSDDClient | None = None,
     ):
         """Initialize the extraction provider dependency."""
         self._provider = provider or LlamaIndexRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
+        self._bsdd_client = bsdd_client or DEFAULT_BSDD_CLIENT
+
+    def _ground_draft_with_bsdd(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
+        """Correct an extracted rule's property_set/property_name against bSDD.
+
+        The LLM frequently invents or misnames property sets (e.g.
+        "Pset_Door" instead of the real "Pset_DoorCommon", or "DoorWidth"
+        instead of "OverallWidth"). When bSDD's own property search has an
+        exact case-insensitive name match carrying a property_set, that
+        canonical pairing replaces whatever the LLM produced, and a note of
+        the correction is attached so a reviewer can see why it changed.
+        Silently leaves the draft untouched when nothing resolves against
+        bSDD — that is not itself evidence the property is wrong, only that
+        it could not be confirmed offline/against this dictionary.
+        """
+        rule = draft.proposed_rule
+        prop_name = (rule.property_name or "").strip()
+        if not prop_name:
+            return draft
+
+        try:
+            matches = self._bsdd_client.search_properties(prop_name, limit=5)
+        except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
+            logger.warning("bSDD grounding lookup failed property_name=%s error=%s", prop_name, exc)
+            return draft
+
+        match = next((m for m in matches if m.name.strip().lower() == prop_name.lower()), None)
+        if match is None or not match.property_set:
+            return draft
+        if rule.property_set == match.property_set and rule.property_name == match.name:
+            return draft
+
+        corrected_rule = rule.model_copy(
+            update={"property_set": match.property_set, "property_name": match.name}
+        )
+        note = (
+            f"bSDD grounding: corrected property to {match.property_set}.{match.name} "
+            f"(was {rule.property_set or '—'}.{rule.property_name or '—'})."
+        )
+        return draft.model_copy(update={"proposed_rule": corrected_rule, "review_notes": note})
 
     async def extract_rules_from_text(self, text: str, *, model: str | None = None) -> ExtractionResult:
         """Extract compliance rules from pre-extracted document text.
@@ -168,7 +210,8 @@ class RuleExtractionService:
                 logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
                 continue
             drafts.extend(
-                draft.model_copy(update={"source_snippet": node.text}) for draft in node_drafts
+                self._ground_draft_with_bsdd(draft.model_copy(update={"source_snippet": node.text}))
+                for draft in node_drafts
             )
 
         saved_drafts = RuleDraftService().save_drafts(drafts)

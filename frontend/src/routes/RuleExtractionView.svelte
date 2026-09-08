@@ -699,8 +699,20 @@
                       >{draft.proposed_rule.description}</td
                     >
                     <td class="px-3 py-3 font-mono text-slate-400">
-                      {draft.proposed_rule.property_set || "—"} / {draft.proposed_rule
-                        .property_name || "—"}
+                      <div class="flex items-center gap-1.5">
+                        <span
+                          >{draft.proposed_rule.property_set || "—"} / {draft.proposed_rule
+                            .property_name || "—"}</span
+                        >
+                        {#if draft.review_notes?.startsWith("bSDD grounding")}
+                          <span
+                            class="rounded-md border border-emerald-800 bg-emerald-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300"
+                            title={draft.review_notes}
+                          >
+                            bSDD
+                          </span>
+                        {/if}
+                      </div>
                     </td>
                     <td class="px-3 py-3 font-mono text-cyan-300">
                       {draft.proposed_rule.operator || "=="}
