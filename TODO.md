@@ -532,6 +532,7 @@ Owner: unassigned.
 - [ ] Utilize Vision-Language Models (VLMs) to automatically audit generated BCF clash snapshots and filter out false positives before they reach human review.
 - [ ] Apply Graph Neural Networks (GNNs) on extracted IFC spatial relationship graphs (like those in `ifc_egress.py` and `ifc_spatial.py`) to infer missing connectivity, room usages, or system topologies when metadata is absent.
 - [ ] Implement a Predictive Cost & Schedule Impact ML model in `cost_model.py` to replace static CSV lookups, dynamically forecasting remediation costs and programme delays based on issue context and historical resolution data.
+- [ ] Introduce a Natural Language Dashboard Assistant (Text-to-SQL/PostgREST) allowing users to query project analytics conversationally (e.g., "Show me all critical clearance issues on Level 3").
 
 Owner: unassigned.
 
