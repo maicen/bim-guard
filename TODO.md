@@ -540,6 +540,19 @@ Owner: unassigned.
 - [ ] Multi-Agent Workflow Orchestration: Refactor the sequential compliance pipeline in `orchestrator.py` into a dynamic, multi-agent LangGraph architecture where specialized agents (e.g., Structural Agent, MEP Agent, Arch Agent) autonomously negotiate clash resolutions and delegate validation tasks.
 - [ ] Generative IDS (Information Delivery Specification): Use LLMs to read unstructured project EIRs (Exchange Information Requirements) and automatically generate valid buildingSMART IDS XML validation schemas, extending `ids_exporter.py` with generative authoring.
 
+
+Owner: unassigned.
+
+## Priority 13: AI Infrastructure Rollout
+
+Based on the 15 opportunities identified above, the overarching AI architecture has been designed and scaffolded in `app/ai/`. It adheres to SOLID principles, isolating probabilistic models from the deterministic physical engines.
+
+**Rollout Strategy:**
+- [x] Scaffold AI namespace (`app/ai/core/`), Protocols (`IVisionModel`, `IPredictiveModel`, etc.), Factory Registry, and Feature Flags.
+- [ ] Phase 1 (High-Impact, Low-Friction): Implement UI-adjacent, non-blocking tools (Predictive Cost ML, Title Block OCR, Natural Language Dashboard Assistant).
+- [ ] Phase 2 (Pipeline Augmentation): Implement human-in-the-loop validation tools (VLM BCF Auditing, Semantic bSDD Mapper, Intelligent System Inference).
+- [ ] Phase 3 (Deep Orchestration): Refactor the backend to support LangGraph multi-agent orchestration, GNN topologies, and Generative 3D Remediation.
+
 Owner: unassigned.
 
 ## Validation Gates
