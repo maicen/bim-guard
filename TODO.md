@@ -522,6 +522,16 @@ home for reference content that currently lives in the app sidebar.
 
 Owner: unassigned.
 
+## Priority 12: AI Implementation Opportunities
+
+- [ ] Implement an LLM or ML classifier in `piping_producer.py` to intelligently predict `PipingSystem` and `EnvironmentClass` from raw metadata when regex matching fails (addressing the 62,000+ UNKNOWN elements).
+- [ ] Add a feedback loop in the UI (`AnalyzeView.svelte`) for users to flag false positives and train an Active Learning classifier to score new issues.
+- [ ] Expand the Digital Inspector agent's tools to convert natural language queries into dynamic `ifcopenshell` geometric queries (e.g., semantic spatial querying).
+- [ ] Embed a multi-modal conversational AI overlay in `IfcViewer.svelte` to query NotebookLM and explain compliance failures contextually on the 3D model.
+- [ ] Implement Automated Generative Remediation in the enhancement pipeline to propose physical routing fixes (e.g., via A* pathfinding) for detected clearance or galvanic clashes.
+
+Owner: unassigned.
+
 ## Validation Gates
 
 - [x] Audit tests prove the source IFC hash is unchanged.
