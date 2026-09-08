@@ -529,6 +529,7 @@ Owner: unassigned.
 - [ ] Expand the Digital Inspector agent's tools to convert natural language queries into dynamic `ifcopenshell` geometric queries (e.g., semantic spatial querying).
 - [ ] Embed a multi-modal conversational AI overlay in `IfcViewer.svelte` to query NotebookLM and explain compliance failures contextually on the 3D model.
 - [ ] Implement Automated Generative Remediation in the enhancement pipeline to propose physical routing fixes (e.g., via A* pathfinding) for detected clearance or galvanic clashes.
+- [ ] Utilize Vision-Language Models (VLMs) to automatically audit generated BCF clash snapshots and filter out false positives before they reach human review.
 
 Owner: unassigned.
 
