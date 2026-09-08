@@ -155,7 +155,11 @@ class LlamaIndexRuleGenerator:
     """
 
     async def generate_drafts_from_node(
-        self, node: DocumentNodeContract, *, deontic: DeonticStatement | None = None
+        self,
+        node: DocumentNodeContract,
+        *,
+        deontic: DeonticStatement | None = None,
+        model: str | None = None,
     ) -> list[RuleExtractionDraft]:
         """Run the Pydantic program over one node's text; [] if no rule found.
 
@@ -163,13 +167,15 @@ class LlamaIndexRuleGenerator:
             node: A clause-annotated document node (Module 1 output).
             deontic: The node's associated deontic statement, if any — used
                 only to bias severity when the LLM leaves it ambiguous.
+            model: Extraction LLM override (e.g. from the UI's model
+                selector); falls back to ``DEFAULT_LLM_MODEL`` when omitted.
         """
         from llama_index.core.program import LLMTextCompletionProgram
 
         program = LLMTextCompletionProgram.from_defaults(
             output_cls=_LLMRuleExtractionResult,
             prompt_template_str=_RULE_PROMPT,
-            llm=build_llm(),
+            llm=build_llm(model),
         )
         result: _LLMRuleExtractionResult = await program.acall(clause_text=node.text)
 
@@ -179,7 +185,7 @@ class LlamaIndexRuleGenerator:
     # ── RuleExtractionProvider conformance ──────────────────────────────────
 
     async def extract_rules_from_text(
-        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1
+        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1, model: str | None = None
     ) -> list[dict]:
         """Drop-in RuleExtractionProvider method for the chunk-text extraction path.
 
@@ -196,7 +202,7 @@ class LlamaIndexRuleGenerator:
             text=text,
             metadata=ClauseMetadata(node_type="paragraph", source_document_id=0),
         )
-        drafts = await self.generate_drafts_from_node(node)
+        drafts = await self.generate_drafts_from_node(node, model=model)
         if not drafts:
             return []
 

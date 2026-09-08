@@ -48,7 +48,7 @@ class RuleExtractionProvider(Protocol):
     """Protocol used by RuleExtractionService (Dependency Inversion)."""
 
     async def extract_rules_from_text(
-        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1
+        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1, model: str | None = None
     ) -> list[dict]:
         """Extract structured rule dicts from one text chunk."""
         ...
@@ -75,8 +75,13 @@ class RuleExtractionService:
         self._provider = provider or LlamaIndexRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
 
-    async def extract_rules_from_text(self, text: str) -> ExtractionResult:
-        """Extract compliance rules from pre-extracted document text."""
+    async def extract_rules_from_text(self, text: str, *, model: str | None = None) -> ExtractionResult:
+        """Extract compliance rules from pre-extracted document text.
+
+        Args:
+            model: Extraction LLM override, threaded down to the provider
+                (e.g. from the Rule Extraction UI's model selector).
+        """
         if not text or not text.strip():
             logger.warning("Skipped rule extraction for empty extracted text")
             return ExtractionResult(rules=[], warnings=[])
@@ -96,6 +101,7 @@ class RuleExtractionService:
                     sub_text,
                     chunk_index=idx,
                     total_chunks=total,
+                    model=model,
                 )
                 extracted_rules.extend(chunk_rules)
 
@@ -138,13 +144,19 @@ class RuleExtractionService:
         )
         return nodes
 
-    async def extract_rule_drafts(self, document_id: int, text: str) -> list[contracts.RuleExtractionDraft]:
+    async def extract_rule_drafts(
+        self, document_id: int, text: str, *, model: str | None = None
+    ) -> list[contracts.RuleExtractionDraft]:
         """Ingest a document and generate reviewable rule drafts via LlamaIndex.
 
         Runs ingestion (clause-annotated nodes + deontic statements), then
         LlamaIndexRuleGenerator over each node, and persists the results as
         `pending_review` drafts via RuleDraftService — the entry point for
         `POST /api/documents/{id}/rules/extract-drafts`.
+
+        Args:
+            model: Extraction LLM override (e.g. from the UI's model
+                selector), applied to every node in this document.
         """
         from app.services.rule_draft_service import RuleDraftService
 
@@ -159,7 +171,7 @@ class RuleExtractionService:
         for node in nodes:
             try:
                 node_drafts = await generator.generate_drafts_from_node(
-                    node, deontic=deontic_by_node.get(node.node_id)
+                    node, deontic=deontic_by_node.get(node.node_id), model=model
                 )
             except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                 logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)

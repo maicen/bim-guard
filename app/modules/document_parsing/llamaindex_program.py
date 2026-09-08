@@ -43,13 +43,19 @@ CLAUSE TEXT:
 """
 
 
-def build_llm():
-    """Construct the LlamaIndex LiteLLM binding from shared app config."""
+def build_llm(model: str | None = None):
+    """Construct the LlamaIndex LiteLLM binding from shared app config.
+
+    Args:
+        model: Overrides ``DEFAULT_LLM_MODEL`` when the caller lets the user
+            pick an extraction model (e.g. the Rule Extraction UI's model
+            selector). Falls back to the configured default when omitted.
+    """
     from llama_index.llms.litellm import LiteLLM
 
     from app.modules.config import COMPLIANCE_TEMPERATURE, DEFAULT_LLM_MODEL
 
-    return LiteLLM(model=DEFAULT_LLM_MODEL, temperature=COMPLIANCE_TEMPERATURE)
+    return LiteLLM(model=model or DEFAULT_LLM_MODEL, temperature=COMPLIANCE_TEMPERATURE)
 
 
 class _DeonticExtractionResult(BaseModel):

@@ -37,6 +37,7 @@ from app.modules.contracts import (
     GoogleDriveImportRequest,
     GoogleDriveImportResponse,
     GoogleDriveImportResult,
+    RuleDraftExtractionRequest,
     RuleExtractionDraft,
     RuleExtractionDraftListResponse,
 )
@@ -504,6 +505,8 @@ async def ingest_document(
 async def extract_rule_drafts(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    model: Optional[str] = None,
+    body: Optional[RuleDraftExtractionRequest] = None,
 ) -> RuleExtractionDraftListResponse:
     """Ingest a document and generate LlamaIndex rule drafts awaiting review.
 
@@ -512,6 +515,10 @@ async def extract_rule_drafts(
     returned for immediate bulk-insert — review via
     `GET /api/documents/{id}/rules/drafts` and
     `PATCH /api/rules/drafts/{draft_id}`.
+
+    `body.text`, when given, scopes extraction to a caller-chosen subset of
+    the document (e.g. sections picked in the UI) rather than the full
+    `documents.extracted_text`.
     """
     doc = service.get_document(document_id)
     if not doc:
@@ -519,7 +526,7 @@ async def extract_rule_drafts(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    text = doc.get("extracted_text") or ""
+    text = (body.text if body and body.text else None) or doc.get("extracted_text") or ""
     if not text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -527,7 +534,7 @@ async def extract_rule_drafts(
         )
 
     extraction_service = RuleExtractionService()
-    drafts = await extraction_service.extract_rule_drafts(document_id, text)
+    drafts = await extraction_service.extract_rule_drafts(document_id, text, model=model)
     return RuleExtractionDraftListResponse(drafts=drafts)
 
 

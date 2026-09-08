@@ -77,6 +77,9 @@ import type {
   RuleFolderBulkUpdatePayload,
   RuleFolderCreatePayload,
   RuleFolderUpdatePayload,
+  RuleDraftReviewRequest,
+  RuleExtractionDraft,
+  RuleExtractionDraftListResponse,
   RulesetCategory,
   RuleSnapshot,
   RuleSnapshotCreatePayload,
@@ -1452,16 +1455,65 @@ export const ruleExtractionApi = {
   async extract(
     file?: File,
     rawText?: string,
+    model?: string,
   ): Promise<{ rules: any[]; warnings: string[]; count: number }> {
     const form = new FormData();
     if (file) form.append("file", file);
     if (rawText) form.append("raw_text", rawText);
+    if (model) form.append("model", model);
 
     const res = await apiFetch(`${API_BASE}/rules/extract`, {
       method: "POST",
       body: form,
     });
     return handleResponse<any>(res);
+  },
+
+  /**
+   * Ingest a document and generate persisted, reviewable rule drafts
+   * (rule_extraction_drafts). `text`, when given, scopes extraction to a
+   * caller-chosen subset of the document (e.g. picked sections) instead of
+   * its full extracted text.
+   */
+  async extractDrafts(
+    documentId: number,
+    model?: string,
+    text?: string,
+  ): Promise<RuleExtractionDraftListResponse> {
+    const query = model ? `?model=${encodeURIComponent(model)}` : "";
+    const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/extract-drafts${query}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(text ? { text } : {}),
+    });
+    return handleResponse<RuleExtractionDraftListResponse>(res);
+  },
+
+  async listDrafts(documentId: number): Promise<RuleExtractionDraftListResponse> {
+    const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/drafts`);
+    return handleResponse<RuleExtractionDraftListResponse>(res);
+  },
+
+  async reviewDraft(draftId: number, payload: RuleDraftReviewRequest): Promise<RuleExtractionDraft> {
+    const res = await apiFetch(`${API_BASE}/rules/drafts/${draftId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<RuleExtractionDraft>(res);
+  },
+
+  async promoteDraft(draftId: number): Promise<any> {
+    const res = await apiFetch(`${API_BASE}/rules/drafts/${draftId}/promote`, {
+      method: "POST",
+    });
+    const result = await handleResponse<any>(res);
+    _ruleFoldersStore.clear();
+    return result;
+  },
+
+  getIdsPreviewUrl(documentId: number): string {
+    return `${API_BASE}/documents/${documentId}/rules/drafts/ids-preview`;
   },
 
   async bulkCreate(rules: any[]): Promise<any> {

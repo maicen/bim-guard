@@ -640,6 +640,72 @@ export interface ExtractedRule {
   selected?: boolean;
 }
 
+export interface ClauseMetadata {
+  clause_id?: string | null;
+  page_number?: number | null;
+  parent_section?: string | null;
+  section_path?: string[];
+  node_type?: "paragraph" | "table" | "list" | "heading";
+  source_document_id: number;
+}
+
+export type RuleDraftStatus = "pending_review" | "accepted" | "rejected" | "edited";
+
+export interface RuleCreateRequest {
+  rule_id: string;
+  description?: string;
+  mechanism?: string;
+  ruleset_id?: string | null;
+  rule_category?: string;
+  category?: string | null;
+  target_ifc_class?: string | null;
+  property_set?: string | null;
+  property_name?: string | null;
+  operator?: string;
+  check_value?: string | null;
+  value_min?: string | null;
+  value_max?: string | null;
+  value_min_property?: string | null;
+  value_max_property?: string | null;
+  value_min_offset?: string | null;
+  value_max_offset?: string | null;
+  compare_property?: string | null;
+  name_pattern?: string | null;
+  uniqueness_scope?: string | null;
+  unit?: string | null;
+  severity: string;
+  confidence?: string | null;
+  extraction_method?: string;
+  needs_review?: number;
+}
+
+export interface RuleExtractionDraft {
+  id?: number | null;
+  source_document_id: number;
+  source_node_id?: string | null;
+  source_snippet?: string | null;
+  clause?: ClauseMetadata | null;
+  proposed_rule: RuleCreateRequest;
+  confidence: number;
+  extraction_method: "llamaindex_pydantic" | "litellm_legacy";
+  status: RuleDraftStatus;
+  reviewer_email?: string | null;
+  reviewed_at?: string | null;
+  review_notes?: string | null;
+  created_at?: string | null;
+}
+
+export interface RuleExtractionDraftListResponse {
+  drafts: RuleExtractionDraft[];
+}
+
+export interface RuleDraftReviewRequest {
+  status: RuleDraftStatus;
+  review_notes?: string | null;
+  reviewer_email?: string | null;
+  edited_rule?: RuleCreateRequest | null;
+}
+
 export interface RuleElementResult {
   element_name?: string;
   guid?: string;

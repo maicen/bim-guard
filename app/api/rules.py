@@ -994,6 +994,7 @@ def delete_rule(
 async def extract_rules(
     file: Optional[UploadFile] = File(None),
     raw_text: Optional[str] = Form(None),
+    model: Optional[str] = Form(None),
 ) -> RuleExtractionResponse:
     """Extract compliance rules from uploaded document or provided raw text via LLM."""
     text = ""
@@ -1015,7 +1016,7 @@ async def extract_rules(
         )
 
     extraction_service = RuleExtractionService()
-    result = await extraction_service.extract_rules_from_text(text)
+    result = await extraction_service.extract_rules_from_text(text, model=model)
     return RuleExtractionResponse(
         rules=result.rules,
         warnings=result.warnings,

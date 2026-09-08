@@ -35,7 +35,7 @@ class FakeProvider:
         self.chunks: list[tuple[str, int, int]] = []
 
     async def extract_rules_from_text(
-        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1
+        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1, model: str | None = None
     ) -> list[dict]:
         self.chunks.append((text, chunk_index, total_chunks))
         return [

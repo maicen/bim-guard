@@ -706,6 +706,17 @@ class RuleExtractionDraftListResponse(BaseModel):
     drafts: list[RuleExtractionDraft]
 
 
+class RuleDraftExtractionRequest(BaseModel):
+    """Optional body for POST .../rules/extract-drafts.
+
+    ``text``, when provided, scopes extraction to a caller-chosen subset of
+    the document (e.g. one or more sections picked in the UI) instead of the
+    full ``documents.extracted_text``.
+    """
+
+    text: Optional[str] = None
+
+
 class RuleSourceResponse(BaseModel):
     """Resolved document-viewer target for a rule's source annotation."""
 

@@ -23,7 +23,7 @@
     Download,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi } from "../lib/api";
-  import type { DocumentItem, DocumentSection, ExtractedRule } from "../lib/types";
+  import type { DocumentItem, DocumentSection, ExtractedRule, RuleExtractionDraft } from "../lib/types";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -53,8 +53,8 @@
   let viewingDraftRule: ExtractedRule | null = $state(null);
 
   // Sections/paragraphs detected in the selected document, so extraction can be
-  // scoped to a chosen clause rather than blindly sent as one document-sized
-  // request (which can exceed the LLM provider's per-request size limit).
+  // scoped to a chosen clause instead of the whole document — the picked
+  // sections' text is sent as an override to the draft-extraction request.
   let docSections: DocumentSection[] = $state([]);
   const selectedSectionKeys: Set<string> = new SvelteSet();
   let isLoadingSections = $state(false);
@@ -89,9 +89,9 @@
       .then((res) => {
         if (selectedDocId !== docId) return; // selection changed while in flight
         docSections = res.sections;
-        // Default to nothing selected when sections were detected, so the
-        // extraction is deliberately scoped; whole-document extraction
-        // remains available below when no sections are detected at all.
+        // Nothing selected by default when sections were detected, so
+        // scoping is deliberate; leaving all sections unselected extracts
+        // from the whole document instead.
       })
       .catch(() => {
         if (selectedDocId === docId) docSections = [];
@@ -100,6 +100,108 @@
         if (selectedDocId === docId) isLoadingSections = false;
       });
   });
+
+  // Persisted drafts (rule_extraction_drafts) belonging to the selected
+  // document — loaded up front so a reviewer returning to a document sees
+  // prior extraction results instead of losing them, unlike the ephemeral
+  // raw-text path below.
+  let draftRules: RuleExtractionDraft[] = $state([]);
+  let isLoadingDrafts = $state(false);
+  let editingDraft: RuleExtractionDraft | null = $state(null);
+
+  $effect(() => {
+    const docId = selectedDocId;
+    draftRules = [];
+    if (!docId) return;
+
+    isLoadingDrafts = true;
+    ruleExtractionApi
+      .listDrafts(docId)
+      .then((res) => {
+        if (selectedDocId !== docId) return;
+        draftRules = res.drafts;
+      })
+      .catch(() => {
+        if (selectedDocId === docId) draftRules = [];
+      })
+      .finally(() => {
+        if (selectedDocId === docId) isLoadingDrafts = false;
+      });
+  });
+
+  const draftTable = createTableState<RuleExtractionDraft, number>({
+    rows: () => draftRules,
+    getId: (d) => d.id!,
+    searchFields: (d) => [
+      d.proposed_rule.rule_id,
+      d.proposed_rule.description,
+      d.proposed_rule.property_name,
+      d.proposed_rule.property_set,
+    ],
+    filters: {
+      status: (d, value) => d.status === value,
+    },
+    initialSort: { field: "id", asc: true },
+  });
+
+  async function reviewDraft(
+    draft: RuleExtractionDraft,
+    status: "accepted" | "rejected",
+  ): Promise<void> {
+    const updated = await ruleExtractionApi.reviewDraft(draft.id!, { status });
+    draftRules = draftRules.map((d) => (d.id === draft.id ? updated : d));
+  }
+
+  function saveEditedDraft(edited: RuleExtractionDraft["proposed_rule"]) {
+    if (!editingDraft) return;
+    const draftId = editingDraft.id!;
+    ruleExtractionApi
+      .reviewDraft(draftId, { status: "edited", edited_rule: edited })
+      .then((updated) => {
+        draftRules = draftRules.map((d) => (d.id === draftId ? updated : d));
+        editingDraft = null;
+      })
+      .catch((err: any) => {
+        error = err.message || "Failed to save draft edits.";
+      });
+  }
+
+  async function promoteDraft(draft: RuleExtractionDraft): Promise<void> {
+    try {
+      await ruleExtractionApi.promoteDraft(draft.id!);
+      draftRules = draftRules.filter((d) => d.id !== draft.id);
+      successMessage = `Promoted "${draft.proposed_rule.rule_id}" into the compliance rule library.`;
+    } catch (err: any) {
+      error = err.message || "Failed to promote draft.";
+    }
+  }
+
+  async function promoteSelectedDrafts(): Promise<void> {
+    const toPromote = draftTable.selectedRows.filter(
+      (d) => d.status === "accepted" || d.status === "edited",
+    );
+    error = "";
+    for (const draft of toPromote) {
+      try {
+        await ruleExtractionApi.promoteDraft(draft.id!);
+      } catch (err: any) {
+        error = err.message || `Failed to promote "${draft.proposed_rule.rule_id}".`;
+      }
+    }
+    const promotedIds = new Set(toPromote.map((d) => d.id));
+    draftRules = draftRules.filter((d) => !promotedIds.has(d.id));
+    draftTable.clearSelection();
+    if (!error) {
+      successMessage = `Promoted ${toPromote.length} draft(s) into the compliance rule library.`;
+    }
+  }
+
+  async function acceptSelectedDrafts(): Promise<void> {
+    const toAccept = draftTable.selectedRows.filter((d) => d.status === "pending_review");
+    for (const draft of toAccept) {
+      await reviewDraft(draft, "accepted");
+    }
+  }
 
   function addManualDraftRule() {
     const newRule: DraftRule = {
@@ -179,36 +281,35 @@
     table.requestedPage = 1;
 
     try {
-      let textToExtract = rawText;
+      // A selected document runs through the persisted draft-review
+      // lifecycle (rule_extraction_drafts) instead of the ephemeral
+      // extract-then-bulk-insert path, so results survive a closed tab and
+      // get a reviewer audit trail. Picked sections scope the extraction to
+      // that subset of the document; leaving none picked runs the whole
+      // document through LlamaIndex's own clause-level chunking.
       if (selectedDocId) {
-        if (docSections.length > 0) {
-          if (selectedSectionKeys.size === 0) {
-            throw new Error(
-              "Select at least one section or paragraph to extract rules from.",
-            );
-          }
-          textToExtract = docSections
-            .filter((s, i) => selectedSectionKeys.has(sectionKey(s, i)))
-            .map((s) => s.text)
-            .join("\n\n");
-        } else if (!isLoadingSections) {
-          // No sections could be detected for this document — rather than
-          // silently sending the whole document (which can exceed the LLM
-          // provider's request-size limit), require a manually pasted excerpt.
-          if (!rawText.trim()) {
-            throw new Error(
-              "No sections were detected in this document. Paste the specific clause or paragraph to extract rules from.",
-            );
-          }
-          textToExtract = rawText;
+        const scopedText =
+          selectedSectionKeys.size > 0
+            ? docSections
+                .filter((s, i) => selectedSectionKeys.has(sectionKey(s, i)))
+                .map((s) => s.text)
+                .join("\n\n")
+            : undefined;
+
+        const res = await ruleExtractionApi.extractDrafts(selectedDocId, selectedModel, scopedText);
+        draftRules = [...res.drafts, ...draftRules];
+        draftTable.clearSelection();
+        if (res.drafts.length === 0) {
+          error = "No valid OpenBIM rules could be parsed from this document.";
         }
+        return;
       }
 
-      if (!textToExtract.trim()) {
+      if (!rawText.trim()) {
         throw new Error("Please select a specification document or paste text to extract rules.");
       }
 
-      const res = await ruleExtractionApi.extract(undefined, textToExtract);
+      const res = await ruleExtractionApi.extract(undefined, rawText, selectedModel);
       extractedRules = (res.rules || []).map((r: any) => ({
         ...r,
         rowId: nextDraftRowId++,
@@ -397,7 +498,6 @@
       </div>
     </div>
 
-    <!-- Section/Paragraph Scope Picker -->
     {#if selectedDocId && isLoadingSections}
       <p class="text-xs text-slate-400">Detecting sections…</p>
     {:else if selectedDocId && docSections.length > 0}
@@ -408,7 +508,7 @@
       >
         <div class="flex items-center justify-between gap-3">
           <span id="rule-section-scope-label" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
-            Which Section / Paragraph Should Rules Be Extracted From?
+            Optionally Scope Extraction to a Section / Paragraph
           </span>
           <div class="flex shrink-0 items-center gap-3 text-micro font-semibold text-accent">
             <button type="button" onclick={selectAllSections} class="hover:underline">
@@ -421,7 +521,7 @@
         </div>
         <p class="text-micro text-slate-500">
           {docSections.length} section{docSections.length === 1 ? "" : "s"} detected. Pick one or more
-          to scope the extraction — large documents can't be sent to the AI in one request.
+          to scope the extraction, or leave all unselected to process the whole document.
         </p>
         <div class="max-h-64 space-y-1 overflow-y-auto pr-1">
           {#each docSections as section, i (sectionKey(section, i))}
@@ -441,18 +541,18 @@
           {/each}
         </div>
       </div>
-    {/if}
-
-    <!-- Raw Text Input (Fallback / Custom Snippet) -->
-    {#if !selectedDocId || (!isLoadingSections && docSections.length === 0)}
+    {:else if selectedDocId}
+      <p class="text-xs text-slate-400">
+        No sections were detected — extraction will run over the whole document.
+      </p>
+    {:else}
+      <!-- Raw Text Input (no document selected — stays ephemeral until saved) -->
       <div class="space-y-2">
         <label
           for="rule-raw-text"
           class="block text-xs font-bold uppercase tracking-wider text-slate-400"
         >
-          {selectedDocId
-            ? "No Sections Detected — Paste the Clause or Paragraph to Extract Rules From:"
-            : "Or Paste Building Code / Specification Clauses Directly:"}
+          Or Paste Building Code / Specification Clauses Directly:
         </label>
         <textarea
           id="rule-raw-text"
@@ -476,6 +576,200 @@
       </button>
     </div>
   </div>
+
+  <!-- Persisted Draft Review (document-sourced extractions) -->
+  {#if selectedDocId && (isLoadingDrafts || draftRules.length > 0)}
+    <div class="space-y-4">
+      <div>
+        <h2 class="text-lg font-bold tracking-tight text-slate-50">
+          Draft Review ({draftRules.length} draft{draftRules.length === 1 ? "" : "s"})
+        </h2>
+        <p class="text-xs text-slate-400">
+          Accept or reject each candidate, then promote accepted drafts into the compliance rule
+          library. Drafts persist across sessions.
+        </p>
+      </div>
+
+      {#if isLoadingDrafts}
+        <LoadingState message="Loading extraction drafts…" />
+      {:else}
+        <div
+          class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 md:flex-row"
+        >
+          <div class="relative w-full flex-1">
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              bind:value={draftTable.search}
+              placeholder="Search drafts by reference, description, property..."
+              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <select
+            bind:value={draftTable.filters.status}
+            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="pending_review">Pending Review</option>
+            <option value="accepted">Accepted</option>
+            <option value="edited">Edited</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <BulkActionBar
+          selectedCount={draftTable.selectedCount}
+          itemLabel="draft"
+          onClearSelection={() => draftTable.clearSelection()}
+        >
+          {#snippet children()}
+            <button
+              type="button"
+              onclick={acceptSelectedDrafts}
+              class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-600/30 px-3 py-1.5 font-semibold text-emerald-200 transition-all hover:bg-emerald-600/50"
+            >
+              <Check class="h-3.5 w-3.5" />
+              <span>Accept</span>
+            </button>
+            <button
+              type="button"
+              onclick={promoteSelectedDrafts}
+              class="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-600/30 px-3 py-1.5 font-semibold text-blue-200 transition-all hover:bg-blue-600/50"
+            >
+              <Upload class="h-3.5 w-3.5 rotate-180" />
+              <span>Promote to Library</span>
+            </button>
+          {/snippet}
+        </BulkActionBar>
+
+        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead
+                class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+              >
+                <tr>
+                  <th class="w-10 px-3 py-3 text-center">
+                    <TableCheckbox
+                      checked={draftTable.allFilteredSelected}
+                      indeterminate={draftTable.someFilteredSelected}
+                      onchange={() => draftTable.toggleSelectAll()}
+                      title="Select all drafts"
+                    />
+                  </th>
+                  <th class="px-3 py-3">Status</th>
+                  <th class="px-3 py-3">Rule Ref</th>
+                  <th class="px-3 py-3">Description</th>
+                  <th class="px-3 py-3">Pset / Property</th>
+                  <th class="px-3 py-3">Check</th>
+                  <th class="px-3 py-3">Severity</th>
+                  <th class="px-3 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60">
+                {#each draftTable.paginated as draft (draft.id)}
+                  <tr
+                    class="transition-colors hover:bg-slate-900/60 {draftTable.isSelected(draft.id!)
+                      ? 'bg-blue-950/20'
+                      : ''}"
+                  >
+                    <td class="px-3 py-3 text-center">
+                      <TableCheckbox
+                        checked={draftTable.isSelected(draft.id!)}
+                        onchange={() => draftTable.toggleSelect(draft.id!)}
+                        ariaLabel={`Select draft ${draft.proposed_rule.rule_id}`}
+                      />
+                    </td>
+                    <td class="px-3 py-3">
+                      <span
+                        class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider
+                          {draft.status === 'accepted' || draft.status === 'edited'
+                          ? 'border-emerald-800 bg-emerald-950/50 text-emerald-300'
+                          : draft.status === 'rejected'
+                            ? 'border-rose-800 bg-rose-950/50 text-rose-300'
+                            : 'border-amber-800 bg-amber-950/50 text-amber-300'}"
+                      >
+                        {draft.status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td class="px-3 py-3 font-mono font-bold text-slate-50"
+                      >{draft.proposed_rule.rule_id}</td
+                    >
+                    <td class="max-w-xs truncate px-3 py-3" title={draft.proposed_rule.description}
+                      >{draft.proposed_rule.description}</td
+                    >
+                    <td class="px-3 py-3 font-mono text-slate-400">
+                      {draft.proposed_rule.property_set || "—"} / {draft.proposed_rule
+                        .property_name || "—"}
+                    </td>
+                    <td class="px-3 py-3 font-mono text-cyan-300">
+                      {draft.proposed_rule.operator || "=="}
+                      {draft.proposed_rule.check_value ||
+                        (draft.proposed_rule.value_min
+                          ? `[${draft.proposed_rule.value_min}..${draft.proposed_rule.value_max}]`
+                          : "")}
+                    </td>
+                    <td class="px-3 py-3">{draft.proposed_rule.severity}</td>
+                    <td class="whitespace-nowrap px-3 py-3 text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        {#if draft.status === "pending_review"}
+                          <button
+                            type="button"
+                            onclick={() => reviewDraft(draft, "accepted")}
+                            class="rounded-lg bg-slate-800 p-1.5 text-emerald-400 transition-colors hover:bg-emerald-950/40"
+                            title="Accept draft"
+                          >
+                            <Check class="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onclick={() => reviewDraft(draft, "rejected")}
+                            class="rounded-lg bg-slate-800 p-1.5 text-rose-400 transition-colors hover:bg-rose-950/40"
+                            title="Reject draft"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </button>
+                        {/if}
+                        <button
+                          type="button"
+                          onclick={() => (editingDraft = draft)}
+                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          title="Edit draft"
+                        >
+                          <Eye class="h-3.5 w-3.5" />
+                        </button>
+                        {#if draft.status === "accepted" || draft.status === "edited"}
+                          <button
+                            type="button"
+                            onclick={() => promoteDraft(draft)}
+                            class="rounded-lg bg-blue-950/40 p-1.5 text-blue-300 transition-colors hover:bg-blue-900/60"
+                            title="Promote to rule library"
+                          >
+                            <Upload class="h-3.5 w-3.5 rotate-180" />
+                          </button>
+                        {/if}
+                      </div>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+
+          <TablePagination
+            currentPage={draftTable.page}
+            pageSize={draftTable.pageSize}
+            totalItems={draftTable.totalItems}
+            onPageChange={(p) => (draftTable.requestedPage = p)}
+            onPageSizeChange={(size) => {
+              draftTable.pageSize = size;
+              draftTable.requestedPage = 1;
+            }}
+          />
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Extraction Results Review -->
   {#if extractedRules.length > 0}
