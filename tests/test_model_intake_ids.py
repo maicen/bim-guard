@@ -5,6 +5,8 @@ Two things are pinned here:
 (a) ``data/ids/bimguard_piping_intake.ids`` parses with ifctester, validates
     against the IDS 1.0 schema, and holds the expected specifications with the
     expected required/optional split;
+(a2) ``scripts/build_intake_ids.py`` still reproduces that IDS byte for byte,
+    so the committed XML and the script that defines it cannot drift apart;
 (b) ``scripts/check_model_intake.py`` measures the demo model's three headline
     counts, which the generator fixes by index rather than by random draw
     (``scripts/generate_demo_mep_model.py:124-141``) so they are exact.
@@ -15,6 +17,7 @@ build output rather than a committed fixture.
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 IDS_PATH = REPO_ROOT / "data" / "ids" / "bimguard_piping_intake.ids"
 DEMO_MODEL = REPO_ROOT / "data" / "test_hospital_mep_demo.ifc"
 GENERATOR = REPO_ROOT / "scripts" / "generate_demo_mep_model.py"
+BUILDER = REPO_ROOT / "scripts" / "build_intake_ids.py"
 
 #: Total piping elements the generator writes.
 DEMO_TOTAL = 420
@@ -134,6 +138,38 @@ def test_every_specification_states_a_consequence(ids_document):
     for specification in ids_document.specifications:
         assert specification.description
         assert "ENGINES:" in specification.description
+
+
+def test_builder_reproduces_the_committed_ids_byte_for_byte(tmp_path):
+    """Re-running the builder rewrites the committed IDS exactly.
+
+    This is what stops the committed XML and the script that defines it from
+    drifting apart: a specification edited in the IDS by hand, or a builder
+    edited without re-running it, fails here. It also pins determinism — the
+    builder stamps a fixed DATE rather than reading the clock, so two runs on
+    different days produce identical bytes.
+    """
+    rebuilt = tmp_path / "rebuilt.ids"
+    completed = subprocess.run(
+        [sys.executable, str(BUILDER), "--out", str(rebuilt)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "schema validation: True" in completed.stdout
+
+    committed_bytes = IDS_PATH.read_bytes()
+    rebuilt_bytes = rebuilt.read_bytes()
+    assert rebuilt_bytes == committed_bytes, (
+        "scripts/build_intake_ids.py no longer reproduces "
+        "data/ids/bimguard_piping_intake.ids. Re-run the builder to regenerate "
+        "the IDS, or revert the hand-edit to the XML."
+    )
+    assert (
+        hashlib.sha256(rebuilt_bytes).hexdigest()
+        == hashlib.sha256(committed_bytes).hexdigest()
+    )
 
 
 # ---------------------------------------------------------------------------

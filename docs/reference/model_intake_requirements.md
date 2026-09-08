@@ -11,7 +11,7 @@ it directly.
 
 **You can check your own model before sending it:**
 
-```
+```bash
 uv run scripts/check_model_intake.py their_model.ifc
 ```
 
@@ -37,6 +37,10 @@ not reported as a problem — it is simply invisible.
 upgrade a model for this.
 
 ## 2. What each element must carry
+
+Every real model received so far has carried element names, system assignments and storeys but
+**0% material**, and material is the one item without which no corrosion check can reach a verdict
+at all.
 
 ### Required
 
@@ -103,8 +107,8 @@ reported as a data-quality item rather than assessed.
 
 ## 5. File size
 
-Keep each file **under 50 MB**. Larger models need to be split (by discipline, or by building
-block) before upload.
+The application accepts files up to 512 MB, but the project's Supabase storage rejects anything
+over roughly 50 MB, so 50 MB is the effective limit; split large models by discipline or system.
 
 ## 6. Confidentiality
 
