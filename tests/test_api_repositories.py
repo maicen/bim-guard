@@ -120,7 +120,7 @@ def test_repository_structure_endpoint(client: TestClient) -> None:
 
 
 def test_attach_repo_models_endpoint(client: TestClient) -> None:
-    """POST /api/projects/{id}/attach-repo-models attaches model(s) to an existing project."""
+    """POST /api/projects/{id}/models/from-repo attaches model(s) to an existing project."""
     repos_resp = client.get("/api/repositories")
     repos = repos_resp.json()
     seeded = next((r for r in repos if "bimguard-test-models" in r["name"]), repos[0])
@@ -142,7 +142,7 @@ def test_attach_repo_models_endpoint(client: TestClient) -> None:
 
     try:
         attach_resp = client.post(
-            f"/api/projects/{project_id}/attach-repo-models",
+            f"/api/projects/{project_id}/models/from-repo",
             json={
                 "repo_id": repo_id,
                 "file_paths": [
@@ -168,7 +168,7 @@ def test_attach_repo_models_endpoint(client: TestClient) -> None:
 
         # An unknown repository is a 404, not a 500.
         missing_repo_resp = client.post(
-            f"/api/projects/{project_id}/attach-repo-models",
+            f"/api/projects/{project_id}/models/from-repo",
             json={"repo_id": 9999999, "file_paths": ["models/hospital/Clinic_HVAC.ifc"]},
         )
         assert missing_repo_resp.status_code == 404

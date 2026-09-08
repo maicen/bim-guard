@@ -10,7 +10,7 @@ from app.services.pipeline_services import (
     execute_model_enhancement,
     run_compliance_analysis,
 )
-from app.services.projects_service import ProjectsService
+from app.services.models_service import ModelsService
 
 
 def test_low_quality_reader_reports_warning_without_improving(tmp_path, monkeypatch):
@@ -271,12 +271,12 @@ def test_project_analysis_resolves_persisted_improved_ifc(tmp_path: Path):
             assert actual_sha256 == source_sha256
             return lineage
 
-    service = ProjectsService.__new__(ProjectsService)
+    service = ModelsService.__new__(ModelsService)
     service._storage = FakeStorage()
     service._lineage = FakeLineage()
-    service.resolve_ifc_file = lambda project_id: source_path
+    service.resolve_primary_path = lambda project_id: source_path
 
-    resolved_path, resolved_lineage = service.resolve_analysis_ifc(7)
+    resolved_path, resolved_lineage = service.resolve_analysis(7)
 
     assert resolved_path == improved_path
     assert resolved_lineage == lineage
