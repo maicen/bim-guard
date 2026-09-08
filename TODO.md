@@ -537,6 +537,8 @@ Owner: unassigned.
 - [ ] Implement a 2D-to-3D Vision-Language Model (VLM) pipeline to extract topological relationships and material specifications directly from P&ID schematics and automatically cross-check them against the 3D IFC model for undocumented deviations.
 - [ ] AI-Powered Semantic bSDD Mapper: Use NLP to automatically map unstandardized local model properties and custom Revit families to the official buildingSMART Data Dictionary (bSDD) classifications (e.g., Uniclass, OmniClass), ensuring global interoperability without manual tagging.
 - [ ] AI-Powered Title Block OCR for ISO 19650 Compliance: Use computer vision and LLMs to automatically extract document numbering, originators, suitability codes, and revisions directly from 2D drawing title blocks upon CDE upload, enforcing ISO 19650 naming conventions automatically.
+- [ ] Multi-Agent Workflow Orchestration: Refactor the sequential compliance pipeline in `orchestrator.py` into a dynamic, multi-agent LangGraph architecture where specialized agents (e.g., Structural Agent, MEP Agent, Arch Agent) autonomously negotiate clash resolutions and delegate validation tasks.
+- [ ] Generative IDS (Information Delivery Specification): Use LLMs to read unstructured project EIRs (Exchange Information Requirements) and automatically generate valid buildingSMART IDS XML validation schemas, extending `ids_exporter.py` with generative authoring.
 
 Owner: unassigned.
 
