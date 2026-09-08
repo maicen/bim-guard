@@ -579,6 +579,53 @@ export const projectsApi = {
     await handleResponse<void>(res);
   },
 
+  /** Re-read schema/authoring-app/storey/element/discipline metadata for an attached model. */
+  async refreshIfcFileMetadata(projectId: number, fileId: number): Promise<ProjectIfcFile> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}/refresh-metadata`, {
+      method: "POST",
+    });
+    return handleResponse<ProjectIfcFile>(res);
+  },
+
+  /** Edit an attached model's display name, role, or ISO 19650 fields. */
+  async updateIfcFile(
+    projectId: number,
+    fileId: number,
+    updates: Partial<
+      Pick<
+        ProjectIfcFile,
+        | "file_name"
+        | "role"
+        | "project_code"
+        | "originator"
+        | "volume_system"
+        | "level"
+        | "type"
+        | "number"
+        | "suitability_code"
+        | "revision_code"
+      >
+    >,
+  ): Promise<ProjectIfcFile> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    return handleResponse<ProjectIfcFile>(res);
+  },
+
+  /** Replace an attached model's stored IFC file with a new upload, in place. */
+  async replaceIfcFile(projectId: number, fileId: number, file: File): Promise<ProjectIfcFile> {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}/replace`, {
+      method: "POST",
+      body: form,
+    });
+    return handleResponse<ProjectIfcFile>(res);
+  },
+
   /**
    * Attach IFC models to an existing project.
    *

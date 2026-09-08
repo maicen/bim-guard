@@ -18,6 +18,8 @@
     Loader2,
     Database,
     Plus,
+    RefreshCw,
+    Pencil,
   } from "lucide-svelte";
   import { projectsApi, githubReposApi } from "../lib/api";
   import { toasts } from "../lib/toast.svelte";
@@ -31,6 +33,7 @@
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
   import UploadModelsModal from "../lib/components/UploadModelsModal.svelte";
+  import EditModelModal from "../lib/components/EditModelModal.svelte";
   import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { createTableState } from "../lib/tableState.svelte";
@@ -50,6 +53,9 @@
   let isDeleteModalOpen = $state(false);
   let isBulkDeleteModalOpen = $state(false);
   let pendingActionId: number | null = $state(null);
+  let refreshingId: number | null = $state(null);
+  let isEditOpen = $state(false);
+  let fileToEdit: ProjectIfcFile | null = $state(null);
 
   // Storage Source selector state — lets a user attach models straight from
   // a connected GitHub repository instead of uploading them by hand.
@@ -270,6 +276,31 @@
     } finally {
       pendingActionId = null;
     }
+  }
+
+  async function handleRefreshMetadata(file: ProjectIfcFile) {
+    if (!initialProjectId || file.id == null) return;
+    refreshingId = file.id;
+    try {
+      const updated = await projectsApi.refreshIfcFileMetadata(initialProjectId, file.id);
+      files = files.map((f) => (f.id === updated.id ? updated : f));
+      toasts.success(`Refreshed metadata for "${file.file_name}".`);
+    } catch (err) {
+      toasts.fromError(err, "Could not refresh this model's metadata.");
+    } finally {
+      refreshingId = null;
+    }
+  }
+
+  function openEditModal(file: ProjectIfcFile) {
+    fileToEdit = file;
+    isEditOpen = true;
+  }
+
+  function handleModelSaved(updated: ProjectIfcFile) {
+    files = files.map((f) => (f.id === updated.id ? updated : f));
+    isEditOpen = false;
+    toasts.success(`Saved changes to "${updated.file_name}".`);
   }
 
   function promptDelete(file: ProjectIfcFile) {
@@ -589,6 +620,27 @@
 
                         <button
                           type="button"
+                          onclick={() => handleRefreshMetadata(file)}
+                          disabled={refreshingId === file.id}
+                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+                          title="Refresh IFC metadata (schema, storeys, elements, discipline)"
+                        >
+                          <RefreshCw
+                            class="h-3.5 w-3.5 {refreshingId === file.id ? 'animate-spin' : ''}"
+                          />
+                        </button>
+
+                        <button
+                          type="button"
+                          onclick={() => openEditModal(file)}
+                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          title="Edit model (name, ISO 19650 fields, replace file)"
+                        >
+                          <Pencil class="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
                           onclick={() => promptDelete(file)}
                           class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                           title="Delete model"
@@ -832,6 +884,14 @@
   projectId={initialProjectId}
   onClose={() => (isUploadOpen = false)}
   onUploaded={handleUploaded}
+/>
+
+<EditModelModal
+  isOpen={isEditOpen}
+  projectId={initialProjectId}
+  file={fileToEdit}
+  onClose={() => (isEditOpen = false)}
+  onSaved={handleModelSaved}
 />
 
 <GitHubRepoManagerModal

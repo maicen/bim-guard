@@ -376,6 +376,26 @@ class ProjectIfcFileResponse(IsoGovernanceFieldsRequired):
     cde_approved_at: Optional[str] = None
 
 
+class ProjectIfcFileUpdateRequest(BaseModel):
+    """Payload for editing an attached model's naming/ISO 19650 fields.
+
+    Every field is optional and independently applied: a caller sends only
+    what the user actually changed. Does not touch the stored model bytes or
+    the derived IFC summary columns.
+    """
+
+    file_name: Optional[str] = Field(default=None, description="Display name for the model")
+    role: Optional[str] = Field(default=None, description="Discipline the model carries")
+    project_code: Optional[str] = Field(default=None, description="ISO 19650 Project Code")
+    originator: Optional[str] = Field(default=None, description="ISO 19650 Originator Code")
+    volume_system: Optional[str] = Field(default=None, description="ISO 19650 Volume/System Breakdown")
+    level: Optional[str] = Field(default=None, description="ISO 19650 Level/Location Breakdown")
+    type: Optional[str] = Field(default=None, description="ISO 19650 Type Code")
+    number: Optional[str] = Field(default=None, description="ISO 19650 Sequential Number")
+    suitability_code: Optional[str] = Field(default=None, description="ISO 19650 Suitability Code (S0-S4, A1-A4)")
+    revision_code: Optional[str] = Field(default=None, description="ISO 19650 Revision Code (P01.01, C01)")
+
+
 class ProjectIfcUploadResponse(BaseModel):
     """Outcome of attaching one or more IFC models to a project."""
 

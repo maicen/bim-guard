@@ -883,6 +883,194 @@ class ProjectsService:
         logger.info("Primary IFC set project_id=%d file_id=%s", project_id, file_id)
         return {**target, "is_primary": True}
 
+    def refresh_ifc_file_metadata(self, project_id: int, file_id: int) -> dict | None:
+        """Re-read schema/authoring-app/storey/element/discipline metadata and persist it.
+
+        For a row attached before this feature existed (blank/zero summary),
+        or one whose stored bytes were replaced by ``replace_ifc_file``
+        without a metadata refresh landing first. Does not touch the stored
+        model bytes -- only the derived columns.
+
+        Args:
+            project_id: Project owning the row.
+            file_id: ``project_ifc_files.id`` to refresh.
+
+        Returns:
+            The updated row, or ``None`` if the project holds no such row.
+        """
+        target = next(
+            (row for row in self._read_ifc_file_rows(project_id) if row.get("id") == file_id),
+            None,
+        )
+        if target is None:
+            logger.warning(
+                "IFC metadata not refreshed; no such file project_id=%d file_id=%s",
+                project_id,
+                file_id,
+            )
+            return None
+
+        summary = self._extract_ifc_summary(target.get("file_path") or "")
+        updates = {
+            "ifc_schema": summary.schema,
+            "authoring_application": summary.authoring_application,
+            "storey_count": summary.storey_count,
+            "element_count": summary.element_count,
+            "discipline_summary": summary.discipline_summary,
+        }
+        self._ifc_files.update(updates=updates, pk_values=file_id)
+        self._invalidate_ifc_files(project_id)
+
+        logger.info("IFC metadata refreshed project_id=%d file_id=%s", project_id, file_id)
+        return {**target, **updates}
+
+    def update_ifc_file(
+        self,
+        project_id: int,
+        file_id: int,
+        *,
+        file_name: str | None = None,
+        role: str | None = None,
+        project_code: str | None = None,
+        originator: str | None = None,
+        volume_system: str | None = None,
+        level: str | None = None,
+        type: str | None = None,
+        number: str | None = None,
+        suitability_code: str | None = None,
+        revision_code: str | None = None,
+    ) -> dict | None:
+        """Update naming/ISO 19650 fields on an attached model.
+
+        Every argument is optional and independently applied: a caller sends
+        only the fields the user actually changed, and the rest of the row is
+        left as it was. Does not touch the stored model bytes or the derived
+        IFC summary columns -- use ``replace_ifc_file`` or
+        ``refresh_ifc_file_metadata`` for those.
+
+        Args:
+            project_id: Project owning the row.
+            file_id: ``project_ifc_files.id`` to update.
+
+        Returns:
+            The updated row, or ``None`` if the project holds no such row.
+        """
+        target = next(
+            (row for row in self._read_ifc_file_rows(project_id) if row.get("id") == file_id),
+            None,
+        )
+        if target is None:
+            logger.warning(
+                "IFC file not updated; no such file project_id=%d file_id=%s",
+                project_id,
+                file_id,
+            )
+            return None
+
+        updates: dict = {}
+        if file_name is not None:
+            updates["file_name"] = file_name.strip() or target.get("file_name") or ""
+        if role is not None:
+            updates["role"] = role.strip() or "context"
+        if project_code is not None:
+            updates["project_code"] = project_code.strip()
+        if originator is not None:
+            updates["originator"] = originator.strip()
+        if volume_system is not None:
+            updates["volume_system"] = volume_system.strip()
+        if level is not None:
+            updates["level"] = level.strip()
+        if type is not None:
+            updates["type"] = type.strip()
+        if number is not None:
+            updates["number"] = number.strip()
+        if suitability_code is not None:
+            updates["suitability_code"] = suitability_code.strip() or "S0"
+        if revision_code is not None:
+            updates["revision_code"] = revision_code.strip() or "P01.01"
+
+        if not updates:
+            return target
+
+        self._ifc_files.update(updates=updates, pk_values=file_id)
+        self._invalidate_ifc_files(project_id)
+
+        logger.info("IFC file updated project_id=%d file_id=%s fields=%s", project_id, file_id, list(updates))
+        return {**target, **updates}
+
+    def replace_ifc_file(
+        self,
+        project_id: int,
+        file_id: int,
+        *,
+        content: bytes,
+        file_name: str,
+    ) -> dict | None:
+        """Replace the stored bytes of an attached model with a new upload.
+
+        The old storage object is deleted only after the new one is written,
+        so a failed upload never leaves the row pointing at nothing. The
+        replacement is re-summarized immediately -- a stale schema/element
+        count from the file it replaced would be a worse display than a
+        moment of "Loading models..." during the swap. If the replaced file
+        was primary, ``projects.ifc_file_path`` is repointed at the new
+        object so every reader that predates this table still resolves it.
+
+        Args:
+            project_id: Project owning the row.
+            file_id: ``project_ifc_files.id`` to replace.
+            content: New IFC file bytes.
+            file_name: Display name for the replacement.
+
+        Returns:
+            The updated row, or ``None`` if the project holds no such row.
+        """
+        target = next(
+            (row for row in self._read_ifc_file_rows(project_id) if row.get("id") == file_id),
+            None,
+        )
+        if target is None:
+            logger.warning(
+                "IFC file not replaced; no such file project_id=%d file_id=%s",
+                project_id,
+                file_id,
+            )
+            return None
+
+        old_file_path = target.get("file_path") or ""
+        new_file_path = self._storage.save_upload(file_name, content, "uploads/ifc")
+        summary = self._extract_ifc_summary(new_file_path)
+
+        updates = {
+            "file_path": new_file_path,
+            "file_name": (file_name or "").strip() or Path(new_file_path.replace("\\", "/")).name,
+            "ifc_schema": summary.schema,
+            "authoring_application": summary.authoring_application,
+            "storey_count": summary.storey_count,
+            "element_count": summary.element_count,
+            "discipline_summary": summary.discipline_summary,
+        }
+        self._ifc_files.update(updates=updates, pk_values=file_id)
+        self._invalidate_ifc_files(project_id)
+
+        if target.get("is_primary"):
+            self.attach_ifc(project_id, new_file_path)
+
+        if old_file_path and old_file_path != new_file_path:
+            try:
+                self._storage.delete(old_file_path)
+            except Exception:  # noqa: BLE001 - the row already points at the new file
+                logger.warning(
+                    "Old IFC object not deleted after replace project_id=%d file_id=%s ref=%s",
+                    project_id,
+                    file_id,
+                    old_file_path,
+                    exc_info=True,
+                )
+
+        logger.info("IFC file replaced project_id=%d file_id=%s ref=%s", project_id, file_id, new_file_path)
+        return {**target, **updates}
+
     def delete_ifc_file(self, project_id: int, file_id: int) -> dict | None:
         """Detach and delete one of a project's models.
 

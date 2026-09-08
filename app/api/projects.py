@@ -57,6 +57,7 @@ from app.modules.contracts import (
     ProjectDocumentBindingsResponse,
     ProjectDocumentBindingsUpdateRequest,
     ProjectIfcFileResponse,
+    ProjectIfcFileUpdateRequest,
     ProjectIfcUploadResponse,
     ProjectListResponse,
     ProjectOptionsResponse,
@@ -1061,6 +1062,99 @@ def set_primary_project_ifc_file(
         HTTPException: 404 if the project does not exist or holds no such model.
     """
     row = service.set_primary_ifc_file(project_id, file_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} has no attached model with ID {file_id}.",
+        )
+    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
+
+
+@router.post(
+    "/{project_id}/files/{file_id}/refresh-metadata",
+    response_model=ProjectIfcFileResponse,
+    summary="Re-read schema/authoring-app/storey/element/discipline metadata for an attached model",
+)
+def refresh_project_ifc_file_metadata(
+    project_id: int,
+    file_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> ProjectIfcFileResponse:
+    """Re-extract a model's summary metadata without re-uploading it.
+
+    For a row attached before this feature existed, or one whose extraction
+    ran into a transient storage error the first time. Does not touch the
+    stored model bytes.
+
+    Raises:
+        HTTPException: 404 if the project does not exist or holds no such model.
+    """
+    row = service.refresh_ifc_file_metadata(project_id, file_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} has no attached model with ID {file_id}.",
+        )
+    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
+
+
+@router.patch(
+    "/{project_id}/files/{file_id}",
+    response_model=ProjectIfcFileResponse,
+    summary="Edit an attached model's display name, role, or ISO 19650 fields",
+)
+def update_project_ifc_file(
+    project_id: int,
+    file_id: int,
+    payload: ProjectIfcFileUpdateRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> ProjectIfcFileResponse:
+    """Update naming/ISO 19650 fields on an attached model.
+
+    Every field in the payload is optional; only the ones actually sent are
+    changed. Does not touch the stored model bytes -- see the ``/replace``
+    endpoint for swapping the IFC file itself.
+
+    Raises:
+        HTTPException: 404 if the project does not exist or holds no such model.
+    """
+    row = service.update_ifc_file(project_id, file_id, **payload.model_dump(exclude_unset=True))
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} has no attached model with ID {file_id}.",
+        )
+    return ProjectIfcFileResponse(**{"project_id": project_id, **row})
+
+
+@router.post(
+    "/{project_id}/files/{file_id}/replace",
+    response_model=ProjectIfcFileResponse,
+    summary="Replace the stored IFC file of an attached model with a new upload",
+)
+async def replace_project_ifc_file(
+    project_id: int,
+    file_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    file: Annotated[UploadFile, File(description="Replacement IFC model")],
+) -> ProjectIfcFileResponse:
+    """Swap an attached model's bytes for a new upload, in place.
+
+    The row's ``id``, role, and ISO 19650 fields are kept; only the file
+    itself and its derived summary metadata (schema, storey/element counts,
+    discipline breakdown) change. If the replaced model was primary,
+    ``projects.ifc_file_path`` is repointed at the new object.
+
+    Raises:
+        HTTPException: 400 if the upload is not an ``.ifc`` file; 404 if the
+            project does not exist or holds no such model.
+    """
+    [name] = _validated_ifc_names([file])
+    content = await file.read()
+    row = service.replace_ifc_file(project_id, file_id, content=content, file_name=name)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
