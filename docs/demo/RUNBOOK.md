@@ -6,6 +6,72 @@ root unless a step says otherwise. Numbers quoted here were measured on
 
 ---
 
+## The demo runs from a tagged worktree, not from `main`
+
+`main` keeps moving. The demo runs from a detached worktree pinned to the
+verified commit, so nothing merged this week can change what the audience sees.
+
+| | |
+| --- | --- |
+| Tag | `fmp-demo` |
+| Commit | `a55b70a` |
+| Worktree | `D:\Zigurat Masters\bim-guard-fmpdemo` |
+| Verified by | `docs/validation/final-verification-2026-09-09.md`, including the 2026-09-08 freeze spot-check |
+
+The worktree was created with `git worktree add "D:\Zigurat Masters\bim-guard-fmpdemo" fmp-demo`,
+then `.env` and `frontend\.env` copied in, `uv sync`, `npm ci` and
+`npx vite build` run inside it. It already has its dependencies and its build.
+Nothing below needs repeating unless the worktree is deleted.
+
+**Everything in this runbook runs from the worktree, not from the repo root** --
+with one exception, noted under Pre-warm.
+
+## Start the demo servers (from the worktree)
+
+Both servers run in their own window so you can read their logs. Run these two
+commands verbatim; the working directory inside each is what makes
+`python-dotenv` find `.env` and the rule catalogs come from the database rather
+than the reduced fallback table.
+
+```powershell
+Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo'; `$env:BIMGUARD_CACHE_TTL_SECONDS='2592000'; `$env:BIMGUARD_CACHE_ENTRIES='128'; uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 *>&1 | Tee-Object -FilePath 'docs\validation\demo-backend.log'"
+Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo\frontend'; npx vite --port 5173"
+```
+
+**Why the two cache variables.** Left alone, `analysis_cache` keeps entries for
+24 hours (`BIMGUARD_CACHE_TTL_SECONDS`, default 86400) and holds only 64 of them
+(`BIMGUARD_CACHE_ENTRIES`, default 64) — and a full warm is 63, one short of the
+cap, so anything else analysed that day evicts a demo entry. The values above
+raise the TTL to 30 days and the ceiling to 128, which takes both of those out
+of the picture for a week of rehearsals. What they cannot do is survive a
+restart: the cache lives *inside* the uvicorn process, so a reboot, a crash or a
+deliberate restart empties it no matter how the variables are set. **Warm again
+after every restart.**
+
+PIDs from the 2026-09-08 restart: backend window **33220** (uvicorn worker
+**29148**), frontend window **68816** (vite **45348**). Yours will differ; note
+them so you can stop the right windows afterwards.
+
+Wait for `http://127.0.0.1:8000/api/health` to answer 200, then run the FALLBACK
+gate before anything else:
+
+```powershell
+Select-String -Quiet -Path 'docs\validation\demo-backend.log' -Pattern "Using hardcoded fallback ruleset"
+```
+
+`False` means the database is reachable and the demo may proceed. `True` means
+the rulesets came from the reduced hardcoded table — stop, fix `.env`, restart.
+
+Neither `/api/health` nor the startup log echoes the two cache values back, so
+there is nothing to read that confirms the backend picked them up. The proof
+that matters is the pre-warm's own closing line: 63 of 63 entries verified.
+
+**Restart = repeat this whole section, then Pre-warm.** The analysis cache lives
+inside the uvicorn process, so restarting the backend empties it and every
+number in the walkthrough becomes a cold multi-minute run.
+
+---
+
 ## Before you start
 
 Two files must exist. Neither is in git; both hold secrets, so check for them
@@ -103,41 +169,76 @@ Every engine chip combination is its own cache entry. Warm them before the
 audience is watching, or unticking a chip mid-demo starts a fresh multi-minute
 run.
 
-```powershell
-uv run python scripts/prewarm_demo.py --piping <PIPING_PROJECT_ID> --seismic <SEISMIC_PROJECT_ID>
-```
-
-For the projects used below that is:
+**This is the one step that runs from the repo root, not the worktree** — it is
+the fixed script that lives on `main`, pointed at the worktree's backend:
 
 ```powershell
-uv run python scripts/prewarm_demo.py --piping 1917 1540 --seismic 1542
+uv run python scripts/prewarm_demo.py --base-url http://127.0.0.1:8000 --piping 1917 1540 --seismic 1542
 ```
+
+It signs itself in. Every `/api/analyze` route has required a bearer token since
+`47cf29b`, so the script reads `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+`VITE_DEV_AUTH_EMAIL` and `VITE_DEV_AUTH_PASSWORD` out of `frontend\.env` and
+runs the same Supabase password grant as the SPA's "Sign in as dev test user"
+button. Nothing is passed on the command line and no token is printed. Supabase
+issues a one-hour token and a full warm runs longer than that, so the script
+re-mints every 40 minutes and again on any 401, retrying that one request once.
 
 What to expect:
 
 - **31 combinations per Piping project** (2⁵ − 1 — every chip selection except
   the empty one, which the Run button refuses).
+- Per-entry lines as it goes, naming the project, the slug, the combination
+  index, the elapsed seconds, and `WARMED` (the engines just ran), `HIT` (it was
+  already cached) or, on the verification pass, `MISS`.
 - A small project such as 1541 warms all 31 in about 3 minutes. West Riverside
-  (1540) is minutes per uncached combination; warm it only if the demo will
-  touch its chips, or pass `--combinations full-only` to warm just the default
-  five-engine view.
+  (1540) is minutes per uncached combination and is the long pole; warm it only
+  if the demo will touch its chips, or pass `--combinations full-only` to warm
+  just the default five-engine view.
 - Seismic on 1542 takes about **10 minutes** on a cold cache (measured 577 s).
-- The script then reads every entry back. Each must print `cached=true`. Any
-  line prefixed `WARN` is an entry that will recompute in front of the audience;
-  the script exits non-zero if there are any.
+- The script then reads every entry back and closes with its summary. The line
+  to check is:
 
-`cached=true` on the second pass means the result is held in the backend's
-in-memory store, keyed on the model's SHA-256 plus the engine selection. The
-store lives **inside the uvicorn process**: restart the backend and every entry
-is gone. Do not restart it after warming. Entries last 24 hours
-(`BIMGUARD_CACHE_TTL_SECONDS`, default 86400) and the store holds 64 of them
-(`BIMGUARD_CACHE_ENTRIES`), so a morning warm-up survives an afternoon demo.
+  ```text
+  Entries verified 63/63; misses 0; warm errors 0; token mints N; wall-clock N min
+  ```
 
-Mind the ceiling: two Piping projects warmed in full plus one Seismic project is
-31 + 31 + 1 = 63 entries against a limit of 64, and the 65th eviction is the
-least recently used. Warming a third Piping project in full will push earlier
-entries out — use `--combinations full-only` for the projects whose chips you
-will not touch, or raise `BIMGUARD_CACHE_ENTRIES` before starting the backend.
+  63 = 31 combinations × two Piping projects (1917, 1540) + 1 Seismic (1542).
+  Any `MISS` is an entry that will recompute in front of the audience; the
+  script exits non-zero if there are any.
+- **Budget two hours from cold.** Measured 2026-09-08: 120.7 minutes for the
+  full 63 with 34 of them already cached. 1917 warms all 31 in about 10 minutes
+  (15–26 s each); 1540 is 205–283 s per uncached combination and is the long
+  pole; 1542 seismic took 809.6 s. `token mints 3` in that summary is the
+  40-minute re-mint doing its job across a two-hour run, not a fault.
+
+**Do not let the laptop sleep during the warm.** Windows Modern Standby drops
+the network, and a warm that loses it mid-run cannot re-mint its token and
+fails every remaining request — that is exactly how the first attempt on
+2026-09-08 ended, with `Entries verified 0/63` after 229 minutes. Entries
+already cached survive standby, so a re-run picks up where it left off and only
+recomputes what is missing, but it is far cheaper to keep the machine awake.
+
+A hit on the second pass means the result is held in the backend's in-memory
+store, keyed on the model's SHA-256 plus the engine selection. The store lives
+**inside the uvicorn process**: restart the backend and every entry is gone. Do
+not restart it after warming.
+
+Warm reads measured straight afterwards on 2026-09-08, all `cached=true`: 1917
+piping 4,282 ms, 1540 piping 6,127 ms, 1542 seismic 3,588 ms. **1540 is over
+the 5 s the demo budgets for**, and it is payload, not recomputation — the
+un-paged response is 27.2 MB of findings. The same call paged at `limit=50`,
+which is what the results table actually renders, takes about 3.5 s, and a
+repeat of the un-paged call measured 4,622 ms, so 1540 straddles the threshold.
+Note also that every cached read carries a floor of roughly 3 s even for a
+50-row page.
+
+With the two cache variables set as the start section shows, entries last 30
+days and the store holds 128 of them, so the 63 warmed here sit well inside both
+limits and a third Piping project could be warmed in full without evicting
+anything. Start the backend *without* those variables and you are back to the
+defaults — 24 hours and 64 entries — where 63 leaves a single slot free and the
+next thing analysed evicts a demo entry.
 
 ---
 
@@ -145,7 +246,12 @@ will not touch, or raise `BIMGUARD_CACHE_ENTRIES` before starting the backend.
 
 ### 1. Piping audit on the data-bearing project (1917)
 
-Open **Compliance Audit → Piping**, project *BIMGUARD Demo — Hospital MEP
+Start on the Dashboard after sign-in. Its Project Registry table is the former
+ALL PROJECTS list. The stats tiles take 5–8 s to fill on this build
+(`/api/dashboard/stats`, known limitation, raised with Osama) — open project
+1917 from the registry immediately; do not wait for the tiles.
+
+Then **Compliance Audit → Piping**, project *BIMGUARD Demo — Hospital MEP
 (data)*. The page loads its stored result on mount — no need to press Run Audit.
 
 Expect: **1,988 findings** over 420 elements, stat cards reading TOTAL FINDINGS
@@ -266,6 +372,27 @@ team's shared values.
 ## Known limitations
 
 State these plainly if asked; every one is measured, not estimated.
+
+- **`scripts/prewarm_demo.py` could not authenticate — fixed on `main` in
+  `43780b5`.** It sent no `Authorization` header, and `47cf29b` made every
+  `/api/analyze` route require one, so on 2026-09-08 all 63 warm requests
+  returned `HTTP 401` and nothing was cached. It now mints and re-mints the dev
+  token itself. The fix is on `main`, not in the `fmp-demo` worktree, which is
+  why Pre-warm is the one step that runs from the repo root.
+- **The Dashboard stats tiles take 5–8 s** and the SPA re-requests
+  `/api/dashboard/stats` roughly every 40 s for as long as the tab is open,
+  including while you are inside a project. Measured over 80 minutes on
+  2026-09-08: 142 requests, median 6.8 s, slowest 13.1 s. Raised with Osama;
+  `386ff7b` does not fix it on this build. It costs nothing you can see once
+  you are inside a project, but it is why the Dashboard itself feels slow.
+- **Migration `20260907202655_add_org_code_to_organizations.sql` is in the build
+  but not applied to Supabase, and is not needed for the demo.** Only
+  new-organisation creation needs it, which the walkthrough never does. Do not
+  apply it this week.
+- **An export link carries the access token captured when its row rendered.**
+  Supabase rotates the token about hourly. Interacting with the results table
+  rebuilds the link, so this is invisible in normal use — but if the page has
+  sat untouched for over an hour, click Run Audit again before clicking Export.
 
 - **MC-001 produces no verdicts without hydraulic data.** 8,539 of 8,539
   elements on West Riverside and 4 of 4 on the MEP scenario returned
