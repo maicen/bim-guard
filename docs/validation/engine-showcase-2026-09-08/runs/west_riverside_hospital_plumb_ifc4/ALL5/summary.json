@@ -1,0 +1,110 @@
+{
+  "model": "west_riverside_hospital_plumb_ifc4.ifc",
+  "model_stem": "west_riverside_hospital_plumb_ifc4",
+  "model_path": "D:\\Zigurat Masters\\bim-guard\\test-models\\models\\hospital\\west_riverside_hospital_plumb_ifc4.ifc",
+  "model_sha256": "bb53f0eb8f7295e91e0fb6ec6b79a30022a2e0e248714aab6bb1a8930c4793dd",
+  "engine_set": "ALL5",
+  "engines_requested": [
+    "GC-001",
+    "CC-001",
+    "MC-001",
+    "MM-001",
+    "XM-001"
+  ],
+  "engines_canonical": [
+    "GC-001",
+    "CC-001",
+    "MC-001",
+    "MM-001",
+    "XM-001"
+  ],
+  "include_low": true,
+  "element_count": 8539,
+  "wall_clock_seconds": 33.53,
+  "findings_total": 29181,
+  "verdicts_total": 0,
+  "data_quality_total": 29181,
+  "bands": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "data_quality_status": {
+    "hydraulics_unavailable": 8539,
+    "material_normalisation": 3563,
+    "material_not_in_series": 1,
+    "material_unresolved": 17078
+  },
+  "per_engine": {
+    "GC-001": {
+      "verdicts": 0,
+      "data_quality": 8539
+    },
+    "CC-001": {
+      "verdicts": 0,
+      "data_quality": 8539
+    },
+    "MC-001": {
+      "verdicts": 0,
+      "data_quality": 8539
+    },
+    "MM-001": {
+      "verdicts": 0,
+      "data_quality": 3563
+    },
+    "XM-001": {
+      "verdicts": 0,
+      "data_quality": 1
+    }
+  },
+  "rows_missing_ruleset_version": 0,
+  "ruleset_versions": {
+    "CC-001": "BIMGUARD-CC-001 v1.0.0",
+    "GC-001": "BIMGUARD-GC-001 v1.0.0",
+    "MC-001": "BIMGUARD-MC-001 v1.0.0",
+    "MM-001": "BIMGUARD-MM-001 v1.0.0",
+    "XM-001": "BIMGUARD-XM-001 v1.0.0"
+  },
+  "coverage": {
+    "elements": 8539,
+    "material_resolved": 0,
+    "material_pct": 0.0,
+    "system_assigned": 8534,
+    "system_pct": 99.94,
+    "hydraulics_available": 0,
+    "hydraulics_pct": 0.0,
+    "no_material": 8539,
+    "no_system": 5,
+    "no_hydraulics": 8539
+  },
+  "parity": {
+    "model_validate_ok": true,
+    "csv_header": [
+      "id",
+      "element_id",
+      "rule_id",
+      "mechanism",
+      "band",
+      "score",
+      "title",
+      "description",
+      "mitigation",
+      "assignee_role",
+      "status",
+      "is_data_quality",
+      "check",
+      "overlap_volume_mm3",
+      "clearance_mm",
+      "standards"
+    ],
+    "csv_header_matches_exporter_columns": true,
+    "contract_fields_unpopulated_on_every_issue": []
+  },
+  "bcf": {
+    "topics": 29181,
+    "xsd_violations": 0,
+    "examples": []
+  },
+  "compliance_error": null
+}

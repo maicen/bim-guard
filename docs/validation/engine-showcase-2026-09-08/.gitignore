@@ -1,0 +1,23 @@
+# The showcase writes large per-run artefacts. Only the readable report, the
+# summaries, and a 50-row sample of each CSV belong in git.
+#
+# findings.csv on the five-engine West Riverside run alone is tens of MB, and
+# findings.bcf is a zip of thousands of topic folders. Both are reproducible by
+# rerunning scripts/showcase_run.py, so committing them would cost the
+# repository size for no information it cannot regenerate.
+
+findings.csv
+findings.json
+result.json
+*.bcf
+*.ifc
+
+# sample_50.csv and summary.json are the committed evidence; keep them.
+!sample_50.csv
+!summary.json
+
+# Regenerable sidecars, outside the agreed commit list. 01_inventory.json is
+# rebuilt by showcase_inventory.py and consumed by showcase_run.py's model
+# selection; 02_consistency.json is reproduced in README.md's consistency table.
+01_inventory.json
+02_consistency.json
