@@ -717,6 +717,20 @@ class RuleDraftExtractionRequest(BaseModel):
     text: Optional[str] = None
 
 
+class RuleExtractionProgressResponse(BaseModel):
+    """Poll target for an in-flight or recently finished draft extraction.
+
+    ``status`` is ``"unknown"`` when nothing has ever run for this document
+    id (or the last run's entry expired) -- not an error, just "no data".
+    """
+
+    document_id: int
+    total: int = 0
+    completed: int = 0
+    status: Literal["running", "complete", "failed", "unknown"] = "unknown"
+    error: Optional[str] = None
+
+
 class RuleSourceResponse(BaseModel):
     """Resolved document-viewer target for a rule's source annotation."""
 

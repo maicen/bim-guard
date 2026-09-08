@@ -1,13 +1,20 @@
 """LLM-only compliance rule extraction from pre-extracted document text."""
 
-from typing import Protocol
+import asyncio
+from typing import Any, Protocol
 
 from app.logging_config import get_logger
 from app.modules import contracts
 from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
 from app.modules.document_parsing.section_chunker import SectionChunker
 from app.modules.rule_builder.llamaindex_rule_generator import LlamaIndexRuleGenerator
+from app.services import extraction_progress
 from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
+
+#: Node-level LLM calls to run concurrently during draft extraction. Bounded
+#: rather than unbounded asyncio.gather so a 100-section document doesn't
+#: fire 100 simultaneous requests at the LLM provider.
+_MAX_CONCURRENT_NODES = 4
 
 logger = get_logger(__name__)
 
@@ -60,6 +67,20 @@ class ExtractionResult:
         self.warnings = warnings
 
 
+class RuleDraftGenerator(Protocol):
+    """Protocol for the node-level draft generator used by extract_rule_drafts."""
+
+    async def generate_drafts_from_node(
+        self,
+        node: contracts.DocumentNodeContract,
+        *,
+        deontic: contracts.DeonticStatement | None = None,
+        model: str | None = None,
+    ) -> list[contracts.RuleExtractionDraft]:
+        """Generate zero or more rule drafts from one clause-annotated node."""
+        ...
+
+
 class RuleExtractionService:
     """Extract and deduplicate rules using only an LLM provider."""
 
@@ -69,11 +90,25 @@ class RuleExtractionService:
         provider: RuleExtractionProvider | None = None,
         ingestor: LlamaIndexIngestor | None = None,
         bsdd_client: BSDDClient | None = None,
+        generator: RuleDraftGenerator | None = None,
+        draft_service: Any | None = None,
+        max_concurrent_nodes: int = _MAX_CONCURRENT_NODES,
     ):
-        """Initialize the extraction provider dependency."""
+        """Initialize the extraction provider dependency.
+
+        Args:
+            draft_service: Injectable RuleDraftService, for tests -- kept
+                Any-typed and resolved lazily (real default constructed only
+                when actually needed) rather than imported at module load,
+                matching the existing local-import convention for that
+                service elsewhere in this class.
+        """
         self._provider = provider or LlamaIndexRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
         self._bsdd_client = bsdd_client or DEFAULT_BSDD_CLIENT
+        self._generator = generator or LlamaIndexRuleGenerator()
+        self._draft_service = draft_service
+        self._max_concurrent_nodes = max_concurrent_nodes
 
     def _ground_draft_with_bsdd(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
         """Correct an extracted rule's property_set/property_name against bSDD.
@@ -183,15 +218,26 @@ class RuleExtractionService:
         """Ingest a document and generate reviewable rule drafts via LlamaIndex.
 
         Runs ingestion (clause-annotated nodes + deontic statements), then
-        LlamaIndexRuleGenerator over each node, and persists the results as
-        `pending_review` drafts via RuleDraftService — the entry point for
+        the draft generator over each node with bounded concurrency
+        (`_MAX_CONCURRENT_NODES` at a time, rather than one LLM round-trip
+        after another), and persists the results as `pending_review` drafts
+        via RuleDraftService — the entry point for
         `POST /api/documents/{id}/rules/extract-drafts`.
+
+        Progress is reported through `app.services.extraction_progress`
+        (not `pipeline_tracker` — see that module's docstring for why) so
+        `GET /api/documents/{id}/rules/extract-progress` can be polled while
+        a large document is still processing.
 
         Args:
             model: Extraction LLM override (e.g. from the UI's model
                 selector), applied to every node in this document.
         """
-        from app.services.rule_draft_service import RuleDraftService
+        draft_service = self._draft_service
+        if draft_service is None:
+            from app.services.rule_draft_service import RuleDraftService
+
+            draft_service = RuleDraftService()
 
         nodes = await self.ingest_with_llamaindex(document_id, text)
         deontic_by_node = {
@@ -199,22 +245,34 @@ class RuleExtractionService:
             for node in nodes
         }
 
-        generator = LlamaIndexRuleGenerator()
-        drafts: list[contracts.RuleExtractionDraft] = []
-        for node in nodes:
-            try:
-                node_drafts = await generator.generate_drafts_from_node(
-                    node, deontic=deontic_by_node.get(node.node_id), model=model
-                )
-            except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
-                logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
-                continue
-            drafts.extend(
-                self._ground_draft_with_bsdd(draft.model_copy(update={"source_snippet": node.text}))
-                for draft in node_drafts
-            )
+        extraction_progress.start(document_id, total=len(nodes))
+        semaphore = asyncio.Semaphore(self._max_concurrent_nodes)
 
-        saved_drafts = RuleDraftService().save_drafts(drafts)
+        async def process_node(node: contracts.DocumentNodeContract) -> list[contracts.RuleExtractionDraft]:
+            async with semaphore:
+                try:
+                    node_drafts = await self._generator.generate_drafts_from_node(
+                        node, deontic=deontic_by_node.get(node.node_id), model=model
+                    )
+                except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
+                    logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
+                    return []
+                finally:
+                    extraction_progress.increment(document_id)
+                return [
+                    self._ground_draft_with_bsdd(draft.model_copy(update={"source_snippet": node.text}))
+                    for draft in node_drafts
+                ]
+
+        try:
+            per_node_drafts = await asyncio.gather(*(process_node(node) for node in nodes))
+        except Exception as exc:
+            extraction_progress.fail(document_id, str(exc))
+            raise
+        drafts = [draft for node_drafts in per_node_drafts for draft in node_drafts]
+
+        saved_drafts = draft_service.save_drafts(drafts)
+        extraction_progress.complete(document_id)
         logger.info(
             "LlamaIndex rule-draft extraction complete document_id=%d nodes=%d drafts=%d",
             document_id,

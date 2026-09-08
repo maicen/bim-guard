@@ -699,6 +699,14 @@ export interface RuleExtractionDraftListResponse {
   drafts: RuleExtractionDraft[];
 }
 
+export interface RuleExtractionProgressResponse {
+  document_id: number;
+  total: number;
+  completed: number;
+  status: "running" | "complete" | "failed" | "unknown";
+  error?: string | null;
+}
+
 export interface RuleDraftReviewRequest {
   status: RuleDraftStatus;
   review_notes?: string | null;

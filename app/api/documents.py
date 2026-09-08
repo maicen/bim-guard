@@ -40,6 +40,7 @@ from app.modules.contracts import (
     RuleDraftExtractionRequest,
     RuleExtractionDraft,
     RuleExtractionDraftListResponse,
+    RuleExtractionProgressResponse,
 )
 from app.modules.document_parsing.section_chunker import SectionChunker
 from app.services.document_access_service import DocumentAccessService
@@ -536,6 +537,31 @@ async def extract_rule_drafts(
     extraction_service = RuleExtractionService()
     drafts = await extraction_service.extract_rule_drafts(document_id, text, model=model)
     return RuleExtractionDraftListResponse(drafts=drafts)
+
+
+@router.get(
+    "/{document_id}/rules/extract-progress",
+    response_model=RuleExtractionProgressResponse,
+    summary="Poll progress of an in-flight or recent rule-draft extraction",
+)
+def get_rule_extraction_progress(document_id: int) -> RuleExtractionProgressResponse:
+    """Return how many of a document's clause-nodes have finished extraction.
+
+    `status="unknown"` means nothing has run for this document since the
+    process started (or the last run's entry expired) -- not an error.
+    """
+    from app.services.extraction_progress import snapshot as progress_snapshot
+
+    progress = progress_snapshot(document_id)
+    if progress is None:
+        return RuleExtractionProgressResponse(document_id=document_id)
+    return RuleExtractionProgressResponse(
+        document_id=document_id,
+        total=progress.total,
+        completed=progress.completed,
+        status=progress.status,
+        error=progress.error,
+    )
 
 
 @router.get(

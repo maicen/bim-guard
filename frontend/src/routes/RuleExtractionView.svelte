@@ -255,6 +255,7 @@
     table.selectedIds.delete(rowId);
   }
   let isExtracting = $state(false);
+  let extractionProgress: { completed: number; total: number } | null = $state(null);
   let isSaving = $state(false);
   let error = $state("");
   let successMessage = $state("");
@@ -305,12 +306,32 @@
 
   async function handleExtract() {
     isExtracting = true;
+    extractionProgress = null;
     error = "";
     successMessage = "";
     extractedRules = [];
     table.clearSelection();
     extractionWarnings = [];
     table.requestedPage = 1;
+
+    // Large documents run many clause-nodes through the LLM concurrently on
+    // the backend (extraction_progress) — poll it while the request is in
+    // flight so the button shows real progress instead of a static spinner.
+    let pollInterval: ReturnType<typeof setInterval> | undefined;
+    if (selectedDocId) {
+      const docId = selectedDocId;
+      pollInterval = setInterval(async () => {
+        try {
+          const progress = await ruleExtractionApi.getExtractionProgress(docId);
+          if (progress.status !== "unknown") {
+            extractionProgress = { completed: progress.completed, total: progress.total };
+          }
+        } catch {
+          // Transient polling error — the main extraction request is the
+          // source of truth; just skip this tick.
+        }
+      }, 1200);
+    }
 
     try {
       // A selected document runs through the persisted draft-review
@@ -357,7 +378,9 @@
     } catch (err: any) {
       error = err.message || "Rule extraction failed.";
     } finally {
+      if (pollInterval) clearInterval(pollInterval);
       isExtracting = false;
+      extractionProgress = null;
     }
   }
 
@@ -604,7 +627,15 @@
         class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >
         <Sparkles class="h-4 w-4" />
-        <span>{isExtracting ? "Extracting Rules via AI..." : "Extract Compliance Rules"}</span>
+        <span>
+          {#if !isExtracting}
+            Extract Compliance Rules
+          {:else if extractionProgress && extractionProgress.total > 0}
+            Extracting Rules via AI... ({extractionProgress.completed}/{extractionProgress.total})
+          {:else}
+            Extracting Rules via AI...
+          {/if}
+        </span>
       </button>
     </div>
   </div>

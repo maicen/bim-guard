@@ -80,6 +80,7 @@ import type {
   RuleDraftReviewRequest,
   RuleExtractionDraft,
   RuleExtractionDraftListResponse,
+  RuleExtractionProgressResponse,
   RulesetCategory,
   RuleSnapshot,
   RuleSnapshotCreatePayload,
@@ -1520,6 +1521,12 @@ export const ruleExtractionApi = {
   async getDraftSource(draftId: number): Promise<RuleSourceResponse> {
     const res = await apiFetch(`${API_BASE}/rules/drafts/${draftId}/source`);
     return handleResponse<RuleSourceResponse>(res);
+  },
+
+  /** Poll progress of an in-flight or recent document rule-draft extraction. */
+  async getExtractionProgress(documentId: number): Promise<RuleExtractionProgressResponse> {
+    const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/extract-progress`);
+    return handleResponse<RuleExtractionProgressResponse>(res);
   },
 
   async bulkCreate(rules: any[]): Promise<any> {
