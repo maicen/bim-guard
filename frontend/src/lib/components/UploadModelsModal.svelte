@@ -1,14 +1,14 @@
 <script lang="ts">
   import { UploadCloud, X as XIcon } from "lucide-svelte";
   import Modal from "./Modal.svelte";
-  import { projectsApi } from "../api";
-  import { IFC_FILE_ROLES, type ProjectIfcFile } from "../types";
+  import { modelsApi } from "../api";
+  import { IFC_FILE_ROLES, type Model } from "../types";
 
   interface Props {
     isOpen: boolean;
     projectId: number | null;
     onClose: () => void;
-    onUploaded: (files: ProjectIfcFile[]) => void;
+    onUploaded: (files: Model[]) => void;
   }
 
   let { isOpen, projectId, onClose, onUploaded }: Props = $props();
@@ -45,8 +45,8 @@
     isSubmitting = true;
     errorMessage = "";
     try {
-      const res = await projectsApi.uploadIfcFiles(projectId, selectedFiles, primaryIndex, roles);
-      const updated = await projectsApi.listIfcFiles(projectId);
+      const res = await modelsApi.upload(projectId, selectedFiles, primaryIndex, roles);
+      const updated = await modelsApi.list(projectId);
       onUploaded(updated.length ? updated : res.files);
       reset();
     } catch (err: any) {

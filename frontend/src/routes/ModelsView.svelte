@@ -21,9 +21,9 @@
     RefreshCw,
     Pencil,
   } from "lucide-svelte";
-  import { projectsApi, githubReposApi } from "../lib/api";
+  import { modelsApi, githubReposApi } from "../lib/api";
   import { toasts } from "../lib/toast.svelte";
-  import type { ProjectIfcFile, GitHubRepo, GitHubRepoStructure } from "../lib/types";
+  import type { Model, GitHubRepo, GitHubRepoStructure } from "../lib/types";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
@@ -45,17 +45,17 @@
 
   let { initialProjectId, onSelectProjectForViewer }: Props = $props();
 
-  let files: ProjectIfcFile[] = $state([]);
+  let files: Model[] = $state([]);
   let isLoading = $state(true);
   let loadError = $state("");
   let isUploadOpen = $state(false);
-  let fileToDelete: ProjectIfcFile | null = $state(null);
+  let fileToDelete: Model | null = $state(null);
   let isDeleteModalOpen = $state(false);
   let isBulkDeleteModalOpen = $state(false);
   let pendingActionId: number | null = $state(null);
   let refreshingId: number | null = $state(null);
   let isEditOpen = $state(false);
-  let fileToEdit: ProjectIfcFile | null = $state(null);
+  let fileToEdit: Model | null = $state(null);
 
   // Storage Source selector state — lets a user attach models straight from
   // a connected GitHub repository instead of uploading them by hand.
@@ -82,7 +82,7 @@
     isLoading = true;
     loadError = "";
     try {
-      const result = await projectsApi.listIfcFiles(projectId);
+      const result = await modelsApi.list(projectId);
       if (token !== loadToken) return;
       files = result;
     } catch (err: any) {
@@ -133,7 +133,7 @@
   // App.svelte's targetProjectId can bounce back to a previously-seen id
   // while the active organization is still settling (see the
   // profile-readiness comment on App.svelte's prefetch effect); without this
-  // guard each bounce re-fires this effect and piles another listIfcFiles
+  // guard each bounce re-fires this effect and piles another modelsApi.list
   // request on top of ones already in flight. Scoped to this effect alone --
   // the explicit loadFiles(initialProjectId) calls elsewhere (after
   // set-primary, delete, repo attach) must still re-fetch the same id.
@@ -155,7 +155,7 @@
 
   // Search, sort, paginate and select — for the attached-models table.
   const table = $state(
-    createTableState<ProjectIfcFile, number | string>({
+    createTableState<Model, number | string>({
       rows: () => files,
       getId: (f) => f.id ?? f.file_path,
       searchFields: (f) => [f.file_name, f.role, f.ifc_schema, f.authoring_application],
@@ -241,7 +241,7 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   }
 
-  function handleUploaded(updated: ProjectIfcFile[]) {
+  function handleUploaded(updated: Model[]) {
     files = updated;
     isUploadOpen = false;
   }
@@ -254,7 +254,7 @@
   };
 
   /** Top disciplines by element count, e.g. "MEP 120 · Arch 40 · +1 more". */
-  function disciplineSummaryLabel(file: ProjectIfcFile): string {
+  function disciplineSummaryLabel(file: Model): string {
     const entries = Object.entries(file.discipline_summary ?? {}).filter(([, n]) => n > 0);
     if (entries.length === 0) return "—";
     entries.sort((a, b) => b[1] - a[1]);
@@ -265,12 +265,12 @@
     return entries.length > 2 ? `${shown} · +${entries.length - 2} more` : shown;
   }
 
-  async function handleSetPrimary(file: ProjectIfcFile) {
+  async function handleSetPrimary(file: Model) {
     if (!initialProjectId || file.id == null || file.is_primary) return;
     pendingActionId = file.id;
     try {
-      await projectsApi.setPrimaryIfcFile(initialProjectId, file.id);
-      files = await projectsApi.listIfcFiles(initialProjectId);
+      await modelsApi.setPrimary(initialProjectId, file.id);
+      files = await modelsApi.list(initialProjectId);
     } catch (err) {
       toasts.fromError(err, "Could not set this model as primary.");
     } finally {
@@ -278,11 +278,11 @@
     }
   }
 
-  async function handleRefreshMetadata(file: ProjectIfcFile) {
+  async function handleRefreshMetadata(file: Model) {
     if (!initialProjectId || file.id == null) return;
     refreshingId = file.id;
     try {
-      const updated = await projectsApi.refreshIfcFileMetadata(initialProjectId, file.id);
+      const updated = await modelsApi.refreshMetadata(initialProjectId, file.id);
       files = files.map((f) => (f.id === updated.id ? updated : f));
       toasts.success(`Refreshed metadata for "${file.file_name}".`);
     } catch (err) {
@@ -292,18 +292,18 @@
     }
   }
 
-  function openEditModal(file: ProjectIfcFile) {
+  function openEditModal(file: Model) {
     fileToEdit = file;
     isEditOpen = true;
   }
 
-  function handleModelSaved(updated: ProjectIfcFile) {
+  function handleModelSaved(updated: Model) {
     files = files.map((f) => (f.id === updated.id ? updated : f));
     isEditOpen = false;
     toasts.success(`Saved changes to "${updated.file_name}".`);
   }
 
-  function promptDelete(file: ProjectIfcFile) {
+  function promptDelete(file: Model) {
     fileToDelete = file;
     isDeleteModalOpen = true;
   }
@@ -311,7 +311,7 @@
   async function confirmDelete() {
     if (!initialProjectId || fileToDelete?.id == null) return;
     try {
-      await projectsApi.deleteIfcFile(initialProjectId, fileToDelete.id);
+      await modelsApi.delete(initialProjectId, fileToDelete.id);
       files = files.filter((f) => f.id !== fileToDelete!.id);
       table.selectedIds.delete(fileToDelete.id);
       toasts.success(`Removed "${fileToDelete.file_name}".`);
@@ -326,7 +326,7 @@
     if (!initialProjectId || !table.selectedCount) return;
     const ids = table.selectedIdList.filter((id): id is number => typeof id === "number");
     const results = await Promise.allSettled(
-      ids.map((id) => projectsApi.deleteIfcFile(initialProjectId!, id)),
+      ids.map((id) => modelsApi.delete(initialProjectId!, id)),
     );
     const failed = results.filter((r) => r.status === "rejected").length;
     files = files.filter((f) => f.id == null || !ids.includes(f.id));

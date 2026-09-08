@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack, onMount } from "svelte";
-  import { projectsApi } from "../lib/api";
-  import type { Project, ProjectIfcFile } from "../lib/types";
+  import { projectsApi, modelsApi } from "../lib/api";
+  import type { Project, Model } from "../lib/types";
   import IfcViewer from "../lib/components/IfcViewer.svelte";
   import { ScanEye, Layers, Building2, ChevronDown } from "lucide-svelte";
 
@@ -25,7 +25,7 @@
   // The project's attached models. A project predating project_ifc_files
   // reports its one model here too, with a null id, so this list is the single
   // shape the picker renders either side of that migration.
-  let ifcFiles: ProjectIfcFile[] = $state([]);
+  let ifcFiles: Model[] = $state([]);
   let selectedFileId: number | null = $state(null);
   let filesProjectId: number | null = null;
   // The viewport is held back until the list arrives. Loading the project's
@@ -42,7 +42,7 @@
     selectedFileId = null;
     filesReady = false;
     try {
-      ifcFiles = await projectsApi.listIfcFiles(projectId);
+      ifcFiles = await modelsApi.list(projectId);
       selectedFileId = ifcFiles.find((f) => f.is_primary)?.id ?? ifcFiles[0]?.id ?? null;
     } catch (err) {
       console.error("Failed to load project IFC files:", err);

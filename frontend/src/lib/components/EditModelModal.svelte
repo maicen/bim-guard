@@ -2,15 +2,15 @@
   import { run } from "svelte/legacy";
   import { Pencil, UploadCloud, AlertTriangle, X as XIcon } from "lucide-svelte";
   import Modal from "./Modal.svelte";
-  import { projectsApi } from "../api";
-  import { IFC_FILE_ROLES, type ProjectIfcFile } from "../types";
+  import { modelsApi } from "../api";
+  import { IFC_FILE_ROLES, type Model } from "../types";
 
   interface Props {
     isOpen: boolean;
     projectId: number | null;
-    file: ProjectIfcFile | null;
+    file: Model | null;
     onClose: () => void;
-    onSaved: (updated: ProjectIfcFile) => void;
+    onSaved: (updated: Model) => void;
   }
 
   let { isOpen, projectId, file, onClose, onSaved }: Props = $props();
@@ -64,11 +64,11 @@
     isSaving = true;
     errorMessage = "";
     try {
-      let updated: ProjectIfcFile;
+      let updated: Model;
       if (replacement) {
-        updated = await projectsApi.replaceIfcFile(projectId, file.id, replacement);
+        updated = await modelsApi.replace(projectId, file.id, replacement);
       }
-      updated = await projectsApi.updateIfcFile(projectId, file.id, {
+      updated = await modelsApi.update(projectId, file.id, {
         file_name: fileName.trim(),
         role,
         project_code: projectCode.trim(),

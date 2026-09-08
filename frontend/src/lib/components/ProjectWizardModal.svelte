@@ -4,7 +4,7 @@
 
   import { onMount } from "svelte";
   import { X, Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from "lucide-svelte";
-  import { bsddApi, projectsApi, documentsApi, namingConfigApi } from "../api";
+  import { bsddApi, projectsApi, modelsApi, documentsApi, namingConfigApi } from "../api";
   import { authState } from "../auth.svelte";
   import {
     IFC_FILE_ROLES,
@@ -408,7 +408,7 @@
 
       if (ifcFiles.length) {
         try {
-          await projectsApi.uploadIfcFiles(createdProject.id, ifcFiles, primaryIndex, ifcRoles);
+          await modelsApi.upload(createdProject.id, ifcFiles, primaryIndex, ifcRoles);
         } catch (uploadErr: any) {
           // The project row is already saved. Reporting that plainly and
           // staying open is better than closing on an error the user would

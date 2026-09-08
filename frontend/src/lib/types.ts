@@ -140,8 +140,8 @@ export const IFC_FILE_ROLES = ["primary", "context"] as const;
 
 export type IfcFileRole = (typeof IFC_FILE_ROLES)[number];
 
-/** One IFC model attached to a project. Mirrors ProjectIfcFileResponse. */
-export interface ProjectIfcFile extends IsoGovernanceFieldsRequired {
+/** One IFC model attached to a project. Mirrors ModelResponse. */
+export interface Model extends IsoGovernanceFieldsRequired {
   /** project_ifc_files.id; null for a model attached before that table existed. */
   id: number | null;
   project_id: number;
@@ -165,11 +165,17 @@ export interface ProjectIfcFile extends IsoGovernanceFieldsRequired {
   cde_approved_at?: string | null;
 }
 
-/** Outcome of attaching one or more IFC models. Mirrors ProjectIfcUploadResponse. */
-export interface ProjectIfcUploadResponse {
+/** Outcome of attaching one or more IFC models. Mirrors ModelUploadResponse. */
+export interface ModelUploadResponse {
   success: boolean;
-  files: ProjectIfcFile[];
+  files: Model[];
   primary_id: number | null;
+}
+
+/** A project's attached IFC models. Mirrors ModelListResponse. */
+export interface ModelListResponse {
+  project_id: number;
+  models: Model[];
 }
 
 export interface ProjectListResponse {
@@ -586,6 +592,8 @@ export interface SettingsResponse {
 export interface ModelLineageRecord {
   id: number;
   project_id: number;
+  /** project_ifc_files.id this version was produced from, when known. */
+  ifc_file_id?: number | null;
   source_version: number;
   version: number;
   status: string;
@@ -598,6 +606,8 @@ export interface ModelLineageRecord {
 export interface BcfArtifact {
   id: number;
   project_id: number;
+  /** project_ifc_files.id this export was produced from, when known. */
+  ifc_file_id?: number | null;
   artifact_type: string;
   filename: string;
   storage_ref: string;

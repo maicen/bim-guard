@@ -16,16 +16,16 @@
   import PageHeader from "../lib/components/PageHeader.svelte";
   import ProjectWizardModal from "../lib/components/ProjectWizardModal.svelte";
   import UploadModelsModal from "../lib/components/UploadModelsModal.svelte";
-  import { projectsApi, rulesApi, documentsApi, analyzeApi } from "../lib/api";
+  import { projectsApi, modelsApi, rulesApi, documentsApi, analyzeApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { DOCUMENT_TYPES } from "../lib/types";
-  import type { Project, RuleFolder, ProjectIfcFile } from "../lib/types";
+  import type { Project, RuleFolder, Model } from "../lib/types";
 
   // Step 1: project + IFC model.
   let isWizardOpen = $state(false);
   let project: Project | null = $state(null);
-  let ifcFiles: ProjectIfcFile[] = $state([]);
+  let ifcFiles: Model[] = $state([]);
   let isModelModalOpen = $state(false);
   let isCheckingModel = $state(false);
   let existingProjects: Project[] = $state([]);
@@ -78,7 +78,7 @@
     if (!project) return;
     isCheckingModel = true;
     try {
-      ifcFiles = await projectsApi.listIfcFiles(project.id);
+      ifcFiles = await modelsApi.list(project.id);
     } catch {
       ifcFiles = [];
     } finally {
@@ -86,7 +86,7 @@
     }
   }
 
-  function handleModelsUploaded(files: ProjectIfcFile[]) {
+  function handleModelsUploaded(files: Model[]) {
     ifcFiles = files;
     isModelModalOpen = false;
   }

@@ -61,9 +61,10 @@ import type {
   ProjectBulkActionResponse,
   ProjectBulkUpdatePayload,
   ProjectCreatePayload,
+  Model,
+  ModelListResponse,
+  ModelUploadResponse,
   ProjectDocumentBindingsResponse,
-  ProjectIfcFile,
-  ProjectIfcUploadResponse,
   ProjectOptions,
   ProjectListResponse,
   ProjectRulesetBindingsResponse,
@@ -550,111 +551,6 @@ export const projectsApi = {
     return `${API_BASE}/projects/${id}/ifc`;
   },
 
-  /** URL for one specific attached model, rather than the project's primary. */
-  getIfcFileUrl(projectId: number, fileId: number): string {
-    return `${API_BASE}/projects/${projectId}/files/${fileId}/ifc`;
-  },
-
-  async listIfcFiles(projectId: number): Promise<ProjectIfcFile[]> {
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files`);
-    return handleResponse<ProjectIfcFile[]>(res);
-  },
-
-  /** Promote one attached model to primary. Any previous primary is demoted. */
-  async setPrimaryIfcFile(projectId: number, fileId: number): Promise<ProjectIfcFile> {
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}/primary`, {
-      method: "POST",
-    });
-    return handleResponse<ProjectIfcFile>(res);
-  },
-
-  /**
-   * Detach and delete one attached model. Deleting the primary promotes the
-   * next remaining model; deleting a project's last model leaves it with none.
-   */
-  async deleteIfcFile(projectId: number, fileId: number): Promise<void> {
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}`, {
-      method: "DELETE",
-    });
-    await handleResponse<void>(res);
-  },
-
-  /** Re-read schema/authoring-app/storey/element/discipline metadata for an attached model. */
-  async refreshIfcFileMetadata(projectId: number, fileId: number): Promise<ProjectIfcFile> {
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}/refresh-metadata`, {
-      method: "POST",
-    });
-    return handleResponse<ProjectIfcFile>(res);
-  },
-
-  /** Edit an attached model's display name, role, or ISO 19650 fields. */
-  async updateIfcFile(
-    projectId: number,
-    fileId: number,
-    updates: Partial<
-      Pick<
-        ProjectIfcFile,
-        | "file_name"
-        | "role"
-        | "project_code"
-        | "originator"
-        | "volume_system"
-        | "level"
-        | "type"
-        | "number"
-        | "suitability_code"
-        | "revision_code"
-      >
-    >,
-  ): Promise<ProjectIfcFile> {
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    return handleResponse<ProjectIfcFile>(res);
-  },
-
-  /** Replace an attached model's stored IFC file with a new upload, in place. */
-  async replaceIfcFile(projectId: number, fileId: number, file: File): Promise<ProjectIfcFile> {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/files/${fileId}/replace`, {
-      method: "POST",
-      body: form,
-    });
-    return handleResponse<ProjectIfcFile>(res);
-  },
-
-  /**
-   * Attach IFC models to an existing project.
-   *
-   * `roles` goes over the wire as one repeated form entry per file, not as a
-   * JSON blob: the endpoint declares `roles: list[str] = Form()`, which FastAPI
-   * fills from repeated entries. A single JSON string would arrive as a
-   * one-element list and be rejected for not matching the file count.
-   */
-  async uploadIfcFiles(
-    projectId: number,
-    files: File[],
-    primaryIndex: number,
-    roles: string[],
-  ): Promise<ProjectIfcUploadResponse> {
-    const form = new FormData();
-    files.forEach((file) => form.append("files", file));
-    form.append("primary_index", String(primaryIndex));
-    roles.forEach((role) => form.append("roles", role));
-
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/upload`, {
-      method: "POST",
-      body: form,
-    });
-    // The primary is mirrored onto projects.ifc_file_path server-side, so a
-    // caller holding a project row fetched before this call should re-read it
-    // with { forceRefresh: true } -- the cache cannot know the column moved.
-    return handleResponse<ProjectIfcUploadResponse>(res);
-  },
-
   /** Rulesets bound to this project, and which of its org's grants remain
    * available to bind. A brand-new project has none bound. */
   async getRulesetBindings(projectId: number): Promise<ProjectRulesetBindingsResponse> {
@@ -689,6 +585,115 @@ export const projectsApi = {
       body: JSON.stringify({ document_ids: documentIds }),
     });
     return handleResponse<ProjectDocumentBindingsResponse>(res);
+  },
+};
+
+export const modelsApi = {
+  async list(projectId: number): Promise<Model[]> {
+    const res = await apiFetch(`${API_BASE}/models?project_id=${projectId}`);
+    const body = await handleResponse<ModelListResponse>(res);
+    return body.models;
+  },
+
+  /** URL for one specific attached model, rather than the project's primary. */
+  downloadUrl(projectId: number, modelId: number): string {
+    return `${API_BASE}/models/${modelId}/download?project_id=${projectId}`;
+  },
+
+  /** Promote one attached model to primary. Any previous primary is demoted. */
+  async setPrimary(projectId: number, modelId: number): Promise<Model> {
+    const res = await apiFetch(`${API_BASE}/models/${modelId}/primary?project_id=${projectId}`, {
+      method: "POST",
+    });
+    return handleResponse<Model>(res);
+  },
+
+  /**
+   * Detach and delete one attached model. Deleting the primary promotes the
+   * next remaining model; deleting a project's last model leaves it with none.
+   */
+  async delete(projectId: number, modelId: number): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/models/${modelId}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
+  },
+
+  /** Re-read schema/authoring-app/storey/element/discipline metadata for an attached model. */
+  async refreshMetadata(projectId: number, modelId: number): Promise<Model> {
+    const res = await apiFetch(
+      `${API_BASE}/models/${modelId}/refresh-metadata?project_id=${projectId}`,
+      { method: "POST" },
+    );
+    return handleResponse<Model>(res);
+  },
+
+  /** Edit an attached model's display name, role, or ISO 19650 fields. */
+  async update(
+    projectId: number,
+    modelId: number,
+    updates: Partial<
+      Pick<
+        Model,
+        | "file_name"
+        | "role"
+        | "project_code"
+        | "originator"
+        | "volume_system"
+        | "level"
+        | "type"
+        | "number"
+        | "suitability_code"
+        | "revision_code"
+      >
+    >,
+  ): Promise<Model> {
+    const res = await apiFetch(`${API_BASE}/models/${modelId}?project_id=${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    return handleResponse<Model>(res);
+  },
+
+  /** Replace an attached model's stored IFC file with a new upload, in place. */
+  async replace(projectId: number, modelId: number, file: File): Promise<Model> {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await apiFetch(`${API_BASE}/models/${modelId}/replace?project_id=${projectId}`, {
+      method: "POST",
+      body: form,
+    });
+    return handleResponse<Model>(res);
+  },
+
+  /**
+   * Attach IFC models to an existing project.
+   *
+   * `roles` goes over the wire as one repeated form entry per file, not as a
+   * JSON blob: the endpoint declares `roles: list[str] = Form()`, which FastAPI
+   * fills from repeated entries. A single JSON string would arrive as a
+   * one-element list and be rejected for not matching the file count.
+   */
+  async upload(
+    projectId: number,
+    files: File[],
+    primaryIndex: number,
+    roles: string[],
+  ): Promise<ModelUploadResponse> {
+    const form = new FormData();
+    files.forEach((file) => form.append("files", file));
+    form.append("primary_index", String(primaryIndex));
+    roles.forEach((role) => form.append("roles", role));
+
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/models`, {
+      method: "POST",
+      body: form,
+    });
+    // The primary is mirrored onto projects.ifc_file_path server-side, so a
+    // caller holding a project row fetched before this call should re-read it
+    // with { forceRefresh: true } -- the cache cannot know the column moved.
+    return handleResponse<ModelUploadResponse>(res);
   },
 };
 
@@ -1577,13 +1582,13 @@ export const githubReposApi = {
   async attachModelsToProject(
     projectId: number,
     payload: AttachRepoModelsPayload,
-  ): Promise<ProjectIfcUploadResponse> {
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/attach-repo-models`, {
+  ): Promise<ModelUploadResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/models/from-repo`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    return handleResponse<ProjectIfcUploadResponse>(res);
+    return handleResponse<ModelUploadResponse>(res);
   },
 };
 

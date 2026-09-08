@@ -8,8 +8,8 @@
     CheckCircle2,
     ArrowRight,
   } from "lucide-svelte";
-  import { projectsApi } from "../lib/api";
-  import type { Project, ProjectIfcFile } from "../lib/types";
+  import { modelsApi } from "../lib/api";
+  import type { Project, Model } from "../lib/types";
   import PageHeader from "../lib/components/PageHeader.svelte";
 
   interface Props {
@@ -20,7 +20,7 @@
 
   let { initialProjectId, selectedProject = null, onNavigate }: Props = $props();
 
-  let ifcFiles: ProjectIfcFile[] = $state([]);
+  let ifcFiles: Model[] = $state([]);
   let isLoadingFiles = $state(true);
 
   // See ModelsView.svelte for why this needs a token: App.svelte's
@@ -32,7 +32,7 @@
   // a previously-seen id while the active organization is still settling
   // (see the profile-readiness comment on App.svelte's prefetch effect), and
   // without this, each bounce re-triggers this $effect and piles up another
-  // listIfcFiles request on top of ones still in flight.
+  // modelsApi.list request on top of ones still in flight.
   let lastRequestedProjectId: number | null = null;
 
   async function loadFiles(projectId: number) {
@@ -40,7 +40,7 @@
     const token = ++loadToken;
     isLoadingFiles = true;
     try {
-      const result = await projectsApi.listIfcFiles(projectId);
+      const result = await modelsApi.list(projectId);
       if (token !== loadToken) return;
       ifcFiles = result;
     } catch {

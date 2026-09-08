@@ -3,7 +3,7 @@
 
   import { onMount, onDestroy } from "svelte";
   import { Loader2, AlertCircle, RefreshCw, UploadCloud, Layers } from "lucide-svelte";
-  import { projectsApi, analyzeApi } from "../api";
+  import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
 
   interface Props {
@@ -89,7 +89,7 @@
       const ifcUrl =
         targetFileId === null
           ? projectsApi.getIfcUrl(id)
-          : projectsApi.getIfcFileUrl(id, targetFileId);
+          : modelsApi.downloadUrl(id, targetFileId);
       await viewerAPI.loadIfc(ifcUrl, authHeaders);
       loadedProjectId = id;
       loadedFileId = targetFileId;
