@@ -3,6 +3,20 @@
 Application-level orchestrator used by the web routes: BIMGuard_App below
 provides orchestrate_workflow() for running IFC + compliance analysis for a
 project.
+
+``orchestrate_workflow`` is decomposed into private helper methods, one per
+phase (project/document loading, IFC extraction, theme compliance, rule
+compliance, audit merge). Each helper takes its inputs as explicit parameters
+and returns its results rather than reading/writing ``self`` state, because
+``BIMGuard_App`` is a container-wired singleton (see app/bootstrap.py) that
+concurrent requests can call at once -- instance attributes would race across
+those calls the way locals never do.
+
+Collaborators (``ProjectsService``, ``ModelsService``, ``DocumentService``,
+``RuleService``, ``AnalysisService``) are constructor-injected, mirroring
+``ModelsService.__init__``'s own shape: each is keyword-only and optional,
+defaulting to a real instance when omitted so ``BIMGuard_App()`` still works
+standalone (tests, ad-hoc scripts) without reaching for the container.
 """
 
 import time
@@ -17,6 +31,22 @@ class BIMGuard_App:
     Application-level orchestrator used by the web routes.
     Provides orchestrate_workflow() for full IFC + compliance analysis.
     """
+
+    def __init__(
+        self,
+        *,
+        projects_service=None,
+        models_service=None,
+        documents_service=None,
+        rules_service=None,
+        analysis_service=None,
+    ) -> None:
+        """Initialize with explicit dependency injection, defaulting to real instances."""
+        self._projects_service = projects_service
+        self._models_service = models_service
+        self._documents_service = documents_service
+        self._rules_service = rules_service
+        self._analysis_service = analysis_service
 
     def orchestrate_workflow(
         self,
@@ -37,16 +67,9 @@ class BIMGuard_App:
         """
         from app.services.documents_service import DocumentService
         from app.services.models_service import ModelsService
-        from app.services.pipeline_services import AnalysisService, run_compliance_analysis
+        from app.services.pipeline_services import AnalysisService
         from app.services.projects_service import ProjectsService
         from app.services.rules_service import RuleService
-
-        from .ifc_reader import IFCReader
-        from .ifc_reader.ifc_parser import (
-            generate_synthetic_elements,
-            get_schema_compatibility_note,
-            parse_ifc_model,
-        )
 
         started_at = time.monotonic()
 
@@ -62,9 +85,19 @@ class BIMGuard_App:
                 f" {detail_text}" if detail_text else "",
             )
 
-        projects_svc = ProjectsService()
-        models_svc = ModelsService(project_mirror=projects_svc)
-        documents_svc = DocumentService()
+        projects_svc = self._projects_service if self._projects_service is not None else ProjectsService()
+        models_svc = (
+            self._models_service
+            if self._models_service is not None
+            else ModelsService(project_mirror=projects_svc)
+        )
+        documents_svc = (
+            self._documents_service if self._documents_service is not None else DocumentService()
+        )
+        rules_svc = self._rules_service if self._rules_service is not None else RuleService()
+        analysis_svc = (
+            self._analysis_service if self._analysis_service is not None else AnalysisService()
+        )
         selected_theme = RuleService.normalize_theme(analysis_theme)
         rule_folder = (rule_folder or "").strip()
         log_progress(0, "request-started", documents=len(doc_ids), rule_folder=rule_folder or "all")
@@ -76,14 +109,110 @@ class BIMGuard_App:
             rule_folder or "all",
         )
 
+        project = self._load_project(projects_svc, project_id, log_progress)
+        if project is None:
+            return {"error": f"Project {project_id} not found."}
+
+        documents = self._load_documents(documents_svc, doc_ids, log_progress)
+
+        ifc = self._extract_ifc(
+            models_svc,
+            project_id,
+            selected_theme,
+            include_openings=include_openings,
+            include_spaces=include_spaces,
+            include_type_definitions=include_type_definitions,
+            log_progress=log_progress,
+        )
+
+        theme_result = self._run_theme_compliance(
+            selected_theme, ifc["elements"], ifc["ifc_path"], project_id, log_progress
+        )
+
+        rule_result = self._run_rule_compliance(
+            rules_svc,
+            rule_folder,
+            selected_theme,
+            ifc,
+            project_id,
+            log_progress,
+        )
+
+        if rule_result["rule_compliance"]:
+            self._merge_audit_results(
+                analysis_svc,
+                theme_result,
+                rule_result["rule_compliance"],
+                project_id,
+                log_progress,
+            )
+
+        if selected_theme == "MEP":
+            ifc_element_count = len(ifc["elements"])
+        else:
+            ifc_element_count = int(ifc["ifc_totals"].get("adjusted_products", 0))
+
+        log_progress(
+            100,
+            "analysis-complete",
+            elements=ifc_element_count,
+            rule_results=len(rule_result["rule_compliance"]),
+        )
+        logger.info(
+            "Compliance workflow complete project_id=%d elements=%d MEP_results=%d rule_results=%d demo=%s",
+            project_id,
+            ifc_element_count,
+            len(theme_result["compliance_results"]),
+            len(rule_result["rule_compliance"]),
+            ifc["is_demo"],
+        )
+
+        return {
+            "project": project,
+            "analysis_theme": selected_theme,
+            "rule_folder": rule_folder,
+            "ifc_element_count": ifc_element_count,
+            "ifc_type_counts": ifc["ifc_type_counts"],
+            "ifc_totals": ifc["ifc_totals"],
+            "ifc_error": ifc["ifc_error"],
+            "ifc_quality_report": ifc["ifc_quality_report"],
+            "ifc_quality_warnings": ifc["ifc_quality_warnings"],
+            "ifc_quality_improvements": ifc["ifc_quality_improvements"],
+            "ifc_schema_note": ifc["ifc_schema_note"],
+            "documents": documents,
+            "compliance_results": theme_result["compliance_results"],
+            "audit_issues": theme_result["audit_issues"],
+            "bcf_topics": theme_result["bcf_topics"],
+            "audit_source_sha256": theme_result["audit_source_sha256"],
+            "cost_impact": theme_result["cost_impact"],
+            "issue_stats": theme_result["issue_stats"],
+            "compliance_is_demo": ifc["is_demo"],
+            "bcf_project_id": project_id,
+            "compliance_error": theme_result["compliance_error"],
+            "rule_validations": rule_result["rule_validations"],
+            # Module 4 results
+            "rule_compliance": rule_result["rule_compliance"],
+            "rule_compliance_summary": rule_result["rule_compliance_summary"],
+            "rule_compliance_error": rule_result["rule_compliance_error"],
+            "building_summary": ifc["building_summary"],
+            "spatial_checks": ifc["spatial_checks"],
+            "egress_checks": ifc["egress_checks"],
+        }
+
+    @staticmethod
+    def _load_project(projects_svc, project_id: int, log_progress) -> dict | None:
+        """Fetch the project row, or None if it does not exist."""
         project = projects_svc.get_project(project_id)
         if project is None:
             log_progress(5, "project-not-found")
             logger.warning("Compliance workflow project not found project_id=%d", project_id)
-            return {"error": f"Project {project_id} not found."}
+            return None
         log_progress(5, "project-loaded", project_name=project.get("name", ""))
+        return project
 
-        # ── Documents ────────────────────────────────────────────────────────
+    @staticmethod
+    def _load_documents(documents_svc, doc_ids: list[int], log_progress) -> list[dict]:
+        """Fetch and summarise the requested documents, skipping any that are missing."""
         documents = []
         for doc_id in doc_ids:
             doc = documents_svc.get_document(doc_id)
@@ -97,8 +226,31 @@ class BIMGuard_App:
                 }
             )
         log_progress(10, "documents-loaded", loaded=len(documents), requested=len(doc_ids))
+        return documents
 
-        # ── IFC parsing ──────────────────────────────────────────────────────
+    @staticmethod
+    def _extract_ifc(
+        models_svc,
+        project_id: int,
+        selected_theme: str,
+        *,
+        include_openings: bool,
+        include_spaces: bool,
+        include_type_definitions: bool,
+        log_progress,
+    ) -> dict:
+        """Resolve, parse and summarise the project's IFC model.
+
+        Falls back to synthetic demo elements when no IFC file is attached, so
+        the UI still has something to render.
+        """
+        from .ifc_reader import IFCReader
+        from .ifc_reader.ifc_parser import (
+            generate_synthetic_elements,
+            get_schema_compatibility_note,
+            parse_ifc_model,
+        )
+
         log_progress(15, "ifc-file-resolution-started")
         ifc_path, improvement_lineage = models_svc.resolve_analysis(project_id)
         ifc_error = None
@@ -274,7 +426,30 @@ class BIMGuard_App:
             log_progress(50, "synthetic-ifc-data-generated", elements=len(elements))
             logger.info("Using synthetic IFC elements project_id=%d elements=%d", project_id, len(elements))
 
-        # ── Compliance checks ─────────────────────────────────────────────────
+        return {
+            "ifc_path": ifc_path,
+            "ifc_error": ifc_error,
+            "elements": elements,
+            "ifc_type_counts": ifc_type_counts,
+            "ifc_totals": ifc_totals,
+            "is_demo": is_demo,
+            "m2_reader": m2_reader,
+            "ifc_quality_report": ifc_quality_report,
+            "ifc_quality_warnings": ifc_quality_warnings,
+            "ifc_quality_improvements": ifc_quality_improvements,
+            "ifc_schema_note": ifc_schema_note,
+            "building_summary": building_summary,
+            "spatial_checks": spatial_checks,
+            "egress_checks": egress_checks,
+        }
+
+    @staticmethod
+    def _run_theme_compliance(
+        selected_theme: str, elements: list, ifc_path, project_id: int, log_progress
+    ) -> dict:
+        """Run the MEP corrosion/compliance pipeline, when the theme selects it."""
+        from app.services.pipeline_services import run_compliance_analysis
+
         compliance_results = []
         compliance_error = None
         cost_impact = None
@@ -320,7 +495,34 @@ class BIMGuard_App:
         else:
             log_progress(65, "mep-compliance-skipped")
 
-        # ── Module 2 + 4 + 5: Rule-based compliance check ────────────────────
+        return {
+            "compliance_results": compliance_results,
+            "compliance_error": compliance_error,
+            "cost_impact": cost_impact,
+            "issue_stats": issue_stats,
+            "audit_issues": audit_issues,
+            "bcf_topics": bcf_topics,
+            "audit_source_sha256": audit_source_sha256,
+        }
+
+    @staticmethod
+    def _run_rule_compliance(
+        rules_service,
+        rule_folder: str,
+        selected_theme: str,
+        ifc: dict,
+        project_id: int,
+        log_progress,
+    ) -> dict:
+        """Run the Module 2 -> 4 -> 5 rule-based compliance pipeline.
+
+        Mutates ``ifc["ifc_type_counts"]`` in place when a rule's target class
+        was not already counted, matching the original inline behaviour.
+        """
+        m2_reader = ifc["m2_reader"]
+        ifc_error = ifc["ifc_error"]
+        ifc_type_counts = ifc["ifc_type_counts"]
+
         rule_compliance: list[dict] = []
         rule_compliance_summary: dict = {}
         rule_compliance_error: str | None = None
@@ -331,9 +533,9 @@ class BIMGuard_App:
             from .reporter import ComplianceReporter
 
             if rule_folder:
-                library_rules = RuleService().list_by_ruleset(rule_folder)
+                library_rules = rules_service.list_by_ruleset(rule_folder)
             else:
-                library_rules = RuleService().list_by_theme(selected_theme)
+                library_rules = rules_service.list_by_theme(selected_theme)
             log_progress(70, "rules-loaded", rules=len(library_rules))
             for rule_index, rule in enumerate(library_rules, start=1):
                 logger.info(
@@ -428,80 +630,46 @@ class BIMGuard_App:
             log_progress(90, "rule-compliance-failed", error=type(exc).__name__)
             logger.exception("Rule-based compliance checks failed project_id=%d", project_id)
 
-        if rule_compliance:
-            log_progress(95, "audit-results-merging", results=len(rule_compliance))
-            existing_issue_count = len(audit_issues)
-            existing_topic_count = len(bcf_topics)
-            audit_result = AnalysisService().include_rule_results(
-                {
-                    "pipeline": "audit",
-                    "element_count": len(compliance_results),
-                    "results": compliance_results,
-                    "issues": audit_issues,
-                    "bcf_topics": bcf_topics,
-                },
-                rule_compliance,
-                run_id=f"BGR-{project_id}",
-            )
-            audit_issues = audit_result["issues"]
-            bcf_topics = audit_result["bcf_topics"]
-            logger.info(
-                "Audit merge complete project_id=%d rule_failures_added=%d bcf_topics_added=%d total_issues=%d total_bcf_topics=%d",
-                project_id,
-                len(audit_issues) - existing_issue_count,
-                len(bcf_topics) - existing_topic_count,
-                len(audit_issues),
-                len(bcf_topics),
-            )
-
-        if selected_theme == "MEP":
-            ifc_element_count = len(elements)
-        else:
-            ifc_element_count = int(ifc_totals.get("adjusted_products", 0))
-
-        log_progress(
-            100,
-            "analysis-complete",
-            elements=ifc_element_count,
-            rule_results=len(rule_compliance),
-        )
-        logger.info(
-            "Compliance workflow complete project_id=%d elements=%d MEP_results=%d rule_results=%d demo=%s",
-            project_id,
-            ifc_element_count,
-            len(compliance_results),
-            len(rule_compliance),
-            is_demo,
-        )
-
         return {
-            "project": project,
-            "analysis_theme": selected_theme,
-            "rule_folder": rule_folder,
-            "ifc_element_count": ifc_element_count,
-            "ifc_type_counts": ifc_type_counts,
-            "ifc_totals": ifc_totals,
-            "ifc_error": ifc_error,
-            "ifc_quality_report": ifc_quality_report,
-            "ifc_quality_warnings": ifc_quality_warnings,
-            "ifc_quality_improvements": ifc_quality_improvements,
-            "ifc_schema_note": ifc_schema_note,
-            "documents": documents,
-            "compliance_results": compliance_results,
-            "audit_issues": audit_issues,
-            "bcf_topics": bcf_topics,
-            "audit_source_sha256": audit_source_sha256,
-            "cost_impact": cost_impact,
-            "issue_stats": issue_stats,
-            "compliance_is_demo": is_demo,
-            "bcf_project_id": project_id,
-            "compliance_error": compliance_error,
             "rule_validations": rule_validations,
-            # Module 4 results
             "rule_compliance": rule_compliance,
             "rule_compliance_summary": rule_compliance_summary,
             "rule_compliance_error": rule_compliance_error,
-            "building_summary": building_summary,
-            "spatial_checks": spatial_checks,
-            "egress_checks": egress_checks,
         }
+
+    @staticmethod
+    def _merge_audit_results(
+        analysis_service,
+        theme_result: dict,
+        rule_compliance: list[dict],
+        project_id: int,
+        log_progress,
+    ) -> None:
+        """Fold rule-compliance failures into the shared audit issue/BCF lists.
+
+        Mutates ``theme_result["audit_issues"]``/``["bcf_topics"]`` in place.
+        """
+        log_progress(95, "audit-results-merging", results=len(rule_compliance))
+        existing_issue_count = len(theme_result["audit_issues"])
+        existing_topic_count = len(theme_result["bcf_topics"])
+        audit_result = analysis_service.include_rule_results(
+            {
+                "pipeline": "audit",
+                "element_count": len(theme_result["compliance_results"]),
+                "results": theme_result["compliance_results"],
+                "issues": theme_result["audit_issues"],
+                "bcf_topics": theme_result["bcf_topics"],
+            },
+            rule_compliance,
+            run_id=f"BGR-{project_id}",
+        )
+        theme_result["audit_issues"] = audit_result["issues"]
+        theme_result["bcf_topics"] = audit_result["bcf_topics"]
+        logger.info(
+            "Audit merge complete project_id=%d rule_failures_added=%d bcf_topics_added=%d total_issues=%d total_bcf_topics=%d",
+            project_id,
+            len(theme_result["audit_issues"]) - existing_issue_count,
+            len(theme_result["bcf_topics"]) - existing_topic_count,
+            len(theme_result["audit_issues"]),
+            len(theme_result["bcf_topics"]),
+        )

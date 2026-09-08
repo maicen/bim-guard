@@ -339,10 +339,16 @@ class PipelineOrchestratorService:
         doc_ids: list[int] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Execute complete application workflow and return summary payload."""
-        from app.modules.orchestrator import BIMGuard_App
+        """Execute complete application workflow and return summary payload.
 
-        workflow = BIMGuard_App()
+        Delegates to the container's ``BIMGuard_App`` singleton rather than
+        constructing one inline, so this reuses the same
+        ``ProjectsService``/``ModelsService``/etc. instances every other
+        caller does instead of building a second, unwired copy of each.
+        """
+        from app.bootstrap import get_container
+
+        workflow = get_container().bimguard_app
         return workflow.orchestrate_workflow(
             project_id=project_id, doc_ids=doc_ids or [], **kwargs
         )

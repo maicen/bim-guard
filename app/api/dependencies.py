@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.bootstrap import get_container
+from app.modules.orchestrator import BIMGuard_App
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
 from app.services.bsdd_ontology_repository import (
@@ -35,6 +36,11 @@ def get_projects_service() -> ProjectsService:
 def get_models_service() -> ModelsService:
     """Return the configured ModelsService instance."""
     return get_container().models_service
+
+
+def get_bimguard_app() -> BIMGuard_App:
+    """Return the configured BIMGuard_App orchestrator instance."""
+    return get_container().bimguard_app
 
 
 def get_bsdd_client() -> BSDDClient:

@@ -23,6 +23,7 @@ from app.modules.document_parsing.engines.unstructured_driver import (
     UnstructuredHostedDriver,
     UnstructuredLocalDriver,
 )
+from app.modules.orchestrator import BIMGuard_App
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.db_adapters import DatabaseAdapter
 from app.services.digital_inspector_service import DigitalInspectorService
@@ -111,6 +112,7 @@ class ApplicationContainer:
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
     digital_inspector_service: DigitalInspectorService
+    bimguard_app: BIMGuard_App
     engine_registry: RuleEngineRegistry = field(default_factory=RuleEngineRegistry)
 
 
@@ -583,6 +585,14 @@ def build_default_container() -> ApplicationContainer:
 
     digital_inspector_service = DigitalInspectorService()
 
+    bimguard_app = BIMGuard_App(
+        projects_service=projects_service,
+        models_service=models_service,
+        documents_service=documents_service,
+        rules_service=rules_service,
+        analysis_service=analysis_service,
+    )
+
     return ApplicationContainer(
         storage=storage,
         projects_repo=projects_repo,
@@ -629,6 +639,7 @@ def build_default_container() -> ApplicationContainer:
         arch_analysis_service=arch_analysis_service,
         digital_inspector_service=digital_inspector_service,
         engine_registry=registry,
+        bimguard_app=bimguard_app,
     )
 
 

@@ -226,9 +226,9 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
 ### API & Backend Guidelines (`app/api/`)
 
 - **Strict Contracts**: Every endpoint must accept and return strict Pydantic schemas defined in `app/modules/contracts.py`. Never return raw dicts or unvalidated payloads.
-- **Dependency Injection**: Use FastAPI `Depends(...)` with providers from `app/api/dependencies.py` to obtain service instances.
+- **Dependency Injection**: Use FastAPI `Depends(...)` with providers from `app/api/dependencies.py` to obtain service instances. This applies one layer down too: domain services must receive their own collaborators (other services, engines, repositories) via constructor injection, wired once in `app/bootstrap.py`'s `ApplicationContainer` and exposed through `app/api/dependencies.py` — never instantiate another service or engine inline inside business logic (see `ModelsService.__init__` in `app/services/models_service.py` for the established shape: keyword-only args, each optional and defaulting to a real instance when omitted).
 - **Error Handling**: Raise standard `fastapi.HTTPException` with appropriate status codes (400, 404, 409, 500) and clear detail messages.
-- **Real-Time Events**: Publish progress through `PipelineTracker` and stream via `/api/events/{project_id}`.
+- **Real-Time Events**: Publish progress through `PipelineTracker` and stream via `/api/events/{project_id}`. `PipelineTracker`'s store is keyed by `project_id` only, with no per-run isolation — do not wrap a second concurrent analysis path (e.g. a new analysis theme) in `tracking(project_id)` without first extending the store to per-run keys, or it will reset an in-flight run's tracked progress for the same project. Today only the corrosion pipeline is tracked this way; the Architecture and Seismic themes are deliberately untracked for this reason.
 
 ### Database & Rule Management
 
