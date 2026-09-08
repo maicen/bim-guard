@@ -14,6 +14,7 @@
     Plus,
     Trash2,
     Eye,
+    Pencil,
     X,
     Search,
     SlidersHorizontal,
@@ -23,7 +24,14 @@
     Download,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi } from "../lib/api";
-  import type { DocumentItem, DocumentSection, ExtractedRule, RuleExtractionDraft } from "../lib/types";
+  import type {
+    DocumentItem,
+    DocumentSection,
+    ExtractedRule,
+    RuleExtractionDraft,
+    RuleSourceResponse,
+  } from "../lib/types";
+  import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -108,6 +116,9 @@
   let draftRules: RuleExtractionDraft[] = $state([]);
   let isLoadingDrafts = $state(false);
   let editingDraft: RuleExtractionDraft | null = $state(null);
+  let editForm: RuleExtractionDraft["proposed_rule"] | null = $state(null);
+  let viewingDraftSource: RuleSourceResponse | null = $state(null);
+  let draftSourceError = $state("");
 
   $effect(() => {
     const docId = selectedDocId;
@@ -152,18 +163,39 @@
     draftRules = draftRules.map((d) => (d.id === draft.id ? updated : d));
   }
 
-  function saveEditedDraft(edited: RuleExtractionDraft["proposed_rule"]) {
-    if (!editingDraft) return;
+  function openEditDraftModal(draft: RuleExtractionDraft) {
+    editingDraft = draft;
+    // Edit on a clone, not the live table row -- otherwise a bound input
+    // would mutate draftRules before the PATCH confirms the edit was saved.
+    editForm = { ...draft.proposed_rule };
+  }
+
+  function closeEditDraftModal() {
+    editingDraft = null;
+    editForm = null;
+  }
+
+  function saveEditedDraft() {
+    if (!editingDraft || !editForm) return;
     const draftId = editingDraft.id!;
     ruleExtractionApi
-      .reviewDraft(draftId, { status: "edited", edited_rule: edited })
+      .reviewDraft(draftId, { status: "edited", edited_rule: editForm })
       .then((updated) => {
         draftRules = draftRules.map((d) => (d.id === draftId ? updated : d));
-        editingDraft = null;
+        closeEditDraftModal();
       })
       .catch((err: any) => {
         error = err.message || "Failed to save draft edits.";
       });
+  }
+
+  async function viewDraftSource(draft: RuleExtractionDraft): Promise<void> {
+    draftSourceError = "";
+    try {
+      viewingDraftSource = await ruleExtractionApi.getDraftSource(draft.id!);
+    } catch (err: any) {
+      draftSourceError = err?.message || "Could not resolve this draft's source document.";
+    }
   }
 
   async function promoteDraft(draft: RuleExtractionDraft): Promise<void> {
@@ -744,11 +776,19 @@
                         {/if}
                         <button
                           type="button"
-                          onclick={() => (editingDraft = draft)}
+                          onclick={() => viewDraftSource(draft)}
+                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          title="View source in document"
+                        >
+                          <Eye class="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onclick={() => openEditDraftModal(draft)}
                           class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
                           title="Edit draft"
                         >
-                          <Eye class="h-3.5 w-3.5" />
+                          <Pencil class="h-3.5 w-3.5" />
                         </button>
                         {#if draft.status === "accepted" || draft.status === "edited"}
                           <button
@@ -1071,6 +1111,186 @@
     </button>
   {/snippet}
 </Modal>
+
+<!-- Draft Source Annotation Modal: jumps to and highlights the page/snippet a draft came from -->
+{#if viewingDraftSource}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+    <div
+      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+    >
+      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <div>
+          <h2 class="text-base font-bold tracking-tight text-slate-50">{viewingDraftSource.filename}</h2>
+          {#if viewingDraftSource.page_number}
+            <p class="mt-0.5 text-xs text-slate-400">Page {viewingDraftSource.page_number}</p>
+          {/if}
+        </div>
+        <button
+          type="button"
+          onclick={() => (viewingDraftSource = null)}
+          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+        >
+          <X class="h-5 w-5" />
+        </button>
+      </div>
+      <div class="flex-1 overflow-hidden">
+        <DocumentViewer
+          documentId={viewingDraftSource.document_id}
+          page={viewingDraftSource.page_number}
+          highlightText={viewingDraftSource.snippet}
+        />
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if draftSourceError}
+  <div
+    class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-red-800/60 bg-red-950/90 px-4 py-3 text-xs text-red-200 shadow-2xl"
+  >
+    <div class="flex items-start justify-between gap-3">
+      <span>{draftSourceError}</span>
+      <button
+        type="button"
+        onclick={() => (draftSourceError = "")}
+        class="shrink-0 text-red-300 hover:text-red-100"
+      >
+        <X class="h-3.5 w-3.5" />
+      </button>
+    </div>
+  </div>
+{/if}
+
+<!-- Edit Draft Modal -->
+{#if editingDraft && editForm}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+    <div
+      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+    >
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <Pencil class="h-4 w-4 text-accent" />
+          <h3 class="font-mono text-sm font-bold text-slate-50">Edit Draft</h3>
+        </div>
+        <button
+          type="button"
+          onclick={closeEditDraftModal}
+          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        >
+          <X class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="space-y-1">
+          <label for="edit-draft-description" class="block font-semibold text-slate-300"
+            >Description</label
+          >
+          <textarea
+            id="edit-draft-description"
+            bind:value={editForm.description}
+            rows="2"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-slate-50 focus:border-accent focus:outline-none"
+          ></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div class="space-y-1">
+            <label for="edit-draft-target" class="block font-semibold text-slate-300"
+              >Target IFC Class</label
+            >
+            <input
+              id="edit-draft-target"
+              type="text"
+              bind:value={editForm.target_ifc_class}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="edit-draft-pset" class="block font-semibold text-slate-300"
+              >Property Set</label
+            >
+            <input
+              id="edit-draft-pset"
+              type="text"
+              bind:value={editForm.property_set}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="edit-draft-prop" class="block font-semibold text-slate-300">Property</label>
+            <input
+              id="edit-draft-prop"
+              type="text"
+              bind:value={editForm.property_name}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="edit-draft-operator" class="block font-semibold text-slate-300"
+              >Operator</label
+            >
+            <select
+              id="edit-draft-operator"
+              bind:value={editForm.operator}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-none"
+            >
+              <option value="==">== (Equals)</option>
+              <option value="!=">!= (Not equals)</option>
+              <option value=">">&gt; (Greater than)</option>
+              <option value=">=">&gt;= (Greater or equal)</option>
+              <option value="<">&lt; (Less than)</option>
+              <option value="<=">&lt;= (Less or equal)</option>
+              <option value="between">between</option>
+              <option value="exists">exists</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label for="edit-draft-value" class="block font-semibold text-slate-300"
+              >Check Value</label
+            >
+            <input
+              id="edit-draft-value"
+              type="text"
+              bind:value={editForm.check_value}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="edit-draft-severity" class="block font-semibold text-slate-300"
+              >Severity</label
+            >
+            <select
+              id="edit-draft-severity"
+              bind:value={editForm.severity}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-none"
+            >
+              <option value="mandatory">Mandatory</option>
+              <option value="recommended">Recommended</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
+        <button
+          type="button"
+          onclick={closeEditDraftModal}
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onclick={saveEditedDraft}
+          class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover"
+        >
+          Save Edits
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- Inspect Draft Rule Modal -->
 {#if viewingDraftRule}

@@ -1516,6 +1516,12 @@ export const ruleExtractionApi = {
     return `${API_BASE}/documents/${documentId}/rules/drafts/ids-preview`;
   },
 
+  /** Resolve a draft's source document/page for the document-viewer modal. */
+  async getDraftSource(draftId: number): Promise<RuleSourceResponse> {
+    const res = await apiFetch(`${API_BASE}/rules/drafts/${draftId}/source`);
+    return handleResponse<RuleSourceResponse>(res);
+  },
+
   async bulkCreate(rules: any[]): Promise<any> {
     const res = await apiFetch(`${API_BASE}/rules/bulk`, {
       method: "POST",
