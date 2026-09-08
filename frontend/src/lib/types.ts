@@ -150,6 +150,16 @@ export interface ProjectIfcFile extends IsoGovernanceFieldsRequired {
   is_primary: boolean;
   role: IfcFileRole | string;
   uploaded_at?: string | null;
+  /** IFC schema version from the model header, e.g. IFC4, IFC2X3. */
+  ifc_schema?: string;
+  /** Authoring application + version that produced this model. */
+  authoring_application?: string;
+  /** Count of IfcBuildingStorey entities; null if extraction failed. */
+  storey_count?: number | null;
+  /** Count of IfcElement occurrences; null if extraction failed. */
+  element_count?: number | null;
+  /** Heuristic element-count breakdown by discipline (architectural/structural/mep/other). */
+  discipline_summary?: Record<string, number>;
   project_code?: string;
   cde_approved_by?: string;
   cde_approved_at?: string | null;

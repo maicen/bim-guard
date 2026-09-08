@@ -152,9 +152,11 @@
     createTableState<ProjectIfcFile, number | string>({
       rows: () => files,
       getId: (f) => f.id ?? f.file_path,
-      searchFields: (f) => [f.file_name, f.role],
+      searchFields: (f) => [f.file_name, f.role, f.ifc_schema, f.authoring_application],
       comparators: {
         is_primary: (a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0),
+        storey_count: (a, b) => (a.storey_count ?? -1) - (b.storey_count ?? -1),
+        element_count: (a, b) => (a.element_count ?? -1) - (b.element_count ?? -1),
       },
       initialSort: { field: "is_primary", asc: true },
       initialPageSize: 25,
@@ -236,6 +238,25 @@
   function handleUploaded(updated: ProjectIfcFile[]) {
     files = updated;
     isUploadOpen = false;
+  }
+
+  const DISCIPLINE_LABELS: Record<string, string> = {
+    architectural: "Arch",
+    structural: "Struct",
+    mep: "MEP",
+    other: "Other",
+  };
+
+  /** Top disciplines by element count, e.g. "MEP 120 · Arch 40 · +1 more". */
+  function disciplineSummaryLabel(file: ProjectIfcFile): string {
+    const entries = Object.entries(file.discipline_summary ?? {}).filter(([, n]) => n > 0);
+    if (entries.length === 0) return "—";
+    entries.sort((a, b) => b[1] - a[1]);
+    const shown = entries
+      .slice(0, 2)
+      .map(([key, n]) => `${DISCIPLINE_LABELS[key] ?? key} ${n}`)
+      .join(" · ");
+    return entries.length > 2 ? `${shown} · +${entries.length - 2} more` : shown;
   }
 
   async function handleSetPrimary(file: ProjectIfcFile) {
@@ -448,6 +469,27 @@
                   >ISO 19650</th
                 >
                 <SortHeader
+                  column="ifc_schema"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}>Schema</SortHeader
+                >
+                <SortHeader
+                  column="storey_count"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}>Storeys</SortHeader
+                >
+                <SortHeader
+                  column="element_count"
+                  sortField={table.sortField}
+                  sortAsc={table.sortAsc}
+                  onSort={(f) => table.toggleSort(f)}>Elements</SortHeader
+                >
+                <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  >Discipline</th
+                >
+                <SortHeader
                   column="uploaded_at"
                   sortField={table.sortField}
                   sortAsc={table.sortAsc}
@@ -475,8 +517,15 @@
                       ariaLabel={`Select model ${file.file_name}`}
                     />
                   </td>
-                  <td class="max-w-xs truncate px-4 py-3 font-semibold text-slate-50">
-                    {file.file_name}
+                  <td class="max-w-xs truncate px-4 py-3">
+                    <div class="truncate font-semibold text-slate-50" title={file.file_name}>
+                      {file.file_name}
+                    </div>
+                    {#if file.authoring_application}
+                      <div class="truncate text-micro text-slate-500" title={file.authoring_application}>
+                        {file.authoring_application}
+                      </div>
+                    {/if}
                   </td>
                   <td class="px-4 py-3">
                     {#if file.is_primary}
@@ -500,6 +549,18 @@
                       revision={file.revision_code}
                       cdeState={file.cde_state}
                     />
+                  </td>
+                  <td class="px-4 py-3 text-slate-400">
+                    {file.ifc_schema || "—"}
+                  </td>
+                  <td class="px-4 py-3 text-right text-slate-400">
+                    {file.storey_count ?? "—"}
+                  </td>
+                  <td class="px-4 py-3 text-right text-slate-400">
+                    {file.element_count ?? "—"}
+                  </td>
+                  <td class="px-4 py-3 text-slate-400" title={JSON.stringify(file.discipline_summary ?? {})}>
+                    {disciplineSummaryLabel(file)}
                   </td>
                   <td class="px-4 py-3 text-slate-400">
                     {file.uploaded_at ? new Date(file.uploaded_at).toLocaleDateString() : "—"}

@@ -7,7 +7,7 @@ Library:  ifcopenshell (open source)
 
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import ifcopenshell
@@ -657,6 +657,198 @@ def parse_ifc_model(model) -> list[ServiceElement]:
             )
 
     return elements
+
+
+#: IFC classes grouped by discipline for the models table's discipline-breakdown
+#: column. A heuristic for a quick-glance column, not a certification: classes
+#: that fit no group below (proxies, generic furnishings, civil elements) land
+#: in "other" rather than being guessed at.
+_DISCIPLINE_CLASSES: dict[str, frozenset[str]] = {
+    "architectural": frozenset(
+        {
+            "IfcWall",
+            "IfcWallStandardCase",
+            "IfcWallElementedCase",
+            "IfcSlab",
+            "IfcSlabStandardCase",
+            "IfcRoof",
+            "IfcDoor",
+            "IfcWindow",
+            "IfcCurtainWall",
+            "IfcStair",
+            "IfcStairFlight",
+            "IfcRailing",
+            "IfcRamp",
+            "IfcRampFlight",
+            "IfcCovering",
+            "IfcFurnishingElement",
+            "IfcSpace",
+        }
+    ),
+    "structural": frozenset(
+        {
+            "IfcBeam",
+            "IfcColumn",
+            "IfcFooting",
+            "IfcPile",
+            "IfcMember",
+            "IfcPlate",
+            "IfcReinforcingBar",
+            "IfcReinforcingMesh",
+            "IfcTendon",
+            "IfcTendonAnchor",
+        }
+    ),
+    "mep": frozenset(
+        {
+            "IfcPipeSegment",
+            "IfcPipeFitting",
+            "IfcDuctSegment",
+            "IfcDuctFitting",
+            "IfcCableSegment",
+            "IfcCableFitting",
+            "IfcCableCarrierSegment",
+            "IfcCableCarrierFitting",
+            "IfcFlowSegment",
+            "IfcFlowFitting",
+            "IfcFlowTerminal",
+            "IfcFlowController",
+            "IfcFlowMovingDevice",
+            "IfcFlowStorageDevice",
+            "IfcFlowTreatmentDevice",
+            "IfcFlowInstrument",
+            "IfcElectricAppliance",
+            "IfcElectricDistributionBoard",
+            "IfcElectricFlowStorageDevice",
+            "IfcElectricGenerator",
+            "IfcElectricMotor",
+            "IfcElectricTimeControl",
+            "IfcSanitaryTerminal",
+            "IfcValve",
+            "IfcPump",
+            "IfcBoiler",
+            "IfcChiller",
+            "IfcCoil",
+            "IfcCondenser",
+            "IfcCooledBeam",
+            "IfcCoolingTower",
+            "IfcDamper",
+            "IfcEvaporativeCooler",
+            "IfcEvaporator",
+            "IfcFan",
+            "IfcFilter",
+            "IfcFireSuppressionTerminal",
+            "IfcHeatExchanger",
+            "IfcHumidifier",
+            "IfcJunctionBox",
+            "IfcLamp",
+            "IfcLightFixture",
+            "IfcMedicalDevice",
+            "IfcMotorConnection",
+            "IfcOutlet",
+            "IfcProtectiveDevice",
+            "IfcSensor",
+            "IfcSpaceHeater",
+            "IfcSwitchingDevice",
+            "IfcTank",
+            "IfcTransformer",
+            "IfcTubeBundle",
+            "IfcUnitaryEquipment",
+            "IfcAirTerminal",
+            "IfcAirTerminalBox",
+            "IfcAlarm",
+            "IfcActuator",
+            "IfcController",
+        }
+    ),
+}
+
+
+def _classify_discipline(ifc_class: str) -> str:
+    """Map one IFC entity class to a discipline bucket, or ``"other"``."""
+    for discipline, classes in _DISCIPLINE_CLASSES.items():
+        if ifc_class in classes:
+            return discipline
+    return "other"
+
+
+@dataclass
+class IfcModelSummary:
+    """Cheap header/type-count metadata read from an IFC model, for display.
+
+    Every field is a header entity or a ``by_type()`` count -- nothing here
+    walks geometry -- so this stays fast enough to run on every model attach,
+    not just during a full analysis pass.
+    """
+
+    schema: str = ""
+    authoring_application: str = ""
+    storey_count: Optional[int] = None
+    element_count: Optional[int] = None
+    discipline_summary: dict[str, int] = field(default_factory=dict)
+
+
+def summarize_ifc_model(model) -> IfcModelSummary:
+    """Read schema, authoring app, storey/element counts, and a discipline breakdown.
+
+    Args:
+        model: An already-open ``ifcopenshell`` model.
+    """
+    schema = str(getattr(model, "schema", "") or "")
+
+    authoring_application = ""
+    try:
+        applications = model.by_type("IfcApplication")
+        if applications:
+            app = applications[0]
+            authoring_application = " ".join(
+                part
+                for part in (
+                    str(getattr(app, "ApplicationFullName", "") or ""),
+                    str(getattr(app, "Version", "") or ""),
+                )
+                if part
+            ).strip()
+    except Exception:
+        authoring_application = ""
+
+    try:
+        storey_count = len(model.by_type("IfcBuildingStorey"))
+    except Exception:
+        storey_count = None
+
+    try:
+        elements = model.by_type("IfcElement")
+    except Exception:
+        elements = []
+
+    discipline_summary: dict[str, int] = {}
+    for el in elements:
+        category = _classify_discipline(el.is_a())
+        discipline_summary[category] = discipline_summary.get(category, 0) + 1
+
+    return IfcModelSummary(
+        schema=schema,
+        authoring_application=authoring_application,
+        storey_count=storey_count,
+        element_count=len(elements) if elements is not None else None,
+        discipline_summary=discipline_summary,
+    )
+
+
+def extract_ifc_summary_metadata(ifc_path: str) -> IfcModelSummary:
+    """Open an IFC file and read its cheap summary metadata.
+
+    Args:
+        ifc_path: Path to a local ``.ifc`` file.
+
+    Returns:
+        The summary. On any failure to open or read the file, callers should
+        catch the exception themselves -- this raises rather than swallowing,
+        since a caller may want to distinguish "no metadata" from "failed".
+    """
+    model = ifcopenshell.open(ifc_path)
+    return summarize_ifc_model(model)
 
 
 def get_schema_compatibility_note(model) -> str | None:

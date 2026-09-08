@@ -12,6 +12,7 @@ from app.constants import (
     normalize_analysis_type,
 )
 from app.logging_config import get_logger
+from app.modules.ifc_reader.ifc_parser import IfcModelSummary, extract_ifc_summary_metadata
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
@@ -739,6 +740,24 @@ class ProjectsService:
             legacy["file_path"],
         )
 
+    def _extract_ifc_summary(self, file_path: str) -> IfcModelSummary:
+        """Best-effort read of schema/authoring-app/storey/element/discipline metadata.
+
+        Never blocks or fails the attach: a model that cannot be opened yet
+        (corrupt upload, unreachable repo URL) still gets a row -- it just
+        carries a blank summary instead of the whole attach failing.
+        """
+        try:
+            local_path = self._storage.materialize_local_path(file_path)
+            if local_path is None:
+                return IfcModelSummary()
+            return extract_ifc_summary_metadata(str(local_path))
+        except Exception as exc:  # noqa: BLE001 - display metadata, not a hard requirement
+            logger.warning(
+                "IFC summary metadata extraction failed ref=%s error=%s", file_path, exc
+            )
+            return IfcModelSummary()
+
     def add_ifc_file(
         self,
         project_id: int,
@@ -791,6 +810,8 @@ class ProjectsService:
             if originator is None:
                 originator = parent.get("originator", "")
 
+        summary = self._extract_ifc_summary(file_path)
+
         row = {
             "project_id": project_id,
             "file_path": file_path,
@@ -800,6 +821,11 @@ class ProjectsService:
             "uploaded_at": now_iso_utc(),
             "project_code": project_code or "",
             "originator": originator or "",
+            "ifc_schema": summary.schema,
+            "authoring_application": summary.authoring_application,
+            "storey_count": summary.storey_count,
+            "element_count": summary.element_count,
+            "discipline_summary": summary.discipline_summary,
         }
         inserted = self._ifc_files.insert(row)
         self._invalidate_ifc_files(project_id)

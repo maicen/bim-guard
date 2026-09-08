@@ -352,6 +352,24 @@ class ProjectIfcFileResponse(IsoGovernanceFieldsRequired):
     )
     uploaded_at: Optional[str] = None
 
+    # IFC-derived summary metadata (cheap header/type-count reads taken at attach time)
+    ifc_schema: Optional[str] = Field(
+        default="", description="IFC schema version from the model header, e.g. IFC4, IFC2X3"
+    )
+    authoring_application: Optional[str] = Field(
+        default="", description="Authoring application + version that produced this model"
+    )
+    storey_count: Optional[int] = Field(
+        default=None, description="Count of IfcBuildingStorey entities"
+    )
+    element_count: Optional[int] = Field(
+        default=None, description="Count of IfcElement occurrences"
+    )
+    discipline_summary: dict[str, int] = Field(
+        default_factory=dict,
+        description="Heuristic element-count breakdown by discipline (architectural/structural/mep/other)",
+    )
+
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
     cde_approved_by: Optional[str] = ""
