@@ -677,6 +677,10 @@ export interface RuleCreateRequest {
   confidence?: string | null;
   extraction_method?: string;
   needs_review?: number;
+  /** Scope predicate narrowing which elements this rule governs, e.g. {"material_any_of": ["gypsum"]}. */
+  applies_when?: Record<string, unknown> | null;
+  /** Waiver predicates excusing an otherwise-failing element; each references another rule. */
+  exceptions?: unknown[] | null;
 }
 
 export interface RuleExtractionDraft {

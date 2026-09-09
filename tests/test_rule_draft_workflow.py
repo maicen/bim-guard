@@ -142,3 +142,27 @@ def test_promote_draft_calls_rule_service_create_rule_and_records_promoted_id():
     assert rule_service.created[0]["rule_id"] == "9.8.2.1"
     assert created["id"] == rule_service.created[0]["id"]
     assert table.rows[0]["promoted_rule_id"] == created["id"]
+
+
+def test_promote_draft_passes_through_applies_when_and_exceptions():
+    service, _, rule_service = _service()
+    draft = RuleExtractionDraft(
+        source_document_id=1,
+        proposed_rule=RuleCreateRequest(
+            rule_id="9.8.2.2",
+            description="Gypsum partitions shall be fire-rated",
+            severity="mandatory",
+            applies_when={"material_any_of": ["gypsum"]},
+            exceptions=[{"reference": "9.8.2.2-exc", "predicate": {"is_suspended": True}}],
+        ),
+    )
+    saved = service.save_drafts([draft])
+    draft_id = saved[0].id
+    service.review_draft(draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.accepted))
+
+    service.promote_draft(draft_id)
+
+    assert rule_service.created[0]["applies_when"] == {"material_any_of": ["gypsum"]}
+    assert rule_service.created[0]["exceptions"] == [
+        {"reference": "9.8.2.2-exc", "predicate": {"is_suspended": True}}
+    ]

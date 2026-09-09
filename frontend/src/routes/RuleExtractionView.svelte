@@ -758,9 +758,19 @@
                     <td class="px-3 py-3 font-mono font-bold text-slate-50"
                       >{draft.proposed_rule.rule_id}</td
                     >
-                    <td class="max-w-xs truncate px-3 py-3" title={draft.proposed_rule.description}
-                      >{draft.proposed_rule.description}</td
-                    >
+                    <td class="max-w-xs truncate px-3 py-3" title={draft.proposed_rule.description}>
+                      <div class="flex items-center gap-1.5">
+                        <span class="truncate">{draft.proposed_rule.description}</span>
+                        {#if draft.proposed_rule.applies_when && Object.keys(draft.proposed_rule.applies_when).length > 0}
+                          <span
+                            class="shrink-0 rounded-md border border-amber-800 bg-amber-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300"
+                            title={`Scoped: ${JSON.stringify(draft.proposed_rule.applies_when)}`}
+                          >
+                            Conditional
+                          </span>
+                        {/if}
+                      </div>
+                    </td>
                     <td class="px-3 py-3 font-mono text-slate-400">
                       <div class="flex items-center gap-1.5">
                         <span

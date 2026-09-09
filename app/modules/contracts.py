@@ -608,6 +608,23 @@ class RuleCreateRequest(BaseModel):
     confidence: Optional[str] = None
     extraction_method: Optional[str] = "manual"
     needs_review: int = Field(default=0, description="1 if flag for review")
+    applies_when: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Scope predicate narrowing which elements this rule governs "
+            "(e.g. {'material_any_of': ['gypsum']}) -- evaluated by "
+            "app.modules.comparator against each element; an unrecognised or "
+            "untestable key leaves scope UNDETERMINED, never silently narrowed."
+        ),
+    )
+    exceptions: Optional[list] = Field(
+        default=None,
+        description=(
+            "Waiver predicates that excuse an otherwise-failing element, each "
+            "referencing another rule's applies_when by reference. See "
+            "app.modules.comparator._waiver_for."
+        ),
+    )
 
 
 class RuleUpdateRequest(BaseModel):

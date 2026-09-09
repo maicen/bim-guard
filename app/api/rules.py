@@ -946,6 +946,8 @@ def create_rule(
             confidence=payload.confidence or "1.0",
             extraction_method=payload.extraction_method or "manual",
             needs_review=payload.needs_review,
+            applies_when=payload.applies_when,
+            exceptions=payload.exceptions,
         )
         return _rule_response(created)
     except Exception as exc:
@@ -1118,6 +1120,8 @@ def bulk_create_rules(
             confidence=payload.confidence or "1.0",
             extraction_method=payload.extraction_method or "ai_extracted",
             needs_review=payload.needs_review,
+            applies_when=payload.applies_when,
+            exceptions=payload.exceptions,
         )
         for payload in rules
     ]

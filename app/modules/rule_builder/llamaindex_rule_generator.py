@@ -66,6 +66,11 @@ For each rule found, fill in:
   a table you cannot see in full, or if the bound is computed from a
   building-level metric (e.g. "one-half of the diagonal dimension of the
   area served") rather than a fixed value or a same-element property — else 0
+- applies_when_materials: if the clause narrows this rule to elements of a
+  specific material (e.g. "gypsum board partitions", "steel pipework"), list
+  the material keyword(s) here — else leave empty. Do not use this for
+  conditions you cannot express this way (e.g. sprinkler exceptions, table
+  lookups by occupancy) — leave those to needs_review instead of guessing.
 
 CLAUSE TEXT:
 {clause_text}
@@ -90,6 +95,15 @@ class _LLMRuleCandidate(BaseModel):
     severity: str = "recommended"
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     needs_review: int = 0
+    applies_when_materials: list[str] = Field(
+        default_factory=list,
+        description=(
+            "If the clause narrows this rule to elements of a specific "
+            "material (e.g. 'gypsum board partitions', 'steel pipework'), "
+            "list the material keyword(s) here. Leave empty when the rule "
+            "applies to every element of target_ifc_class."
+        ),
+    )
 
 
 class _LLMRuleExtractionResult(BaseModel):
@@ -116,6 +130,9 @@ def _candidate_to_draft(
     if deontic is not None and deontic.modality in ("shall", "must"):
         severity = "mandatory"
 
+    materials = [m.strip() for m in candidate.applies_when_materials if m.strip()]
+    applies_when = {"material_any_of": materials} if materials else None
+
     proposed_rule = RuleCreateRequest(
         rule_id=candidate.rule_id.strip() or (node.metadata.clause_id or node.node_id[:8]),
         description=candidate.description.strip(),
@@ -133,6 +150,7 @@ def _candidate_to_draft(
         confidence=str(candidate.confidence),
         extraction_method="llamaindex_pydantic",
         needs_review=candidate.needs_review,
+        applies_when=applies_when,
     )
 
     return RuleExtractionDraft(

@@ -150,6 +150,8 @@ class RuleDraftService:
             confidence=float(payload.confidence) if payload.confidence else 1.0,
             extraction_method=payload.extraction_method or "ai_extracted",
             needs_review=payload.needs_review,
+            applies_when=payload.applies_when,
+            exceptions=payload.exceptions,
         )
 
         self._drafts.update(updates={"promoted_rule_id": created.get("id")}, pk_values=draft_id)
