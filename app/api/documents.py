@@ -521,6 +521,7 @@ def export_document_doclang_archive(
 
     headers = {
         "Content-Disposition": f'attachment; filename="{archive_name}"',
+        "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
     }
     return Response(
         content=buf.getvalue(),
