@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an improvement, enhancement, or new capability.
+description: Propose a new capability, enhancement, or standard support for BIM-Guard.
 title: "[Feature]: "
 labels:
   - enhancement
@@ -7,54 +7,85 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for sharing an idea. Help us understand the use case and expected outcome.
+        Thanks for proposing an enhancement. Please describe the use case, governing standards, and anticipated architecture impact.
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Functional Domain
+      description: Select the primary area this feature affects.
+      options:
+        - "Compliance Engine / Physics (GC-001, CC-001, MC-001, Blue Halo, Arch)"
+        - "3D Viewer & Model Inspection (@thatopen/components / Web-IFC)"
+        - "BuildingSMART Standards (bSDD, IDS XML, BCF REST/Export, openCDE)"
+        - "AI Extraction, Agents & LLM Providers (LlamaIndex, LangGraph, Vision)"
+        - "Frontend UX & Views (Svelte 5 / Tailwind / Universal Data Tables)"
+        - "Backend API Gateway (FastAPI / SSE Streaming / Pydantic Contracts)"
+        - "ISO 19650 CDE Workflow & Enterprise RBAC"
+        - "Developer Tooling / CI / Automation"
+    validations:
+      required: true
 
   - type: textarea
     id: problem
     attributes:
-      label: Problem statement
-      description: What problem are you trying to solve?
-      placeholder: As a ..., I want ..., so that ...
+      label: Problem Statement / Use Case
+      description: What challenge or user workflow does this feature address?
+      placeholder: As a BIM coordinator / compliance engineer, I need to ... so that ...
     validations:
       required: true
 
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed solution
-      description: Describe the change you would like to see.
+      label: Proposed Solution
+      description: Describe the desired feature, capability, or architectural change.
     validations:
       required: true
 
-  - type: textarea
-    id: alternatives
+  - type: input
+    id: standards
     attributes:
-      label: Alternatives considered
-      description: What other approaches did you consider?
+      label: Governing Standards / Regulatory Codes (if applicable)
+      description: Standards or specifications this feature adheres to (e.g. ISO 19650-2, buildingSMART IDS 1.0, NASA-STD-6012, DIN 4149, OBC Part 9).
+      placeholder: e.g. buildingSMART IDS 1.0 / ISO 19650-2 / FEMA E-74
 
   - type: textarea
     id: scope
     attributes:
-      label: Scope and impact
-      description: Note affected pages/routes/modules and expected tradeoffs.
+      label: Architectural Scope & Impact
+      description: Note affected directories and data contract considerations.
       placeholder: |
-        - Affected area: app/routes/...
-        - Backward compatibility: ...
-        - Risk level: low/medium/high
+        - Affected Areas: e.g. frontend/src/routes/..., app/api/..., app/engines/...
+        - Contract Parity: updates to app/modules/contracts.py and frontend/src/lib/types.ts
+        - Database Migrations: supabase/migrations/ (if schema changes needed)
+        - Backward Compatibility: ...
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches or workarounds were considered?
 
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance criteria
-      description: Define what done looks like.
+      label: Acceptance Criteria
+      description: Bulleted checklist defining what "done" looks like.
       placeholder: |
-        - [ ] ...
-        - [ ] ...
+        - [ ] Feature endpoint / component implemented
+        - [ ] Fast-path unit test added (`uv run pytest tests/ -m 'not slow'`)
+        - [ ] Frontend build succeeds (`npm run build`)
+    validations:
+      required: true
 
   - type: checkboxes
     id: checks
     attributes:
       label: Pre-flight checks
       options:
-        - label: I searched existing issues and discussions first.
+        - label: I searched existing issues and discussions to avoid duplicate requests.
           required: true
+        - label: This proposal aligns with the decoupled FastAPI + Svelte 5 architecture in `AGENTS.md`.
+          required: true
+

@@ -1,0 +1,115 @@
+name: Compliance Engine Defect
+description: Report an incorrect rule evaluation, false positive/negative, or physics calculation deviation.
+title: "[Compliance Defect]: "
+labels:
+  - bug
+  - compliance
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to report a discrepancy in compliance evaluation, physics calculations (galvanic, crevice, MIC, seismic clearance), or property resolution.
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Target Engine / Compliance Domain
+      description: Select the compliance engine where the discrepancy was observed.
+      options:
+        - "GC-001: Galvanic Corrosion Engine (anode/cathode coupling, voltage gap, area ratio)"
+        - "CC-001: Crevice Corrosion Engine (critical gap width, electrolyte resistivity)"
+        - "MC-001: Microbiological Influenced Corrosion (flow velocity, temp, deadleg, biocide)"
+        - "Blue Halo: Seismic Bracing Clearance (clearance bbox, clash detection, EN 1998 / DIN 4149)"
+        - "ARCH Egress: Egress Analysis (door clear width, exit capacity, travel distance, stair rise/run)"
+        - "ARCH Spatial: Spatial Daylight & Room Area (glazing ratio, habitable space containment)"
+        - "buildingSMART IDS: Information Delivery Specification conformance validation"
+        - "Other / Custom Ruleset"
+    validations:
+      required: true
+
+  - type: input
+    id: rule_ref
+    attributes:
+      label: Rule ID / Reference Citation
+      description: The specific rule identifier (e.g. GC-001.VOLTAGE.T3, MC-001.FLOW.STAGNANT, CODE 9.9.10.1, SB-001).
+      placeholder: e.g. GC-001.VOLTAGE.T3 or CODE 9.9.10.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: observed_verdict
+    attributes:
+      label: Observed Result / Verdict
+      description: What verdict did BIM-Guard output?
+      options:
+        - "FAIL (False Positive — rule should have passed)"
+        - "PASS (False Negative — rule should have failed)"
+        - "CRITICAL (Severe risk band assigned incorrectly)"
+        - "NEEDS_REVIEW / MISSING_DATA (Property resolution failed or unmapped)"
+        - "DATA_QUALITY (Syntactic / pre-flight check failure)"
+        - "Engine Crash / Exception thrown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: expected_verdict
+    attributes:
+      label: Expected Result / Verdict
+      description: What verdict should have been produced according to governing codes?
+      options:
+        - "PASS"
+        - "FAIL"
+        - "NEEDS_REVIEW"
+        - "EXEMPT / NOT_APPLICABLE"
+    validations:
+      required: true
+
+  - type: textarea
+    id: material_parameters
+    attributes:
+      label: Materials, Media, and Environmental Parameters
+      description: Detail the elements, materials, fluid service, or clearance parameters involved.
+      placeholder: |
+        - Element A (Anode): Material = Carbon Steel, Area = 0.5 m2, Class = IfcPipeSegment
+        - Element B (Cathode): Material = Copper, Area = 2.0 m2, Class = IfcPipeFitting
+        - Environment Class: T3_CHLORIDE / E2_NORMAL / Indoor damp
+        - Fluid Service: Potable Water / Chilled Water / Sea Water
+        - Temperature / Velocity: 45 deg C, 0.2 m/s
+
+  - type: textarea
+    id: element_guids
+    attributes:
+      label: IFC Element GUID(s) & Model Context
+      description: Provide the 22-character IFC GlobalId(s) for the offending element(s).
+      placeholder: |
+        - Primary GUID: 2$N5z7x5f8V9A3Q0W1kLmN
+        - Counterpart GUID (if couple/clash): 1X9k0LmNpQrStUvWxYz12A
+        - IFC Schema: IFC2X3 / IFC4
+        - Model file name: e.g. Duplex_MEP_Sample.ifc
+
+  - type: textarea
+    id: standard_citation
+    attributes:
+      label: Governing Standard & Technical Justification
+      description: Cite the standard, table, or clause proving the expected verdict (e.g. ISO 9223 Table 2, NASA-STD-6012 §4.3, FEMA E-74 §6.2, OBC 9.9.10.1).
+      placeholder: |
+        Per NASA-STD-6012 §4.3.2, galvanic coupling between Copper and Carbon Steel in a T3 environment has a maximum allowable voltage potential difference of 0.15 V. The observed calculation used 0.25 V...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, Calculation Output, or BCF Export Excerpt
+      description: Paste relevant JSON output from /api/analyze, terminal tracebacks, or BCF issue markup.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verification checklist
+      options:
+        - label: I verified that the model passes IFC pre-flight quality checks (syntax, schema, single root).
+          required: true
+        - label: I confirmed that material names / property sets were populated or checked against `ModelingManualView`.
+          required: false

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem or regression.
+description: Report a reproducible software defect or regression in BIM-Guard.
 title: "[Bug]: "
 labels:
   - bug
@@ -7,14 +7,44 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for filing a bug report. Please provide enough detail so we can reproduce and fix the issue.
+        Thanks for filing a bug report. Please provide sufficient detail so the team can isolate, reproduce, and fix the issue.
+
+  - type: dropdown
+    id: subsystem
+    attributes:
+      label: Affected Subsystem
+      description: Select the architectural component where the defect occurs.
+      options:
+        - "Frontend (Svelte 5 / ThatOpen 3D Viewer / UI)"
+        - "Backend API Gateway (FastAPI / SSE / Endpoints / Contracts)"
+        - "Physics & Compliance Engines (GC-001, CC-001, MC-001, Blue Halo, Arch)"
+        - "IFC Reader & Geometry Extraction (app/modules/ifc_reader)"
+        - "OpenBIM Standards (bSDD, IDS XML, BCF REST / Exporter, CDE States)"
+        - "Rule Extraction & AI (LlamaIndex Ingestion, LangGraph Digital Inspector)"
+        - "Database, Supabase & Auth / RBAC"
+        - "Other / Tooling"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity / Impact
+      description: Assess the impact of this bug on users or pipeline execution.
+      options:
+        - "Critical — Blocker / server crash / core pipeline unusable"
+        - "High — Incorrect compliance verdict / data loss / evaluation failure"
+        - "Medium — Feature degraded / edge case failure / UI interaction defect"
+        - "Low — Minor visual styling / cosmetic / typo / documentation"
+    validations:
+      required: true
 
   - type: textarea
     id: summary
     attributes:
       label: Summary
       description: A clear and concise description of what happened.
-      placeholder: What did you observe?
+      placeholder: Describe the observed behavior and the context in which it occurred.
     validations:
       required: true
 
@@ -22,20 +52,32 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Include exact steps, inputs, and files if relevant.
+      description: Provide step-by-step instructions to reproduce the behavior.
       placeholder: |
-        1. Go to ...
-        2. Upload ...
-        3. Click ...
-        4. See error ...
+        1. Open view ...
+        2. Upload model or document ...
+        3. Trigger analysis or action ...
+        4. Observe unexpected error or verdict ...
     validations:
       required: true
+
+  - type: textarea
+    id: model_context
+    attributes:
+      label: IFC Model / Element Context (if applicable)
+      description: Provide model details if the issue involves IFC parsing, geometry, or element inspection.
+      placeholder: |
+        - IFC Schema: IFC2X3 / IFC4 / IFC4.3
+        - Authoring Tool: Revit 2024 / Archicad / blender-bim / synthetic
+        - Element Class: e.g. IfcDoor, IfcPipeSegment, IfcWall
+        - Element GUID: e.g. 2$N5z7x5f8V9A3Q0W1kLmN
+        - Property Set / Attribute: e.g. Pset_DoorCommon.ClearWidth
 
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
-      description: What should have happened instead?
+      description: What should have happened according to specifications or requirements?
     validations:
       required: true
 
@@ -43,37 +85,44 @@ body:
     id: actual
     attributes:
       label: Actual behavior
-      description: What actually happened?
+      description: What actually happened? Include error messages or unexpected output.
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: Logs and screenshots
-      description: Paste traceback, terminal output, and screenshots if available.
+      label: Logs, Tracebacks, and Screenshots
+      description: Paste terminal output, browser console logs, or upload screenshots.
       render: shell
 
   - type: input
     id: version
     attributes:
-      label: App or commit version
-      description: Commit SHA, tag, or branch where this occurred.
-      placeholder: main (commit abc123)
+      label: App or Commit Version
+      description: Git commit hash, release tag, or branch where this occurred.
+      placeholder: main (commit 3a9f1b2)
+    validations:
+      required: true
 
   - type: input
     id: environment
     attributes:
       label: Environment
-      description: OS, Python version, and relevant tooling.
-      placeholder: Windows 11, Python 3.12, uv 0.x
+      description: Operating system, browser, Python version, and execution mode.
+      placeholder: Windows 11 / macOS, Python 3.12, Chrome 128, uv 0.4.x
+    validations:
+      required: true
 
   - type: checkboxes
     id: checks
     attributes:
       label: Pre-flight checks
       options:
-        - label: I searched existing issues to avoid duplicates.
+        - label: I searched existing issues and discussions to avoid duplicates.
           required: true
-        - label: I can reproduce this issue with the current main branch.
+        - label: I reproduced this issue on the current main branch.
           required: false
+        - label: If reporting a code failure, I ran `uv run pytest tests/ -m 'not slow'` or `npm run check`.
+          required: false
+

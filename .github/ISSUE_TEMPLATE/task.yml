@@ -1,0 +1,85 @@
+name: Task / Technical Chore
+description: Track a planned engineering chore, roadmap priority, refactor, or architecture spike.
+title: "[Task]: "
+labels:
+  - task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to define concrete implementation work items, technical debt reduction, or architectural roadmap milestones tracked in `TODO.md`.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Priority / Architecture Category
+      description: Select the relevant priority track from TODO.md or architecture layer.
+      options:
+        - "Priority 3: Rules Catalog, Seeding & buildingSMART IDS"
+        - "Priority 4: Background Processing, Job Queues & Worker Architecture"
+        - "Priority 5: 3D OpenBIM Viewer Integration (@thatopen / WebGL)"
+        - "Priority 6: Analysis, Reporting UX & BCF Restructuring"
+        - "Priority 7: Architecture Documentation & ADR Authoring"
+        - "Priority 8: IFC Ingestion Correctness & Property Precedence"
+        - "Priority 9: OAuth, Multi-Tenant RBAC & Resource Grants"
+        - "Priority 10: AI Pipelines (LlamaIndex Ingestion / LangGraph Digital Inspector)"
+        - "Priority 11: Enterprise Workspace UX & Universal Data Tables"
+        - "Priority 12/13: AI Infrastructure, Vision Models & ML Rollout"
+        - "Logging, Observability & Tracing (structlog / OpenTelemetry)"
+        - "Testing & CI/CD (Pytest fast-path / Playwright E2E)"
+        - "General Technical Debt / Dependency Maintenance"
+    validations:
+      required: true
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective & Context
+      description: Describe what needs to be built, refactored, or investigated, and why.
+      placeholder: |
+        Reference relevant sections in TODO.md, AGENTS.md, or architecture.md.
+    validations:
+      required: true
+
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Technical Requirements & Implementation Steps
+      description: Detailed breakdown of changes required across backend, frontend, or data contracts.
+      placeholder: |
+        1. Implement ... in app/services/...
+        2. Expose endpoint in app/api/...
+        3. Update contracts in app/modules/contracts.py and frontend/src/lib/types.ts
+        4. Add unit tests in tests/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria (Definition of Done)
+      description: Measurable criteria required for merging.
+      placeholder: |
+        - [ ] All fast-path unit tests pass (`uv run pytest tests/ -m 'not slow'`)
+        - [ ] Frontend builds without errors (`npm run build`)
+        - [ ] Backend passes lint check (`uv run ruff check .`)
+        - [ ] Updated TODO.md / documentation if applicable
+    validations:
+      required: true
+
+  - type: input
+    id: dependencies
+    attributes:
+      label: Blockers & Dependencies
+      description: Issues, PRs, external services, or credentials that must land first.
+      placeholder: e.g. Blocked by Supabase migration XYZ / Requires Playwright setup
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I verified that this task aligns with conventions in `AGENTS.md` and `CLAUDE.md`.
+          required: true
+        - label: This task preserves the decoupled FastAPI + Svelte 5 SPA architecture.
+          required: true
