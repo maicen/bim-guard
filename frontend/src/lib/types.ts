@@ -282,6 +282,7 @@ export interface DocumentItem extends IsoGovernanceFieldsRequired {
   char_count: number;
   has_doclang?: boolean;
   doclang_size_bytes?: number;
+  doclang_storage_path?: string | null;
   doclang_xml?: string | null;
   project_code?: string;
 }
@@ -294,6 +295,7 @@ export interface DocumentDetail extends IsoGovernanceFieldsRequired {
   upload_date?: string | null;
   extracted_text: string;
   char_count: number;
+  doclang_storage_path?: string | null;
   doclang_xml?: string | null;
   project_code?: string;
 }

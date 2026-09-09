@@ -135,6 +135,9 @@ def test_export_doclang_archive_endpoint(monkeypatch):
                 return fake_doc
             return None
 
+        def get_doclang_content(self, doc):
+            return doc.get("doclang_xml") or ""
+
     app.dependency_overrides[get_documents_service] = lambda: FakeDocService()
 
     try:
@@ -161,4 +164,36 @@ def test_export_doclang_archive_endpoint(monkeypatch):
         assert manifest["metadata"]["cde_state"] == "SHARED"
     finally:
         app.dependency_overrides.pop(get_documents_service, None)
+
+
+def test_document_service_get_doclang_content_storage_fallback(tmp_path):
+    """Verify DocumentService.get_doclang_content resolves from storage when inline xml is empty."""
+    from app.services.documents_service import DocumentService
+
+    # Create dummy storage file
+    xml_file = tmp_path / "doclang_999.xml"
+    xml_file.write_text("<doclang>from storage</doclang>", encoding="utf-8")
+
+    class FakeStorage:
+        def materialize_local_path(self, ref):
+            if ref == "sb://test-bucket/doclang/doclang_999.xml":
+                return xml_file
+            return None
+
+    svc = DocumentService(storage=FakeStorage(), documents_repo=None)
+
+    # 1. Inline xml takes precedence
+    doc_inline = {"doclang_xml": "<doclang>inline</doclang>", "doclang_storage_path": None}
+    assert svc.get_doclang_content(doc_inline) == "<doclang>inline</doclang>"
+
+    # 2. Offloaded storage fallback when inline is empty
+    doc_offloaded = {
+        "doclang_xml": "",
+        "doclang_storage_path": "sb://test-bucket/doclang/doclang_999.xml",
+    }
+    assert svc.get_doclang_content(doc_offloaded) == "<doclang>from storage</doclang>"
+
+    # 3. None/missing returns empty string
+    assert svc.get_doclang_content({}) == ""
+
 

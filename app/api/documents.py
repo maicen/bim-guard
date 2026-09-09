@@ -107,6 +107,7 @@ def list_documents(
                 char_count=len(text),
                 has_doclang=has_doclang,
                 doclang_size_bytes=len(doclang_str.encode("utf-8")) if has_doclang else 0,
+                doclang_storage_path=r.get("doclang_storage_path"),
                 doclang_xml="",
                 project_code=r.get("project_code", ""),
                 originator=r.get("originator", ""),
@@ -146,7 +147,8 @@ def get_document(
         upload_date=doc.get("upload_date"),
         extracted_text=text,
         char_count=len(text),
-        doclang_xml=doc.get("doclang_xml") or "",
+        doclang_storage_path=doc.get("doclang_storage_path"),
+        doclang_xml=service.get_doclang_content(doc),
         project_code=doc.get("project_code", ""),
         originator=doc.get("originator", ""),
         volume_system=doc.get("volume_system", ""),
@@ -208,6 +210,7 @@ def _row_to_detail_response(row: dict) -> DocumentDetailResponse:
         upload_date=row.get("upload_date"),
         extracted_text=text,
         char_count=len(text),
+        doclang_storage_path=row.get("doclang_storage_path"),
         doclang_xml=row.get("doclang_xml") or "",
         project_code=row.get("project_code", ""),
         originator=row.get("originator", ""),
@@ -450,13 +453,17 @@ def get_document_doclang(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    xml_content = doc.get("doclang_xml") or ""
+    xml_content = service.get_doclang_content(doc)
     if not xml_content.strip():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document {document_id} has no DocLang XML available.",
         )
-    return Response(content=xml_content, media_type="application/xml")
+    return Response(
+        content=xml_content,
+        media_type="application/xml",
+        headers={"Cache-Control": "private, max-age=3600, stale-while-revalidate=86400"},
+    )
 
 
 @router.get("/{document_id}/export-doclang", summary="Export document as DocLang archive (.dclx)")
@@ -479,7 +486,7 @@ def export_document_doclang_archive(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    xml_content = doc.get("doclang_xml") or ""
+    xml_content = service.get_doclang_content(doc)
     if not xml_content.strip():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -589,7 +596,7 @@ async def get_document_sections_tree(
     if cached is not None:
         return DocumentSectionTreeResponse.model_validate(cached)
 
-    doclang_xml = (doc.get("doclang_xml") or "").strip()
+    doclang_xml = service.get_doclang_content(doc).strip()
     if doclang_xml:
         from app.modules.document_parsing.doclang_chunker import DocLangChunker
 

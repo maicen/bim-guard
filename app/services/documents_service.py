@@ -81,6 +81,7 @@ class DocumentService:
         revision_code: str = "P01.01",
         cde_state: str = "WIP",
         doclang_xml: str = "",
+        doclang_storage_path: str | None = None,
     ):
         """Create and persist a new uploaded document record."""
         clean_doc_type = (doc_type or "").strip() or "Specification"
@@ -102,6 +103,7 @@ class DocumentService:
             "revision_code": revision_code or "P01.01",
             "cde_state": cde_state or "WIP",
             "doclang_xml": doclang_xml or "",
+            "doclang_storage_path": doclang_storage_path,
         }
         document = self._documents.insert(payload)
         invalidate_cache("bimguard:documents:list")
@@ -121,6 +123,29 @@ class DocumentService:
         logger.info("Document file stored filename=%s bytes=%d", filename, len(content))
         return storage_ref
 
+    def store_doclang_file(self, document_id: int, xml_content: str) -> str:
+        """Persist canonical DocLang XML into Supabase Storage and return the storage reference."""
+        data = xml_content.encode("utf-8")
+        filename = f"doclang_{document_id}.xml"
+        storage_ref = self._storage.save_upload(filename, data, "doclang")
+        logger.info("DocLang XML stored document_id=%d bytes=%d ref=%s", document_id, len(data), storage_ref)
+        return storage_ref
+
+    def get_doclang_content(self, doc: dict) -> str:
+        """Return canonical DocLang XML from inline column or materialized from storage."""
+        xml = doc.get("doclang_xml") or ""
+        if xml.strip():
+            return xml
+        storage_ref = doc.get("doclang_storage_path")
+        if storage_ref:
+            path = self.materialize_local_path(storage_ref)
+            if path and path.is_file():
+                try:
+                    return path.read_text(encoding="utf-8")
+                except Exception:
+                    logger.exception("Failed reading materialized DocLang XML from %s", path)
+        return ""
+
     def materialize_local_path(self, file_path: str):
         """Resolve a stored file reference to a local path for streaming/serving."""
         return self._storage.materialize_local_path(file_path)
@@ -137,6 +162,7 @@ class DocumentService:
         revision_code: str | None = None,
         cde_state: str | None = None,
         doclang_xml: str | None = None,
+        doclang_storage_path: str | None = None,
     ):
         """Update mutable document metadata and extracted text."""
         updates: dict = {"filename": filename, "extracted_text": extracted_text}
@@ -154,6 +180,8 @@ class DocumentService:
             updates["cde_state"] = cde_state.strip() or "WIP"
         if doclang_xml is not None:
             updates["doclang_xml"] = doclang_xml
+        if doclang_storage_path is not None:
+            updates["doclang_storage_path"] = doclang_storage_path
 
         self._documents.update(
             updates=updates,
