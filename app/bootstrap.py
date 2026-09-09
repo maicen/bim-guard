@@ -63,6 +63,7 @@ from app.services.static_data_service import (
 )
 from app.services.user_admin_service import UserAdminService
 from app.services.graph_database import GraphService
+from app.services.kuzu_provider import KuzuDatabaseProvider
 
 logger = get_logger(__name__)
 
@@ -611,7 +612,13 @@ def build_default_container() -> ApplicationContainer:
     )
 
     digital_inspector_service = DigitalInspectorService()
-    graph_service = GraphService()
+    
+    try:
+        kuzu_provider = KuzuDatabaseProvider(db_path=".kuzu_db")
+        graph_service = GraphService(provider=kuzu_provider)
+    except Exception as e:
+        logger.warning(f"Could not initialize KuzuDatabaseProvider: {e}")
+        graph_service = GraphService()
 
     bimguard_app = BIMGuard_App(
         projects_service=projects_service,

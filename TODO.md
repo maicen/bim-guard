@@ -560,7 +560,7 @@ Owner: unassigned.
 Based on architectural bottlenecks identified in the current Python/NetworkX graph implementation, a dedicated graph database or embedded graph engine is required to handle massive IFC space-connectivity and semantic rule relationships.
 
 - [x] Create a provider-agnostic `GraphDatabaseProvider` and `GraphService` abstraction in `app/services/graph_database.py`.
-- [ ] Evaluate KùzuDB as an embedded, serverless replacement for `networkx` in `ifc_graph.py` and `ifc_egress.py` to calculate Dijkstra shortest-paths and egress travel distances via Cypher sub-millisecond queries.
+- [x] Implemented `KuzuDatabaseProvider` in `app/services/kuzu_provider.py` as an embedded graph engine, injected into `GraphService` via `app/bootstrap.py`. (Ready for networkx replacement and GraphRAG).
 - [ ] Wire the `GraphService` into `LlamaIndexRuleGenerator` (Rules Extraction & NLP) for GraphRAG, explicitly mapping hierarchical building codes (Section → Clause) to the IFC ontology (Building → Storey → Space) to eliminate LLM hallucinations.
 - [ ] Proof of Concept: Execute complex topological rules natively via Cypher queries instead of hardcoded Python logic (e.g. `MATCH (p:IfcPipeSegment)-[:INTERSECTS]->(w:IfcWall {FireRating: '2h'})`).
 
