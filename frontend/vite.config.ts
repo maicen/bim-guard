@@ -4,6 +4,7 @@ import { hostname } from 'node:os';
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: process.env.GITHUB_PAGES ? '/bim-guard/' : '/',
   plugins: [svelte()],
   server: {
     host: '0.0.0.0',
