@@ -620,6 +620,18 @@ export interface SettingsResponse {
   db_backend: string;
 }
 
+export interface EnvVarStatusItem {
+  name: string;
+  category: string;
+  description: string;
+  required: boolean;
+  is_set: boolean;
+}
+
+export interface EnvVarStatusResponse {
+  variables: EnvVarStatusItem[];
+}
+
 export interface ModelLineageRecord {
   id: number;
   project_id: number;

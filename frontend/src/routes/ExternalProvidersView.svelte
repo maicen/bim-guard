@@ -10,6 +10,9 @@
     Building2,
     Settings2,
     Star,
+    Terminal,
+    CheckCircle2,
+    XCircle,
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
@@ -18,7 +21,7 @@
   import ProviderInstanceForm from "../lib/components/ProviderInstanceForm.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TaskAssignmentModal from "../lib/components/TaskAssignmentModal.svelte";
-  import { parsingEnginesApi, llmProvidersApi } from "../lib/api";
+  import { parsingEnginesApi, llmProvidersApi, settingsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import type {
@@ -32,14 +35,16 @@
     LLMProviderModel,
     LLMTask,
     LLMTaskModelAssignment,
+    EnvVarStatusItem,
   } from "../lib/types";
 
   let activeOrg = $derived(authState.activeOrganization);
-  let activeTab = $state<"parsing" | "llm">("parsing");
+  let activeTab = $state<"parsing" | "llm" | "env">("parsing");
 
   const TABS = [
     { id: "parsing", label: "Document Parsing", icon: FileText },
     { id: "llm", label: "LLM Providers", icon: BrainCircuit },
+    { id: "env", label: "Environment", icon: Terminal },
   ];
 
   // Accent color by provider family/kind — purely cosmetic grouping.
@@ -435,6 +440,37 @@
     configuringTask = null;
   }
 
+  // ── Environment (platform-wide, superadmin-only) ─────────────────────────
+  let envVars = $state<EnvVarStatusItem[]>([]);
+  let envLoading = $state(false);
+  let envError = $state("");
+  let envLoaded = $state(false);
+
+  let envCategories = $derived.by(() => {
+    const byCategory = new Map<string, EnvVarStatusItem[]>();
+    for (const item of envVars) {
+      const list = byCategory.get(item.category) ?? [];
+      list.push(item);
+      byCategory.set(item.category, list);
+    }
+    return [...byCategory.entries()];
+  });
+  let envMissingRequired = $derived(envVars.filter((v) => v.required && !v.is_set));
+
+  async function loadEnvStatus() {
+    envLoading = true;
+    envError = "";
+    try {
+      const res = await settingsApi.getEnvStatus();
+      envVars = res.variables || [];
+      envLoaded = true;
+    } catch (err: any) {
+      envError = err.message || "Failed to load environment variable status.";
+    } finally {
+      envLoading = false;
+    }
+  }
+
   $effect(() => {
     loadEngineKinds();
     loadEngines();
@@ -445,6 +481,12 @@
       loadLlmKinds(activeOrg.organization_id);
       loadLlmInstances(activeOrg.organization_id);
       loadTasksAndAssignments(activeOrg.organization_id);
+    }
+  });
+
+  $effect(() => {
+    if (activeTab === "env" && authState.isSuperadmin && !envLoaded && !envLoading) {
+      loadEnvStatus();
     }
   });
 </script>
@@ -466,7 +508,98 @@
   {:else}
     <TabStrip tabs={TABS} active={activeTab} onSelect={(id) => (activeTab = id as "parsing" | "llm")} />
 
-    {#if activeTab === "parsing"}
+    {#if activeTab === "env"}
+      <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+        <div>
+          <h2 class="text-base font-bold tracking-tight text-slate-50">Environment Variables</h2>
+          <p class="text-xs text-slate-400">
+            Every environment variable this deployment reads, and whether it's currently set in this
+            process — names and presence only, values are never sent to the browser. Most are fallbacks
+            used only when no matching DB-configured provider instance exists (see the tabs above).
+          </p>
+        </div>
+
+        {#if !authState.isSuperadmin}
+          <div
+            class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400"
+          >
+            <ShieldAlert class="h-4 w-4 shrink-0 text-slate-500" />
+            <span>Only a platform superadmin can view environment variable status.</span>
+          </div>
+        {:else}
+          {#if envError}
+            <div
+              class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300"
+            >
+              {envError}
+            </div>
+          {/if}
+
+          {#if envLoading}
+            <div class="p-8 text-center text-xs text-slate-400">Loading environment status...</div>
+          {:else if envVars.length > 0}
+            {#if envMissingRequired.length > 0}
+              <div
+                class="flex items-center gap-2 rounded-xl border border-amber-800 bg-amber-950/50 p-3.5 text-xs text-amber-300"
+              >
+                <ShieldAlert class="h-4 w-4 shrink-0 text-amber-400" />
+                <span
+                  >{envMissingRequired.length} required variable{envMissingRequired.length === 1 ? "" : "s"}
+                  missing: {envMissingRequired.map((v) => v.name).join(", ")}</span
+                >
+              </div>
+            {/if}
+
+            <div class="space-y-5">
+              {#each envCategories as [category, items] (category)}
+                <div>
+                  <h3 class="mb-2 text-caption font-semibold uppercase tracking-wide text-slate-500">
+                    {category}
+                  </h3>
+                  <div class="divide-y divide-slate-800/80 rounded-xl border border-slate-800/80 bg-slate-950/60">
+                    {#each items as item (item.name)}
+                      <div class="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-1.5">
+                            <span class="font-mono text-xs font-semibold text-slate-200">{item.name}</span>
+                            {#if item.required}
+                              <span
+                                class="rounded-full border border-slate-700 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-slate-400"
+                                >Required</span
+                              >
+                            {/if}
+                          </div>
+                          {#if item.description}
+                            <p class="mt-0.5 text-caption text-slate-500">{item.description}</p>
+                          {/if}
+                        </div>
+                        {#if item.is_set}
+                          <span
+                            class="flex shrink-0 items-center gap-1 rounded-full border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold text-emerald-300"
+                          >
+                            <CheckCircle2 class="h-3 w-3" />
+                            Set
+                          </span>
+                        {:else}
+                          <span
+                            class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-micro font-semibold {item.required
+                              ? 'border-rose-800/60 bg-rose-950/60 text-rose-300'
+                              : 'border-slate-700 bg-slate-900 text-slate-500'}"
+                          >
+                            <XCircle class="h-3 w-3" />
+                            Missing
+                          </span>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+      </div>
+    {:else if activeTab === "parsing"}
       <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
         <div class="flex items-center justify-between">
           <div>
@@ -574,7 +707,7 @@
           </div>
         {/if}
       </div>
-    {:else}
+    {:else if activeTab === "llm"}
       <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
         <div class="flex items-center justify-between">
           <div>

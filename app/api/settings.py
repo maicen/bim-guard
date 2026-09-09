@@ -11,6 +11,9 @@ from app.api.organizations import _require_superadmin
 from app.auth import CurrentUser, get_current_user
 from app.logging_config import current_level_name, get_logger, set_log_level
 from app.modules.contracts import (
+    EnvVarStatusResponse,
+)
+from app.modules.contracts import (
     SettingItemContract as SettingItem,
 )
 from app.modules.contracts import (
@@ -19,6 +22,7 @@ from app.modules.contracts import (
 from app.modules.contracts import (
     SettingsUpdateRequestContract as SettingsUpdateRequest,
 )
+from app.services import env_status_service
 from app.services.persistence import PersistenceService
 from app.services.profile_service import ProfileService
 from app.services.settings_service import SettingsService
@@ -77,4 +81,23 @@ def update_settings(
                 logger.warning("Could not set log level to %s: %s", value, exc)
 
     return get_settings(current_user, profiles, service)
+
+
+@router.get(
+    "/env-status",
+    response_model=EnvVarStatusResponse,
+    summary="Report which documented environment variables are loaded (names only, never values)",
+)
+def get_env_status(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> EnvVarStatusResponse:
+    """List every documented env var with whether it's set in this process.
+
+    Backs the admin Environment tab. Deliberately reports presence only --
+    the values themselves (API keys, service-role secrets) are never
+    serialized to the client.
+    """
+    _require_superadmin(current_user, profiles)
+    return EnvVarStatusResponse(variables=env_status_service.get_env_status())
 

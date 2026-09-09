@@ -27,6 +27,7 @@ import type {
   DocumentSectionsResponse,
   DocumentSectionTreeResponse,
   DocumentUpdatePayload,
+  EnvVarStatusResponse,
   GitHubRepo,
   GitHubRepoCreatePayload,
   GitHubRepoStructure,
@@ -1465,6 +1466,11 @@ export const settingsApi = {
       body: JSON.stringify({ settings }),
     });
     return handleResponse<any>(res);
+  },
+
+  async getEnvStatus(): Promise<EnvVarStatusResponse> {
+    const res = await apiFetch(`${API_BASE}/settings/env-status`);
+    return handleResponse<EnvVarStatusResponse>(res);
   },
 };
 

@@ -1209,6 +1209,22 @@ class SettingsUpdateRequestContract(BaseModel):
     settings: dict[str, str] = Field(..., description="Map of setting key to new value")
 
 
+class EnvVarStatusItem(BaseModel):
+    """Whether one documented environment variable is loaded -- never its value."""
+
+    name: str = Field(..., description="Environment variable name")
+    category: str = Field(..., description="Grouping shown in the admin UI (e.g. 'LLM Providers')")
+    description: str = Field("", description="What this variable controls")
+    required: bool = Field(False, description="Whether the app expects this to always be set")
+    is_set: bool = Field(..., description="True when set to a non-empty value in this process's environment")
+
+
+class EnvVarStatusResponse(BaseModel):
+    """Response container for the admin Environment tab's loaded/missing report."""
+
+    variables: list[EnvVarStatusItem] = Field(default_factory=list)
+
+
 class RevitSyncElement(BaseModel):
     """Element descriptor pushed by pyRevit."""
 
