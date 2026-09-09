@@ -213,11 +213,11 @@ Owner: Osama.
       it. Reproduction: golden reference model, Doors card, rule folder "All folders".
       **Found and fixed one real defect**: when a door/window has neither a Pset value
       nor a populated `OverallWidth`/`OverallHeight` attribute, `ClearWidth` fell through
-      to Pass 7 geometry, which mapped it to `get_corridor_width_mm()` — the *shortest*
+      to Pass 7 geometry, which mapped it to `get_corridor_width_mm()` — the _shortest_
       side of the element's own bounding footprint. That algorithm is correct for a
       room/corridor (its narrow passable dimension) but wrong for a door/window leaf,
       whose own footprint is a thin panel: the shortest side there is the frame/leaf
-      *thickness*, not the openable width (confirmed against a synthetic 950×50×2125 mm
+      _thickness_, not the openable width (confirmed against a synthetic 950×50×2125 mm
       door: `ClearWidth` came back 50 mm, the thickness, not 2,125 mm). Fixed in
       `get_geometry_value()` (`app/modules/ifc_reader/ifc_geometry.py`) to route
       `IfcDoor`/`IfcDoorStandardCase`/`IfcWindow`/`IfcWindowStandardCase` through the same
@@ -227,7 +227,7 @@ Owner: Osama.
       `tests/test_ifc_geometry_units.py::test_clear_width_on_door_uses_overall_width_not_leaf_thickness`
       (and `test_corridor_width_still_used_for_rooms` for the non-regression case).
       **Not reproduced**: the exact reported symptom — both `OverallWidth` and
-      `ClearWidth` resolving to precisely the door *height* (2,125 mm), with `Width`
+      `ClearWidth` resolving to precisely the door _height_ (2,125 mm), with `Width`
       correctly resolving to 950 mm in the same run — could not be reproduced against
       synthetic Pset, Qto, direct-attribute, type-vs-instance-precedence, or axis-aligned
       geometry scenarios (all resolved correctly in isolation; see session notes). This
@@ -268,8 +268,8 @@ Builds on the base Supabase Auth / JWT work in Priority 4.1.
 ### Enterprise RBAC: Groups and Resource Grants
 
 Two matrices, per the multi-tenant/enterprise-grade ask: a superadmin controls
-which rulesets each *organization* may use at all; an org owner controls which
-*projects* each *group* within their org may access. A brand-new project or
+which rulesets each _organization_ may use at all; an org owner controls which
+_projects_ each _group_ within their org may access. A brand-new project or
 organization starts with nothing bound — "zero bindings unless assigned" is an
 empty grant table, not a flag.
 
@@ -315,7 +315,7 @@ empty grant table, not a flag.
 
 Same two-level grant pattern extended to two more cases: projects (unlike
 rulesets) already had a single owning `organization_id`, so this adds a
-second, additive way in — a superadmin-controlled grant of *extra* access on
+second, additive way in — a superadmin-controlled grant of _extra_ access on
 top of ownership — plus giving documents the same org-grant/project-binding
 treatment rulesets already had.
 
@@ -528,7 +528,7 @@ Owner: unassigned.
 - [ ] Add a feedback loop in the UI (`AnalyzeView.svelte`) for users to flag false positives and train an Active Learning classifier to score new issues.
 - [ ] Expand the Digital Inspector agent's tools to convert natural language queries into dynamic `ifcopenshell` geometric queries (e.g., semantic spatial querying).
 - [ ] Embed a multi-modal conversational AI overlay in `IfcViewer.svelte` to query NotebookLM and explain compliance failures contextually on the 3D model.
-- [ ] Implement Automated Generative Remediation in the enhancement pipeline to propose physical routing fixes (e.g., via A* pathfinding) for detected clearance or galvanic clashes.
+- [ ] Implement Automated Generative Remediation in the enhancement pipeline to propose physical routing fixes (e.g., via A\* pathfinding) for detected clearance or galvanic clashes.
 - [ ] Utilize Vision-Language Models (VLMs) to automatically audit generated BCF clash snapshots and filter out false positives before they reach human review.
 - [ ] Apply Graph Neural Networks (GNNs) on extracted IFC spatial relationship graphs (like those in `ifc_egress.py` and `ifc_spatial.py`) to infer missing connectivity, room usages, or system topologies when metadata is absent.
 - [ ] Implement a Predictive Cost & Schedule Impact ML model in `cost_model.py` to replace static CSV lookups, dynamically forecasting remediation costs and programme delays based on issue context and historical resolution data.
@@ -540,7 +540,6 @@ Owner: unassigned.
 - [ ] Multi-Agent Workflow Orchestration: Refactor the sequential compliance pipeline in `orchestrator.py` into a dynamic, multi-agent LangGraph architecture where specialized agents (e.g., Structural Agent, MEP Agent, Arch Agent) autonomously negotiate clash resolutions and delegate validation tasks.
 - [ ] Generative IDS (Information Delivery Specification): Use LLMs to read unstructured project EIRs (Exchange Information Requirements) and automatically generate valid buildingSMART IDS XML validation schemas, extending `ids_exporter.py` with generative authoring.
 
-
 Owner: unassigned.
 
 ## Priority 13: AI Infrastructure Rollout
@@ -548,6 +547,7 @@ Owner: unassigned.
 Based on the 15 opportunities identified above, the overarching AI architecture has been designed and scaffolded in `app/ai/`. It adheres to SOLID principles, isolating probabilistic models from the deterministic physical engines.
 
 **Rollout Strategy:**
+
 - [x] Scaffold AI namespace (`app/ai/core/`), Protocols (`IVisionModel`, `IPredictiveModel`, etc.), Factory Registry, and Feature Flags.
 - [ ] Phase 1 (High-Impact, Low-Friction): Implement UI-adjacent, non-blocking tools (Predictive Cost ML, Title Block OCR, Natural Language Dashboard Assistant).
 - [ ] Phase 2 (Pipeline Augmentation): Implement human-in-the-loop validation tools (VLM BCF Auditing, Semantic bSDD Mapper, Intelligent System Inference).
@@ -639,10 +639,149 @@ Owner: unassigned.
 
 Verification blocked: The open_browser_url tool failed multiple times because the Playwright environment driver could not be installed (HTTP 404 from playwright.azureedge.net).
 
-
 ## Priority: Logging Improvements
 
 - [ ] Implement Request IDs (Correlation IDs) using `contextvars` to trace requests through the system.
 - [ ] Transition from plain text logging to structured JSON logging for production environments to improve aggregator parsing.
 - [ ] Elevate `RequestLoggingMiddleware` API request logs to `INFO` level to capture traffic baselines in production.
 - [ ] Consider migrating to `structlog` for easier contextual binds throughout the codebase.
+
+---
+
+20260909
+
+Searched for "doclang_xml"
+Viewed 20260909180000_add_doclang_and_bbox_support.sql:1-33
+Viewed documents_service.py:60-130
+Searched for "def save_upload"
+Viewed object_storage.py:1-100
+Searched for "CREATE TABLE.\*documents"
+Searched for "document_nodes"
+Viewed 20260902143724_create_document_nodes.sql:1-56
+Searched for "list_documents"
+Viewed documents_service.py:45-65
+Viewed documents.py:75-115
+Viewed documents.py:430-490
+Viewed DocumentViewer.svelte:235-290
+
+### Strategic Review: Storage & Database Architecture after DocLang
+
+The introduction of **DocLang XML** and **OTSL (Ordered Table Structure Language)** represents a major quality upgrade for BIM-Guard: it replaces fragile regex parsing with canonical layout headings, deterministic tree hierarchies, exact bounding boxes (`bbox`), and structured table definitions.
+
+However, storing rich multimodal XML alongside standard transactional records introduces critical storage, performance, and scaling implications across PostgreSQL and Supabase Storage.
+
+---
+
+### 1. Current State vs. Growth Profile
+
+| Asset                       | Current Location                           | Average Size (100–300 page spec) | Scaling Profile                                                                   |
+| :-------------------------- | :----------------------------------------- | :------------------------------- | :-------------------------------------------------------------------------------- |
+| **Source File (PDF/DOCX)**  | Supabase Storage (`uploads/`)              | 5 MB – 50 MB                     | Low DB impact, offloaded to S3-compatible storage.                                |
+| **Extracted Text**          | Postgres `public.documents.extracted_text` | 100 KB – 1.5 MB                  | Pushed to TOAST tables in Postgres.                                               |
+| **DocLang XML (with OTSL)** | Postgres `public.documents.doclang_xml`    | **1.5 MB – 15 MB+**              | Dense XML tags, cell coordinates, and token spans create significant DB overhead. |
+| **Document Nodes**          | Postgres `public.document_nodes`           | ~1 KB per clause/table row       | Indexed, highly queryable relational/semantic records.                            |
+| **Rendered Pages**          | Postgres `public.document_pages`           | 5 KB – 20 KB per page            | Fast snippet search for page resolution.                                          |
+
+---
+
+### 2. Architectural Findings & Risks
+
+#### Finding 1: API Over-Fetching & Network Egress Bottleneck
+
+- **The Issue**: In [app/api/documents.py](file:///c:/Users/osama/coding/bim-guard/app/api/documents.py#L75-L120), `GET /api/documents` retrieves all rows via `SELECT *` from `public.documents` and serializes the complete `doclang_xml` string inside every `DocumentResponse`.
+- **Impact**:
+  - Loading the documents table in the frontend transfers **every document's full multi-megabyte XML string** over the wire.
+  - A project with 25 standards (averaging 4 MB XML each) transfers **~100 MB of JSON** just to render the document list page.
+  - Spikes FastAPI worker memory, delays frontend initial paint, and rapidly consumes Supabase egress bandwidth.
+
+#### Finding 2: PostgreSQL TOAST Pressure & Write Amplification
+
+- **The Issue**: PostgreSQL rows max out at 8 KB. Any column > 2 KB is compressed and stored out-of-line in the PostgreSQL **TOAST** (The Oversized-Attribute Storage Technique) table.
+- **Impact**:
+  - Updating document lifecycle metadata (e.g. ISO 19650 CDE transitions: `WIP` → `SHARED` → `PUBLISHED`, or updating `suitability_code`) writes a new row version (MVCC).
+  - Backups (`pg_dump`), vacuuming, and replication must continuously process these large XML blobs.
+  - Supabase database compute/disk (e.g., 500 MB – 8 GB quotas) is 10× to 50× more expensive per gigabyte than Supabase Object Storage.
+
+#### Finding 3: Inline Figures & Multimodal Table Assets
+
+- Future Docling extractions can include extracted table image crops or formula figures (`<image src="...">`).
+- If these are stored inline or as base64 within `doclang_xml` in PostgreSQL, individual document rows could swell to 30 MB+, causing connection timeouts and memory spikes.
+
+---
+
+### 3. Recommended Storage & DB Target Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client["Frontend Client (Svelte 5)"]
+        UI_List["Documents Table<br/>(Metadata only)"]
+        UI_Tree["Section Tree Picker<br/>(/sections-tree)"]
+        UI_Viewer["DocLang / PDF Viewer<br/>(/doclang)"]
+    end
+
+    subgraph FastAPI["FastAPI Gateway"]
+        API_List["GET /api/documents<br/>(Slim projection)"]
+        API_Tree["GET /api/documents/{id}/sections-tree<br/>(Cached outline)"]
+        API_DocLang["GET /api/documents/{id}/doclang<br/>(Stream from Storage/Cache)"]
+    end
+
+    subgraph Postgres["PostgreSQL (Supabase DB)"]
+        T_Docs["public.documents<br/>• ISO 19650 Metadata<br/>• md5_hash, file_path<br/>• has_doclang (boolean)<br/>• doclang_storage_path"]
+        T_Nodes["public.document_nodes<br/>• clause_id, section_path<br/>• node_type (heading/table/p)<br/>• bbox (JSONB)<br/>• vector embeddings"]
+    end
+
+    subgraph Storage["Supabase Object Storage"]
+        S_Uploads["uploads/<br/>Source PDF / DOCX"]
+        S_Doclang["doclang/{id}/<br/>• document.xml.gz<br/>• archive.dclx<br/>• image_crops/"]
+    end
+
+    UI_List --> API_List
+    UI_Tree --> API_Tree
+    UI_Viewer --> API_DocLang
+
+    API_List --> T_Docs
+    API_Tree --> T_Nodes
+    API_DocLang --> S_Doclang
+    API_DocLang -.->|fallback| T_Docs
+```
+
+---
+
+### 4. Phased Implementation Strategy
+
+#### Phase 1: Immediate Payload & Query Optimization (Zero Schema Changes)
+
+1. **Lightweight List Projection**:
+   - In `DocumentResponse` for `GET /api/documents`, exclude full `doclang_xml` and `extracted_text`. Replace with `has_doclang: bool` and `char_count: int`.
+   - Keep full `doclang_xml` exclusively in `GET /api/documents/{id}` (detail) and the dedicated `GET /api/documents/{id}/doclang` streaming endpoint.
+   - Adjust `list_documents()` query to project only metadata columns (`SELECT id, filename, doc_type, project_code, suitability_code, revision_code, cde_state, ...`).
+
+2. **HTTP Compression & Caching**:
+   - Enable Gzip / Brotli compression on `GET /api/documents/{id}/doclang` and `GET /api/documents/{id}/sections-tree`. XML compresses by **80%–90%** due to repetitive tags.
+   - Add strong `ETag` and `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` because parsed DocLang is immutable for a given document revision.
+
+#### Phase 2: Hybrid DB / Object Storage Tiering
+
+1. **Offload Canonical XML to Supabase Storage**:
+   - Store the complete DocLang XML under `doclang/{document_id}/document.xml.gz` in the `bim-guard-artifacts` bucket.
+   - In `public.documents`, keep:
+     - `has_doclang: boolean NOT NULL DEFAULT FALSE`
+     - `doclang_storage_path: text` (pointing to `sb://bim-guard-artifacts/doclang/{document_id}/document.xml.gz`)
+   - _Graceful fallback_: For backward compatibility, if `doclang_xml` is under 256 KB, it can remain cached in PostgreSQL; if larger, stream directly from Supabase Storage.
+
+2. **Leverage `document_nodes` for Relational & Semantic Operations**:
+   - Keep `public.document_nodes` as the relational, queryable face of DocLang:
+     - Each clause, table, and heading chunk lives here with its `clause_id`, `section_path` (JSONB), `node_type` (`table`, `heading`, `paragraph`), and `bbox` (JSONB).
+     - Add a GIN index on `section_path` (`USING gin (section_path jsonb_path_ops)`) to allow sub-millisecond clause lookups without ever reparsing the full XML file.
+
+#### Phase 3: DocLang Multimodal & OTSL Artifact Bundling
+
+1. **Standardized `.dclx` Archive Persistence**:
+   - When documents are ingested, generate the `.dclx` bundle (`document.xml` + OTSL table references + `manifest.json`) and persist it directly in Storage.
+   - The official DocLang viewer or offline tools can stream this bundle directly using pre-signed URLs without routing through FastAPI server memory.
+
+---
+
+### Recommended Next Step
+
+Would you like to implement **Phase 1** now (slimming down `GET /api/documents` to eliminate the multi-megabyte payload bloat while preserving full on-demand retrieval for the viewer)?
