@@ -263,6 +263,22 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class AgentDiscoveryLinkMiddleware(BaseHTTPMiddleware):
+    """Advertise API discovery docs to agent clients via the HTTP Link header."""
+
+    LINK_HEADER = (
+        '</api/openapi.json>; rel="service-desc", '
+        '</.well-known/api-catalog>; rel="api-catalog", '
+        '</auth.md>; rel="auth"'
+    )
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("Link", self.LINK_HEADER)
+        return response
+
+
+app.add_middleware(AgentDiscoveryLinkMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 
 # Register API Gateway routers directly under /api prefix

@@ -566,6 +566,54 @@ Based on architectural bottlenecks identified in the current Python/NetworkX gra
 
 Owner: unassigned.
 
+## Priority 15: Agent-Callable Infrastructure (Pivot — Later Phases)
+
+Later-phase work to turn BIM Guard from an app that agents merely *browse*
+into infrastructure other agents can *call into* — discover its API, log in,
+invoke tools, and delegate work. Deferred until the core product pivot is
+committed; each item below assumes the previous ones exist.
+
+Already done (see `frontend/public/`, `app/main.py`): `robots.txt` with
+`Content-Signal`, `.well-known/api-catalog`, `auth.md`, and a `Link` header
+advertising all three on every response.
+
+- [ ] **Sitemap**: low priority while the SPA is auth-gated past the login
+      screen — revisit only if a public marketing/docs surface is added.
+- [ ] **Markdown Negotiation**: serve `text/markdown` for public pages via
+      `Accept` header content negotiation — same caveat as Sitemap, needs
+      public content to negotiate first.
+- [ ] **AI Crawler Rules**: this is a Cloudflare dashboard / bot-management
+      setting on the `bim-guard.xyz` zone, not app code — configure once the
+      domain is on Cloudflare.
+- [ ] **OAuth Discovery** (RFC 8414 authorization server metadata): Supabase
+      is the actual IdP here, so this would need to proxy or mirror
+      Supabase's own OAuth metadata rather than being authored locally.
+- [ ] **OAuth Protected Resource** (RFC 9728): publish `.well-known/oauth-protected-resource`
+      describing the `/api/*` resource server and required scopes, once API
+      scopes beyond "authenticated Supabase user" actually exist.
+- [ ] **Skills Index**: publish a machine-readable list of BIM Guard's
+      callable capabilities (project analysis, rule extraction, BCF export,
+      etc.) — natural next step once the API catalog above is load-bearing.
+- [ ] **A2A Agent Card** (`/.well-known/agent-card.json`): expose BIM Guard's
+      internal terminal agent (`BIM_GUARD_AGENT_MODEL`) as an Agent2Agent
+      endpoint other agents can delegate tasks to — real product surface,
+      not a config tweak.
+- [ ] **MCP Server Card**: wrap the analysis/rules/documents API as an MCP
+      server so agent clients (e.g. Claude, other MCP hosts) can call BIM
+      Guard's tools directly instead of hitting REST. Biggest lift on this
+      list; likely the centerpiece of the pivot.
+- [ ] **Web Bot Auth**: sign outbound requests made by BIM Guard's own
+      terminal agent (web search, tool calls) per the emerging Web Bot Auth
+      spec — relevant once that agent is calling third-party sites on a
+      user's behalf at scale.
+- [ ] **WebMCP**: expose in-browser tools from the Svelte SPA itself — still
+      an experimental spec; revisit once it stabilizes.
+- [ ] **DNS-AID**: DNS TXT record advertising BIM Guard's agent endpoints —
+      registrar/DNS config for `bim-guard.xyz`, not app code; do this last,
+      once the endpoints it would advertise (Agent Card, MCP server) exist.
+
+Owner: unassigned.
+
 ## Validation Gates
 
 - [x] Audit tests prove the source IFC hash is unchanged.
