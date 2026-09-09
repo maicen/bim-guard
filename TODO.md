@@ -750,38 +750,18 @@ flowchart TD
 ### 4. Phased Implementation Strategy
 
 #### Phase 1: Immediate Payload & Query Optimization (Zero Schema Changes)
-
-1. **Lightweight List Projection**:
-   - In `DocumentResponse` for `GET /api/documents`, exclude full `doclang_xml` and `extracted_text`. Replace with `has_doclang: bool` and `char_count: int`.
-   - Keep full `doclang_xml` exclusively in `GET /api/documents/{id}` (detail) and the dedicated `GET /api/documents/{id}/doclang` streaming endpoint.
-   - Adjust `list_documents()` query to project only metadata columns (`SELECT id, filename, doc_type, project_code, suitability_code, revision_code, cde_state, ...`).
-
-2. **HTTP Compression & Caching**:
-   - Enable Gzip / Brotli compression on `GET /api/documents/{id}/doclang` and `GET /api/documents/{id}/sections-tree`. XML compresses by **80%–90%** due to repetitive tags.
-   - Add strong `ETag` and `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` because parsed DocLang is immutable for a given document revision.
+- [x] **Lightweight List Projection**: Exclude full `doclang_xml` and `extracted_text` from `GET /api/documents`. Return slim metadata (`has_doclang: bool`, `doclang_size_bytes: int`). Reserve full XML for detail view and dedicated stream endpoints. *(Implemented in commit `26bfc45`)*
+- [x] **Selective Database Query Projection**: Added `select_projected(columns)` to `DatabaseAdapter` and `SupabaseTableAdapter`, querying only `DOCUMENT_SUMMARY_COLUMNS` during `list_documents()` to eliminate PostgreSQL TOAST table scans. *(Implemented in commit `c468922`)*
+- [x] **HTTP Compression & Caching**: Added Starlette `GZipMiddleware(minimum_size=1024)` in `app/main.py` for automatic 70%–90% payload compression in transit. Added `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` to DocLang XML and `.dclx` endpoints. *(Implemented in commit `ff68fab`)*
 
 #### Phase 2: Hybrid DB / Object Storage Tiering
-
-1. **Offload Canonical XML to Supabase Storage**:
-   - Store the complete DocLang XML under `doclang/{document_id}/document.xml.gz` in the `bim-guard-artifacts` bucket.
-   - In `public.documents`, keep:
-     - `has_doclang: boolean NOT NULL DEFAULT FALSE`
-     - `doclang_storage_path: text` (pointing to `sb://bim-guard-artifacts/doclang/{document_id}/document.xml.gz`)
-   - _Graceful fallback_: For backward compatibility, if `doclang_xml` is under 256 KB, it can remain cached in PostgreSQL; if larger, stream directly from Supabase Storage.
-
-2. **Leverage `document_nodes` for Relational & Semantic Operations**:
-   - Keep `public.document_nodes` as the relational, queryable face of DocLang:
-     - Each clause, table, and heading chunk lives here with its `clause_id`, `section_path` (JSONB), `node_type` (`table`, `heading`, `paragraph`), and `bbox` (JSONB).
-     - Add a GIN index on `section_path` (`USING gin (section_path jsonb_path_ops)`) to allow sub-millisecond clause lookups without ever reparsing the full XML file.
+- [x] **Supabase DB Migration**: Created and applied `20260909183000_optimize_doclang_indexes_and_storage_path.sql` adding `doclang_storage_path` column to `public.documents`. *(Implemented in commit `88a92e6`)*
+- [x] **Relational & Semantic Query Indexes**: Created composite index on `(document_id, node_type)` and GIN index on `section_path jsonb_path_ops` on `public.document_nodes`. *(Implemented in commit `88a92e6`)*
+- [x] **Threshold-Based Storage Offload**: Implemented `DOCLANG_OFFLOAD_THRESHOLD_BYTES = 256 * 1024` in `DocumentService`. XMLs larger than 256 KB automatically upload to Supabase Storage (`sb://bim-guard-artifacts/doclang/{doc_id}/document.xml.gz`) while smaller XMLs remain in Postgres with transparent dual-mode fallback via `get_doclang_content()`. *(Implemented in commit `5718b5a`)*
 
 #### Phase 3: DocLang Multimodal & OTSL Artifact Bundling
+- [x] **Standardized `.dclx` Archive Export Endpoint**: Created `GET /api/documents/{id}/export-doclang` generating zip archives containing `document.xml` and `manifest.json` with ISO 19650 metadata. *(Implemented in commit `44e057f` & `ff68fab`)*
+- [ ] **Pre-Ingestion `.dclx` Persistence in Supabase Storage**: Pre-generate and store `bundle.dclx` directly into Supabase Storage (`doclang/{document_id}/bundle.dclx`) when documents are ingested or updated with DocLang XML, caching the artifact in object storage.
+- [ ] **Pre-Signed / Direct Storage Streaming for `.dclx`**: Update `GET /api/documents/{id}/export-doclang` to stream directly from Supabase Storage or issue pre-signed redirect URLs when pre-persisted, avoiding in-memory zip compression.
+- [ ] **Multimodal Asset Extraction Support**: Support extracting embedded DocLang figures and table crop references into decoupled storage paths (`doclang/{id}/assets/`) rather than inline base64 blobs.
 
-1. **Standardized `.dclx` Archive Persistence**:
-   - When documents are ingested, generate the `.dclx` bundle (`document.xml` + OTSL table references + `manifest.json`) and persist it directly in Storage.
-   - The official DocLang viewer or offline tools can stream this bundle directly using pre-signed URLs without routing through FastAPI server memory.
-
----
-
-### Recommended Next Step
-
-Would you like to implement **Phase 1** now (slimming down `GET /api/documents` to eliminate the multi-megabyte payload bloat while preserving full on-demand retrieval for the viewer)?
