@@ -11,6 +11,7 @@ from app.services.bsdd_ontology_repository import (
     get_bsdd_ontology_repository,
 )
 from app.services.digital_inspector_service import DigitalInspectorService
+from app.services.graph_database import GraphService
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
@@ -98,6 +99,11 @@ def get_naming_config_service() -> NamingConfigService:
 def get_digital_inspector_service() -> DigitalInspectorService:
     """Return the configured DigitalInspectorService instance."""
     return get_container().digital_inspector_service
+
+
+def get_graph_service() -> GraphService:
+    """Return the configured GraphService instance."""
+    return get_container().graph_service
 
 
 def get_parsing_engine_instances_service() -> ParsingEngineInstancesService:

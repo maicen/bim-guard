@@ -559,8 +559,9 @@ Owner: unassigned.
 
 Based on architectural bottlenecks identified in the current Python/NetworkX graph implementation, a dedicated graph database or embedded graph engine is required to handle massive IFC space-connectivity and semantic rule relationships.
 
+- [x] Create a provider-agnostic `GraphDatabaseProvider` and `GraphService` abstraction in `app/services/graph_database.py`.
 - [ ] Evaluate KùzuDB as an embedded, serverless replacement for `networkx` in `ifc_graph.py` and `ifc_egress.py` to calculate Dijkstra shortest-paths and egress travel distances via Cypher sub-millisecond queries.
-- [ ] Evaluate Neo4j or FalkorDB for GraphRAG in the rules extraction pipeline, explicitly mapping hierarchical building codes (Section → Clause) to the IFC ontology (Building → Storey → Space) to eliminate LLM hallucinations.
+- [ ] Wire the `GraphService` into `LlamaIndexRuleGenerator` (Rules Extraction & NLP) for GraphRAG, explicitly mapping hierarchical building codes (Section → Clause) to the IFC ontology (Building → Storey → Space) to eliminate LLM hallucinations.
 - [ ] Proof of Concept: Execute complex topological rules natively via Cypher queries instead of hardcoded Python logic (e.g. `MATCH (p:IfcPipeSegment)-[:INTERSECTS]->(w:IfcWall {FireRating: '2h'})`).
 
 Owner: unassigned.

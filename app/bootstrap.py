@@ -8,6 +8,7 @@ the codebase.
 
 from __future__ import annotations
 
+from typing import Any
 from dataclasses import dataclass, field
 
 from app.logging_config import get_logger
@@ -61,6 +62,7 @@ from app.services.static_data_service import (
     StaticDataService,
 )
 from app.services.user_admin_service import UserAdminService
+from app.services.graph_database import GraphService
 
 logger = get_logger(__name__)
 
@@ -115,6 +117,7 @@ class ApplicationContainer:
     phase6_service: Phase6Service
     arch_analysis_service: ArchAnalysisService
     digital_inspector_service: DigitalInspectorService
+    graph_service: Any  # typed properly in the import if desired, but Any works for now without circular imports
     bimguard_app: BIMGuard_App
     engine_registry: RuleEngineRegistry = field(default_factory=RuleEngineRegistry)
 
@@ -608,6 +611,7 @@ def build_default_container() -> ApplicationContainer:
     )
 
     digital_inspector_service = DigitalInspectorService()
+    graph_service = GraphService()
 
     bimguard_app = BIMGuard_App(
         projects_service=projects_service,
@@ -664,6 +668,7 @@ def build_default_container() -> ApplicationContainer:
         phase6_service=phase6_service,
         arch_analysis_service=arch_analysis_service,
         digital_inspector_service=digital_inspector_service,
+        graph_service=graph_service,
         engine_registry=registry,
         bimguard_app=bimguard_app,
     )
