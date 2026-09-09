@@ -33,6 +33,7 @@ from app.modules.contracts import (
     DocumentResponse,
     DocumentSection,
     DocumentSectionsResponse,
+    DocumentSectionTreeResponse,
     DocumentUpdateRequest,
     GoogleDriveImportRequest,
     GoogleDriveImportResponse,
@@ -43,6 +44,9 @@ from app.modules.contracts import (
     RuleExtractionProgressResponse,
 )
 from app.modules.document_parsing.section_chunker import SectionChunker
+from app.modules.document_parsing.section_tree import build_section_tree
+from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
+from app.services.cache import cache_service
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.membership_service import MembershipService
@@ -457,6 +461,51 @@ def get_document_sections(
         for chunk in chunks
     ]
     return DocumentSectionsResponse(document_id=document_id, sections=sections)
+
+
+@router.get(
+    "/{document_id}/sections-tree",
+    response_model=DocumentSectionTreeResponse,
+    summary="Hierarchical, AI-arranged view of a document's sections, for scoping rule extraction",
+)
+async def get_document_sections_tree(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> DocumentSectionTreeResponse:
+    """Nest a document's detected sections into a tree for the scope picker.
+
+    The tree structure itself is derived deterministically from each
+    section's number/heading (free, always available). A one-time AI pass
+    additionally cleans up cosmetically broken labels (see
+    ``section_tree_enhancer``); its result is cached per document so the
+    LLM only runs once, not on every request — ``enhanced`` reports
+    whether that pass ran successfully this time.
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    cache_key = f"section_tree:{document_id}"
+    cached = cache_service.get(cache_key)
+    if cached is not None:
+        return DocumentSectionTreeResponse.model_validate(cached)
+
+    text = doc.get("extracted_text") or ""
+    chunks = SectionChunker().chunk(text) if text.strip() else []
+    tree, flat = build_section_tree(chunks)
+    tree, enhanced = await enhance_section_tree(tree, flat)
+
+    response = DocumentSectionTreeResponse(
+        document_id=document_id,
+        tree=tree,
+        sections=[DocumentSection(**chunk) for chunk in flat],
+        enhanced=enhanced,
+    )
+    cache_service.set(cache_key, response.model_dump())
+    return response
 
 
 @router.post(

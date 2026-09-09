@@ -560,6 +560,7 @@ class DocumentIngestResponse(BaseModel):
 class DocumentSection(BaseModel):
     """One heading-delimited section/paragraph, offered as an extraction-scope choice."""
 
+    id: Optional[str] = Field(default=None, description="Stable id within the document, e.g. 's12'")
     section_number: Optional[str] = Field(default=None, description="Detected clause/section number, e.g. '9.8.2'")
     section_name: Optional[str] = Field(default=None, description="Heading text for the section")
     text: str = Field(..., description="Full text of the section, for scoped rule extraction")
@@ -571,6 +572,35 @@ class DocumentSectionsResponse(BaseModel):
 
     document_id: int
     sections: list[DocumentSection] = Field(default_factory=list)
+
+
+class SectionTreeNode(BaseModel):
+    """One node in the hierarchical outline built from a document's detected sections."""
+
+    id: str = Field(..., description="Stable id matching the corresponding flat DocumentSection")
+    section_number: Optional[str] = None
+    section_name: Optional[str] = None
+    char_count: int = 0
+    children: list["SectionTreeNode"] = Field(default_factory=list)
+
+
+SectionTreeNode.model_rebuild()
+
+
+class DocumentSectionTreeResponse(BaseModel):
+    """Hierarchical + flat section data for a document, for the scoped-extraction tree picker.
+
+    ``tree`` nests sections for display; ``sections`` is the same data
+    flattened (ids match) so callers can look up a selected node's full
+    text without re-walking the tree. ``enhanced`` reports whether the
+    optional AI label-cleanup pass ran successfully — the tree is fully
+    usable either way.
+    """
+
+    document_id: int
+    tree: list[SectionTreeNode] = Field(default_factory=list)
+    sections: list[DocumentSection] = Field(default_factory=list)
+    enhanced: bool = False
 
 
 # ---------------------------------------------------------------------------

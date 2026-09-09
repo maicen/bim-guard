@@ -30,8 +30,10 @@
     ExtractedRule,
     RuleExtractionDraft,
     RuleSourceResponse,
+    SectionTreeNode,
   } from "../lib/types";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
+  import SectionTree from "../lib/components/SectionTree.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -63,22 +65,17 @@
   // Sections/paragraphs detected in the selected document, so extraction can be
   // scoped to a chosen clause instead of the whole document — the picked
   // sections' text is sent as an override to the draft-extraction request.
+  // `docSections` is the flat list (for text lookup by id); `sectionTree`
+  // nests the same ids for the collapsible picker UI.
   let docSections: DocumentSection[] = $state([]);
+  let sectionTree: SectionTreeNode[] = $state([]);
+  let sectionsEnhanced = $state(false);
   const selectedSectionKeys: Set<string> = new SvelteSet();
   let isLoadingSections = $state(false);
 
-  function sectionKey(section: DocumentSection, index: number): string {
-    return `${section.section_number ?? ""}::${index}`;
-  }
-
-  function toggleSection(key: string) {
-    if (selectedSectionKeys.has(key)) selectedSectionKeys.delete(key);
-    else selectedSectionKeys.add(key);
-  }
-
   function selectAllSections() {
     selectedSectionKeys.clear();
-    for (const [i, s] of docSections.entries()) selectedSectionKeys.add(sectionKey(s, i));
+    for (const s of docSections) if (s.id) selectedSectionKeys.add(s.id);
   }
 
   function clearSectionSelection() {
@@ -88,21 +85,28 @@
   $effect(() => {
     const docId = selectedDocId;
     docSections = [];
+    sectionTree = [];
+    sectionsEnhanced = false;
     selectedSectionKeys.clear();
     if (!docId) return;
 
     isLoadingSections = true;
     documentsApi
-      .getSections(docId)
+      .getSectionsTree(docId)
       .then((res) => {
         if (selectedDocId !== docId) return; // selection changed while in flight
         docSections = res.sections;
+        sectionTree = res.tree;
+        sectionsEnhanced = res.enhanced;
         // Nothing selected by default when sections were detected, so
         // scoping is deliberate; leaving all sections unselected extracts
         // from the whole document instead.
       })
       .catch(() => {
-        if (selectedDocId === docId) docSections = [];
+        if (selectedDocId === docId) {
+          docSections = [];
+          sectionTree = [];
+        }
       })
       .finally(() => {
         if (selectedDocId === docId) isLoadingSections = false;
@@ -344,7 +348,7 @@
         const scopedText =
           selectedSectionKeys.size > 0
             ? docSections
-                .filter((s, i) => selectedSectionKeys.has(sectionKey(s, i)))
+                .filter((s) => s.id && selectedSectionKeys.has(s.id))
                 .map((s) => s.text)
                 .join("\n\n")
             : undefined;
@@ -577,23 +581,14 @@
         <p class="text-micro text-slate-500">
           {docSections.length} section{docSections.length === 1 ? "" : "s"} detected. Pick one or more
           to scope the extraction, or leave all unselected to process the whole document.
+          {#if sectionsEnhanced}
+            <span class="ml-1 inline-flex items-center gap-1 text-accent">
+              <Sparkles class="h-3 w-3" /> AI-arranged
+            </span>
+          {/if}
         </p>
-        <div class="max-h-64 space-y-1 overflow-y-auto pr-1">
-          {#each docSections as section, i (sectionKey(section, i))}
-            {@const key = sectionKey(section, i)}
-            <label
-              class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-900"
-            >
-              <TableCheckbox
-                checked={selectedSectionKeys.has(key)}
-                onchange={() => toggleSection(key)}
-                ariaLabel={`Select section ${section.section_number || i + 1}`}
-              />
-              <span class="font-mono text-slate-500">{section.section_number || "—"}</span>
-              <span class="flex-1 truncate">{section.section_name || "Untitled section"}</span>
-              <span class="shrink-0 text-slate-600">{section.char_count.toLocaleString()} chars</span>
-            </label>
-          {/each}
+        <div class="max-h-64 overflow-y-auto pr-1">
+          <SectionTree nodes={sectionTree} selected={selectedSectionKeys} />
         </div>
       </div>
     {:else if selectedDocId}

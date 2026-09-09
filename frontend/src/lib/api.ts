@@ -25,6 +25,7 @@ import type {
   DocumentDetail,
   DocumentItem,
   DocumentSectionsResponse,
+  DocumentSectionTreeResponse,
   DocumentUpdatePayload,
   GitHubRepo,
   GitHubRepoCreatePayload,
@@ -1383,6 +1384,11 @@ export const documentsApi = {
   async getSections(id: number): Promise<DocumentSectionsResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/sections`);
     return handleResponse<DocumentSectionsResponse>(res);
+  },
+
+  async getSectionsTree(id: number): Promise<DocumentSectionTreeResponse> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/sections-tree`);
+    return handleResponse<DocumentSectionTreeResponse>(res);
   },
 
   async importFromGoogleDrive(payload: GoogleDriveImportPayload): Promise<GoogleDriveImportResponse> {

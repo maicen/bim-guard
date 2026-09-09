@@ -295,6 +295,7 @@ export interface DocumentDetail extends IsoGovernanceFieldsRequired {
 }
 
 export interface DocumentSection {
+  id?: string | null;
   section_number?: string | null;
   section_name?: string | null;
   text: string;
@@ -304,6 +305,21 @@ export interface DocumentSection {
 export interface DocumentSectionsResponse {
   document_id: number;
   sections: DocumentSection[];
+}
+
+export interface SectionTreeNode {
+  id: string;
+  section_number?: string | null;
+  section_name?: string | null;
+  char_count: number;
+  children: SectionTreeNode[];
+}
+
+export interface DocumentSectionTreeResponse {
+  document_id: number;
+  tree: SectionTreeNode[];
+  sections: DocumentSection[];
+  enhanced: boolean;
 }
 
 export interface DocumentUpdatePayload {
