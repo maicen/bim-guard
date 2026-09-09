@@ -113,3 +113,9 @@ data/*_demo.ifc
 # Claude Code per-machine settings: a local permission allowlist that differs
 # on every developer's machine. The shared settings live in .claude/settings.json.
 .claude/settings.local.json
+
+# Embedded KùzuDB graph database (app/services/kuzu_provider.py via
+# app/bootstrap.py). Generated local state, regenerated from source data on
+# demand -- not the version of record for anything.
+.kuzu/
+.kuzu_db/

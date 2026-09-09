@@ -8,6 +8,7 @@ without changing domain logic.
 
 from typing import Any, Dict, List, Optional, Protocol
 
+
 class GraphDatabaseProvider(Protocol):
     """Protocol defining standard graph database operations."""
     
@@ -19,8 +20,22 @@ class GraphDatabaseProvider(Protocol):
         """Add a node to the graph."""
         ...
         
-    def add_edge(self, source_id: Any, target_id: Any, rel_type: str, properties: Optional[Dict[str, Any]] = None) -> None:
-        """Add an edge between two nodes."""
+    def add_edge(
+        self,
+        source_id: Any,
+        target_id: Any,
+        rel_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add an edge between two nodes.
+
+        from_label/to_label identify each endpoint's node type -- required by
+        providers (e.g. Kùzu) whose graph is strictly typed; a provider that
+        doesn't need them may ignore both.
+        """
         ...
         
     def clear(self) -> None:
@@ -47,14 +62,23 @@ class GraphService:
         return self.provider.execute_query(query, parameters)
         
     def insert_document_node(self, node_id: str, text: str, metadata: Dict[str, Any]) -> None:
-        """Helper to insert an extracted NLP document node for GraphRAG."""
+        """Insert an extracted NLP document node for GraphRAG."""
         if not self.provider:
             return
         properties = {"node_id": node_id, "text": text, **metadata}
         self.provider.add_node("DocumentNode", properties)
         
     def link_rule_to_ifc(self, rule_id: str, ifc_class: str) -> None:
-        """Helper to link an extracted rule to its target IFC class."""
+        """Link an extracted rule to its target IFC class.
+
+        Ensures both endpoint nodes exist first: add_edge needs to know each
+        endpoint's node-table label to build a MATCH against Kuzu's strictly
+        typed graph, and a rule/IFC class pair reaching this helper may never
+        have been added as nodes on their own.
+        """
         if not self.provider:
             return
-        self.provider.add_edge(rule_id, ifc_class, "APPLIES_TO")
+        self.provider.add_node("Rule", {"rule_id": rule_id})
+        self.provider.add_node("IfcClass", {"id": ifc_class, "class_name": ifc_class})
+        self.provider.add_edge(rule_id, ifc_class, "APPLIES_TO", from_label="Rule", to_label="IfcClass")
+
