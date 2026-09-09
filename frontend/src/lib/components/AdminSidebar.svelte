@@ -9,6 +9,7 @@
     ChevronLeft,
     ChevronRight,
     Shield,
+    Plug,
   } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -30,6 +31,13 @@
       icon: Building2,
       path: "/org-settings",
       description: "Members, roles, invites & groups",
+    },
+    {
+      id: "external-providers",
+      label: "External providers",
+      icon: Plug,
+      path: "/external-providers",
+      description: "Document parsing & LLM provider credentials",
     },
     {
       id: "superadmin-users",

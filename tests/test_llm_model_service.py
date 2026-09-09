@@ -4,18 +4,22 @@ import asyncio
 
 import httpx
 
-import app.services.llm_model_service as model_service_module
 from app.services.llm_model_service import LLMModelService
 
 
 def _install_transport(monkeypatch, handler):
+    # Every provider's HTTP call lives in its LLMProviderDriver
+    # (app/modules/llm_providers/*_driver.py), each of which does a plain
+    # `import httpx` and calls `httpx.AsyncClient(...)` — so patching the
+    # attribute on the real httpx module (not a module-local alias) reaches
+    # every driver's call site regardless of which one a given test exercises.
     real_client = httpx.AsyncClient
 
     def client_factory(*args, **kwargs):
         kwargs["transport"] = httpx.MockTransport(handler)
         return real_client(*args, **kwargs)
 
-    monkeypatch.setattr(model_service_module.httpx, "AsyncClient", client_factory)
+    monkeypatch.setattr(httpx, "AsyncClient", client_factory)
 
 
 def test_ollama_models_use_local_tags_endpoint(monkeypatch):

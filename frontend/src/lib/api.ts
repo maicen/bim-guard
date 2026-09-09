@@ -57,6 +57,12 @@ import type {
   ParsingEngineInstanceTestResult,
   ParsingEngineInstanceUpdatePayload,
   ParsingEngineKind,
+  LLMProviderInstance,
+  LLMProviderInstanceCreatePayload,
+  LLMProviderInstanceTestResult,
+  LLMProviderInstanceUpdatePayload,
+  LLMProviderKind,
+  LLMProviderModel,
   ProfileUpdatePayload,
   Project,
   ProjectBulkActionResponse,
@@ -1710,6 +1716,68 @@ export const parsingEnginesApi = {
       method: "POST",
     });
     return handleResponse<ParsingEngineInstanceTestResult>(res);
+  },
+};
+
+// =============================================================================
+// LLM Providers API Client (org-scoped — see app/api/llm_provider_instances.py)
+// =============================================================================
+
+export const llmProvidersApi = {
+  /** Registered provider kinds (drivers) — drives the External Providers UI's
+   * kind selector so a new backend driver appears with no frontend change. */
+  async kinds(organizationId: number): Promise<LLMProviderKind[]> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/kinds`);
+    return handleResponse<LLMProviderKind[]>(res);
+  },
+
+  async list(organizationId: number): Promise<LLMProviderInstance[]> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers`);
+    return handleResponse<LLMProviderInstance[]>(res);
+  },
+
+  async create(
+    organizationId: number,
+    payload: LLMProviderInstanceCreatePayload,
+  ): Promise<LLMProviderInstance> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<LLMProviderInstance>(res);
+  },
+
+  async update(
+    organizationId: number,
+    id: number,
+    payload: LLMProviderInstanceUpdatePayload,
+  ): Promise<LLMProviderInstance> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<LLMProviderInstance>(res);
+  },
+
+  async delete(organizationId: number, id: number): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/${id}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
+  },
+
+  async test(organizationId: number, id: number): Promise<LLMProviderInstanceTestResult> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/${id}/test`, {
+      method: "POST",
+    });
+    return handleResponse<LLMProviderInstanceTestResult>(res);
+  },
+
+  async models(organizationId: number, id: number): Promise<LLMProviderModel[]> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/${id}/models`);
+    return handleResponse<LLMProviderModel[]>(res);
   },
 };
 

@@ -42,6 +42,9 @@ from app.api import (
     events as api_events,
 )
 from app.api import (
+    llm_provider_instances as api_llm_provider_instances,
+)
+from app.api import (
     models as api_models,
 )
 from app.api import (
@@ -197,6 +200,7 @@ TAGS_METADATA = [
     {"name": "Settings", "description": "Application-wide runtime configuration."},
     {"name": "ISO 19650 Naming", "description": "ISO 19650 information-container naming catalog and per-project config."},
     {"name": "Parsing Engines", "description": "Configured external IFC parsing engine instances."},
+    {"name": "LLM Providers", "description": "Per-organization configured LLM provider instances and their models."},
     {"name": "Events", "description": "Server-Sent Events streaming of pipeline/engine progress."},
     {
         "name": "Public",
@@ -285,6 +289,11 @@ app.include_router(
     api_parsing_engines.router,
     prefix="/api/parsing-engines",
     tags=["Parsing Engines"],
+)
+app.include_router(
+    api_llm_provider_instances.router,
+    prefix="/api/organizations",
+    tags=["LLM Providers"],
 )
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 

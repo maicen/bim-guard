@@ -36,6 +36,7 @@
   import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
   import SettingsView from "./routes/SettingsView.svelte";
   import OrgSettingsView from "./routes/OrgSettingsView.svelte";
+  import ExternalProvidersView from "./routes/ExternalProvidersView.svelte";
   import SuperadminRulesetsView from "./routes/SuperadminRulesetsView.svelte";
   import SuperadminProjectGrantsView from "./routes/SuperadminProjectGrantsView.svelte";
   import SuperadminDocumentGrantsView from "./routes/SuperadminDocumentGrantsView.svelte";
@@ -391,6 +392,7 @@
   const ADMIN_VIEWS = new Set([
     "admin",
     "org-settings",
+    "external-providers",
     "superadmin-rulesets",
     "superadmin-project-grants",
     "superadmin-document-grants",
@@ -624,6 +626,8 @@
           <SettingsView />
         {:else if activeView === "org-settings" || activeView === "admin"}
           <OrgSettingsView />
+        {:else if activeView === "external-providers"}
+          <ExternalProvidersView />
         {:else if activeView === "superadmin-rulesets"}
           <SuperadminRulesetsView />
         {:else if activeView === "superadmin-project-grants"}

@@ -23,11 +23,14 @@
     ArrowDown,
     Download,
   } from "lucide-svelte";
-  import { documentsApi, ruleExtractionApi } from "../lib/api";
+  import { documentsApi, ruleExtractionApi, llmProvidersApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import type {
     DocumentItem,
     DocumentSection,
     ExtractedRule,
+    LLMProviderInstance,
+    LLMProviderModel,
     RuleExtractionDraft,
     RuleSourceResponse,
     SectionTreeNode,
@@ -59,7 +62,7 @@
   let selectedDocId: number | null = $state(untrack(() => initialDocId));
   let showReturnPrompt = $state(false);
   let rawText = $state("");
-  let selectedModel = $state("gemini-2.5-flash");
+  let selectedModel = $state("");
   let viewingDraftRule: ExtractedRule | null = $state(null);
 
   // Sections/paragraphs detected in the selected document, so extraction can be
@@ -292,15 +295,41 @@
   let bulkDraftOperator = $state("no_change");
   let isDraftBulkDeleteModalOpen = $state(false);
 
-  const LLM_MODELS = [
-    { id: "gemini-2.5-flash", name: "Google Gemini 2.5 Flash (Recommended)" },
-    { id: "gemini-1.5-pro", name: "Google Gemini 1.5 Pro" },
-    { id: "gpt-4o", name: "OpenAI GPT-4o" },
-    { id: "claude-3-5-sonnet", name: "Anthropic Claude 3.5 Sonnet" },
-    { id: "ollama/llama3", name: "Local Ollama Llama 3" },
-  ];
+  // Model choices come from this organization's configured LLM providers
+  // (Admin → External providers → LLM Providers) instead of a hardcoded
+  // list, so extraction always uses a real, credentialed provider.
+  let llmModels: LLMProviderModel[] = $state([]);
+  let llmModelsLoading = $state(false);
+  let llmModelsError = $state("");
+
+  async function loadLlmModels() {
+    const activeOrg = authState.activeOrganization;
+    if (!activeOrg) return;
+    llmModelsLoading = true;
+    llmModelsError = "";
+    try {
+      const instances = await llmProvidersApi.list(activeOrg.organization_id);
+      const enabled = instances.filter((i) => i.is_enabled);
+      const primary: LLMProviderInstance | undefined =
+        enabled.find((i) => i.is_default) ?? enabled[0];
+      if (!primary) {
+        llmModels = [];
+        return;
+      }
+      llmModels = await llmProvidersApi.models(activeOrg.organization_id, primary.id);
+      if (llmModels.length > 0 && !llmModels.some((m) => m.id === selectedModel)) {
+        selectedModel = llmModels[0].id;
+      }
+    } catch (err: any) {
+      llmModelsError = err.message || "Failed to load models from the configured LLM provider.";
+      llmModels = [];
+    } finally {
+      llmModelsLoading = false;
+    }
+  }
 
   onMount(async () => {
+    loadLlmModels();
     try {
       documents = await documentsApi.list();
     } catch {
@@ -545,15 +574,28 @@
         >
           Extraction Model / Parser
         </label>
-        <select
-          id="rule-ai-model"
-          bind:value={selectedModel}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
-        >
-          {#each LLM_MODELS as model (model.id)}
-            <option value={model.id}>{model.name}</option>
-          {/each}
-        </select>
+        {#if llmModelsLoading}
+          <p class="text-caption text-slate-500">Loading available models…</p>
+        {:else if llmModels.length === 0}
+          <div
+            class="rounded-xl border border-dashed border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-500"
+          >
+            {llmModelsError || "No LLM provider configured for this organization."} Add one under
+            <a href="#/external-providers" class="font-semibold text-accent hover:underline"
+              >Admin → External providers</a
+            >.
+          </div>
+        {:else}
+          <select
+            id="rule-ai-model"
+            bind:value={selectedModel}
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          >
+            {#each llmModels as model (model.id)}
+              <option value={model.id}>{model.name}</option>
+            {/each}
+          </select>
+        {/if}
       </div>
     </div>
 
@@ -617,7 +659,7 @@
     <div class="flex justify-end pt-2">
       <button
         type="button"
-        disabled={isExtracting}
+        disabled={isExtracting || !selectedModel}
         onclick={handleExtract}
         class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >

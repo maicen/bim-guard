@@ -992,6 +992,62 @@ export interface ParsingEngineInstanceTestResult {
   detail: string;
 }
 
+// Org-scoped equivalent of the ParsingEngine* types above, for LLM
+// providers (OpenAI, Anthropic, Gemini, OpenRouter, a self-hosted Ollama
+// server, ...) -- see app/modules/llm_providers on the backend. `kind` is
+// likewise a plain string, discovered at runtime via llmProvidersApi.kinds().
+export type LLMProviderKindId = string;
+
+export interface LLMProviderKind {
+  kind: LLMProviderKindId;
+  display_name: string;
+  description: string;
+  requires_api_key: boolean;
+  default_api_base: string;
+  url_placeholder: string;
+}
+
+export interface LLMProviderInstance extends Timestamps {
+  id: number;
+  organization_id: number;
+  name: string;
+  kind: LLMProviderKindId;
+  api_base: string;
+  has_api_key: boolean;
+  is_default: boolean;
+  is_enabled: boolean;
+  notes: string;
+}
+
+export interface LLMProviderInstanceCreatePayload {
+  name: string;
+  kind: LLMProviderKindId;
+  api_key?: string;
+  api_base?: string;
+  is_default?: boolean;
+  is_enabled?: boolean;
+  notes?: string;
+}
+
+export interface LLMProviderInstanceUpdatePayload {
+  name?: string;
+  api_key?: string;
+  api_base?: string;
+  is_default?: boolean;
+  is_enabled?: boolean;
+  notes?: string;
+}
+
+export interface LLMProviderInstanceTestResult {
+  ok: boolean;
+  detail: string;
+}
+
+export interface LLMProviderModel {
+  id: string;
+  name: string;
+}
+
 // =============================================================================
 // buildingSMART Ecosystem Frontend Types
 // =============================================================================

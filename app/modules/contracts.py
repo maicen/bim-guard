@@ -1448,6 +1448,87 @@ class ParsingEngineKindResponse(BaseModel):
 
 
 # ==============================================================================
+# LLM Provider Instance Contracts (org-scoped — see app/modules/llm_providers)
+# ==============================================================================
+
+
+class LLMProviderInstanceCreateRequest(BaseModel):
+    """Payload for registering a new LLM provider instance within an organization."""
+
+    name: str = Field(..., min_length=1, description="Unique (per org) display name, e.g. 'openrouter-main'")
+    kind: str = Field(
+        ..., min_length=1, description="A registered provider kind — see GET .../llm-providers/kinds"
+    )
+    api_key: Optional[str] = Field(
+        None, description="API key — required for kinds where GET .../llm-providers/kinds reports requires_api_key"
+    )
+    api_base: Optional[str] = Field(None, description="Override the provider's default API base URL")
+    is_default: Optional[bool] = Field(False, description="Use this instance when none is explicitly selected")
+    is_enabled: Optional[bool] = Field(True, description="Whether this instance is selectable")
+    notes: Optional[str] = Field(None, description="Freeform notes")
+
+
+class LLMProviderInstanceUpdateRequest(BaseModel):
+    """Payload for updating an existing LLM provider instance.
+
+    `kind` cannot be changed after creation — register a new instance instead.
+    """
+
+    name: Optional[str] = Field(None, description="Updated display name")
+    api_key: Optional[str] = Field(None, description="Updated API key (omit to leave unchanged)")
+    api_base: Optional[str] = Field(None, description="Updated API base URL override")
+    is_default: Optional[bool] = Field(None, description="Make (or unmake) this the org's default instance")
+    is_enabled: Optional[bool] = Field(None, description="Toggle whether this instance is selectable")
+    notes: Optional[str] = Field(None, description="Updated notes")
+
+
+class LLMProviderInstanceResponse(TimestampFields):
+    """Response contract for a registered LLM provider instance.
+
+    The stored api_key is never echoed back — only whether one is set.
+    """
+
+    id: int
+    organization_id: int
+    name: str
+    kind: str
+    api_base: str = ""
+    has_api_key: bool = False
+    is_default: bool = False
+    is_enabled: bool = True
+    notes: str = ""
+
+
+class LLMProviderInstanceTestResponse(BaseModel):
+    """Result of a connectivity check against a configured LLM provider instance."""
+
+    ok: bool
+    detail: str = ""
+
+
+class LLMProviderKindResponse(BaseModel):
+    """Metadata for one registered LLM provider kind (an LLMProviderDriver).
+
+    Drives the External Providers UI's kind selector — a new backend driver
+    shows up there automatically, with no frontend changes.
+    """
+
+    kind: str
+    display_name: str
+    description: str = ""
+    requires_api_key: bool = False
+    default_api_base: str = ""
+    url_placeholder: str = ""
+
+
+class LLMProviderModelResponse(BaseModel):
+    """One model available from a configured LLM provider instance."""
+
+    id: str
+    name: str
+
+
+# ==============================================================================
 # buildingSMART Ecosystem Contracts
 # ==============================================================================
 

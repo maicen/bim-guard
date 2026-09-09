@@ -30,6 +30,7 @@ from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
+from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.membership_service import MembershipService
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.models_service import ModelsService
@@ -82,6 +83,7 @@ class ApplicationContainer:
     github_repos_repo: DatabaseAdapter
     naming_config_repo: DatabaseAdapter
     parsing_engine_instances_repo: DatabaseAdapter
+    llm_provider_instances_repo: DatabaseAdapter
     organizations_repo: DatabaseAdapter
     memberships_repo: DatabaseAdapter
     organization_invites_repo: DatabaseAdapter
@@ -103,6 +105,7 @@ class ApplicationContainer:
     github_repo_service: GitHubRepoService
     naming_config_service: NamingConfigService
     parsing_engine_instances_service: ParsingEngineInstancesService
+    llm_provider_instances_service: LLMProviderInstancesService
     membership_service: MembershipService
     profile_service: ProfileService
     user_admin_service: UserAdminService
@@ -414,6 +417,23 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    llm_provider_instances_repo = PersistenceService.get_table(
+        "llm_provider_instances",
+        {
+            "id": int,
+            "organization_id": int,
+            "name": str,
+            "kind": str,
+            "api_key": str,
+            "api_base": str,
+            "is_default": bool,
+            "is_enabled": bool,
+            "notes": str,
+            "created_at": str,
+            "updated_at": str,
+        },
+    )
+
     # 3. Model Lineage & Static Data
     lineage = SupabaseModelLineageRepository(lineage_repo=lineage_repo)
     static_data_service = StaticDataService(
@@ -497,6 +517,10 @@ def build_default_container() -> ApplicationContainer:
 
     parsing_engine_instances_service = ParsingEngineInstancesService(
         instances_repo=parsing_engine_instances_repo,
+    )
+
+    llm_provider_instances_service = LLMProviderInstancesService(
+        instances_repo=llm_provider_instances_repo,
     )
 
     # Seed the registry from legacy env vars on first boot, so existing
@@ -608,6 +632,7 @@ def build_default_container() -> ApplicationContainer:
         github_repos_repo=github_repos_repo,
         naming_config_repo=naming_config_repo,
         parsing_engine_instances_repo=parsing_engine_instances_repo,
+        llm_provider_instances_repo=llm_provider_instances_repo,
         organizations_repo=organizations_repo,
         memberships_repo=memberships_repo,
         organization_invites_repo=organization_invites_repo,
@@ -629,6 +654,7 @@ def build_default_container() -> ApplicationContainer:
         github_repo_service=github_repo_service,
         naming_config_service=naming_config_service,
         parsing_engine_instances_service=parsing_engine_instances_service,
+        llm_provider_instances_service=llm_provider_instances_service,
         membership_service=membership_service,
         profile_service=profile_service,
         user_admin_service=user_admin_service,
