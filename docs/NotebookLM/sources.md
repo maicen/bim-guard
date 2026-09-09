@@ -234,3 +234,53 @@ ISO 19650 and BIM clash detection workflows, CDE platform context, and certifica
 https://www.iso.org/standard/68078.html
 ```
 ISO 19650-1 official standard page. Scope, abstract, and publication details. Use for formal academic citation of the standard itself.
+
+---
+
+## Module 9 — Piping codes and terminology (context, secondary sources)
+
+Secondary sources for NotebookLM context only; not citable in a rule row.
+
+```
+https://www.engineeringtoolbox.com/corrosions-terms-d_566.html
+```
+Comprehensive corrosion terminology glossary covering galvanic, crevice, MIC, stress corrosion, and pitting mechanisms with plain-language definitions.
+
+```
+https://www.cedengineering.com/userfiles/Process%20Piping%20Fundamentals,%20Codes%20and%20Standards%20%20-%20Module%201.pdf
+```
+Process Piping Fundamentals PDF covering ASME B31.3, B31.1, and B31.8 scope, philosophy, and design principles. Free downloadable reference for piping code context.
+
+```
+https://whatispiping.com/piping-codes-and-standards/
+```
+Overview of piping codes (ASME B31, ANSI, API) with scope explanation. Useful for distinguishing which standard applies to which service (power, process, refrigerant, gas).
+
+```
+https://engineersnotebook.com/codes-and-standards/asme-b31-3-process-piping/
+```
+ASME B31.3 scope and key design margins. Covers the standard that governs most industrial process piping and its relationship to BIMGUARD's corrosion and spacing engines.
+
+```
+https://epcland.com/piping-codes-standards/
+```
+Comparison of major piping codes by service and jurisdiction. Clarifies which regions default to ASME, API, DIN, or AS/NZS standards for MEP design.
+
+```
+https://www.pipingengineer.org/list-of-asme-b31-codes/
+```
+Complete list of ASME B31 code branches with brief description of scope. Reference for understanding why B31.3 (process), B31.1 (power), and B31.8 (gas) coexist and how BIMGUARD prioritises them.
+
+---
+
+## Module 10 — PD-001 proximity / drip-path (in progress)
+
+Work-in-progress ruleset branch: `feat/pd-001-sources` (reference documentation in `docs/scraped_standards/pd001_sources.md`).
+
+Five PDFs still to be obtained by hand:
+
+1. G12/AS1 amd 14 — AS standards amendment
+2. G12/AS3 amd 14 — AS standards amendment
+3. Copper Tube Handbook — installation spacing and material compatibility
+4. AS/NZS 3500.1 — Australian/NZ plumbing code
+5. Nickel Institute 316 SCC guide — stainless steel stress corrosion cracking prevention
