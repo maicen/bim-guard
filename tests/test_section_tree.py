@@ -185,7 +185,7 @@ def _patch_program(monkeypatch, program: _FakeProgram) -> None:
     monkeypatch.setattr(
         li_program.LLMTextCompletionProgram, "from_defaults", staticmethod(_from_defaults)
     )
-    monkeypatch.setattr(llamaindex_program, "build_llm", lambda model=None: None)
+    monkeypatch.setattr(llamaindex_program, "build_llm", lambda model=None, organization_id=None: None)
 
 
 def test_enhance_section_tree_applies_only_known_id_overrides(monkeypatch):

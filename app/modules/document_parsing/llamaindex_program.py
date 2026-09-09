@@ -43,19 +43,29 @@ CLAUSE TEXT:
 """
 
 
-def build_llm(model: str | None = None):
+def build_llm(model: str | None = None, *, organization_id: int | None = None):
     """Construct the LlamaIndex LiteLLM binding from shared app config.
 
     Args:
         model: Overrides ``DEFAULT_LLM_MODEL`` when the caller lets the user
             pick an extraction model (e.g. the Rule Extraction UI's model
             selector). Falls back to the configured default when omitted.
+        organization_id: Resolves the API key from that org's configured
+            ``llm_provider_instances`` row first (see
+            ``app.modules.llm_providers.key_resolver``), falling back to the
+            provider's env var (e.g. ``OPENROUTER_API_KEY``) when omitted or
+            when the org has no matching instance configured.
     """
     from llama_index.llms.litellm import LiteLLM
 
     from app.modules.config import COMPLIANCE_TEMPERATURE, DEFAULT_LLM_MODEL
+    from app.modules.llm_providers.key_resolver import resolve_api_key
 
-    return LiteLLM(model=model or DEFAULT_LLM_MODEL, temperature=COMPLIANCE_TEMPERATURE)
+    resolved_model = model or DEFAULT_LLM_MODEL
+    provider = resolved_model.split("/", 1)[0] if "/" in resolved_model else "openrouter"
+    api_key = resolve_api_key(provider, organization_id)
+
+    return LiteLLM(model=resolved_model, temperature=COMPLIANCE_TEMPERATURE, api_key=api_key)
 
 
 class _DeonticExtractionResult(BaseModel):
@@ -67,7 +77,7 @@ class _DeonticExtractionResult(BaseModel):
 
 
 async def extract_deontic_statement(
-    clause_text: str, *, clause: ClauseMetadata
+    clause_text: str, *, clause: ClauseMetadata, organization_id: int | None = None
 ) -> DeonticStatement | None:
     """Run a LlamaIndex Pydantic program to extract one deontic statement.
 
@@ -79,7 +89,7 @@ async def extract_deontic_statement(
     program = LLMTextCompletionProgram.from_defaults(
         output_cls=_DeonticExtractionResult,
         prompt_template_str=_DEONTIC_PROMPT,
-        llm=build_llm(),
+        llm=build_llm(organization_id=organization_id),
     )
     result: _DeonticExtractionResult = await program.acall(clause_text=clause_text)
 

@@ -30,27 +30,39 @@ result.
 """
 
 
-def _build_llm():
-    """Construct the LangChain-compatible LiteLLM chat model from shared app config."""
+def _build_llm(organization_id: int | None = None):
+    """Construct the LangChain-compatible LiteLLM chat model from shared app config.
+
+    Args:
+        organization_id: Resolves the API key from that org's configured
+            LLM provider instance first, falling back to the provider's env
+            var — see ``app.modules.llm_providers.key_resolver``.
+    """
     from langchain_litellm import ChatLiteLLM
 
     from app.modules.config import COMPLIANCE_TEMPERATURE, DEFAULT_LLM_MODEL
+    from app.modules.llm_providers.key_resolver import resolve_api_key
 
-    return ChatLiteLLM(model=DEFAULT_LLM_MODEL, temperature=COMPLIANCE_TEMPERATURE)
+    provider = DEFAULT_LLM_MODEL.split("/", 1)[0] if "/" in DEFAULT_LLM_MODEL else "openrouter"
+    api_key = resolve_api_key(provider, organization_id)
+
+    return ChatLiteLLM(model=DEFAULT_LLM_MODEL, temperature=COMPLIANCE_TEMPERATURE, api_key=api_key)
 
 
-@lru_cache(maxsize=1)
-def build_digital_inspector_graph():
-    """Compile the Digital Inspector's ReAct graph once, as a process-wide singleton.
+@lru_cache(maxsize=None)
+def build_digital_inspector_graph(organization_id: int | None = None):
+    """Compile the Digital Inspector's ReAct graph, cached per organization.
 
     Compiling a LangGraph graph is cheap but not free; `ApplicationContainer`
-    (see app.bootstrap) holds this as a singleton rather than recompiling it
-    per request.
+    (see app.bootstrap) held this as a single process-wide singleton before
+    per-org API keys existed. `lru_cache` now keys on `organization_id`
+    instead, so each org's graph (and its resolved API key) is compiled
+    once and reused, rather than recompiling per request.
     """
     from langgraph.prebuilt import create_react_agent
 
     return create_react_agent(
-        _build_llm(),
+        _build_llm(organization_id),
         DIGITAL_INSPECTOR_TOOLS,
         prompt=_SYSTEM_PROMPT,
     )

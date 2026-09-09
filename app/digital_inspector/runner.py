@@ -18,13 +18,15 @@ logger = get_logger(__name__)
 _TRACKER_CODE = "DIGITAL-INSPECTOR"
 
 
-async def run_inspection(project_id: int, query: str) -> InspectorResponse:
+async def run_inspection(
+    project_id: int, query: str, *, organization_id: int | None = None
+) -> InspectorResponse:
     """Run one Digital Inspector query and return the final answer + tool-call trace."""
     from langchain_core.messages import AIMessage
 
     from app.digital_inspector.graph import build_digital_inspector_graph
 
-    graph = build_digital_inspector_graph()
+    graph = build_digital_inspector_graph(organization_id)
 
     with pipeline_tracker.tracking(project_id):
         pipeline_tracker.emit(_TRACKER_CODE, query_chars=len(query))

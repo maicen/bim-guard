@@ -631,7 +631,9 @@ async def get_document_sections_tree(
         text = doc.get("extracted_text") or ""
         chunks = SectionChunker().chunk(text) if text.strip() else []
         tree, flat = build_section_tree(chunks)
-        tree, enhanced = await enhance_section_tree(tree, flat)
+        tree, enhanced = await enhance_section_tree(
+            tree, flat, organization_id=doc.get("organization_id")
+        )
 
     # Attach page numbers for any chunks where not already resolved
     unresolved_indices = [i for i, chunk in enumerate(flat) if chunk.get("page_number") is None]
@@ -693,7 +695,9 @@ async def ingest_document(
         )
 
     extraction_service = RuleExtractionService()
-    nodes = await extraction_service.ingest_with_llamaindex(document_id, text)
+    nodes = await extraction_service.ingest_with_llamaindex(
+        document_id, text, organization_id=doc.get("organization_id")
+    )
     deontic_count = sum(len(node.deontic_statements) for node in nodes)
 
     return DocumentIngestResponse(
@@ -740,7 +744,9 @@ async def extract_rule_drafts(
         )
 
     extraction_service = RuleExtractionService()
-    drafts = await extraction_service.extract_rule_drafts(document_id, text, model=model)
+    drafts = await extraction_service.extract_rule_drafts(
+        document_id, text, model=model, organization_id=doc.get("organization_id")
+    )
     return RuleExtractionDraftListResponse(drafts=drafts)
 
 

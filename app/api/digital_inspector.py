@@ -24,4 +24,6 @@ async def inspect_project(
     Tool-call progress streams on the existing `GET /api/events/{project_id}`
     SSE channel (same as an engine run) rather than a separate event system.
     """
-    return await service.run_inspection(project_id, payload.query)
+    return await service.run_inspection(
+        project_id, payload.query, organization_id=project.get("organization_id")
+    )

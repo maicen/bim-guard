@@ -54,7 +54,13 @@ class RuleExtractionProvider(Protocol):
     """Protocol used by RuleExtractionService (Dependency Inversion)."""
 
     async def extract_rules_from_text(
-        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1, model: str | None = None
+        self,
+        text: str,
+        *,
+        chunk_index: int = 1,
+        total_chunks: int = 1,
+        model: str | None = None,
+        organization_id: int | None = None,
     ) -> list[dict]:
         """Extract structured rule dicts from one text chunk."""
         ...
@@ -77,6 +83,7 @@ class RuleDraftGenerator(Protocol):
         *,
         deontic: contracts.DeonticStatement | None = None,
         model: str | None = None,
+        organization_id: int | None = None,
     ) -> list[contracts.RuleExtractionDraft]:
         """Generate zero or more rule drafts from one clause-annotated node."""
         ...
@@ -156,12 +163,17 @@ class RuleExtractionService:
         )
         return draft.model_copy(update={"proposed_rule": corrected_rule, "review_notes": note})
 
-    async def extract_rules_from_text(self, text: str, *, model: str | None = None) -> ExtractionResult:
+    async def extract_rules_from_text(
+        self, text: str, *, model: str | None = None, organization_id: int | None = None
+    ) -> ExtractionResult:
         """Extract compliance rules from pre-extracted document text.
 
         Args:
             model: Extraction LLM override, threaded down to the provider
                 (e.g. from the Rule Extraction UI's model selector).
+            organization_id: Resolves the API key from that org's configured
+                LLM provider instance first, falling back to the provider's
+                env var — see ``llamaindex_program.build_llm``.
         """
         if not text or not text.strip():
             logger.warning("Skipped rule extraction for empty extracted text")
@@ -183,6 +195,7 @@ class RuleExtractionService:
                     chunk_index=idx,
                     total_chunks=total,
                     model=model,
+                    organization_id=organization_id,
                 )
                 extracted_rules.extend(chunk_rules)
 
@@ -196,7 +209,7 @@ class RuleExtractionService:
         return ExtractionResult(rules=rules, warnings=[])
 
     async def ingest_with_llamaindex(
-        self, document_id: int, text: str
+        self, document_id: int, text: str, *, organization_id: int | None = None
     ) -> list[contracts.DocumentNodeContract]:
         """Ingest document text into clause-annotated nodes with deontic statements.
 
@@ -210,7 +223,7 @@ class RuleExtractionService:
         """
         pages = self._pages_service.get_pages(document_id)
         nodes = self._ingestor.nodes_from_text(text, source_document_id=document_id, pages=pages)
-        statements = await self._ingestor.extract_deontic_statements(nodes)
+        statements = await self._ingestor.extract_deontic_statements(nodes, organization_id=organization_id)
 
         logger.info(
             "LlamaIndex ingestion complete document_id=%d nodes=%d deontic_statements=%d",
@@ -221,7 +234,12 @@ class RuleExtractionService:
         return nodes
 
     async def extract_rule_drafts(
-        self, document_id: int, text: str, *, model: str | None = None
+        self,
+        document_id: int,
+        text: str,
+        *,
+        model: str | None = None,
+        organization_id: int | None = None,
     ) -> list[contracts.RuleExtractionDraft]:
         """Ingest a document and generate reviewable rule drafts via LlamaIndex.
 
@@ -247,7 +265,7 @@ class RuleExtractionService:
 
             draft_service = RuleDraftService()
 
-        nodes = await self.ingest_with_llamaindex(document_id, text)
+        nodes = await self.ingest_with_llamaindex(document_id, text, organization_id=organization_id)
         deontic_by_node = {
             node.node_id: (node.deontic_statements[0] if node.deontic_statements else None)
             for node in nodes
@@ -260,7 +278,10 @@ class RuleExtractionService:
             async with semaphore:
                 try:
                     node_drafts = await self._generator.generate_drafts_from_node(
-                        node, deontic=deontic_by_node.get(node.node_id), model=model
+                        node,
+                        deontic=deontic_by_node.get(node.node_id),
+                        model=model,
+                        organization_id=organization_id,
                     )
                 except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                     logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
