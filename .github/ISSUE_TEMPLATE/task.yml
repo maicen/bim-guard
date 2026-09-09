@@ -83,3 +83,4 @@ body:
           required: true
         - label: This task preserves the decoupled FastAPI + Svelte 5 SPA architecture.
           required: true
+
