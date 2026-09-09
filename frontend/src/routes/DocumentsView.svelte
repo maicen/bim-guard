@@ -529,8 +529,15 @@
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <FileText class="h-4 w-4 shrink-0 text-blue-400" />
-                    <span class="max-w-xs truncate font-semibold text-slate-50">{doc.filename}</span
-                    >
+                    <span class="max-w-xs truncate font-semibold text-slate-50">{doc.filename}</span>
+                    {#if doc.has_doclang}
+                      <span
+                        class="inline-flex items-center rounded border border-cyan-800/40 bg-cyan-950/60 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 shrink-0"
+                        title={doc.doclang_size_bytes ? `DocLang XML: ${(doc.doclang_size_bytes / 1024).toFixed(0)} KB` : "DocLang XML available"}
+                      >
+                        DocLang
+                      </span>
+                    {/if}
                   </div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3">

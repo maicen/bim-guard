@@ -467,7 +467,12 @@ class DocumentResponse(IsoGovernanceFieldsRequired):
     upload_date: Optional[str] = None
     extracted_text_preview: Optional[str] = None
     char_count: int = 0
-    doclang_xml: Optional[str] = Field(default="", description="Canonical DocLang XML export if available")
+    has_doclang: bool = Field(default=False, description="Whether canonical DocLang XML is available")
+    doclang_size_bytes: int = Field(default=0, description="Size of DocLang XML in bytes")
+    doclang_xml: Optional[str] = Field(
+        default="",
+        description="Canonical DocLang XML export if available (omitted in list summaries to preserve bandwidth)",
+    )
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""

@@ -280,6 +280,8 @@ export interface DocumentItem extends IsoGovernanceFieldsRequired {
   upload_date?: string | null;
   extracted_text_preview?: string | null;
   char_count: number;
+  has_doclang?: boolean;
+  doclang_size_bytes?: number;
   doclang_xml?: string | null;
   project_code?: string;
 }
