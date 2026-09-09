@@ -8,6 +8,8 @@
     Server,
     ShieldAlert,
     Building2,
+    Settings2,
+    Star,
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
@@ -15,8 +17,10 @@
   import ProviderInstanceCard from "../lib/components/ProviderInstanceCard.svelte";
   import ProviderInstanceForm from "../lib/components/ProviderInstanceForm.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import TaskAssignmentModal from "../lib/components/TaskAssignmentModal.svelte";
   import { parsingEnginesApi, llmProvidersApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
+  import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import type {
     ParsingEngineInstance,
     ParsingEngineKind,
@@ -26,6 +30,8 @@
     LLMProviderKind,
     LLMProviderKindId,
     LLMProviderModel,
+    LLMTask,
+    LLMTaskModelAssignment,
   } from "../lib/types";
 
   let activeOrg = $derived(authState.activeOrganization);
@@ -394,6 +400,41 @@
     }
   }
 
+  // ── Task Shortlists (org-scoped) ─────────────────────────────────────────
+  let llmTasks = $state<LLMTask[]>([]);
+  let taskAssignments = $state<LLMTaskModelAssignment[]>([]);
+  let tasksLoading = $state(true);
+  let tasksError = $state("");
+  let configuringTask = $state<LLMTask | null>(null);
+
+  function assignmentsForTask(taskKey: string): LLMTaskModelAssignment[] {
+    return taskAssignments.filter((a) => a.task_key === taskKey);
+  }
+
+  async function loadTasksAndAssignments(orgId: number) {
+    tasksLoading = true;
+    tasksError = "";
+    try {
+      const [tasks, assignments] = await Promise.all([
+        llmProvidersApi.tasks(orgId),
+        llmProvidersApi.taskAssignments(orgId),
+      ]);
+      llmTasks = tasks;
+      taskAssignments = assignments;
+    } catch (err: any) {
+      tasksError = err.message || "Failed to load task shortlists.";
+    } finally {
+      tasksLoading = false;
+    }
+  }
+
+  function handleTaskAssignmentsSaved(saved: LLMTaskModelAssignment[]) {
+    const task = configuringTask;
+    if (!task) return;
+    taskAssignments = [...taskAssignments.filter((a) => a.task_key !== task.key), ...saved];
+    configuringTask = null;
+  }
+
   $effect(() => {
     loadEngineKinds();
     loadEngines();
@@ -403,6 +444,7 @@
     if (activeOrg) {
       loadLlmKinds(activeOrg.organization_id);
       loadLlmInstances(activeOrg.organization_id);
+      loadTasksAndAssignments(activeOrg.organization_id);
     }
   });
 </script>
@@ -539,8 +581,8 @@
             <h2 class="text-base font-bold tracking-tight text-slate-50">LLM Providers</h2>
             <p class="text-xs text-slate-400">
               Scoped to <span class="font-semibold text-slate-300">{activeOrg.name}</span> — bring your
-              own API keys per organization. Rule extraction and other AI features pick from this
-              organization's default instance's live model catalogue.
+              own API keys per organization. Curate which models each task may use below, under
+              Task Shortlists.
             </p>
           </div>
           <button
@@ -629,18 +671,87 @@
                   {#if modelsError[instance.id]}
                     <p class="mt-1 text-caption text-rose-400">{modelsError[instance.id]}</p>
                   {:else if modelsById[instance.id]}
-                    <p class="mt-1 text-caption text-slate-500">
-                      {modelsById[instance.id].length} model{modelsById[instance.id].length === 1 ? "" : "s"}
-                      available:
-                      <span class="text-slate-400">
-                        {modelsById[instance.id]
-                          .slice(0, 8)
-                          .map((m) => m.name)
-                          .join(", ")}{modelsById[instance.id].length > 8 ? ", …" : ""}
-                      </span>
-                    </p>
+                    <div class="mt-1.5 space-y-1">
+                      <p class="text-caption text-slate-500">
+                        {modelsById[instance.id].length} model{modelsById[instance.id].length === 1 ? "" : "s"} available
+                        (showing first 8):
+                      </p>
+                      <ul class="space-y-0.5">
+                        {#each modelsById[instance.id].slice(0, 8) as model (model.id)}
+                          <li class="flex flex-wrap items-baseline gap-x-2 text-caption">
+                            <span class="text-slate-300">{model.name}</span>
+                            <span class="text-slate-500">{formatModelMeta(model)}</span>
+                          </li>
+                        {/each}
+                      </ul>
+                      {#if modelsById[instance.id].length > 8}
+                        <p class="text-caption text-slate-600">…and {modelsById[instance.id].length - 8} more.</p>
+                      {/if}
+                    </div>
                   {/if}
                 </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Task Shortlists: which models each task may pick from -->
+      <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+        <div>
+          <h2 class="text-base font-bold tracking-tight text-slate-50">Task Shortlists</h2>
+          <p class="text-xs text-slate-400">
+            Curate which models each task may use — capped to a deliberate shortlist chosen for
+            capability, price, and context window, instead of a provider's whole catalogue.
+          </p>
+        </div>
+
+        {#if tasksError}
+          <div class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300">
+            {tasksError}
+          </div>
+        {/if}
+
+        {#if tasksLoading}
+          <div class="p-8 text-center text-xs text-slate-400">Loading tasks...</div>
+        {:else}
+          <div class="space-y-2">
+            {#each llmTasks as task (task.key)}
+              {@const assigned = assignmentsForTask(task.key)}
+              <div class="rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="space-y-0.5">
+                    <div class="text-sm font-semibold text-slate-50">{task.label}</div>
+                    <p class="text-caption text-slate-500">{task.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onclick={() => (configuringTask = task)}
+                    class="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-caption font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+                  >
+                    <Settings2 class="h-3.5 w-3.5" />
+                    Configure
+                  </button>
+                </div>
+                {#if assigned.length === 0}
+                  <p class="mt-2 text-caption text-slate-600">
+                    No shortlist yet — every enabled provider's full catalogue is offered for this task.
+                  </p>
+                {:else}
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    {#each assigned as a (a.model_id + a.provider_instance_id)}
+                      <span
+                        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-micro font-medium {a.is_default
+                          ? 'border-amber-800/60 bg-amber-950/60 text-amber-300'
+                          : 'border-slate-700 bg-slate-900 text-slate-300'}"
+                      >
+                        {#if a.is_default}<Star class="h-2.5 w-2.5" fill="currentColor" />{/if}
+                        {a.model_name}
+                        <span class="text-slate-500">· {formatModelMeta(a)}</span>
+                      </span>
+                    {/each}
+                  </div>
+                {/if}
               </div>
             {/each}
           </div>
@@ -649,6 +760,17 @@
     {/if}
   {/if}
 </div>
+
+{#if configuringTask && activeOrg}
+  <TaskAssignmentModal
+    task={configuringTask}
+    organizationId={activeOrg.organization_id}
+    instances={llmInstances.filter((i) => i.is_enabled)}
+    currentAssignments={assignmentsForTask(configuringTask.key)}
+    onClose={() => (configuringTask = null)}
+    onSaved={handleTaskAssignmentsSaved}
+  />
+{/if}
 
 <ConfirmModal
   isOpen={enginePendingDelete !== null}

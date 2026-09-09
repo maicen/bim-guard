@@ -40,4 +40,10 @@ class LLMModelService:
         if provider == "ollama":
             api_base = api_base or os.environ.get("OLLAMA_API_BASE")
         models = await driver.list_models(api_key=key, api_base=api_base)
-        return sorted(set(models), key=lambda item: item[1].casefold())
+        # Drivers return richer LLMModelInfo objects (id/name plus whatever
+        # pricing/context data that provider publishes — see
+        # app/modules/llm_providers/base.py); this service's own callers
+        # (app/agent/cli.py) only ever consumed (id, name) pairs, so keep
+        # returning that shape here rather than changing every caller.
+        pairs = [(m.id, m.name) for m in models]
+        return sorted(set(pairs), key=lambda item: item[1].casefold())

@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.modules.llm_providers import LLMProviderRegistry
+from app.modules.llm_providers.base import LLMModelInfo
 from app.services.db_adapters import DatabaseAdapter
 
 
@@ -149,7 +150,7 @@ class LLMProviderInstancesService:
         if self.get_instance(organization_id, instance_id):
             self._repo.delete(instance_id)
 
-    async def list_models(self, organization_id: int, instance_id: int) -> list[tuple[str, str]]:
+    async def list_models(self, organization_id: int, instance_id: int) -> list[LLMModelInfo]:
         """Fetch the live model catalogue for one configured instance."""
         row = self.get_instance(organization_id, instance_id)
         if not row:

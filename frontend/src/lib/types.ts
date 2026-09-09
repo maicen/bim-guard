@@ -1051,9 +1051,55 @@ export interface LLMProviderTestPayload {
   api_base?: string;
 }
 
+// Pricing/context_length/capabilities are only populated for drivers whose
+// provider publishes them (OpenRouter for all three, Gemini for
+// context_length) -- undefined for the rest, an honest gap rather than a guess.
+// See https://openrouter.ai/docs/guides/community/for-providers#3-pricing.
 export interface LLMProviderModel {
   id: string;
   name: string;
+  context_length?: number | null;
+  /** USD per 1,000,000 input tokens. */
+  input_price_per_million?: number | null;
+  /** USD per 1,000,000 output tokens. */
+  output_price_per_million?: number | null;
+  capabilities?: string[];
+}
+
+// Per-task model shortlists (org-scoped) -- see app/modules/llm_providers/tasks.py.
+// `key` is a plain string, discovered at runtime via llmProvidersApi.tasks(),
+// same rationale as LLMProviderKindId.
+export interface LLMTask {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export interface LLMTaskAssignmentModel {
+  provider_instance_id: number;
+  model_id: string;
+  model_name: string;
+  context_length?: number | null;
+  input_price_per_million?: number | null;
+  output_price_per_million?: number | null;
+}
+
+export interface LLMTaskAssignmentSetPayload {
+  models: LLMTaskAssignmentModel[];
+  default_provider_instance_id?: number | null;
+  default_model_id?: string | null;
+}
+
+export interface LLMTaskModelAssignment {
+  task_key: string;
+  provider_instance_id: number;
+  provider_instance_name: string;
+  model_id: string;
+  model_name: string;
+  context_length?: number | null;
+  input_price_per_million?: number | null;
+  output_price_per_million?: number | null;
+  is_default: boolean;
 }
 
 // =============================================================================

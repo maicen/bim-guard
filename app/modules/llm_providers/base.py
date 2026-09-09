@@ -24,6 +24,29 @@ class EngineConnectionResult:
     detail: str = ""
 
 
+@dataclass(frozen=True)
+class LLMModelInfo:
+    """One model available from a provider.
+
+    Carries whatever pricing/capability metadata that provider's own
+    model-listing API publishes. Only OpenRouter's `/models` endpoint
+    documents pricing and context
+    length (https://openrouter.ai/docs/guides/community/for-providers#3-pricing),
+    so those fields are `None` for every other driver — an honest gap, not a
+    guess, since OpenAI/Anthropic/Gemini/Ollama's own `/models` endpoints
+    don't publish this data.
+    """
+
+    id: str
+    name: str
+    context_length: int | None = None
+    input_price_per_million: float | None = None
+    """USD per 1,000,000 input tokens."""
+    output_price_per_million: float | None = None
+    """USD per 1,000,000 output tokens."""
+    capabilities: tuple[str, ...] = ()
+
+
 class LLMProviderDriver(ABC):
     """Describes one selectable LLM provider kind.
 
@@ -45,8 +68,8 @@ class LLMProviderDriver(ABC):
     url_placeholder: ClassVar[str] = ""
 
     @abstractmethod
-    async def list_models(self, *, api_key: str, api_base: str | None) -> list[tuple[str, str]]:
-        """Return available `(litellm_model_id, display_name)` pairs for this provider."""
+    async def list_models(self, *, api_key: str, api_base: str | None) -> list[LLMModelInfo]:
+        """Return available models for this provider, with pricing/context data where published."""
 
     async def test_connection(self, *, api_key: str, api_base: str | None) -> EngineConnectionResult:
         """Best-effort reachability/auth check for a configured instance of this kind.

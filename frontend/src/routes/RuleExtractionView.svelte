@@ -25,6 +25,7 @@
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi, llmProvidersApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
+  import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import type {
     DocumentItem,
     DocumentSection,
@@ -295,12 +296,18 @@
   let bulkDraftOperator = $state("no_change");
   let isDraftBulkDeleteModalOpen = $state(false);
 
-  // Model choices come from this organization's configured LLM providers
-  // (Admin → External providers → LLM Providers) instead of a hardcoded
-  // list, so extraction always uses a real, credentialed provider.
+  // Model choices come from this organization's curated "rule_extraction"
+  // task shortlist (Admin → External providers → LLM Providers → Task
+  // Shortlists) when one exists, so admins can narrow the picker to models
+  // deliberately chosen for capability/price/context fit. If no shortlist
+  // has been configured yet, fall back to the default provider's whole
+  // catalogue so extraction still works before an admin curates one.
+  const RULE_EXTRACTION_TASK_KEY = "rule_extraction";
+
   let llmModels: LLMProviderModel[] = $state([]);
   let llmModelsLoading = $state(false);
   let llmModelsError = $state("");
+  let usingShortlist = $state(false);
 
   async function loadLlmModels() {
     const activeOrg = authState.activeOrganization;
@@ -308,6 +315,29 @@
     llmModelsLoading = true;
     llmModelsError = "";
     try {
+      const shortlist = await llmProvidersApi.taskAssignments(
+        activeOrg.organization_id,
+        RULE_EXTRACTION_TASK_KEY,
+      );
+      if (shortlist.length > 0) {
+        usingShortlist = true;
+        llmModels = shortlist.map((a) => ({
+          id: a.model_id,
+          name: a.model_name,
+          context_length: a.context_length,
+          input_price_per_million: a.input_price_per_million,
+          output_price_per_million: a.output_price_per_million,
+        }));
+        const defaultModel = shortlist.find((a) => a.is_default);
+        if (defaultModel && !llmModels.some((m) => m.id === selectedModel)) {
+          selectedModel = defaultModel.model_id;
+        } else if (!llmModels.some((m) => m.id === selectedModel)) {
+          selectedModel = llmModels[0].id;
+        }
+        return;
+      }
+
+      usingShortlist = false;
       const instances = await llmProvidersApi.list(activeOrg.organization_id);
       const enabled = instances.filter((i) => i.is_enabled);
       const primary: LLMProviderInstance | undefined =
@@ -592,9 +622,17 @@
             class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
           >
             {#each llmModels as model (model.id)}
-              <option value={model.id}>{model.name}</option>
+              <option value={model.id}>{model.name} — {formatModelMeta(model)}</option>
             {/each}
           </select>
+          {#if !usingShortlist}
+            <p class="text-caption text-slate-600">
+              Showing this provider's full catalogue — curate a shortlist under
+              <a href="#/external-providers" class="font-semibold text-accent hover:underline"
+                >Admin → External Providers → LLM Providers</a
+              > for a shorter, priced list here.
+            </p>
+          {/if}
         {/if}
       </div>
     </div>

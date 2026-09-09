@@ -1538,10 +1538,66 @@ class LLMProviderKindResponse(BaseModel):
 
 
 class LLMProviderModelResponse(BaseModel):
-    """One model available from a configured LLM provider instance."""
+    """One model available from a configured LLM provider instance.
+
+    Pricing/context_length are only populated for drivers whose provider
+    publishes them (OpenRouter, and context_length for Gemini) — null for
+    the rest, an honest gap rather than a guess.
+    """
 
     id: str
     name: str
+    context_length: Optional[int] = None
+    input_price_per_million: Optional[float] = Field(
+        None, description="USD per 1,000,000 input tokens"
+    )
+    output_price_per_million: Optional[float] = Field(
+        None, description="USD per 1,000,000 output tokens"
+    )
+    capabilities: list[str] = Field(default_factory=list)
+
+
+class LLMTaskResponse(BaseModel):
+    """One task an org can assign a curated model shortlist to."""
+
+    key: str
+    label: str
+    description: str = ""
+
+
+class LLMTaskAssignmentModelInput(BaseModel):
+    """One shortlisted model in a PUT .../task-assignments/{task_key} request."""
+
+    provider_instance_id: int
+    model_id: str
+    model_name: str
+    context_length: Optional[int] = None
+    input_price_per_million: Optional[float] = None
+    output_price_per_million: Optional[float] = None
+
+
+class LLMTaskAssignmentSetRequest(BaseModel):
+    """Payload replacing an organization's whole model shortlist for one task."""
+
+    models: list[LLMTaskAssignmentModelInput] = Field(default_factory=list)
+    default_provider_instance_id: Optional[int] = Field(
+        None, description="Must match one entry in `models`, or be omitted for no default"
+    )
+    default_model_id: Optional[str] = None
+
+
+class LLMTaskModelAssignmentResponse(BaseModel):
+    """One shortlisted model for a task, as returned to the frontend."""
+
+    task_key: str
+    provider_instance_id: int
+    provider_instance_name: str
+    model_id: str
+    model_name: str
+    context_length: Optional[int] = None
+    input_price_per_million: Optional[float] = None
+    output_price_per_million: Optional[float] = None
+    is_default: bool = False
 
 
 # ==============================================================================

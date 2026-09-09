@@ -18,12 +18,17 @@ from app.modules.llm_providers import (  # noqa: F401
 )
 from app.modules.llm_providers.base import (
     EngineConnectionResult,
+    LLMModelInfo,
     LLMProviderDriver,
     LLMProviderRegistry,
 )
+from app.modules.llm_providers.tasks import LLM_TASKS, LLMTask
 
 __all__ = [
     "EngineConnectionResult",
+    "LLMModelInfo",
     "LLMProviderDriver",
     "LLMProviderRegistry",
+    "LLM_TASKS",
+    "LLMTask",
 ]

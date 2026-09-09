@@ -11,11 +11,12 @@ from app.services.bsdd_ontology_repository import (
     get_bsdd_ontology_repository,
 )
 from app.services.digital_inspector_service import DigitalInspectorService
-from app.services.graph_database import GraphService
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
+from app.services.graph_database import GraphService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
+from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
 from app.services.naming_config_service import NamingConfigService
@@ -124,6 +125,11 @@ def get_profile_service() -> ProfileService:
 def get_llm_provider_instances_service() -> LLMProviderInstancesService:
     """Return the configured LLMProviderInstancesService instance."""
     return get_container().llm_provider_instances_service
+
+
+def get_llm_task_assignment_service() -> LLMTaskAssignmentService:
+    """Return the configured LLMTaskAssignmentService instance."""
+    return get_container().llm_task_assignment_service
 
 
 def get_ruleset_access_service() -> RulesetAccessService:

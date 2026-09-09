@@ -8,8 +8,8 @@ the codebase.
 
 from __future__ import annotations
 
-from typing import Any
 from dataclasses import dataclass, field
+from typing import Any
 
 from app.logging_config import get_logger
 from app.modules.comparator.engine_registry import (
@@ -31,7 +31,10 @@ from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
+from app.services.graph_database import GraphService
+from app.services.kuzu_provider import KuzuDatabaseProvider
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
+from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.models_service import ModelsService
@@ -62,8 +65,6 @@ from app.services.static_data_service import (
     StaticDataService,
 )
 from app.services.user_admin_service import UserAdminService
-from app.services.graph_database import GraphService
-from app.services.kuzu_provider import KuzuDatabaseProvider
 
 logger = get_logger(__name__)
 
@@ -87,6 +88,7 @@ class ApplicationContainer:
     naming_config_repo: DatabaseAdapter
     parsing_engine_instances_repo: DatabaseAdapter
     llm_provider_instances_repo: DatabaseAdapter
+    llm_task_assignments_repo: DatabaseAdapter
     organizations_repo: DatabaseAdapter
     memberships_repo: DatabaseAdapter
     organization_invites_repo: DatabaseAdapter
@@ -109,6 +111,7 @@ class ApplicationContainer:
     naming_config_service: NamingConfigService
     parsing_engine_instances_service: ParsingEngineInstancesService
     llm_provider_instances_service: LLMProviderInstancesService
+    llm_task_assignment_service: LLMTaskAssignmentService
     membership_service: MembershipService
     profile_service: ProfileService
     user_admin_service: UserAdminService
@@ -438,6 +441,23 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    llm_task_assignments_repo = PersistenceService.get_table(
+        "llm_task_model_assignments",
+        {
+            "id": int,
+            "organization_id": int,
+            "task_key": str,
+            "provider_instance_id": int,
+            "model_id": str,
+            "model_name": str,
+            "context_length": int,
+            "input_price_per_million": float,
+            "output_price_per_million": float,
+            "is_default": bool,
+            "created_at": str,
+        },
+    )
+
     # 3. Model Lineage & Static Data
     lineage = SupabaseModelLineageRepository(lineage_repo=lineage_repo)
     static_data_service = StaticDataService(
@@ -525,6 +545,11 @@ def build_default_container() -> ApplicationContainer:
 
     llm_provider_instances_service = LLMProviderInstancesService(
         instances_repo=llm_provider_instances_repo,
+    )
+
+    llm_task_assignment_service = LLMTaskAssignmentService(
+        assignments_repo=llm_task_assignments_repo,
+        provider_instances_service=llm_provider_instances_service,
     )
 
     # Seed the registry from legacy env vars on first boot, so existing
@@ -644,6 +669,7 @@ def build_default_container() -> ApplicationContainer:
         naming_config_repo=naming_config_repo,
         parsing_engine_instances_repo=parsing_engine_instances_repo,
         llm_provider_instances_repo=llm_provider_instances_repo,
+        llm_task_assignments_repo=llm_task_assignments_repo,
         organizations_repo=organizations_repo,
         memberships_repo=memberships_repo,
         organization_invites_repo=organization_invites_repo,
@@ -666,6 +692,7 @@ def build_default_container() -> ApplicationContainer:
         naming_config_service=naming_config_service,
         parsing_engine_instances_service=parsing_engine_instances_service,
         llm_provider_instances_service=llm_provider_instances_service,
+        llm_task_assignment_service=llm_task_assignment_service,
         membership_service=membership_service,
         profile_service=profile_service,
         user_admin_service=user_admin_service,

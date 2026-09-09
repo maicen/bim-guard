@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import (
     get_llm_provider_instances_service,
+    get_llm_task_assignment_service,
     get_membership_service,
     get_profile_service,
 )
@@ -30,9 +31,13 @@ from app.modules.contracts import (
     LLMProviderKindResponse,
     LLMProviderModelResponse,
     LLMProviderTestConnectionRequest,
+    LLMTaskAssignmentSetRequest,
+    LLMTaskModelAssignmentResponse,
+    LLMTaskResponse,
 )
 from app.modules.llm_providers import LLMProviderRegistry
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
+from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
 
@@ -179,6 +184,101 @@ async def test_candidate_connection(
         return LLMProviderInstanceTestResponse(ok=False, detail=str(exc))
 
 
+def _to_task_assignment_response(
+    row: dict[str, Any], instance_names: dict[int, str]
+) -> LLMTaskModelAssignmentResponse:
+    instance_id = row["provider_instance_id"]
+    return LLMTaskModelAssignmentResponse(
+        task_key=row["task_key"],
+        provider_instance_id=instance_id,
+        provider_instance_name=instance_names.get(instance_id, ""),
+        model_id=row["model_id"],
+        model_name=row.get("model_name", row["model_id"]),
+        context_length=row.get("context_length"),
+        input_price_per_million=row.get("input_price_per_million"),
+        output_price_per_million=row.get("output_price_per_million"),
+        is_default=bool(row.get("is_default", False)),
+    )
+
+
+@router.get(
+    "/{organization_id}/llm-providers/tasks",
+    response_model=list[LLMTaskResponse],
+    summary="List tasks that can have a curated LLM model shortlist",
+)
+def list_tasks(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> list[LLMTaskResponse]:
+    """Return every registered task (see app/modules/llm_providers/tasks.py).
+
+    Static, build-time metadata — the External Providers UI's "Task
+    Shortlists" section renders from this list instead of a hardcoded set.
+    """
+    _require_membership(organization_id, current_user, memberships, profiles)
+    return [
+        LLMTaskResponse(key=task.key, label=task.label, description=task.description)
+        for task in LLMTaskAssignmentService.list_tasks()
+    ]
+
+
+@router.get(
+    "/{organization_id}/llm-providers/task-assignments",
+    response_model=list[LLMTaskModelAssignmentResponse],
+    summary="List an organization's shortlisted models, optionally for one task",
+)
+def list_task_assignments(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    instances_service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
+    assignments_service: Annotated[LLMTaskAssignmentService, Depends(get_llm_task_assignment_service)],
+    task_key: str | None = None,
+) -> list[LLMTaskModelAssignmentResponse]:
+    """Return this organization's shortlisted models.
+
+    Any org member needs this to populate a task's model picker (e.g. Rule
+    Extraction Studio).
+    """
+    _require_membership(organization_id, current_user, memberships, profiles)
+    rows = assignments_service.list_assignments(organization_id, task_key)
+    instance_names = {i["id"]: i.get("name", "") for i in instances_service.list_instances(organization_id)}
+    return [_to_task_assignment_response(row, instance_names) for row in rows]
+
+
+@router.put(
+    "/{organization_id}/llm-providers/task-assignments/{task_key}",
+    response_model=list[LLMTaskModelAssignmentResponse],
+    summary="Replace an organization's model shortlist for one task",
+)
+def set_task_assignments(
+    organization_id: int,
+    task_key: str,
+    payload: LLMTaskAssignmentSetRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    instances_service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
+    assignments_service: Annotated[LLMTaskAssignmentService, Depends(get_llm_task_assignment_service)],
+) -> list[LLMTaskModelAssignmentResponse]:
+    """Replace the whole shortlist for (organization_id, task_key) in one call."""
+    _require_org_admin(organization_id, current_user, memberships, profiles)
+    try:
+        created = assignments_service.set_assignments(
+            organization_id,
+            task_key,
+            models=[model.model_dump() for model in payload.models],
+            default_provider_instance_id=payload.default_provider_instance_id,
+            default_model_id=payload.default_model_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    instance_names = {i["id"]: i.get("name", "") for i in instances_service.list_instances(organization_id)}
+    return [_to_task_assignment_response(row, instance_names) for row in created]
+
 @router.get(
     "/{organization_id}/llm-providers/{instance_id}",
     response_model=LLMProviderInstanceResponse,
@@ -318,4 +418,16 @@ async def list_models(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-    return [LLMProviderModelResponse(id=model_id, name=name) for model_id, name in models]
+    return [
+        LLMProviderModelResponse(
+            id=model.id,
+            name=model.name,
+            context_length=model.context_length,
+            input_price_per_million=model.input_price_per_million,
+            output_price_per_million=model.output_price_per_million,
+            capabilities=list(model.capabilities),
+        )
+        for model in models
+    ]
+
+

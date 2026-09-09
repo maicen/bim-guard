@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 
 from app.modules.llm_providers.base import (
+    LLMModelInfo,
     LLMProviderDriver,
     LLMProviderRegistry,
     raise_for_provider_error,
@@ -19,12 +20,12 @@ class AnthropicDriver(LLMProviderDriver):
     default_api_base = "https://api.anthropic.com/v1"
     url_placeholder = "https://api.anthropic.com/v1"
 
-    async def list_models(self, *, api_key: str, api_base: str | None) -> list[tuple[str, str]]:
+    async def list_models(self, *, api_key: str, api_base: str | None) -> list[LLMModelInfo]:
         if not api_key:
             raise RuntimeError("Anthropic API key is required to load models.")
         base = (api_base or self.default_api_base).rstrip("/")
         headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
-        models: list[tuple[str, str]] = []
+        models: list[LLMModelInfo] = []
         after_id = ""
         async with httpx.AsyncClient(timeout=15.0) as client:
             while True:
@@ -34,8 +35,10 @@ class AnthropicDriver(LLMProviderDriver):
                 response = await client.get(f"{base}/models", params=params, headers=headers)
                 raise_for_provider_error(response, "Anthropic")
                 payload = response.json()
+                # Anthropic's /models endpoint publishes neither pricing nor
+                # context length, unlike OpenRouter's — see LLMModelInfo.
                 models.extend(
-                    (f"anthropic/{item['id']}", item.get("display_name") or item["id"])
+                    LLMModelInfo(id=f"anthropic/{item['id']}", name=item.get("display_name") or item["id"])
                     for item in payload.get("data", [])
                     if item.get("id")
                 )
@@ -44,7 +47,7 @@ class AnthropicDriver(LLMProviderDriver):
                 after_id = payload.get("last_id") or ""
                 if not after_id:
                     break
-        return sorted(set(models), key=lambda item: item[1].casefold())
+        return sorted(set(models), key=lambda item: item.name.casefold())
 
 
 LLMProviderRegistry.register(AnthropicDriver())

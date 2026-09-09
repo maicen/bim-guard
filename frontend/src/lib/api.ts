@@ -64,6 +64,9 @@ import type {
   LLMProviderKind,
   LLMProviderModel,
   LLMProviderTestPayload,
+  LLMTask,
+  LLMTaskAssignmentSetPayload,
+  LLMTaskModelAssignment,
   ProfileUpdatePayload,
   Project,
   ProjectBulkActionResponse,
@@ -1794,6 +1797,38 @@ export const llmProvidersApi = {
   async models(organizationId: number, id: number): Promise<LLMProviderModel[]> {
     const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/${id}/models`);
     return handleResponse<LLMProviderModel[]>(res);
+  },
+
+  /** Registered tasks (e.g. "rule_extraction") — drives the External
+   * Providers UI's Task Shortlists section so a new backend task appears
+   * with no frontend change. */
+  async tasks(organizationId: number): Promise<LLMTask[]> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/tasks`);
+    return handleResponse<LLMTask[]>(res);
+  },
+
+  async taskAssignments(organizationId: number, taskKey?: string): Promise<LLMTaskModelAssignment[]> {
+    const query = taskKey ? `?task_key=${encodeURIComponent(taskKey)}` : "";
+    const res = await apiFetch(
+      `${API_BASE}/organizations/${organizationId}/llm-providers/task-assignments${query}`,
+    );
+    return handleResponse<LLMTaskModelAssignment[]>(res);
+  },
+
+  async setTaskAssignments(
+    organizationId: number,
+    taskKey: string,
+    payload: LLMTaskAssignmentSetPayload,
+  ): Promise<LLMTaskModelAssignment[]> {
+    const res = await apiFetch(
+      `${API_BASE}/organizations/${organizationId}/llm-providers/task-assignments/${encodeURIComponent(taskKey)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    return handleResponse<LLMTaskModelAssignment[]>(res);
   },
 };
 
