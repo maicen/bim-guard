@@ -119,6 +119,16 @@ class DocumentService:
     ):
         """Create and persist a new uploaded document record."""
         clean_doc_type = (doc_type or "").strip() or "Specification"
+        extracted_assets: list[dict] = []
+        if "data:image/" in (doclang_xml or ""):
+            from app.modules.document_parsing.doclang_asset_manager import DocLangAssetManager
+
+            doclang_xml, extracted_assets = DocLangAssetManager.extract_and_offload_assets(
+                doclang_xml=doclang_xml,
+                doc_key=str(md5_hash[:12]),
+                storage=self._storage,
+            )
+
         doclang_bytes = (doclang_xml or "").encode("utf-8")
         inline_xml = doclang_xml or ""
         resolved_storage_path = doclang_storage_path
@@ -149,7 +159,7 @@ class DocumentService:
                     "suitability_code": suitability_code or "S0",
                     "revision_code": revision_code or "P01.01",
                 }
-                archive_bytes = self.build_doclang_archive(temp_doc, doclang_xml)
+                archive_bytes = self.build_doclang_archive(temp_doc, doclang_xml, assets=extracted_assets)
                 resolved_archive_path = self._storage.save_upload(filename_key, archive_bytes, "doclang")
                 logger.info(
                     "Pre-persisted DocLang .dclx archive to storage ref=%s bytes=%d",
@@ -207,7 +217,11 @@ class DocumentService:
         return storage_ref
 
     @staticmethod
-    def build_doclang_archive(doc: dict, xml_content: str) -> bytes:
+    def build_doclang_archive(
+        doc: dict,
+        xml_content: str,
+        assets: list[dict] | None = None,
+    ) -> bytes:
         """Package DocLang XML and metadata into a standardized .dclx zip bundle."""
         import io
         import json
@@ -233,6 +247,12 @@ class DocumentService:
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("document.xml", xml_content.encode("utf-8"))
             zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+            if assets:
+                for asset in assets:
+                    asset_fname = asset.get("filename")
+                    asset_content = asset.get("asset_bytes")
+                    if asset_fname and asset_content:
+                        zf.writestr(f"assets/{asset_fname}", asset_content)
         return buf.getvalue()
 
     def store_doclang_archive(self, document_id: int, archive_bytes: bytes) -> str:
@@ -334,6 +354,16 @@ class DocumentService:
         if cde_state is not None:
             updates["cde_state"] = cde_state.strip() or "WIP"
         if doclang_xml is not None:
+            extracted_assets = []
+            if "data:image/" in doclang_xml:
+                from app.modules.document_parsing.doclang_asset_manager import DocLangAssetManager
+
+                doclang_xml, extracted_assets = DocLangAssetManager.extract_and_offload_assets(
+                    doclang_xml=doclang_xml,
+                    doc_key=str(document_id),
+                    storage=self._storage,
+                )
+
             doclang_bytes = doclang_xml.encode("utf-8")
             if len(doclang_bytes) > DOCLANG_OFFLOAD_THRESHOLD_BYTES and doclang_storage_path is None:
                 try:
@@ -358,7 +388,7 @@ class DocumentService:
                         "suitability_code": updates.get("suitability_code", ""),
                         "revision_code": updates.get("revision_code", ""),
                     }
-                    archive_bytes = self.build_doclang_archive(updated_doc_dict, doclang_xml)
+                    archive_bytes = self.build_doclang_archive(updated_doc_dict, doclang_xml, assets=extracted_assets)
                     archive_ref = self.store_doclang_archive(document_id, archive_bytes)
                     updates["doclang_archive_path"] = archive_ref
                 except Exception:

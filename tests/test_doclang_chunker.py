@@ -286,5 +286,93 @@ def test_export_doclang_archive_signed_redirect(monkeypatch):
         app.dependency_overrides.pop(get_documents_service, None)
 
 
+def test_doclang_asset_manager_extracts_and_offloads_base64():
+    """Verify DocLangAssetManager extracts inline data URIs and replaces them with clean relative paths."""
+    import base64
+
+    from app.modules.document_parsing.doclang_asset_manager import DocLangAssetManager
+
+    png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+    b64_str = base64.b64encode(png_bytes).decode("ascii")
+
+    xml_with_image = f"""<doclang>
+  <heading level="1">Corrosion Details</heading>
+  <p>Diagram below:</p>
+  <image src="data:image/png;base64,{b64_str}" />
+</doclang>"""
+
+    saved_uploads = []
+
+    class FakeStorage:
+        def save_upload(self, filename, content, subdir):
+            ref = f"sb://bucket/{subdir}/{filename}"
+            saved_uploads.append((filename, content, ref))
+            return ref
+
+    sanitized_xml, extracted = DocLangAssetManager.extract_and_offload_assets(
+        doclang_xml=xml_with_image,
+        doc_key="doc999",
+        storage=FakeStorage(),
+    )
+
+    assert 'src="assets/asset_1.png"' in sanitized_xml
+    assert "data:image/png;base64" not in sanitized_xml
+    assert len(extracted) == 1
+    assert extracted[0]["filename"] == "asset_1.png"
+    assert extracted[0]["asset_bytes"] == png_bytes
+    assert len(saved_uploads) == 1
+    assert saved_uploads[0][0] == "asset_1.png"
+    assert saved_uploads[0][1] == png_bytes
+
+
+def test_create_document_packages_multimodal_assets_in_dclx():
+    """Verify create_document packages extracted assets directly inside the .dclx zip archive."""
+    import base64
+    import io
+    import zipfile
+
+    from app.services.documents_service import DocumentService
+
+    png_bytes = b"fake-png-data"
+    b64_str = base64.b64encode(png_bytes).decode("ascii")
+
+    xml_with_img = f'<doclang><figure src="data:image/png;base64,{b64_str}" /></doclang>'
+
+    uploads = {}
+
+    class FakeStorage:
+        def save_upload(self, filename, content, subdir):
+            ref = f"sb://bucket/{subdir}/{filename}"
+            uploads[ref] = content
+            return ref
+
+    class FakeRepo:
+        def insert(self, payload):
+            record = dict(payload)
+            record["id"] = 101
+            return record
+
+    svc = DocumentService(storage=FakeStorage(), documents_repo=FakeRepo())
+    doc = svc.create_document(
+        md5_hash="multimodal123456",
+        filename="multimodal_spec.pdf",
+        file_path="uploads/spec.pdf",
+        extracted_text="Text",
+        doclang_xml=xml_with_img,
+    )
+
+    archive_ref = doc["doclang_archive_path"]
+    assert archive_ref in uploads
+
+    # Inspect zip bundle content
+    archive_bytes = uploads[archive_ref]
+    zf = zipfile.ZipFile(io.BytesIO(archive_bytes))
+    namelist = zf.namelist()
+    assert "document.xml" in namelist
+    assert "manifest.json" in namelist
+    assert "assets/asset_1.png" in namelist
+    assert zf.read("assets/asset_1.png") == png_bytes
+
+
 
 
