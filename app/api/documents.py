@@ -94,8 +94,9 @@ def list_documents(
     for r in rows:
         text = r.get("extracted_text") or ""
         preview = text[:200] + "..." if len(text) > 200 else text
+        doclang_storage_ref = r.get("doclang_storage_path") or ""
         doclang_str = r.get("doclang_xml") or ""
-        has_doclang = bool(doclang_str and doclang_str.strip())
+        has_doclang = bool(doclang_storage_ref or (doclang_str and doclang_str.strip()))
         res.append(
             DocumentResponse(
                 id=r["id"],
@@ -106,7 +107,7 @@ def list_documents(
                 extracted_text_preview=preview,
                 char_count=len(text),
                 has_doclang=has_doclang,
-                doclang_size_bytes=len(doclang_str.encode("utf-8")) if has_doclang else 0,
+                doclang_size_bytes=len(doclang_str.encode("utf-8")) if doclang_str else 0,
                 doclang_storage_path=r.get("doclang_storage_path"),
                 doclang_xml="",
                 project_code=r.get("project_code", ""),

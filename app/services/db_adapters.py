@@ -111,6 +111,10 @@ class DatabaseAdapter(abc.ABC):
         for pk in pk_values:
             self.delete(pk)
 
+    def select_projected(self, columns: list[str]) -> list[dict[str, Any]]:
+        """Return all rows projected to a subset of columns."""
+        return [{col: r.get(col) for col in columns if col in r} for r in self.rows]
+
     @abc.abstractmethod
     def rows_where(
         self,
@@ -492,11 +496,36 @@ class SupabaseTableAdapter(DatabaseAdapter):
         """Evict every cached read for this table after a write."""
         adapter_cache_service.invalidate(f"adapter:{self._table_name}:")
 
-    def _run_select(self, *, limit: int | None, expr: _WhereExpr | None) -> list[dict[str, Any]]:
+    def select_projected(self, columns: list[str]) -> list[dict[str, Any]]:
+        """Select all rows projected to a subset of columns, avoiding large text TOAST retrieval."""
+        if self._use_memory_fallback:
+            return [{col: r.get(col) for col in columns if col in r} for r in self._memory_rows]
+
+        cols_key = ",".join(sorted(columns))
+        cache_key = self._cache_key("projected", cols_key)
+        cached = adapter_cache_service.get(cache_key)
+        if cached is not None:
+            return list(cached)
+
+        try:
+            rows = self._run_select(limit=None, expr=None, columns=columns)
+            adapter_cache_service.set(cache_key, rows)
+            return rows
+        except Exception:
+            return [{col: r.get(col) for col in columns if col in r} for r in self.rows]
+
+    def _run_select(
+        self,
+        *,
+        limit: int | None,
+        expr: _WhereExpr | None,
+        columns: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Execute paginated select queries and collect all rows."""
         page_size = 1000
         offset = 0
         collected: list[dict[str, Any]] = []
+        select_cols = ", ".join(columns) if columns else "*"
 
         while True:
             remaining = page_size
@@ -506,7 +535,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
                     break
 
             def _build(offset=offset, remaining=remaining):
-                query = self._client.table(self._table_name).select("*")
+                query = self._client.table(self._table_name).select(select_cols)
                 if expr is not None:
                     query = self._apply_expr(query, expr)
                 # Range-based pagination is only stable across multiple calls

@@ -44,13 +44,42 @@ class DocumentService:
                     "suitability_code": str,
                     "revision_code": str,
                     "cde_state": str,
+                    "doclang_xml": str,
+                    "doclang_storage_path": str,
                 },
             )
         )
 
+    DOCUMENT_SUMMARY_COLUMNS = [
+        "id",
+        "md5_hash",
+        "filename",
+        "file_path",
+        "extracted_text",
+        "upload_date",
+        "doc_type",
+        "project_code",
+        "originator",
+        "volume_system",
+        "level",
+        "type",
+        "role",
+        "number",
+        "suitability_code",
+        "revision_code",
+        "cde_state",
+        "doclang_storage_path",
+    ]
+
     @cache_db_query(key_prefix="bimguard:documents:list")
     def list_documents(self):
-        """Return all documents ordered by newest first."""
+        """Return all documents ordered by newest first, omitting bulky XML from table scans."""
+        if hasattr(self._documents, "select_projected"):
+            try:
+                rows = self._documents.select_projected(self.DOCUMENT_SUMMARY_COLUMNS)
+                return sorted(rows, key=lambda row: row.get("id", 0), reverse=True)
+            except Exception:
+                pass
         return rows_desc_by_id(self._documents)
 
     @cache_db_query(key_prefix="bimguard:documents:item")
