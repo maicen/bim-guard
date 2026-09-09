@@ -44,7 +44,7 @@ from app.modules.contracts import (
     RuleExtractionProgressResponse,
 )
 from app.modules.document_parsing.section_chunker import SectionChunker
-from app.modules.document_parsing.section_tree import attach_page_numbers, build_section_tree
+from app.modules.document_parsing.section_tree import build_section_tree
 from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
 from app.services.cache import cache_service
 from app.services.document_access_service import DocumentAccessService
@@ -585,15 +585,39 @@ async def get_document_sections_tree(
     if cached is not None:
         return DocumentSectionTreeResponse.model_validate(cached)
 
-    text = doc.get("extracted_text") or ""
-    chunks = SectionChunker().chunk(text) if text.strip() else []
-    tree, flat = build_section_tree(chunks)
-    tree, enhanced = await enhance_section_tree(tree, flat)
+    doclang_xml = (doc.get("doclang_xml") or "").strip()
+    if doclang_xml:
+        from app.modules.document_parsing.doclang_chunker import DocLangChunker
 
-    pages = DocumentPagesService().get_pages(document_id)
-    snippets = [chunk["text"][:250] for chunk in flat]
-    page_numbers = DocumentPagesService.find_best_matching_pages(pages, snippets)
-    attach_page_numbers(tree, flat, page_numbers)
+        chunks = DocLangChunker().chunk(doclang_xml)
+        tree, flat = build_section_tree(chunks)
+        enhanced = False
+    else:
+        text = doc.get("extracted_text") or ""
+        chunks = SectionChunker().chunk(text) if text.strip() else []
+        tree, flat = build_section_tree(chunks)
+        tree, enhanced = await enhance_section_tree(tree, flat)
+
+    # Attach page numbers for any chunks where not already resolved
+    unresolved_indices = [i for i, chunk in enumerate(flat) if chunk.get("page_number") is None]
+    if unresolved_indices:
+        pages = DocumentPagesService().get_pages(document_id)
+        if pages:
+            snippets = [flat[i]["text"][:250] for i in unresolved_indices]
+            matched_pages = DocumentPagesService.find_best_matching_pages(pages, snippets)
+            for idx, page_num in zip(unresolved_indices, matched_pages, strict=False):
+                flat[idx]["page_number"] = page_num
+
+            id_to_page = {f["id"]: f.get("page_number") for f in flat}
+
+            def _sync_page(nodes: list[dict]) -> None:
+                for n in nodes:
+                    if n.get("page_number") is None and n.get("id") in id_to_page:
+                        n["page_number"] = id_to_page[n["id"]]
+                    if n.get("children"):
+                        _sync_page(n["children"])
+
+            _sync_page(tree)
 
     response = DocumentSectionTreeResponse(
         document_id=document_id,

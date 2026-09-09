@@ -303,6 +303,8 @@ export interface DocumentSection {
   text: string;
   char_count: number;
   page_number?: number | null;
+  node_type?: string;
+  bbox?: BoundingBox | null;
 }
 
 export interface DocumentSectionsResponse {
@@ -316,6 +318,8 @@ export interface SectionTreeNode {
   section_name?: string | null;
   char_count: number;
   page_number?: number | null;
+  node_type?: string;
+  bbox?: BoundingBox | null;
   children: SectionTreeNode[];
 }
 

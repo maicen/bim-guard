@@ -75,6 +75,67 @@ def test_build_section_tree_empty_input():
     assert flat == []
 
 
+def test_build_section_tree_doclang_chunks_with_section_path_and_tables():
+    chunks = [
+        {
+            "section_number": "1",
+            "section_name": "General Requirements",
+            "section_path": ["1"],
+            "node_type": "heading",
+            "text": "General text",
+            "char_count": 12,
+            "page_number": 1,
+            "bbox": {"page": 1, "l": 50, "t": 100, "r": 500, "b": 120},
+        },
+        {
+            "section_number": "1.1",
+            "section_name": "Interchangeability",
+            "section_path": ["1", "1.1"],
+            "node_type": "heading",
+            "text": "Clause text",
+            "char_count": 11,
+            "page_number": 1,
+            "bbox": {"page": 1, "l": 50, "t": 140, "r": 500, "b": 160},
+        },
+        {
+            "section_number": "1.1",
+            "section_name": "Table 1.1: Component Tolerances",
+            "section_path": ["1", "1.1", "Table 1.1: Component Tolerances"],
+            "node_type": "table",
+            "text": "OTSL table representation",
+            "char_count": 25,
+            "page_number": 2,
+            "bbox": {"page": 2, "l": 60, "t": 200, "r": 480, "b": 450},
+        },
+    ]
+
+    tree, flat = build_section_tree(chunks)
+
+    assert len(tree) == 1
+    root = tree[0]
+    assert root["section_number"] == "1"
+    assert root["node_type"] == "heading"
+    assert root["page_number"] == 1
+    assert root["bbox"] == {"page": 1, "l": 50, "t": 100, "r": 500, "b": 120}
+
+    assert len(root["children"]) == 1
+    sub = root["children"][0]
+    assert sub["section_number"] == "1.1"
+    assert sub["node_type"] == "heading"
+
+    assert len(sub["children"]) == 1
+    tbl = sub["children"][0]
+    assert tbl["section_name"] == "Table 1.1: Component Tolerances"
+    assert tbl["node_type"] == "table"
+    assert tbl["page_number"] == 2
+    assert tbl["bbox"] == {"page": 2, "l": 60, "t": 200, "r": 480, "b": 450}
+
+    # Verify flat list mirrors the nodes and bboxes
+    assert len(flat) == 3
+    assert flat[2]["node_type"] == "table"
+    assert flat[2]["bbox"] == {"page": 2, "l": 60, "t": 200, "r": 480, "b": 450}
+
+
 def test_attach_page_numbers_sets_flat_and_nested_nodes():
     chunks = [
         _chunk("1", "CHAPTER 1"),

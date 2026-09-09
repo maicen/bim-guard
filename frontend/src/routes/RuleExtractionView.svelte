@@ -676,6 +676,7 @@
                 document_id: selectedDocId!,
                 filename: documents.find((d) => d.id === selectedDocId)?.filename ?? "",
                 page_number: node.page_number ?? null,
+                bbox: node.bbox ?? null,
                 // Highlight the section's actual opening text (same snippet
                 // the backend resolved page_number from), not its AI-cleaned
                 // label -- the label may no longer appear verbatim in the PDF.

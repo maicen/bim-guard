@@ -43,17 +43,16 @@ def compute_depth(section_number: str | None, section_name: str | None) -> int:
 def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
     """Nest a flat, document-order chunk list into a tree.
 
+    Supports both legacy SectionChunker chunks (heuristic dot-counting depth)
+    and DocLang chunks (exact hierarchy depth from ``section_path``, with
+    OTSL table nodes, page numbers, and bounding boxes).
+
     Args:
         chunks: The list of dicts returned by ``SectionChunker.chunk()``
-            (``section_number``, ``section_name``, ``text``, ``char_count``),
-            in document order.
+            or ``DocLangChunker.chunk()`` in document order.
 
     Returns:
-        ``(tree, flat)`` where ``flat`` is the same chunks with a stable
-        ``id`` assigned (document order, ``"s0"``, ``"s1"``, ...) and no
-        ``children`` key, and ``tree`` nests those same node dicts (by
-        reference) under a ``children`` list, ready to serialize as
-        ``SectionTreeNode``.
+        ``(tree, flat)`` ready to serialize as ``SectionTreeNode`` and ``DocumentSection``.
     """
     flat: list[dict] = []
     roots: list[dict] = []
@@ -63,24 +62,38 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
         section_number = chunk.get("section_number")
         section_name = chunk.get("section_name")
         char_count = chunk.get("char_count", 0)
+        node_type = chunk.get("node_type", "section")
+        bbox = chunk.get("bbox")
+        page_number = chunk.get("page_number")
         node_id = f"s{i}"
 
-        flat.append(
-            {
-                "id": node_id,
-                "section_number": section_number,
-                "section_name": section_name,
-                "text": chunk.get("text", ""),
-                "char_count": char_count,
-            }
-        )
+        flat_item = {
+            "id": node_id,
+            "section_number": section_number,
+            "section_name": section_name,
+            "text": chunk.get("text", ""),
+            "char_count": char_count,
+            "page_number": page_number,
+            "node_type": node_type,
+            "bbox": bbox,
+        }
+        flat.append(flat_item)
 
-        depth = compute_depth(section_number, section_name)
+        # Infer depth: DocLang provides exact section_path; otherwise compute from number
+        if "section_path" in chunk and chunk["section_path"]:
+            base_depth = max(0, len(chunk["section_path"]) - 1)
+            depth = base_depth + 1 if node_type == "table" else base_depth
+        else:
+            depth = compute_depth(section_number, section_name)
+
         tree_node = {
             "id": node_id,
             "section_number": section_number,
             "section_name": section_name,
             "char_count": char_count,
+            "page_number": page_number,
+            "node_type": node_type,
+            "bbox": bbox,
             "children": [],
         }
 

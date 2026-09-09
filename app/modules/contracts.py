@@ -573,6 +573,8 @@ class DocumentSection(BaseModel):
     page_number: Optional[int] = Field(
         default=None, description="Resolved source-document page this section starts on, when known"
     )
+    node_type: str = Field(default="section", description="Type of node: 'section', 'heading', 'table', 'paragraph'")
+    bbox: Optional[dict[str, Any]] = Field(default=None, description="Bounding box coordinates on the page")
 
 
 class DocumentSectionsResponse(BaseModel):
@@ -592,6 +594,8 @@ class SectionTreeNode(BaseModel):
     page_number: Optional[int] = Field(
         default=None, description="Resolved source-document page this section starts on, when known"
     )
+    node_type: str = Field(default="section", description="Type of outline node: 'section', 'heading', 'table'")
+    bbox: Optional[dict[str, Any]] = Field(default=None, description="Bounding box coordinates on the page")
     children: list["SectionTreeNode"] = Field(default_factory=list)
 
 

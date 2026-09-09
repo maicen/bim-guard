@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, ChevronDown, Eye } from "lucide-svelte";
+  import { ChevronRight, ChevronDown, Eye, Table2 } from "lucide-svelte";
   import type { SectionTreeNode } from "../types";
   import TableCheckbox from "./TableCheckbox.svelte";
   import SectionTree from "./SectionTree.svelte";
@@ -17,14 +17,14 @@
     depth: number;
     /** Already-trimmed/lowercased filter text, forces this row open while active. */
     query?: string;
-    /** When given, shows a "view in document" icon for nodes with a known page_number. */
+    /** When given, shows a "view in document" icon for nodes with a known page_number or bbox. */
     onViewSource?: (node: SectionTreeNode) => void;
   } = $props();
 
   // Top-level chapters open by default; deeper clauses stay collapsed until
   // the user expands them (or a filter match forces every branch open).
-  let localExpanded = $state(depth === 0);
-  const isExpanded = $derived(query !== "" || localExpanded);
+  let userExpanded = $state<boolean | null>(null);
+  const isExpanded = $derived(query !== "" || (userExpanded !== null ? userExpanded : depth === 0));
 
   function allLeafIds(n: SectionTreeNode): string[] {
     if (n.children.length === 0) return [n.id];
@@ -58,7 +58,7 @@
         type="button"
         onclick={(event) => {
           event.preventDefault();
-          localExpanded = !localExpanded;
+          userExpanded = !isExpanded;
         }}
         class="shrink-0 text-slate-500 hover:text-slate-300"
         aria-label={isExpanded ? "Collapse section" : "Expand section"}
@@ -80,11 +80,20 @@
     />
     <span class="font-mono text-slate-500">{node.section_number || "—"}</span>
     <span class="flex-1 truncate">{node.section_name || "Untitled section"}</span>
+    {#if node.node_type === "table"}
+      <span
+        class="inline-flex items-center gap-1 rounded bg-cyan-950/80 border border-cyan-800/50 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 shrink-0"
+        title="DocLang OTSL Table"
+      >
+        <Table2 class="h-3 w-3" />
+        <span>Table</span>
+      </span>
+    {/if}
     {#if node.page_number}
       <span class="shrink-0 rounded border border-slate-800 px-1 text-slate-500">p. {node.page_number}</span>
     {/if}
     <span class="shrink-0 text-slate-600">{node.char_count.toLocaleString()} chars</span>
-    {#if onViewSource && node.page_number}
+    {#if onViewSource && (node.page_number || node.bbox)}
       <button
         type="button"
         onclick={(event) => {
