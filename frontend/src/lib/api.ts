@@ -1391,6 +1391,22 @@ export const documentsApi = {
     return `${API_BASE}/documents/${id}/file`;
   },
 
+  getDoclangUrl(id: number): string {
+    return `${API_BASE}/documents/${id}/doclang`;
+  },
+
+  async getDoclang(id: number): Promise<string> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/doclang`);
+    if (!res.ok) {
+      throw new Error(`Failed to load DocLang XML (HTTP ${res.status})`);
+    }
+    return res.text();
+  },
+
+  getExportDoclangUrl(id: number): string {
+    return `${API_BASE}/documents/${id}/export-doclang`;
+  },
+
   async getSections(id: number): Promise<DocumentSectionsResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/sections`);
     return handleResponse<DocumentSectionsResponse>(res);

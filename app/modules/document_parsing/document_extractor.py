@@ -65,7 +65,11 @@ def _build_extractor(instance: dict | None):
 
 
 def extract_document_text(
-    filename: str, content: bytes, parser: str = PARSER_AUTO, instance: dict | None = None
+    filename: str,
+    content: bytes,
+    parser: str = PARSER_AUTO,
+    instance: dict | None = None,
+    return_doclang: bool = False,
 ) -> tuple:
     """
     Extract text (and tables, when available) from an uploaded document.
@@ -88,13 +92,13 @@ def extract_document_text(
                                  Docling instance) to use. When omitted, falls
                                  back to the legacy env-var-only hosted
                                  Unstructured config.
+        return_doclang (bool):  when True, returns (text, tables, pages, doclang_xml, bboxes)
 
     Returns:
         text   (str)
         tables (list[dict])
-        pages  (list[dict]): [{"page_number": int, "text": str}, ...] — empty
-                              for pageless formats (CSV/TXT/MD) or when the
-                              engine/extractor doesn't report page numbers.
+        pages  (list[dict]): [{"page_number": int, "text": str}, ...]
+        (plus doclang_xml, bboxes when return_doclang=True)
     """
     if parser not in VALID_PARSERS:
         raise ValueError(f"Unknown parser '{parser}'. Expected one of {sorted(VALID_PARSERS)}.")
@@ -104,6 +108,8 @@ def extract_document_text(
 
     if parser == PARSER_LIGHT:
         text, pages = LightExtractor().extract_paged(filename, content)
+        if return_doclang:
+            return text, [], pages, "", []
         return text, [], pages
 
     have_engine = bool(instance) or bool(UNSTRUCTURED_API_KEY)
@@ -116,8 +122,23 @@ def extract_document_text(
     if have_engine:
         try:
             extractor = _build_extractor(instance)
-            text, tables, pages = extractor.extract_bytes(content, filename)
+            doclang_xml = ""
+            bboxes = []
+            if return_doclang and hasattr(extractor, "extract_bytes"):
+                try:
+                    res = extractor.extract_bytes(content, filename, return_doclang=True)
+                    if len(res) == 5:
+                        text, tables, pages, doclang_xml, bboxes = res
+                    else:
+                        text, tables, pages = res[:3]
+                except TypeError:
+                    text, tables, pages = extractor.extract_bytes(content, filename)
+            else:
+                text, tables, pages = extractor.extract_bytes(content, filename)
+
             if text.strip():
+                if return_doclang:
+                    return text, tables, pages, doclang_xml, bboxes
                 return text, tables, pages
             logger.warning(
                 "Structured extraction returned empty text filename=%s instance=%s",
@@ -139,4 +160,6 @@ def extract_document_text(
         )
 
     text, pages = LightExtractor().extract_paged(filename, content)
+    if return_doclang:
+        return text, [], pages, "", []
     return text, [], pages

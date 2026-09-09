@@ -47,6 +47,7 @@ class RuleDraftService:
                     "promoted_rule_id": int,
                     "created_at": str,
                     "original_proposed_rule": dict,
+                    "bbox": dict,
                 },
             )
         )
@@ -62,6 +63,7 @@ class RuleDraftService:
                     "source_node_id": draft.source_node_id or "",
                     "source_snippet": draft.source_snippet or "",
                     "clause": draft.clause.model_dump() if draft.clause else None,
+                    "bbox": draft.bbox or (draft.clause.bbox if draft.clause else None),
                     "proposed_rule": draft.proposed_rule.model_dump(),
                     "confidence": draft.confidence,
                     "extraction_method": draft.extraction_method,

@@ -80,6 +80,7 @@ class DocumentService:
         suitability_code: str = "S0",
         revision_code: str = "P01.01",
         cde_state: str = "WIP",
+        doclang_xml: str = "",
     ):
         """Create and persist a new uploaded document record."""
         clean_doc_type = (doc_type or "").strip() or "Specification"
@@ -100,6 +101,7 @@ class DocumentService:
             "suitability_code": suitability_code or "S0",
             "revision_code": revision_code or "P01.01",
             "cde_state": cde_state or "WIP",
+            "doclang_xml": doclang_xml or "",
         }
         document = self._documents.insert(payload)
         invalidate_cache("bimguard:documents:list")
@@ -134,6 +136,7 @@ class DocumentService:
         suitability_code: str | None = None,
         revision_code: str | None = None,
         cde_state: str | None = None,
+        doclang_xml: str | None = None,
     ):
         """Update mutable document metadata and extracted text."""
         updates: dict = {"filename": filename, "extracted_text": extracted_text}
@@ -149,6 +152,8 @@ class DocumentService:
             updates["revision_code"] = revision_code.strip() or "P01.01"
         if cde_state is not None:
             updates["cde_state"] = cde_state.strip() or "WIP"
+        if doclang_xml is not None:
+            updates["doclang_xml"] = doclang_xml
 
         self._documents.update(
             updates=updates,
@@ -233,14 +238,14 @@ class DocumentService:
             )
 
         try:
-            extracted_text, pages = self.extract_document_text_paged(
-                filename, content, parser=parser, instance=instance
+            extracted_text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
+                filename, content, parser=parser, instance=instance, return_doclang=True
             )
         except (ValueError, RuntimeError):
             raise
         except Exception as exc:
             logger.warning("Document extraction failed filename=%s parser=%s error=%s", filename, parser, exc)
-            extracted_text, pages = f"[Text extraction error: {exc}]", []
+            extracted_text, pages, doclang_xml = f"[Text extraction error: {exc}]", [], ""
 
         file_path = self.store_document_file(filename, content)
         created = self.create_document(
@@ -254,6 +259,7 @@ class DocumentService:
             suitability_code=suitability_code,
             revision_code=revision_code,
             cde_state="WIP",
+            doclang_xml=doclang_xml,
         )
 
         if pages:
@@ -283,15 +289,24 @@ class DocumentService:
 
     @staticmethod
     def extract_document_text_paged(
-        filename: str, content: bytes, parser: str = "auto", instance: dict | None = None
-    ) -> tuple[str, list[dict]]:
+        filename: str,
+        content: bytes,
+        parser: str = "auto",
+        instance: dict | None = None,
+        return_doclang: bool = False,
+    ) -> tuple:
         """Extract text and page-tagged text, like `extract_document_text` plus pages.
 
-        See document_parsing/document_extractor.py for the `pages` shape
-        ([{"page_number": int, "text": str}, ...], empty for pageless
-        formats or engines that don't report page numbers).
+        When `return_doclang=True`, returns `(text, pages, doclang_xml, bboxes)`.
+        Otherwise returns `(text, pages)`.
         """
         from app.modules.document_parsing.document_extractor import extract_document_text
 
-        text, _tables, pages = extract_document_text(filename, content, parser=parser, instance=instance)
+        res = extract_document_text(
+            filename, content, parser=parser, instance=instance, return_doclang=return_doclang
+        )
+        if return_doclang:
+            text, _tables, pages, doclang_xml, bboxes = res
+            return text, pages, doclang_xml, bboxes
+        text, _tables, pages = res[:3]
         return text, pages

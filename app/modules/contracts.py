@@ -467,6 +467,7 @@ class DocumentResponse(IsoGovernanceFieldsRequired):
     upload_date: Optional[str] = None
     extracted_text_preview: Optional[str] = None
     char_count: int = 0
+    doclang_xml: Optional[str] = Field(default="", description="Canonical DocLang XML export if available")
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
@@ -482,6 +483,7 @@ class DocumentDetailResponse(IsoGovernanceFieldsRequired):
     upload_date: Optional[str] = None
     extracted_text: str = ""
     char_count: int = 0
+    doclang_xml: str = Field(default="", description="Canonical DocLang XML export (with OTSL tables)")
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
@@ -529,6 +531,9 @@ class ClauseMetadata(BaseModel):
     section_path: list[str] = Field(default_factory=list, description="Breadcrumb of headings, e.g. ['5', '5.3', '5.3.2']")
     node_type: Literal["paragraph", "table", "list", "heading"] = "paragraph"
     source_document_id: int = Field(..., description="FK to documents.id")
+    bbox: Optional[dict[str, Any]] = Field(
+        default=None, description="Bounding box coordinates on the page: {l, t, r, b, coord_origin}"
+    )
 
 
 class DeonticStatement(BaseModel):
@@ -743,6 +748,9 @@ class RuleExtractionDraft(BaseModel):
         default=None, description="The originating node's text, carried forward for promotion into rules.source_text"
     )
     clause: Optional[ClauseMetadata] = None
+    bbox: Optional[dict[str, Any]] = Field(
+        default=None, description="Bounding box coordinates on the page: {l, t, r, b, coord_origin}"
+    )
     proposed_rule: RuleCreateRequest
     original_proposed_rule: Optional[RuleCreateRequest] = Field(
         default=None,
@@ -802,6 +810,9 @@ class RuleSourceResponse(BaseModel):
         default=None, description="Best-matching page for the rule's source_text, when the document has page-tagged text"
     )
     snippet: str = Field(default="", description="The rule's source_text, for text-layer highlighting")
+    bbox: Optional[dict[str, Any]] = Field(
+        default=None, description="Bounding box coordinates on the page for visual halo highlighting: {l, t, r, b, coord_origin}"
+    )
 
 
 class RuleDraftReviewRequest(BaseModel):

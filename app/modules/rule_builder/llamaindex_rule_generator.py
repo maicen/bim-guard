@@ -156,7 +156,9 @@ def _candidate_to_draft(
     return RuleExtractionDraft(
         source_document_id=node.metadata.source_document_id,
         source_node_id=node.node_id,
+        source_snippet=node.text,
         clause=node.metadata,
+        bbox=node.metadata.bbox,
         proposed_rule=proposed_rule,
         confidence=candidate.confidence,
         extraction_method="llamaindex_pydantic",

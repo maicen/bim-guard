@@ -1,7 +1,5 @@
-"""
-document_parsing/docling_extractor.py
-------------------------------------------
-Document extraction via a Docling service, an alternative to Unstructured.
+"""Document extraction via a Docling service, an alternative to Unstructured.
+
 Two kinds, both speaking the same protocol:
 
   - kind "docling"       — a hosted Docling Serve instance, e.g. IBM's
@@ -33,6 +31,10 @@ Usage:
 
 from io import BytesIO
 from pathlib import Path
+
+from app.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 KIND_DOCLING_HOSTED = "docling"
 KIND_DOCLING_LOCAL = "docling-local"
@@ -93,7 +95,7 @@ class DoclingExtractor:
         self.name = name or self.kind
         print(f"[DoclingExtractor] Ready (kind={self.kind}, instance={self.name})")
 
-    def extract(self, file_path: str | Path, filename: str | None = None) -> tuple:
+    def extract(self, file_path: str | Path, filename: str | None = None, *, return_doclang: bool = False) -> tuple:
         """
         Extract text, tables, and page-tagged text from a document on disk.
 
@@ -102,11 +104,13 @@ class DoclingExtractor:
             filename  (str | None): unused for on-disk paths (Docling reads
                                      the file's own name); kept for parity
                                      with UnstructuredExtractor's signature
+            return_doclang (bool):  when True, returns (text, tables, pages, doclang_xml, bboxes)
 
         Returns:
             text   (str)
             tables (list[dict])
             pages  (list[dict]): [{"page_number": int, "text": str}, ...]
+            (plus doclang_xml, bboxes if return_doclang=True)
         """
         path = Path(file_path)
         if not path.exists():
@@ -114,20 +118,27 @@ class DoclingExtractor:
 
         with self._client_cls(url=self.api_url, api_key=self.api_key) as client:
             result = client.convert(source=path)
-        return self._result_to_text_tables_pages(result, filename or path.name)
+        return self._result_to_text_tables_pages(result, filename or path.name, return_doclang=return_doclang)
 
-    def extract_bytes(self, content: bytes, filename: str) -> tuple:
+    def extract_bytes(self, content: bytes, filename: str, *, return_doclang: bool = False) -> tuple:
         """Extract text, tables, and page-tagged text from raw file bytes via the hosted service."""
         from docling_core.types.io import DocumentStream
 
         stream = DocumentStream(name=filename, stream=BytesIO(content))
         with self._client_cls(url=self.api_url, api_key=self.api_key) as client:
             result = client.convert(source=stream)
-        return self._result_to_text_tables_pages(result, filename)
+        return self._result_to_text_tables_pages(result, filename, return_doclang=return_doclang)
 
-    def _result_to_text_tables_pages(self, result, filename: str) -> tuple:
+    def _result_to_text_tables_pages(self, result, filename: str, *, return_doclang: bool = False) -> tuple:
         document = result.document
         text = document.export_to_markdown()
+
+        doclang_xml = ""
+        try:
+            if hasattr(document, "export_to_doclang"):
+                doclang_xml = document.export_to_doclang()
+        except Exception as exc:
+            logger.warning("DocLang export failed for %s: %s", filename, exc)
 
         tables: list[dict] = []
         for table in document.tables:
@@ -143,11 +154,14 @@ class DoclingExtractor:
                 )
 
         pages = self._pages_from_document(document)
+        bboxes = self._bboxes_from_document(document)
 
         print(
             f"[DoclingExtractor] Done — {len(text):,} chars, {len(tables)} tables, "
-            f"{len(pages)} pages ({filename})"
+            f"{len(pages)} pages, doclang={len(doclang_xml):,} chars ({filename})"
         )
+        if return_doclang:
+            return text, tables, pages, doclang_xml, bboxes
         return text, tables, pages
 
     @staticmethod
@@ -172,3 +186,49 @@ class DoclingExtractor:
             {"page_number": page_no, "text": "\n\n".join(parts)}
             for page_no, parts in sorted(pages_text.items())
         ]
+
+    @staticmethod
+    def _bboxes_from_document(document) -> list[dict]:
+        """Extract element bounding boxes and page provenance from DoclingDocument."""
+        bboxes = []
+        for item in document.texts:
+            item_text = (item.text or "").strip()
+            if not item_text or not item.prov:
+                continue
+            prov = item.prov[0]
+            bbox_dict = None
+            if prov.bbox:
+                bbox_dict = {
+                    "l": float(prov.bbox.l),
+                    "t": float(prov.bbox.t),
+                    "r": float(prov.bbox.r),
+                    "b": float(prov.bbox.b),
+                    "coord_origin": str(getattr(prov.bbox, "coord_origin", "BOTTOMLEFT")),
+                }
+            bboxes.append({
+                "text": item_text,
+                "page_number": prov.page_no,
+                "bbox": bbox_dict,
+            })
+        return bboxes
+
+    @staticmethod
+    def validate_doclang(xml_content: str) -> bool:
+        """Validate DocLang XML against bundled reference XSD schema."""
+        if not xml_content or not xml_content.strip():
+            return False
+        import tempfile
+        from pathlib import Path
+        try:
+            import doclang
+            with tempfile.NamedTemporaryFile(suffix=".xml", delete=False, mode="w", encoding="utf-8") as f:
+                f.write(xml_content)
+                tmp_path = f.name
+            try:
+                doclang.validate(tmp_path, allow_empty_namespace=True, xsd_only=True)
+                return True
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        except Exception as exc:
+            logger.debug("DocLang validation failed: %s", exc)
+            return False

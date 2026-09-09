@@ -10,6 +10,10 @@
     RotateCcw,
     Rows3,
     FileText as FileIcon,
+    FileCode,
+    Download,
+    Copy,
+    Check,
   } from "lucide-svelte";
   import { documentsApi } from "../api";
   import { authHeaders } from "../authToken";
@@ -20,9 +24,11 @@
     page?: number | null;
     /** Source snippet to highlight — matched against the PDF text layer, or the plain-text panel for non-PDF documents. */
     highlightText?: string | null;
+    /** Bounding box coordinates {l, t, r, b, coord_origin} on the page for visual halo highlighting. */
+    bbox?: { l: number; t: number; r: number; b: number; coord_origin?: string } | null;
   }
 
-  let { documentId, page = null, highlightText = null }: Props = $props();
+  let { documentId, page = null, highlightText = null, bbox = null }: Props = $props();
 
   // Single-page mode DOM refs
   let textLayerEl: HTMLDivElement = $state();
@@ -73,6 +79,146 @@
   // scale/mode can detect it's obsolete and bail without clobbering state.
   let renderGeneration = 0;
 
+  let activeBboxRect: { left: number; top: number; width: number; height: number } | null = $state(null);
+  let slotBboxRects: Record<number, { left: number; top: number; width: number; height: number }> = $state({});
+
+  let doclangXml = $state("");
+  let activeViewerTab: "document" | "doclang" = $state("document");
+  let activeDoclangSubTab: "tables" | "xml" = $state("tables");
+  let copiedXml = $state(false);
+
+  function copyXmlToClipboard() {
+    if (!doclangXml) return;
+    navigator.clipboard.writeText(doclangXml);
+    copiedXml = true;
+    setTimeout(() => {
+      copiedXml = false;
+    }, 2500);
+  }
+
+  function downloadDoclangArchive() {
+    window.open(documentsApi.getExportDoclangUrl(documentId), "_blank");
+  }
+
+  interface ParsedOtslTable {
+    title: string;
+    rows: string[][];
+  }
+
+  function parseDoclangTables(xml: string): ParsedOtslTable[] {
+    if (!xml) return [];
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, "application/xml");
+      const tableNodes = Array.from(doc.querySelectorAll("table"));
+      return tableNodes.map((tableNode, idx) => {
+        let title = `Table ${idx + 1}`;
+        let prev = tableNode.previousElementSibling;
+        while (prev) {
+          if (prev.tagName.toLowerCase() === "heading") {
+            title = prev.textContent?.trim() || title;
+            break;
+          }
+          prev = prev.previousElementSibling;
+        }
+
+        const rows: string[][] = [];
+        let currentRow: string[] = [];
+        let currentCellParts: string[] = [];
+
+        for (let i = 0; i < tableNode.childNodes.length; i++) {
+          const node = tableNode.childNodes[i];
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
+            const tag = el.tagName.toLowerCase();
+            if (tag === "fcel") {
+              if (currentCellParts.length > 0) {
+                const text = currentCellParts.join(" ").trim();
+                if (text) currentRow.push(text);
+                currentCellParts = [];
+              }
+              const inner = el.textContent?.trim();
+              if (inner) currentCellParts.push(inner);
+            } else if (tag === "nl") {
+              if (currentCellParts.length > 0) {
+                const text = currentCellParts.join(" ").trim();
+                if (text) currentRow.push(text);
+                currentCellParts = [];
+              }
+              if (currentRow.length > 0) {
+                rows.push(currentRow);
+                currentRow = [];
+              }
+            } else {
+              const text = el.textContent?.trim();
+              if (text) currentCellParts.push(text);
+            }
+          } else if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent?.trim();
+            if (text) currentCellParts.push(text);
+          }
+        }
+        if (currentCellParts.length > 0) {
+          const text = currentCellParts.join(" ").trim();
+          if (text) currentRow.push(text);
+        }
+        if (currentRow.length > 0) {
+          rows.push(currentRow);
+        }
+
+        return { title, rows: rows.filter((r) => r.some((c) => c.trim())) };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  let parsedTables = $derived(parseDoclangTables(doclangXml));
+
+  function updateBboxOverlay(viewport: any, pageNum: number) {
+    if (!bbox || (page !== null && page !== pageNum)) {
+      activeBboxRect = null;
+      return;
+    }
+    try {
+      const minX = Math.min(bbox.l, bbox.r);
+      const minY = Math.min(bbox.t, bbox.b);
+      const maxX = Math.max(bbox.l, bbox.r);
+      const maxY = Math.max(bbox.t, bbox.b);
+      const [rx1, ry1, rx2, ry2] = viewport.convertToViewportRectangle([minX, minY, maxX, maxY]);
+      activeBboxRect = {
+        left: Math.min(rx1, rx2),
+        top: Math.min(ry1, ry2),
+        width: Math.abs(rx2 - rx1),
+        height: Math.abs(ry2 - ry1),
+      };
+    } catch {
+      activeBboxRect = null;
+    }
+  }
+
+  function updateSlotBboxOverlay(viewport: any, pageNum: number) {
+    if (!bbox || (page !== null && page !== pageNum)) {
+      delete slotBboxRects[pageNum];
+      return;
+    }
+    try {
+      const minX = Math.min(bbox.l, bbox.r);
+      const minY = Math.min(bbox.t, bbox.b);
+      const maxX = Math.max(bbox.l, bbox.r);
+      const maxY = Math.max(bbox.t, bbox.b);
+      const [rx1, ry1, rx2, ry2] = viewport.convertToViewportRectangle([minX, minY, maxX, maxY]);
+      slotBboxRects[pageNum] = {
+        left: Math.min(rx1, rx2),
+        top: Math.min(ry1, ry2),
+        width: Math.abs(rx2 - rx1),
+        height: Math.abs(ry2 - ry1),
+      };
+    } catch {
+      delete slotBboxRects[pageNum];
+    }
+  }
+
   let loadedDocumentId: number | null = null;
 
   async function load() {
@@ -84,10 +230,22 @@
     pdfDoc = null;
     isPdf = false;
     plainText = "";
+    doclangXml = "";
+    activeViewerTab = "document";
+    activeDoclangSubTab = "tables";
     viewMode = "single";
     scale = DEFAULT_SCALE;
     teardownObserver();
     pageSlots = [];
+
+    // Fetch document details in background to capture doclang_xml and text
+    documentsApi
+      .get(documentId)
+      .then((detail) => {
+        plainText = detail.extracted_text || "";
+        doclangXml = detail.doclang_xml || "";
+      })
+      .catch(() => {});
 
     try {
       const url = documentsApi.getFileUrl(documentId);
@@ -121,6 +279,7 @@
 
       const detail = await documentsApi.get(documentId);
       plainText = detail.extracted_text || "";
+      doclangXml = detail.doclang_xml || "";
       loading = false;
       if (pdfFallbackNotice && !plainText.trim()) {
         error =
@@ -177,6 +336,7 @@
     const pdfPage = await pdfDoc.getPage(currentPage);
     if (myGeneration !== renderGeneration) return;
     const viewport = pdfPage.getViewport({ scale });
+    updateBboxOverlay(viewport, currentPage);
 
     canvasEl.width = viewport.width;
     canvasEl.height = viewport.height;
@@ -294,6 +454,7 @@
       const pdfPage = await pdfDoc.getPage(pageNumber);
       if (myGeneration !== renderGeneration) return;
       const viewport = pdfPage.getViewport({ scale });
+      updateSlotBboxOverlay(viewport, pageNumber);
 
       canvas.width = viewport.width;
       canvas.height = viewport.height;
@@ -498,125 +659,301 @@
       <AlertCircle class="h-6 w-6" />
       <span>{error}</span>
     </div>
-  {:else if isPdf}
-    <div class="flex flex-1 flex-col overflow-hidden">
-      <div
-        class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2"
-      >
-        <div class="flex items-center gap-1">
-          <button
-            type="button"
-            onclick={zoomOut}
-            disabled={scale <= MIN_SCALE}
-            class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
-            aria-label="Zoom out"
-          >
-            <ZoomOut class="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onclick={zoomReset}
-            class="min-w-[3.5rem] rounded-lg px-1.5 py-1 text-center text-xs text-slate-300 hover:bg-slate-800"
-            title="Reset zoom"
-          >
-            {Math.round((scale / DEFAULT_SCALE) * 100)}%
-          </button>
-          <button
-            type="button"
-            onclick={zoomIn}
-            disabled={scale >= MAX_SCALE}
-            class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
-            aria-label="Zoom in"
-          >
-            <ZoomIn class="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onclick={zoomReset}
-            class="ml-0.5 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-            aria-label="Reset zoom and layout"
-            title="Reset"
-          >
-            <RotateCcw class="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
-          <button
-            type="button"
-            onclick={() => setViewMode("single")}
-            class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {viewMode === 'single'
-              ? 'bg-accent text-white'
-              : 'text-slate-400 hover:text-slate-200'}"
-          >
-            Single Page
-          </button>
-          <button
-            type="button"
-            onclick={() => setViewMode("continuous")}
-            class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {viewMode ===
-            'continuous'
-              ? 'bg-accent text-white'
-              : 'text-slate-400 hover:text-slate-200'}"
-          >
-            <Rows3 class="h-3 w-3" />
-            <span>Continuous</span>
-          </button>
-        </div>
-
-        {#if pageCount > 1}
-          <div class="flex items-center gap-1.5">
+  {:else}
+    {#if doclangXml}
+      <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
+        <div class="flex items-center gap-2">
+          <div class="flex items-center rounded-lg border border-slate-800 bg-slate-900 p-0.5">
             <button
               type="button"
-              onclick={() => goToPage(currentPage - 1)}
-              disabled={currentPage <= 1}
-              class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
-              aria-label="Previous page"
+              onclick={() => (activeViewerTab = "document")}
+              class="rounded-md px-3 py-1 text-xs font-medium transition-colors {activeViewerTab === 'document'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'}"
             >
-              <ChevronLeft class="h-4 w-4" />
+              {isPdf ? "PDF Document" : "Extracted Text"}
             </button>
-            <input
-              type="text"
-              inputmode="numeric"
-              bind:value={pageInputValue}
-              onkeydown={(e) => e.key === "Enter" && handlePageInputSubmit()}
-              onblur={handlePageInputSubmit}
-              class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-none"
-              aria-label="Page number"
-            />
-            <span class="text-xs text-slate-400">of {pageCount}</span>
             <button
               type="button"
-              onclick={() => goToPage(currentPage + 1)}
-              disabled={currentPage >= pageCount}
-              class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
-              aria-label="Next page"
+              onclick={() => (activeViewerTab = "doclang")}
+              class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors {activeViewerTab === 'doclang'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'}"
             >
-              <ChevronRight class="h-4 w-4" />
+              <FileCode class="h-3.5 w-3.5 text-cyan-400" />
+              <span>DocLang & OTSL</span>
+              {#if parsedTables.length > 0}
+                <span class="rounded-full bg-cyan-950 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
+                  {parsedTables.length} {parsedTables.length === 1 ? "table" : "tables"}
+                </span>
+              {/if}
             </button>
           </div>
-        {/if}
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            onclick={downloadDoclangArchive}
+            class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-800/60 bg-cyan-950/30 px-2.5 py-1 text-xs font-medium text-cyan-200 transition-colors hover:bg-cyan-900/50 hover:text-white"
+            title="Export DocLang Archive (.dclx) package compatible with official DocLang Viewer"
+          >
+            <Download class="h-3.5 w-3.5 text-cyan-400" />
+            <span>Export .dclx</span>
+          </button>
+        </div>
       </div>
+    {/if}
 
-      {#if viewMode === "single"}
-        <div class="flex-1 overflow-auto bg-slate-950/60 p-4">
-          <div class="relative mx-auto w-fit">
-            <canvas bind:this={canvasEl} class="block rounded-lg shadow-lg"></canvas>
-            <div bind:this={textLayerEl} class="pdf-text-layer"></div>
+    {#if activeViewerTab === "doclang"}
+      <div class="flex flex-1 flex-col overflow-hidden bg-slate-900">
+        <!-- Sub-toolbar -->
+        <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950/80 px-4 py-2">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
+              <button
+                type="button"
+                onclick={() => (activeDoclangSubTab = "tables")}
+                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeDoclangSubTab === 'tables'
+                  ? 'bg-slate-800 text-slate-100'
+                  : 'text-slate-400 hover:text-slate-200'}"
+              >
+                OTSL Tables ({parsedTables.length})
+              </button>
+              <button
+                type="button"
+                onclick={() => (activeDoclangSubTab = "xml")}
+                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeDoclangSubTab === 'xml'
+                  ? 'bg-slate-800 text-slate-100'
+                  : 'text-slate-400 hover:text-slate-200'}"
+              >
+                DocLang XML Markup
+              </button>
+            </div>
+            <span class="inline-flex items-center gap-1 rounded-full border border-cyan-800/40 bg-cyan-950/30 px-2 py-0.5 text-[11px] text-cyan-300">
+              LF AI & Data / IBM Spec
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            {#if activeDoclangSubTab === "xml"}
+              <button
+                type="button"
+                onclick={copyXmlToClipboard}
+                class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-700 hover:text-white"
+              >
+                {#if copiedXml}
+                  <Check class="h-3 w-3 text-emerald-400" />
+                  <span class="text-emerald-400">Copied!</span>
+                {:else}
+                  <Copy class="h-3 w-3" />
+                  <span>Copy XML</span>
+                {/if}
+              </button>
+            {/if}
           </div>
         </div>
-      {:else}
-        <div bind:this={scrollContainerEl} class="flex-1 overflow-auto bg-slate-950/60 p-4">
-          <div class="mx-auto flex w-fit flex-col gap-4">
-            {#each pageSlots as slot, i (slot.pageNumber)}
-              <div
-                bind:this={pageSlotEls[i]}
-                data-page={slot.pageNumber}
-                class="relative"
-                style="min-width: {estimatedPageWidth}px; min-height: {estimatedPageHeight}px;"
+
+        <!-- Tab content -->
+        <div class="flex-1 overflow-y-auto p-4">
+          {#if activeDoclangSubTab === "tables"}
+            {#if parsedTables.length === 0}
+              <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+                <FileCode class="mb-2 h-10 w-10 text-slate-600" />
+                <p class="text-sm font-semibold text-slate-300">No OTSL Tables in this Document</p>
+                <p class="mt-1 max-w-md text-xs text-slate-500">
+                  The document was parsed into DocLang XML clauses and paragraphs, but contains no tabular &lt;table&gt; grids with &lt;fcel/&gt; separators.
+                </p>
+              </div>
+            {:else}
+              <div class="space-y-6">
+                {#each parsedTables as table, tIdx (tIdx)}
+                  <div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-lg">
+                    <div class="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-4 py-2.5">
+                      <span class="text-xs font-semibold text-slate-200">{table.title}</span>
+                      <span class="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-400">
+                        {table.rows.length} rows × {table.rows[0]?.length || 0} cols
+                      </span>
+                    </div>
+                    <div class="overflow-x-auto p-3">
+                      <table class="w-full text-left text-xs text-slate-300">
+                        {#if table.rows.length > 0}
+                          <thead class="border-b border-slate-800 bg-slate-900/90 font-semibold uppercase text-caption text-slate-400">
+                            <tr>
+                              {#each table.rows[0] as colHeader, colIdx (colIdx)}
+                                <th class="px-3 py-2">{colHeader || `Col ${colIdx + 1}`}</th>
+                              {/each}
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-slate-800/60 font-mono text-xs">
+                            {#each table.rows.slice(1) as row, rowIdx (rowIdx)}
+                              <tr class="hover:bg-slate-900/40">
+                                {#each row as cell, cellIdx (cellIdx)}
+                                  <td class="px-3 py-2 text-slate-200">{cell}</td>
+                                {/each}
+                              </tr>
+                            {/each}
+                          </tbody>
+                        {/if}
+                      </table>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          {:else}
+            <div class="whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-cyan-200/90">
+              {doclangXml}
+            </div>
+          {/if}
+        </div>
+      </div>
+    {:else if isPdf}
+      <div class="flex flex-1 flex-col overflow-hidden">
+        <div
+          class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2"
+        >
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              onclick={zoomOut}
+              disabled={scale <= MIN_SCALE}
+              class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+              aria-label="Zoom out"
+            >
+              <ZoomOut class="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onclick={zoomReset}
+              class="min-w-[3.5rem] rounded-lg px-1.5 py-1 text-center text-xs text-slate-300 hover:bg-slate-800"
+              title="Reset zoom"
+            >
+              {Math.round((scale / DEFAULT_SCALE) * 100)}%
+            </button>
+            <button
+              type="button"
+              onclick={zoomIn}
+              disabled={scale >= MAX_SCALE}
+              class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+              aria-label="Zoom in"
+            >
+              <ZoomIn class="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onclick={zoomReset}
+              class="ml-0.5 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              aria-label="Reset zoom and layout"
+              title="Reset"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
+            <button
+              type="button"
+              onclick={() => setViewMode("single")}
+              class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {viewMode === 'single'
+                ? 'bg-accent text-white'
+                : 'text-slate-400 hover:text-slate-200'}"
+            >
+              Single Page
+            </button>
+            <button
+              type="button"
+              onclick={() => setViewMode("continuous")}
+              class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {viewMode ===
+              'continuous'
+                ? 'bg-accent text-white'
+                : 'text-slate-400 hover:text-slate-200'}"
+            >
+              <Rows3 class="h-3 w-3" />
+              <span>Continuous</span>
+            </button>
+          </div>
+
+          {#if pageCount > 1}
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                onclick={() => goToPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                aria-label="Previous page"
               >
-                <canvas bind:this={pageCanvasEls[i]} class="block rounded-lg shadow-lg"></canvas>
-                <div bind:this={pageTextLayerEls[i]} class="pdf-text-layer"></div>
+                <ChevronLeft class="h-4 w-4" />
+              </button>
+              <input
+                type="text"
+                inputmode="numeric"
+                bind:value={pageInputValue}
+                onkeydown={(e) => e.key === "Enter" && handlePageInputSubmit()}
+                onblur={handlePageInputSubmit}
+                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-none"
+                aria-label="Page number"
+              />
+              <span class="text-xs text-slate-400">of {pageCount}</span>
+              <button
+                type="button"
+                onclick={() => goToPage(currentPage + 1)}
+                disabled={currentPage >= pageCount}
+                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                aria-label="Next page"
+              >
+                <ChevronRight class="h-4 w-4" />
+              </button>
+            </div>
+          {/if}
+        </div>
+
+        {#if viewMode === "single"}
+          <div class="relative flex flex-1 items-start justify-center overflow-auto bg-slate-950/60 p-4">
+            <div class="relative shadow-2xl">
+              <canvas bind:this={canvasEl} class="block rounded-lg bg-white"></canvas>
+              <div bind:this={textLayerEl} class="pdf-text-layer"></div>
+              {#if activeBboxRect}
+                <div
+                  class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
+                  style="left: {activeBboxRect.left}px; top: {activeBboxRect.top}px; width: {activeBboxRect.width}px; height: {activeBboxRect.height}px;"
+                >
+                  <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow">
+                    Source Clause
+                  </span>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {:else}
+          <div
+            bind:this={scrollContainerEl}
+            class="flex flex-1 flex-col items-center gap-4 overflow-y-auto bg-slate-950/60 p-4"
+          >
+            {#each pageSlots as slot (slot.pageNumber)}
+              <div
+                bind:this={pageSlotEls[slot.pageNumber - 1]}
+                class="relative shadow-2xl"
+                style="min-width: {estimatedPageWidth ? `${estimatedPageWidth}px` : 'auto'}; min-height: {estimatedPageHeight ? `${estimatedPageHeight}px` : '400px'};"
+              >
+                <canvas
+                  bind:this={pageCanvasEls[slot.pageNumber - 1]}
+                  class="block rounded-lg bg-white"
+                ></canvas>
+                <div
+                  bind:this={pageTextLayerEls[slot.pageNumber - 1]}
+                  class="pdf-text-layer"
+                ></div>
+                {#if slotBboxRects[slot.pageNumber]}
+                  <div
+                    class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
+                    style="left: {slotBboxRects[slot.pageNumber].left}px; top: {slotBboxRects[slot.pageNumber].top}px; width: {slotBboxRects[slot.pageNumber].width}px; height: {slotBboxRects[slot.pageNumber].height}px;"
+                  >
+                    <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow">
+                      Source Clause
+                    </span>
+                  </div>
+                {/if}
                 {#if !slot.rendered}
                   <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-900/40 text-micro text-slate-500">
                     Page {slot.pageNumber}
@@ -625,29 +962,29 @@
               </div>
             {/each}
           </div>
-        </div>
-      {/if}
-    </div>
-  {:else}
-    <div class="flex flex-1 flex-col overflow-hidden">
-      {#if pdfFallbackNotice}
-        <div class="flex shrink-0 items-start gap-2 border-b border-amber-800/50 bg-amber-950/40 px-4 py-2.5 text-xs text-amber-300">
-          <FileIcon class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{pdfFallbackNotice}</span>
-        </div>
-      {/if}
-      <div
-        bind:this={textPanelEl}
-        class="flex-1 overflow-y-auto whitespace-pre-wrap bg-slate-950/60 p-6 font-mono text-xs leading-relaxed text-slate-300"
-      >
-        {#if highlightSplit}
-          {highlightSplit.before}<mark class="rounded-sm bg-amber-400/60 text-slate-950">{highlightSplit.match}</mark
-          >{highlightSplit.after}
-        {:else}
-          {plainText || "No extracted text found."}
         {/if}
       </div>
-    </div>
+    {:else}
+      <div class="flex flex-1 flex-col overflow-hidden">
+        {#if pdfFallbackNotice}
+          <div class="flex shrink-0 items-start gap-2 border-b border-amber-800/50 bg-amber-950/40 px-4 py-2.5 text-xs text-amber-300">
+            <FileIcon class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{pdfFallbackNotice}</span>
+          </div>
+        {/if}
+        <div
+          bind:this={textPanelEl}
+          class="flex-1 overflow-y-auto whitespace-pre-wrap bg-slate-950/60 p-6 font-mono text-xs leading-relaxed text-slate-300"
+        >
+          {#if highlightSplit}
+            {highlightSplit.before}<mark class="rounded-sm bg-amber-400/60 text-slate-950">{highlightSplit.match}</mark
+            >{highlightSplit.after}
+          {:else}
+            {plainText || "No extracted text found."}
+          {/if}
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 

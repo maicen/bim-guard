@@ -280,6 +280,7 @@ export interface DocumentItem extends IsoGovernanceFieldsRequired {
   upload_date?: string | null;
   extracted_text_preview?: string | null;
   char_count: number;
+  doclang_xml?: string | null;
   project_code?: string;
 }
 
@@ -291,6 +292,7 @@ export interface DocumentDetail extends IsoGovernanceFieldsRequired {
   upload_date?: string | null;
   extracted_text: string;
   char_count: number;
+  doclang_xml?: string | null;
   project_code?: string;
 }
 
@@ -396,6 +398,7 @@ export interface RuleSourceResponse {
   filename: string;
   page_number?: number | null;
   snippet: string;
+  bbox?: BoundingBox | null;
 }
 
 export interface RuleFolder {
@@ -658,6 +661,14 @@ export interface ExtractedRule {
   selected?: boolean;
 }
 
+export interface BoundingBox {
+  l: number;
+  t: number;
+  r: number;
+  b: number;
+  coord_origin?: string;
+}
+
 export interface ClauseMetadata {
   clause_id?: string | null;
   page_number?: number | null;
@@ -665,6 +676,7 @@ export interface ClauseMetadata {
   section_path?: string[];
   node_type?: "paragraph" | "table" | "list" | "heading";
   source_document_id: number;
+  bbox?: BoundingBox | null;
 }
 
 export type RuleDraftStatus = "pending_review" | "accepted" | "rejected" | "edited";
@@ -707,6 +719,7 @@ export interface RuleExtractionDraft {
   source_node_id?: string | null;
   source_snippet?: string | null;
   clause?: ClauseMetadata | null;
+  bbox?: BoundingBox | null;
   proposed_rule: RuleCreateRequest;
   confidence: number;
   extraction_method: "llamaindex_pydantic" | "litellm_legacy";

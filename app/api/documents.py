@@ -103,6 +103,7 @@ def list_documents(
                 upload_date=r.get("upload_date"),
                 extracted_text_preview=preview,
                 char_count=len(text),
+                doclang_xml=r.get("doclang_xml") or "",
                 project_code=r.get("project_code", ""),
                 originator=r.get("originator", ""),
                 volume_system=r.get("volume_system", ""),
@@ -141,6 +142,7 @@ def get_document(
         upload_date=doc.get("upload_date"),
         extracted_text=text,
         char_count=len(text),
+        doclang_xml=doc.get("doclang_xml") or "",
         project_code=doc.get("project_code", ""),
         originator=doc.get("originator", ""),
         volume_system=doc.get("volume_system", ""),
@@ -202,6 +204,7 @@ def _row_to_detail_response(row: dict) -> DocumentDetailResponse:
         upload_date=row.get("upload_date"),
         extracted_text=text,
         char_count=len(text),
+        doclang_xml=row.get("doclang_xml") or "",
         project_code=row.get("project_code", ""),
         originator=row.get("originator", ""),
         volume_system=row.get("volume_system", ""),
@@ -417,6 +420,7 @@ def update_document(
         upload_date=updated.get("upload_date"),
         extracted_text=text,
         char_count=len(text),
+        doclang_xml=updated.get("doclang_xml") or "",
         project_code=updated.get("project_code", ""),
         originator=updated.get("originator", ""),
         volume_system=updated.get("volume_system", ""),
@@ -427,6 +431,89 @@ def update_document(
         suitability_code=updated.get("suitability_code", "S0"),
         revision_code=updated.get("revision_code", "P01.01"),
         cde_state=updated.get("cde_state") or "WIP",
+    )
+
+
+@router.get("/{document_id}/doclang", summary="Retrieve raw DocLang XML content")
+def get_document_doclang(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> Response:
+    """Retrieve canonical DocLang XML export (including OTSL tables) for a document."""
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    xml_content = doc.get("doclang_xml") or ""
+    if not xml_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {document_id} has no DocLang XML available.",
+        )
+    return Response(content=xml_content, media_type="application/xml")
+
+
+@router.get("/{document_id}/export-doclang", summary="Export document as DocLang archive (.dclx)")
+def export_document_doclang_archive(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> Response:
+    """Package document into a standardized DocLang archive (.dclx) zip bundle.
+
+    Contains document.xml and manifest.json, directly loadable in the official
+    DocLang Viewer (doclang-project/viewer).
+    """
+    import io
+    import json
+    import zipfile
+
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    xml_content = doc.get("doclang_xml") or ""
+    if not xml_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {document_id} has no DocLang XML to export.",
+        )
+
+    filename = doc.get("filename") or f"document_{document_id}"
+    base_name = filename.rsplit(".", 1)[0]
+    archive_name = f"{base_name}.dclx"
+
+    manifest = {
+        "format": "doclang-archive",
+        "version": "1.0",
+        "document_name": filename,
+        "entrypoint": "document.xml",
+        "created_by": "BIM-Guard DocLang Engine",
+        "metadata": {
+            "project_code": doc.get("project_code", ""),
+            "originator": doc.get("originator", ""),
+            "cde_state": doc.get("cde_state", ""),
+            "suitability_code": doc.get("suitability_code", ""),
+            "revision_code": doc.get("revision_code", ""),
+        },
+    }
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("document.xml", xml_content.encode("utf-8"))
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+    buf.seek(0)
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{archive_name}"',
+    }
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers=headers,
     )
 
 

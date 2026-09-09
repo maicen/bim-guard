@@ -894,14 +894,17 @@ def get_rule_draft_source(draft_id: int) -> RuleSourceResponse:
         )
 
     snippet = draft.get("source_snippet") or ""
+    clause_meta = draft.get("clause") or {}
     pages = DocumentPagesService().get_pages(int(document_id))
-    page_number = DocumentPagesService.find_best_matching_page(pages, snippet)
+    page_number = clause_meta.get("page_number") or DocumentPagesService.find_best_matching_page(pages, snippet)
+    bbox = draft.get("bbox") or clause_meta.get("bbox")
 
     return RuleSourceResponse(
         document_id=int(document_id),
         filename=doc.get("filename", "document"),
         page_number=page_number,
         snippet=snippet,
+        bbox=bbox,
     )
 
 

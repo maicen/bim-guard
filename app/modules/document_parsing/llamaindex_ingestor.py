@@ -59,8 +59,63 @@ class LlamaIndexIngestor:
         Returns:
             One DocumentNodeContract per detected section/clause.
         """
-        text, _tables, pages = extract_document_text(filename, content, parser=parser)
-        return self.nodes_from_text(text, source_document_id=source_document_id, pages=pages)
+        res = extract_document_text(filename, content, parser=parser, return_doclang=True)
+        text, _tables, pages, doclang_xml, bboxes = res
+        return self.nodes_from_text(
+            text,
+            source_document_id=source_document_id,
+            pages=pages,
+            doclang_xml=doclang_xml,
+            element_bboxes=bboxes,
+        )
+
+    def nodes_from_doclang(
+        self,
+        doclang_xml: str,
+        *,
+        source_document_id: int,
+        element_bboxes: list[dict] | None = None,
+    ) -> list[DocumentNodeContract]:
+        """Split a DocLang XML document into clause-annotated nodes with OTSL tables and bboxes."""
+        from app.modules.document_parsing.doclang_chunker import DocLangChunker
+
+        chunks = DocLangChunker().chunk(doclang_xml, element_bboxes=element_bboxes)
+        nodes: list[DocumentNodeContract] = []
+        for chunk in chunks:
+            chunk_text = str(chunk.get("text") or "").strip()
+            if not chunk_text:
+                continue
+
+            section_number = chunk.get("section_number")
+            section_name = chunk.get("section_name")
+            section_path = chunk.get("section_path") or []
+            node_type = chunk.get("node_type") or "paragraph"
+            bbox = chunk.get("bbox")
+            page_number = chunk.get("page_number")
+
+            metadata = ClauseMetadata(
+                clause_id=section_number if section_number and _CLAUSE_ID_PATTERN.match(str(section_number)) else None,
+                page_number=page_number,
+                parent_section=section_name,
+                section_path=list(section_path) if section_path else ([str(section_number)] if section_number else []),
+                node_type=node_type,
+                source_document_id=source_document_id,
+                bbox=bbox,
+            )
+            nodes.append(
+                DocumentNodeContract(
+                    node_id=str(uuid.uuid4()),
+                    text=chunk_text,
+                    metadata=metadata,
+                )
+            )
+
+        logger.info(
+            "LlamaIndexIngestor produced DocLang nodes document_id=%d count=%d",
+            source_document_id,
+            len(nodes),
+        )
+        return nodes
 
     def nodes_from_text(
         self,
@@ -68,20 +123,21 @@ class LlamaIndexIngestor:
         *,
         source_document_id: int,
         pages: list[dict] | None = None,
+        doclang_xml: str | None = None,
+        element_bboxes: list[dict] | None = None,
     ) -> list[DocumentNodeContract]:
-        """Split already-extracted text into clause-annotated nodes.
+        """Split already-extracted text or DocLang XML into clause-annotated nodes.
 
-        Reuses SectionChunker's heading detection so ingestion sees the same
-        section boundaries as the existing rule-extraction chunking path,
-        instead of a second, divergent splitter.
-
-        Args:
-            pages: Page-tagged text for this document (``{"page_number",
-                "text"}``, e.g. from ``extract_document_text`` or
-                ``DocumentPagesService.get_pages``), used to resolve each
-                node's ``page_number`` via snippet matching. Omit when
-                unavailable — every node's ``page_number`` stays ``None``.
+        Reuses SectionChunker's heading detection or DocLangChunker so ingestion
+        sees the same section boundaries as the existing rule-extraction chunking path.
         """
+        if doclang_xml and doclang_xml.strip():
+            doclang_nodes = self.nodes_from_doclang(
+                doclang_xml, source_document_id=source_document_id, element_bboxes=element_bboxes
+            )
+            if doclang_nodes:
+                return doclang_nodes
+
         if not text or not text.strip():
             return []
 

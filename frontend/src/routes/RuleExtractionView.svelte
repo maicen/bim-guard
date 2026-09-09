@@ -1271,6 +1271,7 @@
           documentId={viewingDraftSource.document_id}
           page={viewingDraftSource.page_number}
           highlightText={viewingDraftSource.snippet}
+          bbox={viewingDraftSource.bbox}
         />
       </div>
     </div>
