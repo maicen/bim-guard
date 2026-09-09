@@ -132,6 +132,22 @@ def test_openai_compatible_models_get_correct_litellm_prefix(monkeypatch):
     assert requests[1].headers["authorization"] == "Bearer router-secret"
 
 
+def test_openrouter_models_are_filtered_to_structured_outputs(monkeypatch):
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={"data": [{"id": "vendor/chat", "name": "Chat"}]})
+
+    _install_transport(monkeypatch, handler)
+
+    asyncio.run(LLMModelService().list_models("openrouter", api_key="router-secret"))
+    asyncio.run(LLMModelService().list_models("openai", api_key="openai-secret"))
+
+    assert requests[0].url.params["supported_parameters"] == "structured_outputs"
+    assert "supported_parameters" not in requests[1].url.params
+
+
 def test_provider_http_error_does_not_expose_api_key(monkeypatch):
     def handler(request):
         return httpx.Response(401, json={"error": "unauthorized"})

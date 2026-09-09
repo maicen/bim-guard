@@ -127,8 +127,14 @@ class LLMModelService:
             else "https://api.openai.com/v1"
         )
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        # OpenRouter-only: every LLM call in this app that needs typed output
+        # goes through LlamaIndex's LLMTextCompletionProgram (deontic
+        # extraction, rule generation, the section-tree AI cleanup pass), so
+        # only surface models OpenRouter reports as supporting structured
+        # outputs — anything else is liable to return unparseable text.
+        params = {"supported_parameters": "structured_outputs"} if provider == "openrouter" else None
         response = await client.get(
-            f"{(api_base or default_base).rstrip('/')}/models", headers=headers
+            f"{(api_base or default_base).rstrip('/')}/models", headers=headers, params=params
         )
         self._ensure_success(response, provider.title())
         models = []
