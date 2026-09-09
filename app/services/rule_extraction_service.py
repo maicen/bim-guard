@@ -10,6 +10,7 @@ from app.modules.document_parsing.section_chunker import SectionChunker
 from app.modules.rule_builder.llamaindex_rule_generator import LlamaIndexRuleGenerator
 from app.services import extraction_progress
 from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
+from app.services.document_pages_service import DocumentPagesService
 
 #: Node-level LLM calls to run concurrently during draft extraction. Bounded
 #: rather than unbounded asyncio.gather so a 100-section document doesn't
@@ -92,6 +93,7 @@ class RuleExtractionService:
         bsdd_client: BSDDClient | None = None,
         generator: RuleDraftGenerator | None = None,
         draft_service: Any | None = None,
+        pages_service: DocumentPagesService | None = None,
         max_concurrent_nodes: int = _MAX_CONCURRENT_NODES,
     ):
         """Initialize the extraction provider dependency.
@@ -102,12 +104,17 @@ class RuleExtractionService:
                 when actually needed) rather than imported at module load,
                 matching the existing local-import convention for that
                 service elsewhere in this class.
+            pages_service: Injectable DocumentPagesService (resolves each
+                ingested clause node's page_number), for tests that inject
+                fakes for the ingestor/generator too and shouldn't otherwise
+                hit the real `document_pages` table.
         """
         self._provider = provider or LlamaIndexRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
         self._bsdd_client = bsdd_client or DEFAULT_BSDD_CLIENT
         self._generator = generator or LlamaIndexRuleGenerator()
         self._draft_service = draft_service
+        self._pages_service = pages_service or DocumentPagesService()
         self._max_concurrent_nodes = max_concurrent_nodes
 
     def _ground_draft_with_bsdd(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
@@ -201,7 +208,8 @@ class RuleExtractionService:
         does not know. Document ingestion has no engine-progress contract of
         its own yet, so this stays plain (unstreamed) for now.
         """
-        nodes = self._ingestor.nodes_from_text(text, source_document_id=document_id)
+        pages = self._pages_service.get_pages(document_id)
+        nodes = self._ingestor.nodes_from_text(text, source_document_id=document_id, pages=pages)
         statements = await self._ingestor.extract_deontic_statements(nodes)
 
         logger.info(

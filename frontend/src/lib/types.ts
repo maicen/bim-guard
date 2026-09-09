@@ -300,6 +300,7 @@ export interface DocumentSection {
   section_name?: string | null;
   text: string;
   char_count: number;
+  page_number?: number | null;
 }
 
 export interface DocumentSectionsResponse {
@@ -312,6 +313,7 @@ export interface SectionTreeNode {
   section_number?: string | null;
   section_name?: string | null;
   char_count: number;
+  page_number?: number | null;
   children: SectionTreeNode[];
 }
 

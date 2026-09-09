@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, ChevronDown } from "lucide-svelte";
+  import { ChevronRight, ChevronDown, Eye } from "lucide-svelte";
   import type { SectionTreeNode } from "../types";
   import TableCheckbox from "./TableCheckbox.svelte";
   import SectionTree from "./SectionTree.svelte";
@@ -9,6 +9,7 @@
     selected,
     depth,
     query = "",
+    onViewSource,
   }: {
     node: SectionTreeNode;
     /** Mutated directly (leaf section ids) — shared by reference with the caller. */
@@ -16,6 +17,8 @@
     depth: number;
     /** Already-trimmed/lowercased filter text, forces this row open while active. */
     query?: string;
+    /** When given, shows a "view in document" icon for nodes with a known page_number. */
+    onViewSource?: (node: SectionTreeNode) => void;
   } = $props();
 
   // Top-level chapters open by default; deeper clauses stay collapsed until
@@ -77,9 +80,25 @@
     />
     <span class="font-mono text-slate-500">{node.section_number || "—"}</span>
     <span class="flex-1 truncate">{node.section_name || "Untitled section"}</span>
+    {#if node.page_number}
+      <span class="shrink-0 rounded border border-slate-800 px-1 text-slate-500">p. {node.page_number}</span>
+    {/if}
     <span class="shrink-0 text-slate-600">{node.char_count.toLocaleString()} chars</span>
+    {#if onViewSource && node.page_number}
+      <button
+        type="button"
+        onclick={(event) => {
+          event.preventDefault();
+          onViewSource?.(node);
+        }}
+        class="shrink-0 rounded p-0.5 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+        title="View this section in the document"
+      >
+        <Eye class="h-3.5 w-3.5" />
+      </button>
+    {/if}
   </label>
   {#if node.children.length > 0 && isExpanded}
-    <SectionTree nodes={node.children} {selected} depth={depth + 1} {query} />
+    <SectionTree nodes={node.children} {selected} depth={depth + 1} {query} {onViewSource} />
   {/if}
 </div>

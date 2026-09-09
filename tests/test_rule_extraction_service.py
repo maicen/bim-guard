@@ -221,10 +221,17 @@ class FakeIngestor:
             for i in range(node_count)
         ]
 
-    def nodes_from_text(self, text: str, *, source_document_id: int):
+    def nodes_from_text(self, text: str, *, source_document_id: int, pages=None):
         return self._nodes
 
     async def extract_deontic_statements(self, nodes):
+        return []
+
+
+class FakePagesService:
+    """No-op DocumentPagesService double -- keeps tests off the real table."""
+
+    def get_pages(self, document_id: int) -> list[dict]:
         return []
 
 
@@ -261,6 +268,7 @@ def _service_with_fakes(node_count: int, *, max_concurrent_nodes: int = 4) -> Ru
         generator=FakeGenerator(),
         bsdd_client=FakeBSDDClient([]),
         draft_service=RuleDraftService(drafts_repo=FakeDraftsTable()),
+        pages_service=FakePagesService(),
         max_concurrent_nodes=max_concurrent_nodes,
     )
 
@@ -295,6 +303,7 @@ def test_extract_rule_drafts_bounds_concurrency():
         generator=generator,
         bsdd_client=FakeBSDDClient([]),
         draft_service=RuleDraftService(drafts_repo=FakeDraftsTable()),
+        pages_service=FakePagesService(),
         max_concurrent_nodes=3,
     )
 
@@ -317,6 +326,7 @@ def test_extract_rule_drafts_survives_one_node_failing():
         generator=FlakyGenerator(),
         bsdd_client=FakeBSDDClient([]),
         draft_service=RuleDraftService(drafts_repo=FakeDraftsTable()),
+        pages_service=FakePagesService(),
     )
 
     drafts = asyncio.run(service.extract_rule_drafts(document_id=9, text="irrelevant"))

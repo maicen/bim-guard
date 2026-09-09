@@ -7,7 +7,11 @@ import asyncio
 import llama_index.core.program as li_program
 
 from app.modules.document_parsing import llamaindex_program
-from app.modules.document_parsing.section_tree import build_section_tree, compute_depth
+from app.modules.document_parsing.section_tree import (
+    attach_page_numbers,
+    build_section_tree,
+    compute_depth,
+)
 from app.modules.document_parsing.section_tree_enhancer import (
     MAX_NODES_FOR_ENHANCEMENT,
     enhance_section_tree,
@@ -69,6 +73,26 @@ def test_build_section_tree_empty_input():
     tree, flat = build_section_tree([])
     assert tree == []
     assert flat == []
+
+
+def test_attach_page_numbers_sets_flat_and_nested_nodes():
+    chunks = [
+        _chunk("1", "CHAPTER 1"),
+        _chunk("1.1.1", "Scope"),
+        _chunk("1.1.2", "Interchangeability"),
+    ]
+    tree, flat = build_section_tree(chunks)
+
+    attach_page_numbers(tree, flat, [3, 5, None])
+
+    assert [c["page_number"] for c in flat] == [3, 5, None]
+    chapter = tree[0]
+    assert chapter["page_number"] == 3
+    assert [c["page_number"] for c in chapter["children"]] == [5, None]
+
+
+def test_attach_page_numbers_on_empty_tree_is_a_no_op():
+    attach_page_numbers([], [], [])  # must not raise
 
 
 class _FakeOverride:

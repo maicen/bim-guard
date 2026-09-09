@@ -630,7 +630,24 @@
           {/if}
         </p>
         <div class="max-h-64 overflow-y-auto pr-1">
-          <SectionTree nodes={sectionTree} selected={selectedSectionKeys} />
+          <SectionTree
+            nodes={sectionTree}
+            selected={selectedSectionKeys}
+            onViewSource={(node) =>
+              (viewingDraftSource = {
+                document_id: selectedDocId!,
+                filename: documents.find((d) => d.id === selectedDocId)?.filename ?? "",
+                page_number: node.page_number ?? null,
+                // Highlight the section's actual opening text (same snippet
+                // the backend resolved page_number from), not its AI-cleaned
+                // label -- the label may no longer appear verbatim in the PDF.
+                snippet:
+                  docSections.find((s) => s.id === node.id)?.text?.slice(0, 250) ||
+                  node.section_name ||
+                  node.section_number ||
+                  "",
+              })}
+          />
         </div>
       </div>
     {:else if selectedDocId}

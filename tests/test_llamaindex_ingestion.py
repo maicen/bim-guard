@@ -32,6 +32,31 @@ def test_nodes_from_text_empty_input_yields_no_nodes():
     assert LlamaIndexIngestor().nodes_from_text("   ", source_document_id=1) == []
 
 
+def test_nodes_from_text_without_pages_leaves_page_number_none():
+    nodes = LlamaIndexIngestor().nodes_from_text(SAMPLE_TEXT, source_document_id=1)
+    assert all(node.metadata.page_number is None for node in nodes)
+
+
+def test_nodes_from_text_resolves_page_number_when_pages_given():
+    pages = [
+        {
+            "page_number": 5,
+            "text": "9.8.2.1 Stair Width\nEvery stair shall have a minimum width of 900 mm.",
+        },
+        {
+            "page_number": 6,
+            "text": (
+                "9.8.2.2 Handrails\nA handrail must be provided on at least one side.\n\n"
+                "9.8.3 Definitions\nA stair is a series of steps connecting two levels."
+            ),
+        },
+    ]
+
+    nodes = LlamaIndexIngestor().nodes_from_text(SAMPLE_TEXT, source_document_id=1, pages=pages)
+
+    assert [n.metadata.page_number for n in nodes] == [5, 6, 6]
+
+
 def test_nodes_from_text_detects_table_like_chunks():
     table_text = """9.9.1 Fixture Counts
 Male   2   1

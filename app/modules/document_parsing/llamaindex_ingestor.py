@@ -1,9 +1,6 @@
-"""
-document_parsing/llamaindex_ingestor.py
-------------------------------------------
-LlamaIndex-based document ingestion: layout-aware chunking with clause
-provenance, plus typed deontic ("shall"/"must"/"should"/"may") entity
-extraction.
+"""LlamaIndex-based document ingestion: layout-aware chunking with clause provenance.
+
+Also does typed deontic ("shall"/"must"/"should"/"may") entity extraction.
 
 This module does NOT reimplement PDF/table parsing. It layers on top of
 the existing ``document_extractor.extract_document_text()`` (Unstructured
@@ -62,15 +59,28 @@ class LlamaIndexIngestor:
         Returns:
             One DocumentNodeContract per detected section/clause.
         """
-        text, _tables, _pages = extract_document_text(filename, content, parser=parser)
-        return self.nodes_from_text(text, source_document_id=source_document_id)
+        text, _tables, pages = extract_document_text(filename, content, parser=parser)
+        return self.nodes_from_text(text, source_document_id=source_document_id, pages=pages)
 
-    def nodes_from_text(self, text: str, *, source_document_id: int) -> list[DocumentNodeContract]:
+    def nodes_from_text(
+        self,
+        text: str,
+        *,
+        source_document_id: int,
+        pages: list[dict] | None = None,
+    ) -> list[DocumentNodeContract]:
         """Split already-extracted text into clause-annotated nodes.
 
         Reuses SectionChunker's heading detection so ingestion sees the same
         section boundaries as the existing rule-extraction chunking path,
         instead of a second, divergent splitter.
+
+        Args:
+            pages: Page-tagged text for this document (``{"page_number",
+                "text"}``, e.g. from ``extract_document_text`` or
+                ``DocumentPagesService.get_pages``), used to resolve each
+                node's ``page_number`` via snippet matching. Omit when
+                unavailable — every node's ``page_number`` stays ``None``.
         """
         if not text or not text.strip():
             return []
@@ -79,9 +89,16 @@ class LlamaIndexIngestor:
         if not section_chunks:
             section_chunks = [{"section_number": None, "section_name": None, "text": text}]
 
+        page_numbers: list[int | None] = [None] * len(section_chunks)
+        if pages:
+            from app.services.document_pages_service import DocumentPagesService
+
+            snippets = [str(chunk.get("text") or "")[:250] for chunk in section_chunks]
+            page_numbers = DocumentPagesService.find_best_matching_pages(pages, snippets)
+
         nodes: list[DocumentNodeContract] = []
         section_path: list[str] = []
-        for chunk in section_chunks:
+        for chunk, page_number in zip(section_chunks, page_numbers):
             chunk_text = str(chunk.get("text") or "").strip()
             if not chunk_text:
                 continue
@@ -95,9 +112,7 @@ class LlamaIndexIngestor:
 
             metadata = ClauseMetadata(
                 clause_id=section_number if section_number and _CLAUSE_ID_PATTERN.match(str(section_number)) else None,
-                page_number=None,  # UnstructuredExtractor's table/layout output does not
-                # currently surface page numbers through extract_document_text's
-                # (text, tables) tuple; wire this through once it does.
+                page_number=page_number,
                 parent_section=section_name,
                 section_path=list(section_path) if section_path else ([str(section_number)] if section_number else []),
                 node_type=node_type,

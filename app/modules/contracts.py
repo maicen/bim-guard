@@ -565,6 +565,9 @@ class DocumentSection(BaseModel):
     section_name: Optional[str] = Field(default=None, description="Heading text for the section")
     text: str = Field(..., description="Full text of the section, for scoped rule extraction")
     char_count: int = 0
+    page_number: Optional[int] = Field(
+        default=None, description="Resolved source-document page this section starts on, when known"
+    )
 
 
 class DocumentSectionsResponse(BaseModel):
@@ -581,6 +584,9 @@ class SectionTreeNode(BaseModel):
     section_number: Optional[str] = None
     section_name: Optional[str] = None
     char_count: int = 0
+    page_number: Optional[int] = Field(
+        default=None, description="Resolved source-document page this section starts on, when known"
+    )
     children: list["SectionTreeNode"] = Field(default_factory=list)
 
 

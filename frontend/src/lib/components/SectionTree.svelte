@@ -8,6 +8,7 @@
     selected,
     depth = 0,
     query = $bindable(""),
+    onViewSource,
   }: {
     nodes: SectionTreeNode[];
     /** Mutated directly (leaf section ids) — shared by reference with the caller. */
@@ -15,6 +16,8 @@
     depth?: number;
     /** Lowercased search text; the input box only renders at depth 0, then flows to every level. */
     query?: string;
+    /** When given, shows a "view in document" icon for nodes with a known page_number. */
+    onViewSource?: (node: SectionTreeNode) => void;
   } = $props();
 
   function nodeMatches(node: SectionTreeNode, q: string): boolean {
@@ -55,6 +58,6 @@
 
 <div class="space-y-0.5" class:mt-2={depth === 0}>
   {#each visibleNodes as node (node.id)}
-    <SectionTreeRow {node} {selected} {depth} query={trimmedQuery} />
+    <SectionTreeRow {node} {selected} {depth} query={trimmedQuery} {onViewSource} />
   {/each}
 </div>

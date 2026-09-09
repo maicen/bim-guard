@@ -69,27 +69,54 @@ class DocumentPagesService:
 
         Shared by both a promoted rule's `/rules/{id}/source` lookup
         (`source_text`) and a pre-promotion draft's `/rules/drafts/{id}/source`
-        lookup (`source_snippet`) — same matching problem either way.
+        lookup (`source_snippet`) — same matching problem either way. For more
+        than one snippet against the same `pages`, prefer
+        `find_best_matching_pages` — this normalizes every page's text fresh
+        on every call, which is fine once but wasteful in a loop.
         """
-        norm_snippet = _normalize_for_match(snippet)
-        if not norm_snippet or not pages:
-            return None
+        return DocumentPagesService.find_best_matching_pages(pages, [snippet])[0]
 
-        for page in pages:
-            if norm_snippet in _normalize_for_match(page.get("text", "")):
-                return page.get("page_number")
+    @staticmethod
+    def find_best_matching_pages(pages: list[dict], snippets: list[str]) -> list[Optional[int]]:
+        """Batch form of `find_best_matching_page` — one page-normalization pass.
 
-        snippet_words = set(norm_snippet.split())
-        if not snippet_words:
-            return None
+        Used when resolving many snippets against the same document (e.g. one
+        per detected section), so normalizing `pages` isn't repeated once per
+        snippet.
+        """
+        normalized_pages = [
+            (page.get("page_number"), _normalize_for_match(page.get("text", ""))) for page in pages
+        ]
 
-        best_page, best_score = None, 0.0
-        for page in pages:
-            page_words = set(_normalize_for_match(page.get("text", "")).split())
-            if not page_words:
+        results: list[Optional[int]] = []
+        for snippet in snippets:
+            norm_snippet = _normalize_for_match(snippet)
+            if not norm_snippet or not normalized_pages:
+                results.append(None)
                 continue
-            overlap = len(snippet_words & page_words) / len(snippet_words)
-            if overlap > best_score:
-                best_score, best_page = overlap, page.get("page_number")
 
-        return best_page if best_score > 0.3 else None
+            matched = next(
+                (number for number, text in normalized_pages if norm_snippet in text),
+                None,
+            )
+            if matched is not None:
+                results.append(matched)
+                continue
+
+            snippet_words = set(norm_snippet.split())
+            if not snippet_words:
+                results.append(None)
+                continue
+
+            best_page, best_score = None, 0.0
+            for number, text in normalized_pages:
+                page_words = set(text.split())
+                if not page_words:
+                    continue
+                overlap = len(snippet_words & page_words) / len(snippet_words)
+                if overlap > best_score:
+                    best_score, best_page = overlap, number
+
+            results.append(best_page if best_score > 0.3 else None)
+
+        return results

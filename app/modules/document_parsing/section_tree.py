@@ -95,3 +95,26 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
         stack.append((depth, tree_node))
 
     return roots, flat
+
+
+def attach_page_numbers(tree: list[dict], flat: list[dict], page_numbers: list[int | None]) -> None:
+    """Set ``page_number`` on every flat entry and its matching tree node.
+
+    Pure structural helper — ``page_numbers`` must already be resolved (one
+    entry per ``flat``, same order/length, e.g. via
+    ``DocumentPagesService.find_best_matching_pages``) by the caller, so this
+    module stays free of any DB/service dependency and independently
+    testable. A page number that couldn't be resolved is ``None`` and is set
+    as such — never omitted, so every node has the key.
+    """
+    id_to_page: dict[str, int | None] = {}
+    for chunk, page_number in zip(flat, page_numbers):
+        chunk["page_number"] = page_number
+        id_to_page[chunk["id"]] = page_number
+
+    def _walk(nodes: list[dict]) -> None:
+        for node in nodes:
+            node["page_number"] = id_to_page.get(node["id"])
+            _walk(node.get("children") or [])
+
+    _walk(tree)

@@ -40,3 +40,28 @@ def test_returns_none_when_overlap_too_weak():
 def test_returns_none_for_empty_snippet_or_pages():
     assert DocumentPagesService.find_best_matching_page(PAGES, "") is None
     assert DocumentPagesService.find_best_matching_page([], "Two exits shall be provided.") is None
+
+
+def test_batch_matches_agree_with_singular_lookup_per_snippet():
+    snippets = [
+        "Two exits shall be provided.",
+        "exit access doorways required for every storey",
+        "completely unrelated text about plumbing fixtures",
+        "",
+    ]
+
+    batch = DocumentPagesService.find_best_matching_pages(PAGES, snippets)
+
+    assert batch == [DocumentPagesService.find_best_matching_page(PAGES, s) for s in snippets]
+    assert batch == [2, 2, None, None]
+
+
+def test_batch_returns_all_none_for_empty_pages():
+    assert DocumentPagesService.find_best_matching_pages([], ["Two exits shall be provided.", "x"]) == [
+        None,
+        None,
+    ]
+
+
+def test_batch_returns_empty_list_for_no_snippets():
+    assert DocumentPagesService.find_best_matching_pages(PAGES, []) == []

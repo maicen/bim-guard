@@ -44,10 +44,11 @@ from app.modules.contracts import (
     RuleExtractionProgressResponse,
 )
 from app.modules.document_parsing.section_chunker import SectionChunker
-from app.modules.document_parsing.section_tree import build_section_tree
+from app.modules.document_parsing.section_tree import attach_page_numbers, build_section_tree
 from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
 from app.services.cache import cache_service
 from app.services.document_access_service import DocumentAccessService
+from app.services.document_pages_service import DocumentPagesService
 from app.services.documents_service import DocumentService
 from app.services.membership_service import MembershipService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
@@ -479,7 +480,11 @@ async def get_document_sections_tree(
     additionally cleans up cosmetically broken labels (see
     ``section_tree_enhancer``); its result is cached per document so the
     LLM only runs once, not on every request — ``enhanced`` reports
-    whether that pass ran successfully this time.
+    whether that pass ran successfully this time. Each section's starting
+    page is resolved (free — snippet matching, not an LLM call) against
+    ``document_pages``, when that table has rows for this document; older
+    documents uploaded before that table existed just get ``page_number:
+    null`` everywhere.
     """
     doc = service.get_document(document_id)
     if not doc:
@@ -497,6 +502,11 @@ async def get_document_sections_tree(
     chunks = SectionChunker().chunk(text) if text.strip() else []
     tree, flat = build_section_tree(chunks)
     tree, enhanced = await enhance_section_tree(tree, flat)
+
+    pages = DocumentPagesService().get_pages(document_id)
+    snippets = [chunk["text"][:250] for chunk in flat]
+    page_numbers = DocumentPagesService.find_best_matching_pages(pages, snippets)
+    attach_page_numbers(tree, flat, page_numbers)
 
     response = DocumentSectionTreeResponse(
         document_id=document_id,
