@@ -197,3 +197,58 @@ def test_document_service_get_doclang_content_storage_fallback(tmp_path):
     assert svc.get_doclang_content({}) == ""
 
 
+def test_document_service_auto_offloads_large_doclang_xml(monkeypatch):
+    """Verify DocumentService offloads XML exceeding DOCLANG_OFFLOAD_THRESHOLD_BYTES to storage."""
+    from app.services.documents_service import DOCLANG_OFFLOAD_THRESHOLD_BYTES, DocumentService
+
+    inserted = []
+
+    class FakeRepo:
+        def insert(self, payload):
+            record = dict(payload)
+            record["id"] = 42
+            inserted.append(record)
+            return record
+
+    uploads = []
+
+    class FakeStorage:
+        def save_upload(self, filename, content, subdir):
+            ref = f"sb://bucket/{subdir}/{filename}"
+            uploads.append((filename, len(content), ref))
+            return ref
+
+    svc = DocumentService(storage=FakeStorage(), documents_repo=FakeRepo())
+
+    # 1. Large XML exceeding threshold -> offloaded to storage, inline xml set to ""
+    large_xml = "<doclang>" + ("X" * (DOCLANG_OFFLOAD_THRESHOLD_BYTES + 100)) + "</doclang>"
+    svc.create_document(
+        md5_hash="abc1234567890",
+        filename="big_standard.pdf",
+        file_path="uploads/big.pdf",
+        extracted_text="Text",
+        doclang_xml=large_xml,
+    )
+
+    assert len(inserted) == 1
+    assert inserted[0]["doclang_xml"] == ""  # offloaded, not stored in db row
+    assert inserted[0]["doclang_storage_path"].startswith("sb://bucket/doclang/doclang_abc123456789.xml")
+    assert len(uploads) == 1
+
+    # 2. Small XML under threshold -> kept inline
+    small_xml = "<doclang><heading>Small</heading></doclang>"
+    svc.create_document(
+        md5_hash="small123",
+        filename="small_standard.pdf",
+        file_path="uploads/small.pdf",
+        extracted_text="Text",
+        doclang_xml=small_xml,
+    )
+
+    assert len(inserted) == 2
+    assert inserted[1]["doclang_xml"] == small_xml
+    assert inserted[1]["doclang_storage_path"] is None
+    assert len(uploads) == 1  # No additional storage upload
+
+
+

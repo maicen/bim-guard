@@ -12,6 +12,8 @@ from app.utils import (
 
 logger = get_logger(__name__)
 
+DOCLANG_OFFLOAD_THRESHOLD_BYTES = 256 * 1024  # 256 KB threshold for offloading XML to Supabase Storage
+
 
 class DocumentService:
     """Encapsulates CRUD and lookup operations for uploaded documents."""
@@ -85,6 +87,24 @@ class DocumentService:
     ):
         """Create and persist a new uploaded document record."""
         clean_doc_type = (doc_type or "").strip() or "Specification"
+        doclang_bytes = (doclang_xml or "").encode("utf-8")
+        inline_xml = doclang_xml or ""
+        resolved_storage_path = doclang_storage_path
+
+        if resolved_storage_path is None and len(doclang_bytes) > DOCLANG_OFFLOAD_THRESHOLD_BYTES:
+            filename_key = f"doclang_{md5_hash[:12]}.xml"
+            try:
+                resolved_storage_path = self._storage.save_upload(filename_key, doclang_bytes, "doclang")
+                inline_xml = ""
+                logger.info(
+                    "Offloaded large DocLang XML to storage ref=%s bytes=%d",
+                    resolved_storage_path,
+                    len(doclang_bytes),
+                )
+            except Exception:
+                logger.warning("Failed offloading DocLang XML to storage; retaining inline in database")
+                inline_xml = doclang_xml or ""
+
         payload = {
             "md5_hash": md5_hash,
             "filename": filename,
@@ -102,8 +122,8 @@ class DocumentService:
             "suitability_code": suitability_code or "S0",
             "revision_code": revision_code or "P01.01",
             "cde_state": cde_state or "WIP",
-            "doclang_xml": doclang_xml or "",
-            "doclang_storage_path": doclang_storage_path,
+            "doclang_xml": inline_xml,
+            "doclang_storage_path": resolved_storage_path,
         }
         document = self._documents.insert(payload)
         invalidate_cache("bimguard:documents:list")
@@ -179,7 +199,18 @@ class DocumentService:
         if cde_state is not None:
             updates["cde_state"] = cde_state.strip() or "WIP"
         if doclang_xml is not None:
-            updates["doclang_xml"] = doclang_xml
+            doclang_bytes = doclang_xml.encode("utf-8")
+            if len(doclang_bytes) > DOCLANG_OFFLOAD_THRESHOLD_BYTES and doclang_storage_path is None:
+                try:
+                    storage_ref = self.store_doclang_file(document_id, doclang_xml)
+                    updates["doclang_storage_path"] = storage_ref
+                    updates["doclang_xml"] = ""
+                    logger.info("Offloaded updated DocLang XML to storage ref=%s bytes=%d", storage_ref, len(doclang_bytes))
+                except Exception:
+                    logger.warning("Failed offloading DocLang XML to storage on update; retaining inline")
+                    updates["doclang_xml"] = doclang_xml
+            else:
+                updates["doclang_xml"] = doclang_xml
         if doclang_storage_path is not None:
             updates["doclang_storage_path"] = doclang_storage_path
 
