@@ -19,6 +19,14 @@ It prints how many elements carry each item and what the audit will be able to s
 It always exits 0 — it is a report, not a gate, and a model that fails items is still worth
 sending.
 
+**What this checker cannot see.** Two things it reports are narrower than what the audit actually
+reads, so read a failure on either as "worth checking", not as "missing". First, an IDS rule can
+name only one property set, and the names cannot be OR-ed together: a property written under a
+differently named set reads here as missing even though the audit will find it, because the audit
+matches on the property name and ignores the set. Second, port connectivity cannot be expressed in
+IDS at all, so the check that looks for dissimilar metals meeting at a junction has an input this
+report cannot audit — connectivity has to be confirmed by opening the model.
+
 ---
 
 ## 1. Which entities to export
@@ -38,9 +46,10 @@ upgrade a model for this.
 
 ## 2. What each element must carry
 
-Every real model received so far has carried element names, system assignments and storeys but
-**0% material**, and material is the one item without which no corrosion check can reach a verdict
-at all.
+Every real MEP model received so far has carried element names (100%), system assignments (99.9%)
+and storeys (100%) but **0% material** — measured across the 8,539 piping elements of
+`west_riverside_hospital_plumb_ifc4.ifc` — and material is the one property without which no
+corrosion check can reach a verdict at all.
 
 ### Required
 

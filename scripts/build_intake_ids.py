@@ -8,23 +8,30 @@ Every specification below is traceable to a row of
 ``docs/reference/piping_intake_sources.md``, which cites the parser line that
 reads the datum. Nothing is required that no parser line reads.
 
-Output is deterministic: the date is fixed by :data:`DATE` rather than taken
-from the clock, so re-running reproduces the committed file byte for byte.
-``tests/test_model_intake_ids.py`` asserts exactly that, which is what stops
-the committed IDS and this script from drifting apart.
+Output is deterministic. The one field that would otherwise vary between runs
+-- the header date -- is not read from the clock but passed in explicitly with
+``--date``, so the same arguments always produce the same bytes.
+``tests/test_model_intake_ids.py`` builds with the committed file's own date
+and asserts the bytes match, which is what stops the committed IDS and this
+script from drifting apart.
+
+``--date`` is required rather than defaulted: a default would let a run
+silently produce a file that differs from the committed one in a field nobody
+looked at.
 
 Usage::
 
-    uv run python scripts/build_intake_ids.py            # rewrite the committed IDS
-    uv run python scripts/build_intake_ids.py --out /tmp/check.ids
+    uv run python scripts/build_intake_ids.py --date 2026-09-08
+    uv run python scripts/build_intake_ids.py --date 2026-09-08 --out /tmp/check.ids
 
 Exit codes: ``0`` on success, ``1`` if the document fails IDS 1.0 schema
-validation.
+validation, ``2`` on a malformed ``--date``.
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 from ifctester import ids
@@ -34,10 +41,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #: Where the committed IDS lives; the checker script defaults to the same path.
 DEFAULT_OUT = REPO_ROOT / "data" / "ids" / "bimguard_piping_intake.ids"
 
-#: Stamped into the IDS header. Fixed, not ``date.today()``: a clock-derived
-#: value would make every run produce a different file and defeat the
-#: byte-for-byte test. Bump it deliberately when the requirements change.
-DATE = "2026-09-08"
+#: The date carried by the committed IDS. Recorded here so a reader knows what
+#: to pass to reproduce it; the builder itself takes the value from ``--date``
+#: and never falls back to this constant or to the clock.
+COMMITTED_DATE = "2026-09-08"
+
+#: IDS 1.0 types the header date as xs:date.
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # piping_producer.py:118-137 — the classes produce_piping_elements_from_model
 # iterates. An element of any other class is never seen by the audit.
@@ -118,13 +128,13 @@ def spec(name, description, requirements, usage, identifier):
     return s
 
 
-def build() -> ids.Ids:
+def build(date: str) -> ids.Ids:
     doc = ids.Ids(
         title="BIMGUARD AI — Piping audit intake requirements",
         version="1.0.0",
         author="info@aspiringdesign3d.co.nz",
         copyright="Aspiring Design 3D Consultancy Ltd",
-        date=DATE,
+        date=date,
         purpose=(
             "States what an IFC model must carry for the BIMGUARD AI piping "
             "corrosion audit (GC-001 galvanic, CC-001 crevice, MC-001 "
@@ -515,14 +525,25 @@ def main(argv: list[str] | None = None) -> int:
         description="Build the BIMGUARD AI piping intake IDS from its definition."
     )
     parser.add_argument(
+        "--date",
+        required=True,
+        help=(
+            "date stamped into the IDS header, as YYYY-MM-DD. Required, so the "
+            f"output never depends on the clock. The committed IDS carries "
+            f"{COMMITTED_DATE}."
+        ),
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=DEFAULT_OUT,
         help=f"where to write the IDS (default: {DEFAULT_OUT})",
     )
     args = parser.parse_args(argv)
+    if not _ISO_DATE.match(args.date):
+        parser.error(f"--date must be YYYY-MM-DD, got {args.date!r}")
 
-    document = build()
+    document = build(args.date)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     valid = document.to_xml(str(args.out))
 
@@ -530,6 +551,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"schema validation: {valid}")
     print(f"specifications: {len(document.specifications)}")
     print(f"required: {required}  optional: {len(document.specifications) - required}")
+    print(f"date: {args.date}")
     print(f"wrote {args.out}")
     return 0 if valid else 1
 

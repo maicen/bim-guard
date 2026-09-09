@@ -18,8 +18,10 @@ build output rather than a committed fixture.
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 import sys
+from itertools import zip_longest
 from pathlib import Path
 
 import pytest
@@ -140,18 +142,59 @@ def test_every_specification_states_a_consequence(ids_document):
         assert "ENGINES:" in specification.description
 
 
-def test_builder_reproduces_the_committed_ids_byte_for_byte(tmp_path):
-    """Re-running the builder rewrites the committed IDS exactly.
+def _committed_ids_date() -> str:
+    """Return the date stamped in the committed IDS header.
+
+    Read from the file rather than hardcoded so the test pins reproducibility
+    -- the builder rebuilding what is committed -- and not one particular date.
+    """
+    match = re.search(r"<date>([^<]+)</date>", IDS_PATH.read_text(encoding="utf-8"))
+    assert match, "the committed IDS carries no <date> element"
+    return match.group(1)
+
+
+def _first_difference(expected: bytes, actual: bytes) -> str:
+    """Describe the first line where two files diverge, for a failure message."""
+    expected_lines = expected.decode("utf-8").splitlines()
+    actual_lines = actual.decode("utf-8").splitlines()
+    for number, (want, got) in enumerate(
+        zip_longest(expected_lines, actual_lines, fillvalue=None), start=1
+    ):
+        if want != got:
+            return (
+                f"first difference at line {number}\n"
+                f"  committed: {want!r}\n"
+                f"  rebuilt:   {got!r}"
+            )
+    return "no line differs; the files differ only in trailing bytes or encoding"
+
+
+def test_builder_reproduces_committed_ids(tmp_path):
+    """The builder rebuilds the committed IDS byte for byte.
 
     This is what stops the committed XML and the script that defines it from
-    drifting apart: a specification edited in the IDS by hand, or a builder
-    edited without re-running it, fails here. It also pins determinism — the
-    builder stamps a fixed DATE rather than reading the clock, so two runs on
-    different days produce identical bytes.
+    drifting apart: a specification hand-edited into the IDS, or a builder
+    edited without re-running it, fails here.
+
+    ``--date`` is passed explicitly, taken from the committed file's own
+    header, because it is the one field that would otherwise vary between
+    runs. The builder requires it and never reads the clock, so everything
+    else in the output is a function of the definition alone.
+
+    On failure the first differing line is reported. Fix it by re-running the
+    builder to regenerate the IDS -- never by editing the committed XML to
+    match.
     """
     rebuilt = tmp_path / "rebuilt.ids"
     completed = subprocess.run(
-        [sys.executable, str(BUILDER), "--out", str(rebuilt)],
+        [
+            sys.executable,
+            str(BUILDER),
+            "--date",
+            _committed_ids_date(),
+            "--out",
+            str(rebuilt),
+        ],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -163,13 +206,49 @@ def test_builder_reproduces_the_committed_ids_byte_for_byte(tmp_path):
     rebuilt_bytes = rebuilt.read_bytes()
     assert rebuilt_bytes == committed_bytes, (
         "scripts/build_intake_ids.py no longer reproduces "
-        "data/ids/bimguard_piping_intake.ids. Re-run the builder to regenerate "
-        "the IDS, or revert the hand-edit to the XML."
+        "data/ids/bimguard_piping_intake.ids. Regenerate the IDS from the "
+        "builder; do not edit the committed XML to match.\n"
+        + _first_difference(committed_bytes, rebuilt_bytes)
     )
     assert (
         hashlib.sha256(rebuilt_bytes).hexdigest()
         == hashlib.sha256(committed_bytes).hexdigest()
     )
+
+
+def test_builder_requires_an_explicit_date(tmp_path):
+    """Omitting --date is an error, not a silent fall back to today."""
+    completed = subprocess.run(
+        [sys.executable, str(BUILDER), "--out", str(tmp_path / "no_date.ids")],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode != 0
+    assert "--date" in completed.stderr
+    assert not (tmp_path / "no_date.ids").exists()
+
+
+def test_builder_date_is_the_only_field_it_changes(tmp_path):
+    """A different --date moves the header date and nothing else."""
+    other = tmp_path / "other_date.ids"
+    completed = subprocess.run(
+        [sys.executable, str(BUILDER), "--date", "2027-01-15", "--out", str(other)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+    committed_lines = IDS_PATH.read_text(encoding="utf-8").splitlines()
+    other_lines = other.read_text(encoding="utf-8").splitlines()
+    differing = [
+        (want, got)
+        for want, got in zip_longest(committed_lines, other_lines, fillvalue=None)
+        if want != got
+    ]
+    assert len(differing) == 1, differing
+    assert "<date>" in differing[0][0]
 
 
 # ---------------------------------------------------------------------------
