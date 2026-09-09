@@ -165,6 +165,21 @@ class LLMProviderInstancesService:
         driver = self._require_driver(row.get("kind", ""))
         return await driver.test_connection(api_key=row.get("api_key") or "", api_base=row.get("api_base") or None)
 
+    async def test_connection(
+        self,
+        kind: str,
+        api_key: Optional[str] = None,
+        api_base: Optional[str] = None,
+    ):
+        """Check connectivity/auth for candidate credentials before creation."""
+        clean_kind = (kind or "").strip().lower()
+        driver = self._require_driver(clean_kind)
+        clean_key = (api_key or "").strip()
+        if driver.requires_api_key and not clean_key:
+            raise ValueError(f"api_key is required for '{clean_kind}' instances.")
+        clean_base = (api_base or "").strip().rstrip("/")
+        return await driver.test_connection(api_key=clean_key, api_base=clean_base or None)
+
     @staticmethod
     def _require_driver(kind: str):
         try:

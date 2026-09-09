@@ -118,4 +118,5 @@ data/*_demo.ifc
 # app/bootstrap.py). Generated local state, regenerated from source data on
 # demand -- not the version of record for anything.
 .kuzu/
+.kuzu_db
 .kuzu_db/

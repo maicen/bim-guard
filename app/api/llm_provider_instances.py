@@ -29,6 +29,7 @@ from app.modules.contracts import (
     LLMProviderInstanceUpdateRequest,
     LLMProviderKindResponse,
     LLMProviderModelResponse,
+    LLMProviderTestConnectionRequest,
 )
 from app.modules.llm_providers import LLMProviderRegistry
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
@@ -142,6 +143,40 @@ def create_instance(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _to_response(created)
+
+
+@router.post(
+    "/{organization_id}/llm-providers/test-connection",
+    response_model=LLMProviderInstanceTestResponse,
+    summary="Check connectivity for candidate LLM provider credentials",
+)
+async def test_candidate_connection(
+    organization_id: int,
+    payload: LLMProviderTestConnectionRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
+) -> LLMProviderInstanceTestResponse:
+    """Check connectivity and credentials before registering an LLM provider instance."""
+    _require_org_admin(organization_id, current_user, memberships, profiles)
+    try:
+        result = await service.test_connection(
+            kind=payload.kind,
+            api_key=payload.api_key,
+            api_base=payload.api_base,
+        )
+        return LLMProviderInstanceTestResponse(ok=result.ok, detail=result.detail)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.warning(
+            "LLM provider candidate test failed org=%s kind=%s error=%s",
+            organization_id,
+            payload.kind,
+            exc,
+        )
+        return LLMProviderInstanceTestResponse(ok=False, detail=str(exc))
 
 
 @router.get(

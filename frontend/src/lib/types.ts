@@ -1045,6 +1045,12 @@ export interface LLMProviderInstanceTestResult {
   detail: string;
 }
 
+export interface LLMProviderTestPayload {
+  kind: LLMProviderKindId;
+  api_key?: string;
+  api_base?: string;
+}
+
 export interface LLMProviderModel {
   id: string;
   name: string;

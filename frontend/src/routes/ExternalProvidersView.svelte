@@ -22,6 +22,7 @@
     ParsingEngineKind,
     ParsingEngineKindId,
     LLMProviderInstance,
+    LLMProviderInstanceTestResult,
     LLMProviderKind,
     LLMProviderKindId,
     LLMProviderModel,
@@ -182,11 +183,30 @@
   let llmError = $state("");
   let showAddLlmForm = $state(false);
   let isSavingLlm = $state(false);
+  let isTestingNewLlm = $state(false);
   let newLlmName = $state("");
   let newLlmKind = $state<LLMProviderKindId>("");
   let newLlmBase = $state("");
   let newLlmKey = $state("");
   let newLlmNotes = $state("");
+  let testedLlmKind = $state<LLMProviderKindId>("");
+  let testedLlmBase = $state("");
+  let testedLlmKey = $state("");
+  let candidateLlmTestResult = $state<LLMProviderInstanceTestResult | null>(null);
+
+  // If the user modifies kind, api_base, or api_key after testing, invalidate the test result
+  let newLlmTestResult = $derived.by(() => {
+    if (!candidateLlmTestResult) return null;
+    if (
+      newLlmKind !== testedLlmKind ||
+      newLlmBase !== testedLlmBase ||
+      newLlmKey !== testedLlmKey
+    ) {
+      return null;
+    }
+    return candidateLlmTestResult;
+  });
+
   let llmPendingDelete = $state<LLMProviderInstance | null>(null);
   let testingLlmId = $state<number | null>(null);
   let llmTestResults = $state<Record<number, { ok: boolean; detail: string }>>({});
@@ -225,6 +245,47 @@
     newLlmBase = "";
     newLlmKey = "";
     newLlmNotes = "";
+    testedLlmKind = "";
+    testedLlmBase = "";
+    testedLlmKey = "";
+    candidateLlmTestResult = null;
+    isTestingNewLlm = false;
+  }
+
+  async function handleTestNewLlm() {
+    if (!activeOrg) return;
+    const selectedKindInfo = llmKindInfo(newLlmKind);
+    if (!newLlmKind) {
+      llmError = "Provider kind is required.";
+      return;
+    }
+    if (selectedKindInfo?.requires_api_key && !newLlmKey.trim()) {
+      llmError = `A ${selectedKindInfo.display_name} instance requires an API key.`;
+      return;
+    }
+    isTestingNewLlm = true;
+    llmError = "";
+    try {
+      const res = await llmProvidersApi.testConnection(activeOrg.organization_id, {
+        kind: newLlmKind,
+        api_key: newLlmKey.trim() || undefined,
+        api_base: newLlmBase.trim() || undefined,
+      });
+      testedLlmKind = newLlmKind;
+      testedLlmBase = newLlmBase;
+      testedLlmKey = newLlmKey;
+      candidateLlmTestResult = res;
+    } catch (err: any) {
+      testedLlmKind = newLlmKind;
+      testedLlmBase = newLlmBase;
+      testedLlmKey = newLlmKey;
+      candidateLlmTestResult = {
+        ok: false,
+        detail: err.message || "Connection test failed.",
+      };
+    } finally {
+      isTestingNewLlm = false;
+    }
   }
 
   async function handleAddLlm() {
@@ -236,6 +297,10 @@
     }
     if (selectedKindInfo?.requires_api_key && !newLlmKey.trim()) {
       llmError = `A ${selectedKindInfo.display_name} instance requires an API key.`;
+      return;
+    }
+    if (!newLlmTestResult?.ok) {
+      llmError = "A successful connection test is required before adding this provider.";
       return;
     }
     isSavingLlm = true;
@@ -480,7 +545,10 @@
           </div>
           <button
             type="button"
-            onclick={() => (showAddLlmForm = !showAddLlmForm)}
+            onclick={() => {
+              showAddLlmForm = !showAddLlmForm;
+              if (showAddLlmForm) resetLlmForm();
+            }}
             class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
           >
             <Plus class="h-4 w-4" />
@@ -508,8 +576,15 @@
             urlRequired={false}
             submitting={isSavingLlm}
             submitLabel="Save Provider"
+            onTest={handleTestNewLlm}
+            testing={isTestingNewLlm}
+            testResult={newLlmTestResult}
+            requireSuccessfulTest={true}
             onSubmit={handleAddLlm}
-            onCancel={() => (showAddLlmForm = false)}
+            onCancel={() => {
+              showAddLlmForm = false;
+              resetLlmForm();
+            }}
           />
         {/if}
 

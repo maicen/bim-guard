@@ -63,6 +63,7 @@ import type {
   LLMProviderInstanceUpdatePayload,
   LLMProviderKind,
   LLMProviderModel,
+  LLMProviderTestPayload,
   ProfileUpdatePayload,
   Project,
   ProjectBulkActionResponse,
@@ -1772,6 +1773,21 @@ export const llmProvidersApi = {
     const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/llm-providers/${id}/test`, {
       method: "POST",
     });
+    return handleResponse<LLMProviderInstanceTestResult>(res);
+  },
+
+  async testConnection(
+    organizationId: number,
+    payload: LLMProviderTestPayload,
+  ): Promise<LLMProviderInstanceTestResult> {
+    const res = await apiFetch(
+      `${API_BASE}/organizations/${organizationId}/llm-providers/test-connection`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
     return handleResponse<LLMProviderInstanceTestResult>(res);
   },
 

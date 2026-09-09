@@ -1506,10 +1506,20 @@ class LLMProviderInstanceResponse(TimestampFields):
 
 
 class LLMProviderInstanceTestResponse(BaseModel):
-    """Result of a connectivity check against a configured LLM provider instance."""
+    """Result of a connectivity check against an LLM provider instance or candidate credentials."""
 
     ok: bool
     detail: str = ""
+
+
+class LLMProviderTestConnectionRequest(BaseModel):
+    """Payload for testing connectivity before saving an LLM provider instance."""
+
+    kind: str = Field(
+        ..., min_length=1, description="A registered provider kind — see GET .../llm-providers/kinds"
+    )
+    api_key: Optional[str] = Field(None, description="API key to test against the provider")
+    api_base: Optional[str] = Field(None, description="Candidate API base URL override")
 
 
 class LLMProviderKindResponse(BaseModel):
