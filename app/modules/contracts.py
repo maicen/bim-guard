@@ -708,6 +708,15 @@ class RuleExtractionDraft(BaseModel):
     )
     clause: Optional[ClauseMetadata] = None
     proposed_rule: RuleCreateRequest
+    original_proposed_rule: Optional[RuleCreateRequest] = Field(
+        default=None,
+        description=(
+            "The LLM's proposed_rule as first extracted, captured only when a "
+            "reviewer edits it (status=edited) -- preserves the pre-edit "
+            "version so `proposed_rule` can carry the correction without "
+            "losing what the model originally produced. Null otherwise."
+        ),
+    )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     extraction_method: Literal["llamaindex_pydantic", "litellm_legacy"] = "litellm_legacy"
     status: RuleDraftStatus = RuleDraftStatus.pending_review

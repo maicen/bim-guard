@@ -118,6 +118,56 @@ def test_review_draft_edited_requires_edited_rule():
         pass
 
 
+def test_review_draft_edited_preserves_original_proposed_rule():
+    service, table, _ = _service()
+    saved = service.save_drafts([_draft()])
+    draft_id = saved[0].id
+    original_rule = table.rows[0]["proposed_rule"]
+
+    edited_rule = RuleCreateRequest(
+        rule_id="9.8.2.1", description="Stairs shall be >= 1000mm wide", operator=">=", check_value="1000"
+    )
+    updated = service.review_draft(
+        draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.edited, edited_rule=edited_rule)
+    )
+
+    assert updated["proposed_rule"]["check_value"] == "1000"
+    assert updated["original_proposed_rule"] == original_rule
+    assert updated["original_proposed_rule"]["check_value"] == "900"
+
+
+def test_review_draft_second_edit_does_not_overwrite_original():
+    service, table, _ = _service()
+    saved = service.save_drafts([_draft()])
+    draft_id = saved[0].id
+    original_rule = table.rows[0]["proposed_rule"]
+
+    first_edit = RuleCreateRequest(rule_id="9.8.2.1", description="First edit", check_value="1000")
+    service.review_draft(
+        draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.edited, edited_rule=first_edit)
+    )
+
+    second_edit = RuleCreateRequest(rule_id="9.8.2.1", description="Second edit", check_value="1100")
+    updated = service.review_draft(
+        draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.edited, edited_rule=second_edit)
+    )
+
+    assert updated["proposed_rule"]["check_value"] == "1100"
+    # Still the LLM's ORIGINAL guess, not the first human edit.
+    assert updated["original_proposed_rule"] == original_rule
+    assert updated["original_proposed_rule"]["check_value"] == "900"
+
+
+def test_review_draft_accept_does_not_set_original_proposed_rule():
+    service, table, _ = _service()
+    saved = service.save_drafts([_draft()])
+    draft_id = saved[0].id
+
+    service.review_draft(draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.accepted))
+
+    assert table.rows[0].get("original_proposed_rule") is None
+
+
 def test_promote_draft_requires_accepted_or_edited_status():
     service, _, _ = _service()
     saved = service.save_drafts([_draft()])

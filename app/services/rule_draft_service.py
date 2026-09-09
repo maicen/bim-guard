@@ -46,6 +46,7 @@ class RuleDraftService:
                     "review_notes": str,
                     "promoted_rule_id": int,
                     "created_at": str,
+                    "original_proposed_rule": dict,
                 },
             )
         )
@@ -100,6 +101,12 @@ class RuleDraftService:
         if payload.status.value == "edited":
             if payload.edited_rule is None:
                 raise ValueError("edited_rule is required when status is 'edited'")
+            # Preserve the LLM's pre-edit proposed_rule the first time this
+            # draft is edited, so the evaluation feedback loop can diff
+            # "what the model produced" against "what the reviewer corrected
+            # it to" -- a second edit does not overwrite the original again.
+            if not existing.get("original_proposed_rule"):
+                updates["original_proposed_rule"] = existing.get("proposed_rule")
             updates["proposed_rule"] = payload.edited_rule.model_dump()
 
         self._drafts.update(updates=updates, pk_values=draft_id)
