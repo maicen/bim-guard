@@ -109,6 +109,7 @@ def list_documents(
                 has_doclang=has_doclang,
                 doclang_size_bytes=len(doclang_str.encode("utf-8")) if doclang_str else 0,
                 doclang_storage_path=r.get("doclang_storage_path"),
+                doclang_archive_path=r.get("doclang_archive_path"),
                 doclang_xml="",
                 project_code=r.get("project_code", ""),
                 originator=r.get("originator", ""),
@@ -149,6 +150,7 @@ def get_document(
         extracted_text=text,
         char_count=len(text),
         doclang_storage_path=doc.get("doclang_storage_path"),
+        doclang_archive_path=doc.get("doclang_archive_path"),
         doclang_xml=service.get_doclang_content(doc),
         project_code=doc.get("project_code", ""),
         originator=doc.get("originator", ""),
@@ -471,15 +473,18 @@ def get_document_doclang(
 def export_document_doclang_archive(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    redirect: bool = Query(
+        default=False,
+        description="Redirect to direct signed storage URL if archive is pre-persisted in Supabase Storage",
+    ),
 ) -> Response:
     """Package document into a standardized DocLang archive (.dclx) zip bundle.
 
     Contains document.xml and manifest.json, directly loadable in the official
-    DocLang Viewer (doclang-project/viewer).
+    DocLang Viewer (doclang-project/viewer). If redirect=true and the archive
+    is pre-persisted in Supabase Storage, returns a 307 temporary redirect to the signed URL.
     """
-    import io
-    import json
-    import zipfile
+    from fastapi.responses import RedirectResponse
 
     doc = service.get_document(document_id)
     if not doc:
@@ -487,44 +492,61 @@ def export_document_doclang_archive(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    xml_content = service.get_doclang_content(doc)
-    if not xml_content.strip():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document {document_id} has no DocLang XML to export.",
-        )
+
+    if redirect and hasattr(service, "get_doclang_archive_signed_url"):
+        signed_url = service.get_doclang_archive_signed_url(doc)
+        if signed_url:
+            return RedirectResponse(url=signed_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+    archive_bytes = None
+    if hasattr(service, "get_doclang_archive_bytes"):
+        archive_bytes = service.get_doclang_archive_bytes(doc)
+
+    if archive_bytes is None:
+        xml_content = service.get_doclang_content(doc)
+        if not xml_content.strip():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document {document_id} has no DocLang XML to export.",
+            )
+        if hasattr(service, "build_doclang_archive"):
+            archive_bytes = service.build_doclang_archive(doc, xml_content)
+        else:
+            import io
+            import json
+            import zipfile
+
+            filename = doc.get("filename") or f"document_{document_id}"
+            manifest = {
+                "format": "doclang-archive",
+                "version": "1.0",
+                "document_name": filename,
+                "entrypoint": "document.xml",
+                "created_by": "BIM-Guard DocLang Engine",
+                "metadata": {
+                    "project_code": doc.get("project_code", ""),
+                    "originator": doc.get("originator", ""),
+                    "cde_state": doc.get("cde_state", ""),
+                    "suitability_code": doc.get("suitability_code", ""),
+                    "revision_code": doc.get("revision_code", ""),
+                },
+            }
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("document.xml", xml_content.encode("utf-8"))
+                zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+            archive_bytes = buf.getvalue()
 
     filename = doc.get("filename") or f"document_{document_id}"
     base_name = filename.rsplit(".", 1)[0]
     archive_name = f"{base_name}.dclx"
-
-    manifest = {
-        "format": "doclang-archive",
-        "version": "1.0",
-        "document_name": filename,
-        "entrypoint": "document.xml",
-        "created_by": "BIM-Guard DocLang Engine",
-        "metadata": {
-            "project_code": doc.get("project_code", ""),
-            "originator": doc.get("originator", ""),
-            "cde_state": doc.get("cde_state", ""),
-            "suitability_code": doc.get("suitability_code", ""),
-            "revision_code": doc.get("revision_code", ""),
-        },
-    }
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("document.xml", xml_content.encode("utf-8"))
-        zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
-    buf.seek(0)
 
     headers = {
         "Content-Disposition": f'attachment; filename="{archive_name}"',
         "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
     }
     return Response(
-        content=buf.getvalue(),
+        content=archive_bytes,
         media_type="application/zip",
         headers=headers,
     )

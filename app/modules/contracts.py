@@ -472,6 +472,9 @@ class DocumentResponse(IsoGovernanceFieldsRequired):
     doclang_storage_path: Optional[str] = Field(
         default=None, description="Storage reference to offloaded DocLang XML or archive"
     )
+    doclang_archive_path: Optional[str] = Field(
+        default=None, description="Storage reference to pre-generated DocLang .dclx archive"
+    )
     doclang_xml: Optional[str] = Field(
         default="",
         description="Canonical DocLang XML export if available (omitted in list summaries to preserve bandwidth)",
@@ -493,6 +496,9 @@ class DocumentDetailResponse(IsoGovernanceFieldsRequired):
     char_count: int = 0
     doclang_storage_path: Optional[str] = Field(
         default=None, description="Storage reference to offloaded DocLang XML or archive"
+    )
+    doclang_archive_path: Optional[str] = Field(
+        default=None, description="Storage reference to pre-generated DocLang .dclx archive"
     )
     doclang_xml: str = Field(default="", description="Canonical DocLang XML export (with OTSL tables)")
 

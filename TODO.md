@@ -761,7 +761,8 @@ flowchart TD
 
 #### Phase 3: DocLang Multimodal & OTSL Artifact Bundling
 - [x] **Standardized `.dclx` Archive Export Endpoint**: Created `GET /api/documents/{id}/export-doclang` generating zip archives containing `document.xml` and `manifest.json` with ISO 19650 metadata. *(Implemented in commit `44e057f` & `ff68fab`)*
-- [ ] **Pre-Ingestion `.dclx` Persistence in Supabase Storage**: Pre-generate and store `bundle.dclx` directly into Supabase Storage (`doclang/{document_id}/bundle.dclx`) when documents are ingested or updated with DocLang XML, caching the artifact in object storage.
-- [ ] **Pre-Signed / Direct Storage Streaming for `.dclx`**: Update `GET /api/documents/{id}/export-doclang` to stream directly from Supabase Storage or issue pre-signed redirect URLs when pre-persisted, avoiding in-memory zip compression.
+- [x] **Pre-Ingestion `.dclx` Persistence in Supabase Storage**: Added migration `20260909185000_add_doclang_archive_path.sql` (applied to Supabase DB). Document creation and metadata updates automatically pre-build and persist `archive_{id}.dclx` in Supabase Storage (`sb://bim-guard-artifacts/doclang/archive_{id}.dclx`) and delete cached archives on document deletion.
+- [x] **Pre-Signed & Cached Storage Streaming for `.dclx`**: Updated `GET /api/documents/{id}/export-doclang` with `redirect=true` support issuing 307 temporary redirects to Supabase Storage signed URLs, and serving pre-cached archive bytes from object storage to prevent in-memory re-zipping.
 - [ ] **Multimodal Asset Extraction Support**: Support extracting embedded DocLang figures and table crop references into decoupled storage paths (`doclang/{id}/assets/`) rather than inline base64 blobs.
+
 

@@ -220,7 +220,7 @@ def test_document_service_auto_offloads_large_doclang_xml(monkeypatch):
 
     svc = DocumentService(storage=FakeStorage(), documents_repo=FakeRepo())
 
-    # 1. Large XML exceeding threshold -> offloaded to storage, inline xml set to ""
+    # 1. Large XML exceeding threshold -> offloaded to storage, inline xml set to "", archive pre-persisted
     large_xml = "<doclang>" + ("X" * (DOCLANG_OFFLOAD_THRESHOLD_BYTES + 100)) + "</doclang>"
     svc.create_document(
         md5_hash="abc1234567890",
@@ -233,9 +233,10 @@ def test_document_service_auto_offloads_large_doclang_xml(monkeypatch):
     assert len(inserted) == 1
     assert inserted[0]["doclang_xml"] == ""  # offloaded, not stored in db row
     assert inserted[0]["doclang_storage_path"].startswith("sb://bucket/doclang/doclang_abc123456789.xml")
-    assert len(uploads) == 1
+    assert inserted[0]["doclang_archive_path"].startswith("sb://bucket/doclang/archive_abc123456789.dclx")
+    assert len(uploads) == 2  # xml blob + .dclx zip bundle
 
-    # 2. Small XML under threshold -> kept inline
+    # 2. Small XML under threshold -> kept inline, but .dclx bundle pre-persisted to storage
     small_xml = "<doclang><heading>Small</heading></doclang>"
     svc.create_document(
         md5_hash="small123",
@@ -248,7 +249,42 @@ def test_document_service_auto_offloads_large_doclang_xml(monkeypatch):
     assert len(inserted) == 2
     assert inserted[1]["doclang_xml"] == small_xml
     assert inserted[1]["doclang_storage_path"] is None
-    assert len(uploads) == 1  # No additional storage upload
+    assert inserted[1]["doclang_archive_path"].startswith("sb://bucket/doclang/archive_small123.dclx")
+    assert len(uploads) == 3  # 2 from previous + 1 .dclx archive
+
+
+def test_export_doclang_archive_signed_redirect(monkeypatch):
+    """Verify GET /api/documents/{id}/export-doclang?redirect=true redirects to signed URL."""
+    from fastapi.testclient import TestClient
+
+    from app.api.dependencies import get_documents_service
+    from app.main import app
+
+    client = TestClient(app)
+    fake_doc = {
+        "id": 888,
+        "filename": "Spec.pdf",
+        "doclang_xml": "<doclang><title>Test</title></doclang>",
+        "doclang_archive_path": "sb://bucket/doclang/archive_888.dclx",
+    }
+
+    class FakeDocServiceWithRedirect:
+        def get_document(self, doc_id):
+            if doc_id == 888:
+                return fake_doc
+            return None
+
+        def get_doclang_archive_signed_url(self, doc, expires_in=3600):
+            return "https://pmisdhiigakpjfuyxgfb.supabase.co/storage/v1/object/sign/bim-guard-artifacts/archive_888.dclx?token=signed"
+
+    app.dependency_overrides[get_documents_service] = lambda: FakeDocServiceWithRedirect()
+    try:
+        res = client.get("/api/documents/888/export-doclang?redirect=true", follow_redirects=False)
+        assert res.status_code == 307
+        assert "token=signed" in res.headers["location"]
+    finally:
+        app.dependency_overrides.pop(get_documents_service, None)
+
 
 
 

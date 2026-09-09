@@ -132,6 +132,25 @@ class ObjectStorage:
 
         return None
 
+    def create_signed_url(self, reference: str, expires_in: int = 3600) -> str | None:
+        """Generate a time-limited signed download URL for Supabase Storage objects."""
+        if not reference or not reference.startswith("sb://"):
+            return None
+
+        parsed = self._parse_supabase_reference(reference)
+        if parsed is None:
+            return None
+
+        bucket, key = parsed
+        try:
+            res = self._supabase_client().storage.from_(bucket).create_signed_url(key, expires_in)
+            if isinstance(res, dict):
+                return res.get("signedURL") or res.get("signedUrl")
+            return str(res)
+        except Exception:
+            logger.warning("Failed generating signed URL bucket=%s key=%s", bucket, key, exc_info=True)
+            return None
+
 
     def delete(self, reference: str) -> None:
         """Delete a stored object using either backend."""

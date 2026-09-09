@@ -46,6 +46,7 @@ class DocumentService:
                     "cde_state": str,
                     "doclang_xml": str,
                     "doclang_storage_path": str,
+                    "doclang_archive_path": str,
                 },
             )
         )
@@ -69,6 +70,7 @@ class DocumentService:
         "revision_code",
         "cde_state",
         "doclang_storage_path",
+        "doclang_archive_path",
     ]
 
     @cache_db_query(key_prefix="bimguard:documents:list")
@@ -113,12 +115,14 @@ class DocumentService:
         cde_state: str = "WIP",
         doclang_xml: str = "",
         doclang_storage_path: str | None = None,
+        doclang_archive_path: str | None = None,
     ):
         """Create and persist a new uploaded document record."""
         clean_doc_type = (doc_type or "").strip() or "Specification"
         doclang_bytes = (doclang_xml or "").encode("utf-8")
         inline_xml = doclang_xml or ""
         resolved_storage_path = doclang_storage_path
+        resolved_archive_path = doclang_archive_path
 
         if resolved_storage_path is None and len(doclang_bytes) > DOCLANG_OFFLOAD_THRESHOLD_BYTES:
             filename_key = f"doclang_{md5_hash[:12]}.xml"
@@ -133,6 +137,27 @@ class DocumentService:
             except Exception:
                 logger.warning("Failed offloading DocLang XML to storage; retaining inline in database")
                 inline_xml = doclang_xml or ""
+
+        if resolved_archive_path is None and (doclang_xml or "").strip():
+            filename_key = f"archive_{md5_hash[:12]}.dclx"
+            try:
+                temp_doc = {
+                    "filename": filename,
+                    "project_code": project_code,
+                    "originator": originator,
+                    "cde_state": cde_state or "WIP",
+                    "suitability_code": suitability_code or "S0",
+                    "revision_code": revision_code or "P01.01",
+                }
+                archive_bytes = self.build_doclang_archive(temp_doc, doclang_xml)
+                resolved_archive_path = self._storage.save_upload(filename_key, archive_bytes, "doclang")
+                logger.info(
+                    "Pre-persisted DocLang .dclx archive to storage ref=%s bytes=%d",
+                    resolved_archive_path,
+                    len(archive_bytes),
+                )
+            except Exception:
+                logger.warning("Failed pre-persisting DocLang archive to storage; will generate on demand", exc_info=True)
 
         payload = {
             "md5_hash": md5_hash,
@@ -153,6 +178,7 @@ class DocumentService:
             "cde_state": cde_state or "WIP",
             "doclang_xml": inline_xml,
             "doclang_storage_path": resolved_storage_path,
+            "doclang_archive_path": resolved_archive_path,
         }
         document = self._documents.insert(payload)
         invalidate_cache("bimguard:documents:list")
@@ -179,6 +205,85 @@ class DocumentService:
         storage_ref = self._storage.save_upload(filename, data, "doclang")
         logger.info("DocLang XML stored document_id=%d bytes=%d ref=%s", document_id, len(data), storage_ref)
         return storage_ref
+
+    @staticmethod
+    def build_doclang_archive(doc: dict, xml_content: str) -> bytes:
+        """Package DocLang XML and metadata into a standardized .dclx zip bundle."""
+        import io
+        import json
+        import zipfile
+
+        filename = doc.get("filename") or f"document_{doc.get('id', 'doc')}"
+        manifest = {
+            "format": "doclang-archive",
+            "version": "1.0",
+            "document_name": filename,
+            "entrypoint": "document.xml",
+            "created_by": "BIM-Guard DocLang Engine",
+            "metadata": {
+                "project_code": doc.get("project_code", ""),
+                "originator": doc.get("originator", ""),
+                "cde_state": doc.get("cde_state", ""),
+                "suitability_code": doc.get("suitability_code", ""),
+                "revision_code": doc.get("revision_code", ""),
+            },
+        }
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("document.xml", xml_content.encode("utf-8"))
+            zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+        return buf.getvalue()
+
+    def store_doclang_archive(self, document_id: int, archive_bytes: bytes) -> str:
+        """Persist a pre-generated .dclx archive into Supabase Storage."""
+        filename = f"archive_{document_id}.dclx"
+        storage_ref = self._storage.save_upload(filename, archive_bytes, "doclang")
+        logger.info(
+            "DocLang archive stored document_id=%d bytes=%d ref=%s",
+            document_id,
+            len(archive_bytes),
+            storage_ref,
+        )
+        return storage_ref
+
+    def get_doclang_archive_signed_url(self, doc: dict, expires_in: int = 3600) -> str | None:
+        """Return a pre-signed direct download URL for the document's .dclx archive."""
+        storage_ref = doc.get("doclang_archive_path")
+        if storage_ref and hasattr(self._storage, "create_signed_url"):
+            return self._storage.create_signed_url(storage_ref, expires_in=expires_in)
+        return None
+
+    def get_doclang_archive_bytes(self, doc: dict) -> bytes | None:
+        """Return .dclx archive bytes, reading from persistent storage cache or generating dynamically."""
+        storage_ref = doc.get("doclang_archive_path")
+        if storage_ref:
+            path = self.materialize_local_path(storage_ref)
+            if path and path.is_file():
+                try:
+                    return path.read_bytes()
+                except Exception:
+                    logger.warning("Failed reading cached .dclx archive from %s", path, exc_info=True)
+
+        xml = self.get_doclang_content(doc)
+        if not xml.strip():
+            return None
+
+        # Build archive dynamically
+        archive_bytes = self.build_doclang_archive(doc, xml)
+
+        # Opportunistically persist to storage cache for future requests
+        doc_id = doc.get("id")
+        if doc_id and not storage_ref:
+            try:
+                new_ref = self.store_doclang_archive(doc_id, archive_bytes)
+                self._documents.update(updates={"doclang_archive_path": new_ref}, pk_values=doc_id)
+                invalidate_cache(f"bimguard:documents:item:document_id={doc_id}")
+                invalidate_cache("bimguard:documents:list")
+            except Exception:
+                logger.warning("Failed persisting generated .dclx archive for document %s", doc_id, exc_info=True)
+
+        return archive_bytes
 
     def get_doclang_content(self, doc: dict) -> str:
         """Return canonical DocLang XML from inline column or materialized from storage."""
@@ -212,6 +317,7 @@ class DocumentService:
         cde_state: str | None = None,
         doclang_xml: str | None = None,
         doclang_storage_path: str | None = None,
+        doclang_archive_path: str | None = None,
     ):
         """Update mutable document metadata and extracted text."""
         updates: dict = {"filename": filename, "extracted_text": extracted_text}
@@ -240,8 +346,28 @@ class DocumentService:
                     updates["doclang_xml"] = doclang_xml
             else:
                 updates["doclang_xml"] = doclang_xml
+
+            if doclang_archive_path is None and doclang_xml.strip():
+                try:
+                    updated_doc_dict = {
+                        "id": document_id,
+                        "filename": filename,
+                        "project_code": updates.get("project_code", ""),
+                        "originator": updates.get("originator", ""),
+                        "cde_state": updates.get("cde_state", ""),
+                        "suitability_code": updates.get("suitability_code", ""),
+                        "revision_code": updates.get("revision_code", ""),
+                    }
+                    archive_bytes = self.build_doclang_archive(updated_doc_dict, doclang_xml)
+                    archive_ref = self.store_doclang_archive(document_id, archive_bytes)
+                    updates["doclang_archive_path"] = archive_ref
+                except Exception:
+                    logger.warning("Failed updating DocLang archive on document %d", document_id, exc_info=True)
+
         if doclang_storage_path is not None:
             updates["doclang_storage_path"] = doclang_storage_path
+        if doclang_archive_path is not None:
+            updates["doclang_archive_path"] = doclang_archive_path
 
         self._documents.update(
             updates=updates,
@@ -259,20 +385,25 @@ class DocumentService:
         logger.info("Document deleted document_id=%d", document_id)
 
     def delete_document_with_file(self, document_id: int):
-        """Delete a document and best-effort remove its stored file from disk."""
+        """Delete a document and best-effort remove its stored files from storage/disk."""
         document = self.get_document(document_id)
         if document is None:
             logger.warning("Skipped deletion for missing document_id=%d", document_id)
             return
 
-        file_path = document.get("file_path")
-        if file_path:
-            try:
-                self._storage.delete(file_path)
-            except OSError:
-                # Keep DB deletion resilient even when file cleanup fails.
-                logger.warning("Document file cleanup failed document_id=%d", document_id, exc_info=True)
-                pass
+        for path_key in ("file_path", "doclang_storage_path", "doclang_archive_path"):
+            stored_ref = document.get(path_key)
+            if stored_ref:
+                try:
+                    self._storage.delete(stored_ref)
+                except Exception:
+                    logger.warning(
+                        "Document file cleanup failed key=%s ref=%s doc_id=%d",
+                        path_key,
+                        stored_ref,
+                        document_id,
+                        exc_info=True,
+                    )
 
         self.delete_document(document_id)
 
