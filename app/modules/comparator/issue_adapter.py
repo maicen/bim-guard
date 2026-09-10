@@ -17,12 +17,16 @@ See docs/integration_plan_mm_xm.md section 4 for the decisions behind this.
 
 from __future__ import annotations
 
+from rdflib import RDF, Graph
+from rdflib.namespace import SH
+
 from app.modules.comparator.issue_schema import (
     Issue,
     RiskBand,
     make_issue,
     to_dict,
 )
+from app.modules.ifc_reader.bot_graph import BIMGUARD
 
 # Mechanism specs: (band_key, score_key, rule_id, metadata_keys_to_lift).
 # Keys are exactly those run_compliance_checks() emits; order fixes the
@@ -329,3 +333,70 @@ def path_a_view(issues: list[Issue], base_results: list[dict]) -> list[dict]:
                 row["xm_band"] = issue.band.value
 
     return output
+
+
+# ── SHACL validation report lift ──────────────────────────────────────────
+# Path C: app.engines.bimguard_shacl_engine returns a RuleEvaluationResult
+# whose raw_result is a pyshacl sh:ValidationReport graph. This is the only
+# function that knows that graph's shape, mirroring how the rest of this
+# module is "the only module that knows both [dict] comparator shapes".
+
+_SEVERITY_TO_BAND = {
+    SH.Violation: RiskBand.HIGH,
+    SH.Warning: RiskBand.MEDIUM,
+    SH.Info: RiskBand.LOW,
+}
+
+_ELEMENT_PREFIX = f"{BIMGUARD['element/']}"
+
+
+def _local_id(uri: str, prefix: str) -> str | None:
+    text = str(uri)
+    return text[len(prefix) :] if text.startswith(prefix) else None
+
+
+def lift_shacl_report(results_graph: Graph, *, mechanism: str = "CODE-SHACL") -> list[Issue]:
+    """Convert a pyshacl `sh:ValidationReport` graph into `Issue` records.
+
+    Each `sh:ValidationResult` becomes one Issue: `sh:focusNode` (a
+    `bot_graph.element_uri()`) resolves to the IFC GlobalId, and the rule id
+    comes from `bimguard:ruleId` on `sh:sourceShape` -- pyshacl copies
+    `sh:sourceShape` into the report as the *property* shape
+    (`shacl_generator._add_shape()`'s blank node), not the enclosing
+    `sh:NodeShape` URI, so `shacl_generator` stamps the rule id directly onto
+    that property shape for this lookup rather than relying on a URI that
+    never appears in the report. `sh:resultMessage` is the description, and
+    `sh:resultSeverity` maps onto `RiskBand`. A result missing a recognisable
+    focus node or rule id is skipped rather than guessed.
+    """
+    issues: list[Issue] = []
+
+    for result in results_graph.subjects(RDF.type, SH.ValidationResult):
+        focus_node = results_graph.value(result, SH.focusNode)
+        source_shape = results_graph.value(result, SH.sourceShape)
+        element_id = _local_id(focus_node, _ELEMENT_PREFIX) if focus_node else None
+        rule_id = results_graph.value(source_shape, BIMGUARD.ruleId) if source_shape else None
+        rule_id = str(rule_id) if rule_id else None
+        if not element_id or not rule_id:
+            continue
+
+        message = str(results_graph.value(result, SH.resultMessage) or f"{rule_id} violated")
+        severity = results_graph.value(result, SH.resultSeverity)
+        band = _SEVERITY_TO_BAND.get(severity, RiskBand.HIGH)
+
+        issues.append(
+            make_issue(
+                id=f"SHACL-{rule_id}-{element_id}",
+                element_id=element_id,
+                rule_id=rule_id,
+                title=message,
+                mechanism=mechanism,
+                band=band,
+                score=1.0,
+                mitigation="",
+                assignee_role="Compliance reviewer",
+                metadata={"source": "shacl"},
+            )
+        )
+
+    return issues

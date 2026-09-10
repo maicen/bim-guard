@@ -146,10 +146,12 @@ def register_default_engines(registry: RuleEngineRegistry | None = None) -> Rule
     from app.engines.bimguard_corrosion_engine import GalvanicCorrosionEngine
     from app.engines.bimguard_crevice_engine import CreviceCorrosionEngine
     from app.engines.bimguard_mic_engine import MICEngine
+    from app.engines.bimguard_shacl_engine import ShaclComplianceEngine
 
     target.register("GC-001", GalvanicCorrosionEngine())
     target.register("CC-001", CreviceCorrosionEngine())
     target.register("MC-001", MICEngine())
     target.register("ARCH-EGRESS-001", EgressAnalysisEngine())
     target.register("ARCH-SPATIAL-001", SpatialDaylightEngine())
+    target.register("CODE-SHACL", ShaclComplianceEngine())
     return target
