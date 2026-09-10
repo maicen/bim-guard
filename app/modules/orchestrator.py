@@ -58,6 +58,7 @@ class BIMGuard_App:
         include_spaces: bool = True,
         include_type_definitions: bool = False,
         enable_shacl: bool = False,
+        enable_arch_engines: bool = False,
     ) -> dict:
         """
         Run the full analysis pipeline for a project:
@@ -71,6 +72,13 @@ class BIMGuard_App:
         surfaces findings under the returned ``shacl_issues``/``shacl_error``
         keys without altering ``rule_compliance``, ``audit_issues``, or
         ``bcf_topics``: existing callers see no behaviour change.
+
+        ``enable_arch_engines`` (default False) similarly opts into running
+        the registered ``ARCH-EGRESS-001``/``ARCH-SPATIAL-001``
+        ``RuleEvaluator`` engines (see ``_run_arch_engine_compliance``) over
+        the egress/spatial records this method already computes, surfacing
+        findings under ``arch_engine_issues``/``arch_engine_error`` -- again
+        without altering any existing key.
         """
         from app.services.documents_service import DocumentService
         from app.services.models_service import ModelsService
@@ -134,6 +142,13 @@ class BIMGuard_App:
 
         theme_result = self._run_theme_compliance(
             selected_theme, ifc["elements"], ifc["ifc_path"], project_id, log_progress
+        )
+
+        arch_engine_issues, arch_engine_error = self._run_arch_engine_compliance(
+            enable_arch_engines=enable_arch_engines,
+            ifc=ifc,
+            project_id=project_id,
+            log_progress=log_progress,
         )
 
         rule_result = self._run_rule_compliance(
@@ -206,6 +221,11 @@ class BIMGuard_App:
             # empty unless a caller explicitly passed enable_shacl=True.
             "shacl_issues": rule_result["shacl_issues"],
             "shacl_error": rule_result["shacl_error"],
+            # Opt-in engine_registry side-channel (see enable_arch_engines /
+            # _run_arch_engine_compliance) -- empty unless a caller explicitly
+            # passed enable_arch_engines=True.
+            "arch_engine_issues": arch_engine_issues,
+            "arch_engine_error": arch_engine_error,
             "building_summary": ifc["building_summary"],
             "spatial_checks": ifc["spatial_checks"],
             "egress_checks": ifc["egress_checks"],
@@ -666,6 +686,90 @@ class BIMGuard_App:
             "shacl_issues": shacl_issues,
             "shacl_error": shacl_error,
         }
+
+    @staticmethod
+    def _run_arch_engine_compliance(
+        *,
+        enable_arch_engines: bool,
+        ifc: dict,
+        project_id: int,
+        log_progress,
+        egress_engine=None,
+        spatial_engine=None,
+    ) -> tuple[list[dict], str | None]:
+        """Opt-in engine_registry side-channel for the two existing ARCH engines.
+
+        `EgressAnalysisEngine` (`ARCH-EGRESS-001`) and `SpatialDaylightEngine`
+        (`ARCH-SPATIAL-001`) are registered in `engine_registry.py` and fully
+        unit-tested (`tests/test_arch_engine_di.py`), but before this were
+        never actually invoked from `orchestrate_workflow()` -- the live
+        pipeline only ran the older, self-contained function checks
+        (`ifc_egress.check_exit_count`/`check_egress_travel_distance`,
+        `ifc_spatial.check_daylight_ratios`/`check_fire_separation`) that
+        already resolve their own thresholds and populate
+        `ifc["egress_checks"]`/`ifc["spatial_checks"]` for the UI.
+
+        Those functions' per-record result dicts already carry exactly the
+        keys these engines' `evaluate()` expects (space_guid, space_name,
+        storey_name/storey, travel_distance_m, exit_count, floor_area_m2,
+        total_window_area_m2, wall_guid, fire_rating_min, etc. -- see
+        `tests/test_arch_engine_di.py`), so this re-evaluates each
+        already-computed record through the registered engine instead of
+        recomputing anything, purely to exercise the registry-based
+        `RuleEvaluator` verdict path end to end. `enable_arch_engines`
+        defaults to False everywhere, so `egress_checks`/`spatial_checks`
+        and every other existing key are completely unaffected either way.
+
+        `egress_engine`/`spatial_engine` are optional DI seams (tests inject
+        instances built with an explicit `rules_service`); omitted, each
+        engine constructs its own default `RuleService()`.
+        """
+        if not enable_arch_engines:
+            return [], None
+
+        try:
+            from app.engines.bimguard_arch_engine import EgressAnalysisEngine, SpatialDaylightEngine
+            from app.modules.comparator.issue_adapter import lift_engine_result
+            from app.modules.comparator.issue_schema import to_dict as issue_to_dict
+
+            egress_engine = egress_engine or EgressAnalysisEngine()
+            spatial_engine = spatial_engine or SpatialDaylightEngine()
+
+            egress_checks = ifc.get("egress_checks") or {}
+            spatial_checks = ifc.get("spatial_checks") or {}
+
+            jobs: list[tuple[str, object, dict]] = []
+            jobs += [
+                ("ARCH-EGRESS-001", egress_engine, record)
+                for record in (egress_checks.get("exit_count") or {}).get("results", [])
+            ]
+            jobs += [
+                ("ARCH-EGRESS-001", egress_engine, record)
+                for record in (egress_checks.get("travel_distance") or [])
+            ]
+            jobs += [
+                ("ARCH-SPATIAL-001", spatial_engine, record)
+                for record in (spatial_checks.get("daylight") or [])
+            ]
+            jobs += [
+                ("ARCH-SPATIAL-001", spatial_engine, record)
+                for record in (spatial_checks.get("fire_separation") or [])
+            ]
+
+            log_progress(66, "arch-engine-compliance-started", records=len(jobs))
+            issues = []
+            for mechanism, engine, record in jobs:
+                result = engine.evaluate(record)
+                issue = lift_engine_result(result, mechanism=mechanism)
+                if issue is not None:
+                    issues.append(issue)
+
+            log_progress(67, "arch-engine-compliance-complete", findings=len(issues))
+            return [issue_to_dict(issue) for issue in issues], None
+        except Exception as exc:
+            log_progress(67, "arch-engine-compliance-failed", error=type(exc).__name__)
+            logger.exception("ARCH engine compliance checks failed project_id=%d", project_id)
+            return [], str(exc)
 
     @staticmethod
     def _run_shacl_compliance(

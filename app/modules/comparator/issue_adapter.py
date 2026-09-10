@@ -400,3 +400,46 @@ def lift_shacl_report(results_graph: Graph, *, mechanism: str = "CODE-SHACL") ->
         )
 
     return issues
+
+
+# ── engine_registry RuleEvaluationResult lift ─────────────────────────────
+# Path D: any RuleEvaluator registered in app.modules.comparator.engine_registry
+# (e.g. EgressAnalysisEngine, SpatialDaylightEngine) returns one
+# RuleEvaluationResult per record evaluated. This converts a FAIL result into
+# the same Issue contract every other path produces, so BCF/dashboard
+# consumers don't need to know which engine produced a finding.
+
+_ENGINE_BAND_TO_RISK_BAND = {
+    "low": RiskBand.LOW,
+    "medium": RiskBand.MEDIUM,
+    "high": RiskBand.HIGH,
+    "critical": RiskBand.CRITICAL,
+}
+
+
+def lift_engine_result(result, *, mechanism: str) -> Issue | None:
+    """Convert one FAIL `RuleEvaluationResult` into an `Issue`, or None.
+
+    Only `status == "FAIL"` becomes a finding -- PASS and NOT_ASSESSED are
+    not findings (NOT_ASSESSED is a data-quality/config gap the caller may
+    still want to surface separately, but that is not this function's job).
+    """
+    if result.status != "FAIL":
+        return None
+
+    band = _ENGINE_BAND_TO_RISK_BAND.get(str(result.band or "").strip().lower(), RiskBand.HIGH)
+    rule_id = str((result.details or {}).get("code_reference") or result.rule_type)
+    title = str(result.action or f"{rule_id} violated")
+
+    return make_issue(
+        id=f"{result.rule_type}-{result.element_id}",
+        element_id=str(result.element_id or "UNKNOWN"),
+        rule_id=rule_id,
+        title=title,
+        mechanism=mechanism,
+        band=band,
+        score=result.score,
+        mitigation=str(result.action or ""),
+        assignee_role="Compliance reviewer",
+        metadata={"source": "engine_registry", "check_type": (result.details or {}).get("check_type")},
+    )
