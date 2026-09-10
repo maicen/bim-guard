@@ -13,12 +13,14 @@ Engines:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.logging_config import get_logger
-from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
 from app.modules.comparator.engine_registry import RuleEvaluationContext, RuleEvaluator
-from app.services.rules_service import RuleService
+from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
+
+if TYPE_CHECKING:
+    from app.services.rules_service import RuleService
 
 logger = get_logger(__name__)
 

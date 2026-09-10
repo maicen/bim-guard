@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Thread
 from time import perf_counter
@@ -211,6 +212,14 @@ TAGS_METADATA = [
     },
 ]
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    from app.services.compute_pool import shutdown_compute_pool
+
+    shutdown_compute_pool()
+
+
 app = FastAPI(
     title="BIM Guard",
     description="OpenBIM Compliance Gateway & Decoupled Svelte 5 SPA Architecture",
@@ -219,6 +228,7 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
     openapi_tags=TAGS_METADATA,
+    lifespan=lifespan,
 )
 
 # Configure CORS

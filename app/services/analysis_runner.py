@@ -203,9 +203,6 @@ def _run_corrosion_tracked(
         Tracking never alters the result, so a tracker failure could not change
         what a report says.
     """
-    # Only the selected engines are tracked. An engine that will not run has no
-    # stages to report, and showing it as pending forever would misdescribe the
-    # run rather than merely look untidy.
     selected = resolve_engine_codes(engines)
     tracked = tuple(code for code in TRACKED_ENGINES if code in selected)
 

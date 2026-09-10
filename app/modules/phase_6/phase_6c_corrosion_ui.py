@@ -96,20 +96,20 @@ from app.engines.bimguard_corrosion_engine import (
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
 from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
 from app.logging_config import get_logger
+from app.modules.comparator import cross_material, material_media
+from app.modules.comparator.issue_adapter import IssueIdAllocator
+from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
 from app.modules.ifc_reader.ifc_parser import (
     MATERIAL_SOURCE_UNMAPPED,
     ServiceElement,
     _spaced,
 )
-from app.modules.phase_6.phase_6b_parsing import UNKNOWN_MATERIAL
 from app.modules.phase_6.finding_narrative import (
     build_description,
     build_mitigations,
     measurements_for,
 )
-from app.modules.comparator import cross_material, material_media
-from app.modules.comparator.issue_adapter import IssueIdAllocator
-from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
+from app.modules.phase_6.phase_6b_parsing import UNKNOWN_MATERIAL
 
 logger = get_logger(__name__)
 
@@ -1130,6 +1130,50 @@ def _finding_issue(
     return issue
 
 
+def _assess_elements_chunk(
+    elements_chunk: list[ServiceElement],
+    specs_codes: tuple[str, ...],
+    include_low: bool,
+) -> tuple[list[tuple], bool]:
+    """Assess a slice of ServiceElements for selected mechanisms in a worker process.
+
+    Returns:
+        (raw_items, mic_scored)
+    """
+    raw_items: list[tuple] = []
+    mic_scored = False
+    specs = tuple(spec for spec in MECHANISMS if spec.code in specs_codes)
+
+    for element in elements_chunk:
+        for spec in specs:
+            gated = _preflight(element, spec)
+            if gated is not None:
+                check, reason, gate_inputs = gated
+                raw_items.append(("dq", element, spec.code, reason, check, gate_inputs))
+                continue
+
+            result, citations, error = _assess(element, spec)
+            if result is None:
+                raw_items.append(("dq", element, spec.code, error or "no result", None, None))
+                continue
+
+            raw_band = getattr(result, "risk_band", None)
+            if raw_band in (None, ""):
+                raw_items.append(("dq", element, spec.code, "engine returned no band", None, None))
+                continue
+
+            band = normalise_band(raw_band, element=element.guid, mechanism=spec.code)
+            if spec is MIC:
+                mic_scored = True
+
+            if band is RiskBand.LOW and not include_low:
+                continue
+
+            raw_items.append(("finding", element, spec.code, result, band, citations))
+
+    return raw_items, mic_scored
+
+
 def run_corrosion_analysis(
     parsed: dict,
     *,
@@ -1186,48 +1230,88 @@ def run_corrosion_analysis(
     # reported only where it could have changed a verdict.
     mic_scored = False
 
-    for element in elements:
-        for spec in active_elementwise:
-            # Step 0, before step 1: an engine that would have to invent an
-            # input is not asked for a band at all. This runs ahead of _assess
-            # so the engine is never entered, which is the difference between
-            # "no verdict" and "a verdict computed from a substitution".
-            gated = _preflight(element, spec)
-            if gated is not None:
-                check, reason, gate_inputs = gated
-                issues.append(
-                    _data_quality_issue(
-                        element, spec, reason, allocator, check=check, inputs=gate_inputs
+    spec_map = {spec.code: spec for spec in MECHANISMS}
+    spec_codes = tuple(spec.code for spec in active_elementwise)
+
+    use_pool = len(elements) >= 30 and bool(active_elementwise)
+    if use_pool:
+        try:
+            from app.services.compute_pool import (
+                get_compute_pool,
+                get_worker_count,
+                is_multiprocessing_enabled,
+            )
+
+            if not is_multiprocessing_enabled():
+                use_pool = False
+        except Exception:
+            use_pool = False
+
+    if use_pool:
+        try:
+            pool = get_compute_pool()
+            workers = get_worker_count()
+            chunk_size = max(15, len(elements) // (workers * 2))
+            chunks = [elements[i : i + chunk_size] for i in range(0, len(elements), chunk_size)]
+
+            futures = [
+                pool.submit(_assess_elements_chunk, chunk, spec_codes, include_low)
+                for chunk in chunks
+            ]
+            for future in futures:
+                chunk_items, chunk_mic_scored = future.result()
+                if chunk_mic_scored:
+                    mic_scored = True
+                for item in chunk_items:
+                    if item[0] == "dq":
+                        _, elem, code, reason, check, gate_inputs = item
+                        spec = spec_map[code]
+                        issues.append(
+                            _data_quality_issue(
+                                elem, spec, reason, allocator, check=check, inputs=gate_inputs
+                            )
+                        )
+                    else:
+                        _, elem, code, result, band, citations = item
+                        spec = spec_map[code]
+                        issues.append(_finding_issue(elem, spec, result, band, citations, allocator))
+        except Exception as exc:
+            logger.warning("Parallel corrosion analysis failed; falling back to sequential: %s", exc)
+            use_pool = False
+
+    if not use_pool:
+        for element in elements:
+            for spec in active_elementwise:
+                gated = _preflight(element, spec)
+                if gated is not None:
+                    check, reason, gate_inputs = gated
+                    issues.append(
+                        _data_quality_issue(
+                            element, spec, reason, allocator, check=check, inputs=gate_inputs
+                        )
                     )
-                )
-                continue
+                    continue
 
-            result, citations, error = _assess(element, spec)
+                result, citations, error = _assess(element, spec)
+                if result is None:
+                    issues.append(_data_quality_issue(element, spec, error or "no result", allocator))
+                    continue
 
-            # Step 1: never invent a band.
-            if result is None:
-                # Step 2 and 3: report the absence as a visible, attributable,
-                # non-verdict finding.
-                issues.append(_data_quality_issue(element, spec, error or "no result", allocator))
-                continue
+                raw_band = getattr(result, "risk_band", None)
+                if raw_band in (None, ""):
+                    issues.append(
+                        _data_quality_issue(element, spec, "engine returned no band", allocator)
+                    )
+                    continue
 
-            raw_band = getattr(result, "risk_band", None)
-            if raw_band in (None, ""):
-                issues.append(
-                    _data_quality_issue(element, spec, "engine returned no band", allocator)
-                )
-                continue
+                band = normalise_band(raw_band, element=element.guid, mechanism=spec.code)
+                if spec is MIC:
+                    mic_scored = True
 
-            band = normalise_band(raw_band, element=element.guid, mechanism=spec.code)
-            if spec is MIC:
-                mic_scored = True
+                if band is RiskBand.LOW and not include_low:
+                    continue
 
-            # Step 4: the include_low filter never applies to data_quality —
-            # those were emitted above and are already past this point.
-            if band is RiskBand.LOW and not include_low:
-                continue
-
-            issues.append(_finding_issue(element, spec, result, band, citations, allocator))
+                issues.append(_finding_issue(element, spec, result, band, citations, allocator))
 
     # A gap in the rules rather than in the model, and reported only when
     # MC-001 actually scored something: on a run where every element was gated

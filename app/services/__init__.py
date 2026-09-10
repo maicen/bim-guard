@@ -14,7 +14,12 @@ Submodules not re-exported here are internal implementation detail; import
 them directly if needed, but they carry no compatibility guarantee.
 """
 
-from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
+def __getattr__(name: str):
+    if name in ("run_analysis", "RUNNABLE_SLUGS"):
+        from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
+
+        return run_analysis if name == "run_analysis" else RUNNABLE_SLUGS
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.bsdd_client import BSDDClient
 from app.services.digital_inspector_service import DigitalInspectorService

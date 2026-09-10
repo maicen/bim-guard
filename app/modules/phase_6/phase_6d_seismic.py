@@ -37,6 +37,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from app.logging_config import get_logger
 from app.modules.blue_halo.halo_volume_generator import (
@@ -368,6 +369,30 @@ def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[
     return geometries, failures
 
 
+def _detect_halo_clashes_chunk(
+    braced_chunk: list[ElementGeometry],
+    all_geometries: list[ElementGeometry],
+    brace_type: BraceType,
+    rule: Any,
+    seismic_zone: bool,
+    building_type: str,
+) -> list[tuple[ClashReport, HaloVolume]]:
+    """Compute halo volumes and detect clashes for a slice of braced elements in a worker process."""
+    clashes: list[tuple[ClashReport, HaloVolume]] = []
+    for geometry in braced_chunk:
+        halo = generate_halo_volume_from_geometry(
+            geometry,
+            brace_type,
+            rule,
+            seismic_zone=seismic_zone,
+            building_type=building_type,
+        )
+        candidates = [g for g in all_geometries if g.element_id != geometry.element_id]
+        for clash in detect_halo_clash_against_geometry(halo, candidates):
+            clashes.append((clash, halo))
+    return clashes
+
+
 def run_seismic_analysis(
     ifc_bytes: bytes,
     *,
@@ -524,17 +549,60 @@ def run_seismic_analysis(
             )
         )
 
-    for geometry in braced:
-        halo = generate_halo_volume_from_geometry(
-            geometry,
-            brace_type,
-            rule,
-            seismic_zone=seismic_zone,
-            building_type=building_type,
-        )
-        candidates = [g for g in geometries if g.element_id != geometry.element_id]
-        for clash in detect_halo_clash_against_geometry(halo, candidates):
-            issues.append(_clash_issue(clash, halo, config, allocator, source_of))
+    use_pool = len(braced) >= 10
+    if use_pool:
+        try:
+            from app.services.compute_pool import (
+                get_compute_pool,
+                get_worker_count,
+                is_multiprocessing_enabled,
+            )
+
+            if not is_multiprocessing_enabled():
+                use_pool = False
+        except Exception:
+            use_pool = False
+
+    if use_pool:
+        try:
+            pool = get_compute_pool()
+            workers = get_worker_count()
+            chunk_size = max(5, len(braced) // (workers * 2))
+            chunks = [braced[i : i + chunk_size] for i in range(0, len(braced), chunk_size)]
+
+            futures = [
+                pool.submit(
+                    _detect_halo_clashes_chunk,
+                    chunk,
+                    geometries,
+                    brace_type,
+                    rule,
+                    seismic_zone,
+                    building_type,
+                )
+                for chunk in chunks
+            ]
+            for future in futures:
+                for clash, halo in future.result():
+                    issues.append(_clash_issue(clash, halo, config, allocator, source_of))
+        except Exception as exc:
+            logger.warning(
+                "Parallel seismic clash detection failed; falling back to sequential: %s", exc
+            )
+            use_pool = False
+
+    if not use_pool:
+        for geometry in braced:
+            halo = generate_halo_volume_from_geometry(
+                geometry,
+                brace_type,
+                rule,
+                seismic_zone=seismic_zone,
+                building_type=building_type,
+            )
+            candidates = [g for g in geometries if g.element_id != geometry.element_id]
+            for clash in detect_halo_clash_against_geometry(halo, candidates):
+                issues.append(_clash_issue(clash, halo, config, allocator, source_of))
 
     logger.info(
         "Seismic analysis complete models=%d elements=%d in_class=%d braced=%d "
