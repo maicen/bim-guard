@@ -25,7 +25,7 @@ from app.api.dependencies import (
     get_membership_service,
     get_parsing_engine_instances_service,
 )
-from app.auth import get_current_user
+from app.auth import get_current_user, get_current_user_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
     DocumentDetailResponse,
@@ -63,6 +63,14 @@ logger = get_logger(__name__)
 # requires sign-in at the router level rather than resource-by-resource
 # ownership checks that don't fit the data model.
 router = APIRouter(dependencies=[Depends(get_current_user)])
+
+# A second router, mounted at the same prefix (see app/main.py), for the
+# handful of routes the frontend opens via plain `<a href>`/`window.location`
+# browser navigation rather than `fetch` -- those can't carry a custom
+# `Authorization` header, so they need `get_current_user_flexible` (bearer
+# token via header OR `?token=`) instead of `router`'s blanket
+# header-only `get_current_user`.
+flexible_router = APIRouter(dependencies=[Depends(get_current_user_flexible)])
 
 
 @router.get("", response_model=list[DocumentResponse], summary="List all uploaded specification documents")
@@ -171,7 +179,7 @@ def get_document(
     )
 
 
-@router.get("/{document_id}/file", summary="Download/stream the original uploaded document file")
+@flexible_router.get("/{document_id}/file", summary="Download/stream the original uploaded document file")
 def get_document_file(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
@@ -270,7 +278,12 @@ async def upload_document(
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)] = None,
     memberships: Annotated[MembershipService, Depends(get_membership_service)] = None,
 ) -> DocumentDetailResponse:
-    """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and generate its DocLang XML.
+    """Upload a specification document and generate its DocLang XML.
+
+    Accepts every format Docling converts to DocLang (PDF, Word, Excel,
+    PowerPoint, HTML, AsciiDoc, Markdown, CSV, common image formats) plus
+    ``.doclang`` — a pre-converted DocLang XML export ingested as-is, with
+    no source PDF/DOCX required.
 
     When `generate_doclang` is False, the file is stored but DocLang
     generation is deferred — call `POST /{id}/generate-doclang` later.

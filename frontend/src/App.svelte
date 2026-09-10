@@ -577,11 +577,11 @@
             initialBcfArtifactId={targetBcfArtifactId}
           />
         {:else if activeView === "documents"}
-          <DocumentsView onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
+          <DocumentsView />
         {:else if activeView === "extract"}
           <RuleExtractionView initialDocId={targetDocId} {fromQuickTest} />
         {:else if activeView === "rules"}
-          <RulesView />
+          <RulesView onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
         {:else if activeView === "manual-rule-editor"}
           <ManualRuleEditorView onBack={() => push("/rules")} />
         {:else if activeView === "arch" || activeView === "piping" || activeView === "seismic" || activeView === "analyze"}

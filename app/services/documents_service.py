@@ -476,10 +476,17 @@ class DocumentService:
         until `generate_doclang_for_existing` is called on it later (e.g. via
         the documents datatable's "Generate DocLang" action).
 
+        A ``.doclang`` upload is a pre-converted DocLang XML export rather
+        than a source document Docling needs to convert: its bytes are used
+        directly as `doclang_xml`, skipping the extraction pipeline
+        entirely, so it needs no accompanying original PDF/DOCX.
+
         Returns:
             row (dict): the document row (existing or newly created)
             created (bool): False when an existing row was reused
         """
+        from pathlib import Path
+
         from app.modules.document_parsing.iso_validator import ISO19650Validator
         from app.utils import md5_hex
 
@@ -507,7 +514,9 @@ class DocumentService:
 
         pages: list = []
         doclang_xml = ""
-        if generate_doclang:
+        if Path(filename).suffix.lower() == ".doclang":
+            doclang_xml = content.decode("utf-8")
+        elif generate_doclang:
             try:
                 _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
                     filename, content, parser=parser, instance=instance, return_doclang=True

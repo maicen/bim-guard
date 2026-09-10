@@ -7,6 +7,10 @@
     CloudDownload,
     Trash2,
     FileText,
+    FileSpreadsheet,
+    FileImage,
+    Presentation,
+    File as FileGeneric,
     Eye,
     Pencil,
     X,
@@ -14,18 +18,18 @@
     Search,
     RotateCw,
     FolderSync,
-    ExternalLink,
     Sparkles,
     FileCode,
   } from "lucide-svelte";
+  import type { ComponentType } from "svelte";
   import { documentsApi, parsingEnginesApi } from "../lib/api";
+  import { withAuthToken } from "../lib/authToken";
   import { authState } from "../lib/auth.svelte";
   import { DOCUMENT_TYPES } from "../lib/types";
   import type {
     DocumentItem,
     DocumentDetail,
     DocumentType,
-    IdsImportResult,
     ParsingEngineInstance,
   } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -41,20 +45,49 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
-  import RulesetImportForm from "../lib/components/RulesetImportForm.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import GoogleDriveImportModal from "../lib/components/GoogleDriveImportModal.svelte";
 
-  interface Props {
-    /**
-     * Called when the "Manual" source tab is chosen — hand-typing a rule needs
-     * the full per-element-category editor, which lives on its own page rather
-     * than cramped inside this modal.
-     */
-    onNavigateToManualRuleEditor?: () => void;
+  /** Icon + accent color for a document's file extension, shown in the table's file column. */
+  function fileIconFor(filename: string): { icon: ComponentType; color: string } {
+    const ext = (filename.split(".").pop() || "").toLowerCase();
+    switch (ext) {
+      case "pdf":
+        return { icon: FileText, color: "text-rose-400" };
+      case "doc":
+      case "docx":
+        return { icon: FileText, color: "text-blue-400" };
+      case "xls":
+      case "xlsx":
+      case "csv":
+        return { icon: FileSpreadsheet, color: "text-emerald-400" };
+      case "ppt":
+      case "pptx":
+        return { icon: Presentation, color: "text-orange-400" };
+      case "png":
+      case "jpg":
+      case "jpeg":
+      case "tiff":
+      case "tif":
+      case "bmp":
+      case "webp":
+        return { icon: FileImage, color: "text-purple-400" };
+      case "html":
+      case "htm":
+      case "adoc":
+      case "asciidoc":
+        return { icon: FileCode, color: "text-amber-400" };
+      case "doclang":
+      case "xml":
+        return { icon: FileCode, color: "text-cyan-400" };
+      case "md":
+      case "markdown":
+      case "txt":
+        return { icon: FileText, color: "text-slate-400" };
+      default:
+        return { icon: FileGeneric, color: "text-slate-400" };
+    }
   }
-
-  let { onNavigateToManualRuleEditor = () => {} }: Props = $props();
 
   const cachedDocs = documentsApi.getCachedList();
   let documents: DocumentItem[] = $state(cachedDocs || []);
@@ -75,17 +108,13 @@
   let isSavingEdit = $state(false);
   let editError = $state("");
 
-  // Upload modal state — three ways a rule source can enter the system,
-  // sharing one modal: an uploaded document (parsed later in Rule Extraction
-  // Studio), a buildingSMART IDS or JSON ruleset file, or a hand-typed rule (which routes to
-  // the dedicated Manual Rule Editor page instead of rendering here).
+  // Upload modal state — a document (PDF/Word/Excel/etc, parsed into DocLang
+  // later in Rule Extraction Studio) or a pre-converted DocLang XML export.
   let isUploadModalOpen = $state(false);
-  let uploadTab: "document" | "ids" = $state("document");
   let isDriveImportModalOpen = $state(false);
 
   // Called by the sidebar's "New Rule Document Upload" action once this view is mounted.
-  export function openUploadModal(tab: "document" | "ids" = "document") {
-    uploadTab = tab;
+  export function openUploadModal() {
     isUploadModalOpen = true;
   }
   let uploadFile: File | null = $state(null);
@@ -98,6 +127,9 @@
   let uploadError = $state("");
   let generatingDoclangId: number | null = $state(null);
   let selectedDocInitialTab: "document" | "doclang" = $state("document");
+
+  /** A .doclang upload is already DocLang XML — no parsing engine or conversion step applies to it. */
+  let isDoclangSelected = $derived(uploadFile?.name.toLowerCase().endsWith(".doclang") ?? false);
 
   async function loadParsingEngines() {
     try {
@@ -117,11 +149,6 @@
     }, 6000);
   }
 
-  function goToManualRuleEditor() {
-    isUploadModalOpen = false;
-    onNavigateToManualRuleEditor();
-  }
-
   function handleDriveImportComplete(successCount: number, failCount: number) {
     isDriveImportModalOpen = false;
     loadDocuments(true);
@@ -130,13 +157,6 @@
     } else if (successCount && failCount) {
       flashSuccess(`Imported ${successCount} of ${successCount + failCount} Google Drive links — see errors for the rest.`);
     }
-  }
-
-  function handleIdsImportedFromUpload(res: IdsImportResult) {
-    isUploadModalOpen = false;
-    flashSuccess(
-      `Imported ${res.created_count} of ${res.total_parsed} rules into "${res.ruleset_id}" — view them in Rules Catalog.`,
-    );
   }
 
   // Text reader modal state
@@ -465,7 +485,7 @@
         <EmptyState
           title="No specification documents found"
           description="Upload building code specifications or sync with OpenCDE to begin extraction."
-          actionLabel="Upload Specification (PDF, TXT, MD)"
+          actionLabel="Upload Specification (PDF, Word, Excel, DocLang...)"
           onAction={() => openUploadModal()}
         />
       </div>
@@ -530,6 +550,8 @@
           </thead>
           <tbody class="divide-y divide-slate-800/60">
             {#each table.paginated as doc (doc.id)}
+              {@const fi = fileIconFor(doc.filename)}
+              {@const FileIcon = fi.icon}
               <tr
                 class="transition-colors hover:bg-slate-900/60 {table.isSelected(doc.id)
                   ? 'bg-blue-950/20'
@@ -545,16 +567,27 @@
                 <td class="px-4 py-3 font-mono text-slate-500">#{doc.id}</td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
-                    <FileText class="h-4 w-4 shrink-0 text-blue-400" />
-                    <span class="max-w-xs truncate font-semibold text-slate-50">{doc.filename}</span>
-                    {#if doc.has_doclang}
-                      <span
-                        class="inline-flex items-center rounded border border-cyan-800/40 bg-cyan-950/60 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 shrink-0"
-                        title={doc.doclang_size_bytes ? `DocLang XML: ${(doc.doclang_size_bytes / 1024).toFixed(0)} KB` : "DocLang XML available"}
-                      >
-                        DocLang
-                      </span>
-                    {/if}
+                    <span class="relative inline-flex shrink-0">
+                      <FileIcon class="h-4 w-4 {fi.color}" />
+                      {#if doc.has_doclang}
+                        <CheckCircle2
+                          class="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-slate-900 text-emerald-400"
+                        />
+                      {/if}
+                    </span>
+                    <a
+                      href={withAuthToken(documentsApi.getFileUrl(doc.id))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="max-w-xs truncate font-semibold text-slate-50 hover:text-accent hover:underline"
+                      title={doc.has_doclang
+                        ? doc.doclang_size_bytes
+                          ? `DocLang XML: ${(doc.doclang_size_bytes / 1024).toFixed(0)} KB — click to open the original file`
+                          : "DocLang XML available — click to open the original file"
+                        : "Click to open the original file"}
+                    >
+                      {doc.filename}
+                    </a>
                   </div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3">
@@ -639,14 +672,14 @@
   </div>
 </div>
 
-<!-- Add Rule Source Modal: a document upload, an IDS import, or a hand-typed rule -->
+<!-- Add Document Modal -->
 {#if isUploadModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
       class="flex max-h-[90vh] w-full max-w-2xl flex-col space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
     >
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h2 class="text-base font-bold text-slate-50">Add Rule Source</h2>
+        <h2 class="text-base font-bold text-slate-50">Add Document</h2>
         <button
           type="button"
           onclick={() => (isUploadModalOpen = false)}
@@ -656,68 +689,33 @@
         </button>
       </div>
 
-      <!-- Source Tabs -->
-      <div class="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-950/60 p-1">
-        <button
-          type="button"
-          onclick={() => (uploadTab = "document")}
-          class="flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors {uploadTab ===
-          'document'
-            ? 'bg-accent text-white shadow-sm'
-            : 'text-slate-400 hover:bg-slate-900 hover:text-slate-50'}"
-        >
-          PDF / Word / Excel / TXT
-        </button>
-        <button
-          type="button"
-          onclick={() => (uploadTab = "ids")}
-          class="flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors {uploadTab ===
-          'ids'
-            ? 'bg-accent text-white shadow-sm'
-            : 'text-slate-400 hover:bg-slate-900 hover:text-slate-50'}"
-        >
-          IDS / JSON Ruleset
-        </button>
-        <button
-          type="button"
-          onclick={goToManualRuleEditor}
-          title="Opens the Manual Rule Editor page, organized by building element category"
-          class="inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-50"
-        >
-          <span>Manual</span>
-          <ExternalLink class="h-3 w-3 opacity-60" />
-        </button>
-      </div>
-
       <div class="flex-1 overflow-y-auto pr-1">
-        {#if uploadTab === "document"}
-          <div class="space-y-4">
-            {#if uploadError}
-              <div
-                class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
-              >
-                {uploadError}
-              </div>
-            {/if}
-
-            <div class="space-y-1.5">
-              <label for="upload-doc-type" class="block text-xs font-semibold text-slate-300">
-                Document Type
-              </label>
-              <select
-                id="upload-doc-type"
-                bind:value={uploadDocType}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
-              >
-                {#each DOCUMENT_TYPES as type (type)}
-                  <option value={type}>{type}</option>
-                {/each}
-              </select>
-              <p class="text-caption text-slate-500">
-                Classifies the document for filtering — used later in Rule Extraction Studio.
-              </p>
+        <div class="space-y-4">
+          {#if uploadError}
+            <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
+              {uploadError}
             </div>
+          {/if}
 
+          <div class="space-y-1.5">
+            <label for="upload-doc-type" class="block text-xs font-semibold text-slate-300">
+              Document Type
+            </label>
+            <select
+              id="upload-doc-type"
+              bind:value={uploadDocType}
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            >
+              {#each DOCUMENT_TYPES as type (type)}
+                <option value={type}>{type}</option>
+              {/each}
+            </select>
+            <p class="text-caption text-slate-500">
+              Classifies the document for filtering — used later in Rule Extraction Studio.
+            </p>
+          </div>
+
+          {#if !isDoclangSelected}
             <div class="space-y-1.5">
               <label for="upload-parser" class="block text-xs font-semibold text-slate-300">
                 Parsing Engine
@@ -789,64 +787,64 @@
                 </p>
               </div>
             {/if}
+          {:else}
+            <div class="rounded-xl border border-cyan-800/40 bg-cyan-950/20 px-3.5 py-2.5 text-xs text-cyan-300">
+              This is a pre-converted DocLang XML file — it's stored as-is, with no parsing engine or
+              conversion step needed.
+            </div>
+          {/if}
 
-            <div
-              class="rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/40 p-6 text-center transition-colors hover:border-accent"
+          <div
+            class="rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/40 p-6 text-center transition-colors hover:border-accent"
+          >
+            <FileText class="mx-auto mb-2 h-8 w-8 text-slate-400" />
+            <p class="mb-3 text-xs text-slate-400">
+              Upload PDF, Word, Excel, PowerPoint, HTML, AsciiDoc, Markdown, CSV, TXT, an image
+              (PNG/JPEG/TIFF/BMP/WEBP), or a pre-converted DocLang XML (.doclang) file
+            </p>
+            <label
+              class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
             >
-              <FileText class="mx-auto mb-2 h-8 w-8 text-slate-400" />
-              <p class="mb-3 text-xs text-slate-400">
-                Upload PDF, Word, Excel, CSV, TXT, or Markdown specifications
-              </p>
-              <label
-                class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
-              >
-                <span>Choose File</span>
-                <input
-                  type="file"
-                  accept=".pdf,.txt,.md,.markdown,.docx,.csv,.xlsx"
-                  onchange={(e) => {
-                    const target = e.target as HTMLInputElement;
-                    if (target.files) uploadFile = target.files[0];
-                  }}
-                  class="hidden"
-                />
-              </label>
-            </div>
-
-            {#if uploadFile}
-              <div
-                class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs"
-              >
-                <span class="truncate font-medium text-slate-50">{uploadFile.name}</span>
-                <span class="text-slate-500">{(uploadFile.size / 1024).toFixed(1)} KB</span>
-              </div>
-            {/if}
-
-            <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
-              <button
-                type="button"
-                onclick={() => (isUploadModalOpen = false)}
-                class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 hover:bg-slate-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!uploadFile || isUploading}
-                onclick={handleUpload}
-                class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
-              >
-                {isUploading ? "Extracting Text..." : "Upload & Extract"}
-              </button>
-            </div>
+              <span>Choose File</span>
+              <input
+                type="file"
+                accept=".pdf,.docx,.xlsx,.pptx,.md,.markdown,.adoc,.asciidoc,.html,.htm,.csv,.txt,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.doclang"
+                onchange={(e) => {
+                  const target = e.target as HTMLInputElement;
+                  if (target.files) uploadFile = target.files[0];
+                }}
+                class="hidden"
+              />
+            </label>
           </div>
-        {:else}
-          <RulesetImportForm
-            defaultRulesetId=""
-            onCancel={() => (isUploadModalOpen = false)}
-            onImported={handleIdsImportedFromUpload}
-          />
-        {/if}
+
+          {#if uploadFile}
+            <div
+              class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs"
+            >
+              <span class="truncate font-medium text-slate-50">{uploadFile.name}</span>
+              <span class="text-slate-500">{(uploadFile.size / 1024).toFixed(1)} KB</span>
+            </div>
+          {/if}
+
+          <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
+            <button
+              type="button"
+              onclick={() => (isUploadModalOpen = false)}
+              class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 hover:bg-slate-700"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!uploadFile || isUploading}
+              onclick={handleUpload}
+              class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {isUploading ? "Extracting Text..." : "Upload & Extract"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

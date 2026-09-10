@@ -27,6 +27,7 @@
     FileCode,
     BookOpen,
     ChevronDown,
+    ExternalLink,
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -54,6 +55,16 @@
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { describeMechanism } from "../lib/glossary";
   import { createTableState } from "../lib/tableState.svelte";
+
+  interface Props {
+    /**
+     * Called when "Manual" is chosen — hand-typing a rule organized by
+     * building element category lives on its own page rather than here.
+     */
+    onNavigateToManualRuleEditor?: () => void;
+  }
+
+  let { onNavigateToManualRuleEditor = () => {} }: Props = $props();
 
   // Top-level tab: Rules catalog vs saved Rule Configuration Snapshots
   let activeMainTab: "rules" | "snapshots" = $state("rules");
@@ -821,6 +832,26 @@
             <span>Save Snapshot</span>
           </button>
         {/if}
+
+        <button
+          type="button"
+          onclick={openImportIdsModal}
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          title="Parse a buildingSMART IDS (.ids/XML) or BIM-Guard JSON ruleset file into new rules"
+        >
+          <Upload class="h-3.5 w-3.5 text-emerald-400" />
+          <span>IDS / JSON Ruleset</span>
+        </button>
+
+        <button
+          type="button"
+          onclick={onNavigateToManualRuleEditor}
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          title="Opens the Manual Rule Editor page, organized by building element category"
+        >
+          <span>Manual</span>
+          <ExternalLink class="h-3 w-3 opacity-60" />
+        </button>
 
         <button
           type="button"

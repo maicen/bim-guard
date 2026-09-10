@@ -5,20 +5,65 @@ from pathlib import Path
 
 from starlette.responses import RedirectResponse
 
-ALLOWED_DOCUMENT_SUFFIXES = {".pdf", ".md", ".txt", ".docx", ".csv", ".xlsx"}
+# Kept in sync with the input formats Docling converts to DocLang (see
+# https://docling-project.github.io/docling/usage/supported_formats/):
+# PDF, Word, Excel, PowerPoint, HTML, AsciiDoc, Markdown, CSV, and common
+# raster image formats. Plus ".doclang" — a pre-converted DocLang XML export
+# that is ingested as-is, with no Docling conversion step, and needs no
+# original PDF/DOCX source document alongside it.
+ALLOWED_DOCUMENT_SUFFIXES = {
+    ".pdf",
+    ".docx",
+    ".xlsx",
+    ".pptx",
+    ".md",
+    ".markdown",
+    ".adoc",
+    ".asciidoc",
+    ".html",
+    ".htm",
+    ".csv",
+    ".txt",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
+    ".tif",
+    ".bmp",
+    ".webp",
+    ".doclang",
+}
+_OOXML_MIME = "application/octet-stream"
 ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {
     ".pdf": {"application/pdf"},
-    ".md": {"text/markdown", "text/x-markdown", "text/plain"},
-    ".txt": {"text/plain"},
     ".docx": {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/octet-stream",
+        _OOXML_MIME,
     },
-    ".csv": {"text/csv", "application/vnd.ms-excel", "text/plain"},
     ".xlsx": {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/octet-stream",
+        _OOXML_MIME,
     },
+    ".pptx": {
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        _OOXML_MIME,
+    },
+    ".md": {"text/markdown", "text/x-markdown", "text/plain"},
+    ".markdown": {"text/markdown", "text/x-markdown", "text/plain"},
+    ".adoc": {"text/plain", "text/x-asciidoc", _OOXML_MIME},
+    ".asciidoc": {"text/plain", "text/x-asciidoc", _OOXML_MIME},
+    ".html": {"text/html"},
+    ".htm": {"text/html"},
+    ".csv": {"text/csv", "application/vnd.ms-excel", "text/plain"},
+    ".txt": {"text/plain"},
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".tiff": {"image/tiff"},
+    ".tif": {"image/tiff"},
+    ".bmp": {"image/bmp", "image/x-ms-bmp"},
+    ".webp": {"image/webp"},
+    ".doclang": {"text/xml", "application/xml", "text/plain", _OOXML_MIME, ""},
 }
 
 
@@ -52,6 +97,17 @@ def is_likely_text_content(content: bytes) -> bool:
     return True
 
 
+_IMAGE_SIGNATURES: dict[str, tuple[bytes, ...]] = {
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+    ".bmp": (b"BM",),
+    ".tif": (b"II*\x00", b"MM\x00*"),
+    ".tiff": (b"II*\x00", b"MM\x00*"),
+    ".webp": (b"RIFF",),
+}
+
+
 def validate_document_upload(
     filename: str,
     content_type: str | None,
@@ -59,7 +115,11 @@ def validate_document_upload(
 ) -> str | None:
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_DOCUMENT_SUFFIXES:
-        return "Only PDF, Word (.docx), Excel (.xlsx), CSV, Markdown (.md), and text (.txt) files are supported."
+        return (
+            "Unsupported file type. Supported formats: PDF, Word (.docx), Excel (.xlsx), "
+            "PowerPoint (.pptx), HTML, AsciiDoc, Markdown, CSV, TXT, common image formats "
+            "(PNG/JPEG/TIFF/BMP/WEBP), and pre-converted DocLang XML (.doclang)."
+        )
 
     normalized_content_type = (content_type or "").split(";", 1)[0].strip().lower()
     allowed_mime_types = ALLOWED_DOCUMENT_MIME_BY_SUFFIX.get(suffix, set())
@@ -72,11 +132,23 @@ def validate_document_upload(
     if suffix == ".pdf" and not file_content.startswith(b"%PDF-"):
         return "Uploaded file content does not match a valid PDF signature."
 
-    if suffix in {".docx", ".xlsx"} and not file_content.startswith(b"PK"):
+    if suffix in {".docx", ".xlsx", ".pptx"} and not file_content.startswith(b"PK"):
         return f"Uploaded file content does not match a valid {suffix} (zip) signature."
 
-    if suffix in {".md", ".txt", ".csv"} and not is_likely_text_content(file_content):
+    if suffix in {".md", ".markdown", ".txt", ".csv", ".adoc", ".asciidoc", ".html", ".htm"} and not is_likely_text_content(
+        file_content
+    ):
         return f"Uploaded {suffix} file appears to be binary content."
+
+    image_signatures = _IMAGE_SIGNATURES.get(suffix)
+    if image_signatures and not file_content.startswith(image_signatures):
+        return f"Uploaded file content does not match a valid {suffix} image signature."
+
+    if suffix == ".doclang":
+        if not is_likely_text_content(file_content):
+            return "Uploaded .doclang file must be UTF-8 encoded XML text."
+        if not file_content.lstrip().startswith(b"<"):
+            return "Uploaded .doclang file does not look like DocLang XML (expected it to start with '<')."
 
     return None
 
