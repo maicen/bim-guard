@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from "svelte";
+  import { push } from "svelte-spa-router";
   import {
     BookOpen,
     Plus,
@@ -28,7 +29,6 @@
   import { DOCUMENT_TYPES } from "../lib/types";
   import type {
     DocumentItem,
-    DocumentDetail,
     DocumentType,
     ParsingEngineInstance,
   } from "../lib/types";
@@ -45,7 +45,6 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
-  import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import GoogleDriveImportModal from "../lib/components/GoogleDriveImportModal.svelte";
 
   /** Icon + accent color for a document's file extension, shown in the table's file column. */
@@ -128,7 +127,6 @@
   let isUploading = $state(false);
   let uploadError = $state("");
   let generatingDoclangId: number | null = $state(null);
-  let selectedDocInitialTab: "document" | "doclang" = $state("document");
 
   /** A pre-converted DocLang upload (.doclang, .dclg, .dclx) is already DocLang — no parsing engine or conversion step applies to it. */
   let isDoclangSelected = $derived(
@@ -162,10 +160,6 @@
       flashSuccess(`Imported ${successCount} of ${successCount + failCount} Google Drive links — see errors for the rest.`);
     }
   }
-
-  // Text reader modal state
-  let selectedDoc: DocumentDetail | null = $state(null);
-  let isLoadingDocDetail = false;
 
   // Search, filter, sort, paginate and select — all owned by the shared state.
   const table = $state(
@@ -291,16 +285,14 @@
     }
   }
 
-  async function openReader(id: number, initialTab: "document" | "doclang" = "document") {
-    selectedDocInitialTab = initialTab;
-    isLoadingDocDetail = true;
-    try {
-      selectedDoc = await documentsApi.get(id);
-    } catch (err: any) {
-      toasts.error(err.message || "Unknown error", "Could not load document text");
-    } finally {
-      isLoadingDocDetail = false;
+  function openReader(id: number, initialTab: "document" | "doclang" = "document") {
+    const params = new URLSearchParams();
+    params.set("doc_id", String(id));
+    if (initialTab === "doclang") params.set("tab", "doclang");
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
     }
+    push(`/document?${params.toString()}`);
   }
 
   async function generateDoclangForRow(doc: DocumentItem) {
@@ -857,71 +849,6 @@
     onClose={() => (isDriveImportModalOpen = false)}
     onComplete={handleDriveImportComplete}
   />
-{/if}
-
-<!-- Document Viewer Modal -->
-{#if selectedDoc}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
-              {selectedDoc.filename}
-            </h2>
-            {#if selectedDoc.doc_type}
-              <span
-                class="rounded-md border border-slate-700/60 bg-slate-800 px-2 py-0.5 text-caption font-medium text-blue-300"
-              >
-                {selectedDoc.doc_type}
-              </span>
-            {/if}
-          </div>
-          <p class="mt-0.5 text-xs text-slate-400">
-            {selectedDoc.char_count.toLocaleString()} extracted characters
-          </p>
-        </div>
-        <button
-          type="button"
-          onclick={() => (selectedDoc = null)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-hidden">
-        <DocumentViewer documentId={selectedDoc.id} initialTab={selectedDocInitialTab} />
-      </div>
-
-      <div
-        class="flex items-center justify-between border-t border-slate-800 bg-slate-950 px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={() => {
-            const doc = documents.find((d) => d.id === selectedDoc!.id);
-            selectedDoc = null;
-            if (doc) openEdit(doc);
-          }}
-          class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-50 transition-colors hover:bg-slate-700"
-        >
-          <Pencil class="h-3.5 w-3.5" />
-          <span>Edit Document</span>
-        </button>
-
-        <button
-          type="button"
-          onclick={() => (selectedDoc = null)}
-          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 hover:bg-slate-700"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
 {/if}
 
 <!-- Edit Document Modal -->

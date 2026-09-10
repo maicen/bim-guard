@@ -22,6 +22,7 @@
   import ModelsView from "./routes/ModelsView.svelte";
   import ViewerView from "./routes/ViewerView.svelte";
   import DocumentsView from "./routes/DocumentsView.svelte";
+  import DocumentView from "./routes/DocumentView.svelte";
   import RuleExtractionView from "./routes/RuleExtractionView.svelte";
   import RulesView from "./routes/RulesView.svelte";
   import ManualRuleEditorView from "./routes/ManualRuleEditorView.svelte";
@@ -70,6 +71,11 @@
     return raw && /^\d+$/.test(raw) ? Number(raw) : null;
   });
   let fromQuickTest = $derived(queryParams.get("from") === "quick-test");
+  // Document View page (?doc_id=...&tab=doclang), navigated to from the
+  // Documents list in place of the old preview modal.
+  let targetDocTab: "document" | "doclang" = $derived(
+    queryParams.get("tab") === "doclang" ? "doclang" : "document",
+  );
   // Signing in is required once Supabase Auth is actually configured (see
   // supabaseClient.ts) -- everything the app does reads through /api/projects
   // or /api/rules, both of which now require a bearer token. Left ungated
@@ -578,6 +584,12 @@
           />
         {:else if activeView === "documents"}
           <DocumentsView />
+        {:else if activeView === "document"}
+          <DocumentView
+            documentId={targetDocId}
+            initialTab={targetDocTab}
+            onBack={() => handleSelectView("documents")}
+          />
         {:else if activeView === "extract"}
           <RuleExtractionView initialDocId={targetDocId} {fromQuickTest} />
         {:else if activeView === "rules"}
