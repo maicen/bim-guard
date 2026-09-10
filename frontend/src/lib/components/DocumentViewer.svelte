@@ -16,9 +16,11 @@
   } from "lucide-svelte";
   import { documentsApi } from "../api";
   import { authHeaders, withAuthToken } from "../authToken";
+  import type { DocumentElementBbox } from "../types";
   import LoadingState from "./LoadingState.svelte";
   import EmptyState from "./EmptyState.svelte";
   import DocLangXmlTree from "./DocLangXmlTree.svelte";
+  import PdfElementOverlay from "./PdfElementOverlay.svelte";
 
   interface Props {
     documentId: number;
@@ -87,6 +89,72 @@
 
   let activeBboxRect: { left: number; top: number; width: number; height: number } | null = $state(null);
   let slotBboxRects: Record<number, { left: number; top: number; width: number; height: number }> = $state({});
+
+  // Per-element bbox overlay (feature: hover/click any paragraph/heading/
+  // table/picture, not just the single external rule-source halo above).
+  let elementBboxes: DocumentElementBbox[] = $state([]);
+  let showBboxOverlay = $state(true);
+  let showReadingOrderArrows = $state(false);
+  let currentPageViewport: any = $state(null);
+  let slotViewports: Record<number, any> = $state({});
+
+  // Drag-to-pan (single-page mode only -- continuous mode's primary gesture
+  // is already vertical scroll-to-flip-page via initPageWheelNav-equivalent
+  // logic below, and panning there would fight it). Only engages when the
+  // drag starts on empty canvas background, never on the PDF text layer or
+  // a bbox-overlay box, so text selection and element click-to-select both
+  // keep working exactly as before.
+  let singlePageScrollEl: HTMLDivElement | undefined = $state();
+  const PAN_DRAG_THRESHOLD_PX = 4;
+  let panDrag: {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+    moved: boolean;
+  } | null = $state(null);
+
+  function isPannableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return true;
+    return !target.closest(".pdf-text-layer, svg");
+  }
+
+  function onPanPointerDown(e: PointerEvent, container: HTMLDivElement | undefined) {
+    if (e.button !== 0 || !container || !isPannableTarget(e.target)) return;
+    panDrag = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      scrollLeft: container.scrollLeft,
+      scrollTop: container.scrollTop,
+      moved: false,
+    };
+  }
+
+  function onPanPointerMove(e: PointerEvent) {
+    if (!panDrag || e.pointerId !== panDrag.pointerId || !singlePageScrollEl) return;
+    const dx = e.clientX - panDrag.startX;
+    const dy = e.clientY - panDrag.startY;
+    if (!panDrag.moved) {
+      if (Math.hypot(dx, dy) < PAN_DRAG_THRESHOLD_PX) return;
+      panDrag.moved = true;
+      singlePageScrollEl.setPointerCapture(e.pointerId);
+    }
+    singlePageScrollEl.scrollLeft = panDrag.scrollLeft - dx;
+    singlePageScrollEl.scrollTop = panDrag.scrollTop - dy;
+    e.preventDefault();
+  }
+
+  function onPanPointerUp(e: PointerEvent) {
+    if (!panDrag || e.pointerId !== panDrag.pointerId) return;
+    if (panDrag.moved && singlePageScrollEl?.hasPointerCapture(e.pointerId)) {
+      singlePageScrollEl.releasePointerCapture(e.pointerId);
+    }
+    panDrag = null;
+  }
+
+  let isPanning = $derived(panDrag?.moved ?? false);
 
   let doclangXml = $state("");
   let activeViewerTab: "document" | "doclang" = $state("document");
@@ -436,6 +504,8 @@
     scale = DEFAULT_SCALE;
     teardownObserver();
     pageSlots = [];
+    elementBboxes = [];
+    selectedElementId = null;
 
     // Fetch document details in background to capture doclang_xml and text
     documentsApi
@@ -448,6 +518,18 @@
       .catch((err: any) => {
         doclangLoadError = err?.message || "Failed to load DocLang content for this document.";
         console.warn("Background DocLang fetch failed", err);
+      });
+
+    // Per-element bbox overlay data -- best-effort, non-blocking: documents
+    // predating this feature (or imported as raw .dclg/.dclx) just get an
+    // empty list back and the overlay silently doesn't render.
+    documentsApi
+      .getElementBboxes(documentId)
+      .then((res) => {
+        elementBboxes = res.elements || [];
+      })
+      .catch(() => {
+        elementBboxes = [];
       });
 
     try {
@@ -541,6 +623,7 @@
     if (myGeneration !== renderGeneration) return;
     const viewport = pdfPage.getViewport({ scale });
     updateBboxOverlay(viewport, currentPage);
+    currentPageViewport = viewport;
 
     canvasEl.width = viewport.width;
     canvasEl.height = viewport.height;
@@ -659,6 +742,7 @@
       if (myGeneration !== renderGeneration) return;
       const viewport = pdfPage.getViewport({ scale });
       updateSlotBboxOverlay(viewport, pageNumber);
+      slotViewports[pageNumber] = viewport;
 
       canvas.width = viewport.width;
       canvas.height = viewport.height;
@@ -705,6 +789,7 @@
     if (textLayerDiv) textLayerDiv.innerHTML = "";
     const slot = pageSlots[pageNumber - 1];
     if (slot) slot.rendered = false;
+    delete slotViewports[pageNumber];
   }
 
   // ── Zoom & page navigation (shared by both modes) ───────────────────────
@@ -1158,6 +1243,31 @@
             </button>
           </div>
 
+          {#if elementBboxes.length > 0}
+            <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
+              <button
+                type="button"
+                onclick={() => (showBboxOverlay = !showBboxOverlay)}
+                title="Toggle per-element bounding boxes"
+                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {showBboxOverlay
+                  ? 'bg-accent text-white'
+                  : 'text-slate-400 hover:text-slate-200'}"
+              >
+                Boxes
+              </button>
+              <button
+                type="button"
+                onclick={() => (showReadingOrderArrows = !showReadingOrderArrows)}
+                title="Toggle reading-order arrows"
+                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {showReadingOrderArrows
+                  ? 'bg-accent text-white'
+                  : 'text-slate-400 hover:text-slate-200'}"
+              >
+                Reading order
+              </button>
+            </div>
+          {/if}
+
           {#if pageCount > 1}
             <div class="flex items-center gap-1.5">
               <button
@@ -1193,10 +1303,35 @@
         </div>
 
         {#if viewMode === "single"}
-          <div class="relative flex flex-1 items-start justify-center overflow-auto bg-slate-950/60 p-4">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            bind:this={singlePageScrollEl}
+            role="region"
+            aria-label="PDF page, draggable to pan when zoomed in"
+            onpointerdown={(e) => onPanPointerDown(e, singlePageScrollEl)}
+            onpointermove={onPanPointerMove}
+            onpointerup={onPanPointerUp}
+            onpointercancel={onPanPointerUp}
+            class="relative flex flex-1 items-start justify-center overflow-auto bg-slate-950/60 p-4 {isPanning
+              ? 'cursor-grabbing select-none'
+              : 'cursor-grab'}"
+          >
             <div class="relative shadow-2xl">
               <canvas bind:this={canvasEl} class="block rounded-lg bg-white"></canvas>
               <div bind:this={textLayerEl} class="pdf-text-layer"></div>
+              {#if currentPageViewport && (elementBboxes.length > 0)}
+                <PdfElementOverlay
+                  elements={elementBboxes}
+                  pageNumber={currentPage}
+                  viewport={currentPageViewport}
+                  width={canvasEl?.width ?? 0}
+                  height={canvasEl?.height ?? 0}
+                  {selectedElementId}
+                  onSelect={selectElement}
+                  showBoxes={showBboxOverlay}
+                  showReadingOrder={showReadingOrderArrows}
+                />
+              {/if}
               {#if activeBboxRect}
                 <div
                   class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
@@ -1228,6 +1363,19 @@
                   bind:this={pageTextLayerEls[slot.pageNumber - 1]}
                   class="pdf-text-layer"
                 ></div>
+                {#if slotViewports[slot.pageNumber] && elementBboxes.length > 0}
+                  <PdfElementOverlay
+                    elements={elementBboxes}
+                    pageNumber={slot.pageNumber}
+                    viewport={slotViewports[slot.pageNumber]}
+                    width={pageCanvasEls[slot.pageNumber - 1]?.width ?? 0}
+                    height={pageCanvasEls[slot.pageNumber - 1]?.height ?? 0}
+                    {selectedElementId}
+                    onSelect={selectElement}
+                    showBoxes={showBboxOverlay}
+                    showReadingOrder={showReadingOrderArrows}
+                  />
+                {/if}
                 {#if slotBboxRects[slot.pageNumber]}
                   <div
                     class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"

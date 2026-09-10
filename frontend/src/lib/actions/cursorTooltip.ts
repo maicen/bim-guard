@@ -17,8 +17,9 @@ const EDGE_PADDING = 8;
  * boxes, or anything else that can't tolerate an extra wrapper.
  *
  * Usage: <button use:cursorTooltip={{ text: "Collapse" }}>...</button>
+ * Works on SVG elements too (e.g. a bbox overlay <rect>), hence the Element type.
  */
-export function cursorTooltip(node: HTMLElement, options: CursorTooltipOptions = {}) {
+export function cursorTooltip(node: Element, options: CursorTooltipOptions = {}) {
   let opts = options;
   let tooltipEl: HTMLDivElement | null = null;
   let destroyPortal: (() => void) | null = null;
