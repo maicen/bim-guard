@@ -57,6 +57,7 @@ class BIMGuard_App:
         include_openings: bool = True,
         include_spaces: bool = True,
         include_type_definitions: bool = False,
+        enable_shacl: bool = False,
     ) -> dict:
         """
         Run the full analysis pipeline for a project:
@@ -64,6 +65,12 @@ class BIMGuard_App:
         2. Load and parse the IFC file once (or use synthetic demo data)
         3. Run corrosion compliance checks
         4. Return a unified result dict consumed by the analyze route
+
+        ``enable_shacl`` (default False) opts into an additional, independent
+        SHACL validation side-channel (see ``_run_shacl_compliance``) that
+        surfaces findings under the returned ``shacl_issues``/``shacl_error``
+        keys without altering ``rule_compliance``, ``audit_issues``, or
+        ``bcf_topics``: existing callers see no behaviour change.
         """
         from app.services.documents_service import DocumentService
         from app.services.models_service import ModelsService
@@ -136,6 +143,7 @@ class BIMGuard_App:
             ifc,
             project_id,
             log_progress,
+            enable_shacl=enable_shacl,
         )
 
         if rule_result["rule_compliance"]:
@@ -194,6 +202,10 @@ class BIMGuard_App:
             "rule_compliance": rule_result["rule_compliance"],
             "rule_compliance_summary": rule_result["rule_compliance_summary"],
             "rule_compliance_error": rule_result["rule_compliance_error"],
+            # Opt-in SHACL side-channel (see enable_shacl / _run_shacl_compliance) --
+            # empty unless a caller explicitly passed enable_shacl=True.
+            "shacl_issues": rule_result["shacl_issues"],
+            "shacl_error": rule_result["shacl_error"],
             "building_summary": ifc["building_summary"],
             "spatial_checks": ifc["spatial_checks"],
             "egress_checks": ifc["egress_checks"],
@@ -513,6 +525,8 @@ class BIMGuard_App:
         ifc: dict,
         project_id: int,
         log_progress,
+        *,
+        enable_shacl: bool = False,
     ) -> dict:
         """Run the Module 2 -> 4 -> 5 rule-based compliance pipeline.
 
@@ -527,6 +541,11 @@ class BIMGuard_App:
         rule_compliance_summary: dict = {}
         rule_compliance_error: str | None = None
         rule_validations: list[dict] = []  # kept for backward-compat
+        # Pre-declared (not just assigned in the try below) so a failure
+        # before this point still leaves a bound, empty list for
+        # _run_shacl_compliance() to read after the except clause, instead of
+        # raising UnboundLocalError.
+        library_rules: list[dict] = []
 
         try:
             from .comparator import ComplianceComparator
@@ -630,12 +649,90 @@ class BIMGuard_App:
             log_progress(90, "rule-compliance-failed", error=type(exc).__name__)
             logger.exception("Rule-based compliance checks failed project_id=%d", project_id)
 
+        shacl_issues, shacl_error = BIMGuard_App._run_shacl_compliance(
+            enable_shacl=enable_shacl,
+            m2_reader=m2_reader,
+            ifc_error=ifc_error,
+            library_rules=library_rules,
+            project_id=project_id,
+            log_progress=log_progress,
+        )
+
         return {
             "rule_validations": rule_validations,
             "rule_compliance": rule_compliance,
             "rule_compliance_summary": rule_compliance_summary,
             "rule_compliance_error": rule_compliance_error,
+            "shacl_issues": shacl_issues,
+            "shacl_error": shacl_error,
         }
+
+    @staticmethod
+    def _run_shacl_compliance(
+        *,
+        enable_shacl: bool,
+        m2_reader,
+        ifc_error,
+        library_rules: list[dict],
+        project_id: int,
+        log_progress,
+    ) -> tuple[list[dict], str | None]:
+        """Opt-in SHACL side-channel: never touches rule_compliance/audit_issues.
+
+        This is deliberately independent of the rule_compliance path above --
+        `enable_shacl` defaults to False everywhere, so orchestrate_workflow's
+        existing behaviour is completely unchanged unless a caller explicitly
+        opts in. When enabled, it builds a BOT graph
+        (`app.modules.ifc_reader.bot_graph`) from the already-loaded IFC model,
+        compiles whichever `library_rules` are SHACL-eligible
+        (`app.modules.rule_builder.shacl_generator`), and returns findings as
+        plain dicts via `issue_adapter.lift_shacl_report()` -- a separate
+        `shacl_issues` key on the result, not merged into `audit_issues`/
+        `bcf_topics`, so it cannot regress the existing merge path.
+
+        A known limitation: the geometry engines (`ifc_geometry.py`,
+        `ifc_egress.py`, `ifc_stair.py`, `blue_halo/`) do not yet write their
+        computed values onto the BOT graph as literals, so a rule targeting
+        an engine-computed property (e.g. a calculated clear width) will not
+        match any element yet -- only rules targeting properties already
+        present on the graph can fire today. Wiring that enrichment step is
+        a separate follow-up.
+        """
+        if not enable_shacl or not m2_reader or ifc_error or not library_rules:
+            return [], None
+
+        try:
+            from app.engines.bimguard_shacl_engine import ShaclComplianceEngine
+            from app.modules.comparator.engine_registry import RuleEvaluationContext
+            from app.modules.comparator.issue_adapter import lift_shacl_report
+            from app.modules.comparator.issue_schema import to_dict as issue_to_dict
+            from app.modules.ifc_reader.bot_graph import build_bot_graph
+            from app.modules.ifc_reader.ifc_graph import build_ifc_graph
+            from app.modules.ifc_reader.ifc_spatial import IFCSpatialAdjacency
+            from app.modules.rule_builder.shacl_generator import compile_shapes
+
+            log_progress(91, "shacl-compliance-started", rules=len(library_rules))
+            shapes = compile_shapes(library_rules)
+            if len(shapes) == 0:
+                log_progress(91, "shacl-compliance-skipped", reason="no-eligible-rules")
+                return [], None
+
+            adjacency = IFCSpatialAdjacency(m2_reader.ifc_file).build()
+            bot_graph = build_bot_graph(build_ifc_graph(m2_reader.ifc_file), adjacency)
+
+            result = ShaclComplianceEngine().evaluate(
+                bot_graph,
+                context=RuleEvaluationContext(
+                    rule_type="CODE-SHACL", element=bot_graph, metadata={"shapes_graph": shapes}
+                ),
+            )
+            issues = lift_shacl_report(result.raw_result) if result.raw_result is not None else []
+            log_progress(92, "shacl-compliance-complete", findings=len(issues))
+            return [issue_to_dict(issue) for issue in issues], None
+        except Exception as exc:
+            log_progress(92, "shacl-compliance-failed", error=type(exc).__name__)
+            logger.exception("SHACL compliance checks failed project_id=%d", project_id)
+            return [], str(exc)
 
     @staticmethod
     def _merge_audit_results(
