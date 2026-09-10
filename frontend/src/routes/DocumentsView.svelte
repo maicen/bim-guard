@@ -78,6 +78,8 @@
       case "asciidoc":
         return { icon: FileCode, color: "text-amber-400" };
       case "doclang":
+      case "dclg":
+      case "dclx":
       case "xml":
         return { icon: FileCode, color: "text-cyan-400" };
       case "md":
@@ -128,8 +130,10 @@
   let generatingDoclangId: number | null = $state(null);
   let selectedDocInitialTab: "document" | "doclang" = $state("document");
 
-  /** A .doclang upload is already DocLang XML — no parsing engine or conversion step applies to it. */
-  let isDoclangSelected = $derived(uploadFile?.name.toLowerCase().endsWith(".doclang") ?? false);
+  /** A pre-converted DocLang upload (.doclang, .dclg, .dclx) is already DocLang — no parsing engine or conversion step applies to it. */
+  let isDoclangSelected = $derived(
+    uploadFile ? /\.(doclang|dclg|dclx)$/i.test(uploadFile.name) : false
+  );
 
   async function loadParsingEngines() {
     try {
@@ -800,7 +804,7 @@
             <FileText class="mx-auto mb-2 h-8 w-8 text-slate-400" />
             <p class="mb-3 text-xs text-slate-400">
               Upload PDF, Word, Excel, PowerPoint, HTML, AsciiDoc, Markdown, CSV, TXT, an image
-              (PNG/JPEG/TIFF/BMP/WEBP), or a pre-converted DocLang XML (.doclang) file
+              (PNG/JPEG/TIFF/BMP/WEBP), or pre-converted DocLang files (.dclg, .dclx, .doclang)
             </p>
             <label
               class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
@@ -808,7 +812,7 @@
               <span>Choose File</span>
               <input
                 type="file"
-                accept=".pdf,.docx,.xlsx,.pptx,.md,.markdown,.adoc,.asciidoc,.html,.htm,.csv,.txt,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.doclang"
+                accept=".pdf,.docx,.xlsx,.pptx,.md,.markdown,.adoc,.asciidoc,.html,.htm,.csv,.txt,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.doclang,.dclg,.dclx"
                 onchange={(e) => {
                   const target = e.target as HTMLInputElement;
                   if (target.files) uploadFile = target.files[0];

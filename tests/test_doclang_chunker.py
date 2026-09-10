@@ -370,5 +370,113 @@ def test_create_document_packages_multimodal_assets_in_dclx():
     assert zf.read("assets/asset_1.png") == png_bytes
 
 
+def test_validate_document_upload_dclg():
+    """Verify validate_document_upload accepts valid .dclg XML and rejects invalid content/MIME."""
+    from app.utils import validate_document_upload
+
+    valid_xml = b"<?xml version=\"1.0\"?><doclang><heading>Test</heading></doclang>"
+
+    # 1. Valid .dclg with standard XML MIME types
+    assert validate_document_upload("spec.dclg", "text/xml", valid_xml) is None
+    assert validate_document_upload("spec.dclg", "application/xml", valid_xml) is None
+    assert validate_document_upload("spec.dclg", "text/plain", valid_xml) is None
+    assert validate_document_upload("spec.dclg", "application/octet-stream", valid_xml) is None
+
+    # 2. Invalid MIME type
+    err = validate_document_upload("spec.dclg", "image/png", valid_xml)
+    assert err is not None and "Invalid MIME type" in err
+
+    # 3. Invalid non-XML text
+    not_xml = b"This is plain text without starting tag"
+    err = validate_document_upload("spec.dclg", "text/xml", not_xml)
+    assert err is not None and "does not look like DocLang XML" in err
+
+    # 4. Binary null bytes in XML
+    binary_content = b"<doclang>\x00\x01\x02</doclang>"
+    err = validate_document_upload("spec.dclg", "text/xml", binary_content)
+    assert err is not None and "must be UTF-8 encoded XML text" in err
+
+
+def test_validate_document_upload_dclx():
+    """Verify validate_document_upload accepts valid .dclx zip archives and rejects non-zip content."""
+    import io
+    import zipfile
+
+    from app.utils import validate_document_upload
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("document.xml", "<doclang>Test</doclang>")
+    valid_zip_bytes = buf.getvalue()
+
+    # 1. Valid .dclx archive
+    assert validate_document_upload("archive.dclx", "application/zip", valid_zip_bytes) is None
+    assert validate_document_upload("archive.dclx", "application/x-zip-compressed", valid_zip_bytes) is None
+    assert validate_document_upload("archive.dclx", "application/octet-stream", valid_zip_bytes) is None
+
+    # 2. Invalid MIME type
+    err = validate_document_upload("archive.dclx", "text/plain", valid_zip_bytes)
+    assert err is not None and "Invalid MIME type" in err
+
+    # 3. Invalid signature (non-zip)
+    err = validate_document_upload("archive.dclx", "application/zip", b"not-a-zip-file")
+    assert err is not None and "match a valid .dclx (zip) signature" in err
+
+
+def test_validate_document_upload_unsupported_suffix_mentions_dclg_and_dclx():
+    """Verify unsupported file type message lists .dclg and .dclx."""
+    from app.utils import validate_document_upload
+
+    err = validate_document_upload("file.xyz", "application/octet-stream", b"dummy")
+    assert err is not None
+    assert ".dclg" in err
+    assert ".dclx" in err
+
+
+def test_document_service_ingests_dclg_and_dclx(tmp_path):
+    """Verify DocumentService ingests raw XML for .dclg and unpacks document.xml for .dclx."""
+    import io
+    import zipfile
+
+    from app.services.documents_service import DocumentService
+
+    inserted = []
+
+    class FakeRepo:
+        def insert(self, payload):
+            record = dict(payload)
+            record["id"] = len(inserted) + 1
+            inserted.append(record)
+            return record
+
+        def rows_where(self, *args, **kwargs):
+            return []
+
+    class FakeStorage:
+        def save_upload(self, filename, content, subdir):
+            return f"sb://bucket/{subdir}/{filename}"
+
+    svc = DocumentService(storage=FakeStorage(), documents_repo=FakeRepo())
+    # Mock store_document_file
+    svc.store_document_file = lambda fname, content: f"uploads/{fname}"
+
+    # 1. Ingest .dclg
+    dclg_content = b"<doclang><heading>DocLang Direct</heading></doclang>"
+    row_dclg, created = svc.ingest_uploaded_bytes("test_doc.dclg", dclg_content)
+    assert created is True
+    assert row_dclg["doclang_xml"] == "<doclang><heading>DocLang Direct</heading></doclang>"
+
+    # 2. Ingest .dclx
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("document.xml", "<doclang><title>Archive Unpacked</title></doclang>")
+        zf.writestr("manifest.json", '{"entrypoint": "document.xml"}')
+    dclx_bytes = buf.getvalue()
+
+    row_dclx, created = svc.ingest_uploaded_bytes("test_archive.dclx", dclx_bytes)
+    assert created is True
+    assert row_dclx["doclang_xml"] == "<doclang><title>Archive Unpacked</title></doclang>"
+
+
 
 

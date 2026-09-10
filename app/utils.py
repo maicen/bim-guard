@@ -8,9 +8,9 @@ from starlette.responses import RedirectResponse
 # Kept in sync with the input formats Docling converts to DocLang (see
 # https://docling-project.github.io/docling/usage/supported_formats/):
 # PDF, Word, Excel, PowerPoint, HTML, AsciiDoc, Markdown, CSV, and common
-# raster image formats. Plus ".doclang" — a pre-converted DocLang XML export
-# that is ingested as-is, with no Docling conversion step, and needs no
-# original PDF/DOCX source document alongside it.
+# raster image formats. Plus pre-converted DocLang files — standard XML (.dclg, .doclang)
+# and DocLang Archive (.dclx) exports that are ingested as-is, with no Docling conversion
+# step, and need no original PDF/DOCX source document alongside them.
 ALLOWED_DOCUMENT_SUFFIXES = {
     ".pdf",
     ".docx",
@@ -32,6 +32,8 @@ ALLOWED_DOCUMENT_SUFFIXES = {
     ".bmp",
     ".webp",
     ".doclang",
+    ".dclg",
+    ".dclx",
 }
 _OOXML_MIME = "application/octet-stream"
 ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {
@@ -64,6 +66,8 @@ ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {
     ".bmp": {"image/bmp", "image/x-ms-bmp"},
     ".webp": {"image/webp"},
     ".doclang": {"text/xml", "application/xml", "text/plain", _OOXML_MIME, ""},
+    ".dclg": {"text/xml", "application/xml", "text/plain", _OOXML_MIME, ""},
+    ".dclx": {"application/zip", "application/x-zip-compressed", _OOXML_MIME},
 }
 
 
@@ -118,7 +122,7 @@ def validate_document_upload(
         return (
             "Unsupported file type. Supported formats: PDF, Word (.docx), Excel (.xlsx), "
             "PowerPoint (.pptx), HTML, AsciiDoc, Markdown, CSV, TXT, common image formats "
-            "(PNG/JPEG/TIFF/BMP/WEBP), and pre-converted DocLang XML (.doclang)."
+            "(PNG/JPEG/TIFF/BMP/WEBP), and pre-converted DocLang files (.dclg, .dclx, .doclang)."
         )
 
     normalized_content_type = (content_type or "").split(";", 1)[0].strip().lower()
@@ -132,7 +136,7 @@ def validate_document_upload(
     if suffix == ".pdf" and not file_content.startswith(b"%PDF-"):
         return "Uploaded file content does not match a valid PDF signature."
 
-    if suffix in {".docx", ".xlsx", ".pptx"} and not file_content.startswith(b"PK"):
+    if suffix in {".docx", ".xlsx", ".pptx", ".dclx"} and not file_content.startswith(b"PK"):
         return f"Uploaded file content does not match a valid {suffix} (zip) signature."
 
     if suffix in {".md", ".markdown", ".txt", ".csv", ".adoc", ".asciidoc", ".html", ".htm"} and not is_likely_text_content(
@@ -144,11 +148,11 @@ def validate_document_upload(
     if image_signatures and not file_content.startswith(image_signatures):
         return f"Uploaded file content does not match a valid {suffix} image signature."
 
-    if suffix == ".doclang":
+    if suffix in {".doclang", ".dclg"}:
         if not is_likely_text_content(file_content):
-            return "Uploaded .doclang file must be UTF-8 encoded XML text."
+            return f"Uploaded {suffix} file must be UTF-8 encoded XML text."
         if not file_content.lstrip().startswith(b"<"):
-            return "Uploaded .doclang file does not look like DocLang XML (expected it to start with '<')."
+            return f"Uploaded {suffix} file does not look like DocLang XML (expected it to start with '<')."
 
     return None
 

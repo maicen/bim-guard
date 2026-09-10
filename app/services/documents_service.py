@@ -1,5 +1,7 @@
 """Document persistence service for uploaded source files and their canonical DocLang XML."""
 
+from pathlib import Path
+
 from app.logging_config import get_logger
 from app.modules.document_parsing.doclang_text import doclang_to_text
 from app.services.object_storage import ObjectStorage
@@ -476,17 +478,16 @@ class DocumentService:
         until `generate_doclang_for_existing` is called on it later (e.g. via
         the documents datatable's "Generate DocLang" action).
 
-        A ``.doclang`` upload is a pre-converted DocLang XML export rather
-        than a source document Docling needs to convert: its bytes are used
-        directly as `doclang_xml`, skipping the extraction pipeline
-        entirely, so it needs no accompanying original PDF/DOCX.
+        A ``.doclang`` or ``.dclg`` upload is a pre-converted DocLang XML export
+        and ``.dclx`` is a DocLang Archive rather than a source document Docling
+        needs to convert: their bytes/XML are used directly as `doclang_xml`,
+        skipping the extraction pipeline entirely, so they need no accompanying
+        original PDF/DOCX.
 
         Returns:
             row (dict): the document row (existing or newly created)
             created (bool): False when an existing row was reused
         """
-        from pathlib import Path
-
         from app.modules.document_parsing.iso_validator import ISO19650Validator
         from app.utils import md5_hex
 
@@ -514,8 +515,27 @@ class DocumentService:
 
         pages: list = []
         doclang_xml = ""
-        if Path(filename).suffix.lower() == ".doclang":
+        suffix = Path(filename).suffix.lower()
+        if suffix in {".doclang", ".dclg"}:
             doclang_xml = content.decode("utf-8")
+        elif suffix == ".dclx":
+            import io
+            import json
+            import zipfile
+
+            try:
+                with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                    entrypoint = "document.xml"
+                    if "manifest.json" in zf.namelist():
+                        try:
+                            manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+                            entrypoint = manifest.get("entrypoint") or "document.xml"
+                        except Exception:
+                            pass
+                    doclang_xml = zf.read(entrypoint).decode("utf-8")
+            except Exception as exc:
+                logger.warning("Failed extracting DocLang XML from %s archive: %s", filename, exc)
+                doclang_xml = ""
         elif generate_doclang:
             try:
                 _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
@@ -572,9 +592,33 @@ class DocumentService:
         filename = doc.get("filename") or local_path.name
         content = local_path.read_bytes()
 
-        _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
-            filename, content, parser=parser, instance=instance, return_doclang=True
-        )
+        suffix = Path(filename).suffix.lower()
+        pages: list = []
+        doclang_xml = ""
+        if suffix in {".doclang", ".dclg"}:
+            doclang_xml = content.decode("utf-8")
+        elif suffix == ".dclx":
+            import io
+            import json
+            import zipfile
+
+            try:
+                with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                    entrypoint = "document.xml"
+                    if "manifest.json" in zf.namelist():
+                        try:
+                            manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+                            entrypoint = manifest.get("entrypoint") or "document.xml"
+                        except Exception:
+                            pass
+                    doclang_xml = zf.read(entrypoint).decode("utf-8")
+            except Exception as exc:
+                logger.warning("Failed extracting DocLang XML from %s archive: %s", filename, exc)
+                doclang_xml = ""
+        else:
+            _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
+                filename, content, parser=parser, instance=instance, return_doclang=True
+            )
         if not doclang_xml.strip():
             raise RuntimeError(f"DocLang generation produced no content for document {document_id}.")
 

@@ -282,8 +282,8 @@ async def upload_document(
 
     Accepts every format Docling converts to DocLang (PDF, Word, Excel,
     PowerPoint, HTML, AsciiDoc, Markdown, CSV, common image formats) plus
-    ``.doclang`` — a pre-converted DocLang XML export ingested as-is, with
-    no source PDF/DOCX required.
+    pre-converted DocLang files (``.dclg``, ``.dclx``, ``.doclang``) ingested
+    as-is, with no source PDF/DOCX required.
 
     When `generate_doclang` is False, the file is stored but DocLang
     generation is deferred — call `POST /{id}/generate-doclang` later.
