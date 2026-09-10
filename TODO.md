@@ -650,119 +650,23 @@ Verification blocked: The open_browser_url tool failed multiple times because th
 
 20260909
 
-Searched for "doclang_xml"
-Viewed 20260909180000_add_doclang_and_bbox_support.sql:1-33
-Viewed documents_service.py:60-130
-Searched for "def save_upload"
-Viewed object_storage.py:1-100
-Searched for "CREATE TABLE.\*documents"
-Searched for "document_nodes"
-Viewed 20260902143724_create_document_nodes.sql:1-56
-Searched for "list_documents"
-Viewed documents_service.py:45-65
-Viewed documents.py:75-115
-Viewed documents.py:430-490
-Viewed DocumentViewer.svelte:235-290
-
-### Strategic Review: Storage & Database Architecture after DocLang
-
-The introduction of **DocLang XML** and **OTSL (Ordered Table Structure Language)** represents a major quality upgrade for BIM-Guard: it replaces fragile regex parsing with canonical layout headings, deterministic tree hierarchies, exact bounding boxes (`bbox`), and structured table definitions.
-
-However, storing rich multimodal XML alongside standard transactional records introduces critical storage, performance, and scaling implications across PostgreSQL and Supabase Storage.
-
----
-
-### 1. Current State vs. Growth Profile
-
-| Asset                       | Current Location                           | Average Size (100–300 page spec) | Scaling Profile                                                                   |
-| :-------------------------- | :----------------------------------------- | :------------------------------- | :-------------------------------------------------------------------------------- |
-| **Source File (PDF/DOCX)**  | Supabase Storage (`uploads/`)              | 5 MB – 50 MB                     | Low DB impact, offloaded to S3-compatible storage.                                |
-| **Extracted Text**          | Postgres `public.documents.extracted_text` | 100 KB – 1.5 MB                  | Pushed to TOAST tables in Postgres.                                               |
-| **DocLang XML (with OTSL)** | Postgres `public.documents.doclang_xml`    | **1.5 MB – 15 MB+**              | Dense XML tags, cell coordinates, and token spans create significant DB overhead. |
-| **Document Nodes**          | Postgres `public.document_nodes`           | ~1 KB per clause/table row       | Indexed, highly queryable relational/semantic records.                            |
-| **Rendered Pages**          | Postgres `public.document_pages`           | 5 KB – 20 KB per page            | Fast snippet search for page resolution.                                          |
-
----
-
-### 2. Architectural Findings & Risks
-
-#### Finding 1: API Over-Fetching & Network Egress Bottleneck
-
-- **The Issue**: In [app/api/documents.py](file:///c:/Users/osama/coding/bim-guard/app/api/documents.py#L75-L120), `GET /api/documents` retrieves all rows via `SELECT *` from `public.documents` and serializes the complete `doclang_xml` string inside every `DocumentResponse`.
-- **Impact**:
-  - Loading the documents table in the frontend transfers **every document's full multi-megabyte XML string** over the wire.
-  - A project with 25 standards (averaging 4 MB XML each) transfers **~100 MB of JSON** just to render the document list page.
-  - Spikes FastAPI worker memory, delays frontend initial paint, and rapidly consumes Supabase egress bandwidth.
-
-#### Finding 2: PostgreSQL TOAST Pressure & Write Amplification
-
-- **The Issue**: PostgreSQL rows max out at 8 KB. Any column > 2 KB is compressed and stored out-of-line in the PostgreSQL **TOAST** (The Oversized-Attribute Storage Technique) table.
-- **Impact**:
-  - Updating document lifecycle metadata (e.g. ISO 19650 CDE transitions: `WIP` → `SHARED` → `PUBLISHED`, or updating `suitability_code`) writes a new row version (MVCC).
-  - Backups (`pg_dump`), vacuuming, and replication must continuously process these large XML blobs.
-  - Supabase database compute/disk (e.g., 500 MB – 8 GB quotas) is 10× to 50× more expensive per gigabyte than Supabase Object Storage.
-
-#### Finding 3: Inline Figures & Multimodal Table Assets
-
-- Future Docling extractions can include extracted table image crops or formula figures (`<image src="...">`).
-- If these are stored inline or as base64 within `doclang_xml` in PostgreSQL, individual document rows could swell to 30 MB+, causing connection timeouts and memory spikes.
-
----
-
-### 3. Recommended Storage & DB Target Architecture
-
-```mermaid
-flowchart TD
-    subgraph Client["Frontend Client (Svelte 5)"]
-        UI_List["Documents Table<br/>(Metadata only)"]
-        UI_Tree["Section Tree Picker<br/>(/sections-tree)"]
-        UI_Viewer["DocLang / PDF Viewer<br/>(/doclang)"]
-    end
-
-    subgraph FastAPI["FastAPI Gateway"]
-        API_List["GET /api/documents<br/>(Slim projection)"]
-        API_Tree["GET /api/documents/{id}/sections-tree<br/>(Cached outline)"]
-        API_DocLang["GET /api/documents/{id}/doclang<br/>(Stream from Storage/Cache)"]
-    end
-
-    subgraph Postgres["PostgreSQL (Supabase DB)"]
-        T_Docs["public.documents<br/>• ISO 19650 Metadata<br/>• md5_hash, file_path<br/>• has_doclang (boolean)<br/>• doclang_storage_path"]
-        T_Nodes["public.document_nodes<br/>• clause_id, section_path<br/>• node_type (heading/table/p)<br/>• bbox (JSONB)<br/>• vector embeddings"]
-    end
-
-    subgraph Storage["Supabase Object Storage"]
-        S_Uploads["uploads/<br/>Source PDF / DOCX"]
-        S_Doclang["doclang/{id}/<br/>• document.xml.gz<br/>• archive.dclx<br/>• image_crops/"]
-    end
-
-    UI_List --> API_List
-    UI_Tree --> API_Tree
-    UI_Viewer --> API_DocLang
-
-    API_List --> T_Docs
-    API_Tree --> T_Nodes
-    API_DocLang --> S_Doclang
-    API_DocLang -.->|fallback| T_Docs
-```
-
----
-
 ### 4. Phased Implementation Strategy
 
 #### Phase 1: Immediate Payload & Query Optimization (Zero Schema Changes)
-- [x] **Lightweight List Projection**: Exclude full `doclang_xml` and `extracted_text` from `GET /api/documents`. Return slim metadata (`has_doclang: bool`, `doclang_size_bytes: int`). Reserve full XML for detail view and dedicated stream endpoints. *(Implemented in commit `26bfc45`)*
-- [x] **Selective Database Query Projection**: Added `select_projected(columns)` to `DatabaseAdapter` and `SupabaseTableAdapter`, querying only `DOCUMENT_SUMMARY_COLUMNS` during `list_documents()` to eliminate PostgreSQL TOAST table scans. *(Implemented in commit `c468922`)*
-- [x] **HTTP Compression & Caching**: Added Starlette `GZipMiddleware(minimum_size=1024)` in `app/main.py` for automatic 70%–90% payload compression in transit. Added `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` to DocLang XML and `.dclx` endpoints. *(Implemented in commit `ff68fab`)*
+
+- [x] **Lightweight List Projection**: Exclude full `doclang_xml` and `extracted_text` from `GET /api/documents`. Return slim metadata (`has_doclang: bool`, `doclang_size_bytes: int`). Reserve full XML for detail view and dedicated stream endpoints. _(Implemented in commit `26bfc45`)_
+- [x] **Selective Database Query Projection**: Added `select_projected(columns)` to `DatabaseAdapter` and `SupabaseTableAdapter`, querying only `DOCUMENT_SUMMARY_COLUMNS` during `list_documents()` to eliminate PostgreSQL TOAST table scans. _(Implemented in commit `c468922`)_
+- [x] **HTTP Compression & Caching**: Added Starlette `GZipMiddleware(minimum_size=1024)` in `app/main.py` for automatic 70%–90% payload compression in transit. Added `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` to DocLang XML and `.dclx` endpoints. _(Implemented in commit `ff68fab`)_
 
 #### Phase 2: Hybrid DB / Object Storage Tiering
-- [x] **Supabase DB Migration**: Created and applied `20260909183000_optimize_doclang_indexes_and_storage_path.sql` adding `doclang_storage_path` column to `public.documents`. *(Implemented in commit `88a92e6`)*
-- [x] **Relational & Semantic Query Indexes**: Created composite index on `(document_id, node_type)` and GIN index on `section_path jsonb_path_ops` on `public.document_nodes`. *(Implemented in commit `88a92e6`)*
-- [x] **Threshold-Based Storage Offload**: Implemented `DOCLANG_OFFLOAD_THRESHOLD_BYTES = 256 * 1024` in `DocumentService`. XMLs larger than 256 KB automatically upload to Supabase Storage (`sb://bim-guard-artifacts/doclang/{doc_id}/document.xml.gz`) while smaller XMLs remain in Postgres with transparent dual-mode fallback via `get_doclang_content()`. *(Implemented in commit `5718b5a`)*
+
+- [x] **Supabase DB Migration**: Created and applied `20260909183000_optimize_doclang_indexes_and_storage_path.sql` adding `doclang_storage_path` column to `public.documents`. _(Implemented in commit `88a92e6`)_
+- [x] **Relational & Semantic Query Indexes**: Created composite index on `(document_id, node_type)` and GIN index on `section_path jsonb_path_ops` on `public.document_nodes`. _(Implemented in commit `88a92e6`)_
+- [x] **Threshold-Based Storage Offload**: Implemented `DOCLANG_OFFLOAD_THRESHOLD_BYTES = 256 * 1024` in `DocumentService`. XMLs larger than 256 KB automatically upload to Supabase Storage (`sb://bim-guard-artifacts/doclang/{doc_id}/document.xml.gz`) while smaller XMLs remain in Postgres with transparent dual-mode fallback via `get_doclang_content()`. _(Implemented in commit `5718b5a`)_
 
 #### Phase 3: DocLang Multimodal & OTSL Artifact Bundling
-- [x] **Standardized `.dclx` Archive Export Endpoint**: Created `GET /api/documents/{id}/export-doclang` generating zip archives containing `document.xml` and `manifest.json` with ISO 19650 metadata. *(Implemented in commit `44e057f` & `ff68fab`)*
+
+- [x] **Standardized `.dclx` Archive Export Endpoint**: Created `GET /api/documents/{id}/export-doclang` generating zip archives containing `document.xml` and `manifest.json` with ISO 19650 metadata. _(Implemented in commit `44e057f` & `ff68fab`)_
 - [x] **Pre-Ingestion `.dclx` Persistence in Supabase Storage**: Added migration `20260909185000_add_doclang_archive_path.sql` (applied to Supabase DB). Document creation and metadata updates automatically pre-build and persist `archive_{id}.dclx` in Supabase Storage (`sb://bim-guard-artifacts/doclang/archive_{id}.dclx`) and delete cached archives on document deletion.
 - [x] **Pre-Signed & Cached Storage Streaming for `.dclx`**: Updated `GET /api/documents/{id}/export-doclang` with `redirect=true` support issuing 307 temporary redirects to Supabase Storage signed URLs, and serving pre-cached archive bytes from object storage to prevent in-memory re-zipping.
 - [x] **Multimodal Asset Extraction Support**: Implemented `DocLangAssetManager` in `app/modules/document_parsing/doclang_asset_manager.py` to decouple inline base64 image data URIs from DocLang XML, offload them to Supabase Storage (`sb://bim-guard-artifacts/doclang/{id}/assets/`), sanitize XML with relative asset paths (`assets/asset_1.png`), and bundle assets directly into `.dclx` archives.
-
-
