@@ -443,11 +443,10 @@ class ProjectListResponse(BaseModel):
 
 
 class DocumentUpdateRequest(BaseModel):
-    """Payload for updating document metadata or extracted text."""
+    """Payload for updating document metadata."""
 
     filename: Optional[str] = Field(None, min_length=1, description="Updated document filename")
     doc_type: Optional[str] = Field(None, description="Updated document type classification")
-    extracted_text: Optional[str] = Field(None, description="Updated extracted text content")
 
     # ISO 19650 Container Naming & CDE Metadata
     project_code: Optional[str] = Field(None, description="ISO 19650 Project Code")
@@ -465,7 +464,7 @@ class DocumentResponse(IsoGovernanceFieldsRequired):
     doc_type: str = Field(default="Specification", description="Document classification type")
     file_path: Optional[str] = None
     upload_date: Optional[str] = None
-    extracted_text_preview: Optional[str] = None
+    text_preview: Optional[str] = Field(default=None, description="Preview of DocLang-derived plain text")
     char_count: int = 0
     has_doclang: bool = Field(default=False, description="Whether canonical DocLang XML is available")
     doclang_size_bytes: int = Field(default=0, description="Size of DocLang XML in bytes")
@@ -485,14 +484,14 @@ class DocumentResponse(IsoGovernanceFieldsRequired):
 
 
 class DocumentDetailResponse(IsoGovernanceFieldsRequired):
-    """Complete document record including full extracted text."""
+    """Complete document record including its full plain text, derived from DocLang."""
 
     id: int
     filename: str
     doc_type: str = Field(default="Specification", description="Document classification type")
     file_path: Optional[str] = None
     upload_date: Optional[str] = None
-    extracted_text: str = ""
+    text: str = Field(default="", description="Full plain text, derived on demand from DocLang XML (not persisted)")
     char_count: int = 0
     doclang_storage_path: Optional[str] = Field(
         default=None, description="Storage reference to offloaded DocLang XML or archive"
@@ -504,6 +503,13 @@ class DocumentDetailResponse(IsoGovernanceFieldsRequired):
 
     # ISO 19650 & CDE fields
     project_code: Optional[str] = ""
+
+
+class GenerateDoclangRequest(BaseModel):
+    """Payload to (re)generate DocLang XML for an already-stored document."""
+
+    parser: Optional[str] = Field(default="auto", description="Extraction parser: auto | unstructured | light")
+    engine_instance: Optional[str] = Field(default="", description="Named parsing engine instance to use")
 
 
 class GoogleDriveImportRequest(BaseModel):
@@ -801,8 +807,8 @@ class RuleDraftExtractionRequest(BaseModel):
     """Optional body for POST .../rules/extract-drafts.
 
     ``text``, when provided, scopes extraction to a caller-chosen subset of
-    the document (e.g. one or more sections picked in the UI) instead of the
-    full ``documents.extracted_text``.
+    the document (e.g. one or more sections picked in the UI) instead of its
+    full DocLang-derived text.
     """
 
     text: Optional[str] = None

@@ -1322,6 +1322,7 @@ export const documentsApi = {
       revision_code?: string;
       parser?: "auto" | "unstructured" | "light";
       engine_instance?: string;
+      generate_doclang?: boolean;
       organization_id?: number | null;
     },
   ): Promise<DocumentDetail> {
@@ -1336,6 +1337,9 @@ export const documentsApi = {
     if (isoOptions?.revision_code) form.append("revision_code", isoOptions.revision_code);
     if (isoOptions?.parser) form.append("parser", isoOptions.parser);
     if (isoOptions?.engine_instance) form.append("engine_instance", isoOptions.engine_instance);
+    if (isoOptions?.generate_doclang !== undefined) {
+      form.append("generate_doclang", String(isoOptions.generate_doclang));
+    }
     const res = await apiFetch(`${API_BASE}/documents`, {
       method: "POST",
       body: form,
@@ -1347,8 +1351,8 @@ export const documentsApi = {
       doc_type: created.doc_type || docType,
       file_path: created.file_path,
       upload_date: created.upload_date,
-      extracted_text_preview: created.extracted_text?.slice(0, 200) || "",
-      char_count: created.char_count ?? created.extracted_text?.length ?? 0,
+      text_preview: created.text?.slice(0, 200) || "",
+      char_count: created.char_count ?? created.text?.length ?? 0,
       project_code: created.project_code,
       originator: created.originator,
       suitability_code: created.suitability_code,
@@ -1372,8 +1376,35 @@ export const documentsApi = {
       doc_type: updated.doc_type || payload.doc_type,
       file_path: updated.file_path,
       upload_date: updated.upload_date,
-      extracted_text_preview: updated.extracted_text?.slice(0, 200) || "",
-      char_count: updated.char_count ?? updated.extracted_text?.length ?? 0,
+      text_preview: updated.text?.slice(0, 200) || "",
+      char_count: updated.char_count ?? updated.text?.length ?? 0,
+    });
+    _documentDetailStore.set(updated.id, updated);
+    return updated;
+  },
+
+  async generateDoclang(
+    id: number,
+    options?: { parser?: "auto" | "unstructured" | "light"; engine_instance?: string },
+  ): Promise<DocumentDetail> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/generate-doclang`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        parser: options?.parser || "auto",
+        engine_instance: options?.engine_instance || "",
+      }),
+    });
+    const updated = await handleResponse<DocumentDetail>(res);
+    _documentsStore.addOrUpdate({
+      id: updated.id,
+      filename: updated.filename,
+      doc_type: updated.doc_type,
+      file_path: updated.file_path,
+      upload_date: updated.upload_date,
+      text_preview: updated.text?.slice(0, 200) || "",
+      char_count: updated.char_count ?? updated.text?.length ?? 0,
+      has_doclang: Boolean(updated.doclang_xml?.trim()),
     });
     _documentDetailStore.set(updated.id, updated);
     return updated;
@@ -1433,8 +1464,8 @@ export const documentsApi = {
           doc_type: item.document.doc_type,
           file_path: item.document.file_path,
           upload_date: item.document.upload_date,
-          extracted_text_preview: item.document.extracted_text?.slice(0, 200) || "",
-          char_count: item.document.char_count ?? item.document.extracted_text?.length ?? 0,
+          text_preview: item.document.text?.slice(0, 200) || "",
+          char_count: item.document.char_count ?? item.document.text?.length ?? 0,
           project_code: item.document.project_code,
           originator: item.document.originator,
           suitability_code: item.document.suitability_code,

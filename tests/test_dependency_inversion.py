@@ -213,7 +213,7 @@ def test_projects_service_repository_injection():
 
 def test_documents_service_repository_injection():
     """Verify DocumentService accepts injected repositories without instantiating Supabase."""
-    mock_docs = MockTableAdapter([{"id": 10, "filename": "spec.pdf", "extracted_text": "text"}])
+    mock_docs = MockTableAdapter([{"id": 10, "filename": "spec.pdf", "doclang_xml": ""}])
     mock_storage = MockStorage()
 
     svc = DocumentService(

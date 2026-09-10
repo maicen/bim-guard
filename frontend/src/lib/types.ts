@@ -268,7 +268,20 @@ export interface ProjectBulkActionResponse {
   affected_ids: number[];
 }
 
-export const DOCUMENT_TYPES = ["Code", "Specification", "Manual"] as const;
+export const DOCUMENT_TYPES = [
+  "Specification",
+  "Code",
+  "Manual",
+  "Standard",
+  "Drawing",
+  "Schedule",
+  "O&M Manual",
+  "Warranty",
+  "Assessment",
+  "Report",
+  "RFI Log",
+  "Other",
+] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
@@ -278,7 +291,7 @@ export interface DocumentItem extends IsoGovernanceFieldsRequired {
   doc_type?: string | null;
   file_path?: string | null;
   upload_date?: string | null;
-  extracted_text_preview?: string | null;
+  text_preview?: string | null;
   char_count: number;
   has_doclang?: boolean;
   doclang_size_bytes?: number;
@@ -294,7 +307,7 @@ export interface DocumentDetail extends IsoGovernanceFieldsRequired {
   doc_type?: string | null;
   file_path?: string | null;
   upload_date?: string | null;
-  extracted_text: string;
+  text: string;
   char_count: number;
   doclang_storage_path?: string | null;
   doclang_archive_path?: string | null;
@@ -339,7 +352,6 @@ export interface DocumentSectionTreeResponse {
 export interface DocumentUpdatePayload {
   filename?: string;
   doc_type?: string | null;
-  extracted_text?: string;
   project_code?: string;
   originator?: string;
   suitability_code?: string;
