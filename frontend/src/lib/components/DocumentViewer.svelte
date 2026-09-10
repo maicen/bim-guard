@@ -13,6 +13,7 @@
     Download,
     Copy,
     Check,
+    Settings2,
   } from "lucide-svelte";
   import { documentsApi } from "../api";
   import { authHeaders, withAuthToken } from "../authToken";
@@ -21,6 +22,7 @@
   import EmptyState from "./EmptyState.svelte";
   import DocLangXmlTree from "./DocLangXmlTree.svelte";
   import PdfElementOverlay from "./PdfElementOverlay.svelte";
+  import type { ElementLayer, ArrowStyle } from "./PdfElementOverlay.svelte";
 
   interface Props {
     documentId: number;
@@ -95,8 +97,74 @@
   let elementBboxes: DocumentElementBbox[] = $state([]);
   let showBboxOverlay = $state(true);
   let showReadingOrderArrows = $state(false);
+  let showElementBadges = $state(false);
   let currentPageViewport: any = $state(null);
   let slotViewports: Record<number, any> = $state({});
+
+  // Reading-order arrow appearance -- persisted so a user's chosen style
+  // survives across documents and sessions instead of resetting each load.
+  const OVERLAY_PREFS_KEY = "bimguard_document_viewer_overlay_prefs";
+  interface OverlayPrefs {
+    showBadges: boolean;
+    arrowColor: string;
+    arrowWidth: number;
+    arrowHead: number;
+    arrowStyle: "solid" | "dashed" | "dotted";
+  }
+  const DEFAULT_OVERLAY_PREFS: OverlayPrefs = {
+    showBadges: false,
+    arrowColor: "#94a3b8",
+    arrowWidth: 1.5,
+    arrowHead: 6,
+    arrowStyle: "dashed",
+  };
+  let arrowColor = $state(DEFAULT_OVERLAY_PREFS.arrowColor);
+  let arrowWidth = $state(DEFAULT_OVERLAY_PREFS.arrowWidth);
+  let arrowHead = $state(DEFAULT_OVERLAY_PREFS.arrowHead);
+  let arrowLineStyle: OverlayPrefs["arrowStyle"] = $state(DEFAULT_OVERLAY_PREFS.arrowStyle);
+  let arrowStyleValue: ArrowStyle = $derived({
+    color: arrowColor,
+    width: arrowWidth,
+    head: arrowHead,
+    style: arrowLineStyle,
+  });
+  let overlaySettingsOpen = $state(false);
+  let overlayPrefsLoaded = false;
+
+  function loadOverlayPrefs() {
+    try {
+      const raw = localStorage.getItem(OVERLAY_PREFS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<OverlayPrefs>;
+      showElementBadges = parsed.showBadges ?? DEFAULT_OVERLAY_PREFS.showBadges;
+      arrowColor = parsed.arrowColor ?? DEFAULT_OVERLAY_PREFS.arrowColor;
+      arrowWidth = parsed.arrowWidth ?? DEFAULT_OVERLAY_PREFS.arrowWidth;
+      arrowHead = parsed.arrowHead ?? DEFAULT_OVERLAY_PREFS.arrowHead;
+      arrowLineStyle = parsed.arrowStyle ?? DEFAULT_OVERLAY_PREFS.arrowStyle;
+    } catch {
+      // ignore -- fall back to defaults
+    } finally {
+      overlayPrefsLoaded = true;
+    }
+  }
+
+  $effect(() => {
+    // Re-runs on every pref change; skipped until the initial load above has
+    // run once, so it never clobbers a saved pref with the module defaults.
+    const prefs: OverlayPrefs = {
+      showBadges: showElementBadges,
+      arrowColor,
+      arrowWidth,
+      arrowHead,
+      arrowStyle: arrowLineStyle,
+    };
+    if (!overlayPrefsLoaded) return;
+    try {
+      localStorage.setItem(OVERLAY_PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      // ignore -- persistence is a nicety, not a requirement
+    }
+  });
 
   // Drag-to-pan (single-page mode only -- continuous mode's primary gesture
   // is already vertical scroll-to-flip-page via initPageWheelNav-equivalent
@@ -262,11 +330,11 @@
   let parsedTables = $derived(parseDoclangTables(doclangXml));
 
   type DoclangBlock =
-    | { type: "heading"; level: number; text: string; elementId: string | null }
-    | { type: "paragraph"; text: string; elementId: string | null }
+    | { type: "heading"; level: number; text: string; elementId: string | null; layer: ElementLayer }
+    | { type: "paragraph"; text: string; elementId: string | null; layer: ElementLayer }
     | { type: "list"; items: string[] }
-    | { type: "table"; title: string; rows: string[][]; elementId: string | null }
-    | { type: "image"; src: string; alt: string; elementId: string | null };
+    | { type: "table"; title: string; rows: string[][]; elementId: string | null; layer: ElementLayer }
+    | { type: "image"; src: string; alt: string; elementId: string | null; layer: ElementLayer };
 
   /**
    * Read the id BIM-Guard's backend injects into DocLang XML at extraction
@@ -286,6 +354,79 @@
       }
     }
     return null;
+  }
+
+  /** Read a DocLang element's direct `<tag>` head child (label/layer/caption/xref/thread/...), if present. */
+  function headChild(el: Element, tag: string): Element | null {
+    for (const child of Array.from(el.children)) {
+      if (child.tagName.toLowerCase() === tag) return child;
+    }
+    return null;
+  }
+
+  /** DocLang's `<layer value="body|furniture|background"/>` head child -- defaults to "body" when absent. */
+  function getElementLayer(el: Element): ElementLayer {
+    const value = headChild(el, "layer")?.getAttribute("value");
+    return value === "furniture" || value === "background" ? value : "body";
+  }
+
+  interface ElementHeadMeta {
+    layer: ElementLayer;
+    label: string | null;
+    caption: string | null;
+    hasXref: boolean;
+    hasThread: boolean;
+  }
+
+  /**
+   * Per-element DocLang head metadata (layer/label/caption/xref/thread),
+   * keyed by the same injected element_id used for bbox pairing -- built for
+   * the PDF pane's overlay (layer hatching, richer hover tooltips) and the
+   * DocLang reading view's Furniture/Background layer toggles.
+   */
+  function buildElementMeta(xml: string): Map<string, ElementHeadMeta> {
+    const meta = new Map<string, ElementHeadMeta>();
+    if (!xml) return meta;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, "application/xml");
+      if (doc.querySelector("parsererror") || !doc.documentElement) return meta;
+      const walker = document.createTreeWalker(doc.documentElement, NodeFilter.SHOW_ELEMENT);
+      let node = walker.nextNode() as Element | null;
+      while (node) {
+        const id = getInjectedElementId(node);
+        if (id) {
+          meta.set(id, {
+            layer: getElementLayer(node),
+            label: headChild(node, "label")?.getAttribute("value") || null,
+            caption: headChild(node, "caption")?.textContent?.trim() || null,
+            hasXref: Boolean(headChild(node, "xref")),
+            hasThread: Boolean(headChild(node, "thread")),
+          });
+        }
+        node = walker.nextNode() as Element | null;
+      }
+    } catch {
+      // best-effort enrichment only
+    }
+    return meta;
+  }
+
+  let elementMeta = $derived(buildElementMeta(doclangXml));
+  let elementLayerMap = $derived(
+    new Map<string, ElementLayer>(Array.from(elementMeta, ([id, m]) => [id, m.layer]))
+  );
+
+  function elementTooltipText(elementId: string): string | null {
+    const meta = elementMeta.get(elementId);
+    if (!meta) return null;
+    const lines: string[] = [];
+    if (meta.label) lines.push(meta.label);
+    if (meta.layer !== "body") lines.push(`Layer: ${meta.layer}`);
+    if (meta.caption) lines.push(`Caption: ${meta.caption}`);
+    if (meta.hasXref) lines.push("Has cross-reference");
+    if (meta.hasThread) lines.push("Part of a fragmented thread");
+    return lines.length > 0 ? lines.join("\n") : null;
   }
 
   /** Read <picture><src uri="assets/..."/></picture>'s uri, resolved to a servable asset URL. */
@@ -350,7 +491,7 @@
           if (text) {
             const levelAttr = parseInt(node.getAttribute("level") || "1", 10);
             const level = Number.isFinite(levelAttr) ? Math.min(Math.max(levelAttr, 1), 6) : 1;
-            blocks.push({ type: "heading", level, text, elementId: getInjectedElementId(node) });
+            blocks.push({ type: "heading", level, text, elementId: getInjectedElementId(node), layer: getElementLayer(node) });
           }
         } else if (tag === "table") {
           flushList();
@@ -360,19 +501,26 @@
             title: `Table ${tableIdx}`,
             rows: extractOtslRows(node),
             elementId: getInjectedElementId(node),
+            layer: getElementLayer(node),
           });
           node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
         } else if (tag === "picture") {
           flushList();
           const src = pictureSrcUrl(node);
           if (src) {
-            blocks.push({ type: "image", src, alt: pictureCaption(node), elementId: getInjectedElementId(node) });
+            blocks.push({
+              type: "image",
+              src,
+              alt: pictureCaption(node),
+              elementId: getInjectedElementId(node),
+              layer: getElementLayer(node),
+            });
           }
           node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
         } else if (tag === "text" || tag === "paragraph" || tag === "p") {
           flushList();
           const text = node.textContent?.trim() || "";
-          if (text) blocks.push({ type: "paragraph", text, elementId: getInjectedElementId(node) });
+          if (text) blocks.push({ type: "paragraph", text, elementId: getInjectedElementId(node), layer: getElementLayer(node) });
         } else if (tag === "item" || tag === "li") {
           const text = node.textContent?.trim() || "";
           if (text) pendingListItems.push(text);
@@ -388,6 +536,21 @@
 
   let documentBlocks = $derived(parseDoclangDocument(doclangXml));
 
+  // Reading view "Layers" toggles (DocLang's body/furniture/background
+  // classification) -- both default to shown, matching the reference DocLang
+  // Viewer's defaults, and are persisted alongside the PDF pane's overlay
+  // prefs below.
+  let showReadingFurniture = $state(true);
+  let showReadingBackground = $state(true);
+  let readingBlocks = $derived(
+    documentBlocks.filter((b) => {
+      if (!("layer" in b)) return true;
+      if (b.layer === "furniture" && !showReadingFurniture) return false;
+      if (b.layer === "background" && !showReadingBackground) return false;
+      return true;
+    })
+  );
+
   // The "rendered" DocLang tab is windowed rather than mounting every block
   // at once -- a large specification can produce thousands of heading/
   // paragraph/table blocks, and Svelte still has to create + diff a DOM node
@@ -395,25 +558,25 @@
   // the bottom of the rendered list scrolls into view.
   const BLOCKS_PAGE_SIZE = 150;
   let visibleBlockCount = $state(BLOCKS_PAGE_SIZE);
-  let visibleBlocks = $derived(documentBlocks.slice(0, visibleBlockCount));
+  let visibleBlocks = $derived(readingBlocks.slice(0, visibleBlockCount));
   let blocksSentinelEl: HTMLDivElement | undefined = $state();
   let blocksObserver: IntersectionObserver | null = null;
 
   $effect(() => {
-    // Re-run whenever the block list itself changes (new document, or tab
-    // reopened) so the window resets to the first page instead of staying
-    // wherever it was left for a different document.
-    void documentBlocks;
+    // Re-run whenever the filtered block list itself changes (new document,
+    // tab reopened, or a layer toggle flipped) so the window resets to the
+    // first page instead of staying wherever it was left.
+    void readingBlocks;
     visibleBlockCount = BLOCKS_PAGE_SIZE;
   });
 
   $effect(() => {
     blocksObserver?.disconnect();
-    if (!blocksSentinelEl || documentBlocks.length <= visibleBlockCount) return;
+    if (!blocksSentinelEl || readingBlocks.length <= visibleBlockCount) return;
     blocksObserver = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          visibleBlockCount = Math.min(visibleBlockCount + BLOCKS_PAGE_SIZE, documentBlocks.length);
+          visibleBlockCount = Math.min(visibleBlockCount + BLOCKS_PAGE_SIZE, readingBlocks.length);
         }
       },
       { rootMargin: "400px" }
@@ -429,10 +592,10 @@
   $effect(() => {
     const id = selectedElementId;
     if (!id || activeViewerTab !== "doclang" || activeDoclangSubTab !== "rendered") return;
-    const blockIdx = documentBlocks.findIndex((b) => "elementId" in b && b.elementId === id);
+    const blockIdx = readingBlocks.findIndex((b) => "elementId" in b && b.elementId === id);
     if (blockIdx === -1) return;
     if (blockIdx >= visibleBlockCount) {
-      visibleBlockCount = Math.min(blockIdx + BLOCKS_PAGE_SIZE, documentBlocks.length);
+      visibleBlockCount = Math.min(blockIdx + BLOCKS_PAGE_SIZE, readingBlocks.length);
     }
     tick().then(() => {
       document
@@ -917,6 +1080,7 @@
   let highlightSplit = $derived(splitOnHighlight(plainText, highlightText));
 
   onMount(() => {
+    loadOverlayPrefs();
     load();
   });
 
@@ -936,6 +1100,8 @@
     }
   });
 </script>
+
+<svelte:document onclick={() => (overlaySettingsOpen = false)} />
 
 <div class="flex h-full min-h-[60vh] flex-col">
   {#if loading}
@@ -1028,6 +1194,31 @@
           </div>
 
           <div class="flex items-center gap-2">
+            {#if activeDoclangSubTab === "rendered" && documentBlocks.some((b) => "layer" in b && b.layer !== "body")}
+              <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
+                <span class="pl-1.5 text-caption uppercase tracking-wide text-slate-500">Layers</span>
+                <button
+                  type="button"
+                  onclick={() => (showReadingFurniture = !showReadingFurniture)}
+                  title="Toggle furniture elements (headers, footers, page numbers, …)"
+                  class="rounded-md px-2 py-1 text-xs font-medium transition-colors {showReadingFurniture
+                    ? 'bg-accent text-white'
+                    : 'text-slate-400 hover:text-slate-200'}"
+                >
+                  Furniture
+                </button>
+                <button
+                  type="button"
+                  onclick={() => (showReadingBackground = !showReadingBackground)}
+                  title="Toggle background elements"
+                  class="rounded-md px-2 py-1 text-xs font-medium transition-colors {showReadingBackground
+                    ? 'bg-accent text-white'
+                    : 'text-slate-400 hover:text-slate-200'}"
+                >
+                  Background
+                </button>
+              </div>
+            {/if}
             {#if activeDoclangSubTab === "xml"}
               <button
                 type="button"
@@ -1065,14 +1256,18 @@
                       data-element-id={block.elementId}
                       onclick={() => block.elementId && selectElement(block.elementId)}
                       role="presentation"
-                      class="rounded-lg {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
-                      block.elementId === selectedElementId
+                      class="rounded-lg {block.layer !== 'body' ? 'border border-dashed border-slate-700/70 bg-slate-950/40 p-2' : ''} {block.elementId
+                        ? 'cursor-pointer'
+                        : ''} {block.elementId && block.elementId === selectedElementId
                         ? 'bg-accent/10 ring-1 ring-accent/50'
                         : ''}"
                     >
+                      {#if block.layer !== "body"}
+                        <span class="mr-2 rounded bg-slate-800 px-1.5 py-0.5 align-middle text-[10px] uppercase tracking-wide text-slate-500">{block.layer}</span>
+                      {/if}
                       <svelte:element
                         this={`h${block.level}`}
-                        class="font-semibold text-slate-100 {block.level === 1
+                        class="inline font-semibold text-slate-100 {block.level === 1
                           ? 'text-lg'
                           : block.level === 2
                             ? 'text-base'
@@ -1086,12 +1281,16 @@
                       data-element-id={block.elementId}
                       onclick={() => block.elementId && selectElement(block.elementId)}
                       role="presentation"
-                      class="whitespace-pre-wrap rounded-lg text-sm leading-relaxed text-slate-300 {block.elementId
-                        ? 'cursor-pointer'
-                        : ''} {block.elementId && block.elementId === selectedElementId
+                      class="whitespace-pre-wrap rounded-lg text-sm leading-relaxed text-slate-300 {block.layer !== 'body'
+                        ? 'border border-dashed border-slate-700/70 bg-slate-950/40 p-2'
+                        : ''} {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
+                      block.elementId === selectedElementId
                         ? 'bg-accent/10 ring-1 ring-accent/50'
                         : ''}"
                     >
+                      {#if block.layer !== "body"}
+                        <span class="mr-2 rounded bg-slate-800 px-1.5 py-0.5 align-middle text-[10px] uppercase tracking-wide text-slate-500">{block.layer}</span>
+                      {/if}
                       {block.text}
                     </p>
                   {:else if block.type === "list"}
@@ -1265,6 +1464,57 @@
               >
                 Reading order
               </button>
+              <div class="relative">
+                <button
+                  type="button"
+                  onclick={() => (overlaySettingsOpen = !overlaySettingsOpen)}
+                  title="Overlay settings"
+                  aria-expanded={overlaySettingsOpen}
+                  class="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                >
+                  <Settings2 class="h-3.5 w-3.5" />
+                </button>
+                {#if overlaySettingsOpen}
+                  <div
+                    role="none"
+                    onclick={(e) => e.stopPropagation()}
+                    class="absolute right-0 top-full z-40 mt-2 w-64 space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs shadow-xl"
+                  >
+                    <label class="flex items-center justify-between gap-2">
+                      <span class="font-medium text-slate-200">Badges</span>
+                      <input type="checkbox" bind:checked={showElementBadges} />
+                    </label>
+                    <div class="border-t border-slate-800 pt-2">
+                      <p class="mb-2 font-medium text-slate-200">Reading-order arrow style</p>
+                      <div class="space-y-2">
+                        <label class="flex items-center justify-between gap-2">
+                          <span class="text-slate-400">Color</span>
+                          <input type="color" bind:value={arrowColor} class="h-6 w-10 rounded border border-slate-700 bg-slate-950" />
+                        </label>
+                        <label class="flex items-center justify-between gap-2">
+                          <span class="text-slate-400">Thickness</span>
+                          <input type="range" min="0.5" max="6" step="0.5" bind:value={arrowWidth} class="w-28" />
+                        </label>
+                        <label class="flex items-center justify-between gap-2">
+                          <span class="text-slate-400">Head size</span>
+                          <input type="range" min="3" max="14" step="1" bind:value={arrowHead} class="w-28" />
+                        </label>
+                        <label class="flex items-center justify-between gap-2">
+                          <span class="text-slate-400">Line</span>
+                          <select
+                            bind:value={arrowLineStyle}
+                            class="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 text-slate-200"
+                          >
+                            <option value="solid">Solid</option>
+                            <option value="dashed">Dashed</option>
+                            <option value="dotted">Dotted</option>
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              </div>
             </div>
           {/if}
 
@@ -1330,6 +1580,10 @@
                   onSelect={selectElement}
                   showBoxes={showBboxOverlay}
                   showReadingOrder={showReadingOrderArrows}
+                  elementLayers={elementLayerMap}
+                  showBadges={showElementBadges}
+                  arrowStyle={arrowStyleValue}
+                  tooltipText={elementTooltipText}
                 />
               {/if}
               {#if activeBboxRect}
@@ -1374,6 +1628,10 @@
                     onSelect={selectElement}
                     showBoxes={showBboxOverlay}
                     showReadingOrder={showReadingOrderArrows}
+                    elementLayers={elementLayerMap}
+                    showBadges={showElementBadges}
+                    arrowStyle={arrowStyleValue}
+                    tooltipText={elementTooltipText}
                   />
                 {/if}
                 {#if slotBboxRects[slot.pageNumber]}
