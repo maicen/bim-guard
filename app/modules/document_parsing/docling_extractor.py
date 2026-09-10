@@ -156,12 +156,28 @@ class DoclingExtractor:
         pages = self._pages_from_document(document)
         bboxes = self._bboxes_from_document(document)
 
+        element_records: list[dict] = []
+        if doclang_xml and bboxes:
+            try:
+                from app.modules.document_parsing.doclang_element_ids import assign_element_ids
+
+                doclang_xml, element_records = assign_element_ids(doclang_xml, bboxes)
+            except Exception:
+                logger.warning("Failed assigning DocLang element ids for %s", filename, exc_info=True)
+                element_records = []
+
         print(
             f"[DoclingExtractor] Done — {len(text):,} chars, {len(tables)} tables, "
             f"{len(pages)} pages, doclang={len(doclang_xml):,} chars ({filename})"
         )
         if return_doclang:
-            return text, tables, pages, doclang_xml, bboxes
+            # `element_records` (each carrying its own `element_id`) supersede
+            # the raw `bboxes` list for any caller that wants a stable,
+            # XML-anchored per-element bbox -- see doclang_element_ids.py.
+            # Callers that only need coarse text/page/bbox provenance (e.g.
+            # rule-extraction clause metadata) can keep using the same shape,
+            # since element_records is additive (extra keys only).
+            return text, tables, pages, doclang_xml, (element_records or bboxes)
         return text, tables, pages
 
     @staticmethod
@@ -187,15 +203,39 @@ class DoclingExtractor:
             for page_no, parts in sorted(pages_text.items())
         ]
 
-    @staticmethod
-    def _bboxes_from_document(document) -> list[dict]:
-        """Extract element bounding boxes and page provenance from DoclingDocument."""
+    # Docling's DocItemLabel values (docling_core.types.doc.DocItemLabel) mapped
+    # onto the coarse "kind" the frontend renders/colors blocks by. Unlisted
+    # labels fall back to "paragraph".
+    _KIND_BY_DOCITEM_LABEL = {
+        "title": "heading",
+        "section_header": "heading",
+        "list_item": "list",
+        "table": "table",
+        "document_index": "table",
+        "picture": "picture",
+        "chart": "picture",
+    }
+
+    @classmethod
+    def _bboxes_from_document(cls, document) -> list[dict]:
+        """Extract element bounding boxes, page provenance, and kind, in reading order.
+
+        Walks `document.iterate_items()` (the same body-tree reading order
+        Docling's own `export_to_doclang()` serializes from) rather than only
+        `document.texts`, so tables and pictures -- which previously had no
+        bbox coverage at all -- are now included alongside text elements.
+        """
         bboxes = []
-        for item in document.texts:
-            item_text = (item.text or "").strip()
-            if not item_text or not item.prov:
+        for item, _level in document.iterate_items():
+            prov_list = getattr(item, "prov", None)
+            if not prov_list:
                 continue
-            prov = item.prov[0]
+            prov = prov_list[0]
+            item_text = (getattr(item, "text", "") or "").strip()
+            label = getattr(item, "label", None)
+            label_value = getattr(label, "value", None) or str(label or "")
+            kind = cls._KIND_BY_DOCITEM_LABEL.get(label_value, "paragraph")
+
             bbox_dict = None
             if prov.bbox:
                 bbox_dict = {
@@ -207,6 +247,7 @@ class DoclingExtractor:
                 }
             bboxes.append({
                 "text": item_text,
+                "kind": kind,
                 "page_number": prov.page_no,
                 "bbox": bbox_dict,
             })

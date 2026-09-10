@@ -10,6 +10,9 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Any
 
+import defusedxml.ElementTree as safe_ET
+from defusedxml.common import DefusedXmlException
+
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -117,9 +120,14 @@ class DocLangChunker:
             return []
 
         try:
-            root = ET.fromstring(doclang_xml)
+            # DocLang XML comes straight from untrusted uploads (.dclg/.dclx) --
+            # parse defensively against entity-expansion/external-entity attacks.
+            root = safe_ET.fromstring(doclang_xml)
         except ET.ParseError as exc:
             logger.warning("DocLang XML parse error: %s -- falling back to empty chunks", exc)
+            return []
+        except DefusedXmlException as exc:
+            logger.warning("DocLang XML rejected as unsafe: %s -- falling back to empty chunks", exc)
             return []
 
         chunks: list[dict[str, Any]] = []

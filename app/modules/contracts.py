@@ -467,7 +467,6 @@ class DocumentResponse(IsoGovernanceFieldsRequired):
     text_preview: Optional[str] = Field(default=None, description="Preview of DocLang-derived plain text")
     char_count: int = 0
     has_doclang: bool = Field(default=False, description="Whether canonical DocLang XML is available")
-    doclang_size_bytes: int = Field(default=0, description="Size of DocLang XML in bytes")
     doclang_storage_path: Optional[str] = Field(
         default=None, description="Storage reference to offloaded DocLang XML or archive"
     )
@@ -639,6 +638,37 @@ class DocumentSectionTreeResponse(BaseModel):
     tree: list[SectionTreeNode] = Field(default_factory=list)
     sections: list[DocumentSection] = Field(default_factory=list)
     enhanced: bool = False
+
+
+class DocumentElementBbox(BaseModel):
+    """One rendered block's (heading/paragraph/table/picture) bounding box on the page.
+
+    ``element_id`` matches the id injected into the document's DocLang XML at
+    extraction time (``<custom><bg_element_id value="..."/></custom>``, see
+    app/modules/document_parsing/doclang_element_ids.py) — the same id the
+    frontend's DocLang XML/rendered-block parsers read directly off each
+    element, so no separate client-side order-matching is needed to line this
+    up with what's on screen.
+    """
+
+    element_id: str
+    kind: Literal["heading", "paragraph", "list", "table", "picture"] = "paragraph"
+    page_number: Optional[int] = None
+    bbox: Optional[dict[str, Any]] = Field(default=None, description="{l, t, r, b, coord_origin}")
+    order: int = Field(default=0, description="Reading-order index, for reading-order/cross-reference arrows")
+
+
+class DocumentElementBboxesResponse(BaseModel):
+    """Per-element bbox list for a document's PDF-page overlay.
+
+    Empty for documents whose DocLang XML predates this feature, or that came
+    from a raw ``.dclg``/``.dclx`` import (no Docling extraction pass, so no
+    ids were ever injected) — the caller should treat an empty list as "no
+    per-element overlay available", not an error.
+    """
+
+    document_id: int
+    elements: list[DocumentElementBbox] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

@@ -585,9 +585,7 @@
                       rel="noopener noreferrer"
                       class="max-w-xs truncate font-semibold text-slate-50 hover:text-accent hover:underline"
                       title={doc.has_doclang
-                        ? doc.doclang_size_bytes
-                          ? `DocLang XML: ${(doc.doclang_size_bytes / 1024).toFixed(0)} KB — click to open the original file`
-                          : "DocLang XML available — click to open the original file"
+                        ? "DocLang XML available — click to open the original file"
                         : "Click to open the original file"}
                     >
                       {doc.filename}

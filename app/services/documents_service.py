@@ -16,6 +16,7 @@ from app.utils import (
 logger = get_logger(__name__)
 
 DOCLANG_OFFLOAD_THRESHOLD_BYTES = 256 * 1024  # 256 KB threshold for offloading XML to Supabase Storage
+MAX_DOCLANG_ARCHIVE_ENTRY_BYTES = 50 * 1024 * 1024  # cap per decompressed .dclx entry, guards against zip bombs
 
 
 class DocumentService:
@@ -51,6 +52,7 @@ class DocumentService:
                     "doclang_archive_path": str,
                     "char_count": int,
                     "text_preview": str,
+                    "element_bboxes": list,
                 },
             )
         )
@@ -122,18 +124,21 @@ class DocumentService:
         doclang_xml: str = "",
         doclang_storage_path: str | None = None,
         doclang_archive_path: str | None = None,
+        preloaded_assets: list[dict] | None = None,
+        element_bboxes: list[dict] | None = None,
     ):
         """Create and persist a new uploaded document record."""
         clean_doc_type = (doc_type or "").strip() or "Specification"
-        extracted_assets: list[dict] = []
+        extracted_assets: list[dict] = list(preloaded_assets or [])
         if "data:image/" in (doclang_xml or ""):
             from app.modules.document_parsing.doclang_asset_manager import DocLangAssetManager
 
-            doclang_xml, extracted_assets = DocLangAssetManager.extract_and_offload_assets(
+            doclang_xml, inline_assets = DocLangAssetManager.extract_and_offload_assets(
                 doclang_xml=doclang_xml,
                 doc_key=str(md5_hash[:12]),
                 storage=self._storage,
             )
+            extracted_assets.extend(inline_assets)
 
         doclang_bytes = (doclang_xml or "").encode("utf-8")
         inline_xml = doclang_xml or ""
@@ -197,6 +202,7 @@ class DocumentService:
             "doclang_archive_path": resolved_archive_path,
             "char_count": len(derived_text),
             "text_preview": derived_text[: self.TEXT_PREVIEW_LENGTH],
+            "element_bboxes": element_bboxes or [],
         }
         document = self._documents.insert(payload)
         invalidate_cache("bimguard:documents:list")
@@ -262,6 +268,101 @@ class DocumentService:
                     if asset_fname and asset_content:
                         zf.writestr(f"assets/{asset_fname}", asset_content)
         return buf.getvalue()
+
+    @staticmethod
+    def _safe_zip_read(zf, name: str) -> bytes:
+        """Read a zip entry, refusing anything past `MAX_DOCLANG_ARCHIVE_ENTRY_BYTES` decompressed."""
+        info = zf.getinfo(name)
+        if info.file_size > MAX_DOCLANG_ARCHIVE_ENTRY_BYTES:
+            raise ValueError(
+                f"Archive entry '{name}' is too large ({info.file_size} bytes > "
+                f"{MAX_DOCLANG_ARCHIVE_ENTRY_BYTES} byte limit)."
+            )
+        return zf.read(name)
+
+    @staticmethod
+    def extract_doclang_archive(content: bytes) -> tuple[str, list[dict]]:
+        """Unpack a `.dclx` archive's DocLang XML entrypoint and any bundled `assets/` files.
+
+        Shared by upload ingestion and on-demand regeneration. Guards against
+        zip bombs (per-entry decompressed size cap, see `_safe_zip_read`) and
+        path traversal (entrypoint/asset names are resolved relative to the
+        archive root only, `..` segments rejected).
+
+        Returns:
+            doclang_xml: the archive's entrypoint XML content.
+            assets: `[{"filename": ..., "asset_bytes": ...}, ...]` for any
+                files found under an `assets/` directory in the archive, so
+                a re-exported archive doesn't silently drop them.
+
+        Raises:
+            ValueError: if the archive is not a valid zip, is oversized, or
+                its entrypoint is missing/unsafe.
+        """
+        import io
+        import json
+        import zipfile
+
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(content))
+        except zipfile.BadZipFile as exc:
+            raise ValueError(f"Not a valid .dclx (zip) archive: {exc}") from exc
+
+        with zf:
+            entrypoint = "document.xml"
+            if "manifest.json" in zf.namelist():
+                try:
+                    manifest = json.loads(DocumentService._safe_zip_read(zf, "manifest.json").decode("utf-8"))
+                    entrypoint = manifest.get("entrypoint") or "document.xml"
+                except ValueError:
+                    raise
+                except Exception as exc:
+                    logger.warning("Failed reading .dclx manifest.json, defaulting to document.xml: %s", exc)
+
+            entrypoint = entrypoint.lstrip("/")
+            if ".." in Path(entrypoint).parts:
+                raise ValueError(f"Unsafe archive entrypoint path: {entrypoint!r}")
+            if entrypoint not in zf.namelist():
+                raise ValueError(f"Archive entrypoint {entrypoint!r} not found in .dclx archive.")
+
+            try:
+                doclang_xml = DocumentService._safe_zip_read(zf, entrypoint).decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise ValueError(f"Archive entrypoint {entrypoint!r} is not valid UTF-8 text: {exc}") from exc
+
+            assets: list[dict] = []
+            for info in zf.infolist():
+                if info.is_dir() or not info.filename.startswith("assets/"):
+                    continue
+                asset_name = info.filename[len("assets/") :]
+                if not asset_name or ".." in Path(asset_name).parts:
+                    logger.warning("Skipped unsafe asset path in .dclx archive: %r", info.filename)
+                    continue
+                try:
+                    assets.append(
+                        {"filename": asset_name, "asset_bytes": DocumentService._safe_zip_read(zf, info.filename)}
+                    )
+                except ValueError:
+                    logger.warning("Skipped oversized asset %r in .dclx archive", info.filename)
+
+        return doclang_xml, assets
+
+    @staticmethod
+    def _warn_if_invalid_doclang(doclang_xml: str, filename: str) -> None:
+        """Log (non-fatal) when user-supplied DocLang XML fails XSD schema validation.
+
+        Only applied to `.dclg`/`.dclx` uploads, which carry DocLang XML authored
+        outside BIM-Guard's own Docling pipeline and so aren't guaranteed to be
+        schema-conformant. Doesn't block ingestion -- the chunker/renderer
+        degrade gracefully on malformed content -- but surfaces it in logs.
+        """
+        try:
+            from app.modules.document_parsing.docling_extractor import DoclingExtractor
+
+            if doclang_xml.strip() and not DoclingExtractor.validate_doclang(doclang_xml):
+                logger.warning("Uploaded DocLang XML for %s failed XSD schema validation", filename)
+        except Exception:
+            logger.debug("DocLang XSD validation unavailable, skipping check for %s", filename, exc_info=True)
 
     def store_doclang_archive(self, document_id: int, archive_bytes: bytes) -> str:
         """Persist a pre-generated .dclx archive into Supabase Storage."""
@@ -336,6 +437,48 @@ class DocumentService:
         """Return the document's full plain text, derived on demand from its DocLang XML."""
         return doclang_to_text(self.get_doclang_content(doc))
 
+    def get_asset_bytes(self, doc: dict, filename: str) -> bytes | None:
+        """Return a multimodal asset's bytes (e.g. an embedded picture), from the .dclx archive.
+
+        Assets are only ever packaged inside `assets/{filename}` in the
+        document's .dclx archive (see `DocLangAssetManager.extract_and_offload_assets`
+        and `build_doclang_archive`) -- there's no separate per-asset storage
+        path, so this reuses the same archive-bytes + hardened zip-read helpers
+        already used by the export-doclang route.
+        """
+        clean_name = Path(filename).name
+        if not clean_name or clean_name != filename or ".." in filename:
+            return None
+
+        archive_bytes = self.get_doclang_archive_bytes(doc)
+        if not archive_bytes:
+            return None
+
+        import io
+        import zipfile
+
+        try:
+            with zipfile.ZipFile(io.BytesIO(archive_bytes)) as zf:
+                entry_name = f"assets/{clean_name}"
+                if entry_name not in zf.namelist():
+                    return None
+                return self._safe_zip_read(zf, entry_name)
+        except (zipfile.BadZipFile, ValueError):
+            logger.warning("Failed reading asset %s from document %s archive", clean_name, doc.get("id"), exc_info=True)
+            return None
+
+    def get_element_bboxes(self, doc: dict) -> list[dict]:
+        """Return this document's per-element bbox records, keyed by DocLang-injected ids.
+
+        Filters out any record missing `element_id` -- documents parsed by a
+        non-Docling engine (Unstructured, light extractor) never got ids
+        injected into their DocLang XML, so their raw bbox records (if any)
+        can't be matched to a rendered element client-side and are dropped
+        rather than surfaced with a dangling/absent id.
+        """
+        records = doc.get("element_bboxes") or []
+        return [r for r in records if isinstance(r, dict) and r.get("element_id")]
+
     def update_document(
         self,
         document_id: int,
@@ -349,6 +492,8 @@ class DocumentService:
         doclang_xml: str | None = None,
         doclang_storage_path: str | None = None,
         doclang_archive_path: str | None = None,
+        preloaded_assets: list[dict] | None = None,
+        element_bboxes: list[dict] | None = None,
     ):
         """Update mutable document metadata and, when provided, its DocLang XML."""
         updates: dict = {"filename": filename}
@@ -365,15 +510,16 @@ class DocumentService:
         if cde_state is not None:
             updates["cde_state"] = cde_state.strip() or "WIP"
         if doclang_xml is not None:
-            extracted_assets = []
+            extracted_assets: list[dict] = list(preloaded_assets or [])
             if "data:image/" in doclang_xml:
                 from app.modules.document_parsing.doclang_asset_manager import DocLangAssetManager
 
-                doclang_xml, extracted_assets = DocLangAssetManager.extract_and_offload_assets(
+                doclang_xml, inline_assets = DocLangAssetManager.extract_and_offload_assets(
                     doclang_xml=doclang_xml,
                     doc_key=str(document_id),
                     storage=self._storage,
                 )
+                extracted_assets.extend(inline_assets)
 
             doclang_bytes = doclang_xml.encode("utf-8")
             if len(doclang_bytes) > DOCLANG_OFFLOAD_THRESHOLD_BYTES and doclang_storage_path is None:
@@ -391,6 +537,12 @@ class DocumentService:
             derived_text = doclang_to_text(doclang_xml)
             updates["char_count"] = len(derived_text)
             updates["text_preview"] = derived_text[: self.TEXT_PREVIEW_LENGTH]
+            # Old element_bboxes correspond to the OLD doclang_xml's injected
+            # ids -- always replace (never merge) alongside a doclang_xml
+            # change, defaulting to empty so a document generated before this
+            # feature (or a re-import with no fresh ids) doesn't keep stale
+            # records pointing at ids that no longer exist in the new XML.
+            updates["element_bboxes"] = element_bboxes or []
 
             if doclang_archive_path is None and doclang_xml.strip():
                 try:
@@ -515,37 +667,28 @@ class DocumentService:
 
         pages: list = []
         doclang_xml = ""
+        archive_assets: list[dict] = []
+        element_bboxes: list[dict] = []
         suffix = Path(filename).suffix.lower()
         if suffix in {".doclang", ".dclg"}:
             doclang_xml = content.decode("utf-8")
+            self._warn_if_invalid_doclang(doclang_xml, filename)
         elif suffix == ".dclx":
-            import io
-            import json
-            import zipfile
-
             try:
-                with zipfile.ZipFile(io.BytesIO(content)) as zf:
-                    entrypoint = "document.xml"
-                    if "manifest.json" in zf.namelist():
-                        try:
-                            manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
-                            entrypoint = manifest.get("entrypoint") or "document.xml"
-                        except Exception:
-                            pass
-                    doclang_xml = zf.read(entrypoint).decode("utf-8")
-            except Exception as exc:
-                logger.warning("Failed extracting DocLang XML from %s archive: %s", filename, exc)
-                doclang_xml = ""
+                doclang_xml, archive_assets = self.extract_doclang_archive(content)
+            except ValueError as exc:
+                raise ValueError(f"Invalid DocLang archive '{filename}': {exc}") from exc
+            self._warn_if_invalid_doclang(doclang_xml, filename)
         elif generate_doclang:
             try:
-                _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
+                _text, pages, doclang_xml, element_bboxes = self.extract_document_text_paged(
                     filename, content, parser=parser, instance=instance, return_doclang=True
                 )
             except (ValueError, RuntimeError):
                 raise
             except Exception as exc:
                 logger.warning("Document extraction failed filename=%s parser=%s error=%s", filename, parser, exc)
-                pages, doclang_xml = [], ""
+                pages, doclang_xml, element_bboxes = [], "", []
 
         file_path = self.store_document_file(filename, content)
         created = self.create_document(
@@ -559,6 +702,8 @@ class DocumentService:
             revision_code=revision_code,
             cde_state="WIP",
             doclang_xml=doclang_xml,
+            preloaded_assets=archive_assets,
+            element_bboxes=element_bboxes,
         )
 
         if pages:
@@ -595,28 +740,19 @@ class DocumentService:
         suffix = Path(filename).suffix.lower()
         pages: list = []
         doclang_xml = ""
+        archive_assets: list[dict] = []
+        element_bboxes: list[dict] = []
         if suffix in {".doclang", ".dclg"}:
             doclang_xml = content.decode("utf-8")
+            self._warn_if_invalid_doclang(doclang_xml, filename)
         elif suffix == ".dclx":
-            import io
-            import json
-            import zipfile
-
             try:
-                with zipfile.ZipFile(io.BytesIO(content)) as zf:
-                    entrypoint = "document.xml"
-                    if "manifest.json" in zf.namelist():
-                        try:
-                            manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
-                            entrypoint = manifest.get("entrypoint") or "document.xml"
-                        except Exception:
-                            pass
-                    doclang_xml = zf.read(entrypoint).decode("utf-8")
-            except Exception as exc:
-                logger.warning("Failed extracting DocLang XML from %s archive: %s", filename, exc)
-                doclang_xml = ""
+                doclang_xml, archive_assets = self.extract_doclang_archive(content)
+            except ValueError as exc:
+                raise ValueError(f"Invalid DocLang archive for document {document_id}: {exc}") from exc
+            self._warn_if_invalid_doclang(doclang_xml, filename)
         else:
-            _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
+            _text, pages, doclang_xml, element_bboxes = self.extract_document_text_paged(
                 filename, content, parser=parser, instance=instance, return_doclang=True
             )
         if not doclang_xml.strip():
@@ -632,6 +768,8 @@ class DocumentService:
             revision_code=doc.get("revision_code"),
             cde_state=doc.get("cde_state"),
             doclang_xml=doclang_xml,
+            preloaded_assets=archive_assets,
+            element_bboxes=element_bboxes,
         )
 
         if pages:

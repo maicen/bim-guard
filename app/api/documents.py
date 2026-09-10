@@ -29,6 +29,8 @@ from app.auth import get_current_user, get_current_user_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
     DocumentDetailResponse,
+    DocumentElementBbox,
+    DocumentElementBboxesResponse,
     DocumentIngestResponse,
     DocumentResponse,
     DocumentSection,
@@ -121,7 +123,6 @@ def list_documents(
                 text_preview=r.get("text_preview") or "",
                 char_count=char_count,
                 has_doclang=has_doclang,
-                doclang_size_bytes=0,
                 doclang_storage_path=r.get("doclang_storage_path"),
                 doclang_archive_path=r.get("doclang_archive_path"),
                 doclang_xml="",
@@ -228,6 +229,7 @@ def _row_to_detail_response(row: dict, service: "DocumentService") -> DocumentDe
         text=text,
         char_count=len(text),
         doclang_storage_path=row.get("doclang_storage_path"),
+        doclang_archive_path=row.get("doclang_archive_path"),
         doclang_xml=service.get_doclang_content(row),
         project_code=row.get("project_code", ""),
         originator=row.get("originator", ""),
@@ -489,7 +491,9 @@ def update_document(
         upload_date=updated.get("upload_date"),
         text=text,
         char_count=len(text),
-        doclang_xml=updated.get("doclang_xml") or "",
+        doclang_storage_path=updated.get("doclang_storage_path"),
+        doclang_archive_path=updated.get("doclang_archive_path"),
+        doclang_xml=service.get_doclang_content(updated),
         project_code=updated.get("project_code", ""),
         originator=updated.get("originator", ""),
         volume_system=updated.get("volume_system", ""),
@@ -528,7 +532,41 @@ def get_document_doclang(
     )
 
 
-@router.get("/{document_id}/export-doclang", summary="Export document as DocLang archive (.dclx)")
+@flexible_router.get("/{document_id}/assets/{filename}", summary="Stream an embedded DocLang picture/asset")
+def get_document_asset(
+    document_id: int,
+    filename: str,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> Response:
+    """Resolve a `assets/{filename}` reference from a document's DocLang XML to bytes.
+
+    DocLang XML embeds pictures as `src="assets/asset_N.png"` relative
+    references (see `DocLangAssetManager`) rather than inline data URIs once
+    offloaded; this endpoint is what the rendered-view `<img src>` points at.
+    On `flexible_router` (not `router`) so it works as a bare browser-loaded
+    `<img src>` via `?token=`, the same pattern as `/file` and `/export-doclang`.
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    asset_bytes = service.get_asset_bytes(doc, filename)
+    if asset_bytes is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Asset '{filename}' not found for document {document_id}.",
+        )
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return Response(
+        content=asset_bytes,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=3600, stale-while-revalidate=86400"},
+    )
+
+
+@flexible_router.get("/{document_id}/export-doclang", summary="Export document as DocLang archive (.dclx)")
 def export_document_doclang_archive(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
@@ -710,6 +748,33 @@ async def get_document_sections_tree(
     )
     cache_service.set(cache_key, response.model_dump())
     return response
+
+
+@router.get(
+    "/{document_id}/element-bboxes",
+    response_model=DocumentElementBboxesResponse,
+    summary="Per-rendered-block bounding boxes, for the PDF page overlay and reading-order arrows",
+)
+def get_document_element_bboxes(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+) -> DocumentElementBboxesResponse:
+    """Return one bbox per rendered block (heading/paragraph/table/picture), keyed by element id.
+
+    Each `element_id` matches the id injected into the document's DocLang XML
+    at extraction time, so the frontend can hit-test/highlight without any
+    positional matching between this list and its own XML parse. Returns an
+    empty list for documents predating this feature or imported as raw
+    `.dclg`/`.dclx` (no Docling extraction pass, so no ids were injected).
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    elements = [DocumentElementBbox(**record) for record in service.get_element_bboxes(doc)]
+    return DocumentElementBboxesResponse(document_id=document_id, elements=elements)
 
 
 @router.post(

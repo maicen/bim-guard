@@ -35,6 +35,8 @@ ALLOWED_DOCUMENT_SUFFIXES = {
     ".dclg",
     ".dclx",
 }
+MAX_DOCUMENT_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB cap on a single uploaded/imported document
+
 _OOXML_MIME = "application/octet-stream"
 ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {
     ".pdf": {"application/pdf"},
@@ -133,6 +135,12 @@ def validate_document_upload(
     if not file_content:
         return "Uploaded file is empty."
 
+    if len(file_content) > MAX_DOCUMENT_UPLOAD_BYTES:
+        return (
+            f"Uploaded file is too large ({len(file_content) / (1024 * 1024):.1f} MB). "
+            f"Maximum allowed size is {MAX_DOCUMENT_UPLOAD_BYTES // (1024 * 1024)} MB."
+        )
+
     if suffix == ".pdf" and not file_content.startswith(b"%PDF-"):
         return "Uploaded file content does not match a valid PDF signature."
 
@@ -177,6 +185,7 @@ from app.services.cache import (  # noqa: E402
 __all__ = [
     "ALLOWED_DOCUMENT_MIME_BY_SUFFIX",
     "ALLOWED_DOCUMENT_SUFFIXES",
+    "MAX_DOCUMENT_UPLOAD_BYTES",
     "cache_db_query",
     "cache_stats",
     "clear_cache",

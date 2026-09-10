@@ -3,7 +3,6 @@
   import {
     ChevronLeft,
     ChevronRight,
-    Loader2,
     AlertCircle,
     ZoomIn,
     ZoomOut,
@@ -16,7 +15,9 @@
     Check,
   } from "lucide-svelte";
   import { documentsApi } from "../api";
-  import { authHeaders } from "../authToken";
+  import { authHeaders, withAuthToken } from "../authToken";
+  import LoadingState from "./LoadingState.svelte";
+  import EmptyState from "./EmptyState.svelte";
 
   interface Props {
     documentId: number;
@@ -46,6 +47,8 @@
   let filename = $state("");
   /** Set when a PDF failed to parse (e.g. corrupted xref/trailer) and we fell back to the text panel. */
   let pdfFallbackNotice: string | null = $state(null);
+  /** Set when the background fetch for DocLang XML/text (PDF path only) fails, so it isn't silently swallowed. */
+  let doclangLoadError: string | null = $state(null);
 
   let pdfDoc: any = $state(null);
   let currentPage = $state(1);
@@ -99,7 +102,7 @@
   }
 
   function downloadDoclangArchive() {
-    window.open(documentsApi.getExportDoclangUrl(documentId), "_blank");
+    window.open(withAuthToken(documentsApi.getExportDoclangUrl(documentId)), "_blank");
   }
 
   interface ParsedOtslTable {
@@ -255,6 +258,40 @@
 
   let documentBlocks = $derived(parseDoclangDocument(doclangXml));
 
+  // The "rendered" DocLang tab is windowed rather than mounting every block
+  // at once -- a large specification can produce thousands of heading/
+  // paragraph/table blocks, and Svelte still has to create + diff a DOM node
+  // per block. BLOCKS_PAGE_SIZE more are appended each time the sentinel at
+  // the bottom of the rendered list scrolls into view.
+  const BLOCKS_PAGE_SIZE = 150;
+  let visibleBlockCount = $state(BLOCKS_PAGE_SIZE);
+  let visibleBlocks = $derived(documentBlocks.slice(0, visibleBlockCount));
+  let blocksSentinelEl: HTMLDivElement | undefined = $state();
+  let blocksObserver: IntersectionObserver | null = null;
+
+  $effect(() => {
+    // Re-run whenever the block list itself changes (new document, or tab
+    // reopened) so the window resets to the first page instead of staying
+    // wherever it was left for a different document.
+    void documentBlocks;
+    visibleBlockCount = BLOCKS_PAGE_SIZE;
+  });
+
+  $effect(() => {
+    blocksObserver?.disconnect();
+    if (!blocksSentinelEl || documentBlocks.length <= visibleBlockCount) return;
+    blocksObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          visibleBlockCount = Math.min(visibleBlockCount + BLOCKS_PAGE_SIZE, documentBlocks.length);
+        }
+      },
+      { rootMargin: "400px" }
+    );
+    blocksObserver.observe(blocksSentinelEl);
+    return () => blocksObserver?.disconnect();
+  });
+
   function updateBboxOverlay(viewport: any, pageNum: number) {
     if (!bbox || (page !== null && page !== pageNum)) {
       activeBboxRect = null;
@@ -307,6 +344,7 @@
     loading = true;
     error = null;
     pdfFallbackNotice = null;
+    doclangLoadError = null;
     pdfDoc = null;
     isPdf = false;
     plainText = "";
@@ -326,7 +364,10 @@
         doclangXml = detail.doclang_xml || "";
         if (initialTab === "doclang" && doclangXml.trim()) activeViewerTab = "doclang";
       })
-      .catch(() => {});
+      .catch((err: any) => {
+        doclangLoadError = err?.message || "Failed to load DocLang content for this document.";
+        console.warn("Background DocLang fetch failed", err);
+      });
 
     try {
       const url = documentsApi.getFileUrl(documentId);
@@ -732,16 +773,22 @@
 
 <div class="flex h-full min-h-[60vh] flex-col">
   {#if loading}
-    <div class="flex flex-1 items-center justify-center gap-2 text-sm text-slate-400">
-      <Loader2 class="h-5 w-5 animate-spin" />
-      <span>Loading document…</span>
+    <div class="flex flex-1 items-center justify-center">
+      <LoadingState message="Loading document…" />
     </div>
   {:else if error}
-    <div class="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-red-400">
-      <AlertCircle class="h-6 w-6" />
-      <span>{error}</span>
+    <div class="flex flex-1 items-center justify-center">
+      <EmptyState title="Couldn't load document" description={error} icon={AlertCircle} />
     </div>
   {:else}
+    {#if doclangLoadError && !doclangXml}
+      <div
+        class="flex shrink-0 items-center gap-2 border-b border-amber-900/60 bg-amber-950/30 px-4 py-2 text-xs text-amber-300"
+      >
+        <AlertCircle class="h-3.5 w-3.5 shrink-0" />
+        <span>DocLang content unavailable — {doclangLoadError}</span>
+      </div>
+    {/if}
     {#if doclangXml}
       <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
         <div class="flex items-center gap-2">
@@ -812,9 +859,6 @@
                 DocLang XML Markup
               </button>
             </div>
-            <span class="inline-flex items-center gap-1 rounded-full border border-cyan-800/40 bg-cyan-950/30 px-2 py-0.5 text-[11px] text-cyan-300">
-              LF AI & Data / IBM Spec
-            </span>
           </div>
 
           <div class="flex items-center gap-2">
@@ -849,7 +893,7 @@
               </div>
             {:else}
               <div class="mx-auto max-w-4xl space-y-4">
-                {#each documentBlocks as block, bIdx (bIdx)}
+                {#each visibleBlocks as block, bIdx (bIdx)}
                   {#if block.type === "heading"}
                     <svelte:element
                       this={`h${block.level}`}
@@ -902,6 +946,11 @@
                     </div>
                   {/if}
                 {/each}
+                {#if visibleBlockCount < documentBlocks.length}
+                  <div bind:this={blocksSentinelEl} class="flex justify-center py-4">
+                    <span class="text-caption text-slate-500">Loading more…</span>
+                  </div>
+                {/if}
               </div>
             {/if}
           {:else}

@@ -313,6 +313,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "cachetools" },
+    { name = "defusedxml" },
     { name = "docling-slim" },
     { name = "fastapi" },
     { name = "fastlite" },
@@ -363,6 +364,7 @@ ml-pipeline = [
 [package.metadata]
 requires-dist = [
     { name = "cachetools", specifier = ">=5.5.0" },
+    { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "docling-slim", specifier = ">=2.124.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fastlite", specifier = ">=0.1.1" },

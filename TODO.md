@@ -702,7 +702,7 @@ Verification blocked: The open_browser_url tool failed multiple times because th
 
 #### Phase 1: Immediate Payload & Query Optimization (Zero Schema Changes)
 
-- [x] **Lightweight List Projection**: Exclude full `doclang_xml` and `extracted_text` from `GET /api/documents`. Return slim metadata (`has_doclang: bool`, `doclang_size_bytes: int`). Reserve full XML for detail view and dedicated stream endpoints. _(Implemented in commit `26bfc45`)_
+- [x] **Lightweight List Projection**: Exclude full `doclang_xml` and `extracted_text` from `GET /api/documents`. Return slim metadata (`has_doclang: bool`). Reserve full XML for detail view and dedicated stream endpoints. _(Implemented in commit `26bfc45`; the `doclang_size_bytes` field mentioned here was never actually computed — hardcoded to `0` — and has since been removed.)_
 - [x] **Selective Database Query Projection**: Added `select_projected(columns)` to `DatabaseAdapter` and `SupabaseTableAdapter`, querying only `DOCUMENT_SUMMARY_COLUMNS` during `list_documents()` to eliminate PostgreSQL TOAST table scans. _(Implemented in commit `c468922`)_
 - [x] **HTTP Compression & Caching**: Added Starlette `GZipMiddleware(minimum_size=1024)` in `app/main.py` for automatic 70%–90% payload compression in transit. Added `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` to DocLang XML and `.dclx` endpoints. _(Implemented in commit `ff68fab`)_
 

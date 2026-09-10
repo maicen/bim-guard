@@ -294,7 +294,6 @@ export interface DocumentItem extends IsoGovernanceFieldsRequired {
   text_preview?: string | null;
   char_count: number;
   has_doclang?: boolean;
-  doclang_size_bytes?: number;
   doclang_storage_path?: string | null;
   doclang_archive_path?: string | null;
   doclang_xml?: string | null;
