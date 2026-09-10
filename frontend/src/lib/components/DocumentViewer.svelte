@@ -18,6 +18,7 @@
   import { authHeaders, withAuthToken } from "../authToken";
   import LoadingState from "./LoadingState.svelte";
   import EmptyState from "./EmptyState.svelte";
+  import DocLangXmlTree from "./DocLangXmlTree.svelte";
 
   interface Props {
     documentId: number;
@@ -90,6 +91,14 @@
   let doclangXml = $state("");
   let activeViewerTab: "document" | "doclang" = $state("document");
   let activeDoclangSubTab: "rendered" | "xml" = $state("rendered");
+  // Shared across the rendered-blocks view, the XML tree, and the bbox
+  // overlay -- clicking any one of them highlights/scrolls the others to
+  // the same DocLang-injected element id (feature: click-to-sync selection).
+  let selectedElementId: string | null = $state(null);
+
+  function selectElement(elementId: string | null) {
+    selectedElementId = elementId;
+  }
   let copiedXml = $state(false);
 
   function copyXmlToClipboard() {
@@ -185,16 +194,57 @@
   let parsedTables = $derived(parseDoclangTables(doclangXml));
 
   type DoclangBlock =
-    | { type: "heading"; level: number; text: string }
-    | { type: "paragraph"; text: string }
+    | { type: "heading"; level: number; text: string; elementId: string | null }
+    | { type: "paragraph"; text: string; elementId: string | null }
     | { type: "list"; items: string[] }
-    | { type: "table"; title: string; rows: string[][] };
+    | { type: "table"; title: string; rows: string[][]; elementId: string | null }
+    | { type: "image"; src: string; alt: string; elementId: string | null };
+
+  /**
+   * Read the id BIM-Guard's backend injects into DocLang XML at extraction
+   * time (`<custom><bg_element_id value="elem-N"/></custom>`, a direct child
+   * -- see app/modules/document_parsing/doclang_element_ids.py). The value
+   * lives on an attribute of a leaf element, never as text content, so it
+   * never leaks into `textContent`-based text extraction elsewhere in this
+   * file. Returns null for elements from documents predating this feature.
+   */
+  function getInjectedElementId(el: Element): string | null {
+    for (const child of Array.from(el.children)) {
+      if (child.tagName.toLowerCase() !== "custom") continue;
+      for (const grandchild of Array.from(child.children)) {
+        if (grandchild.tagName.toLowerCase() === "bg_element_id") {
+          return grandchild.getAttribute("value");
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Read <picture><src uri="assets/..."/></picture>'s uri, resolved to a servable asset URL. */
+  function pictureSrcUrl(pictureEl: Element): string | null {
+    for (const child of Array.from(pictureEl.children)) {
+      if (child.tagName.toLowerCase() !== "src") continue;
+      const uri = child.getAttribute("uri");
+      if (!uri) continue;
+      if (/^(data:|https?:)/i.test(uri)) return uri;
+      const filename = uri.replace(/^assets\//, "");
+      return withAuthToken(documentsApi.getAssetUrl(documentId, filename));
+    }
+    return null;
+  }
+
+  function pictureCaption(pictureEl: Element): string {
+    for (const child of Array.from(pictureEl.children)) {
+      if (child.tagName.toLowerCase() === "caption") return child.textContent?.trim() || "";
+    }
+    return "";
+  }
 
   /**
    * Walk the full DocLang XML tree in document order and produce a flat,
-   * readable sequence of blocks (headings, paragraphs, lists, tables) — the
-   * same tag set app/modules/document_parsing/doclang_chunker.py handles on
-   * the backend — instead of extracting only the <table> elements.
+   * readable sequence of blocks (headings, paragraphs, lists, tables,
+   * pictures) — the same tag set app/modules/document_parsing/doclang_chunker.py
+   * handles on the backend — instead of extracting only the <table> elements.
    */
   function parseDoclangDocument(xml: string): DoclangBlock[] {
     if (!xml) return [];
@@ -232,17 +282,29 @@
           if (text) {
             const levelAttr = parseInt(node.getAttribute("level") || "1", 10);
             const level = Number.isFinite(levelAttr) ? Math.min(Math.max(levelAttr, 1), 6) : 1;
-            blocks.push({ type: "heading", level, text });
+            blocks.push({ type: "heading", level, text, elementId: getInjectedElementId(node) });
           }
         } else if (tag === "table") {
           flushList();
           tableIdx += 1;
-          blocks.push({ type: "table", title: `Table ${tableIdx}`, rows: extractOtslRows(node) });
+          blocks.push({
+            type: "table",
+            title: `Table ${tableIdx}`,
+            rows: extractOtslRows(node),
+            elementId: getInjectedElementId(node),
+          });
+          node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
+        } else if (tag === "picture") {
+          flushList();
+          const src = pictureSrcUrl(node);
+          if (src) {
+            blocks.push({ type: "image", src, alt: pictureCaption(node), elementId: getInjectedElementId(node) });
+          }
           node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
         } else if (tag === "text" || tag === "paragraph" || tag === "p") {
           flushList();
           const text = node.textContent?.trim() || "";
-          if (text) blocks.push({ type: "paragraph", text });
+          if (text) blocks.push({ type: "paragraph", text, elementId: getInjectedElementId(node) });
         } else if (tag === "item" || tag === "li") {
           const text = node.textContent?.trim() || "";
           if (text) pendingListItems.push(text);
@@ -290,6 +352,25 @@
     );
     blocksObserver.observe(blocksSentinelEl);
     return () => blocksObserver?.disconnect();
+  });
+
+  // Cross-pane sync: when selection changes (from the XML tree or the bbox
+  // overlay, not a click inside this pane itself) and the rendered blocks
+  // tab is open, scroll the matching block into view -- expanding the
+  // windowed list first if the block hasn't been rendered yet.
+  $effect(() => {
+    const id = selectedElementId;
+    if (!id || activeViewerTab !== "doclang" || activeDoclangSubTab !== "rendered") return;
+    const blockIdx = documentBlocks.findIndex((b) => "elementId" in b && b.elementId === id);
+    if (blockIdx === -1) return;
+    if (blockIdx >= visibleBlockCount) {
+      visibleBlockCount = Math.min(blockIdx + BLOCKS_PAGE_SIZE, documentBlocks.length);
+    }
+    tick().then(() => {
+      document
+        .querySelector(`[data-element-id="${CSS.escape(id)}"]`)
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
   });
 
   function updateBboxOverlay(viewport: any, pageNum: number) {
@@ -895,18 +976,39 @@
               <div class="mx-auto max-w-4xl space-y-4">
                 {#each visibleBlocks as block, bIdx (bIdx)}
                   {#if block.type === "heading"}
-                    <svelte:element
-                      this={`h${block.level}`}
-                      class="font-semibold text-slate-100 {block.level === 1
-                        ? 'text-lg'
-                        : block.level === 2
-                          ? 'text-base'
-                          : 'text-sm'}"
+                    <div
+                      data-element-id={block.elementId}
+                      onclick={() => block.elementId && selectElement(block.elementId)}
+                      role="presentation"
+                      class="rounded-lg {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
+                      block.elementId === selectedElementId
+                        ? 'bg-accent/10 ring-1 ring-accent/50'
+                        : ''}"
+                    >
+                      <svelte:element
+                        this={`h${block.level}`}
+                        class="font-semibold text-slate-100 {block.level === 1
+                          ? 'text-lg'
+                          : block.level === 2
+                            ? 'text-base'
+                            : 'text-sm'}"
+                      >
+                        {block.text}
+                      </svelte:element>
+                    </div>
+                  {:else if block.type === "paragraph"}
+                    <p
+                      data-element-id={block.elementId}
+                      onclick={() => block.elementId && selectElement(block.elementId)}
+                      role="presentation"
+                      class="whitespace-pre-wrap rounded-lg text-sm leading-relaxed text-slate-300 {block.elementId
+                        ? 'cursor-pointer'
+                        : ''} {block.elementId && block.elementId === selectedElementId
+                        ? 'bg-accent/10 ring-1 ring-accent/50'
+                        : ''}"
                     >
                       {block.text}
-                    </svelte:element>
-                  {:else if block.type === "paragraph"}
-                    <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{block.text}</p>
+                    </p>
                   {:else if block.type === "list"}
                     <ul class="list-disc space-y-1 pl-5 text-sm text-slate-300">
                       {#each block.items as item, iIdx (iIdx)}
@@ -914,7 +1016,16 @@
                       {/each}
                     </ul>
                   {:else if block.type === "table"}
-                    <div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-lg">
+                    <div
+                      data-element-id={block.elementId}
+                      onclick={() => block.elementId && selectElement(block.elementId)}
+                      role="presentation"
+                      class="overflow-hidden rounded-xl border shadow-lg {block.elementId
+                        ? 'cursor-pointer'
+                        : ''} {block.elementId && block.elementId === selectedElementId
+                        ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
+                        : 'border-slate-800 bg-slate-950/60'}"
+                    >
                       <div class="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-4 py-2.5">
                         <span class="text-xs font-semibold text-slate-200">{block.title}</span>
                         <span class="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-400">
@@ -944,6 +1055,27 @@
                         </table>
                       </div>
                     </div>
+                  {:else if block.type === "image"}
+                    <figure
+                      data-element-id={block.elementId}
+                      onclick={() => block.elementId && selectElement(block.elementId)}
+                      role="presentation"
+                      class="overflow-hidden rounded-xl border p-3 {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
+                      block.elementId === selectedElementId
+                        ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
+                        : 'border-slate-800 bg-slate-950/60'}"
+                    >
+                      <img
+                        src={block.src}
+                        alt={block.alt || "Embedded document picture"}
+                        loading="lazy"
+                        class="mx-auto max-h-[32rem] rounded-lg object-contain"
+                        onerror={(e) => ((e.currentTarget as HTMLImageElement).classList.add("opacity-30"))}
+                      />
+                      {#if block.alt}
+                        <figcaption class="mt-2 text-center text-xs text-slate-400">{block.alt}</figcaption>
+                      {/if}
+                    </figure>
                   {/if}
                 {/each}
                 {#if visibleBlockCount < documentBlocks.length}
@@ -954,8 +1086,8 @@
               </div>
             {/if}
           {:else}
-            <div class="whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-cyan-200/90">
-              {doclangXml}
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-2">
+              <DocLangXmlTree xml={doclangXml} {selectedElementId} onSelect={selectElement} />
             </div>
           {/if}
         </div>

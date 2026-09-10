@@ -30,6 +30,7 @@
 <script lang="ts">
   import { onDestroy, tick, untrack } from "svelte";
   import type { ComponentType } from "svelte";
+  import { portal } from "../actions/portal";
 
   type Side = "top" | "bottom" | "left" | "right";
   type Align = "start" | "center" | "end";
@@ -121,16 +122,6 @@
     left: "right",
     right: "left",
   };
-
-  /** Move a node to <body> so table overflow containers cannot clip it. */
-  function portal(node: HTMLElement) {
-    document.body.appendChild(node);
-    return {
-      destroy() {
-        node.remove();
-      },
-    };
-  }
 
   function clearTimers() {
     if (openTimer) clearTimeout(openTimer);

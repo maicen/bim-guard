@@ -24,6 +24,7 @@ import type {
   CurrentUserResponse,
   DocumentDetail,
   DocumentItem,
+  DocumentElementBboxesResponse,
   DocumentSectionsResponse,
   DocumentSectionTreeResponse,
   DocumentUpdatePayload,
@@ -1447,6 +1448,15 @@ export const documentsApi = {
   async getSectionsTree(id: number): Promise<DocumentSectionTreeResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/sections-tree`);
     return handleResponse<DocumentSectionTreeResponse>(res);
+  },
+
+  async getElementBboxes(id: number): Promise<DocumentElementBboxesResponse> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/element-bboxes`);
+    return handleResponse<DocumentElementBboxesResponse>(res);
+  },
+
+  getAssetUrl(id: number, filename: string): string {
+    return `${API_BASE}/documents/${id}/assets/${encodeURIComponent(filename)}`;
   },
 
   async importFromGoogleDrive(payload: GoogleDriveImportPayload): Promise<GoogleDriveImportResponse> {

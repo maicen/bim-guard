@@ -348,6 +348,22 @@ export interface DocumentSectionTreeResponse {
   enhanced: boolean;
 }
 
+export type DocumentElementKind = "heading" | "paragraph" | "list" | "table" | "picture";
+
+/** One rendered block's bbox, keyed by the id injected into the document's DocLang XML at extraction time. */
+export interface DocumentElementBbox {
+  element_id: string;
+  kind: DocumentElementKind;
+  page_number?: number | null;
+  bbox?: BoundingBox | null;
+  order: number;
+}
+
+export interface DocumentElementBboxesResponse {
+  document_id: number;
+  elements: DocumentElementBbox[];
+}
+
 export interface DocumentUpdatePayload {
   filename?: string;
   doc_type?: string | null;
