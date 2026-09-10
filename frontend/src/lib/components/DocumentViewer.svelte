@@ -86,7 +86,7 @@
 
   let doclangXml = $state("");
   let activeViewerTab: "document" | "doclang" = $state("document");
-  let activeDoclangSubTab: "tables" | "xml" = $state("tables");
+  let activeDoclangSubTab: "rendered" | "xml" = $state("rendered");
   let copiedXml = $state(false);
 
   function copyXmlToClipboard() {
@@ -107,6 +107,55 @@
     rows: string[][];
   }
 
+  /** Parse a single OTSL <table> element's <fcel/>/<nl/> grid into rows of cell text. */
+  function extractOtslRows(tableNode: Element): string[][] {
+    const rows: string[][] = [];
+    let currentRow: string[] = [];
+    let currentCellParts: string[] = [];
+
+    for (let i = 0; i < tableNode.childNodes.length; i++) {
+      const node = tableNode.childNodes[i];
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        const tag = el.tagName.toLowerCase();
+        if (tag === "fcel") {
+          if (currentCellParts.length > 0) {
+            const text = currentCellParts.join(" ").trim();
+            if (text) currentRow.push(text);
+            currentCellParts = [];
+          }
+          const inner = el.textContent?.trim();
+          if (inner) currentCellParts.push(inner);
+        } else if (tag === "nl") {
+          if (currentCellParts.length > 0) {
+            const text = currentCellParts.join(" ").trim();
+            if (text) currentRow.push(text);
+            currentCellParts = [];
+          }
+          if (currentRow.length > 0) {
+            rows.push(currentRow);
+            currentRow = [];
+          }
+        } else {
+          const text = el.textContent?.trim();
+          if (text) currentCellParts.push(text);
+        }
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        if (text) currentCellParts.push(text);
+      }
+    }
+    if (currentCellParts.length > 0) {
+      const text = currentCellParts.join(" ").trim();
+      if (text) currentRow.push(text);
+    }
+    if (currentRow.length > 0) {
+      rows.push(currentRow);
+    }
+
+    return rows.filter((r) => r.some((c) => c.trim()));
+  }
+
   function parseDoclangTables(xml: string): ParsedOtslTable[] {
     if (!xml) return [];
     try {
@@ -123,52 +172,7 @@
           }
           prev = prev.previousElementSibling;
         }
-
-        const rows: string[][] = [];
-        let currentRow: string[] = [];
-        let currentCellParts: string[] = [];
-
-        for (let i = 0; i < tableNode.childNodes.length; i++) {
-          const node = tableNode.childNodes[i];
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as HTMLElement;
-            const tag = el.tagName.toLowerCase();
-            if (tag === "fcel") {
-              if (currentCellParts.length > 0) {
-                const text = currentCellParts.join(" ").trim();
-                if (text) currentRow.push(text);
-                currentCellParts = [];
-              }
-              const inner = el.textContent?.trim();
-              if (inner) currentCellParts.push(inner);
-            } else if (tag === "nl") {
-              if (currentCellParts.length > 0) {
-                const text = currentCellParts.join(" ").trim();
-                if (text) currentRow.push(text);
-                currentCellParts = [];
-              }
-              if (currentRow.length > 0) {
-                rows.push(currentRow);
-                currentRow = [];
-              }
-            } else {
-              const text = el.textContent?.trim();
-              if (text) currentCellParts.push(text);
-            }
-          } else if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent?.trim();
-            if (text) currentCellParts.push(text);
-          }
-        }
-        if (currentCellParts.length > 0) {
-          const text = currentCellParts.join(" ").trim();
-          if (text) currentRow.push(text);
-        }
-        if (currentRow.length > 0) {
-          rows.push(currentRow);
-        }
-
-        return { title, rows: rows.filter((r) => r.some((c) => c.trim())) };
+        return { title, rows: extractOtslRows(tableNode) };
       });
     } catch {
       return [];
@@ -176,6 +180,80 @@
   }
 
   let parsedTables = $derived(parseDoclangTables(doclangXml));
+
+  type DoclangBlock =
+    | { type: "heading"; level: number; text: string }
+    | { type: "paragraph"; text: string }
+    | { type: "list"; items: string[] }
+    | { type: "table"; title: string; rows: string[][] };
+
+  /**
+   * Walk the full DocLang XML tree in document order and produce a flat,
+   * readable sequence of blocks (headings, paragraphs, lists, tables) — the
+   * same tag set app/modules/document_parsing/doclang_chunker.py handles on
+   * the backend — instead of extracting only the <table> elements.
+   */
+  function parseDoclangDocument(xml: string): DoclangBlock[] {
+    if (!xml) return [];
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, "application/xml");
+      if (doc.querySelector("parsererror")) return [];
+      const root = doc.documentElement;
+      if (!root) return [];
+
+      const blocks: DoclangBlock[] = [];
+      const skip = new Set<Element>();
+      let pendingListItems: string[] = [];
+      let tableIdx = 0;
+
+      const flushList = () => {
+        if (pendingListItems.length > 0) {
+          blocks.push({ type: "list", items: pendingListItems });
+          pendingListItems = [];
+        }
+      };
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let node = walker.nextNode() as Element | null;
+      while (node) {
+        if (skip.has(node)) {
+          node = walker.nextNode() as Element | null;
+          continue;
+        }
+        const tag = node.tagName.toLowerCase();
+
+        if (tag === "heading") {
+          flushList();
+          const text = node.textContent?.trim() || "";
+          if (text) {
+            const levelAttr = parseInt(node.getAttribute("level") || "1", 10);
+            const level = Number.isFinite(levelAttr) ? Math.min(Math.max(levelAttr, 1), 6) : 1;
+            blocks.push({ type: "heading", level, text });
+          }
+        } else if (tag === "table") {
+          flushList();
+          tableIdx += 1;
+          blocks.push({ type: "table", title: `Table ${tableIdx}`, rows: extractOtslRows(node) });
+          node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
+        } else if (tag === "text" || tag === "paragraph" || tag === "p") {
+          flushList();
+          const text = node.textContent?.trim() || "";
+          if (text) blocks.push({ type: "paragraph", text });
+        } else if (tag === "item" || tag === "li") {
+          const text = node.textContent?.trim() || "";
+          if (text) pendingListItems.push(text);
+        }
+        node = walker.nextNode() as Element | null;
+      }
+      flushList();
+      return blocks;
+    } catch {
+      return [];
+    }
+  }
+
+  let documentBlocks = $derived(parseDoclangDocument(doclangXml));
 
   function updateBboxOverlay(viewport: any, pageNum: number) {
     if (!bbox || (page !== null && page !== pageNum)) {
@@ -234,7 +312,7 @@
     plainText = "";
     doclangXml = "";
     activeViewerTab = "document";
-    activeDoclangSubTab = "tables";
+    activeDoclangSubTab = "rendered";
     viewMode = "single";
     scale = DEFAULT_SCALE;
     teardownObserver();
@@ -717,12 +795,12 @@
             <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
               <button
                 type="button"
-                onclick={() => (activeDoclangSubTab = "tables")}
-                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeDoclangSubTab === 'tables'
+                onclick={() => (activeDoclangSubTab = "rendered")}
+                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeDoclangSubTab === 'rendered'
                   ? 'bg-slate-800 text-slate-100'
                   : 'text-slate-400 hover:text-slate-200'}"
               >
-                OTSL Tables ({parsedTables.length})
+                Full Document ({documentBlocks.length})
               </button>
               <button
                 type="button"
@@ -760,48 +838,69 @@
 
         <!-- Tab content -->
         <div class="flex-1 overflow-y-auto p-4">
-          {#if activeDoclangSubTab === "tables"}
-            {#if parsedTables.length === 0}
+          {#if activeDoclangSubTab === "rendered"}
+            {#if documentBlocks.length === 0}
               <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
                 <FileCode class="mb-2 h-10 w-10 text-slate-600" />
-                <p class="text-sm font-semibold text-slate-300">No OTSL Tables in this Document</p>
+                <p class="text-sm font-semibold text-slate-300">No Renderable Content</p>
                 <p class="mt-1 max-w-md text-xs text-slate-500">
-                  The document was parsed into DocLang XML clauses and paragraphs, but contains no tabular &lt;table&gt; grids with &lt;fcel/&gt; separators.
+                  The document was parsed into DocLang XML, but no headings, paragraphs, lists, or tables could be extracted from it.
                 </p>
               </div>
             {:else}
-              <div class="space-y-6">
-                {#each parsedTables as table, tIdx (tIdx)}
-                  <div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-lg">
-                    <div class="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-4 py-2.5">
-                      <span class="text-xs font-semibold text-slate-200">{table.title}</span>
-                      <span class="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-400">
-                        {table.rows.length} rows × {table.rows[0]?.length || 0} cols
-                      </span>
-                    </div>
-                    <div class="overflow-x-auto p-3">
-                      <table class="w-full text-left text-xs text-slate-300">
-                        {#if table.rows.length > 0}
-                          <thead class="border-b border-slate-800 bg-slate-900/90 font-semibold uppercase text-caption text-slate-400">
-                            <tr>
-                              {#each table.rows[0] as colHeader, colIdx (colIdx)}
-                                <th class="px-3 py-2">{colHeader || `Col ${colIdx + 1}`}</th>
-                              {/each}
-                            </tr>
-                          </thead>
-                          <tbody class="divide-y divide-slate-800/60 font-mono text-xs">
-                            {#each table.rows.slice(1) as row, rowIdx (rowIdx)}
-                              <tr class="hover:bg-slate-900/40">
-                                {#each row as cell, cellIdx (cellIdx)}
-                                  <td class="px-3 py-2 text-slate-200">{cell}</td>
+              <div class="mx-auto max-w-4xl space-y-4">
+                {#each documentBlocks as block, bIdx (bIdx)}
+                  {#if block.type === "heading"}
+                    <svelte:element
+                      this={`h${block.level}`}
+                      class="font-semibold text-slate-100 {block.level === 1
+                        ? 'text-lg'
+                        : block.level === 2
+                          ? 'text-base'
+                          : 'text-sm'}"
+                    >
+                      {block.text}
+                    </svelte:element>
+                  {:else if block.type === "paragraph"}
+                    <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{block.text}</p>
+                  {:else if block.type === "list"}
+                    <ul class="list-disc space-y-1 pl-5 text-sm text-slate-300">
+                      {#each block.items as item, iIdx (iIdx)}
+                        <li>{item}</li>
+                      {/each}
+                    </ul>
+                  {:else if block.type === "table"}
+                    <div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-lg">
+                      <div class="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-4 py-2.5">
+                        <span class="text-xs font-semibold text-slate-200">{block.title}</span>
+                        <span class="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-400">
+                          {block.rows.length} rows × {block.rows[0]?.length || 0} cols
+                        </span>
+                      </div>
+                      <div class="overflow-x-auto p-3">
+                        <table class="w-full text-left text-xs text-slate-300">
+                          {#if block.rows.length > 0}
+                            <thead class="border-b border-slate-800 bg-slate-900/90 font-semibold uppercase text-caption text-slate-400">
+                              <tr>
+                                {#each block.rows[0] as colHeader, colIdx (colIdx)}
+                                  <th class="px-3 py-2">{colHeader || `Col ${colIdx + 1}`}</th>
                                 {/each}
                               </tr>
-                            {/each}
-                          </tbody>
-                        {/if}
-                      </table>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 font-mono text-xs">
+                              {#each block.rows.slice(1) as row, rowIdx (rowIdx)}
+                                <tr class="hover:bg-slate-900/40">
+                                  {#each row as cell, cellIdx (cellIdx)}
+                                    <td class="px-3 py-2 text-slate-200">{cell}</td>
+                                  {/each}
+                                </tr>
+                              {/each}
+                            </tbody>
+                          {/if}
+                        </table>
+                      </div>
                     </div>
-                  </div>
+                  {/if}
                 {/each}
               </div>
             {/if}
