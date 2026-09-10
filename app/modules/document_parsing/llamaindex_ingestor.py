@@ -206,7 +206,7 @@ class LlamaIndexIngestor:
         return multi_column / len(lines) > 0.5
 
     async def extract_deontic_statements(
-        self, nodes: list[DocumentNodeContract]
+        self, nodes: list[DocumentNodeContract], *, organization_id: int | None = None
     ) -> list[DeonticStatement]:
         """Extract typed 'shall/must/should/may' obligations from each node.
 
@@ -222,7 +222,9 @@ class LlamaIndexIngestor:
         statements: list[DeonticStatement] = []
         for node in candidates:
             try:
-                statement = await extract_deontic_statement(node.text, clause=node.metadata)
+                statement = await extract_deontic_statement(
+                    node.text, clause=node.metadata, organization_id=organization_id
+                )
             except Exception as exc:  # noqa: BLE001 - a single bad node must not abort the batch
                 logger.warning(
                     "Deontic extraction failed node_id=%s error=%s", node.node_id, exc

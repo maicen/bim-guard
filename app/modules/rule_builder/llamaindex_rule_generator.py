@@ -180,6 +180,7 @@ class LlamaIndexRuleGenerator:
         *,
         deontic: DeonticStatement | None = None,
         model: str | None = None,
+        organization_id: int | None = None,
     ) -> list[RuleExtractionDraft]:
         """Run the Pydantic program over one node's text; [] if no rule found.
 
@@ -189,13 +190,16 @@ class LlamaIndexRuleGenerator:
                 only to bias severity when the LLM leaves it ambiguous.
             model: Extraction LLM override (e.g. from the UI's model
                 selector); falls back to ``DEFAULT_LLM_MODEL`` when omitted.
+            organization_id: Resolves the API key from that org's configured
+                LLM provider instance first, falling back to the provider's
+                env var — see ``build_llm``.
         """
         from llama_index.core.program import LLMTextCompletionProgram
 
         program = LLMTextCompletionProgram.from_defaults(
             output_cls=_LLMRuleExtractionResult,
             prompt_template_str=_RULE_PROMPT,
-            llm=build_llm(model),
+            llm=build_llm(model, organization_id=organization_id),
         )
         result: _LLMRuleExtractionResult = await program.acall(clause_text=node.text)
 
@@ -205,7 +209,13 @@ class LlamaIndexRuleGenerator:
     # ── RuleExtractionProvider conformance ──────────────────────────────────
 
     async def extract_rules_from_text(
-        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1, model: str | None = None
+        self,
+        text: str,
+        *,
+        chunk_index: int = 1,
+        total_chunks: int = 1,
+        model: str | None = None,
+        organization_id: int | None = None,
     ) -> list[dict]:
         """Drop-in RuleExtractionProvider method for the chunk-text extraction path.
 
@@ -222,7 +232,7 @@ class LlamaIndexRuleGenerator:
             text=text,
             metadata=ClauseMetadata(node_type="paragraph", source_document_id=0),
         )
-        drafts = await self.generate_drafts_from_node(node, model=model)
+        drafts = await self.generate_drafts_from_node(node, model=model, organization_id=organization_id)
         if not drafts:
             return []
 

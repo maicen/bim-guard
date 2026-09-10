@@ -1,0 +1,22 @@
+{
+  "$schema": "https://www.rfc-editor.org/rfc/rfc9727",
+  "title": "BIM Guard API Catalog",
+  "entries": [
+    {
+      "title": "BIM Guard REST API",
+      "description": "OpenBIM compliance gateway — projects, documents, rules, analysis, and BCF/reporting endpoints.",
+      "linkRelation": "service-desc",
+      "url": "/api/openapi.json"
+    },
+    {
+      "title": "BIM Guard interactive API docs",
+      "linkRelation": "service-doc",
+      "url": "/api/docs"
+    },
+    {
+      "title": "Agent authentication instructions",
+      "linkRelation": "auth",
+      "url": "/auth.md"
+    }
+  ]
+}

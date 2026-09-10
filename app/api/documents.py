@@ -35,6 +35,7 @@ from app.modules.contracts import (
     DocumentSectionsResponse,
     DocumentSectionTreeResponse,
     DocumentUpdateRequest,
+    GenerateDoclangRequest,
     GoogleDriveImportRequest,
     GoogleDriveImportResponse,
     GoogleDriveImportResult,
@@ -43,9 +44,8 @@ from app.modules.contracts import (
     RuleExtractionDraftListResponse,
     RuleExtractionProgressResponse,
 )
-from app.modules.document_parsing.section_chunker import SectionChunker
+from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.section_tree import build_section_tree
-from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
 from app.services.cache import cache_service
 from app.services.document_access_service import DocumentAccessService
 from app.services.document_pages_service import DocumentPagesService
@@ -85,18 +85,24 @@ def list_documents(
     if effective_org_id is not None:
         allowed_ids = set(document_access.list_org_grants(effective_org_id))
         rows = [r for r in rows if r["id"] in allowed_ids]
-    etag = f'"{hashlib.sha256(str(len(rows)).encode() + (rows[0]["created_at"].encode() if rows and "created_at" in rows[0] else b"")).hexdigest()[:16]}"'
+    # `documents` rows carry no `created_at`/`updated_at` column, so the ETag
+    # is derived from the rows' own content (not just their count) — otherwise
+    # an edit or DocLang generation that doesn't change the row count would
+    # produce an identical ETag and get cached clients stuck on a 304 forever.
+    etag = f'"{hashlib.sha256(repr(rows).encode()).hexdigest()[:16]}"'
     response.headers["ETag"] = etag
     if if_none_match and if_none_match.strip() == etag:
         response.status_code = status.HTTP_304_NOT_MODIFIED
         return []
     res = []
     for r in rows:
-        text = r.get("extracted_text") or ""
-        preview = text[:200] + "..." if len(text) > 200 else text
-        doclang_storage_ref = r.get("doclang_storage_path") or ""
-        doclang_str = r.get("doclang_xml") or ""
-        has_doclang = bool(doclang_storage_ref or (doclang_str and doclang_str.strip()))
+        char_count = r.get("char_count") or 0
+        # DOCUMENT_SUMMARY_COLUMNS deliberately omits the (possibly large,
+        # possibly offloaded) doclang_xml column from this list scan, so
+        # has_doclang/size can't be read off it directly here — char_count
+        # is a reliable cheap proxy since it's derived from DocLang XML
+        # only when DocLang was actually generated.
+        has_doclang = char_count > 0 or bool(r.get("doclang_storage_path"))
         res.append(
             DocumentResponse(
                 id=r["id"],
@@ -104,10 +110,10 @@ def list_documents(
                 doc_type=r.get("doc_type") or "Specification",
                 file_path=r.get("file_path"),
                 upload_date=r.get("upload_date"),
-                extracted_text_preview=preview,
-                char_count=len(text),
+                text_preview=r.get("text_preview") or "",
+                char_count=char_count,
                 has_doclang=has_doclang,
-                doclang_size_bytes=len(doclang_str.encode("utf-8")) if doclang_str else 0,
+                doclang_size_bytes=0,
                 doclang_storage_path=r.get("doclang_storage_path"),
                 doclang_archive_path=r.get("doclang_archive_path"),
                 doclang_xml="",
@@ -126,13 +132,13 @@ def list_documents(
     return res
 
 
-@router.get("/{document_id}", response_model=DocumentDetailResponse, summary="Get document details & extracted text")
+@router.get("/{document_id}", response_model=DocumentDetailResponse, summary="Get document details & DocLang-derived text")
 def get_document(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
     response: Response,
 ) -> DocumentDetailResponse:
-    """Retrieve a document by ID including its full extracted text."""
+    """Retrieve a document by ID including its full plain text, derived from DocLang."""
     response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
     doc = service.get_document(document_id)
     if not doc:
@@ -140,14 +146,14 @@ def get_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    text = doc.get("extracted_text") or ""
+    text = service.get_document_text(doc)
     return DocumentDetailResponse(
         id=doc["id"],
         filename=doc.get("filename", "document"),
         doc_type=doc.get("doc_type") or "Specification",
         file_path=doc.get("file_path"),
         upload_date=doc.get("upload_date"),
-        extracted_text=text,
+        text=text,
         char_count=len(text),
         doclang_storage_path=doc.get("doclang_storage_path"),
         doclang_archive_path=doc.get("doclang_archive_path"),
@@ -202,19 +208,19 @@ def get_document_file(
     return FileResponse(path=local_path, media_type=media_type, filename=filename)
 
 
-def _row_to_detail_response(row: dict) -> DocumentDetailResponse:
+def _row_to_detail_response(row: dict, service: "DocumentService") -> DocumentDetailResponse:
     """Build a DocumentDetailResponse from a `documents` row dict."""
-    text = row.get("extracted_text") or ""
+    text = service.get_document_text(row)
     return DocumentDetailResponse(
         id=row["id"],
         filename=row.get("filename", "document"),
         doc_type=row.get("doc_type") or "Specification",
         file_path=row.get("file_path"),
         upload_date=row.get("upload_date"),
-        extracted_text=text,
+        text=text,
         char_count=len(text),
         doclang_storage_path=row.get("doclang_storage_path"),
-        doclang_xml=row.get("doclang_xml") or "",
+        doclang_xml=service.get_doclang_content(row),
         project_code=row.get("project_code", ""),
         originator=row.get("originator", ""),
         volume_system=row.get("volume_system", ""),
@@ -254,6 +260,7 @@ async def upload_document(
     revision_code: Annotated[str, Form()] = "P01.01",
     parser: Annotated[str, Form()] = "auto",
     engine_instance: Annotated[str, Form()] = "",
+    generate_doclang: Annotated[bool, Form()] = True,
     organization_id: Annotated[Optional[int], Form()] = None,
     x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     service: Annotated[DocumentService, Depends(get_documents_service)] = None,
@@ -263,7 +270,11 @@ async def upload_document(
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)] = None,
     memberships: Annotated[MembershipService, Depends(get_membership_service)] = None,
 ) -> DocumentDetailResponse:
-    """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and extract text."""
+    """Upload a specification document (PDF, DOCX, XLSX, CSV, TXT, MD) and generate its DocLang XML.
+
+    When `generate_doclang` is False, the file is stored but DocLang
+    generation is deferred — call `POST /{id}/generate-doclang` later.
+    """
     if service is None:
         service = DocumentService()
     if instances_service is None:
@@ -315,6 +326,7 @@ async def upload_document(
             revision_code=revision_code,
             parser=clean_parser,
             instance=resolved_instance,
+            generate_doclang=generate_doclang,
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -327,7 +339,7 @@ async def upload_document(
         except Exception as exc:
             logger.warning("Could not auto-grant uploaded document to org %d: %s", target_org_id, exc)
 
-    return _row_to_detail_response(row)
+    return _row_to_detail_response(row, service)
 
 
 @router.post(
@@ -377,7 +389,7 @@ async def import_from_google_drive(
                 parser=(payload.parser or "auto").strip().lower(),
                 instance=resolved_instance,
             )
-            results.append(GoogleDriveImportResult(url=url, ok=True, document=_row_to_detail_response(row)))
+            results.append(GoogleDriveImportResult(url=url, ok=True, document=_row_to_detail_response(row, service)))
         except (GoogleDriveError, ValueError, RuntimeError) as exc:
             logger.warning("Google Drive import failed url=%s error=%s", url, exc)
             results.append(GoogleDriveImportResult(url=url, ok=False, error=str(exc)))
@@ -388,13 +400,51 @@ async def import_from_google_drive(
     return GoogleDriveImportResponse(results=results)
 
 
+@router.post(
+    "/{document_id}/generate-doclang",
+    response_model=DocumentDetailResponse,
+    summary="Generate and persist DocLang XML for a document whose generation was deferred",
+)
+async def generate_document_doclang(
+    document_id: int,
+    payload: GenerateDoclangRequest,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    instances_service: Annotated[
+        ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)
+    ],
+) -> DocumentDetailResponse:
+    """Run extraction against an already-stored file and persist its DocLang XML.
+
+    Backs the documents datatable's "Generate DocLang" action, enabled for
+    documents uploaded with generation deferred (or where an earlier attempt
+    failed) — see `DocumentService.generate_doclang_for_existing`.
+    """
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", instances_service)
+    clean_parser = (payload.parser or "auto").strip().lower()
+    try:
+        updated = await run_in_threadpool(
+            service.generate_doclang_for_existing, document_id, clean_parser, resolved_instance
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return _row_to_detail_response(updated, service)
+
+
 @router.put("/{document_id}", response_model=DocumentDetailResponse, summary="Update document")
 def update_document(
     document_id: int,
     payload: DocumentUpdateRequest,
     service: Annotated[DocumentService, Depends(get_documents_service)],
 ) -> DocumentDetailResponse:
-    """Update specification document metadata and/or extracted text."""
+    """Update specification document metadata."""
     existing = service.get_document(document_id)
     if not existing:
         raise HTTPException(
@@ -403,15 +453,11 @@ def update_document(
         )
 
     filename = payload.filename if payload.filename is not None else existing.get("filename", "")
-    extracted_text = (
-        payload.extracted_text if payload.extracted_text is not None else existing.get("extracted_text", "")
-    )
     doc_type = payload.doc_type if payload.doc_type is not None else existing.get("doc_type", "Specification")
 
     service.update_document(
         document_id,
         filename=filename.strip(),
-        extracted_text=extracted_text,
         doc_type=doc_type,
         project_code=payload.project_code,
         originator=payload.originator,
@@ -420,7 +466,7 @@ def update_document(
         cde_state=payload.cde_state.value if hasattr(payload.cde_state, "value") else payload.cde_state,
     )
     updated = service.get_document(document_id) or existing
-    text = updated.get("extracted_text") or ""
+    text = service.get_document_text(updated)
 
     return DocumentDetailResponse(
         id=updated["id"],
@@ -428,7 +474,7 @@ def update_document(
         doc_type=updated.get("doc_type") or doc_type or "Specification",
         file_path=updated.get("file_path"),
         upload_date=updated.get("upload_date"),
-        extracted_text=text,
+        text=text,
         char_count=len(text),
         doclang_xml=updated.get("doclang_xml") or "",
         project_code=updated.get("project_code", ""),
@@ -561,10 +607,10 @@ def get_document_sections(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
 ) -> DocumentSectionsResponse:
-    """Split a document's extracted text into sections for scoped rule extraction.
+    """Split a document's DocLang XML into sections for scoped rule extraction.
 
-    Returns no sections when the text has no detectable headings (e.g. a single
-    undifferentiated block) — the caller should fall back to a manual excerpt.
+    Returns no sections when the document has no DocLang XML yet (generation
+    deferred or failed) — the caller should fall back to a manual excerpt.
     """
     doc = service.get_document(document_id)
     if not doc:
@@ -572,8 +618,8 @@ def get_document_sections(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    text = doc.get("extracted_text") or ""
-    chunks = SectionChunker().chunk(text) if text.strip() else []
+    doclang_xml = service.get_doclang_content(doc).strip()
+    chunks = DocLangChunker().chunk(doclang_xml) if doclang_xml else []
     sections = [
         DocumentSection(
             section_number=chunk.get("section_number"),
@@ -597,16 +643,13 @@ async def get_document_sections_tree(
 ) -> DocumentSectionTreeResponse:
     """Nest a document's detected sections into a tree for the scope picker.
 
-    The tree structure itself is derived deterministically from each
-    section's number/heading (free, always available). A one-time AI pass
-    additionally cleans up cosmetically broken labels (see
-    ``section_tree_enhancer``); its result is cached per document so the
-    LLM only runs once, not on every request — ``enhanced`` reports
-    whether that pass ran successfully this time. Each section's starting
-    page is resolved (free — snippet matching, not an LLM call) against
-    ``document_pages``, when that table has rows for this document; older
-    documents uploaded before that table existed just get ``page_number:
-    null`` everywhere.
+    The tree structure is derived deterministically from each DocLang
+    section's number/heading. Returns an empty tree when the document has no
+    DocLang XML yet (generation deferred or failed) — the caller should fall
+    back to a manual excerpt. Each section's starting page is resolved
+    (free — snippet matching, not an LLM call) against ``document_pages``,
+    when that table has rows for this document; older documents uploaded
+    before that table existed just get ``page_number: null`` everywhere.
     """
     doc = service.get_document(document_id)
     if not doc:
@@ -621,17 +664,9 @@ async def get_document_sections_tree(
         return DocumentSectionTreeResponse.model_validate(cached)
 
     doclang_xml = service.get_doclang_content(doc).strip()
-    if doclang_xml:
-        from app.modules.document_parsing.doclang_chunker import DocLangChunker
-
-        chunks = DocLangChunker().chunk(doclang_xml)
-        tree, flat = build_section_tree(chunks)
-        enhanced = False
-    else:
-        text = doc.get("extracted_text") or ""
-        chunks = SectionChunker().chunk(text) if text.strip() else []
-        tree, flat = build_section_tree(chunks)
-        tree, enhanced = await enhance_section_tree(tree, flat)
+    chunks = DocLangChunker().chunk(doclang_xml) if doclang_xml else []
+    tree, flat = build_section_tree(chunks)
+    enhanced = False
 
     # Attach page numbers for any chunks where not already resolved
     unresolved_indices = [i for i, chunk in enumerate(flat) if chunk.get("page_number") is None]
@@ -673,7 +708,7 @@ async def ingest_document(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
 ) -> DocumentIngestResponse:
-    """Ingest an already-uploaded document's extracted text via LlamaIndexIngestor.
+    """Ingest an already-uploaded document's DocLang-derived text via LlamaIndexIngestor.
 
     Splits the document into clause-annotated nodes and extracts typed
     deontic ("shall"/"must"/"should"/"may") statements. Progress streams on
@@ -685,7 +720,7 @@ async def ingest_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    text = doc.get("extracted_text") or ""
+    text = service.get_document_text(doc)
     if not text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -693,7 +728,9 @@ async def ingest_document(
         )
 
     extraction_service = RuleExtractionService()
-    nodes = await extraction_service.ingest_with_llamaindex(document_id, text)
+    nodes = await extraction_service.ingest_with_llamaindex(
+        document_id, text, organization_id=doc.get("organization_id")
+    )
     deontic_count = sum(len(node.deontic_statements) for node in nodes)
 
     return DocumentIngestResponse(
@@ -723,8 +760,8 @@ async def extract_rule_drafts(
     `PATCH /api/rules/drafts/{draft_id}`.
 
     `body.text`, when given, scopes extraction to a caller-chosen subset of
-    the document (e.g. sections picked in the UI) rather than the full
-    `documents.extracted_text`.
+    the document (e.g. sections picked in the UI) rather than its full
+    DocLang-derived text.
     """
     doc = service.get_document(document_id)
     if not doc:
@@ -732,7 +769,7 @@ async def extract_rule_drafts(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    text = (body.text if body and body.text else None) or doc.get("extracted_text") or ""
+    text = (body.text if body and body.text else None) or service.get_document_text(doc)
     if not text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -740,7 +777,9 @@ async def extract_rule_drafts(
         )
 
     extraction_service = RuleExtractionService()
-    drafts = await extraction_service.extract_rule_drafts(document_id, text, model=model)
+    drafts = await extraction_service.extract_rule_drafts(
+        document_id, text, model=model, organization_id=doc.get("organization_id")
+    )
     return RuleExtractionDraftListResponse(drafts=drafts)
 
 

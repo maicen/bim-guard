@@ -23,7 +23,13 @@ class FakeProvider:
         self.chunks = []
 
     async def extract_rules_from_text(
-        self, text: str, *, chunk_index: int = 1, total_chunks: int = 1, model: str | None = None
+        self,
+        text: str,
+        *,
+        chunk_index: int = 1,
+        total_chunks: int = 1,
+        model: str | None = None,
+        organization_id: int | None = None,
     ) -> list[dict]:
         self.chunks.append((text, chunk_index, total_chunks))
         return [
@@ -224,7 +230,7 @@ class FakeIngestor:
     def nodes_from_text(self, text: str, *, source_document_id: int, pages=None):
         return self._nodes
 
-    async def extract_deontic_statements(self, nodes):
+    async def extract_deontic_statements(self, nodes, *, organization_id=None):
         return []
 
 
@@ -243,7 +249,7 @@ class FakeGenerator:
         self.max_in_flight = 0
         self.calls = 0
 
-    async def generate_drafts_from_node(self, node, *, deontic=None, model=None):
+    async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
         self.calls += 1
         self.in_flight += 1
         self.max_in_flight = max(self.max_in_flight, self.in_flight)
@@ -315,7 +321,7 @@ def test_extract_rule_drafts_bounds_concurrency():
 
 def test_extract_rule_drafts_survives_one_node_failing():
     class FlakyGenerator(FakeGenerator):
-        async def generate_drafts_from_node(self, node, *, deontic=None, model=None):
+        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
             if node.node_id == "node-1":
                 raise RuntimeError("LLM blew up")
             return await super().generate_drafts_from_node(node, deontic=deontic, model=model)

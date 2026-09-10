@@ -1,6 +1,7 @@
-"""Document persistence service for uploaded source files and extracted text."""
+"""Document persistence service for uploaded source files and their canonical DocLang XML."""
 
 from app.logging_config import get_logger
+from app.modules.document_parsing.doclang_text import doclang_to_text
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import (
@@ -31,7 +32,6 @@ class DocumentService:
                     "md5_hash": str,
                     "filename": str,
                     "file_path": str,
-                    "extracted_text": str,
                     "upload_date": str,
                     "doc_type": str,
                     "project_code": str,
@@ -47,6 +47,8 @@ class DocumentService:
                     "doclang_xml": str,
                     "doclang_storage_path": str,
                     "doclang_archive_path": str,
+                    "char_count": int,
+                    "text_preview": str,
                 },
             )
         )
@@ -56,7 +58,6 @@ class DocumentService:
         "md5_hash",
         "filename",
         "file_path",
-        "extracted_text",
         "upload_date",
         "doc_type",
         "project_code",
@@ -71,7 +72,11 @@ class DocumentService:
         "cde_state",
         "doclang_storage_path",
         "doclang_archive_path",
+        "char_count",
+        "text_preview",
     ]
+
+    TEXT_PREVIEW_LENGTH = 200
 
     @cache_db_query(key_prefix="bimguard:documents:list")
     def list_documents(self):
@@ -101,7 +106,6 @@ class DocumentService:
         md5_hash: str,
         filename: str,
         file_path: str,
-        extracted_text: str,
         doc_type: str = "Specification",
         project_code: str = "",
         originator: str = "",
@@ -169,11 +173,11 @@ class DocumentService:
             except Exception:
                 logger.warning("Failed pre-persisting DocLang archive to storage; will generate on demand", exc_info=True)
 
+        derived_text = doclang_to_text(doclang_xml or "")
         payload = {
             "md5_hash": md5_hash,
             "filename": filename,
             "file_path": file_path,
-            "extracted_text": extracted_text,
             "upload_date": now_iso_utc(),
             "doc_type": clean_doc_type,
             "project_code": project_code,
@@ -189,16 +193,18 @@ class DocumentService:
             "doclang_xml": inline_xml,
             "doclang_storage_path": resolved_storage_path,
             "doclang_archive_path": resolved_archive_path,
+            "char_count": len(derived_text),
+            "text_preview": derived_text[: self.TEXT_PREVIEW_LENGTH],
         }
         document = self._documents.insert(payload)
         invalidate_cache("bimguard:documents:list")
         logger.info(
-            "Document created document_id=%s filename=%s doc_type=%s suitability=%s extracted_chars=%d",
+            "Document created document_id=%s filename=%s doc_type=%s suitability=%s doclang_chars=%d",
             document.get("id"),
             filename,
             clean_doc_type,
             suitability_code,
-            len(extracted_text),
+            len(derived_text),
         )
         return document
 
@@ -324,11 +330,14 @@ class DocumentService:
         """Resolve a stored file reference to a local path for streaming/serving."""
         return self._storage.materialize_local_path(file_path)
 
+    def get_document_text(self, doc: dict) -> str:
+        """Return the document's full plain text, derived on demand from its DocLang XML."""
+        return doclang_to_text(self.get_doclang_content(doc))
+
     def update_document(
         self,
         document_id: int,
         filename: str,
-        extracted_text: str,
         doc_type: str | None = None,
         project_code: str | None = None,
         originator: str | None = None,
@@ -339,8 +348,8 @@ class DocumentService:
         doclang_storage_path: str | None = None,
         doclang_archive_path: str | None = None,
     ):
-        """Update mutable document metadata and extracted text."""
-        updates: dict = {"filename": filename, "extracted_text": extracted_text}
+        """Update mutable document metadata and, when provided, its DocLang XML."""
+        updates: dict = {"filename": filename}
         if doc_type is not None:
             updates["doc_type"] = doc_type.strip() or "Specification"
         if project_code is not None:
@@ -377,6 +386,10 @@ class DocumentService:
             else:
                 updates["doclang_xml"] = doclang_xml
 
+            derived_text = doclang_to_text(doclang_xml)
+            updates["char_count"] = len(derived_text)
+            updates["text_preview"] = derived_text[: self.TEXT_PREVIEW_LENGTH]
+
             if doclang_archive_path is None and doclang_xml.strip():
                 try:
                     updated_doc_dict = {
@@ -405,7 +418,7 @@ class DocumentService:
         )
         invalidate_cache(f"bimguard:documents:item:document_id={document_id}")
         invalidate_cache("bimguard:documents:list")
-        logger.info("Document updated document_id=%d extracted_chars=%d", document_id, len(extracted_text))
+        logger.info("Document updated document_id=%d", document_id)
 
     def delete_document(self, document_id: int):
         """Delete a document row by primary key."""
@@ -449,6 +462,7 @@ class DocumentService:
         revision_code: str = "P01.01",
         parser: str = "auto",
         instance: dict | None = None,
+        generate_doclang: bool = True,
     ) -> tuple[dict, bool]:
         """Extract, store, and persist an uploaded/imported document.
 
@@ -456,6 +470,11 @@ class DocumentService:
         endpoint — the only difference between those two entry points is how
         `content` bytes were obtained. Dedupes by md5: a byte-identical
         re-upload/re-import returns the existing row unchanged.
+
+        When `generate_doclang` is False, the file is stored but DocLang
+        generation is skipped — the resulting row has `has_doclang=False`
+        until `generate_doclang_for_existing` is called on it later (e.g. via
+        the documents datatable's "Generate DocLang" action).
 
         Returns:
             row (dict): the document row (existing or newly created)
@@ -486,22 +505,24 @@ class DocumentService:
                 else val.fields.get("revision_code", "P01.01")
             )
 
-        try:
-            extracted_text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
-                filename, content, parser=parser, instance=instance, return_doclang=True
-            )
-        except (ValueError, RuntimeError):
-            raise
-        except Exception as exc:
-            logger.warning("Document extraction failed filename=%s parser=%s error=%s", filename, parser, exc)
-            extracted_text, pages, doclang_xml = f"[Text extraction error: {exc}]", [], ""
+        pages: list = []
+        doclang_xml = ""
+        if generate_doclang:
+            try:
+                _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
+                    filename, content, parser=parser, instance=instance, return_doclang=True
+                )
+            except (ValueError, RuntimeError):
+                raise
+            except Exception as exc:
+                logger.warning("Document extraction failed filename=%s parser=%s error=%s", filename, parser, exc)
+                pages, doclang_xml = [], ""
 
         file_path = self.store_document_file(filename, content)
         created = self.create_document(
             md5_hash=file_md5,
             filename=filename,
             file_path=file_path,
-            extracted_text=extracted_text,
             doc_type=clean_doc_type,
             project_code=project_code,
             originator=originator,
@@ -517,6 +538,55 @@ class DocumentService:
             DocumentPagesService().save_pages(created["id"], pages)
 
         return created, True
+
+    def generate_doclang_for_existing(
+        self, document_id: int, parser: str = "auto", instance: dict | None = None
+    ) -> dict:
+        """Run extraction against an already-stored file and persist its DocLang XML.
+
+        Backs the documents datatable's "Generate DocLang" action for a
+        document that was uploaded with generation deferred (`generate_doclang=False`)
+        or whose earlier generation attempt failed.
+        """
+        doc = self.get_document(document_id)
+        if doc is None:
+            raise ValueError(f"Document {document_id} not found.")
+
+        file_path = doc.get("file_path")
+        if not file_path:
+            raise ValueError(f"Document {document_id} has no stored file to parse.")
+
+        local_path = self.materialize_local_path(file_path)
+        if local_path is None or not local_path.is_file():
+            raise ValueError(f"Stored file for document {document_id} could not be resolved.")
+
+        filename = doc.get("filename") or local_path.name
+        content = local_path.read_bytes()
+
+        _text, pages, doclang_xml, _bboxes = self.extract_document_text_paged(
+            filename, content, parser=parser, instance=instance, return_doclang=True
+        )
+        if not doclang_xml.strip():
+            raise RuntimeError(f"DocLang generation produced no content for document {document_id}.")
+
+        self.update_document(
+            document_id,
+            filename=filename,
+            doc_type=doc.get("doc_type"),
+            project_code=doc.get("project_code"),
+            originator=doc.get("originator"),
+            suitability_code=doc.get("suitability_code"),
+            revision_code=doc.get("revision_code"),
+            cde_state=doc.get("cde_state"),
+            doclang_xml=doclang_xml,
+        )
+
+        if pages:
+            from app.services.document_pages_service import DocumentPagesService
+
+            DocumentPagesService().save_pages(document_id, pages)
+
+        return self.get_document(document_id)
 
     @staticmethod
     def extract_document_text(

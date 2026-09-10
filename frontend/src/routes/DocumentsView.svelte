@@ -15,6 +15,8 @@
     RotateCw,
     FolderSync,
     ExternalLink,
+    Sparkles,
+    FileCode,
   } from "lucide-svelte";
   import { documentsApi, parsingEnginesApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -70,7 +72,6 @@
   let docToEdit: DocumentItem | null = $state(null);
   let editFilename = $state("");
   let editDocType = $state("Specification");
-  let editExtractedText = $state("");
   let isSavingEdit = $state(false);
   let editError = $state("");
 
@@ -91,9 +92,12 @@
   let uploadDocType = $state("Specification");
   let uploadParser: "auto" | "unstructured" | "light" = $state("auto");
   let uploadInstance = $state("");
+  let generateDoclangOnUpload = $state(true);
   let parsingEngines: ParsingEngineInstance[] = $state([]);
   let isUploading = $state(false);
   let uploadError = $state("");
+  let generatingDoclangId: number | null = $state(null);
+  let selectedDocInitialTab: "document" | "doclang" = $state("document");
 
   async function loadParsingEngines() {
     try {
@@ -144,7 +148,7 @@
     createTableState<DocumentItem, number>({
       rows: () => documents,
       getId: (d) => d.id,
-      searchFields: (d) => [d.filename, d.extracted_text_preview],
+      searchFields: (d) => [d.filename, d.text_preview],
       filters: {
         docType: (d, value) => (d.doc_type || "Specification") === value,
       },
@@ -246,6 +250,7 @@
       const created = await documentsApi.upload(uploadFile, uploadDocType, {
         parser: uploadParser,
         engine_instance: uploadParser === "light" ? undefined : uploadInstance || undefined,
+        generate_doclang: generateDoclangOnUpload,
         organization_id: authState.activeOrganizationId,
       });
       documents = [created, ...documents];
@@ -254,6 +259,7 @@
       uploadDocType = "Specification";
       uploadParser = "auto";
       uploadInstance = "";
+      generateDoclangOnUpload = true;
     } catch (err: any) {
       uploadError = err.message || "Failed to upload document.";
     } finally {
@@ -261,7 +267,8 @@
     }
   }
 
-  async function openReader(id: number) {
+  async function openReader(id: number, initialTab: "document" | "doclang" = "document") {
+    selectedDocInitialTab = initialTab;
     isLoadingDocDetail = true;
     try {
       selectedDoc = await documentsApi.get(id);
@@ -272,19 +279,34 @@
     }
   }
 
-  async function openEdit(doc: DocumentItem) {
+  async function generateDoclangForRow(doc: DocumentItem) {
+    generatingDoclangId = doc.id;
+    try {
+      const updated = await documentsApi.generateDoclang(doc.id);
+      documents = documents.map((d) =>
+        d.id === updated.id
+          ? {
+              ...d,
+              text_preview: updated.text?.slice(0, 200) || "",
+              char_count: updated.char_count,
+              has_doclang: Boolean(updated.doclang_xml?.trim()),
+            }
+          : d,
+      );
+      flashSuccess(`DocLang generated for "${doc.filename}".`);
+    } catch (err: any) {
+      toasts.error(err.message || "Unknown error", "Could not generate DocLang");
+    } finally {
+      generatingDoclangId = null;
+    }
+  }
+
+  function openEdit(doc: DocumentItem) {
     docToEdit = doc;
     editFilename = doc.filename;
     editDocType = doc.doc_type || "Specification";
-    editExtractedText = "";
     editError = "";
     isEditModalOpen = true;
-    try {
-      const detail = await documentsApi.get(doc.id);
-      editExtractedText = detail.extracted_text || "";
-    } catch {
-      editExtractedText = doc.extracted_text_preview || "";
-    }
   }
 
   async function handleSaveEdit() {
@@ -299,7 +321,6 @@
       const updated = await documentsApi.update(docToEdit.id, {
         filename: editFilename.trim(),
         doc_type: editDocType,
-        extracted_text: editExtractedText,
       });
       documents = documents.map((d) =>
         d.id === updated.id
@@ -307,10 +328,6 @@
               ...d,
               filename: updated.filename,
               doc_type: updated.doc_type,
-              extracted_text_preview:
-                updated.extracted_text.slice(0, 200) +
-                (updated.extracted_text.length > 200 ? "..." : ""),
-              char_count: updated.char_count,
             }
           : d,
       );
@@ -491,7 +508,7 @@
               >
                 Type
               </SortHeader>
-              <th class="px-4 py-3">Extracted Text</th>
+              <th class="px-4 py-3">Text Preview</th>
               <SortHeader
                 column="char_count"
                 sortField={table.sortField}
@@ -548,7 +565,7 @@
                   </span>
                 </td>
                 <td class="max-w-sm truncate px-4 py-3 text-caption text-slate-400">
-                  {doc.extracted_text_preview || "No preview available"}
+                  {doc.text_preview || "No preview available"}
                 </td>
                 <td class="px-4 py-3 font-mono text-xs text-slate-400">
                   {doc.char_count.toLocaleString()}
@@ -565,6 +582,24 @@
                       title="Preview document"
                     >
                       <Eye class="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!doc.has_doclang}
+                      onclick={() => openReader(doc.id, "doclang")}
+                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-cyan-950/30 hover:text-cyan-400 disabled:cursor-not-allowed disabled:opacity-30"
+                      title={doc.has_doclang ? "Preview DocLang XML" : "No DocLang generated yet"}
+                    >
+                      <FileCode class="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={doc.has_doclang || generatingDoclangId === doc.id}
+                      onclick={() => generateDoclangForRow(doc)}
+                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-950/30 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-30"
+                      title={doc.has_doclang ? "DocLang already generated" : "Generate DocLang"}
+                    >
+                      <Sparkles class="h-3.5 w-3.5 {generatingDoclangId === doc.id ? 'animate-pulse' : ''}" />
                     </button>
                     <button
                       type="button"
@@ -692,12 +727,42 @@
                 bind:value={uploadParser}
                 class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
               >
-                <option value="auto">Auto (Unstructured API, falls back to local)</option>
-                <option value="unstructured"
-                  >Unstructured API only (best quality, slower, uploads file)</option
+                <option value="auto">Auto (configured engine, falls back to local)</option>
+                <option value="unstructured" disabled={parsingEngines.length === 0}
+                  >Force configured engine only{parsingEngines.length === 0
+                    ? " (no engine configured)"
+                    : " (best quality, slower, uploads file)"}</option
                 >
                 <option value="light">Light local extraction only (instant, no upload)</option>
               </select>
+            </div>
+
+            <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5">
+              <div>
+                <label for="upload-generate-doclang" class="block text-xs font-semibold text-slate-300">
+                  Convert to DocLang now
+                </label>
+                <p class="text-caption text-slate-500">
+                  When off, the file is stored but DocLang is generated later from the documents table.
+                </p>
+              </div>
+              <button
+                id="upload-generate-doclang"
+                type="button"
+                role="switch"
+                aria-checked={generateDoclangOnUpload}
+                aria-label="Convert to DocLang now"
+                onclick={() => (generateDoclangOnUpload = !generateDoclangOnUpload)}
+                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors {generateDoclangOnUpload
+                  ? 'bg-accent'
+                  : 'bg-slate-700'}"
+              >
+                <span
+                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform {generateDoclangOnUpload
+                    ? 'translate-x-5'
+                    : 'translate-x-1'}"
+                ></span>
+              </button>
             </div>
 
             {#if uploadParser !== "light" && parsingEngines.length > 0}
@@ -828,7 +893,7 @@
       </div>
 
       <div class="flex-1 overflow-hidden">
-        <DocumentViewer documentId={selectedDoc.id} />
+        <DocumentViewer documentId={selectedDoc.id} initialTab={selectedDocInitialTab} />
       </div>
 
       <div
@@ -876,7 +941,7 @@
               Edit Document #{docToEdit.id}
             </h2>
             <p class="text-xs text-slate-400">
-              Update specification filename and parsed text content
+              Update specification filename and document type
             </p>
           </div>
         </div>
@@ -923,19 +988,6 @@
               <option value={type}>{type}</option>
             {/each}
           </select>
-        </div>
-
-        <div class="flex flex-1 flex-col space-y-1.5">
-          <label for="edit-doc-text" class="block text-xs font-semibold text-slate-300">
-            Extracted Specification Text
-          </label>
-          <textarea
-            id="edit-doc-text"
-            rows="10"
-            bind:value={editExtractedText}
-            placeholder="Parsed specification clauses and text content..."
-            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs leading-relaxed text-slate-200 placeholder-slate-500 focus:border-accent focus:outline-none"
-          ></textarea>
         </div>
       </div>
 

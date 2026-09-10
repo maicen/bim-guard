@@ -14,8 +14,10 @@ from app.modules.contracts import InspectorResponse
 class DigitalInspectorService:
     """Runs Digital Inspector queries against a project."""
 
-    async def run_inspection(self, project_id: int, query: str) -> InspectorResponse:
+    async def run_inspection(
+        self, project_id: int, query: str, *, organization_id: int | None = None
+    ) -> InspectorResponse:
         """Run one natural-language query through the Digital Inspector graph."""
         from app.digital_inspector.runner import run_inspection
 
-        return await run_inspection(project_id, query)
+        return await run_inspection(project_id, query, organization_id=organization_id)

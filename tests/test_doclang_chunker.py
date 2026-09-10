@@ -121,7 +121,6 @@ def test_export_doclang_archive_endpoint(monkeypatch):
         "id": 123,
         "filename": "Sample_Standard.pdf",
         "doclang_xml": SAMPLE_DOCLANG_XML,
-        "extracted_text": "Sample text",
         "project_code": "PRJ-01",
         "originator": "ENG",
         "cde_state": "SHARED",
@@ -226,7 +225,6 @@ def test_document_service_auto_offloads_large_doclang_xml(monkeypatch):
         md5_hash="abc1234567890",
         filename="big_standard.pdf",
         file_path="uploads/big.pdf",
-        extracted_text="Text",
         doclang_xml=large_xml,
     )
 
@@ -242,7 +240,6 @@ def test_document_service_auto_offloads_large_doclang_xml(monkeypatch):
         md5_hash="small123",
         filename="small_standard.pdf",
         file_path="uploads/small.pdf",
-        extracted_text="Text",
         doclang_xml=small_xml,
     )
 
@@ -357,7 +354,6 @@ def test_create_document_packages_multimodal_assets_in_dclx():
         md5_hash="multimodal123456",
         filename="multimodal_spec.pdf",
         file_path="uploads/spec.pdf",
-        extracted_text="Text",
         doclang_xml=xml_with_img,
     )
 

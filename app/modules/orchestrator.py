@@ -218,7 +218,7 @@ class BIMGuard_App:
             doc = documents_svc.get_document(doc_id)
             if doc is None:
                 continue
-            text = doc.get("extracted_text") or ""
+            text = documents_svc.get_document_text(doc)
             documents.append(
                 {
                     "filename": doc.get("filename", ""),

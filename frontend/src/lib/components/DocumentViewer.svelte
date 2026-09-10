@@ -26,9 +26,11 @@
     highlightText?: string | null;
     /** Bounding box coordinates {l, t, r, b, coord_origin} on the page for visual halo highlighting. */
     bbox?: { l: number; t: number; r: number; b: number; coord_origin?: string } | null;
+    /** Which tab to switch to once loaded, when the document has DocLang XML available. */
+    initialTab?: "document" | "doclang";
   }
 
-  let { documentId, page = null, highlightText = null, bbox = null }: Props = $props();
+  let { documentId, page = null, highlightText = null, bbox = null, initialTab = "document" }: Props = $props();
 
   // Single-page mode DOM refs
   let textLayerEl: HTMLDivElement = $state();
@@ -242,8 +244,9 @@
     documentsApi
       .get(documentId)
       .then((detail) => {
-        plainText = detail.extracted_text || "";
+        plainText = detail.text || "";
         doclangXml = detail.doclang_xml || "";
+        if (initialTab === "doclang" && doclangXml.trim()) activeViewerTab = "doclang";
       })
       .catch(() => {});
 
@@ -278,8 +281,9 @@
       }
 
       const detail = await documentsApi.get(documentId);
-      plainText = detail.extracted_text || "";
+      plainText = detail.text || "";
       doclangXml = detail.doclang_xml || "";
+      if (initialTab === "doclang" && doclangXml.trim()) activeViewerTab = "doclang";
       loading = false;
       if (pdfFallbackNotice && !plainText.trim()) {
         error =

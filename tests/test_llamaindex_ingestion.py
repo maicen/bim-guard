@@ -72,7 +72,7 @@ def test_extract_deontic_statements_skips_non_deontic_nodes(monkeypatch):
     """Only nodes containing a deontic keyword should reach the LLM."""
     calls = []
 
-    async def fake_extract(clause_text, *, clause):
+    async def fake_extract(clause_text, *, clause, organization_id=None):
         calls.append(clause_text)
         return DeonticStatement(
             text=clause_text.strip(),

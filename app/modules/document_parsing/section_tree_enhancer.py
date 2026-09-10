@@ -92,6 +92,7 @@ async def enhance_section_tree(
     flat: list[dict],
     *,
     model: str | None = None,
+    organization_id: int | None = None,
 ) -> tuple[list[dict], bool]:
     """Apply an optional AI label-cleanup pass to a deterministic tree.
 
@@ -118,7 +119,7 @@ async def enhance_section_tree(
         program = LLMTextCompletionProgram.from_defaults(
             output_cls=_LabelOverrides,
             prompt_template_str=_ENHANCE_PROMPT,
-            llm=build_llm(model),
+            llm=build_llm(model, organization_id=organization_id),
         )
         result: _LabelOverrides = await program.acall(skeleton=_build_skeleton(flat))
     except Exception:

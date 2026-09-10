@@ -119,10 +119,11 @@ def extract_rules_from_document(document_id: int) -> dict:
     from app.bootstrap import get_container
     from app.services.rule_extraction_service import RuleExtractionService
 
-    doc = get_container().documents_service.get_document(document_id)
+    documents_service = get_container().documents_service
+    doc = documents_service.get_document(document_id)
     if doc is None:
         return {"document_id": document_id, "error": "document not found"}
-    text = doc.get("extracted_text") or ""
+    text = documents_service.get_document_text(doc)
     if not text.strip():
         return {"document_id": document_id, "error": "document has no extracted text"}
 

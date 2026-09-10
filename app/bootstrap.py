@@ -214,7 +214,6 @@ def build_default_container() -> ApplicationContainer:
             "md5_hash": str,
             "filename": str,
             "file_path": str,
-            "extracted_text": str,
             "upload_date": str,
         },
     )
