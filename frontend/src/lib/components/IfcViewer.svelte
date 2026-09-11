@@ -70,14 +70,11 @@
     if (focusAttempted === key) return;
     focusAttempted = key;
 
-    const missing =
-      `Element ${guid} could not be located in this model. ` +
-      `Run Export BCF 2.1 on this project, then retry.`;
     notFoundMessage = null;
 
     try {
       loading = true;
-      loadingMessage = "Loading BCF viewpoints...";
+      loadingMessage = "Locating element in BCF viewpoints...";
 
       // The project's persisted artifact first: it is a stored file, so it
       // costs a download and nothing more. Only the architectural pipeline
@@ -85,37 +82,31 @@
       // a corrosion or seismic project this 404s and the export below is what
       // actually answers. Exporting regenerates the archive from the cached
       // run, which is why it is second rather than first.
-      let loaded = false;
-      for (const url of [
-        analyzeApi.getLatestBcfUrl(id),
-        analyzeApi.getExportUrl(id, "corrosion", "bcf"),
-      ]) {
-        try {
-          await viewerAPI.loadBcf(url, guid, authHeaders, { autoSelectTopic: false });
-          loaded = true;
-          break;
-        } catch (err) {
-          console.warn("BCF source unavailable for element focus:", url, err);
-        }
-      }
-      if (!loaded) {
-        notFoundMessage = missing;
-        return;
-      }
+      //
+      // The viewer owns the rest: it cuts the archive down to this element
+      // before parsing any of it, then loads, selects and frames it, logging
+      // each stage under [bimguard-3d]. Never throws -- a failed stage comes
+      // back as a reason, so the spinner clears on one path either way.
+      const result = await viewerAPI.loadBcfForElement(
+        [
+          { label: "latest", url: analyzeApi.getLatestBcfUrl(id) },
+          { label: "export", url: analyzeApi.getExportUrl(id, "corrosion", "bcf") },
+        ],
+        guid,
+        authHeaders,
+      );
 
-      // Deliberately not loadBcf's own lookup: its fall-back to the archive's
-      // first topic would highlight a different element than the one clicked.
-      const topic = viewerAPI.findTopicByElementGuid(guid);
-      if (!topic) {
-        notFoundMessage = missing;
-        return;
+      if (!result?.ok) {
+        notFoundMessage =
+          `Element ${guid} could not be located in this model` +
+          `${result?.reason ? ` (${result.reason})` : ""}. ` +
+          `Run the audit for this project, then retry.`;
       }
-
-      await viewerAPI.selectTopic(topic);
-      // False when the topic's viewpoint resolved to no geometry in this
-      // model — the topic exists but the element does not, so the camera has
-      // not moved and there is nothing to isolate.
-      if (!(await viewerAPI.fitToSelection())) notFoundMessage = missing;
+    } catch (err: any) {
+      // Belt and braces: loadBcfForElement is written not to throw, but the
+      // spinner must clear and the user must be told even if it ever does.
+      console.warn("[bimguard-3d] focus failed:", err);
+      notFoundMessage = `Element ${guid} could not be located in this model.`;
     } finally {
       loading = false;
     }
@@ -129,7 +120,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-2";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-3";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer(containerEl);
       isInitialized = true;

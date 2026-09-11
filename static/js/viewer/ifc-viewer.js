@@ -3,8 +3,17 @@ import * as OBC from "https://esm.sh/@thatopen/components@3.4.8?external=web-ifc
 import * as OBF from "https://esm.sh/@thatopen/components-front@3.4.4?external=web-ifc&deps=@thatopen/components@3.4.8,@thatopen/fragments@3.4.7,three@0.182.0";
 import * as CUI from "https://esm.sh/@thatopen/ui-obc@3.4.2?external=web-ifc&deps=@thatopen/ui@3.4.10,@thatopen/components@3.4.8,three@0.182.0,@thatopen/fragments@3.4.7";
 import * as THREE from "https://esm.sh/three@0.182.0";
+// The very JSZip that @thatopen/components@3.4.8 bundles for its own
+// BCFTopics.load (it vendors JSZip 3.10.1 rather than re-exporting it, so the
+// same version has to be pulled alongside rather than reached through OBC).
+import JSZip from "https://esm.sh/jszip@3.10.1";
+import { filterBcfArchive, priorityRank } from "./bcf-filter.js?v=viewer-isolate-3";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
+
+/** Stage log for the findings deep link — demo evidence, deliberately kept. */
+const LOG = "[bimguard-3d]";
+const since = (t0) => Math.round(performance.now() - t0);
 
 // The BCF viewpoints the corrosion engine generates carry the failing
 // element's GUID in their selection (see bcf_generator._viewpoint_xml), but
@@ -906,9 +915,8 @@ export async function initViewer(containerOrId) {
     // severe topic is the one to show — it is the row someone is most likely
     // to have clicked, and it is at least deterministic, where "first one the
     // archive happened to yield" is not. The vocabulary is the exporter's own
-    // Critical/Major/Normal/Minor (phase_6e_export, RiskBand -> priority).
-    const PRIORITY_RANK = { critical: 0, major: 1, normal: 2, minor: 3 };
-
+    // Critical/Major/Normal/Minor (phase_6e_export, RiskBand -> priority), and
+    // priorityRank is shared with the archive filter so both agree.
     function findTopicByElementGuid(elementGuid) {
         if (!elementGuid) return null;
         const needles = [`ElementGUID: ${elementGuid}`, `GUID: ${elementGuid}`];
@@ -918,14 +926,20 @@ export async function initViewer(containerOrId) {
                 if ((topic.description || "").includes(needle)) matches.push(topic);
             }
             if (matches.length === 0) continue;
-            matches.sort((a, b) => {
-                const rank = (t) =>
-                    PRIORITY_RANK[String(t.priority || "").toLowerCase()] ?? 9;
-                return rank(a) - rank(b);
-            });
+            matches.sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
             return matches[0];
         }
         return null;
+    }
+
+    /** Total ids across a ModelIdMap, for the select log line. */
+    function countSelection(map) {
+        if (!map) return 0;
+        let n = 0;
+        for (const ids of Object.values(map)) {
+            n += ids instanceof Set ? ids.size : (ids?.length ?? 0);
+        }
+        return n;
     }
 
     // Frames whatever is currently highlighted. Returns false when nothing is
@@ -980,6 +994,103 @@ export async function initViewer(containerOrId) {
         }
     }
 
+    /**
+     * The findings deep-link path: fetch an archive, cut it down to the one
+     * element, then load, select and frame it.
+     *
+     * The whole-archive route this replaces was correct but unusable — the
+     * hospital demo's export is 1,384 topics and 5.1 MB, and BCFTopics.load
+     * parses every topic, instantiates every viewpoint, and re-renders the
+     * topics table once per row, so the selection could not run for minutes.
+     * Filtering the bytes first (see bcf-filter.js) leaves a handful of
+     * entries, and everything downstream is then trivially fast.
+     *
+     * `sources` is tried in order, as {label, url}; the first that fetches wins.
+     * Returns {ok, reason}. Never throws: every failure is a reason string, so
+     * the host page can show a notice and clear its spinner on one code path.
+     */
+    async function loadBcfForElement(sources, elementGuid, getHeaders) {
+        if (!elementGuid) return { ok: false, reason: "no element guid" };
+
+        // ── fetch ────────────────────────────────────────────────────────
+        let buffer = null;
+        for (const { label, url } of sources) {
+            const t0 = performance.now();
+            try {
+                const response = await fetchWithAuthRetry(url, getHeaders);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                buffer = await response.arrayBuffer();
+                console.info(`${LOG} source=${label} bytes=${buffer.byteLength} ms=${since(t0)}`);
+                break;
+            } catch (error) {
+                console.warn(`${LOG} fetch failed: ${label} ${error?.message || error}`);
+            }
+        }
+        if (!buffer) return { ok: false, reason: "no BCF archive available" };
+
+        // ── filter ───────────────────────────────────────────────────────
+        let filtered;
+        const tFilter = performance.now();
+        try {
+            filtered = await filterBcfArchive(JSZip, buffer, elementGuid);
+        } catch (error) {
+            console.warn(`${LOG} filter failed: ${error?.message || error}`);
+            return { ok: false, reason: "could not read the BCF archive" };
+        }
+        console.info(`${LOG} archive entries=${filtered.entries} topics=${filtered.topics}`);
+        console.info(
+            `${LOG} filter guid=${elementGuid} kept=${filtered.kept} ms=${since(tFilter)}`,
+        );
+        if (!filtered.data) {
+            console.warn(`${LOG} filter failed: no topic references ${elementGuid}`);
+            return { ok: false, reason: "no BCF topic references this element" };
+        }
+
+        // ── load ─────────────────────────────────────────────────────────
+        const tLoad = performance.now();
+        try {
+            const imported = await workspace.topics.load(filtered.data);
+            for (const viewpoint of Array.from(imported.viewpoints)) viewpoint.world = world;
+            workspace.refreshTopicsList();
+            const loadedCount = workspace.topics.list.size ?? filtered.kept;
+            console.info(`${LOG} bcf loaded topics=${loadedCount} ms=${since(tLoad)}`);
+        } catch (error) {
+            console.warn(`${LOG} load failed: ${error?.message || error}`);
+            return { ok: false, reason: "could not load the filtered BCF archive" };
+        }
+
+        // ── select ───────────────────────────────────────────────────────
+        const topic = findTopicByElementGuid(elementGuid);
+        if (!topic) {
+            console.warn(`${LOG} select failed: no loaded topic matched ${elementGuid}`);
+            return { ok: false, reason: "no BCF topic matched this element" };
+        }
+        try {
+            await workspace.selectTopic(topic);
+        } catch (error) {
+            console.warn(`${LOG} select failed: ${error?.message || error}`);
+            return { ok: false, reason: "could not select the element's topic" };
+        }
+        const items = countSelection(isolate.getSelectionMap());
+        console.info(
+            `${LOG} select topic=${topic.title || topic.guid} ` +
+            `priority=${topic.priority || "-"} selection_items=${items}`,
+        );
+        if (items === 0) {
+            console.warn(`${LOG} select failed: topic resolved to no geometry in this model`);
+            return { ok: false, reason: "the element is not in the loaded model" };
+        }
+
+        // ── fit ──────────────────────────────────────────────────────────
+        const fitted = await fitToSelection();
+        console.info(`${LOG} fit ok=${fitted}`);
+        if (!fitted) {
+            console.warn(`${LOG} fit failed: no bounding geometry for the selection`);
+            return { ok: false, reason: "could not frame the element" };
+        }
+        return { ok: true, reason: null };
+    }
+
     function setupFileLoader(inputId) {
         const input = document.getElementById(inputId);
         if (input) {
@@ -1031,6 +1142,7 @@ export async function initViewer(containerOrId) {
         selectTopic: workspace.selectTopic,
         findTopicByElementGuid,
         fitToSelection,
+        loadBcfForElement,
         dispose: () => {
             try {
                 workspace.dispose();
