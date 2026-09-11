@@ -285,10 +285,9 @@
     }
   }
 
-  function openReader(id: number, initialTab: "document" | "doclang" = "document") {
+  function openReader(id: number) {
     const params = new URLSearchParams();
     params.set("doc_id", String(id));
-    if (initialTab === "doclang") params.set("tab", "doclang");
     if (authState.activeOrganizationId) {
       params.set("org", String(authState.activeOrganizationId));
     }
@@ -613,7 +612,7 @@
                     <button
                       type="button"
                       disabled={!doc.has_doclang}
-                      onclick={() => openReader(doc.id, "doclang")}
+                      onclick={() => openReader(doc.id)}
                       class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-cyan-950/30 hover:text-cyan-400 disabled:cursor-not-allowed disabled:opacity-30"
                       title={doc.has_doclang ? "Preview DocLang XML" : "No DocLang generated yet"}
                     >

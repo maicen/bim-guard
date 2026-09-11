@@ -10,11 +10,10 @@
 
   interface Props {
     documentId: number | null;
-    initialTab?: "document" | "doclang";
     onBack: () => void;
   }
 
-  let { documentId, initialTab = "document", onBack }: Props = $props();
+  let { documentId, onBack }: Props = $props();
 
   let doc: DocumentDetail | null = $state(null);
   let loading = $state(true);
@@ -47,7 +46,7 @@
   });
 </script>
 
-<div class="mx-auto flex h-full max-w-6xl flex-col space-y-5 pb-12">
+<div class="flex h-full flex-col space-y-5 pb-12">
   <PageHeader
     category="Documents"
     title={doc?.filename || (loading ? "Loading document…" : "Document")}
@@ -85,7 +84,7 @@
     <div
       class="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl"
     >
-      <DocumentViewer documentId={documentId!} {initialTab} />
+      <DocumentViewer documentId={documentId!} />
     </div>
   {/if}
 </div>

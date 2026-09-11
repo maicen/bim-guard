@@ -14,6 +14,7 @@
     Copy,
     Check,
     Settings2,
+    ChevronDown,
   } from "lucide-svelte";
   import { documentsApi } from "../api";
   import { authHeaders, withAuthToken } from "../authToken";
@@ -32,11 +33,9 @@
     highlightText?: string | null;
     /** Bounding box coordinates {l, t, r, b, coord_origin} on the page for visual halo highlighting. */
     bbox?: { l: number; t: number; r: number; b: number; coord_origin?: string } | null;
-    /** Which tab to switch to once loaded, when the document has DocLang XML available. */
-    initialTab?: "document" | "doclang";
   }
 
-  let { documentId, page = null, highlightText = null, bbox = null, initialTab = "document" }: Props = $props();
+  let { documentId, page = null, highlightText = null, bbox = null }: Props = $props();
 
   // Single-page mode DOM refs
   let textLayerEl: HTMLDivElement = $state();
@@ -225,8 +224,17 @@
   let isPanning = $derived(panDrag?.moved ?? false);
 
   let doclangXml = $state("");
-  let activeViewerTab: "document" | "doclang" = $state("document");
-  let activeDoclangSubTab: "rendered" | "xml" = $state("rendered");
+  // Original Page / DocLang / Reading View render simultaneously as three
+  // synchronized panes (rather than switching between them) -- these control
+  // per-pane visibility via the "Views" menu, mirroring the reference
+  // DocLang Viewer. All default on; a document with no DocLang XML at all
+  // just shows Original Page, full width (see the {#if doclangXml} branch
+  // in the template).
+  let showOriginalPage = $state(true);
+  let showDoclangPane = $state(true);
+  let showReadingPane = $state(true);
+  let viewsMenuOpen = $state(false);
+  let layersMenuOpen = $state(false);
   // Shared across the rendered-blocks view, the XML tree, and the bbox
   // overlay -- clicking any one of them highlights/scrolls the others to
   // the same DocLang-injected element id (feature: click-to-sync selection).
@@ -597,12 +605,12 @@
   });
 
   // Cross-pane sync: when selection changes (from the XML tree or the bbox
-  // overlay, not a click inside this pane itself) and the rendered blocks
-  // tab is open, scroll the matching block into view -- expanding the
+  // overlay, not a click inside this pane itself) and the Reading View pane
+  // is visible, scroll the matching block into view -- expanding the
   // windowed list first if the block hasn't been rendered yet.
   $effect(() => {
     const id = selectedElementId;
-    if (!id || activeViewerTab !== "doclang" || activeDoclangSubTab !== "rendered") return;
+    if (!id || !showReadingPane) return;
     const blockIdx = readingBlocks.findIndex((b) => "elementId" in b && b.elementId === id);
     if (blockIdx === -1) return;
     if (blockIdx >= visibleBlockCount) {
@@ -672,8 +680,6 @@
     isPdf = false;
     plainText = "";
     doclangXml = "";
-    activeViewerTab = "document";
-    activeDoclangSubTab = "rendered";
     viewMode = "single";
     scale = DEFAULT_SCALE;
     teardownObserver();
@@ -687,7 +693,6 @@
       .then((detail) => {
         plainText = detail.text || "";
         doclangXml = detail.doclang_xml || "";
-        if (initialTab === "doclang" && doclangXml.trim()) activeViewerTab = "doclang";
       })
       .catch((err: any) => {
         doclangLoadError = err?.message || "Failed to load DocLang content for this document.";
@@ -739,13 +744,6 @@
       const detail = await documentsApi.get(documentId);
       plainText = detail.text || "";
       doclangXml = detail.doclang_xml || "";
-      // No real PDF to show (missing, or failed to render) -- the flat
-      // extracted-text panel is a worse default than the structured DocLang
-      // view when one is available, *unless* this load is a jump-to-clause
-      // request (highlightText/bbox), which only the text/PDF panel supports.
-      if (doclangXml.trim() && (initialTab === "doclang" || (!isPdf && !highlightText))) {
-        activeViewerTab = "doclang";
-      }
       loading = false;
       if (pdfFallbackNotice && !plainText.trim()) {
         error =
@@ -1118,7 +1116,13 @@
   });
 </script>
 
-<svelte:document onclick={() => (overlaySettingsOpen = false)} />
+<svelte:document
+  onclick={() => {
+    overlaySettingsOpen = false;
+    viewsMenuOpen = false;
+    layersMenuOpen = false;
+  }}
+/>
 
 <div class="flex h-full min-h-[60vh] flex-col">
   {#if loading}
@@ -1140,33 +1144,37 @@
     {/if}
     {#if doclangXml}
       <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
-        <div class="flex items-center gap-2">
-          <div class="flex items-center rounded-lg border border-slate-800 bg-slate-900 p-0.5">
-            <button
-              type="button"
-              onclick={() => (activeViewerTab = "document")}
-              class="rounded-md px-3 py-1 text-xs font-medium transition-colors {activeViewerTab === 'document'
-                ? 'bg-accent text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'}"
+        <div class="relative">
+          <button
+            type="button"
+            onclick={(e) => (e.stopPropagation(), (viewsMenuOpen = !viewsMenuOpen))}
+            aria-expanded={viewsMenuOpen}
+            aria-haspopup="true"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          >
+            <span>Views</span>
+            <ChevronDown class="h-3 w-3" />
+          </button>
+          {#if viewsMenuOpen}
+            <div
+              role="none"
+              onclick={(e) => e.stopPropagation()}
+              class="absolute left-0 top-full z-40 mt-2 w-48 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl"
             >
-              {isPdf ? "PDF Document" : "Extracted Text"}
-            </button>
-            <button
-              type="button"
-              onclick={() => (activeViewerTab = "doclang")}
-              class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors {activeViewerTab === 'doclang'
-                ? 'bg-accent text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'}"
-            >
-              <FileCode class="h-3.5 w-3.5 text-cyan-400" />
-              <span>DocLang & OTSL</span>
-              {#if parsedTables.length > 0}
-                <span class="rounded-full bg-cyan-950 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
-                  {parsedTables.length} {parsedTables.length === 1 ? "table" : "tables"}
-                </span>
-              {/if}
-            </button>
-          </div>
+              <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
+                <span class="text-slate-200">Original Page</span>
+                <input type="checkbox" bind:checked={showOriginalPage} />
+              </label>
+              <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
+                <span class="text-slate-200">DocLang</span>
+                <input type="checkbox" bind:checked={showDoclangPane} />
+              </label>
+              <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
+                <span class="text-slate-200">Reading View</span>
+                <input type="checkbox" bind:checked={showReadingPane} />
+              </label>
+            </div>
+          {/if}
         </div>
 
         <div class="flex items-center gap-2">
@@ -1183,99 +1191,26 @@
       </div>
     {/if}
 
-    {#if activeViewerTab === "doclang"}
-      <div class="flex flex-1 flex-col overflow-hidden bg-slate-900">
-        <!-- Sub-toolbar -->
-        <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950/80 px-4 py-2">
-          <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
-              <button
-                type="button"
-                onclick={() => (activeDoclangSubTab = "rendered")}
-                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeDoclangSubTab === 'rendered'
-                  ? 'bg-slate-800 text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'}"
-              >
-                Full Document ({documentBlocks.length})
-              </button>
-              <button
-                type="button"
-                onclick={() => (activeDoclangSubTab = "xml")}
-                class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeDoclangSubTab === 'xml'
-                  ? 'bg-slate-800 text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'}"
-              >
-                DocLang XML Markup
-              </button>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            {#if activeDoclangSubTab === "rendered" && documentBlocks.some((b) => "layer" in b && b.layer !== "body")}
-              <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
-                <span class="pl-1.5 text-caption uppercase tracking-wide text-slate-500">Layers</span>
-                <button
-                  type="button"
-                  onclick={() => (showReadingFurniture = !showReadingFurniture)}
-                  title="Toggle furniture elements (headers, footers, page numbers, …)"
-                  class="rounded-md px-2 py-1 text-xs font-medium transition-colors {showReadingFurniture
-                    ? 'bg-accent text-white'
-                    : 'text-slate-400 hover:text-slate-200'}"
-                >
-                  Furniture
-                </button>
-                <button
-                  type="button"
-                  onclick={() => (showReadingBackground = !showReadingBackground)}
-                  title="Toggle background elements"
-                  class="rounded-md px-2 py-1 text-xs font-medium transition-colors {showReadingBackground
-                    ? 'bg-accent text-white'
-                    : 'text-slate-400 hover:text-slate-200'}"
-                >
-                  Background
-                </button>
-              </div>
-            {/if}
-            {#if activeDoclangSubTab === "xml"}
-              <button
-                type="button"
-                onclick={copyXmlToClipboard}
-                class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-700 hover:text-white"
-              >
-                {#if copiedXml}
-                  <Check class="h-3 w-3 text-emerald-400" />
-                  <span class="text-emerald-400">Copied!</span>
-                {:else}
-                  <Copy class="h-3 w-3" />
-                  <span>Copy XML</span>
-                {/if}
-              </button>
-            {/if}
-          </div>
+    {#snippet readingViewContent()}
+      {#if documentBlocks.length === 0}
+        <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+          <FileCode class="mb-2 h-10 w-10 text-slate-600" />
+          <p class="text-sm font-semibold text-slate-300">No Renderable Content</p>
+          <p class="mt-1 max-w-md text-xs text-slate-500">
+            The document was parsed into DocLang XML, but no headings, paragraphs, lists, or tables could be extracted from it.
+          </p>
         </div>
-
-        <!-- Tab content -->
-        <div class="flex-1 overflow-y-auto p-4">
-          {#if activeDoclangSubTab === "rendered"}
-            {#if documentBlocks.length === 0}
-              <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
-                <FileCode class="mb-2 h-10 w-10 text-slate-600" />
-                <p class="text-sm font-semibold text-slate-300">No Renderable Content</p>
-                <p class="mt-1 max-w-md text-xs text-slate-500">
-                  The document was parsed into DocLang XML, but no headings, paragraphs, lists, or tables could be extracted from it.
-                </p>
-              </div>
-            {:else if readingBlocks.length === 0}
-              <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
-                <FileCode class="mb-2 h-10 w-10 text-slate-600" />
-                <p class="text-sm font-semibold text-slate-300">Everything is hidden</p>
-                <p class="mt-1 max-w-md text-xs text-slate-500">
-                  All of this document's content is furniture/background and currently hidden — turn on the Layers toggles above to show it.
-                </p>
-              </div>
-            {:else}
-              <div class="mx-auto max-w-4xl space-y-4">
-                {#each visibleBlocks as block, bIdx (bIdx)}
+      {:else if readingBlocks.length === 0}
+        <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+          <FileCode class="mb-2 h-10 w-10 text-slate-600" />
+          <p class="text-sm font-semibold text-slate-300">Everything is hidden</p>
+          <p class="mt-1 max-w-md text-xs text-slate-500">
+            All of this document's content is furniture/background and currently hidden — turn on the Layers toggles above to show it.
+          </p>
+        </div>
+      {:else}
+        <div class="mx-auto max-w-3xl space-y-4">
+          {#each visibleBlocks as block, bIdx (bIdx)}
                   {#if block.type === "heading"}
                     <div
                       data-element-id={block.elementId}
@@ -1395,21 +1330,17 @@
                     </div>
                   {/if}
                 {/each}
-                {#if visibleBlockCount < readingBlocks.length}
-                  <div bind:this={blocksSentinelEl} class="flex justify-center py-4">
-                    <span class="text-caption text-slate-500">Loading more…</span>
-                  </div>
-                {/if}
-              </div>
-            {/if}
-          {:else}
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-2">
-              <DocLangXmlTree xml={doclangXml} {selectedElementId} onSelect={selectElement} />
+          {#if visibleBlockCount < readingBlocks.length}
+            <div bind:this={blocksSentinelEl} class="flex justify-center py-4">
+              <span class="text-caption text-slate-500">Loading more…</span>
             </div>
           {/if}
         </div>
-      </div>
-    {:else if isPdf}
+      {/if}
+    {/snippet}
+
+    {#snippet originalPageContent()}
+      {#if isPdf}
       <div class="flex flex-1 flex-col overflow-hidden">
         <div
           class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2"
@@ -1500,7 +1431,7 @@
               <div class="relative">
                 <button
                   type="button"
-                  onclick={() => (overlaySettingsOpen = !overlaySettingsOpen)}
+                  onclick={(e) => (e.stopPropagation(), (overlaySettingsOpen = !overlaySettingsOpen))}
                   title="Overlay settings"
                   aria-expanded={overlaySettingsOpen}
                   class="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
@@ -1707,6 +1638,97 @@
           {/if}
         </div>
       </div>
+      {/if}
+    {/snippet}
+
+    <!-- Three synchronized panes -- Original Page (PDF or text fallback),
+         DocLang (raw XML), Reading View (rendered blocks) -- all visible at
+         once so a click/hover in one highlights the matching element in the
+         others, instead of the old single-active-tab switcher. Collapses to
+         just Original Page (full width) when there's no DocLang XML at all. -->
+    {#if doclangXml}
+      <div class="flex flex-1 overflow-x-auto overflow-y-hidden">
+        {#if showOriginalPage}
+          <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden border-r border-slate-800">
+            <div class="flex shrink-0 items-center border-b border-slate-800 bg-slate-950 px-3 py-1.5">
+              <span class="text-caption font-semibold uppercase tracking-wide text-slate-500">Original Page</span>
+            </div>
+            {@render originalPageContent()}
+          </div>
+        {/if}
+        {#if showDoclangPane}
+          <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden border-r border-slate-800">
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-1.5">
+              <div class="flex items-center gap-2">
+                <span class="text-caption font-semibold uppercase tracking-wide text-slate-500">DocLang</span>
+                {#if parsedTables.length > 0}
+                  <span class="rounded-full bg-cyan-950 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
+                    {parsedTables.length} {parsedTables.length === 1 ? "table" : "tables"}
+                  </span>
+                {/if}
+              </div>
+              <button
+                type="button"
+                onclick={copyXmlToClipboard}
+                class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-700 hover:text-white"
+              >
+                {#if copiedXml}
+                  <Check class="h-3 w-3 text-emerald-400" />
+                  <span class="text-emerald-400">Copied!</span>
+                {:else}
+                  <Copy class="h-3 w-3" />
+                  <span>Copy XML</span>
+                {/if}
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-2">
+              <DocLangXmlTree xml={doclangXml} {selectedElementId} onSelect={selectElement} />
+            </div>
+          </div>
+        {/if}
+        {#if showReadingPane}
+          <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden">
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-1.5">
+              <span class="text-caption font-semibold uppercase tracking-wide text-slate-500">Reading View</span>
+              {#if documentBlocks.some((b) => "layer" in b && b.layer !== "body")}
+                <div class="relative">
+                  <button
+                    type="button"
+                    onclick={(e) => (e.stopPropagation(), (layersMenuOpen = !layersMenuOpen))}
+                    aria-expanded={layersMenuOpen}
+                    aria-haspopup="true"
+                    class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-700 hover:text-white"
+                  >
+                    <span>Layers</span>
+                    <ChevronDown class="h-3 w-3" />
+                  </button>
+                  {#if layersMenuOpen}
+                    <div
+                      role="none"
+                      onclick={(e) => e.stopPropagation()}
+                      class="absolute right-0 top-full z-40 mt-2 w-44 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-2 text-xs shadow-xl"
+                    >
+                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-slate-800">
+                        <span class="text-slate-200">Furniture</span>
+                        <input type="checkbox" bind:checked={showReadingFurniture} />
+                      </label>
+                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-slate-800">
+                        <span class="text-slate-200">Background</span>
+                        <input type="checkbox" bind:checked={showReadingBackground} />
+                      </label>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+              {@render readingViewContent()}
+            </div>
+          </div>
+        {/if}
+      </div>
+    {:else}
+      {@render originalPageContent()}
     {/if}
   {/if}
 </div>
