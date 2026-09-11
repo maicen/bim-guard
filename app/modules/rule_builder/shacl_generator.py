@@ -28,6 +28,8 @@ from rdflib import BNode, Graph, Literal
 from rdflib.namespace import RDF, SH, XSD
 
 from app.modules.ifc_reader.bot_graph import BIMGUARD
+from app.modules.ifc_reader.ontology_namespaces import AEC3PO
+from app.services.qudt_normalizer import normalize_to_qudt
 
 #: `RuleCreateRequest.operator` -> SHACL constraint predicate for a single
 #: bound. Only operators expressible as a per-element property constraint
@@ -90,6 +92,11 @@ def _add_shape(shapes: Graph, rule: dict[str, Any]) -> None:
     property_path = BIMGUARD[str(rule["property_name"])]
 
     shapes.add((node_shape, RDF.type, SH.NodeShape))
+    
+    # Link AEC3PO statement to the SHACL shape
+    statement = BIMGUARD[f"statement/{rule_id}"]
+    shapes.add((statement, AEC3PO.isOperationalizedBy, node_shape))
+
     if not _apply_scope_target(shapes, node_shape, target_class, rule.get("applies_when")):
         shapes.add((node_shape, SH.targetClass, target_class))
 
@@ -182,16 +189,19 @@ def _add_shape(shapes: Graph, rule: dict[str, Any]) -> None:
 
     if operator == "between":
         if rule.get("value_min") is not None:
-            shapes.add((prop_shape, SH.minInclusive, Literal(float(rule["value_min"]), datatype=XSD.decimal)))
+            si_min, _ = normalize_to_qudt(float(rule["value_min"]), str(unit or ""))
+            shapes.add((prop_shape, SH.minInclusive, Literal(si_min, datatype=XSD.decimal)))
         if rule.get("value_max") is not None:
-            shapes.add((prop_shape, SH.maxInclusive, Literal(float(rule["value_max"]), datatype=XSD.decimal)))
+            si_max, _ = normalize_to_qudt(float(rule["value_max"]), str(unit or ""))
+            shapes.add((prop_shape, SH.maxInclusive, Literal(si_max, datatype=XSD.decimal)))
     else:
         constraint_predicate = _OPERATOR_TO_SHACL[operator]
         check_value = rule.get("check_value")
         if constraint_predicate == SH.pattern:
             shapes.add((prop_shape, constraint_predicate, Literal(str(check_value))))
         else:
-            shapes.add((prop_shape, constraint_predicate, Literal(float(check_value), datatype=datatype)))
+            si_val, _ = normalize_to_qudt(float(check_value), str(unit or ""))
+            shapes.add((prop_shape, constraint_predicate, Literal(si_val, datatype=datatype)))
 
     # If this is a property shape and we have exceptions, we need to add a sh:sparql 
     # exclusion directly onto the property shape, or change the target to exclude exceptions.

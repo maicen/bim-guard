@@ -71,6 +71,10 @@ For each rule found, fill in:
   the material keyword(s) here — else leave empty. Do not use this for
   conditions you cannot express this way (e.g. sprinkler exceptions, table
   lookups by occupancy) — leave those to needs_review instead of guessing.
+- rase_requirement: the exact regulatory text representing the core obligation (e.g. "Doors shall have a clear width").
+- rase_applicability: JSON object defining when the requirement applies (e.g. {{"occupancy": "residential"}}), or empty.
+- rase_selection: JSON object defining criteria for selecting specific targets, or empty.
+- rase_exception: JSON object defining conditions excusing the requirement (e.g. {{"has_sprinkler": true}}), or empty.
 
 CLAUSE TEXT:
 {clause_text}
@@ -104,6 +108,10 @@ class _LLMRuleCandidate(BaseModel):
             "applies to every element of target_ifc_class."
         ),
     )
+    rase_requirement: str = Field(default="", description="Core obligation text")
+    rase_applicability: dict = Field(default_factory=dict, description="When the requirement applies")
+    rase_selection: dict = Field(default_factory=dict, description="Criteria for targets")
+    rase_exception: dict = Field(default_factory=dict, description="Conditions excusing the requirement")
 
 
 class _LLMRuleExtractionResult(BaseModel):
@@ -151,6 +159,10 @@ def _candidate_to_draft(
         extraction_method="llamaindex_pydantic",
         needs_review=candidate.needs_review,
         applies_when=applies_when,
+        rase_requirement=candidate.rase_requirement.strip() or None,
+        rase_applicability=candidate.rase_applicability or None,
+        rase_selection=candidate.rase_selection or None,
+        rase_exception=candidate.rase_exception or None,
     )
 
     return RuleExtractionDraft(

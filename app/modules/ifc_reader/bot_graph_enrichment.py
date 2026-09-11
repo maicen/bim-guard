@@ -60,7 +60,7 @@ def _enrich_door_clear_widths(graph: Graph, m2_reader: Any) -> None:
         except Exception:
             continue
         if clear_width_mm is not None:
-            enrich_literal(graph, guid, "calculatedClearWidth", clear_width_mm)
+            enrich_literal(graph, guid, "calculatedClearWidth", clear_width_mm, unit="mm")
 
 
 def _enrich_travel_distances(graph: Graph, egress_checks: dict | None) -> None:
@@ -68,4 +68,4 @@ def _enrich_travel_distances(graph: Graph, egress_checks: dict | None) -> None:
         space_guid = record.get("space_guid")
         distance_m = record.get("travel_distance_m")
         if space_guid and distance_m is not None:
-            enrich_literal(graph, space_guid, "travelDistanceM", distance_m)
+            enrich_literal(graph, space_guid, "travelDistanceM", distance_m, unit="m")

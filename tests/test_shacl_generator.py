@@ -44,7 +44,7 @@ def test_compile_shapes_emits_node_shape_with_min_inclusive():
     prop_shapes = list(shapes.objects(node_shapes[0], SH.property))
     assert len(prop_shapes) == 1
     assert shapes.value(prop_shapes[0], SH.minInclusive) is not None
-    assert float(shapes.value(prop_shapes[0], SH.minInclusive)) == 900.0
+    assert float(shapes.value(prop_shapes[0], SH.minInclusive)) == 0.9
     assert shapes.value(prop_shapes[0], SH.severity) == SH.Violation
 
 

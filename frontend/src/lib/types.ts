@@ -450,6 +450,10 @@ export interface Rule extends Timestamps {
   confidence?: string | null;
   extraction_method?: string | null;
   needs_review?: number;
+  rase_requirement?: string | null;
+  rase_applicability?: Record<string, unknown> | null;
+  rase_selection?: Record<string, unknown> | null;
+  rase_exception?: Record<string, unknown> | null;
 }
 
 export interface RuleSourceResponse {
@@ -784,6 +788,10 @@ export interface RuleCreateRequest {
   applies_when?: Record<string, unknown> | null;
   /** Waiver predicates excusing an otherwise-failing element; each references another rule. */
   exceptions?: unknown[] | null;
+  rase_requirement?: string | null;
+  rase_applicability?: Record<string, unknown> | null;
+  rase_selection?: Record<string, unknown> | null;
+  rase_exception?: Record<string, unknown> | null;
 }
 
 export interface RuleExtractionDraft {

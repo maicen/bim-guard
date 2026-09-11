@@ -748,6 +748,10 @@ class RuleCreateRequest(BaseModel):
             "app.modules.comparator._waiver_for."
         ),
     )
+    rase_requirement: Optional[str] = Field(default=None, description="Regulatory text representing the core obligation")
+    rase_applicability: Optional[dict] = Field(default=None, description="Condition defining when the requirement applies")
+    rase_selection: Optional[dict] = Field(default=None, description="Criteria for selecting specific targets")
+    rase_exception: Optional[dict] = Field(default=None, description="Condition excusing the requirement")
 
 
 class RuleUpdateRequest(BaseModel):
@@ -772,6 +776,10 @@ class RuleUpdateRequest(BaseModel):
     severity: Optional[str] = None
     needs_review: Optional[int] = None
     category: Optional[str] = None
+    rase_requirement: Optional[str] = None
+    rase_applicability: Optional[dict] = None
+    rase_selection: Optional[dict] = None
+    rase_exception: Optional[dict] = None
 
 
 class RuleResponse(TimestampFields):
@@ -809,6 +817,10 @@ class RuleResponse(TimestampFields):
     confidence: Optional[str] = None
     extraction_method: Optional[str] = None
     needs_review: Optional[int] = 0
+    rase_requirement: Optional[str] = None
+    rase_applicability: Optional[dict] = None
+    rase_selection: Optional[dict] = None
+    rase_exception: Optional[dict] = None
 
 
 class RuleDraftStatus(str, Enum):

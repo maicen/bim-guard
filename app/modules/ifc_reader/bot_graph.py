@@ -18,12 +18,16 @@ from __future__ import annotations
 from typing import Any
 
 import networkx as nx
-from rdflib import RDF, RDFS, Graph, Literal, Namespace, URIRef
+from rdflib import RDF, RDFS, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import XSD
+
+from app.services.qudt_normalizer import normalize_to_qudt
 
 BOT = Namespace("https://w3id.org/bot#")
 BIMGUARD = Namespace("https://bimguard.ai/onto#")
 S4BLDG = Namespace("https://saref.etsi.org/saref4bldg/")
+QUDT = Namespace("http://qudt.org/schema/qudt/")
+UNIT = Namespace("http://qudt.org/vocab/unit/")
 
 #: IFC spatial-structure types mapped onto their BOT class. `IfcProject` maps
 #: to `bot:Zone` (the SRS's root spatial container) rather than a dedicated
@@ -87,6 +91,8 @@ def build_bot_graph(ifc_graph: nx.DiGraph, adjacency: Any | None = None) -> Grap
     graph.bind("bot", BOT)
     graph.bind("bimguard", BIMGUARD)
     graph.bind("s4bldg", S4BLDG)
+    graph.bind("qudt", QUDT)
+    graph.bind("unit", UNIT)
 
     for guid, data in ifc_graph.nodes(data=True):
         subject = element_uri(guid)
@@ -146,6 +152,7 @@ def enrich_literal(
     value: float | int | str | bool,
     *,
     datatype: URIRef = XSD.decimal,
+    unit: str | None = None,
 ) -> None:
     """Attach one engine-computed value to an element node as an RDF literal.
 
@@ -154,4 +161,14 @@ def enrich_literal(
     constrain them -- e.g. `enrich_literal(graph, door_guid,
     "calculatedClearWidth", 880.0)`.
     """
-    graph.set((element_uri(guid), BIMGUARD[predicate], Literal(value, datatype=datatype)))
+    subject = element_uri(guid)
+    graph.set((subject, BIMGUARD[predicate], Literal(value, datatype=datatype)))
+    
+    if unit is not None and isinstance(value, (int, float)):
+        si_value, qudt_uri = normalize_to_qudt(float(value), unit)
+        if qudt_uri:
+            # Create an additive QUDT blank node for this quantity
+            quantity_node = BNode()
+            graph.add((subject, BIMGUARD[f"{predicate}Qudt"], quantity_node))
+            graph.add((quantity_node, QUDT.numericValue, Literal(si_value, datatype=XSD.decimal)))
+            graph.add((quantity_node, QUDT.hasUnit, URIRef(qudt_uri)))
