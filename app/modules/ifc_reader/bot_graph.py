@@ -160,6 +160,14 @@ def enrich_literal(
     `ifc_stair.py`, `blue_halo/`) back onto the BOT graph so SHACL shapes can
     constrain them -- e.g. `enrich_literal(graph, door_guid,
     "calculatedClearWidth", 880.0)`.
+
+    `value` is always stored raw/as given under `predicate` -- SHACL shapes
+    (`app.modules.rule_builder.shacl_generator`) compare against this literal
+    in whatever unit it was written in. When `unit` is also given, an
+    ADDITIONAL, SI-converted `qudt:numericValue`/`qudt:hasUnit` quantity node
+    is attached under `{predicate}Qudt` purely for interoperability/export --
+    it is never what a SHACL constraint reads, so it does not need to agree
+    with `datatype`/`value`'s own unit.
     """
     subject = element_uri(guid)
     graph.set((subject, BIMGUARD[predicate], Literal(value, datatype=datatype)))

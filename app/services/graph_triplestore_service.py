@@ -92,19 +92,23 @@ class GraphTriplestoreService:
             The SPARQL JSON results format representation of the query results.
         """
         graph_name = self._graph_name_for(project_id)
-        
+
         try:
-            # We use use_default_graph_as_union=False and default_graph=graph_name
-            # so the query only sees the project's data.
-            # wait, pyoxigraph's query method has `default_graph` param?
-            # Actually, `query` signature: query(query: str, *, default_graph: Union[NamedNode, BlankNode, DefaultGraph, None] = None, named_graphs: Optional[Iterable[Union[NamedNode, BlankNode]]] = None, use_default_graph_as_union: bool = False, base_iri: Optional[str] = None)
-            
+            # `default_graph` alone only restricts the query's DEFAULT
+            # (unnamed) graph pattern -- an explicit `GRAPH <uri> { ... }`
+            # clause in the submitted query text can still address ANY named
+            # graph in the shared store regardless of `default_graph`, which
+            # would let one project's query read another project's data.
+            # `named_graphs` is what actually restricts which graphs GRAPH
+            # clauses may name, so both must be passed together to enforce
+            # tenant isolation (per-project named graphs, single store).
             results = self.store.query(
                 sparql_query,
                 default_graph=graph_name,
+                named_graphs=[graph_name],
                 use_default_graph_as_union=False,
             )
-            
+
             return self._format_results(results)
         except Exception as exc:
             logger.error("SPARQL query failed project_id=%d error=%s", project_id, exc)

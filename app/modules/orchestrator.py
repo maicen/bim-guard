@@ -838,12 +838,25 @@ class BIMGuard_App:
                     rule_type="CODE-SHACL", element=bot_graph, metadata={"shapes_graph": shapes}
                 ),
             )
-            
-            if triplestore_service:
-                bot_graph += shapes
-                triplestore_service.load_graph(project_id, bot_graph)
 
-            issues = lift_shacl_report(result.raw_result) if result.raw_result is not None else []
+            if triplestore_service:
+                # Persist the domain graph plus its RASE/AEC3PO regulatory
+                # provenance (app.modules.rule_builder.aec3po_exporter) so
+                # both are queryable via /api/sparql -- but never the SHACL
+                # shapes graph itself, which is validation-engine plumbing
+                # (sh:NodeShape, sh:sparql, ...), not domain or regulatory
+                # data, and would otherwise pollute every SPARQL query
+                # against the project's graph.
+                from app.modules.rule_builder.aec3po_exporter import export_aec3po
+
+                persisted_graph = bot_graph + export_aec3po(library_rules)
+                triplestore_service.load_graph(project_id, persisted_graph)
+
+            issues = (
+                lift_shacl_report(result.raw_result, shapes_graph=shapes)
+                if result.raw_result is not None
+                else []
+            )
             log_progress(92, "shacl-compliance-complete", findings=len(issues))
             return [issue_to_dict(issue) for issue in issues], None
         except Exception as exc:

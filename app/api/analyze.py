@@ -615,16 +615,20 @@ def run_analysis_endpoint(
 def run_lbd_persistence(
     project_id: int,
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
-    use_cache: bool = Query(True, description="Whether to read from cache"),
 ) -> dict[str, Any]:
     """Execute SHACL compliance and persist the BOT graph to the triplestore."""
     project_access(project_id)
-    
-    # We call run_analysis for 'architecture' with enable_shacl=True.
-    # The orchestrator is wired with the triplestore service, so the graph will
-    # be automatically saved to the pyoxigraph store during the SHACL step.
-    raw_result = run_analysis("architecture", project_id, use_cache=use_cache, enable_shacl=True)
-    
+
+    # We call run_analysis for 'architecture' with enable_shacl=True. The
+    # orchestrator is wired with the triplestore service, and saves the graph
+    # during the SHACL step -- but only when that step actually runs.
+    # use_cache is forced off: `enable_shacl` is part of the cache key
+    # (analysis_cache.CacheKey), so a prior cached run with SHACL enabled
+    # (e.g. from the "SHACL (preview)" toggle) would otherwise short-circuit
+    # orchestrate_workflow entirely and skip the persistence side effect,
+    # while this endpoint still reported success.
+    raw_result = run_analysis("architecture", project_id, use_cache=False, enable_shacl=True)
+
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

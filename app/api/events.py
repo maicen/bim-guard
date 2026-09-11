@@ -101,6 +101,7 @@ async def _sse_generator(
                 yield ": keep-alive ping\n\n"
                 continue
 
+            hit_max = False
             for event in batch:
                 event_data = {
                     "event_type": event.event_type,
@@ -111,14 +112,20 @@ async def _sse_generator(
                 }
                 yield f"event: pipeline_event\ndata: {json.dumps(event_data)}\n\n"
                 yielded += 1
+                if effective_max is not None and yielded >= effective_max:
+                    hit_max = True
+                    break
 
                 # Also send updated full snapshot on stage transitions or completion
                 if event.event_type in {"stage_transition", "engine_complete", "engine_failed"}:
                     current_snap = snapshot(project_id)
                     yield f"event: status\ndata: {json.dumps(current_snap)}\n\n"
                     yielded += 1
+                    if effective_max is not None and yielded >= effective_max:
+                        hit_max = True
+                        break
 
-            if effective_max is not None and yielded >= effective_max:
+            if hit_max:
                 break
 
     except asyncio.CancelledError:

@@ -10,14 +10,27 @@ pyshacl against a BOT graph (`app.modules.ifc_reader.bot_graph`).
 Per this repo's "Zero Hardcoded Logic" rule, shapes are compiled from `rules`
 rows at run time -- there is no static .ttl shape file checked in.
 
-Scope of this first pass: `applies_when` (Applicability/Selection) is
-compiled into scope-narrowing SPARQL-based targets, preserving the
+Scope: `applies_when` (Applicability/Selection) is compiled into
+scope-narrowing SPARQL-based targets, preserving the
 MATCH/NO_MATCH/UNDETERMINED semantics `app.modules.comparator` already uses
 (an element the graph says nothing about stays in scope). `exceptions`
-(waivers) are NOT yet compiled here -- they still only apply along the
-existing dict-based comparator path. Extending pyshacl-based validation to
-also honour `exceptions` is a follow-up once there is a concrete need to
-waive a SHACL-flagged violation.
+(waivers) are compiled too, as an additional `FILTER NOT EXISTS` on the
+shape's target/constraint query, mirroring the comparator's own waiver
+semantics rather than reimplementing them.
+
+Numeric thresholds are compared in the rule's own declared `unit` (attached
+to the shape as a plain `bimguard:unit` documentation literal), matching
+whatever unit the graph literal itself is recorded in -- they are
+deliberately NOT converted to SI, since nothing guarantees every literal on
+the BOT graph is SI-normalized (see `bot_graph.enrich_literal`, which keeps
+the raw value as the primary literal and only attaches SI-converted QUDT
+metadata as an additional, non-authoritative annotation).
+
+`field_consistency` and `unique_within_scope` are only compiled for the
+subset of cases with a safe, faithful SPARQL translation (see
+`rule_is_shacl_eligible`'s docstring) -- everything else stays on the
+existing dict-based comparator path rather than risk a SHACL result that
+silently disagrees with it.
 """
 
 from __future__ import annotations
@@ -29,7 +42,6 @@ from rdflib.namespace import RDF, SH, XSD
 
 from app.modules.ifc_reader.bot_graph import BIMGUARD
 from app.modules.ifc_reader.ontology_namespaces import AEC3PO
-from app.services.qudt_normalizer import normalize_to_qudt
 
 #: `RuleCreateRequest.operator` -> SHACL constraint predicate for a single
 #: bound. Only operators expressible as a per-element property constraint
@@ -63,12 +75,32 @@ _OPERATOR_TO_SPARQL = {
 }
 
 def rule_is_shacl_eligible(rule: dict[str, Any]) -> bool:
-    """Return True when a rule's requirement can be expressed as a SHACL shape."""
+    """Return True when a rule's requirement can be expressed as a SHACL shape.
+
+    `field_consistency` and `unique_within_scope` are narrowed relative to
+    what the procedural comparator (`app.modules.comparator`) supports:
+
+    - `field_consistency` compares two DIFFERENT properties on the SAME
+      element, optionally transforming one through `name_pattern` (a Python
+      regex, via `_apply_name_pattern`). Only the untransformed case (no
+      `name_pattern`) has a safe, faithful SPARQL translation here -- a rule
+      that also sets `name_pattern` is left to the procedural path rather
+      than risk a SPARQL approximation that silently disagrees with it.
+    - `unique_within_scope` groups elements by `uniqueness_scope`
+      (storey/space/building). Only the "building" scope (the default) --
+      elements of the same `target_ifc_class` graph-wide -- is compiled;
+      "storey"/"space" scoping would need multi-hop BOT traversal this first
+      pass does not attempt, so those stay on the procedural path too.
+    """
     if not rule.get("target_ifc_class") or not rule.get("property_name"):
         return False
     operator = str(rule.get("operator") or "")
     if operator == "between":
         return rule.get("value_min") is not None or rule.get("value_max") is not None
+    if operator == "field_consistency":
+        return bool(rule.get("compare_property")) and not rule.get("name_pattern")
+    if operator == "unique_within_scope":
+        return str(rule.get("uniqueness_scope") or "building").strip().lower() == "building"
     return operator in _OPERATOR_TO_SHACL or operator in _OPERATOR_TO_SPARQL
 
 
@@ -92,10 +124,14 @@ def _add_shape(shapes: Graph, rule: dict[str, Any]) -> None:
     property_path = BIMGUARD[str(rule["property_name"])]
 
     shapes.add((node_shape, RDF.type, SH.NodeShape))
-    
-    # Link AEC3PO statement to the SHACL shape
-    statement = BIMGUARD[f"statement/{rule_id}"]
-    shapes.add((statement, AEC3PO.isOperationalizedBy, node_shape))
+
+    # Link the AEC3PO regulatory statement to the SHACL shape that
+    # operationalizes it -- only for rules that actually carry RASE
+    # metadata (see aec3po_exporter.export_aec3po()); a rule with no RASE
+    # fields has no corresponding aec3po:Statement to point at.
+    if rule.get("rase_requirement"):
+        statement = BIMGUARD[f"statement/{rule_id}"]
+        shapes.add((statement, AEC3PO.isOperationalizedBy, node_shape))
 
     if not _apply_scope_target(shapes, node_shape, target_class, rule.get("applies_when")):
         shapes.add((node_shape, SH.targetClass, target_class))
@@ -108,6 +144,12 @@ def _add_shape(shapes: Graph, rule: dict[str, Any]) -> None:
     datatype = XSD.string if unit == "" and operator == "matches" else XSD.decimal
 
     if operator in _OPERATOR_TO_SPARQL:
+        # pyshacl reports sh:sourceShape as the shape DECLARING the sh:sparql
+        # constraint -- the NodeShape, not the SPARQLConstraint blank node --
+        # so lift_shacl_report() (which reads bimguard:ruleId off
+        # sh:sourceShape) needs it here too, not only on sparql_constraint.
+        shapes.add((node_shape, BIMGUARD.ruleId, Literal(rule_id)))
+
         sparql_constraint = BNode()
         shapes.add((node_shape, SH.sparql, sparql_constraint))
         shapes.add((sparql_constraint, RDF.type, SH.SPARQLConstraint))
@@ -151,21 +193,35 @@ def _add_shape(shapes: Graph, rule: dict[str, Any]) -> None:
             }}
             """
         elif operator == "unique_within_scope":
+            # Only compiled for uniqueness_scope="building" (see
+            # rule_is_shacl_eligible) -- ?other is restricted to the same
+            # target_ifc_class, matching _evaluate_uniqueness_rule()'s
+            # per-rule element list, which only ever contains elements of
+            # this rule's own target class.
             query = f"""
             SELECT $this ?value
             WHERE {{
-                $this bimguard:{property_local} ?value .
-                ?other bimguard:{property_local} ?value .
+                $this a <{target_class}> ;
+                      bimguard:{property_local} ?value .
+                ?other a <{target_class}> ;
+                       bimguard:{property_local} ?value .
                 FILTER($this != ?other)
             }}
             """
         elif operator == "field_consistency":
+            # Only compiled when compare_property is set and name_pattern is
+            # not (see rule_is_shacl_eligible) -- this compares two
+            # DIFFERENT properties on the SAME element, matching
+            # _evaluate_rule()'s field_consistency branch exactly (modulo
+            # the name_pattern transform, which has no safe SPARQL
+            # translation and is left to the procedural path).
+            compare_property_local = str(rule.get("compare_property") or "")
             query = f"""
             SELECT $this ?value
             WHERE {{
-                $this bimguard:{property_local} ?value .
-                ?other bimguard:{property_local} ?other_val .
-                FILTER($this != ?other && ?value != ?other_val)
+                $this bimguard:{property_local} ?value ;
+                      bimguard:{compare_property_local} ?compare_value .
+                FILTER(LCASE(STR(?value)) != LCASE(STR(?compare_value)))
             }}
             """
         else:
@@ -187,21 +243,30 @@ def _add_shape(shapes: Graph, rule: dict[str, Any]) -> None:
     shapes.add((prop_shape, SH.severity, severity))
     shapes.add((prop_shape, BIMGUARD.ruleId, Literal(rule_id)))
 
+    # The constraint value is compared against whatever unit the graph
+    # literal is actually recorded in (raw/native -- e.g. mm for
+    # calculatedClearWidth, see bot_graph_enrichment.py), so it MUST stay in
+    # the rule's own declared unit rather than being SI-converted: SI-
+    # converting only the threshold while the graph literal stays native
+    # would silently break every numeric comparison (e.g. 900mm becoming a
+    # 0.9 threshold compared against an 880mm literal). `unit` is instead
+    # attached as a plain documentation literal below, not folded into the
+    # comparison value.
     if operator == "between":
         if rule.get("value_min") is not None:
-            si_min, _ = normalize_to_qudt(float(rule["value_min"]), str(unit or ""))
-            shapes.add((prop_shape, SH.minInclusive, Literal(si_min, datatype=XSD.decimal)))
+            shapes.add((prop_shape, SH.minInclusive, Literal(float(rule["value_min"]), datatype=XSD.decimal)))
         if rule.get("value_max") is not None:
-            si_max, _ = normalize_to_qudt(float(rule["value_max"]), str(unit or ""))
-            shapes.add((prop_shape, SH.maxInclusive, Literal(si_max, datatype=XSD.decimal)))
+            shapes.add((prop_shape, SH.maxInclusive, Literal(float(rule["value_max"]), datatype=XSD.decimal)))
     else:
         constraint_predicate = _OPERATOR_TO_SHACL[operator]
         check_value = rule.get("check_value")
         if constraint_predicate == SH.pattern:
             shapes.add((prop_shape, constraint_predicate, Literal(str(check_value))))
         else:
-            si_val, _ = normalize_to_qudt(float(check_value), str(unit or ""))
-            shapes.add((prop_shape, constraint_predicate, Literal(si_val, datatype=datatype)))
+            shapes.add((prop_shape, constraint_predicate, Literal(float(check_value), datatype=datatype)))
+
+    if unit:
+        shapes.add((prop_shape, BIMGUARD.unit, Literal(str(unit))))
 
     # If this is a property shape and we have exceptions, we need to add a sh:sparql 
     # exclusion directly onto the property shape, or change the target to exclude exceptions.

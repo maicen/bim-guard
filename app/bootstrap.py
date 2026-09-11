@@ -649,6 +649,16 @@ def build_default_container() -> ApplicationContainer:
     try:
         graph_triplestore_service = GraphTriplestoreService(store_path=".oxigraph_db")
     except Exception as e:
+        # pyoxigraph's on-disk store takes an exclusive process-level lock,
+        # so a second process pointed at the same .oxigraph_db path (another
+        # test worker, or another uvicorn worker in a multi-worker
+        # production deployment) cannot open it and lands here. The
+        # in-memory fallback keeps that process working, but its triplestore
+        # is then private to this process -- SPARQL/LBD persistence in a
+        # multi-worker deployment will not be consistent across workers
+        # until this store is moved off a single shared on-disk path (e.g. a
+        # dedicated triplestore service each worker connects to over the
+        # network) rather than an embedded per-process store.
         logger.warning(f"Could not initialize GraphTriplestoreService with disk store: {e}")
         graph_triplestore_service = GraphTriplestoreService()
 

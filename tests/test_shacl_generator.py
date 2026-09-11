@@ -35,6 +35,21 @@ def test_rule_is_not_eligible_for_unsupported_operator():
     assert rule_is_shacl_eligible(_door_width_rule(operator="some_unsupported_op")) is False
 
 
+def test_field_consistency_eligible_only_without_name_pattern():
+    rule = _door_width_rule(operator="field_consistency", compare_property="tag_id")
+    assert rule_is_shacl_eligible(rule) is True
+    assert rule_is_shacl_eligible({**rule, "name_pattern": r"(\d+)$"}) is False
+    assert rule_is_shacl_eligible({**rule, "compare_property": None}) is False
+
+
+def test_unique_within_scope_eligible_only_for_building_scope():
+    rule = _door_width_rule(operator="unique_within_scope")
+    assert rule_is_shacl_eligible(rule) is True
+    assert rule_is_shacl_eligible({**rule, "uniqueness_scope": "building"}) is True
+    assert rule_is_shacl_eligible({**rule, "uniqueness_scope": "storey"}) is False
+    assert rule_is_shacl_eligible({**rule, "uniqueness_scope": "space"}) is False
+
+
 def test_compile_shapes_emits_node_shape_with_min_inclusive():
     shapes = compile_shapes([_door_width_rule()])
 
@@ -44,7 +59,7 @@ def test_compile_shapes_emits_node_shape_with_min_inclusive():
     prop_shapes = list(shapes.objects(node_shapes[0], SH.property))
     assert len(prop_shapes) == 1
     assert shapes.value(prop_shapes[0], SH.minInclusive) is not None
-    assert float(shapes.value(prop_shapes[0], SH.minInclusive)) == 0.9
+    assert float(shapes.value(prop_shapes[0], SH.minInclusive)) == 900.0
     assert shapes.value(prop_shapes[0], SH.severity) == SH.Violation
 
 

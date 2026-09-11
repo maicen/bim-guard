@@ -355,19 +355,28 @@ def _local_id(uri: str, prefix: str) -> str | None:
     return text[len(prefix) :] if text.startswith(prefix) else None
 
 
-def lift_shacl_report(results_graph: Graph, *, mechanism: str = "CODE-SHACL") -> list[Issue]:
+def lift_shacl_report(
+    results_graph: Graph, *, shapes_graph: Graph | None = None, mechanism: str = "CODE-SHACL"
+) -> list[Issue]:
     """Convert a pyshacl `sh:ValidationReport` graph into `Issue` records.
 
     Each `sh:ValidationResult` becomes one Issue: `sh:focusNode` (a
     `bot_graph.element_uri()`) resolves to the IFC GlobalId, and the rule id
-    comes from `bimguard:ruleId` on `sh:sourceShape` -- pyshacl copies
-    `sh:sourceShape` into the report as the *property* shape
-    (`shacl_generator._add_shape()`'s blank node), not the enclosing
-    `sh:NodeShape` URI, so `shacl_generator` stamps the rule id directly onto
-    that property shape for this lookup rather than relying on a URI that
-    never appears in the report. `sh:resultMessage` is the description, and
-    `sh:resultSeverity` maps onto `RiskBand`. A result missing a recognisable
-    focus node or rule id is skipped rather than guessed.
+    comes from `bimguard:ruleId` on `sh:sourceShape`.
+
+    Where that lookup resolves depends on what kind of shape produced the
+    violation. For a SHACL Core property constraint, `sh:sourceShape` is the
+    *property* shape blank node (`shacl_generator._add_shape()`'s), and
+    pyshacl inlines a blank node's own triples into the report graph, so
+    `bimguard:ruleId` is already present in `results_graph`. For a `sh:sparql`
+    constraint, `sh:sourceShape` is instead the enclosing `sh:NodeShape`'s own
+    URI (a named node, never inlined) -- `results_graph` alone has no triples
+    about it, so `shapes_graph` (the original compiled shapes, still in scope
+    at the caller) is required to resolve `bimguard:ruleId` for that case.
+
+    `sh:resultMessage` is the description, and `sh:resultSeverity` maps onto
+    `RiskBand`. A result missing a recognisable focus node or rule id is
+    skipped rather than guessed.
     """
     issues: list[Issue] = []
 
@@ -376,6 +385,8 @@ def lift_shacl_report(results_graph: Graph, *, mechanism: str = "CODE-SHACL") ->
         source_shape = results_graph.value(result, SH.sourceShape)
         element_id = _local_id(focus_node, _ELEMENT_PREFIX) if focus_node else None
         rule_id = results_graph.value(source_shape, BIMGUARD.ruleId) if source_shape else None
+        if rule_id is None and source_shape is not None and shapes_graph is not None:
+            rule_id = shapes_graph.value(source_shape, BIMGUARD.ruleId)
         rule_id = str(rule_id) if rule_id else None
         if not element_id or not rule_id:
             continue

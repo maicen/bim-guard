@@ -315,7 +315,7 @@ def as_issue(raw: Issue | dict) -> Issue:
 
 
 def _run_architecture(project_id: int, enable_shacl: bool = False) -> dict:
-    """Return the ``AnalysisResult`` for an architectural run.checks, shaped as an ``AnalysisResult``.
+    """Run the Part 9 architectural checks, shaped as an ``AnalysisResult``.
 
     Architecture does not reach its findings through Phase 6 the way corrosion
     and seismic do: it runs the orchestrator's Architecture theme, which already
@@ -344,8 +344,8 @@ def _run_architecture(project_id: int, enable_shacl: bool = False) -> dict:
         raw = PipelineOrchestratorService.orchestrate_workflow(
             project_id=project_id,
             doc_ids=[],  # No documents needed for structural/corrosion/architecture clash
-            analysis_theme=analysis_theme,
-            rule_folder=rule_folder,
+            analysis_theme="Architecture",
+            rule_folder="",
             include_openings=True,
             include_spaces=True,
             include_type_definitions=False,
