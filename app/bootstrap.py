@@ -661,6 +661,18 @@ def build_default_container() -> ApplicationContainer:
         triplestore_service=graph_triplestore_service,
     )
 
+    # 6. Background Cache Pre-warming (MTR-03)
+    import threading
+    from app.services.bsdd_ontology_repository import get_bsdd_ontology_repository
+
+    def _prewarm_bsdd_cache():
+        try:
+            get_bsdd_ontology_repository()._refresh_if_stale()
+        except Exception:
+            pass
+
+    threading.Thread(target=_prewarm_bsdd_cache, daemon=True).start()
+
     return ApplicationContainer(
         storage=storage,
         projects_repo=projects_repo,

@@ -78,9 +78,30 @@ async def _sse_generator(
                 logger.debug("SSE client disconnected for project_id=%d", project_id)
                 break
 
+            batch = []
             try:
-                # Wait up to 15 seconds for an event before sending a keep-alive heartbeat
+                # Wait up to 15 seconds for the first event
                 event: PipelineEvent = await asyncio.wait_for(queue.get(), timeout=15.0)
+                batch.append(event)
+                
+                # Drain the queue for up to 100ms (MTR-04 batching)
+                loop = asyncio.get_running_loop()
+                end_time = loop.time() + 0.1
+                while True:
+                    remaining_time = end_time - loop.time()
+                    if remaining_time <= 0:
+                        break
+                    try:
+                        next_event = await asyncio.wait_for(queue.get(), timeout=remaining_time)
+                        batch.append(next_event)
+                    except asyncio.TimeoutError:
+                        break
+            except asyncio.TimeoutError:
+                # Keep-alive heartbeat comment
+                yield ": keep-alive ping\n\n"
+                continue
+
+            for event in batch:
                 event_data = {
                     "event_type": event.event_type,
                     "source_module": event.source_module,
@@ -90,20 +111,15 @@ async def _sse_generator(
                 }
                 yield f"event: pipeline_event\ndata: {json.dumps(event_data)}\n\n"
                 yielded += 1
-                if effective_max is not None and yielded >= effective_max:
-                    break
 
                 # Also send updated full snapshot on stage transitions or completion
                 if event.event_type in {"stage_transition", "engine_complete", "engine_failed"}:
                     current_snap = snapshot(project_id)
                     yield f"event: status\ndata: {json.dumps(current_snap)}\n\n"
                     yielded += 1
-                    if effective_max is not None and yielded >= effective_max:
-                        break
 
-            except asyncio.TimeoutError:
-                # Keep-alive heartbeat comment
-                yield ": keep-alive ping\n\n"
+            if effective_max is not None and yielded >= effective_max:
+                break
 
     except asyncio.CancelledError:
         logger.debug("SSE connection cancelled for project_id=%d", project_id)

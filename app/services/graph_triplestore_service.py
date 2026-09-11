@@ -21,13 +21,18 @@ class GraphTriplestoreService:
     that isolates project data using named graphs.
     """
 
-    def __init__(self, store_path: str | None = None) -> None:
+    def __init__(self, store_path: str | None = None, max_in_memory_graphs: int = 5) -> None:
         """Initialize the triplestore.
 
         Args:
             store_path: Optional path to persist the store on disk. If None,
                 the store is kept in-memory.
+            max_in_memory_graphs: How many project graphs to keep if in-memory.
         """
+        self.is_in_memory = not bool(store_path)
+        self.max_in_memory_graphs = max_in_memory_graphs
+        self._lru: list[int] = []
+
         if store_path:
             self.store = pyoxigraph.Store(store_path)
             logger.info("Initialized pyoxigraph store at %s", store_path)
@@ -46,6 +51,15 @@ class GraphTriplestoreService:
             project_id: The project this graph belongs to.
             graph: The rdflib.Graph containing the triples to store.
         """
+        if self.is_in_memory:
+            if project_id in self._lru:
+                self._lru.remove(project_id)
+            self._lru.append(project_id)
+            if len(self._lru) > self.max_in_memory_graphs:
+                evict_id = self._lru.pop(0)
+                self.store.clear_graph(self._graph_name_for(evict_id))
+                logger.info("Evicted graph for project_id=%d from in-memory store (MTR-05 LRU)", evict_id)
+
         graph_name = self._graph_name_for(project_id)
         
         # Clear existing graph for this project to ensure we don't leak stale triples

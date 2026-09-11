@@ -88,12 +88,31 @@ class ShaclComplianceEngine(RuleEvaluator):
                 action="No rule in this ruleset compiles to a SHACL shape",
             )
 
-        conforms, results_graph, results_text = pyshacl_validate(
-            data_graph,
-            shacl_graph=shapes_graph,
-            advanced=True,
-            inference="none",
-        )
+        import concurrent.futures
+
+        def _run_validate():
+            return pyshacl_validate(
+                data_graph,
+                shacl_graph=shapes_graph,
+                advanced=True,
+                inference="none",
+            )
+            
+        # MTR-02: At least 20 shapes/second, minimum 10s
+        timeout_seconds = max(10.0, len(shapes_graph) / 20.0)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_run_validate)
+            try:
+                conforms, results_graph, results_text = future.result(timeout=timeout_seconds)
+            except concurrent.futures.TimeoutError:
+                logger.error("SHACL evaluation timed out after %s seconds", timeout_seconds)
+                return RuleEvaluationResult(
+                    rule_type=self.rule_type,
+                    status="NOT_ASSESSED",
+                    details={"reason": "SHACL evaluation timed out", "timeout_seconds": timeout_seconds},
+                    action="Simplify shapes or increase timeout",
+                )
 
         return RuleEvaluationResult(
             rule_type=self.rule_type,
