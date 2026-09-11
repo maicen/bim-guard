@@ -44,6 +44,21 @@ def build_ifc_graph(model) -> nx.DiGraph:
     """Build a directed IFC relationship graph from products and key relations."""
     graph = nx.DiGraph()
 
+    # IfcProject is IfcContext, not IfcProduct, so it is added explicitly --
+    # the IfcProduct loop below would otherwise never see it, leaving the
+    # BOT graph (app.modules.ifc_reader.bot_graph) without a root bot:Zone
+    # node even though IfcRelAggregates links it to every IfcSite.
+    for project in model.by_type("IfcProject"):
+        guid = getattr(project, "GlobalId", None)
+        if not guid:
+            continue
+        graph.add_node(
+            guid,
+            label=_safe_label(project),
+            ifc_type=project.is_a(),
+            psets={},
+        )
+
     for product in model.by_type("IfcProduct"):
         guid = getattr(product, "GlobalId", None)
         if not guid:

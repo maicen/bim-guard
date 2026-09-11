@@ -23,23 +23,48 @@ from rdflib.namespace import XSD
 
 BOT = Namespace("https://w3id.org/bot#")
 BIMGUARD = Namespace("https://bimguard.ai/onto#")
+S4BLDG = Namespace("https://saref.etsi.org/saref4bldg/")
 
-#: IFC spatial-structure types mapped onto their BOT class.
+#: IFC spatial-structure types mapped onto their BOT class. `IfcProject` maps
+#: to `bot:Zone` (the SRS's root spatial container) rather than a dedicated
+#: BOT class of its own -- BOT has no `Project` class, and `bot:Zone` is the
+#: vocabulary's generic spatial-region superclass.
 _SPATIAL_TYPE_TO_BOT = {
+    "IfcProject": BOT.Zone,
     "IfcSite": BOT.Site,
     "IfcBuilding": BOT.Building,
     "IfcBuildingStorey": BOT.Storey,
     "IfcSpace": BOT.Space,
 }
 
+#: IFC distribution/MEP element types mapped onto their SAREF4BLDG class,
+#: emitted as an *additional* `rdf:type` alongside the generic `bot:Element`
+#: typing every non-spatial element already gets -- see the SRS's Building
+#: Geometry and Spatial Topology Integration table.
+_DISTRIBUTION_TYPE_TO_S4BLDG = {
+    "IfcDistributionElement": S4BLDG.DistributionDevice,
+    "IfcFlowController": S4BLDG.FlowController,
+    "IfcEnergyConversionDevice": S4BLDG.EnergyConversionDevice,
+    "IfcSensor": S4BLDG.Sensor,
+    "IfcAlarm": S4BLDG.Alarm,
+}
+
 #: `ifc_graph.build_ifc_graph()` edge `rel_type` -> BOT containment predicate,
 #: keyed by (container BOT class, member BOT class); falls back to
-#: `bot:containsElement` for anything not spatial-to-spatial.
+#: `bot:containsElement`/`bot:hasElement` for anything not spatial-to-spatial.
+#: `(Zone, Site)` is here because `IfcProject`-to-`IfcSite` is only ever
+#: expressed via `IfcRelAggregates` ("Aggregates"), never
+#: `IfcRelContainedInSpatialStructure` ("ContainedIn").
 _CONTAINMENT_PREDICATE = {
+    (BOT.Zone, BOT.Site): BOT.containsZone,
     (BOT.Site, BOT.Building): BOT.hasBuilding,
     (BOT.Building, BOT.Storey): BOT.hasStorey,
     (BOT.Storey, BOT.Space): BOT.hasSpace,
 }
+
+#: Edge `rel_type` values (from `build_ifc_graph()`) treated as containment
+#: for BOT-graph purposes.
+_CONTAINMENT_REL_TYPES = {"ContainedIn", "Aggregates"}
 
 
 def element_uri(guid: str) -> URIRef:
@@ -61,6 +86,7 @@ def build_bot_graph(ifc_graph: nx.DiGraph, adjacency: Any | None = None) -> Grap
     graph = Graph()
     graph.bind("bot", BOT)
     graph.bind("bimguard", BIMGUARD)
+    graph.bind("s4bldg", S4BLDG)
 
     for guid, data in ifc_graph.nodes(data=True):
         subject = element_uri(guid)
@@ -68,20 +94,31 @@ def build_bot_graph(ifc_graph: nx.DiGraph, adjacency: Any | None = None) -> Grap
         bot_class = _SPATIAL_TYPE_TO_BOT.get(ifc_type, BOT.Element)
         graph.add((subject, RDF.type, bot_class))
         graph.add((subject, RDF.type, BIMGUARD[ifc_type or "UnknownIfcType"]))
+        s4bldg_class = _DISTRIBUTION_TYPE_TO_S4BLDG.get(ifc_type)
+        if s4bldg_class is not None:
+            graph.add((subject, RDF.type, s4bldg_class))
         label = data.get("label")
         if label:
             graph.add((subject, RDFS.label, Literal(str(label))))
         graph.add((subject, BIMGUARD.globalId, Literal(guid, datatype=XSD.string)))
 
     for container_guid, member_guid, edge in ifc_graph.edges(data=True):
-        if edge.get("rel_type") != "ContainedIn":
+        if edge.get("rel_type") not in _CONTAINMENT_REL_TYPES:
             continue
         container = element_uri(container_guid)
         member = element_uri(member_guid)
         container_class = next(graph.objects(container, RDF.type), None)
         member_class = next(graph.objects(member, RDF.type), None)
-        predicate = _CONTAINMENT_PREDICATE.get((container_class, member_class), BOT.containsElement)
-        graph.add((container, predicate, member))
+        predicate = _CONTAINMENT_PREDICATE.get((container_class, member_class))
+        if predicate is not None:
+            graph.add((container, predicate, member))
+        else:
+            # No specific spatial predicate for this pair: emit both the
+            # existing generic BOT predicate (kept for backward
+            # compatibility with earlier graphs/shapes) and `bot:hasElement`
+            # (the SRS's preferred generic containment predicate).
+            graph.add((container, BOT.containsElement, member))
+            graph.add((container, BOT.hasElement, member))
 
     if adjacency is not None and getattr(adjacency, "has_boundaries", False):
         _add_adjacency_triples(graph, adjacency)

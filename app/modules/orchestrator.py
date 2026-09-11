@@ -676,6 +676,7 @@ class BIMGuard_App:
             library_rules=library_rules,
             project_id=project_id,
             log_progress=log_progress,
+            egress_checks=ifc.get("egress_checks"),
         )
 
         return {
@@ -780,6 +781,7 @@ class BIMGuard_App:
         library_rules: list[dict],
         project_id: int,
         log_progress,
+        egress_checks: dict | None = None,
     ) -> tuple[list[dict], str | None]:
         """Opt-in SHACL side-channel: never touches rule_compliance/audit_issues.
 
@@ -788,19 +790,13 @@ class BIMGuard_App:
         existing behaviour is completely unchanged unless a caller explicitly
         opts in. When enabled, it builds a BOT graph
         (`app.modules.ifc_reader.bot_graph`) from the already-loaded IFC model,
-        compiles whichever `library_rules` are SHACL-eligible
+        enriches it with already-computed engine outputs
+        (`app.modules.ifc_reader.bot_graph_enrichment`), compiles whichever
+        `library_rules` are SHACL-eligible
         (`app.modules.rule_builder.shacl_generator`), and returns findings as
         plain dicts via `issue_adapter.lift_shacl_report()` -- a separate
         `shacl_issues` key on the result, not merged into `audit_issues`/
         `bcf_topics`, so it cannot regress the existing merge path.
-
-        A known limitation: the geometry engines (`ifc_geometry.py`,
-        `ifc_egress.py`, `ifc_stair.py`, `blue_halo/`) do not yet write their
-        computed values onto the BOT graph as literals, so a rule targeting
-        an engine-computed property (e.g. a calculated clear width) will not
-        match any element yet -- only rules targeting properties already
-        present on the graph can fire today. Wiring that enrichment step is
-        a separate follow-up.
         """
         if not enable_shacl or not m2_reader or ifc_error or not library_rules:
             return [], None
@@ -811,6 +807,9 @@ class BIMGuard_App:
             from app.modules.comparator.issue_adapter import lift_shacl_report
             from app.modules.comparator.issue_schema import to_dict as issue_to_dict
             from app.modules.ifc_reader.bot_graph import build_bot_graph
+            from app.modules.ifc_reader.bot_graph_enrichment import (
+                enrich_bot_graph_with_engine_outputs,
+            )
             from app.modules.ifc_reader.ifc_graph import build_ifc_graph
             from app.modules.ifc_reader.ifc_spatial import IFCSpatialAdjacency
             from app.modules.rule_builder.shacl_generator import compile_shapes
@@ -823,6 +822,9 @@ class BIMGuard_App:
 
             adjacency = IFCSpatialAdjacency(m2_reader.ifc_file).build()
             bot_graph = build_bot_graph(build_ifc_graph(m2_reader.ifc_file), adjacency)
+            enrich_bot_graph_with_engine_outputs(
+                bot_graph, m2_reader=m2_reader, egress_checks=egress_checks
+            )
 
             result = ShaclComplianceEngine().evaluate(
                 bot_graph,

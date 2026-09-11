@@ -2,11 +2,12 @@
 
 Covers `BIMGuard_App._run_shacl_compliance` (app.modules.orchestrator). These
 only exercise the bridge's plumbing (short-circuits, no crash on a real IFC
-model), not a genuine SHACL violation: bot_graph.py does not yet mirror IFC
-Pset properties onto the graph as literals (see its module docstring and
-_run_shacl_compliance's own docstring), so a rule referencing a raw or
-engine-computed property currently always conforms rather than firing --
-that enrichment wiring is a separate follow-up.
+model), not a genuine SHACL violation: the `_FakeReader` test double below
+has no `geometry_extractor`/real geometry, so
+`bot_graph_enrichment.enrich_bot_graph_with_engine_outputs()` cannot resolve
+a clear width for its door and skips it, leaving the shape conforming rather
+than firing. See `tests/test_bot_graph_enrichment.py` for coverage of the
+enrichment step itself with a reader that *can* resolve a value.
 """
 
 import ifcopenshell
@@ -72,10 +73,11 @@ def test_enabled_but_no_shacl_eligible_rules_is_a_noop():
 
 
 def test_enabled_with_eligible_rule_runs_without_crashing():
-    # No enrichment wiring yet, so calculatedClearWidth has no values on the
-    # graph and the shape conforms -- this proves the bridge runs end to end
-    # against a real ifcopenshell model without error, not that it can flag
-    # a real violation (see module docstring).
+    # _FakeReader can't resolve a clear width (see module docstring), so
+    # calculatedClearWidth has no values on the graph and the shape
+    # conforms -- this proves the bridge runs end to end against a real
+    # ifcopenshell model without error, not that it can flag a real
+    # violation.
     issues, error = BIMGuard_App._run_shacl_compliance(
         enable_shacl=True,
         m2_reader=_FakeReader(_door_ifc_model()),
