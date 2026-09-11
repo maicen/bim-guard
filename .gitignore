@@ -120,3 +120,4 @@ data/*_demo.ifc
 .kuzu/
 .kuzu_db
 .kuzu_db/
+.oxigraph_db/

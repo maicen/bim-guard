@@ -70,6 +70,9 @@ from app.api import (
 from app.api import (
     settings as api_settings,
 )
+from app.api import (
+    sparql_routes as api_sparql,
+)
 from app.environment import load_env_file
 from app.logging_config import configure_logging, get_logger
 from app.modules.contracts import HealthCheckResponse
@@ -324,6 +327,7 @@ app.include_router(
     prefix="/api/organizations",
     tags=["LLM Providers"],
 )
+app.include_router(api_sparql.router, prefix="/api", tags=["sparql"])
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 
 

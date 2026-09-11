@@ -40,6 +40,7 @@ class BIMGuard_App:
         documents_service=None,
         rules_service=None,
         analysis_service=None,
+        triplestore_service=None,
     ) -> None:
         """Initialize with explicit dependency injection, defaulting to real instances."""
         self._projects_service = projects_service
@@ -47,6 +48,7 @@ class BIMGuard_App:
         self._documents_service = documents_service
         self._rules_service = rules_service
         self._analysis_service = analysis_service
+        self._triplestore_service = triplestore_service
 
     def orchestrate_workflow(
         self,
@@ -159,6 +161,7 @@ class BIMGuard_App:
             project_id,
             log_progress,
             enable_shacl=enable_shacl,
+            triplestore_service=self._triplestore_service,
         )
 
         if rule_result["rule_compliance"]:
@@ -547,6 +550,7 @@ class BIMGuard_App:
         log_progress,
         *,
         enable_shacl: bool = False,
+        triplestore_service=None,
     ) -> dict:
         """Run the Module 2 -> 4 -> 5 rule-based compliance pipeline.
 
@@ -677,6 +681,7 @@ class BIMGuard_App:
             project_id=project_id,
             log_progress=log_progress,
             egress_checks=ifc.get("egress_checks"),
+            triplestore_service=triplestore_service,
         )
 
         return {
@@ -782,6 +787,7 @@ class BIMGuard_App:
         project_id: int,
         log_progress,
         egress_checks: dict | None = None,
+        triplestore_service=None,
     ) -> tuple[list[dict], str | None]:
         """Opt-in SHACL side-channel: never touches rule_compliance/audit_issues.
 
@@ -832,6 +838,11 @@ class BIMGuard_App:
                     rule_type="CODE-SHACL", element=bot_graph, metadata={"shapes_graph": shapes}
                 ),
             )
+            
+            if triplestore_service:
+                bot_graph += shapes
+                triplestore_service.load_graph(project_id, bot_graph)
+
             issues = lift_shacl_report(result.raw_result) if result.raw_result is not None else []
             log_progress(92, "shacl-compliance-complete", findings=len(issues))
             return [issue_to_dict(issue) for issue in issues], None

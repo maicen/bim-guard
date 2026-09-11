@@ -32,6 +32,7 @@ from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
+from app.services.graph_triplestore_service import GraphTriplestoreService
 from app.services.kuzu_provider import KuzuDatabaseProvider
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
@@ -122,6 +123,7 @@ class ApplicationContainer:
     arch_analysis_service: ArchAnalysisService
     digital_inspector_service: DigitalInspectorService
     graph_service: Any  # typed properly in the import if desired, but Any works for now without circular imports
+    graph_triplestore_service: GraphTriplestoreService
     bimguard_app: BIMGuard_App
     engine_registry: RuleEngineRegistry = field(default_factory=RuleEngineRegistry)
 
@@ -644,12 +646,19 @@ def build_default_container() -> ApplicationContainer:
         logger.warning(f"Could not initialize KuzuDatabaseProvider: {e}")
         graph_service = GraphService()
 
+    try:
+        graph_triplestore_service = GraphTriplestoreService(store_path=".oxigraph_db")
+    except Exception as e:
+        logger.warning(f"Could not initialize GraphTriplestoreService with disk store: {e}")
+        graph_triplestore_service = GraphTriplestoreService()
+
     bimguard_app = BIMGuard_App(
         projects_service=projects_service,
         models_service=models_service,
         documents_service=documents_service,
         rules_service=rules_service,
         analysis_service=analysis_service,
+        triplestore_service=graph_triplestore_service,
     )
 
     return ApplicationContainer(
@@ -702,6 +711,7 @@ def build_default_container() -> ApplicationContainer:
         arch_analysis_service=arch_analysis_service,
         digital_inspector_service=digital_inspector_service,
         graph_service=graph_service,
+        graph_triplestore_service=graph_triplestore_service,
         engine_registry=registry,
         bimguard_app=bimguard_app,
     )

@@ -611,6 +611,34 @@ def run_analysis_endpoint(
     return _format_result(slug, payload.project_id, raw_result)
 
 
+@router.post("/lbd/{project_id}", summary="Persist BOT graph and SHACL evaluation to triplestore")
+def run_lbd_persistence(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    use_cache: bool = Query(True, description="Whether to read from cache"),
+) -> dict[str, Any]:
+    """Execute SHACL compliance and persist the BOT graph to the triplestore."""
+    project_access(project_id)
+    
+    # We call run_analysis for 'architecture' with enable_shacl=True.
+    # The orchestrator is wired with the triplestore service, so the graph will
+    # be automatically saved to the pyoxigraph store during the SHACL step.
+    raw_result = run_analysis("architecture", project_id, use_cache=use_cache, enable_shacl=True)
+    
+    if raw_result.get("compliance_error"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=raw_result["compliance_error"],
+        )
+        
+    return {
+        "success": True,
+        "message": "BOT graph successfully persisted to triplestore.",
+        "project_id": project_id,
+        "shacl_issues": raw_result.get("shacl_issues", []),
+    }
+
+
 @router.post("/corrosion", summary="Run corrosion analysis")
 def run_corrosion(
     project_id: Annotated[int, Form(...)],

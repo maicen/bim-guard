@@ -15,6 +15,7 @@ from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
+from app.services.graph_triplestore_service import GraphTriplestoreService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
@@ -145,3 +146,8 @@ def get_document_access_service() -> DocumentAccessService:
 def get_user_admin_service() -> UserAdminService:
     """Return the configured UserAdminService instance."""
     return get_container().user_admin_service
+
+
+def get_graph_triplestore_service() -> GraphTriplestoreService:
+    """Return the configured GraphTriplestoreService instance."""
+    return get_container().graph_triplestore_service
