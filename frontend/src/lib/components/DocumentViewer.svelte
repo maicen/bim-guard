@@ -7,7 +7,6 @@
     ZoomIn,
     ZoomOut,
     RotateCcw,
-    Rows3,
     FileText as FileIcon,
     FileCode,
     Download,
@@ -59,6 +58,9 @@
   let pageCount = $state(0);
   let pageInputValue = $state("1");
   let renderTask: any = null;
+  // Scroll targets for the top-level page nav's DocLang/Reading View sync.
+  let readingViewBodyEl: HTMLDivElement | undefined = $state();
+  let docLangPaneEl: HTMLDivElement | undefined = $state();
 
   const DEFAULT_SCALE = 1.25;
   const MIN_SCALE = 0.5;
@@ -231,7 +233,7 @@
   // just shows Original Page, full width (see the {#if doclangXml} branch
   // in the template).
   let showOriginalPage = $state(true);
-  let showDoclangPane = $state(true);
+  let showDoclangPane = $state(false);
   let showReadingPane = $state(true);
   let viewsMenuOpen = $state(false);
   let layersMenuOpen = $state(false);
@@ -1083,22 +1085,61 @@
     setScale(DEFAULT_SCALE);
   }
 
+  // Documents with no PDF at all still have a page concept, derived from the
+  // DocLang XML's own <page_break/> markers (see parseDoclangDocument's
+  // "page-break" blocks) rather than pdfDoc.numPages -- this is what lets the
+  // page nav drive DocLang/Reading View navigation even without a PDF pane.
+  let doclangPageCount = $derived(
+    Math.max(1, documentBlocks.filter((b) => b.type === "page-break").length + 1)
+  );
+  let totalPageCount = $derived(isPdf ? pageCount : doclangPageCount);
+
   async function goToPage(next: number) {
-    const target = Math.min(Math.max(Math.trunc(next) || 1, 1), pageCount || 1);
+    const target = Math.min(Math.max(Math.trunc(next) || 1, 1), totalPageCount || 1);
     currentPage = target;
     pageInputValue = String(target);
-    if (viewMode === "single") {
+    if (isPdf) {
       await renderCurrentPage();
-    } else {
-      await tick();
-      pageSlotEls[target - 1]?.scrollIntoView({ block: "start", behavior: "smooth" });
     }
+    await scrollReadingViewToPage(target);
+    scrollDocLangToPage(target);
   }
 
   function handlePageInputSubmit() {
     const n = parseInt(pageInputValue, 10);
     if (!Number.isNaN(n)) goToPage(n);
     else pageInputValue = String(currentPage);
+  }
+
+  /** Scroll the Reading View pane to the "Page N" divider inserted between blocks. */
+  async function scrollReadingViewToPage(page: number) {
+    if (!readingViewBodyEl) return;
+    if (page <= 1) {
+      readingViewBodyEl.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const idx = readingBlocks.findIndex((b) => b.type === "page-break" && b.pageNumber === page);
+    if (idx === -1) return;
+    if (idx >= visibleBlockCount) {
+      visibleBlockCount = Math.min(idx + BLOCKS_PAGE_SIZE, readingBlocks.length);
+    }
+    await tick();
+    readingViewBodyEl
+      .querySelector(`[aria-label="Page ${page}"]`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  /** Scroll the DocLang XML pane to the Nth <page_break/> line (page N's break is the (N-1)th one). */
+  function scrollDocLangToPage(page: number) {
+    if (!docLangPaneEl) return;
+    if (page <= 1) {
+      docLangPaneEl.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const pageBreakLines = Array.from(docLangPaneEl.querySelectorAll(".markup-line")).filter((el) =>
+      (el.textContent || "").includes("page_break")
+    );
+    pageBreakLines[page - 2]?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
   // ── Highlighting ─────────────────────────────────────────────────────────
@@ -1226,35 +1267,70 @@
     {/if}
     {#if doclangXml}
       <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
-        <div class="relative">
-          <button
-            type="button"
-            onclick={(e) => (e.stopPropagation(), (viewsMenuOpen = !viewsMenuOpen))}
-            aria-expanded={viewsMenuOpen}
-            aria-haspopup="true"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
-          >
-            <span>Views</span>
-            <ChevronDown class="h-3 w-3" />
-          </button>
-          {#if viewsMenuOpen}
-            <div
-              role="none"
-              onclick={(e) => e.stopPropagation()}
-              class="absolute left-0 top-full z-40 mt-2 w-48 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl"
+        <div class="flex items-center gap-3">
+          <div class="relative">
+            <button
+              type="button"
+              onclick={(e) => (e.stopPropagation(), (viewsMenuOpen = !viewsMenuOpen))}
+              aria-expanded={viewsMenuOpen}
+              aria-haspopup="true"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
             >
-              <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
-                <span class="text-slate-200">Original Page</span>
-                <input type="checkbox" bind:checked={showOriginalPage} />
-              </label>
-              <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
-                <span class="text-slate-200">DocLang</span>
-                <input type="checkbox" bind:checked={showDoclangPane} />
-              </label>
-              <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
-                <span class="text-slate-200">Reading View</span>
-                <input type="checkbox" bind:checked={showReadingPane} />
-              </label>
+              <span>Views</span>
+              <ChevronDown class="h-3 w-3" />
+            </button>
+            {#if viewsMenuOpen}
+              <div
+                role="none"
+                onclick={(e) => e.stopPropagation()}
+                class="absolute left-0 top-full z-40 mt-2 w-48 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl"
+              >
+                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
+                  <span class="text-slate-200">Original Page</span>
+                  <input type="checkbox" bind:checked={showOriginalPage} />
+                </label>
+                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
+                  <span class="text-slate-200">DocLang</span>
+                  <input type="checkbox" bind:checked={showDoclangPane} />
+                </label>
+                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
+                  <span class="text-slate-200">Reading View</span>
+                  <input type="checkbox" bind:checked={showReadingPane} />
+                </label>
+              </div>
+            {/if}
+          </div>
+
+          {#if totalPageCount > 1}
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                onclick={() => goToPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                aria-label="Previous page"
+              >
+                <ChevronLeft class="h-4 w-4" />
+              </button>
+              <input
+                type="text"
+                inputmode="numeric"
+                bind:value={pageInputValue}
+                onkeydown={(e) => e.key === "Enter" && handlePageInputSubmit()}
+                onblur={handlePageInputSubmit}
+                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-none"
+                aria-label="Page number"
+              />
+              <span class="text-xs text-slate-400">of {totalPageCount}</span>
+              <button
+                type="button"
+                onclick={() => goToPage(currentPage + 1)}
+                disabled={currentPage >= totalPageCount}
+                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                aria-label="Next page"
+              >
+                <ChevronRight class="h-4 w-4" />
+              </button>
             </div>
           {/if}
         </div>
@@ -1475,29 +1551,6 @@
             </button>
           </div>
 
-          <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
-            <button
-              type="button"
-              onclick={() => setViewMode("single")}
-              class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {viewMode === 'single'
-                ? 'bg-accent text-white'
-                : 'text-slate-400 hover:text-slate-200'}"
-            >
-              Single Page
-            </button>
-            <button
-              type="button"
-              onclick={() => setViewMode("continuous")}
-              class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {viewMode ===
-              'continuous'
-                ? 'bg-accent text-white'
-                : 'text-slate-400 hover:text-slate-200'}"
-            >
-              <Rows3 class="h-3 w-3" />
-              <span>Continuous</span>
-            </button>
-          </div>
-
           {#if elementBboxes.length > 0}
             <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
               <button
@@ -1574,7 +1627,7 @@
             </div>
           {/if}
 
-          {#if pageCount > 1}
+          {#if !doclangXml && pageCount > 1}
             <div class="flex items-center gap-1.5">
               <button
                 type="button"
@@ -1774,7 +1827,7 @@
                 {/if}
               </button>
             </div>
-            <div class="flex-1 overflow-y-auto p-2">
+            <div bind:this={docLangPaneEl} class="flex-1 overflow-y-auto p-2">
               <DocLangXmlTree xml={doclangXml} {selectedElementId} onSelect={selectElement} />
             </div>
           </div>
@@ -1814,7 +1867,7 @@
                 </div>
               {/if}
             </div>
-            <div class="flex-1 overflow-y-auto p-4">
+            <div bind:this={readingViewBodyEl} class="flex-1 overflow-y-auto p-4">
               {@render readingViewContent()}
             </div>
           </div>
