@@ -2,9 +2,22 @@
   import { run } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
-  import { Loader2, AlertCircle, RefreshCw, UploadCloud, Layers } from "lucide-svelte";
+  import {
+    Loader2,
+    AlertCircle,
+    RefreshCw,
+    UploadCloud,
+    Layers,
+    ClipboardList,
+    LayoutGrid,
+    PenTool,
+  } from "lucide-svelte";
   import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
+  import CollapsiblePanel from "./CollapsiblePanel.svelte";
+  import ViewerRibbon from "./viewer/ViewerRibbon.svelte";
+  import LayersPanel from "./viewer/LayersPanel.svelte";
+  import DrawingsPanel from "./viewer/DrawingsPanel.svelte";
 
   interface Props {
     projectId?: number | null;
@@ -28,7 +41,9 @@
     fileName = "",
   }: Props = $props();
 
-  let containerEl: HTMLDivElement = $state();
+  let viewportHost: HTMLDivElement = $state();
+  let detailsHost: HTMLDivElement = $state();
+  let drawingsSheetBoardHost: HTMLDivElement | undefined = $state();
   let fileInputEl: HTMLInputElement = $state();
   let viewerAPI: any = $state(null);
   let loading = $state(false);
@@ -40,16 +55,20 @@
   let isInitialized = false;
 
   async function init() {
-    if (!containerEl || isInitialized) return;
+    if (!viewportHost || isInitialized) return;
     try {
       loading = true;
       loadingMessage = "Loading 3D graphics engine...";
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-1";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-ribbon-2";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
-      viewerAPI = await mod.initViewer(containerEl);
+      viewerAPI = await mod.initViewer({
+        viewport: viewportHost,
+        details: detailsHost,
+        drawings: drawingsSheetBoardHost,
+      });
       isInitialized = true;
 
       if (projectId) {
@@ -173,11 +192,11 @@
 </script>
 
 <div
-  class="relative flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl"
+  class="bimguard-viewer-root bimguard-viewer-container relative flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl"
 >
   <!-- Viewport Window Top Bar -->
   <div
-    class="z-20 flex h-11 items-center justify-between border-b border-slate-800 bg-slate-900/90 px-4 backdrop-blur-md"
+    class="z-20 flex h-11 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/90 px-4 backdrop-blur-md"
   >
     <div class="flex items-center gap-2">
       <span class="h-3 w-3 rounded-full bg-rose-500/80 shadow-sm shadow-rose-500/20"></span>
@@ -241,7 +260,7 @@
   <!-- Error Alert Banner -->
   {#if error}
     <div
-      class="z-20 flex items-center justify-between border-b border-red-800/60 bg-red-950/80 p-3.5 text-xs text-red-200"
+      class="z-20 flex shrink-0 items-center justify-between border-b border-red-800/60 bg-red-950/80 p-3.5 text-xs text-red-200"
     >
       <div class="flex items-center gap-2">
         <AlertCircle class="h-4 w-4 shrink-0 text-red-400" />
@@ -260,9 +279,25 @@
     </div>
   {/if}
 
-  <!-- Viewport DOM Container (ThatOpen mounts here) -->
-  <div
-    bind:this={containerEl}
-    class="bimguard-viewer-container relative h-[720px] min-h-[500px] w-full bg-slate-950"
-  ></div>
+  <!-- Revit-style ribbon: tabs of grouped buttons driving the engine bridge -->
+  {#if viewerAPI}
+    <ViewerRibbon {viewerAPI} />
+  {/if}
+
+  <!-- Docked workspace: collapsible BCF/Layers/Drawings panels around the 3D viewport -->
+  <div class="flex min-h-0 flex-1">
+    <CollapsiblePanel title="BCF Topics" icon={ClipboardList} side="left" id="viewer-details" collapsed={false}>
+      <div bind:this={detailsHost} class="min-h-0"></div>
+    </CollapsiblePanel>
+
+    <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-slate-950"></div>
+
+    <CollapsiblePanel title="Layers" icon={LayoutGrid} side="right" id="viewer-layers" collapsed={true}>
+      <LayersPanel {viewerAPI} />
+    </CollapsiblePanel>
+
+    <CollapsiblePanel title="Drawings" icon={PenTool} side="right" id="viewer-drawings" collapsed={true}>
+      <DrawingsPanel {viewerAPI} bind:sheetBoardHost={drawingsSheetBoardHost} />
+    </CollapsiblePanel>
+  </div>
 </div>
