@@ -7,7 +7,7 @@ import * as THREE from "https://esm.sh/three@0.182.0";
 // BCFTopics.load (it vendors JSZip 3.10.1 rather than re-exporting it, so the
 // same version has to be pulled alongside rather than reached through OBC).
 import JSZip from "https://esm.sh/jszip@3.10.1";
-import { filterBcfArchive, priorityRank } from "./bcf-filter.js?v=viewer-isolate-3";
+import { filterBcfArchive, priorityRank } from "./bcf-filter.js?v=viewer-isolate-4";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
@@ -15,13 +15,47 @@ const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 const LOG = "[bimguard-3d]";
 const since = (t0) => Math.round(performance.now() - t0);
 
+/** Mounts of this module in one page session; see initViewer. */
+let mountCount = 0;
+
+// ─── Viewpoint.go() patch — installed ONCE per module, not per mount ────────
+//
 // The BCF viewpoints the corrosion engine generates carry the failing
 // element's GUID in their selection (see bcf_generator._viewpoint_xml), but
 // Viewpoint.go() only moves the camera and applies visibility — it never
-// colors the linked component. Patching go() once here means every way a
-// viewpoint can be shown (the topic list's row click below, and the native
-// eye-icon button ui-obc renders per viewpoint) highlights the offending
-// element in red instead of just zooming to it.
+// colors the linked component. Patching go() means every way a viewpoint can
+// be shown (the topic list's row click below, and the native eye-icon button
+// ui-obc renders per viewpoint) highlights the offending element in red
+// instead of just zooming to it.
+//
+// This used to be patched inside installErrorHighlighting, which runs per
+// mount — so the second mount captured the first mount's wrapper as its
+// "original" and wrapped it again. Navigating to the viewer twice in one SPA
+// session produced nested highlightingGo frames (two on the second mount,
+// three on the third), and the innermost one still pointed at the first
+// mount's highlighter, whose Components had been disposed. That surfaced as
+// "FragmentsManager not initialized. Call init() first." and no red element on
+// every mount after the first.
+//
+// So: patch once, and route through a mutable reference that each mount
+// replaces. Only the live mount's highlighter is ever touched.
+let activeHighlighting = null;
+let goPatched = false;
+
+function patchViewpointGo() {
+    if (goPatched) return;
+    goPatched = true;
+    const originalGo = OBC.Viewpoint.prototype.go;
+    OBC.Viewpoint.prototype.go = async function highlightingGo(config) {
+        await originalGo.call(this, config);
+        // Read at call time, never captured: a viewpoint created by one mount
+        // can outlive it, and must colour through whoever is live now.
+        const active = activeHighlighting;
+        if (!active) return;
+        await active.applyViewpointSelection(this);
+    };
+}
+
 function installErrorHighlighting(components, world) {
     components.get(OBC.Raycasters).get(world);
     const highlighter = components.get(OBF.Highlighter);
@@ -69,17 +103,19 @@ function installErrorHighlighting(components, world) {
         hider.set(true);
     }
 
-    const originalGo = OBC.Viewpoint.prototype.go;
-    OBC.Viewpoint.prototype.go = async function highlightingGo(config) {
-        await originalGo.call(this, config);
+    // What the patched go() calls back into, for this mount only.
+    async function applyViewpointSelection(viewpoint) {
         await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
-        const selectionMap = await this.getSelectionMap();
+        const selectionMap = await viewpoint.getSelectionMap();
         const map = OBC.ModelIdMapUtils.isEmpty(selectionMap) ? null : selectionMap;
         setSelectionMap(map);
         if (map) {
             await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, selectionMap, false, false);
         }
-    };
+    }
+
+    patchViewpointGo();
+    activeHighlighting = { applyViewpointSelection };
 
     // Highlights every element linked to the given topics at once (used for
     // the topics table's checkbox multi-select), replacing whatever a single
@@ -113,6 +149,16 @@ function installErrorHighlighting(components, world) {
             // The map behind the current highlight, for callers that need to
             // frame it rather than just show/hide it (see fitToSelection).
             getSelectionMap: () => currentSelectionMap,
+        },
+        // Detach this mount from the shared go() patch, but only if a later
+        // mount has not already taken over — dispose can arrive after the next
+        // mount has installed itself.
+        disposeHighlighting: () => {
+            if (activeHighlighting && activeHighlighting.applyViewpointSelection === applyViewpointSelection) {
+                activeHighlighting = null;
+            }
+            selectionListeners.clear();
+            currentSelectionMap = null;
         },
     };
 }
@@ -216,8 +262,17 @@ function createTopicsWorkspace(components, world, viewport, highlightTopics) {
     topicsList.addEventListener("dataselected", updateMultiHighlight);
     topicsList.addEventListener("datadeselected", updateMultiHighlight);
     topicsList.addEventListener("dataselectioncleared", updateMultiHighlight);
+    // Debounced to a single pending timer, and cancellable.
+    //
+    // This fires from topics.list.onItemSet, i.e. once per imported topic, so
+    // the unfiltered 1,384-topic archive used to queue 1,384 separate timers,
+    // each rebuilding the whole table. They also outlived dispose, waking up
+    // to touch a detached table after the viewer was gone.
+    let refreshTimer = null;
     const refreshTopicsList = () => {
-        window.setTimeout(() => {
+        if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(() => {
+            refreshTimer = null;
             topicsList.data = [...topicsList.data];
             topicsList.requestUpdate();
         }, 150);
@@ -346,7 +401,17 @@ function createTopicsWorkspace(components, world, viewport, highlightTopics) {
         topicsModal,
         refreshTopicsList,
         selectTopic,
-        dispose: () => layoutObserver.disconnect(),
+        dispose: () => {
+            layoutObserver.disconnect();
+            if (refreshTimer !== null) {
+                window.clearTimeout(refreshTimer);
+                refreshTimer = null;
+            }
+            // Appended to document.body, so it is not removed by clearing the
+            // viewer's own container and would otherwise accumulate one dialog
+            // per mount.
+            topicsModal.remove();
+        },
     };
 }
 
@@ -760,6 +825,16 @@ export async function initViewer(containerOrId) {
 
     BUI.Manager.init();
 
+    // Every mount of this module in one page session gets a number, so a
+    // console transcript shows whether a failure came from a fresh viewer or
+    // from one that had already been mounted and torn down.
+    mountCount += 1;
+    const mountId = mountCount;
+    let disposed = false;
+    /** In-flight filter worker, terminated on dispose so it cannot outlive us. */
+    let activeFilterWorker = null;
+    console.info(`${LOG} viewer mount #${mountId}`);
+
     const viewport = document.createElement("bim-viewport");
     viewport.className = "bimguard-viewport";
     const components = new OBC.Components();
@@ -779,7 +854,8 @@ export async function initViewer(containerOrId) {
     const grids = components.get(OBC.Grids);
     grids.create(world);
 
-    const { highlightTopics, isolate } = installErrorHighlighting(components, world);
+    const { highlightTopics, isolate, disposeHighlighting } =
+        installErrorHighlighting(components, world);
 
     const fragments = components.get(OBC.FragmentsManager);
     const workerUrl = await OBC.FragmentsManager.getWorker();
@@ -801,10 +877,22 @@ export async function initViewer(containerOrId) {
         },
     });
 
-    viewport.addEventListener("resize", () => {
-        if (world.renderer) world.renderer.resize();
-        if (world.camera) world.camera.updateAspect();
-    });
+    // bim-viewport drives this from its own internal ResizeObserver, which can
+    // still fire once after the element is detached — and after dispose,
+    // SimpleWorld's `renderer`/`camera` are getters that THROW ("No camera
+    // initialized!") rather than return undefined, so a truthiness guard alone
+    // is not enough. Hence the disposed flag, the try, and removing the
+    // listener in dispose so the observer has nothing left to call.
+    const onViewportResize = () => {
+        if (disposed) return;
+        try {
+            if (world.renderer) world.renderer.resize();
+            if (world.camera) world.camera.updateAspect();
+        } catch {
+            // World torn down between the observer firing and this running.
+        }
+    };
+    viewport.addEventListener("resize", onViewportResize);
 
     const workspace = createTopicsWorkspace(components, world, viewport, highlightTopics);
 
@@ -995,6 +1083,56 @@ export async function initViewer(containerOrId) {
     }
 
     /**
+     * Filter the archive, off the main thread when the browser allows it.
+     *
+     * JSZip pumps each inflate through setImmediate, which in a browser is a
+     * postMessage task competing with rendering — 2,764 entries cost 58.6 s on
+     * the main thread here against 365 ms in Node. The worker gets that queue
+     * to itself and the page stays interactive meanwhile.
+     *
+     * The archive is CLONED to the worker rather than transferred. Transfer
+     * would save a copy of ~5 MB, but it detaches the buffer here, and the
+     * inline fallback below then has nothing left to work on if the worker
+     * turns out to be unusable. A few milliseconds of copy buys a fallback
+     * that actually works; the result comes back transferred, which is free.
+     */
+    function runFilter(buffer, elementGuid) {
+        let worker;
+        try {
+            worker = new Worker(
+                new URL("./bcf-filter.worker.js?v=viewer-isolate-4", import.meta.url),
+                { type: "module" },
+            );
+        } catch (error) {
+            console.warn(`${LOG} worker unavailable, filtering on main thread:`, error);
+            return filterBcfArchive(JSZip, buffer, elementGuid);
+        }
+
+        activeFilterWorker = worker;
+        return new Promise((resolve, reject) => {
+            const finish = (fn, value) => {
+                worker.terminate();
+                if (activeFilterWorker === worker) activeFilterWorker = null;
+                fn(value);
+            };
+            worker.onmessage = (event) => {
+                const { ok, result, error } = event.data || {};
+                if (ok) finish(resolve, result);
+                else finish(reject, new Error(error || "filter worker failed"));
+            };
+            worker.onerror = (event) => {
+                // A worker that fails to start (import blocked, syntax) must
+                // not strand the caller — run it inline instead.
+                console.warn(`${LOG} worker error, filtering on main thread:`, event.message || event);
+                worker.terminate();
+                if (activeFilterWorker === worker) activeFilterWorker = null;
+                filterBcfArchive(JSZip, buffer, elementGuid).then(resolve, reject);
+            };
+            worker.postMessage({ buffer, elementGuid });
+        });
+    }
+
+    /**
      * The findings deep-link path: fetch an archive, cut it down to the one
      * element, then load, select and frame it.
      *
@@ -1032,9 +1170,9 @@ export async function initViewer(containerOrId) {
         let filtered;
         const tFilter = performance.now();
         try {
-            filtered = await filterBcfArchive(JSZip, buffer, elementGuid);
+            filtered = await runFilter(buffer, elementGuid);
         } catch (error) {
-            console.warn(`${LOG} filter failed: ${error?.message || error}`);
+            console.warn(`${LOG} filter failed:`, error);
             return { ok: false, reason: "could not read the BCF archive" };
         }
         console.info(`${LOG} archive entries=${filtered.entries} topics=${filtered.topics}`);
@@ -1068,7 +1206,9 @@ export async function initViewer(containerOrId) {
         try {
             await workspace.selectTopic(topic);
         } catch (error) {
-            console.warn(`${LOG} select failed: ${error?.message || error}`);
+            // The object, not its message: the stack is what identified the
+            // nested go() wrappers behind the remount bug.
+            console.warn(`${LOG} select failed:`, error);
             return { ok: false, reason: "could not select the element's topic" };
         }
         const items = countSelection(isolate.getSelectionMap());
@@ -1144,11 +1284,21 @@ export async function initViewer(containerOrId) {
         fitToSelection,
         loadBcfForElement,
         dispose: () => {
+            // Flag first: everything below can trigger a resize or a pending
+            // callback, and those must see a torn-down viewer, not race it.
+            disposed = true;
+            console.info(`${LOG} viewer dispose #${mountId}`);
             try {
+                viewport.removeEventListener("resize", onViewportResize);
+                if (activeFilterWorker) {
+                    activeFilterWorker.terminate();
+                    activeFilterWorker = null;
+                }
+                disposeHighlighting();
                 workspace.dispose();
                 components.dispose();
             } catch (e) {
-                console.warn("Error disposing viewer:", e);
+                console.warn(`${LOG} dispose #${mountId} failed:`, e);
             }
         },
     };

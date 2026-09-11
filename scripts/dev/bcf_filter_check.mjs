@@ -48,7 +48,7 @@ const started = performance.now();
 const result = await filterBcfArchive(JSZip, raw, elementGuid);
 const elapsedMs = performance.now() - started;
 
-console.log(`entries=${result.entries} topics=${result.topics}`);
+console.log(`entries=${result.entries} topics=${result.topics} read=${result.read}`);
 console.log(`kept=${result.kept} ms=${elapsedMs.toFixed(0)}`);
 console.log(`reduced archive bytes=${result.data ? result.data.length : 0}`);
 console.log(`shrink: ${(raw.length / (result.data?.length || 1)).toFixed(1)}x smaller`);
@@ -84,8 +84,15 @@ if (result.data) {
   if (!titles.some((t) => t.title.includes(expectedTitle))) {
     failures.push(`no title contains ${expectedTitle}`);
   }
-  if (titles.length && priorityRank(titles[0].priority) !== 0) {
-    failures.push(`highest-priority topic is ${titles[0].priority}, expected Critical`);
+  // The topic that sorts first is the one the viewer selects and frames, so
+  // that -- not the literal band -- is the invariant worth asserting. A
+  // critical finding must outrank the element's other topics; an element whose
+  // findings are all Normal still has to resolve to the expected one.
+  if (titles.length && !titles[0].title.includes(expectedTitle)) {
+    failures.push(
+      `first topic is "${titles[0].title.slice(0, 60)}" [${titles[0].priority}], ` +
+        `expected one containing ${expectedTitle}`,
+    );
   }
 }
 

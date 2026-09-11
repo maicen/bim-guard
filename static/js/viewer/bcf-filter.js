@@ -54,8 +54,10 @@ async function keptFolders(zip, elementGuid) {
   const viewpointNeedle = `IfcGuid="${elementGuid}"`;
   const kept = new Set();
 
-  // markup.bcf first: it is one file per topic and carries the subject, so it
-  // decides most folders without touching the viewpoints at all.
+  // Only these two extensions are ever decompressed. Snapshots are PNGs of a
+  // viewpoint and can be several KB each; there are ~1,384 of them here and
+  // none can contain the GUID, so they are copied verbatim later and never
+  // read.
   const markups = [];
   const viewpoints = [];
   zip.forEach((path, entry) => {
@@ -64,21 +66,50 @@ async function keptFolders(zip, elementGuid) {
     else if (path.endsWith(".bcfv")) viewpoints.push([path, entry]);
   });
 
-  for (const [path, entry] of markups) {
-    const folder = topicFolderOf(path);
-    if (!folder) continue;
-    const text = await entry.async("string");
-    if (descriptionNeedles.some((n) => text.includes(n))) kept.add(folder);
+  // Read in parallel, not one awaited call after another.
+  //
+  // This is the whole performance story. JSZip's async() drives its inflate
+  // through a chunked stream that yields to the event loop between chunks, so
+  // an awaited loop pays the browser's minimum timer delay per entry rather
+  // than per batch: 2,768 sequential reads measured 58.6 s in Edge against
+  // 365 ms in Node, where the same clamp does not apply. Started together they
+  // interleave and the wall time collapses to roughly the decompression cost.
+  //
+  // Chunked rather than one giant Promise.all so an archive far larger than
+  // this one cannot hold every inflated entry in memory at once.
+  const CHUNK = 512;
+  const scan = async (pairs, matches) => {
+    const hits = [];
+    for (let i = 0; i < pairs.length; i += CHUNK) {
+      const slice = pairs.slice(i, i + CHUNK);
+      const texts = await Promise.all(slice.map(([, entry]) => entry.async("string")));
+      for (let j = 0; j < slice.length; j += 1) {
+        const folder = topicFolderOf(slice[j][0]);
+        if (folder && matches(texts[j])) hits.push(folder);
+      }
+    }
+    return hits;
+  };
+
+  // markup.bcf carries the subject element and decides most folders.
+  for (const folder of await scan(markups, (t) =>
+    descriptionNeedles.some((n) => t.includes(n)),
+  )) {
+    kept.add(folder);
   }
 
-  for (const [path, entry] of viewpoints) {
+  // Viewpoints add the topics where this element is a partner component -- the
+  // other half of a galvanic couple, the other side of a clash -- rather than
+  // the subject. Folders already kept are skipped so they are never inflated.
+  const remaining = viewpoints.filter(([path]) => {
     const folder = topicFolderOf(path);
-    if (!folder || kept.has(folder)) continue;
-    const text = await entry.async("string");
-    if (text.includes(viewpointNeedle)) kept.add(folder);
+    return folder && !kept.has(folder);
+  });
+  for (const folder of await scan(remaining, (t) => t.includes(viewpointNeedle))) {
+    kept.add(folder);
   }
 
-  return kept;
+  return { kept, read: markups.length + remaining.length };
 }
 
 /**
@@ -103,9 +134,9 @@ export async function filterBcfArchive(JSZip, data, elementGuid) {
     if (path.endsWith("markup.bcf")) topics += 1;
   });
 
-  const folders = await keptFolders(zip, elementGuid);
+  const { kept: folders, read } = await keptFolders(zip, elementGuid);
   if (folders.size === 0) {
-    return { data: null, kept: 0, entries, topics, folders: [] };
+    return { data: null, kept: 0, entries, topics, read, folders: [] };
   }
 
   // Copied rather than deleted-in-place: a fresh archive of ~a dozen entries
@@ -119,8 +150,10 @@ export async function filterBcfArchive(JSZip, data, elementGuid) {
     const keep = folder === null ? ROOT_FILES.has(path) : folders.has(folder);
     if (keep) copies.push([path, entry]);
   });
-  for (const [path, entry] of copies) {
-    out.file(path, await entry.async("uint8array"), { binary: true });
+  // Raw bytes, in parallel: no decode/re-encode, and snapshots stay opaque.
+  const bytes = await Promise.all(copies.map(([, entry]) => entry.async("uint8array")));
+  for (let i = 0; i < copies.length; i += 1) {
+    out.file(copies[i][0], bytes[i], { binary: true });
   }
 
   // STORE, not DEFLATE: this archive is handed straight to BCFTopics.load in
@@ -131,6 +164,7 @@ export async function filterBcfArchive(JSZip, data, elementGuid) {
     kept: folders.size,
     entries,
     topics,
+    read,
     folders: [...folders],
   };
 }
