@@ -340,7 +340,7 @@
   type DoclangBlock =
     | { type: "heading"; level: number; text: string; elementId: string | null; layer: ElementLayer }
     | { type: "paragraph"; text: string; elementId: string | null; layer: ElementLayer }
-    | { type: "list"; items: string[] }
+    | { type: "list"; items: { text: string; elementId: string | null }[] }
     | { type: "table"; title: string; rows: string[][]; elementId: string | null; layer: ElementLayer }
     | { type: "image"; src: string; alt: string; elementId: string | null; layer: ElementLayer }
     | { type: "page-break"; pageNumber: number };
@@ -481,7 +481,7 @@
 
       const blocks: DoclangBlock[] = [];
       const skip = new Set<Element>();
-      let pendingListItems: string[] = [];
+      let pendingListItems: { text: string; elementId: string | null }[] = [];
       let tableIdx = 0;
       let pageNumber = 1;
 
@@ -539,7 +539,7 @@
           if (text) blocks.push({ type: "paragraph", text, elementId: getInjectedElementId(node), layer: getElementLayer(node) });
         } else if (tag === "item" || tag === "li") {
           const text = node.textContent?.trim() || "";
-          if (text) pendingListItems.push(text);
+          if (text) pendingListItems.push({ text, elementId: getInjectedElementId(node) });
         } else if (tag === "list") {
           // A DocLang <list> is overloaded: some entries are numbered
           // section headings (<ldiv><marker>9.8.2.</marker></ldiv> followed
@@ -555,7 +555,12 @@
           const flushItemBuffer = () => {
             const text = textBuffer.replace(/\s+/g, " ").trim();
             textBuffer = "";
-            if (text) pendingListItems.push(currentMarker ? `${currentMarker} ${text}` : text);
+            if (text) {
+              pendingListItems.push({
+                text: currentMarker ? `${currentMarker} ${text}` : text,
+                elementId: currentElementId,
+              });
+            }
             currentMarker = "";
             currentElementId = null;
           };
@@ -677,7 +682,11 @@
   $effect(() => {
     const id = selectedElementId;
     if (!id || !showReadingPane) return;
-    const blockIdx = readingBlocks.findIndex((b) => "elementId" in b && b.elementId === id);
+    const blockIdx = readingBlocks.findIndex(
+      (b) =>
+        ("elementId" in b && b.elementId === id) ||
+        (b.type === "list" && b.items.some((item) => item.elementId === id))
+    );
     if (blockIdx === -1) return;
     if (blockIdx >= visibleBlockCount) {
       visibleBlockCount = Math.min(blockIdx + BLOCKS_PAGE_SIZE, readingBlocks.length);
@@ -1329,7 +1338,17 @@
                   {:else if block.type === "list"}
                     <ul class="list-disc space-y-1 pl-5 text-sm text-slate-300">
                       {#each block.items as item, iIdx (iIdx)}
-                        <li>{item}</li>
+                        <li
+                          data-element-id={item.elementId}
+                          onclick={() => item.elementId && selectElement(item.elementId)}
+                          role="presentation"
+                          class="rounded {item.elementId ? 'cursor-pointer' : ''} {item.elementId &&
+                          item.elementId === selectedElementId
+                            ? 'bg-accent/10 ring-1 ring-accent/50'
+                            : ''}"
+                        >
+                          {item.text}
+                        </li>
                       {/each}
                     </ul>
                   {:else if block.type === "table"}
