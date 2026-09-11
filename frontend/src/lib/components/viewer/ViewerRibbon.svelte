@@ -20,12 +20,40 @@
     Download,
     MousePointer2,
     SquarePlus,
+    ChevronDown,
+    UploadCloud,
   } from "lucide-svelte";
+  import type { Model } from "../../types";
 
   // The IFC viewer engine (static/js/viewer/ifc-viewer.js) is loaded dynamically
   // and typed loosely as `any` throughout IfcViewer.svelte — this ribbon just
   // drives whatever bridge object `initViewer()` returned.
-  let { viewerAPI }: { viewerAPI: any } = $props();
+  let {
+    viewerAPI,
+    fileName = "",
+    ifcFiles = [],
+    selectedFileId = null,
+    onSelectFile,
+    onLocalFile,
+  }: {
+    viewerAPI: any;
+    /** Display name for the currently-loaded model, shown when there's only one to pick from. */
+    fileName?: string;
+    /** The project's attached models, when there's more than one to switch between. */
+    ifcFiles?: Model[];
+    selectedFileId?: number | null;
+    onSelectFile?: (id: number) => void;
+    /** Called with a locally-picked IFC file from the "Open Local IFC" button. */
+    onLocalFile?: (file: File) => void;
+  } = $props();
+
+  let fileInputEl: HTMLInputElement = $state();
+  function handleLocalFileUpload(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) onLocalFile?.(file);
+    target.value = "";
+  }
 
   const TABS: TabStripItem[] = [
     { id: "view", label: "View" },
@@ -190,7 +218,57 @@
 </script>
 
 <div class="flex shrink-0 flex-col gap-2 border-b border-slate-800 bg-slate-900/60 px-3 py-2">
-  <TabStrip tabs={TABS} active={activeTab} onSelect={(id) => (activeTab = id)} ariaLabel="Viewer ribbon" />
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <TabStrip tabs={TABS} active={activeTab} onSelect={(id) => (activeTab = id)} ariaLabel="Viewer ribbon" />
+
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+      {#if ifcFiles.length > 1}
+        <div class="relative">
+          <select
+            value={selectedFileId}
+            onchange={(e) => onSelectFile?.(Number((e.target as HTMLSelectElement).value))}
+            class="w-full max-w-[220px] appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
+            title="Switch which of this project's models the viewport renders"
+          >
+            {#each ifcFiles as file (file.id)}
+              <option value={file.id}>
+                {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
+                  ? " (primary)"
+                  : ""}
+              </option>
+            {/each}
+          </select>
+          <ChevronDown
+            class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+          />
+        </div>
+      {:else if fileName}
+        <span
+          class="max-w-[220px] truncate rounded-md border border-blue-800/40 bg-blue-950/60 px-2.5 py-1.5 text-xs font-medium text-blue-300"
+          title={fileName}
+        >
+          Viewing: {fileName}
+        </span>
+      {/if}
+
+      <button
+        type="button"
+        onclick={() => fileInputEl?.click()}
+        class="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+        title="Open a local IFC model directly"
+      >
+        <UploadCloud class="h-3.5 w-3.5" />
+        <span>Open Local IFC</span>
+      </button>
+      <input
+        type="file"
+        accept=".ifc"
+        bind:this={fileInputEl}
+        onchange={handleLocalFileUpload}
+        class="hidden"
+      />
+    </div>
+  </div>
 
   <div class="flex flex-wrap items-center gap-1">
     {#if activeTab === "view"}

@@ -154,8 +154,11 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover {
 /* Native OpenBIM ThatOpen Viewer Styles */
 .bimguard-viewer-container {
   width: 100%;
-  height: clamp(46rem, 78vh, 64rem);
-  min-height: 500px;
+  /* Fills the remaining viewport height below the page header/model-picker
+     row above it, rather than a fixed/clamped height, so the 3D viewport
+     uses all the space it reasonably can. */
+  height: calc(100vh - 15.5rem);
+  min-height: 32rem;
   position: relative;
   overflow: hidden;
   background-color: #0b1120;

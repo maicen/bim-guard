@@ -1,20 +1,23 @@
 <script lang="ts">
   import { untrack, onMount } from "svelte";
+  import { router, replace } from "svelte-spa-router";
   import { projectsApi, modelsApi } from "../lib/api";
   import type { Project, Model } from "../lib/types";
   import IfcViewer from "../lib/components/IfcViewer.svelte";
-  import { ScanEye, Layers, Building2, ChevronDown } from "lucide-svelte";
+  import { ScanEye } from "lucide-svelte";
 
   interface Props {
     initialProjectId?: number | null;
     initialElementGuid?: string | null;
     initialBcfArtifactId?: number | null;
+    initialFileId?: number | null;
   }
 
   let {
     initialProjectId = null,
     initialElementGuid = null,
     initialBcfArtifactId = null,
+    initialFileId = null,
   }: Props = $props();
 
   let projects: Project[] = $state([]);
@@ -43,7 +46,9 @@
     filesReady = false;
     try {
       ifcFiles = await modelsApi.list(projectId);
-      selectedFileId = ifcFiles.find((f) => f.is_primary)?.id ?? ifcFiles[0]?.id ?? null;
+      const preferred =
+        initialFileId !== null ? ifcFiles.find((f) => f.id === initialFileId) : undefined;
+      selectedFileId = preferred?.id ?? ifcFiles.find((f) => f.is_primary)?.id ?? ifcFiles[0]?.id ?? null;
     } catch (err) {
       console.error("Failed to load project IFC files:", err);
       ifcFiles = [];
@@ -51,6 +56,20 @@
     } finally {
       filesReady = true;
     }
+  }
+
+  // Reflects the user's model pick in the URL (?file_id=...) so a deep link
+  // into the viewer can land on a specific one of a project's models, the
+  // same way project_id/element_guid/bcf_artifact_id already do.
+  function selectFile(id: number | null) {
+    selectedFileId = id;
+    const params = new URLSearchParams(router.querystring || "");
+    if (id !== null) {
+      params.set("file_id", String(id));
+    } else {
+      params.delete("file_id");
+    }
+    replace(`/viewer?${params.toString()}`);
   }
 
   async function loadProjects() {
@@ -95,57 +114,7 @@
   });
 </script>
 
-<div class="mx-auto space-y-6">
-  <div>
-    <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Viewer</div>
-    <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">3D OpenBIM Viewer</h1>
-    <p class="text-xs text-slate-400 sm:text-sm">
-      Spatial geometry inspection powered by ThatOpenCompany web-ifc and BCF viewpoints.
-    </p>
-  </div>
-
-  <!-- ═══ Model Selector (if project has multiple IFC files) ═══ -->
-  {#if ifcFiles.length > 1}
-    <div
-      class="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center"
-    >
-      <div class="flex shrink-0 items-center gap-2">
-        <Layers class="h-4 w-4 text-accent" />
-        <span class="text-xs font-bold text-slate-300">Viewing Model</span>
-      </div>
-      <div class="relative flex-1 sm:max-w-xs">
-        <select
-          id="viewer-file-select"
-          bind:value={selectedFileId}
-          class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
-        >
-          {#each ifcFiles as file (file.id)}
-            <option value={file.id}>
-              {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
-                ? " (primary)"
-                : ""}
-            </option>
-          {/each}
-        </select>
-        <ChevronDown
-          class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-        />
-      </div>
-    </div>
-  {/if}
-
-  {#if ifcFiles.length > 1}
-    <div
-      class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400"
-    >
-      <Layers class="h-4 w-4 shrink-0 text-blue-400" />
-      <span>
-        This project carries {ifcFiles.length} models. Switching between them changes what the viewport
-        renders only — the analysis results already on screen are left as they are.
-      </span>
-    </div>
-  {/if}
-
+<div class="mx-auto space-y-4">
   {#if selectedElementGuid}
     <div
       class="flex items-center justify-between rounded-xl border border-blue-800/60 bg-blue-950/40 p-3 text-xs text-blue-300"
@@ -193,5 +162,7 @@
     fileName={selectedFile?.file_name ?? ""}
     elementGuid={selectedElementGuid}
     bcfArtifactId={selectedBcfArtifactId}
+    {ifcFiles}
+    onSelectFile={selectFile}
   />
 </div>

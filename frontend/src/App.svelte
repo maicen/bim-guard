@@ -115,6 +115,7 @@
   let targetProjectId: number | null = $state(getInitialProjectId());
   let targetElementGuid: string | null = $state(null);
   let targetBcfArtifactId: number | null = $state(null);
+  let targetFileId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
   // Clicking the header's running-pipeline badge opens the live tracker in a
   // drawer rather than navigating to a dedicated page — the same information
@@ -244,6 +245,8 @@
     targetElementGuid = params.get("element_guid");
     const bcfArtifactId = Number(params.get("bcf_artifact_id"));
     targetBcfArtifactId = bcfArtifactId || null;
+    const fileId = Number(params.get("file_id"));
+    targetFileId = fileId || null;
   });
 
   function buildTargetUrl(
@@ -576,6 +579,7 @@
             initialProjectId={targetProjectId}
             initialElementGuid={targetElementGuid}
             initialBcfArtifactId={targetBcfArtifactId}
+            initialFileId={targetFileId}
           />
         {:else if activeView === "documents"}
           <DocumentsView />

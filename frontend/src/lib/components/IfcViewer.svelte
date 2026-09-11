@@ -2,18 +2,10 @@
   import { run } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
-  import {
-    Loader2,
-    AlertCircle,
-    RefreshCw,
-    UploadCloud,
-    Layers,
-    ClipboardList,
-    LayoutGrid,
-    PenTool,
-  } from "lucide-svelte";
+  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool } from "lucide-svelte";
   import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
+  import type { Model } from "../types";
   import CollapsiblePanel from "./CollapsiblePanel.svelte";
   import ViewerRibbon from "./viewer/ViewerRibbon.svelte";
   import LayersPanel from "./viewer/LayersPanel.svelte";
@@ -29,8 +21,12 @@
      * model predates that table resolves to.
      */
     fileId?: number | null;
-    /** Display name for the model on screen, shown in the viewport title bar. */
+    /** Display name for the model on screen, shown by the ribbon when there's only one to pick from. */
     fileName?: string;
+    /** The project's attached models, forwarded to the ribbon's model switcher when there's more than one. */
+    ifcFiles?: Model[];
+    /** Called with the id the user picked from the ribbon's model switcher. */
+    onSelectFile?: (id: number) => void;
   }
 
   let {
@@ -39,12 +35,13 @@
     bcfArtifactId = null,
     fileId = null,
     fileName = "",
+    ifcFiles = [],
+    onSelectFile,
   }: Props = $props();
 
   let viewportHost: HTMLDivElement = $state();
   let detailsHost: HTMLDivElement = $state();
   let drawingsSheetBoardHost: HTMLDivElement | undefined = $state();
-  let fileInputEl: HTMLInputElement = $state();
   let viewerAPI: any = $state(null);
   let loading = $state(false);
   let loadingMessage = $state("Initializing OpenBIM 3D Viewport...");
@@ -134,11 +131,8 @@
     }
   }
 
-  async function handleLocalFileUpload(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-    if (!file || !viewerAPI) return;
-
+  async function loadLocalFile(file: File) {
+    if (!viewerAPI) return;
     try {
       loading = true;
       loadingMessage = `Parsing ${file.name}...`;
@@ -151,7 +145,6 @@
       error = err?.message || "Failed to parse local IFC model";
     } finally {
       loading = false;
-      target.value = "";
     }
   }
 
@@ -194,68 +187,16 @@
 <div
   class="bimguard-viewer-root bimguard-viewer-container relative flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl"
 >
-  <!-- Viewport Window Top Bar -->
-  <div
-    class="z-20 flex h-11 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/90 px-4 backdrop-blur-md"
-  >
-    <div class="flex items-center gap-2">
-      <span class="h-3 w-3 rounded-full bg-rose-500/80 shadow-sm shadow-rose-500/20"></span>
-      <span class="h-3 w-3 rounded-full bg-amber-500/80 shadow-sm shadow-amber-500/20"></span>
-      <span class="h-3 w-3 rounded-full bg-emerald-500/80 shadow-sm shadow-emerald-500/20"></span>
-      <div class="ml-3 flex items-center gap-2">
-        <Layers class="h-4 w-4 text-blue-400" />
-        <span class="text-xs font-semibold tracking-wide text-slate-200"
-          >Native OpenBIM 3D Viewport</span
-        >
-      </div>
+  <!-- Loading indicator: a slim strip, present only while actually loading so
+       the viewport otherwise fills the whole card right up to the ribbon. -->
+  {#if loading}
+    <div
+      class="z-20 flex shrink-0 items-center gap-2 border-b border-blue-800/60 bg-blue-950/60 px-4 py-1.5 text-xs text-blue-300"
+    >
+      <Loader2 class="h-3.5 w-3.5 animate-spin text-blue-400" />
+      <span class="font-medium">{loadingMessage}</span>
     </div>
-
-    <div class="flex items-center gap-3">
-      {#if loading}
-        <div
-          class="flex items-center gap-2 rounded-md border border-blue-800/60 bg-blue-950/60 px-3 py-1 text-xs text-blue-300"
-        >
-          <Loader2 class="h-3.5 w-3.5 animate-spin text-blue-400" />
-          <span class="text-caption font-medium">{loadingMessage}</span>
-        </div>
-      {/if}
-
-      {#if projectId}
-        <span
-          class="rounded-md border border-emerald-800/40 bg-emerald-950/60 px-2.5 py-0.5 font-mono text-xs font-medium text-emerald-400"
-        >
-          Project #{projectId}
-        </span>
-      {/if}
-
-      {#if fileName}
-        <span
-          class="max-w-[220px] truncate rounded-md border border-blue-800/40 bg-blue-950/60 px-2.5 py-0.5 text-xs font-medium text-blue-300"
-          title={fileName}
-        >
-          Viewing: {fileName}
-        </span>
-      {/if}
-
-      <!-- Local File Upload Button -->
-      <button
-        type="button"
-        onclick={() => fileInputEl?.click()}
-        class="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
-        title="Open a local IFC model directly"
-      >
-        <UploadCloud class="h-3.5 w-3.5" />
-        <span>Open Local IFC</span>
-      </button>
-      <input
-        type="file"
-        accept=".ifc"
-        bind:this={fileInputEl}
-        onchange={handleLocalFileUpload}
-        class="hidden"
-      />
-    </div>
-  </div>
+  {/if}
 
   <!-- Error Alert Banner -->
   {#if error}
@@ -281,7 +222,14 @@
 
   <!-- Revit-style ribbon: tabs of grouped buttons driving the engine bridge -->
   {#if viewerAPI}
-    <ViewerRibbon {viewerAPI} />
+    <ViewerRibbon
+      {viewerAPI}
+      {fileName}
+      {ifcFiles}
+      selectedFileId={fileId}
+      {onSelectFile}
+      onLocalFile={loadLocalFile}
+    />
   {/if}
 
   <!-- Docked workspace: collapsible BCF/Layers/Drawings panels around the 3D viewport -->
