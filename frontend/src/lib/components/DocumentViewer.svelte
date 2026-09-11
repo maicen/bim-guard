@@ -334,7 +334,8 @@
     | { type: "paragraph"; text: string; elementId: string | null; layer: ElementLayer }
     | { type: "list"; items: string[] }
     | { type: "table"; title: string; rows: string[][]; elementId: string | null; layer: ElementLayer }
-    | { type: "image"; src: string; alt: string; elementId: string | null; layer: ElementLayer };
+    | { type: "image"; src: string; alt: string; elementId: string | null; layer: ElementLayer }
+    | { type: "page-break"; pageNumber: number };
 
   /**
    * Read the id BIM-Guard's backend injects into DocLang XML at extraction
@@ -468,6 +469,7 @@
       const skip = new Set<Element>();
       let pendingListItems: string[] = [];
       let tableIdx = 0;
+      let pageNumber = 1;
 
       const flushList = () => {
         if (pendingListItems.length > 0) {
@@ -524,6 +526,15 @@
         } else if (tag === "item" || tag === "li") {
           const text = node.textContent?.trim() || "";
           if (text) pendingListItems.push(text);
+        } else if (tag === "page_break") {
+          flushList();
+          pageNumber += 1;
+          // Only a divider between pages that both have content -- a
+          // page_break before anything's been pushed yet (or two in a row)
+          // would render a bare "Page N" heading with nothing above it.
+          if (blocks.length > 0 && blocks[blocks.length - 1].type !== "page-break") {
+            blocks.push({ type: "page-break", pageNumber });
+          }
         }
         node = walker.nextNode() as Element | null;
       }
@@ -728,7 +739,13 @@
       const detail = await documentsApi.get(documentId);
       plainText = detail.text || "";
       doclangXml = detail.doclang_xml || "";
-      if (initialTab === "doclang" && doclangXml.trim()) activeViewerTab = "doclang";
+      // No real PDF to show (missing, or failed to render) -- the flat
+      // extracted-text panel is a worse default than the structured DocLang
+      // view when one is available, *unless* this load is a jump-to-clause
+      // request (highlightText/bbox), which only the text/PDF panel supports.
+      if (doclangXml.trim() && (initialTab === "doclang" || (!isPdf && !highlightText))) {
+        activeViewerTab = "doclang";
+      }
       loading = false;
       if (pdfFallbackNotice && !plainText.trim()) {
         error =
@@ -1248,6 +1265,14 @@
                   The document was parsed into DocLang XML, but no headings, paragraphs, lists, or tables could be extracted from it.
                 </p>
               </div>
+            {:else if readingBlocks.length === 0}
+              <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+                <FileCode class="mb-2 h-10 w-10 text-slate-600" />
+                <p class="text-sm font-semibold text-slate-300">Everything is hidden</p>
+                <p class="mt-1 max-w-md text-xs text-slate-500">
+                  All of this document's content is furniture/background and currently hidden — turn on the Layers toggles above to show it.
+                </p>
+              </div>
             {:else}
               <div class="mx-auto max-w-4xl space-y-4">
                 {#each visibleBlocks as block, bIdx (bIdx)}
@@ -1360,9 +1385,17 @@
                         <figcaption class="mt-2 text-center text-xs text-slate-400">{block.alt}</figcaption>
                       {/if}
                     </figure>
+                  {:else if block.type === "page-break"}
+                    <div class="flex items-center gap-3 py-1" role="separator" aria-label="Page {block.pageNumber}">
+                      <div class="h-px flex-1 bg-slate-800"></div>
+                      <span class="shrink-0 text-caption font-semibold uppercase tracking-widest text-slate-600"
+                        >Page {block.pageNumber}</span
+                      >
+                      <div class="h-px flex-1 bg-slate-800"></div>
+                    </div>
                   {/if}
                 {/each}
-                {#if visibleBlockCount < documentBlocks.length}
+                {#if visibleBlockCount < readingBlocks.length}
                   <div bind:this={blocksSentinelEl} class="flex justify-center py-4">
                     <span class="text-caption text-slate-500">Loading more…</span>
                   </div>

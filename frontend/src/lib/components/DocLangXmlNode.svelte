@@ -24,7 +24,7 @@
     autoCollapseDepth?: number;
   }
 
-  let { element, depth, collapsed, selectedElementId, onSelect, autoCollapseDepth = 2 }: Props = $props();
+  let { element, depth, collapsed, selectedElementId, onSelect, autoCollapseDepth = 1 }: Props = $props();
 
   function localName(el: Element): string {
     return el.tagName.toLowerCase().split(":").pop() || el.tagName.toLowerCase();
@@ -70,21 +70,22 @@
   let isLeaf = $derived(children.length === 0);
   let foldable = $derived(!isLeaf);
 
-  // Initialize (once per element) whether a foldable node starts collapsed --
-  // deep subtrees default closed so a large document's initial tree isn't
-  // fully expanded; the user opens what they care about.
-  $effect(() => {
-    if (foldable && depth >= autoCollapseDepth && !collapsed.has(element)) {
-      collapsed.add(element);
-    }
-  });
-
-  let isCollapsed = $derived(collapsed.has(element));
+  // Deep subtrees default closed so a large document's initial tree isn't
+  // fully expanded -- the user opens what they care about. This has to be a
+  // pure, synchronous derivation (not an $effect that mutates `collapsed` on
+  // mount): an $effect only runs *after* the initial render commits, so
+  // every descendant -- however deep, however many thousands of OTSL table
+  // cells included -- would still get mounted once on first paint before
+  // being torn down again. For a large document that one-frame over-mount
+  // was enough to freeze the tab. `collapsed` here instead tracks only
+  // explicit user toggles, applied as a flip against the depth-based default.
+  let defaultCollapsed = $derived(foldable && depth >= autoCollapseDepth);
+  let isCollapsed = $derived(defaultCollapsed !== collapsed.has(element));
   let isSelected = $derived(elementId !== null && elementId === selectedElementId);
 
   function toggleFold(e: MouseEvent) {
     e.stopPropagation();
-    if (isCollapsed) collapsed.delete(element);
+    if (collapsed.has(element)) collapsed.delete(element);
     else collapsed.add(element);
   }
 
