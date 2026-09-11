@@ -10,6 +10,7 @@
   } from "lucide-svelte";
   import { modelsApi } from "../lib/api";
   import type { Project, Model } from "../lib/types";
+  import { formatAnalysisDomain } from "../lib/analysisDomain";
   import PageHeader from "../lib/components/PageHeader.svelte";
 
   interface Props {
@@ -119,7 +120,7 @@
     <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
       <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Domain</div>
       <div class="mt-2 text-xl font-bold text-slate-50">
-        {selectedProject?.analysis_type || "—"}
+        {selectedProject?.analysis_type ? formatAnalysisDomain(selectedProject.analysis_type) : "—"}
       </div>
     </div>
     <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">

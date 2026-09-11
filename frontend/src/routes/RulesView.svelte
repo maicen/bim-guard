@@ -912,7 +912,7 @@
   </div>
 
   {#if activeMainTab === "rules"}
-    <!-- Category Selector Tabs: Arch | Piping | seismic -->
+    <!-- Category Selector Tabs: Arch | Piping | Seismic -->
     <div
       class="flex w-fit items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-1.5"
     >
@@ -971,7 +971,7 @@
           : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
       >
         <span class="h-2 w-2 rounded-full bg-purple-400"></span>
-        <span>seismic</span>
+        <span>Seismic</span>
         <span class="ml-0.5 text-micro opacity-75">({seismicCount})</span>
       </button>
     </div>
@@ -1113,13 +1113,13 @@
                     class="rounded px-1.5 py-0.5 font-mono text-nano font-medium {selectedFolderId ===
                     folder.ruleset_id
                       ? 'bg-white/20 text-white'
-                      : folder.category === 'Piping'
+                      : folder.category?.toLowerCase() === 'piping'
                         ? 'bg-amber-500/20 text-amber-300'
-                        : folder.category === 'seismic'
+                        : folder.category?.toLowerCase() === 'seismic'
                           ? 'bg-purple-500/20 text-purple-300'
                           : 'bg-blue-500/20 text-blue-300'}"
                   >
-                    {folder.category}
+                    {folder.category?.toLowerCase() === 'seismic' ? 'Seismic' : (folder.category || 'Arch')}
                   </span>
                 {/if}
 
@@ -1396,14 +1396,14 @@
                       </td>
                       <td class="px-4 py-3">
                         <span
-                          class="inline-block rounded px-2 py-0.5 font-mono text-micro font-semibold {rule.category ===
-                          'Piping'
+                          class="inline-block rounded px-2 py-0.5 font-mono text-micro font-semibold {rule.category?.toLowerCase() ===
+                          'piping'
                             ? 'border border-amber-800/50 bg-amber-950/60 text-amber-300'
-                            : rule.category === 'seismic'
+                            : rule.category?.toLowerCase() === 'seismic'
                               ? 'border border-purple-800/50 bg-purple-950/60 text-purple-300'
                               : 'border border-blue-800/50 bg-blue-950/60 text-blue-300'}"
                         >
-                          {rule.category || "Arch"}
+                          {rule.category?.toLowerCase() === 'seismic' ? 'Seismic' : (rule.category || "Arch")}
                         </span>
                       </td>
                       <td class="px-4 py-3">
@@ -1999,7 +1999,7 @@
             >
               <option value="Arch">Arch (Architectural)</option>
               <option value="Piping">Piping (Corrosion)</option>
-              <option value="seismic">seismic (Clearance)</option>
+              <option value="seismic">Seismic (Clearance)</option>
             </select>
           </div>
 
@@ -2137,7 +2137,7 @@
               <option value="__keep__">— Keep current —</option>
               <option value="Arch">Arch (Architectural)</option>
               <option value="Piping">Piping (Corrosion)</option>
-              <option value="seismic">seismic (Clearance)</option>
+              <option value="seismic">Seismic (Clearance)</option>
             </select>
           </div>
 
@@ -2264,7 +2264,7 @@
             <option value="__keep__">— Keep current —</option>
             <option value="Arch">Arch (Architectural)</option>
             <option value="Piping">Piping (Corrosion)</option>
-            <option value="seismic">seismic (Clearance)</option>
+            <option value="seismic">Seismic (Clearance)</option>
           </select>
         </div>
 

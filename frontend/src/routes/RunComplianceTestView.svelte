@@ -21,6 +21,7 @@
   import { toasts } from "../lib/toast.svelte";
   import { DOCUMENT_TYPES } from "../lib/types";
   import type { Project, RuleFolder, Model } from "../lib/types";
+  import { formatAnalysisDomain } from "../lib/analysisDomain";
 
   // Step 1: project + IFC model.
   let isWizardOpen = $state(false);
@@ -236,7 +237,7 @@
       <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-3.5">
         <div class="min-w-0">
           <p class="truncate text-sm font-semibold text-slate-100">{project.name}</p>
-          <p class="text-micro text-slate-500">{project.country} · {project.analysis_type}</p>
+          <p class="text-micro text-slate-500">{project.country} · {formatAnalysisDomain(project.analysis_type)}</p>
         </div>
         {#if isCheckingModel}
           <span class="flex shrink-0 items-center gap-1.5 text-micro text-slate-500">

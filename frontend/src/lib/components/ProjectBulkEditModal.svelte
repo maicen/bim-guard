@@ -152,7 +152,7 @@
             <option value="no_change">-- Keep Current Domain --</option>
             <option value="Arch">Arch</option>
             <option value="Piping">Piping</option>
-            <option value="seismic">seismic</option>
+            <option value="seismic">Seismic</option>
           </select>
         </div>
       </div>

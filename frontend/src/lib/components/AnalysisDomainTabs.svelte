@@ -36,7 +36,11 @@
       onclick={() => onSelect(tab.id)}
       class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors {active ===
       tab.id
-        ? 'bg-accent text-white'
+        ? tab.id === 'piping'
+          ? 'bg-amber-600 text-white shadow-sm'
+          : tab.id === 'seismic'
+            ? 'bg-purple-600 text-white shadow-sm'
+            : 'bg-blue-600 text-white shadow-sm'
         : 'text-slate-400 hover:text-white'}"
     >
       <tab.icon class="h-3.5 w-3.5" />

@@ -28,6 +28,7 @@
   import { toasts } from "../lib/toast.svelte";
   import { SvelteSet } from "svelte/reactivity";
   import type { Group, OrganizationSummary, Project } from "../lib/types";
+  import { formatAnalysisDomain } from "../lib/analysisDomain";
 
   let isSuperadmin = $derived(authState.isSuperadmin);
 
@@ -565,7 +566,7 @@
                     {project.name}
                   </div>
                   <div class="text-micro text-slate-500 font-mono">
-                    #{project.id} &middot; {project.analysis_type || "Arch"}
+                    #{project.id} &middot; {project.analysis_type ? formatAnalysisDomain(project.analysis_type) : "Arch"}
                   </div>
                 </td>
                 <td class="px-4 py-3 text-slate-400">

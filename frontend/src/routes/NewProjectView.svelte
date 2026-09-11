@@ -834,7 +834,7 @@
             >
               <option value="Arch">Arch — Doors, Egress, Daylight, Stairs</option>
               <option value="Piping">Piping — GC-001, CC-001, MC-001</option>
-              <option value="seismic">seismic — Blue Halo Clearance Detection</option>
+              <option value="seismic">Seismic — Blue Halo Clearance Detection</option>
             </select>
             <p class="mt-1 text-caption text-slate-500">
               Determines which analysis page opens once the project is created.

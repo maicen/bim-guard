@@ -38,3 +38,27 @@ export function viewForAnalysisDomain(analysisType: string | null | undefined): 
       return "arch";
   }
 }
+
+/** User-facing display label for an analysis domain with proper capitalization. */
+export function formatAnalysisDomain(analysisType: string | null | undefined): string {
+  switch (normalizeAnalysisDomain(analysisType)) {
+    case "Piping":
+      return "Piping";
+    case "seismic":
+      return "Seismic";
+    default:
+      return "Arch";
+  }
+}
+
+/** Distinctive domain badge styling classes across the app. */
+export function getDomainBadgeClasses(analysisType: string | null | undefined): string {
+  switch (normalizeAnalysisDomain(analysisType)) {
+    case "Piping":
+      return "border border-amber-800/50 bg-amber-950/60 text-amber-300";
+    case "seismic":
+      return "border border-purple-800/50 bg-purple-950/60 text-purple-300";
+    default:
+      return "border border-blue-800/50 bg-blue-950/60 text-blue-300";
+  }
+}

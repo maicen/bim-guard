@@ -13,6 +13,7 @@
     ShieldCheck,
   } from "lucide-svelte";
   import { projectsApi } from "../api";
+  import { formatAnalysisDomain } from "../analysisDomain";
   import type { Project } from "../types";
 
   interface Props {
@@ -100,7 +101,7 @@
             >
             <div class="flex items-center gap-1.5 font-medium text-slate-300">
               <Layers class="h-3.5 w-3.5 text-slate-400" />
-              <span>{project.analysis_type}</span>
+              <span>{formatAnalysisDomain(project.analysis_type)}</span>
             </div>
           </div>
 

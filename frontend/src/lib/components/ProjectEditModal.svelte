@@ -242,7 +242,7 @@
           >
             <option value="Arch">Arch</option>
             <option value="Piping">Piping</option>
-            <option value="seismic">seismic</option>
+            <option value="seismic">Seismic</option>
           </select>
         </div>
 

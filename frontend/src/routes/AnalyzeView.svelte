@@ -39,6 +39,7 @@
   import HoverCard from "../lib/components/HoverCard.svelte";
   import PipingChecksExplainer from "../lib/components/PipingChecksExplainer.svelte";
   import { describeMechanism } from "../lib/glossary";
+  import { formatAnalysisDomain } from "../lib/analysisDomain";
   import type {
     AnalysisResult,
     Project,
@@ -648,7 +649,7 @@
             ? 'border-purple-800/80 bg-purple-950/60 text-purple-300 shadow-sm'
             : 'border-amber-800/80 bg-amber-950/60 text-amber-300 shadow-sm'}"
         >
-          Category: {activeCategory}
+          Category: {formatAnalysisDomain(activeCategory)}
         </span>
         {#if result?.cached}
           <span
@@ -827,7 +828,7 @@
           <div class="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
             <span>Jurisdiction: <strong>{currentProject.country}</strong></span>
             <span>•</span>
-            <span>Type: <strong>{currentProject.analysis_type}</strong></span>
+            <span>Type: <strong>{formatAnalysisDomain(currentProject.analysis_type)}</strong></span>
           </div>
         </div>
       </div>

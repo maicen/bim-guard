@@ -31,7 +31,11 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import { createTableState } from "../lib/tableState.svelte";
-  import { normalizeAnalysisDomain } from "../lib/analysisDomain";
+  import {
+    normalizeAnalysisDomain,
+    formatAnalysisDomain,
+    getDomainBadgeClasses,
+  } from "../lib/analysisDomain";
 
   interface Props {
     onSelectProjectForAudit: (projectId: number, analysisType?: string | null) => void;
@@ -300,7 +304,7 @@
           <option value="all">All Domains</option>
           <option value="Arch">Arch</option>
           <option value="Piping">Piping</option>
-          <option value="seismic">seismic</option>
+          <option value="seismic">Seismic</option>
         </select>
       </div>
     </div>
@@ -449,14 +453,11 @@
                   </td>
                   <td class="px-4 py-3">
                     <span
-                      class="inline-block rounded px-2 py-0.5 font-mono text-micro font-semibold {project.analysis_type ===
-                      'Piping'
-                        ? 'border border-amber-800/50 bg-amber-950/60 text-amber-300'
-                        : project.analysis_type === 'Seismic'
-                          ? 'border border-purple-800/50 bg-purple-950/60 text-purple-300'
-                          : 'border border-blue-800/50 bg-blue-950/60 text-blue-300'}"
+                      class="inline-block rounded px-2 py-0.5 font-mono text-micro font-semibold {getDomainBadgeClasses(
+                        project.analysis_type,
+                      )}"
                     >
-                      {project.analysis_type}
+                      {formatAnalysisDomain(project.analysis_type)}
                     </span>
                   </td>
                   <td class="px-4 py-3 text-slate-400">{project.country}</td>
