@@ -101,6 +101,9 @@ function installErrorHighlighting(components, world) {
             isActive: () => isolateActive,
             hasSelection: () => currentSelectionMap !== null,
             onSelectionChange: (cb) => selectionListeners.add(cb),
+            // The map behind the current highlight, for callers that need to
+            // frame it rather than just show/hide it (see fitToSelection).
+            getSelectionMap: () => currentSelectionMap,
         },
     };
 }
@@ -886,16 +889,73 @@ export async function initViewer(containerOrId) {
     // the topic's Description (a basic, spec-required BCF field every
     // compliant reader must preserve verbatim). Matching that substring is
     // how a "View in 3D" link for one specific element finds its topic here.
+    //
+    // Two archive shapes reach this viewer and they label that line
+    // differently, so both spellings are tried, most specific first:
+    //   "ElementGUID: <guid>"  — persisted artifacts, from
+    //     pipeline_services._to_bcf_topic
+    //   "GUID: <guid>"         — the /analyze/export?fmt=bcf archive, whose
+    //     description is built by phase_6e_export._description under an
+    //     "ELEMENT" heading
+    // Both needles are anchored on the label, so neither can match a GUID
+    // that merely appears somewhere else in the text.
+    //
+    // One element usually carries several findings (the demo's clicked fitting
+    // has four: one MC critical and three normal), so a match is rarely
+    // unique. The deep link names the element, not the finding, so the most
+    // severe topic is the one to show — it is the row someone is most likely
+    // to have clicked, and it is at least deterministic, where "first one the
+    // archive happened to yield" is not. The vocabulary is the exporter's own
+    // Critical/Major/Normal/Minor (phase_6e_export, RiskBand -> priority).
+    const PRIORITY_RANK = { critical: 0, major: 1, normal: 2, minor: 3 };
+
     function findTopicByElementGuid(elementGuid) {
         if (!elementGuid) return null;
-        const needle = `ElementGUID: ${elementGuid}`;
-        for (const topic of workspace.topics.list.values()) {
-            if ((topic.description || "").includes(needle)) return topic;
+        const needles = [`ElementGUID: ${elementGuid}`, `GUID: ${elementGuid}`];
+        for (const needle of needles) {
+            const matches = [];
+            for (const topic of workspace.topics.list.values()) {
+                if ((topic.description || "").includes(needle)) matches.push(topic);
+            }
+            if (matches.length === 0) continue;
+            matches.sort((a, b) => {
+                const rank = (t) =>
+                    PRIORITY_RANK[String(t.priority || "").toLowerCase()] ?? 9;
+                return rank(a) - rank(b);
+            });
+            return matches[0];
         }
         return null;
     }
 
-    async function loadBcf(urlOrFile, elementGuid, getHeaders) {
+    // Frames whatever is currently highlighted. Returns false when nothing is
+    // selected, or when the selection resolved to no geometry in the loaded
+    // model, so the caller can tell the user rather than leave the camera
+    // parked somewhere unrelated with no explanation.
+    //
+    // SimpleCamera.fitToItems (inherited by OrthoPerspectiveCamera) takes a
+    // ModelIdMap straight off, going through BoundingBoxer.addFromModelIdMap
+    // and controls.fitToSphere internally — so there is no box to assemble
+    // here. Note fitToBox does not exist on this build's controls.
+    async function fitToSelection() {
+        const map = isolate.getSelectionMap();
+        if (!map || OBC.ModelIdMapUtils.isEmpty(map)) return false;
+        try {
+            await world.camera.fitToItems(map);
+            return true;
+        } catch (e) {
+            console.warn("Could not fit camera to selection:", e);
+            return false;
+        }
+    }
+
+    // `autoSelectTopic` false loads the archive and selects nothing, leaving
+    // the caller to find its own topic. A deep link for one specific element
+    // needs that: the fall-back below picks the archive's first topic when the
+    // GUID misses, which for a download is a reasonable "show me something"
+    // and for a deep link would silently highlight the wrong element.
+    async function loadBcf(urlOrFile, elementGuid, getHeaders, options = {}) {
+        const { autoSelectTopic = true } = options;
         try {
             const file = typeof urlOrFile === "string"
                 ? await fetchWithAuthRetry(urlOrFile, getHeaders).then(async (response) => {
@@ -908,9 +968,11 @@ export async function initViewer(containerOrId) {
             for (const viewpoint of importedViewpoints) viewpoint.world = world;
             workspace.refreshTopicsList();
 
-            const targetTopic = findTopicByElementGuid(elementGuid)
-                || workspace.topics.list.values().next().value;
-            if (targetTopic) await workspace.selectTopic(targetTopic);
+            if (autoSelectTopic) {
+                const targetTopic = findTopicByElementGuid(elementGuid)
+                    || workspace.topics.list.values().next().value;
+                if (targetTopic) await workspace.selectTopic(targetTopic);
+            }
             return imported;
         } catch (error) {
             console.error("Error loading BCF file", error);
@@ -968,6 +1030,7 @@ export async function initViewer(containerOrId) {
         setupFileLoader,
         selectTopic: workspace.selectTopic,
         findTopicByElementGuid,
+        fitToSelection,
         dispose: () => {
             try {
                 workspace.dispose();

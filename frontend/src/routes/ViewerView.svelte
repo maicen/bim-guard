@@ -22,6 +22,9 @@
   let selectedElementGuid: string | null = $state(untrack(() => initialElementGuid));
   let selectedBcfArtifactId: number | null = $state(untrack(() => initialBcfArtifactId));
 
+  /** Filled by IfcViewer when a deep-linked element could not be highlighted. */
+  let elementNotFound: string | null = $state(null);
+
   // The project's attached models. A project predating project_ifc_files
   // reports its one model here too, with a null id, so this list is the single
   // shape the picker renders either side of that migration.
@@ -168,6 +171,17 @@
     </div>
   {/if}
 
+  {#if elementNotFound}
+    <div
+      class="flex items-center justify-between rounded-xl border border-amber-800/60 bg-amber-950/40 p-3 text-xs text-amber-300"
+    >
+      <div class="flex items-center gap-2">
+        <ScanEye class="h-4 w-4 shrink-0 text-amber-400" />
+        <span>{elementNotFound}</span>
+      </div>
+    </div>
+  {/if}
+
   {#if !selectedProjectId && projects.length > 0}
     <div
       class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400"
@@ -193,5 +207,6 @@
     fileName={selectedFile?.file_name ?? ""}
     elementGuid={selectedElementGuid}
     bcfArtifactId={selectedBcfArtifactId}
+    bind:notFoundMessage={elementNotFound}
   />
 </div>

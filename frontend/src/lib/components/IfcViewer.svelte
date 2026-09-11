@@ -18,6 +18,12 @@
     fileId?: number | null;
     /** Display name for the model on screen, shown in the viewport title bar. */
     fileName?: string;
+    /**
+     * Set when a findings deep link named an element the viewer could not end
+     * up highlighting. Bindable so the host view can show it alongside its own
+     * GUID banner rather than inside the viewport chrome.
+     */
+    notFoundMessage?: string | null;
   }
 
   let {
@@ -26,6 +32,7 @@
     bcfArtifactId = null,
     fileId = null,
     fileName = "",
+    notFoundMessage = $bindable(null),
   }: Props = $props();
 
   let containerEl: HTMLDivElement = $state();
@@ -39,6 +46,81 @@
   let loadedBcfArtifactId: number | null = $state(null);
   let isInitialized = false;
 
+  /**
+   * `${projectId}::${elementGuid}` of the deep link already attempted. The
+   * archive is fetched at most once per pair — both reactive entry points
+   * below can fire repeatedly for one navigation, and the fallback leg can
+   * cost a full analysis run.
+   */
+  let focusAttempted: string | null = null;
+
+  /**
+   * Highlight, frame and make isolatable the element a findings row linked to.
+   *
+   * The viewer can only select through a BCF topic — a topic's viewpoint is
+   * what carries the element's GlobalId as a component selection, and
+   * `Viewpoint.go()` is what publishes the selection map that the red
+   * highlight and the ISOLATE button both read. On the findings path no
+   * archive is loaded, which is why the element used to arrive unhighlighted
+   * with ISOLATE greyed out. So: fetch an archive first, then select from it.
+   */
+  async function focusElement(id: number, guid: string) {
+    if (!viewerAPI) return;
+    const key = `${id}::${guid}`;
+    if (focusAttempted === key) return;
+    focusAttempted = key;
+
+    const missing =
+      `Element ${guid} could not be located in this model. ` +
+      `Run Export BCF 2.1 on this project, then retry.`;
+    notFoundMessage = null;
+
+    try {
+      loading = true;
+      loadingMessage = "Loading BCF viewpoints...";
+
+      // The project's persisted artifact first: it is a stored file, so it
+      // costs a download and nothing more. Only the architectural pipeline
+      // writes one (ArchAnalysisService.run_analysis -> persist_bcf), so for
+      // a corrosion or seismic project this 404s and the export below is what
+      // actually answers. Exporting regenerates the archive from the cached
+      // run, which is why it is second rather than first.
+      let loaded = false;
+      for (const url of [
+        analyzeApi.getLatestBcfUrl(id),
+        analyzeApi.getExportUrl(id, "corrosion", "bcf"),
+      ]) {
+        try {
+          await viewerAPI.loadBcf(url, guid, authHeaders, { autoSelectTopic: false });
+          loaded = true;
+          break;
+        } catch (err) {
+          console.warn("BCF source unavailable for element focus:", url, err);
+        }
+      }
+      if (!loaded) {
+        notFoundMessage = missing;
+        return;
+      }
+
+      // Deliberately not loadBcf's own lookup: its fall-back to the archive's
+      // first topic would highlight a different element than the one clicked.
+      const topic = viewerAPI.findTopicByElementGuid(guid);
+      if (!topic) {
+        notFoundMessage = missing;
+        return;
+      }
+
+      await viewerAPI.selectTopic(topic);
+      // False when the topic's viewpoint resolved to no geometry in this
+      // model — the topic exists but the element does not, so the camera has
+      // not moved and there is nothing to isolate.
+      if (!(await viewerAPI.fitToSelection())) notFoundMessage = missing;
+    } finally {
+      loading = false;
+    }
+  }
+
   async function init() {
     if (!containerEl || isInitialized) return;
     try {
@@ -47,7 +129,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-1";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-2";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer(containerEl);
       isInitialized = true;
@@ -102,10 +184,7 @@
         await viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders);
         loadedBcfArtifactId = bcfArtifactId;
       } else if (elementGuid) {
-        const topic = viewerAPI.findTopicByElementGuid(elementGuid);
-        if (topic) {
-          await viewerAPI.selectTopic(topic);
-        }
+        await focusElement(id, elementGuid);
       }
     } catch (err: any) {
       console.error("Failed to load project IFC:", err);
@@ -163,11 +242,19 @@
   });
 
   run(() => {
-    if (viewerAPI && elementGuid && loadedProjectId) {
-      const topic = viewerAPI.findTopicByElementGuid(elementGuid);
-      if (topic) {
-        viewerAPI.selectTopic(topic);
-      }
+    // Only the standalone element deep link. With a bcfArtifactId the effect
+    // above already loads that archive and selects from it.
+    if (viewerAPI && elementGuid && !bcfArtifactId && loadedProjectId) {
+      focusElement(loadedProjectId, elementGuid);
+    }
+  });
+
+  // Clearing the banner (or linking to a different element) re-arms the
+  // lookup, so a retry after a failure is one click rather than a reload.
+  run(() => {
+    if (!elementGuid) {
+      notFoundMessage = null;
+      focusAttempted = null;
     }
   });
 </script>
