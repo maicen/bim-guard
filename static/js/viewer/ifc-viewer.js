@@ -7,7 +7,7 @@ import * as THREE from "https://esm.sh/three@0.182.0";
 // BCFTopics.load (it vendors JSZip 3.10.1 rather than re-exporting it, so the
 // same version has to be pulled alongside rather than reached through OBC).
 import JSZip from "https://esm.sh/jszip@3.10.1";
-import { filterBcfArchive, priorityRank } from "./bcf-filter.js?v=viewer-isolate-4";
+import { filterBcfArchive, priorityRank } from "./bcf-filter.js?v=viewer-isolate-5";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
@@ -223,9 +223,23 @@ function createTopicPanel(components, topics, world) {
     const topicPanel = document.createElement("div");
     topicPanel.style.minWidth = "0";
     topicPanel.style.minHeight = "0";
+    // Never throws.
+    //
+    // The sections rendered here resolve ids through the live managers —
+    // topicRelations maps the topic's RelatedTopic guids through topics.list
+    // and reads .guid off each result — so anything the archive references but
+    // does not contain surfaces as a TypeError inside lit's synchronous render.
+    // That used to propagate out through selectTopic and abort the whole
+    // selection, costing the red element over a panel that nobody had looked at
+    // yet. The panel is the least important thing on screen here; it must never
+    // be able to take the highlight down with it.
     const updateTopicPanel = ({ topic } = {}) => {
         if (topic) selectedTopic = topic;
-        topicPanel.replaceChildren(renderTopicPanel(selectedTopic));
+        try {
+            topicPanel.replaceChildren(renderTopicPanel(selectedTopic));
+        } catch (error) {
+            console.warn(`${LOG} panel update failed:`, error);
+        }
     };
     updateTopicPanel();
 
@@ -281,14 +295,26 @@ function createTopicsWorkspace(components, world, viewport, highlightTopics) {
     topics.list.onItemUpdated.add(refreshTopicsList);
 
     const [topicPanel, updateTopicPanel] = createTopicPanel(components, topics, world);
+    // Geometry first, panel second — deliberately, and in that order.
+    //
+    // viewpoint.go() is what colours the element, publishes the selection map
+    // the ISOLATE button reads, and lets the caller frame it. The panel is
+    // commentary. Rendering the panel first meant a single unresolvable id in
+    // it aborted the selection before any of that ran, which is exactly what
+    // happened to the topics whose RelatedTopic references the archive filter
+    // had pruned away. updateTopicPanel swallows its own errors too; the
+    // ordering is the belt to that braces.
     const selectTopic = async (topic) => {
-        updateTopicPanel({ topic });
         const viewpointGuid = topic.viewpoints.values().next().value;
         const viewpoint = viewpointGuid ? viewpoints.list.get(viewpointGuid) : null;
-        if (!viewpoint) return;
+        if (!viewpoint) {
+            updateTopicPanel({ topic });
+            return;
+        }
 
         viewpoint.world = world;
         await viewpoint.go({ transition: true, applyVisibility: true });
+        updateTopicPanel({ topic });
     };
     topicsList.addEventListener("rowcreated", (event) => {
         const { row } = event.detail;
@@ -1100,7 +1126,7 @@ export async function initViewer(containerOrId) {
         let worker;
         try {
             worker = new Worker(
-                new URL("./bcf-filter.worker.js?v=viewer-isolate-4", import.meta.url),
+                new URL("./bcf-filter.worker.js?v=viewer-isolate-5", import.meta.url),
                 { type: "module" },
             );
         } catch (error) {
@@ -1177,7 +1203,8 @@ export async function initViewer(containerOrId) {
         }
         console.info(`${LOG} archive entries=${filtered.entries} topics=${filtered.topics}`);
         console.info(
-            `${LOG} filter guid=${elementGuid} kept=${filtered.kept} ms=${since(tFilter)}`,
+            `${LOG} filter guid=${elementGuid} kept=${filtered.kept} ` +
+            `pruned_relations=${filtered.strippedRelations ?? 0} ms=${since(tFilter)}`,
         );
         if (!filtered.data) {
             console.warn(`${LOG} filter failed: no topic references ${elementGuid}`);

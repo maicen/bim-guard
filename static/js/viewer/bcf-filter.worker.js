@@ -10,15 +10,15 @@
 //     that task queue nothing else to compete with, and the page stays
 //     responsive while it drains instead of freezing.
 //
-//     The archive arrives as a transferred ArrayBuffer, so the 5 MB is moved
-//     rather than copied, and the reduced archive is transferred back the same
-//     way.
+//     The archive is cloned in rather than transferred, so the caller keeps its
+//     bytes and can still run the filter inline if this worker turns out to be
+//     unusable. The reduced archive goes back transferred, which is free.
 //
 // The caller falls back to running the filter inline if this worker cannot be
 // constructed, so nothing here is load-bearing for correctness.
 
 import JSZip from "https://esm.sh/jszip@3.10.1";
-import { filterBcfArchive } from "./bcf-filter.js?v=viewer-isolate-4";
+import { filterBcfArchive } from "./bcf-filter.js?v=viewer-isolate-5";
 
 self.onmessage = async (event) => {
   const { buffer, elementGuid } = event.data || {};

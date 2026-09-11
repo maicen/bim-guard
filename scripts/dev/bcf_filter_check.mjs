@@ -66,11 +66,34 @@ if (result.data) {
   reparsed.forEach((p, e) => {
     if (!e.dir && p.endsWith("markup.bcf")) markups.push([p, e]);
   });
+  const keptTopicGuids = new Set();
+  const relationRefs = [];
   for (const [, entry] of markups) {
     const xml = await entry.async("string");
     const title = /<Title>([\s\S]*?)<\/Title>/.exec(xml)?.[1] ?? "(untitled)";
     const priority = /<Priority>([\s\S]*?)<\/Priority>/.exec(xml)?.[1] ?? "";
     titles.push({ title, priority });
+    const own = /<Topic\b[^>]*\bGuid="([^"]+)"/.exec(xml)?.[1];
+    if (own) keptTopicGuids.add(own);
+    for (const m of xml.matchAll(/<RelatedTopic\s+Guid="([^"]+)"/g)) {
+      relationRefs.push({ title, guid: m[1] });
+    }
+  }
+
+  // The reduced archive must be internally consistent. A RelatedTopic pointing
+  // at a topic that was filtered out resolves to undefined in
+  // CUI.sections.topicRelations, which reads .guid off it and throws inside
+  // lit's render -- synchronously, before the element gets highlighted.
+  const dangling = relationRefs.filter((r) => !keptTopicGuids.has(r.guid));
+  console.log(
+    `relatedTopic refs=${relationRefs.length} dangling=${dangling.length} ` +
+      `(stripped by filter=${result.strippedRelations})`,
+  );
+  if (dangling.length) {
+    failures.push(
+      `${dangling.length} dangling RelatedTopic refs remain, e.g. ` +
+        `"${dangling[0].title.slice(0, 40)}" -> ${dangling[0].guid}`,
+    );
   }
   titles.sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
 

@@ -120,7 +120,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-4";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-5";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer(containerEl);
       isInitialized = true;

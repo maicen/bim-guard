@@ -31,6 +31,37 @@ export function priorityRank(priority) {
   return PRIORITY_RANK[String(priority || "").toLowerCase()] ?? 9;
 }
 
+/** `<Topic ... Guid="...">` — the topic's own id, not a reference to another. */
+const TOPIC_GUID_RE = /<Topic\b[^>]*\bGuid="([^"]+)"/;
+
+/** `<RelatedTopic Guid="..."/>`, self-closing or paired. */
+const RELATED_TOPIC_RE = /[ \t]*<RelatedTopic\s+Guid="([^"]+)"\s*(?:\/>|><\/RelatedTopic>)\r?\n?/g;
+
+/**
+ * Drop `<RelatedTopic>` references to topics this archive no longer contains.
+ *
+ * Filtering to one element leaves every kept topic still pointing at its
+ * siblings across the whole project — `phase_6e_export._related_topic_guids`
+ * links each finding to the others on the same element and its partners, so a
+ * galvanic topic can name a dozen. Left dangling, the first thing that tries to
+ * resolve them gets `undefined`: `CUI.sections.topicRelations` maps them
+ * through `topics.list` and reads `.guid` off each result, which threw
+ * "Cannot read properties of undefined (reading 'guid')" inside lit's render,
+ * synchronously, before the element could be highlighted.
+ *
+ * Removing them is the honest reduction: an archive that claims a relation to a
+ * topic it does not carry is malformed, whoever is reading it.
+ */
+function pruneRelatedTopics(xml, keptTopicGuids) {
+  let stripped = 0;
+  const out = xml.replace(RELATED_TOPIC_RE, (match, guid) => {
+    if (keptTopicGuids.has(guid)) return match;
+    stripped += 1;
+    return "";
+  });
+  return { xml: out, stripped };
+}
+
 /** The topic folder an archive entry belongs to, or null for a root entry. */
 function topicFolderOf(path) {
   const slash = path.indexOf("/");
@@ -150,10 +181,25 @@ export async function filterBcfArchive(JSZip, data, elementGuid) {
     const keep = folder === null ? ROOT_FILES.has(path) : folders.has(folder);
     if (keep) copies.push([path, entry]);
   });
-  // Raw bytes, in parallel: no decode/re-encode, and snapshots stay opaque.
-  const bytes = await Promise.all(copies.map(([, entry]) => entry.async("uint8array")));
-  for (let i = 0; i < copies.length; i += 1) {
-    out.file(copies[i][0], bytes[i], { binary: true });
+  // Markup is rewritten (see pruneRelatedTopics); everything else, snapshots
+  // included, is copied as raw bytes with no decode/re-encode.
+  const markupCopies = copies.filter(([path]) => path.endsWith("markup.bcf"));
+  const binaryCopies = copies.filter(([path]) => !path.endsWith("markup.bcf"));
+
+  const markupTexts = await Promise.all(markupCopies.map(([, e]) => e.async("string")));
+  const keptTopicGuids = new Set(
+    markupTexts.map((t) => TOPIC_GUID_RE.exec(t)?.[1]).filter(Boolean),
+  );
+  let strippedRelations = 0;
+  for (let i = 0; i < markupCopies.length; i += 1) {
+    const { xml, stripped } = pruneRelatedTopics(markupTexts[i], keptTopicGuids);
+    strippedRelations += stripped;
+    out.file(markupCopies[i][0], xml);
+  }
+
+  const bytes = await Promise.all(binaryCopies.map(([, entry]) => entry.async("uint8array")));
+  for (let i = 0; i < binaryCopies.length; i += 1) {
+    out.file(binaryCopies[i][0], bytes[i], { binary: true });
   }
 
   // STORE, not DEFLATE: this archive is handed straight to BCFTopics.load in
@@ -165,6 +211,7 @@ export async function filterBcfArchive(JSZip, data, elementGuid) {
     entries,
     topics,
     read,
+    strippedRelations,
     folders: [...folders],
   };
 }
