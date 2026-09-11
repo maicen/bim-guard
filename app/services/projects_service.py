@@ -308,6 +308,17 @@ class ProjectsService:
                 f"building_code must be one of {sorted(_BUILDING_CODE_IDS)!r}, "
                 f"got {building_code!r}"
             )
+        if project_type is not None and str(project_type).strip():
+            pt_clean = str(project_type).strip().upper()
+            from app.constants import PROJECT_TYPES
+            type_map = {pt.upper(): pt for pt in PROJECT_TYPES}
+            if pt_clean not in type_map:
+                raise ValueError(
+                    f"project_type must be one of {PROJECT_TYPES!r}, got {project_type!r}"
+                )
+            project_type = type_map[pt_clean]
+        else:
+            project_type = None
 
         now = now_iso_utc()
         row = {
@@ -385,6 +396,7 @@ class ProjectsService:
         revision_code: str | None = None,
         cde_state: str | None = None,
         classification_standard: str | None = None,
+        project_type: str | None = None,
     ):
         """Update editable fields for an existing project."""
         updates: dict = {
@@ -421,6 +433,18 @@ class ProjectsService:
             updates["cde_state"] = cde_state.strip() or "WIP"
         if classification_standard is not None:
             updates["classification_standard"] = classification_standard.strip() or None
+        if project_type is not None:
+            pt_clean = project_type.strip()
+            if pt_clean:
+                from app.constants import PROJECT_TYPES
+                type_map = {pt.upper(): pt for pt in PROJECT_TYPES}
+                if pt_clean.upper() not in type_map:
+                    raise ValueError(
+                        f"project_type must be one of {PROJECT_TYPES!r}, got {project_type!r}"
+                    )
+                updates["project_type"] = type_map[pt_clean.upper()]
+            else:
+                updates["project_type"] = None
         if analysis_type:
             analysis_type = normalize_analysis_type(analysis_type.strip())
             if analysis_type not in ANALYSIS_TYPES:
@@ -485,6 +509,7 @@ class ProjectsService:
         status: str | None = None,
         country: str | None = None,
         analysis_type: str | None = None,
+        project_type: str | None = None,
     ) -> list[int]:
         """Update specified fields for multiple existing projects in bulk."""
         if not project_ids:
@@ -495,6 +520,15 @@ class ProjectsService:
             updates["status"] = status.strip()
         if country is not None and country.strip():
             updates["country"] = country.strip()
+        if project_type is not None and project_type.strip():
+            pt_clean = project_type.strip().upper()
+            from app.constants import PROJECT_TYPES
+            type_map = {pt.upper(): pt for pt in PROJECT_TYPES}
+            if pt_clean not in type_map:
+                raise ValueError(
+                    f"project_type must be one of {PROJECT_TYPES!r}, got {project_type!r}"
+                )
+            updates["project_type"] = type_map[pt_clean]
         if analysis_type is not None and analysis_type.strip():
             norm_analysis = normalize_analysis_type(analysis_type.strip())
             if norm_analysis not in ANALYSIS_TYPES:

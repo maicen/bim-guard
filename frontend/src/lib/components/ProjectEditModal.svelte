@@ -9,6 +9,7 @@
     PROJECT_CODE_PATTERN,
     SHORT_NAME_MAX_LENGTH,
     SHORT_NAME_MIN_LENGTH,
+    PROJECT_TYPES,
   } from "../types";
   import type { BSDDDictionaryItem, Project } from "../types";
 
@@ -28,6 +29,7 @@
   let status = $state("Active");
   let country = $state("Canada");
   let analysisType = $state("Architecture");
+  let projectType = $state("RESIDENTIAL");
   let classificationStandard = $state("");
   let isSaving = $state(false);
   let errorMessage = $state("");
@@ -52,6 +54,7 @@
       status = project.status || "Active";
       country = project.country || "Canada";
       analysisType = project.analysis_type || "Arch";
+      projectType = project.project_type || "RESIDENTIAL";
       classificationStandard = project.classification_standard || "";
       errorMessage = "";
     }
@@ -68,6 +71,9 @@
     }
     if (!PROJECT_CODE_PATTERN.test(projectCode.trim())) {
       return "Project code may only contain letters and numbers.";
+    }
+    if (!projectType) {
+      return "Project type is required.";
     }
     return "";
   }
@@ -91,6 +97,7 @@
         status,
         country,
         analysis_type: analysisType,
+        project_type: projectType,
         classification_standard: classificationStandard,
       });
       onProjectUpdated(updated);
@@ -243,6 +250,21 @@
             <option value="Arch">Arch</option>
             <option value="Piping">Piping</option>
             <option value="seismic">Seismic</option>
+          </select>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="edit-proj-type" class="block text-xs font-semibold text-slate-300">
+            Project Type <span class="text-rose-400">*</span>
+          </label>
+          <select
+            id="edit-proj-type"
+            bind:value={projectType}
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          >
+            {#each PROJECT_TYPES as type (type)}
+              <option value={type}>{type}</option>
+            {/each}
           </select>
         </div>
 

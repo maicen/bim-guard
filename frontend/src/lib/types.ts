@@ -91,6 +91,24 @@ export type OrgRole = "owner" | "admin" | "member";
  */
 export type AnalysisDomain = "Arch" | "Piping" | "seismic";
 
+export const PROJECT_TYPES = [
+  "RESIDENTIAL",
+  "COMMERCIAL",
+  "MEDICAL",
+  "EDUCATIONAL",
+  "INDUSTRIAL",
+  "AGRICULTURAL",
+  "GOVERNMENTAL",
+  "MILITARY",
+  "PARKING",
+  "RELIGIOUS",
+  "TRANSPORT",
+  "RECREATIONAL",
+  "INFRASTRUCTURE",
+] as const;
+
+export type ProjectType = (typeof PROJECT_TYPES)[number];
+
 export interface Project extends IsoGovernanceFieldsRequired, Timestamps {
   id: number;
   name: string;
@@ -102,7 +120,7 @@ export interface Project extends IsoGovernanceFieldsRequired, Timestamps {
   country: string;
   analysis_type: AnalysisDomain | string;
   building_code?: string | null;
-  project_type?: string | null;
+  project_type?: ProjectType | string | null;
   project_size_sqm?: number | null;
   buildings_count?: number | null;
   floors_count?: number | null;
@@ -249,6 +267,7 @@ export interface ProjectUpdatePayload extends IsoGovernanceFieldsOptional {
   status?: string;
   country?: string;
   analysis_type?: AnalysisDomain | string;
+  project_type?: ProjectType | string | null;
   classification_standard?: string | null;
 }
 
@@ -261,6 +280,7 @@ export interface ProjectBulkUpdatePayload {
   status?: string;
   country?: string;
   analysis_type?: string;
+  project_type?: ProjectType | string | null;
 }
 
 export interface ProjectBulkActionResponse {

@@ -265,6 +265,9 @@ class ProjectUpdateRequest(IsoGovernanceFieldsOptional):
         pattern=PROJECT_CODE_PATTERN,
     )
     classification_standard: Optional[str] = None
+    project_type: Optional[str] = Field(
+        None, description="Optional building type from PROJECT_TYPES"
+    )
 
 
 class ProjectBulkDeleteRequest(BaseModel):
@@ -297,6 +300,7 @@ class ProjectBulkUpdateRequest(BaseModel):
     status: Optional[str] = Field(None, description="Optional new status (Active, Draft, Archived)")
     country: Optional[str] = Field(None, description="Optional new country/jurisdiction")
     analysis_type: Optional[str] = Field(None, description="Optional new analysis domain")
+    project_type: Optional[str] = Field(None, description="Optional new project type from PROJECT_TYPES")
 
 
 class ProjectBulkActionResponse(BaseModel):

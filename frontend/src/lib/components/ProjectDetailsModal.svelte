@@ -108,6 +108,17 @@
           <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
             <span
               class="mb-1 block text-micro font-semibold uppercase tracking-wider text-slate-500"
+              >Project Type</span
+            >
+            <div class="flex items-center gap-1.5 font-medium text-slate-300">
+              <Building2 class="h-3.5 w-3.5 text-slate-400" />
+              <span>{project.project_type || "—"}</span>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+            <span
+              class="mb-1 block text-micro font-semibold uppercase tracking-wider text-slate-500"
               >Created At</span
             >
             <div class="flex items-center gap-1.5 text-slate-400">

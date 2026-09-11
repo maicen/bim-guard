@@ -155,14 +155,19 @@ def building_codes_for(country: str | None = None) -> list[dict[str, Any]]:
 
 #: Building types offered by the project setup wizard.
 PROJECT_TYPES: list[str] = [
-    "Commercial Office",
-    "Residential",
-    "Healthcare",
-    "Educational",
-    "Industrial",
-    "Retail",
-    "Mixed-Use",
-    "Infrastructure",
+    "RESIDENTIAL",
+    "COMMERCIAL",
+    "MEDICAL",
+    "EDUCATIONAL",
+    "INDUSTRIAL",
+    "AGRICULTURAL",
+    "GOVERNMENTAL",
+    "MILITARY",
+    "PARKING",
+    "RELIGIOUS",
+    "TRANSPORT",
+    "RECREATIONAL",
+    "INFRASTRUCTURE",
 ]
 
 #: Document classification types for specification library and project documents.

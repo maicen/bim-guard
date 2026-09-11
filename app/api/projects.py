@@ -376,6 +376,7 @@ def bulk_update_projects(
             status=payload.status,
             country=payload.country,
             analysis_type=payload.analysis_type,
+            project_type=payload.project_type,
         )
         return ProjectBulkActionResponse(success_count=len(updated_ids), affected_ids=updated_ids)
     except ValueError as exc:
@@ -687,6 +688,7 @@ def update_project(
             status=status_val,
             country=country,
             analysis_type=analysis_type,
+            project_type=payload.project_type,
             project_code=payload.project_code,
             originator=payload.originator,
             volume_system=payload.volume_system,

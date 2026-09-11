@@ -230,3 +230,65 @@ def test_bulk_delete_projects():
     assert svc.get_project(p1_id) is None
     assert svc.get_project(p2_id) is None
 
+
+def test_project_options_serves_canonical_project_types():
+    """Verify /api/projects/options returns the exact 13 required project types in uppercase."""
+    expected = [
+        "RESIDENTIAL",
+        "COMMERCIAL",
+        "MEDICAL",
+        "EDUCATIONAL",
+        "INDUSTRIAL",
+        "AGRICULTURAL",
+        "GOVERNMENTAL",
+        "MILITARY",
+        "PARKING",
+        "RELIGIOUS",
+        "TRANSPORT",
+        "RECREATIONAL",
+        "INFRASTRUCTURE",
+    ]
+    response = client.get("/api/projects/options")
+    assert response.status_code == 200
+    assert response.json()["project_types"] == expected
+
+
+def test_create_project_persists_project_type():
+    """Verify valid project_type is saved and normalized to uppercase canonical type."""
+    from app.services.projects_service import ProjectsService
+
+    response = client.post(
+        "/api/projects",
+        json={
+            "name": "Commercial Building",
+            "short_name": "CommBldg",
+            "project_code": "COMM",
+            "country": "US",
+            "analysis_type": "Arch",
+            "project_type": "commercial",
+        },
+    )
+    assert response.status_code == 201
+    created = response.json()
+    try:
+        assert created["project_type"] == "COMMERCIAL"
+    finally:
+        ProjectsService().delete_project(created["id"])
+
+
+def test_create_project_rejects_invalid_project_type():
+    """Verify unknown project_type is rejected with 400 Bad Request."""
+    response = client.post(
+        "/api/projects",
+        json={
+            "name": "Invalid Type Project",
+            "short_name": "InvType",
+            "project_code": "INVT",
+            "country": "US",
+            "analysis_type": "Arch",
+            "project_type": "NOT_A_REAL_TYPE",
+        },
+    )
+    assert response.status_code == 400
+    assert "project_type" in response.json()["detail"].lower()
+

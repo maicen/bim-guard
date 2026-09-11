@@ -3,6 +3,7 @@
 
   import { X, Check, SlidersHorizontal, AlertTriangle } from "lucide-svelte";
   import { projectsApi } from "../api";
+  import { PROJECT_TYPES } from "../types";
 
   interface Props {
     isOpen?: boolean;
@@ -16,6 +17,7 @@
   let status: string = $state("no_change");
   let country: string = $state("no_change");
   let analysisType: string = $state("no_change");
+  let projectType: string = $state("no_change");
   let isSaving: boolean = $state(false);
   let errorMessage: string = $state("");
 
@@ -24,12 +26,16 @@
       status = "no_change";
       country = "no_change";
       analysisType = "no_change";
+      projectType = "no_change";
       errorMessage = "";
     }
   });
 
   let hasChanges = $derived(
-    status !== "no_change" || country !== "no_change" || analysisType !== "no_change",
+    status !== "no_change" ||
+      country !== "no_change" ||
+      analysisType !== "no_change" ||
+      projectType !== "no_change",
   );
 
   async function handleSave() {
@@ -44,6 +50,7 @@
         status: status !== "no_change" ? status : undefined,
         country: country !== "no_change" ? country : undefined,
         analysis_type: analysisType !== "no_change" ? analysisType : undefined,
+        project_type: projectType !== "no_change" ? projectType : undefined,
       });
       onBulkUpdated();
       onClose();
@@ -153,6 +160,23 @@
             <option value="Arch">Arch</option>
             <option value="Piping">Piping</option>
             <option value="seismic">Seismic</option>
+          </select>
+        </div>
+
+        <!-- Project Type -->
+        <div class="space-y-1.5">
+          <label for="bulk-proj-type" class="block text-xs font-semibold text-slate-300">
+            Project Type
+          </label>
+          <select
+            id="bulk-proj-type"
+            bind:value={projectType}
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          >
+            <option value="no_change">-- Keep Current Project Type --</option>
+            {#each PROJECT_TYPES as type (type)}
+              <option value={type}>{type}</option>
+            {/each}
           </select>
         </div>
       </div>

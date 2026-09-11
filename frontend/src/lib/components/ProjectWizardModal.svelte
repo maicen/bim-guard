@@ -13,6 +13,7 @@
     PROJECT_CODE_PATTERN,
     SHORT_NAME_MAX_LENGTH,
     SHORT_NAME_MIN_LENGTH,
+    PROJECT_TYPES,
   } from "../types";
   import type {
     BSDDDictionaryItem,
@@ -347,6 +348,9 @@
     }
     if (!PROJECT_CODE_PATTERN.test(projectCode.trim())) {
       return "Project code may only contain letters and numbers.";
+    }
+    if (!projectType || !projectType.trim()) {
+      return "Please select a project type.";
     }
     return "";
   }
@@ -683,30 +687,30 @@
             </div>
 
             <div>
-              <span
-                class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300"
-              >
-                Project Type
-              </span>
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {#each options.project_types as type (type)}
+              <div class="mb-1.5 flex items-center justify-between">
+                <span class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  Project Type <span class="text-rose-400">*</span>
+                </span>
+                {#if projectType}
+                  <span class="rounded bg-accent/20 px-2 py-0.5 font-mono text-micro font-bold text-blue-400">
+                    {projectType}
+                  </span>
+                {/if}
+              </div>
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {#each (options.project_types?.length ? options.project_types : PROJECT_TYPES) as type (type)}
                   <button
                     type="button"
-                    onclick={() => (projectType = projectType === type ? "" : type)}
-                    class="rounded-xl border px-2.5 py-2.5 text-left text-caption font-semibold transition-all {projectType ===
+                    onclick={() => (projectType = type)}
+                    class="flex items-center justify-center rounded-xl border px-2.5 py-2.5 text-center text-caption font-semibold transition-all {projectType ===
                     type
-                      ? 'border-accent bg-blue-950/40 text-slate-50'
-                      : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'}"
+                      ? 'border-accent bg-blue-950/60 text-slate-50 ring-1 ring-accent'
+                      : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-slate-200'}"
                   >
                     {type}
                   </button>
                 {/each}
               </div>
-              {#if !options.project_types.length}
-                <p class="text-caption text-slate-500">
-                  Building types are unavailable — the project can be created without one.
-                </p>
-              {/if}
             </div>
 
             <div class="grid grid-cols-3 gap-3">
