@@ -41,6 +41,7 @@ dependencies = [
     "defusedxml>=0.7.1",
     "rdflib>=7.1.0",
     "pyshacl>=0.30.0",
+    "doclang[schematron-saxon]>=0.7.3",
 ]
 
 [project.scripts]

@@ -159,9 +159,21 @@ class DoclingExtractor:
         element_records: list[dict] = []
         if doclang_xml and bboxes:
             try:
-                from app.modules.document_parsing.doclang_element_ids import assign_element_ids
+                from app.modules.document_parsing.doclang_element_ids import (
+                    ID_ELIGIBLE_KINDS,
+                    assign_element_ids,
+                )
 
-                doclang_xml, element_records = assign_element_ids(doclang_xml, bboxes)
+                # assign_element_ids pairs this list positionally against DocLang
+                # XML elements eligible for id injection (heading/table/paragraph/
+                # picture only -- see doclang_element_ids.ID_ELIGIBLE_KINDS).
+                # `bboxes` here also includes "list" (Docling's list_item) entries,
+                # which the XML-side walk skips entirely; left in, the first list
+                # item in the document permanently shifts every bbox after it onto
+                # the wrong element. Drop them so both sides walk the same kinds
+                # in the same reading order.
+                eligible_bboxes = [b for b in bboxes if b.get("kind") in ID_ELIGIBLE_KINDS]
+                doclang_xml, element_records = assign_element_ids(doclang_xml, eligible_bboxes)
             except Exception:
                 logger.warning("Failed assigning DocLang element ids for %s", filename, exc_info=True)
                 element_records = []
@@ -255,7 +267,13 @@ class DoclingExtractor:
 
     @staticmethod
     def validate_doclang(xml_content: str) -> bool:
-        """Validate DocLang XML against bundled reference XSD schema."""
+        """Validate DocLang XML against the bundled reference XSD + Schematron rules.
+
+        Runs full validation (structural XSD plus Schematron's semantic rules --
+        e.g. a list body must start with `<ldiv>`) via the `doclang[schematron-saxon]`
+        package. Both checks are backed entirely by the bundled `doclang` package;
+        no network access or external service is involved.
+        """
         if not xml_content or not xml_content.strip():
             return False
         import tempfile
@@ -266,7 +284,7 @@ class DoclingExtractor:
                 f.write(xml_content)
                 tmp_path = f.name
             try:
-                doclang.validate(tmp_path, allow_empty_namespace=True, xsd_only=True)
+                doclang.validate(tmp_path, allow_empty_namespace=True)
                 return True
             finally:
                 Path(tmp_path).unlink(missing_ok=True)

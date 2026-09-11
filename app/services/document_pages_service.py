@@ -37,6 +37,11 @@ class DocumentPagesService:
         """Persist a document's page-tagged text, replacing any existing rows."""
         if not pages:
             return
+        existing_ids = [
+            row["id"] for row in self._pages.rows if int(row.get("document_id") or 0) == document_id
+        ]
+        if existing_ids:
+            self._pages.delete_many(existing_ids)
         rows = [
             {
                 "document_id": document_id,

@@ -80,6 +80,149 @@ def test_assign_element_ids_returns_original_xml_on_parse_error():
     assert records == []
 
 
+LIST_DOCLANG_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<doclang>
+  <list class="ordered">
+    <ldiv><marker>9.8.2.</marker></ldiv>
+    <location value="60" /><location value="52" /><location value="146" /><location value="57" />
+    <content> Stair Dimensions</content>
+  </list>
+  <text>First paragraph.</text>
+  <list class="ordered">
+    <ldiv><marker>(2)</marker></ldiv>
+    <location value="68" /><location value="88" /><location value="452" /><location value="94" />
+    Required exit stairs shall have a width of not less than 860 mm.
+    <ldiv />
+    <location value="68" /><location value="115" /><location value="124" /><location value="121" />
+    (a) 900 mm, or
+  </list>
+  <text>Second paragraph.</text>
+</doclang>
+"""
+
+_LIST_BBOXES = [
+    {"kind": "list", "page_number": 1, "bbox": {"l": 0, "t": 0, "r": 1, "b": 1, "coord_origin": "BOTTOMLEFT"}},
+    {"kind": "paragraph", "page_number": 1, "bbox": None},
+    {"kind": "list", "page_number": 1, "bbox": None},
+    {"kind": "list", "page_number": 1, "bbox": None},
+    {"kind": "paragraph", "page_number": 1, "bbox": None},
+]
+
+
+def test_assign_element_ids_covers_ldiv_list_items_interleaved_with_paragraphs():
+    """Every <ldiv> gets its own id, in true document order.
+
+    Both heading-shaped and plain-clause ldivs get ids, interleaved with the
+    surrounding <text> elements -- not dropped, and not all lumped after the
+    top-level elements.
+    """
+    updated_xml, records = assign_element_ids(LIST_DOCLANG_XML, _LIST_BBOXES)
+
+    assert [r["element_id"] for r in records] == ["elem-1", "elem-2", "elem-3", "elem-4", "elem-5"]
+    assert [r["kind"] for r in records] == ["list", "paragraph", "list", "list", "paragraph"]
+    # elem-1 = the "9.8.2. Stair Dimensions" heading-shaped ldiv, elem-2 = the
+    # first <text>, elem-3/elem-4 = the two clause ldivs ("(2)" and "(a)"),
+    # elem-5 = the second <text> -- exactly Docling's reading order.
+    assert records[0]["bbox"] == {"l": 0, "t": 0, "r": 1, "b": 1, "coord_origin": "BOTTOMLEFT"}
+
+
+def test_assign_element_ids_places_custom_as_ldiv_sibling_not_child():
+    """The injected <custom> must be a sibling of <ldiv>, never its child.
+
+    <ldiv>'s content model is <marker>? only (doclang.xsd), so <custom> has
+    to land within the enclosing <list>, positioned after <ldiv>'s trailing
+    <location> siblings.
+    """
+    updated_xml, _records = assign_element_ids(LIST_DOCLANG_XML, _LIST_BBOXES)
+
+    import xml.etree.ElementTree as ET
+
+    root = ET.fromstring(updated_xml)
+    first_list = root.find("list")
+    ldiv = first_list.find("ldiv")
+    assert ldiv.find("custom") is None, "custom must not be injected inside <ldiv>"
+    children = list(first_list)
+    ldiv_idx = children.index(ldiv)
+    # custom sits right after ldiv's 4 <location> siblings, before <content>.
+    assert [c.tag for c in children[ldiv_idx : ldiv_idx + 6]] == [
+        "ldiv",
+        "location",
+        "location",
+        "location",
+        "location",
+        "custom",
+    ]
+
+
+def test_assign_element_ids_output_is_schema_valid_doclang():
+    """The injected XML must pass the real DocLang XSD + Schematron rules.
+
+    Schematron enforces that element-head members (custom included) precede
+    any non-whitespace text -- catches regressions in `_inject_id`'s handling
+    of trailing body text stored as a head child's `.tail` rather than
+    `elem.text` (the common real-world `<text><location/>x4>words</text>`
+    shape), and in `_inject_ldiv_sibling_id`'s placement within `<list>`.
+    """
+    from app.modules.document_parsing.docling_extractor import DoclingExtractor
+
+    updated_xml, _records = assign_element_ids(LIST_DOCLANG_XML, _LIST_BBOXES)
+    assert DoclingExtractor.validate_doclang(updated_xml)
+
+
+TRAILING_TEXT_DOCLANG_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<doclang>
+  <text>
+    <location value="60" /><location value="71" /><location value="454" /><location value="84" />
+    Body text after four locations -- the realistic Docling-export shape.
+  </text>
+  <text>Body text with no locations at all.</text>
+</doclang>
+"""
+
+_TRAILING_TEXT_BBOXES = [
+    {"kind": "paragraph", "page_number": 1, "bbox": None},
+    {"kind": "paragraph", "page_number": 1, "bbox": None},
+]
+
+
+def test_assign_element_ids_keeps_custom_before_trailing_text_after_locations():
+    """<custom> must precede body text whether it's elem.text or a tail.
+
+    Regression test for a bug where `_inject_id` re-appended existing
+    `<location>` children (preserving their `.tail`, the real home of trailing
+    body text in ElementTree) and then appended `<custom>` after them --
+    landing `<custom>` *after* the body text, which the DocLang Schematron
+    rules reject.
+    """
+    from app.modules.document_parsing.docling_extractor import DoclingExtractor
+
+    updated_xml, records = assign_element_ids(TRAILING_TEXT_DOCLANG_XML, _TRAILING_TEXT_BBOXES)
+
+    assert len(records) == 2
+    assert DoclingExtractor.validate_doclang(updated_xml)
+
+    # <custom> must appear before its own element's body text -- check each
+    # <text> element directly rather than raw string offsets.
+    import xml.etree.ElementTree as ET
+
+    root = ET.fromstring(updated_xml)
+    for text_el in root.findall("text"):
+        rendered = ET.tostring(text_el, encoding="unicode")
+        assert rendered.index("<custom>") < rendered.index("Body text")
+
+
+def test_assign_element_ids_does_not_corrupt_chunker_text_extraction_for_lists():
+    updated_xml, _records = assign_element_ids(LIST_DOCLANG_XML, _LIST_BBOXES)
+
+    original_chunks = DocLangChunker().chunk(LIST_DOCLANG_XML)
+    injected_chunks = DocLangChunker().chunk(updated_xml)
+
+    assert len(original_chunks) == len(injected_chunks)
+    for original, injected in zip(original_chunks, injected_chunks, strict=True):
+        assert original["text"] == injected["text"]
+        assert "elem-" not in injected["text"]
+
+
 def test_get_document_element_bboxes_endpoint():
     """GET /documents/{id}/element-bboxes returns the persisted per-element records."""
     from starlette.testclient import TestClient

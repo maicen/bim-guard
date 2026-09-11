@@ -45,7 +45,16 @@ _KIND_BY_TAG = {
     "p": "paragraph",
     "picture": "picture",
     "figure": "picture",
+    "ldiv": "list",
 }
+
+# The coarse "kind" values _KIND_BY_TAG can ever produce -- callers building a
+# bbox list to pair against this module's id-eligible XML walk (e.g.
+# DoclingExtractor.extract_bytes) must filter to these same kinds first, or
+# any bbox entry of a kind that never gets an id here (e.g. Docling's "list",
+# from list_item) permanently shifts every bbox after it onto the wrong
+# element -- assign_element_ids pairs the two lists by position, not identity.
+ID_ELIGIBLE_KINDS = frozenset(_KIND_BY_TAG.values())
 
 
 def _local_name(el: Element) -> str:
@@ -63,10 +72,19 @@ def _inject_id(elem: Element, element_id: str) -> None:
 
     Uses an attribute (not text content) so it never contaminates
     `itertext()`-based extraction. Existing head-tag children (label/thread/
-    etc.) are kept in their documented order, ahead of any other children;
-    `elem`'s own leading text (`elem.text`, e.g. a paragraph's content) is a
-    string attribute on `elem` itself in ElementTree's model, not a child node,
-    so reordering children never touches it.
+    etc.) are kept in their documented order, ahead of any other children.
+
+    `elem`'s body text is *not* always `elem.text` -- for the common real-world
+    shape `<text><location/>x4>Actual words</text>`, "Actual words" is stored
+    by ElementTree as the last `<location>` child's `.tail`, not as `elem.text`
+    (which only covers text before the *first* child). Left where it was, that
+    tail would render *before* the re-appended `<custom>`, which the DocLang
+    Schematron rules reject: element-head members must precede any
+    non-whitespace text. So the trailing text -- from `elem.text` when there
+    are no head children, or from the last head child's `.tail` otherwise --
+    is moved onto `<custom>`'s own `.tail`, keeping its rendered position
+    (right after the head span) while landing after `<custom>` instead of
+    before it.
     """
     custom = ET.Element("custom")
     id_el = ET.SubElement(custom, "bg_element_id")
@@ -76,6 +94,15 @@ def _inject_id(elem: Element, element_id: str) -> None:
     head = [c for c in children if _local_name(c) in _HEAD_TAG_ORDER]
     body = [c for c in children if _local_name(c) not in _HEAD_TAG_ORDER]
     head.sort(key=lambda c: _HEAD_TAG_ORDER.index(_local_name(c)))
+
+    if head:
+        last_head = head[-1]
+        custom.tail = last_head.tail
+        last_head.tail = None
+    else:
+        custom.tail = elem.text
+        elem.text = None
+
     for c in children:
         elem.remove(c)
     for c in head:
@@ -83,6 +110,30 @@ def _inject_id(elem: Element, element_id: str) -> None:
     elem.append(custom)
     for c in body:
         elem.append(c)
+
+
+def _inject_ldiv_sibling_id(ldiv: Element, parent: Element, element_id: str) -> None:
+    """Add a `<custom>` id sibling right after `ldiv`'s element-head span.
+
+    Per doclang.xsd's `list_item` group (`ldiv, element_head?,
+    virtual_text_content*`), a list item's own `<ldiv>` never has element-head
+    children (its content model is `<marker>?` only) -- the head tags,
+    `custom` included, are its SIBLINGS within the enclosing `<list>`,
+    positioned between `<ldiv>` and whatever `<content>`/raw text/nested
+    elements make up that item's body.
+    """
+    custom = ET.Element("custom")
+    ET.SubElement(custom, "bg_element_id").set("value", element_id)
+
+    children = list(parent)
+    try:
+        i = children.index(ldiv)
+    except ValueError:
+        return
+    j = i + 1
+    while j < len(children) and _local_name(children[j]) in _HEAD_TAG_ORDER and _local_name(children[j]) != "custom":
+        j += 1
+    parent.insert(j, custom)
 
 
 def assign_element_ids(
@@ -119,14 +170,34 @@ def assign_element_ids(
     records: list[dict[str, Any]] = []
 
     try:
-        for elem in root.iter():
-            tag = _local_name(elem)
-            if tag not in _ID_ELIGIBLE_TAGS or not _has_selectable_content(elem, tag):
-                continue
+        # Snapshot the tree before mutating it -- .iter() is a live generator,
+        # and inserting <custom> elements mid-walk (for the ldiv case below)
+        # would otherwise revisit/skip nodes. The parent map is built from
+        # this same pre-mutation snapshot, which is fine: insertions only add
+        # new parent/child relationships, never change existing ones.
+        elements = list(root.iter())
+        parent_map = {child: parent for parent in elements for child in parent}
 
-            idx = len(records)
-            element_id = f"elem-{idx + 1}"
-            _inject_id(elem, element_id)
+        for elem in elements:
+            tag = _local_name(elem)
+
+            if tag == "ldiv":
+                # A list item's own <ldiv> never carries element-head children
+                # (its content model is <marker>? only) -- see
+                # _inject_ldiv_sibling_id. Every <ldiv>, self-closing or not,
+                # corresponds to exactly one Docling list_item bbox entry.
+                parent = parent_map.get(elem)
+                if parent is None:
+                    continue
+                idx = len(records)
+                element_id = f"elem-{idx + 1}"
+                _inject_ldiv_sibling_id(elem, parent, element_id)
+            elif tag in _ID_ELIGIBLE_TAGS and _has_selectable_content(elem, tag):
+                idx = len(records)
+                element_id = f"elem-{idx + 1}"
+                _inject_id(elem, element_id)
+            else:
+                continue
 
             source = bboxes[idx] if idx < len(bboxes) else {}
             records.append(
