@@ -550,12 +550,14 @@
           // <ldiv> entry is classified independently rather than treating
           // the whole <list> as one or the other.
           let currentMarker = "";
+          let currentElementId: string | null = null;
           let textBuffer = "";
           const flushItemBuffer = () => {
             const text = textBuffer.replace(/\s+/g, " ").trim();
             textBuffer = "";
             if (text) pendingListItems.push(currentMarker ? `${currentMarker} ${text}` : text);
             currentMarker = "";
+            currentElementId = null;
           };
           for (const child of Array.from(node.childNodes)) {
             if (child.nodeType === Node.ELEMENT_NODE) {
@@ -565,6 +567,16 @@
                 currentMarker = (child.textContent || "").trim();
               } else if (childTag === "location") {
                 // positional metadata only -- not part of the text
+              } else if (childTag === "custom") {
+                // Backend-injected id for this list_item (see
+                // doclang_element_ids.py's _inject_ldiv_sibling_id) -- a
+                // sibling of <ldiv>, not a child of it, since <ldiv>'s own
+                // content model is <marker>? only.
+                for (const grandchild of Array.from((child as Element).children)) {
+                  if (grandchild.tagName.toLowerCase() === "bg_element_id") {
+                    currentElementId = grandchild.getAttribute("value");
+                  }
+                }
               } else if (childTag === "content") {
                 flushList();
                 const headingText = [currentMarker, child.textContent?.trim()].filter(Boolean).join(" ");
@@ -573,11 +585,12 @@
                     type: "heading",
                     level: headingLevelFromMarker(currentMarker),
                     text: headingText,
-                    elementId: null,
+                    elementId: currentElementId,
                     layer: "body",
                   });
                 }
                 currentMarker = "";
+                currentElementId = null;
               } else {
                 textBuffer += child.textContent || "";
               }
@@ -920,6 +933,13 @@
       setupContinuousObserver();
       await tick();
       pageSlotEls[currentPage - 1]?.scrollIntoView({ block: "start" });
+      // Don't wait on the observer's own (spec-guaranteed, but not
+      // necessarily immediate) first callback for the very first paint --
+      // eagerly render the page being scrolled to and its neighbors so
+      // switching to Continuous shows something right away.
+      renderPageIntoSlot(currentPage);
+      if (currentPage > 1) renderPageIntoSlot(currentPage - 1);
+      if (currentPage < pageCount) renderPageIntoSlot(currentPage + 1);
     } else {
       teardownObserver();
       await tick();
@@ -1623,6 +1643,7 @@
             {#each pageSlots as slot (slot.pageNumber)}
               <div
                 bind:this={pageSlotEls[slot.pageNumber - 1]}
+                data-page={slot.pageNumber}
                 class="relative shadow-2xl"
                 style="min-width: {estimatedPageWidth ? `${estimatedPageWidth}px` : 'auto'}; min-height: {estimatedPageHeight ? `${estimatedPageHeight}px` : '400px'};"
               >

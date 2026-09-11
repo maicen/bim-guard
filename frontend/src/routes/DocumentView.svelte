@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { ArrowLeft, BookOpen } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
   import { toasts } from "../lib/toast.svelte";
@@ -19,6 +20,36 @@
   let loading = $state(true);
   let loadError = $state("");
   let loadedForId: number | null = null;
+
+  // The app shell's <main> declares overflow-y-auto but is never actually
+  // height-bounded (its ancestor chain uses min-h-screen, not h-screen, so
+  // it grows to fit content and the whole page scrolls -- fine for normal
+  // routes, but this page's three-pane viewer needs a real fixed-height,
+  // internally-scrolling box). Measuring the viewer's own top and pinning
+  // its height to the remaining viewport avoids depending on that chain.
+  let viewerContainerEl: HTMLDivElement | undefined = $state();
+  let viewerHeight = $state("70vh");
+
+  function updateViewerHeight() {
+    if (!viewerContainerEl) return;
+    const top = viewerContainerEl.getBoundingClientRect().top;
+    viewerHeight = `calc(100vh - ${Math.round(top)}px - 1.5rem)`;
+  }
+
+  onMount(() => {
+    updateViewerHeight();
+    window.addEventListener("resize", updateViewerHeight);
+    return () => window.removeEventListener("resize", updateViewerHeight);
+  });
+
+  $effect(() => {
+    // Re-measure once the header settles into its loaded state (its own
+    // height can change between the "Loading document…" title and the
+    // final filename/badge/subtitle row).
+    void doc;
+    void loading;
+    queueMicrotask(updateViewerHeight);
+  });
 
   $effect(() => {
     const id = documentId;
@@ -82,7 +113,9 @@
     <EmptyState title="Could not load document" description={loadError} />
   {:else}
     <div
-      class="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl"
+      bind:this={viewerContainerEl}
+      style="height: {viewerHeight};"
+      class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl"
     >
       <DocumentViewer documentId={documentId!} />
     </div>
