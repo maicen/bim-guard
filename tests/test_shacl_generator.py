@@ -32,7 +32,7 @@ def test_rule_is_not_eligible_without_target_class_or_property():
 
 
 def test_rule_is_not_eligible_for_unsupported_operator():
-    assert rule_is_shacl_eligible(_door_width_rule(operator="unique_within_scope")) is False
+    assert rule_is_shacl_eligible(_door_width_rule(operator="some_unsupported_op")) is False
 
 
 def test_compile_shapes_emits_node_shape_with_min_inclusive():
@@ -49,7 +49,7 @@ def test_compile_shapes_emits_node_shape_with_min_inclusive():
 
 
 def test_compile_shapes_skips_ineligible_rules():
-    shapes = compile_shapes([_door_width_rule(operator="field_consistency")])
+    shapes = compile_shapes([_door_width_rule(operator="some_unsupported_op")])
 
     assert len(list(shapes.subjects(RDF.type, SH.NodeShape))) == 0
 
