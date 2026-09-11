@@ -271,6 +271,8 @@ async def upload_document(
     parser: Annotated[str, Form()] = "auto",
     engine_instance: Annotated[str, Form()] = "",
     generate_doclang: Annotated[bool, Form()] = True,
+    start_page: Annotated[Optional[int], Form()] = None,
+    end_page: Annotated[Optional[int], Form()] = None,
     organization_id: Annotated[Optional[int], Form()] = None,
     x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     service: Annotated[DocumentService, Depends(get_documents_service)] = None,
@@ -289,6 +291,10 @@ async def upload_document(
 
     When `generate_doclang` is False, the file is stored but DocLang
     generation is deferred — call `POST /{id}/generate-doclang` later.
+
+    `start_page`/`end_page` (1-based, inclusive) optionally trim a PDF
+    upload down to that page range before anything else happens — dedup,
+    storage, and extraction all operate on the trimmed PDF. PDF-only.
     """
     if service is None:
         service = DocumentService()
@@ -312,6 +318,23 @@ async def upload_document(
     error_msg = validate_document_upload(clean_filename, file.content_type, content)
     if error_msg:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
+
+    if start_page is not None or end_page is not None:
+        if start_page is None or end_page is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Both start_page and end_page are required to limit an upload to a page range.",
+            )
+        if not clean_filename.lower().endswith(".pdf"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A page range can only be applied to PDF uploads.",
+            )
+        if start_page < 1 or end_page < start_page:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_page must be 1 or greater and end_page must be >= start_page.",
+            )
 
     target_org_id = organization_id
     if target_org_id is None and x_org_id and x_org_id.strip().isdigit():
@@ -342,6 +365,8 @@ async def upload_document(
             parser=clean_parser,
             instance=resolved_instance,
             generate_doclang=generate_doclang,
+            start_page=start_page,
+            end_page=end_page,
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

@@ -1325,6 +1325,9 @@ export const documentsApi = {
       engine_instance?: string;
       generate_doclang?: boolean;
       organization_id?: number | null;
+      /** 1-based, inclusive -- trims a PDF upload to just these pages before storage/extraction. PDF-only; both must be set together. */
+      start_page?: number | null;
+      end_page?: number | null;
     },
   ): Promise<DocumentDetail> {
     const form = new FormData();
@@ -1341,6 +1344,8 @@ export const documentsApi = {
     if (isoOptions?.generate_doclang !== undefined) {
       form.append("generate_doclang", String(isoOptions.generate_doclang));
     }
+    if (isoOptions?.start_page != null) form.append("start_page", String(isoOptions.start_page));
+    if (isoOptions?.end_page != null) form.append("end_page", String(isoOptions.end_page));
     const res = await apiFetch(`${API_BASE}/documents`, {
       method: "POST",
       body: form,

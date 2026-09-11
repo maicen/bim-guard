@@ -617,6 +617,8 @@ class DocumentService:
         parser: str = "auto",
         instance: dict | None = None,
         generate_doclang: bool = True,
+        start_page: int | None = None,
+        end_page: int | None = None,
     ) -> tuple[dict, bool]:
         """Extract, store, and persist an uploaded/imported document.
 
@@ -636,12 +638,24 @@ class DocumentService:
         skipping the extraction pipeline entirely, so they need no accompanying
         original PDF/DOCX.
 
+        `start_page`/`end_page` (1-based, inclusive), when given, trim a PDF
+        upload down to that page range *before* dedup/storage/extraction --
+        everything downstream (the stored file, the extracted text/DocLang,
+        the viewer) only ever sees the trimmed pages. Ignored for non-PDF
+        uploads and for pre-converted DocLang files, which have no such
+        pre-extraction step to trim ahead of.
+
         Returns:
             row (dict): the document row (existing or newly created)
             created (bool): False when an existing row was reused
         """
         from app.modules.document_parsing.iso_validator import ISO19650Validator
         from app.utils import md5_hex
+
+        if start_page is not None and end_page is not None and Path(filename).suffix.lower() == ".pdf":
+            from app.modules.document_parsing.pdf_page_range import slice_pdf_pages
+
+            content = slice_pdf_pages(content, start_page, end_page)
 
         file_md5 = md5_hex(content)
         existing = self.find_by_md5(file_md5)
