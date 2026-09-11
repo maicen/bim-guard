@@ -39,6 +39,25 @@ def test_parse_otsl_table_with_separators():
     assert "| ValA | ValB |" in text_repr
 
 
+def test_parse_otsl_table_ched_header_cells_are_distinct_from_fcel_body_cells():
+    """<ched> (header cell) must not merge into an adjacent <fcel>'s text.
+
+    Regression test: `ched` used to fall into the generic "accumulate text"
+    branch, so a header cell's text merged into whichever body cell happened
+    to be open instead of becoming its own column value.
+    """
+    xml_snippet = """<table>
+      <ched/>Category<ched/>Description<nl/>
+      <fcel/>C1<fcel/>Very Low<nl/>
+    </table>"""
+    elem = ET.fromstring(xml_snippet)
+    rows, text_repr = parse_otsl_table(elem)
+
+    assert rows[0] == ["Category", "Description"]
+    assert rows[1] == ["C1", "Very Low"]
+    assert "| Category | Description |" in text_repr
+
+
 def test_parse_otsl_table_fallback():
     xml_snippet = "<table>Single row table text fallback</table>"
     elem = ET.fromstring(xml_snippet)

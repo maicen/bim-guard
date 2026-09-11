@@ -24,7 +24,11 @@ def parse_otsl_table(table_elem: ET.Element) -> tuple[list[list[str]], str]:
     """Parse an OTSL table element into a 2D matrix and a formatted text representation.
 
     OTSL (Optimized Table Structure Language) represents table grids using
-    <fcel/> (field/cell separator) and <nl/> (newline separator).
+    <fcel/> (body cell), <ched/> (header cell) and <nl/> (row separator).
+    `<ched>` gets the same cell-boundary treatment as `<fcel>` -- without it,
+    a header cell's text merges into whichever body cell happens to be open
+    instead of becoming its own column value. (This mirrors the frontend's
+    extractOtslRows in DocumentViewer.svelte -- keep both in sync.)
     """
     raw_text = "".join(table_elem.itertext()).strip()
 
@@ -35,7 +39,7 @@ def parse_otsl_table(table_elem: ET.Element) -> tuple[list[list[str]], str]:
 
     for child in table_elem:
         tag = child.tag.lower().split("}")[-1]  # Strip any XML namespace
-        if tag == "fcel":
+        if tag in ("fcel", "ched"):
             if current_cell_parts:
                 cell_text = " ".join("".join(current_cell_parts).split())
                 if cell_text:

@@ -244,7 +244,14 @@
     rows: string[][];
   }
 
-  /** Parse a single OTSL <table> element's <fcel/>/<nl/> grid into rows of cell text. */
+  /**
+   * Parse a single OTSL <table> element's <fcel/>(body)/<ched/>(header)/<nl/>
+   * grid into rows of cell text. `<ched>` gets the same cell-boundary
+   * treatment as `<fcel>` -- without it, a header cell's text merges into
+   * whichever body cell happens to be open instead of becoming its own
+   * column value. (Mirrors the backend's parse_otsl_table in
+   * app/modules/document_parsing/doclang_chunker.py -- keep both in sync.)
+   */
   function extractOtslRows(tableNode: Element): string[][] {
     const rows: string[][] = [];
     let currentRow: string[] = [];
@@ -255,7 +262,7 @@
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
         const tag = el.tagName.toLowerCase();
-        if (tag === "fcel") {
+        if (tag === "fcel" || tag === "ched") {
           if (currentCellParts.length > 0) {
             const text = currentCellParts.join(" ").trim();
             if (text) currentRow.push(text);
