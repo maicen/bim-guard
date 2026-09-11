@@ -549,7 +549,6 @@
               >
                 Type
               </SortHeader>
-              <th class="px-4 py-3">Text Preview</th>
               <SortHeader
                 column="char_count"
                 sortField={table.sortField}
@@ -615,9 +614,6 @@
                   >
                     {doc.doc_type || "Specification"}
                   </span>
-                </td>
-                <td class="max-w-sm truncate px-4 py-3 text-caption text-slate-400">
-                  {doc.text_preview || "No preview available"}
                 </td>
                 <td class="px-4 py-3 font-mono text-xs text-slate-400">
                   {doc.char_count.toLocaleString()}

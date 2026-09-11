@@ -458,6 +458,12 @@
     return "";
   }
 
+  /** A numbered-clause marker like "9.8.2." goes one heading level deeper per dot-separated segment. */
+  function headingLevelFromMarker(marker: string): number {
+    const segments = marker.split(".").map((s) => s.trim()).filter(Boolean);
+    return Math.min(Math.max(segments.length + 1, 2), 6);
+  }
+
   /**
    * Walk the full DocLang XML tree in document order and produce a flat,
    * readable sequence of blocks (headings, paragraphs, lists, tables,
@@ -534,6 +540,53 @@
         } else if (tag === "item" || tag === "li") {
           const text = node.textContent?.trim() || "";
           if (text) pendingListItems.push(text);
+        } else if (tag === "list") {
+          // A DocLang <list> is overloaded: some entries are numbered
+          // section headings (<ldiv><marker>9.8.2.</marker></ldiv> followed
+          // by 4 <location>s and a <content>text</content>), others are
+          // ordinary numbered clauses (same shape, but the text is a bare
+          // node instead of wrapped in <content> -- no heading intended).
+          // Headings and clauses can interleave within one <list>, so each
+          // <ldiv> entry is classified independently rather than treating
+          // the whole <list> as one or the other.
+          let currentMarker = "";
+          let textBuffer = "";
+          const flushItemBuffer = () => {
+            const text = textBuffer.replace(/\s+/g, " ").trim();
+            textBuffer = "";
+            if (text) pendingListItems.push(currentMarker ? `${currentMarker} ${text}` : text);
+            currentMarker = "";
+          };
+          for (const child of Array.from(node.childNodes)) {
+            if (child.nodeType === Node.ELEMENT_NODE) {
+              const childTag = (child as Element).tagName.toLowerCase();
+              if (childTag === "ldiv") {
+                flushItemBuffer();
+                currentMarker = (child.textContent || "").trim();
+              } else if (childTag === "location") {
+                // positional metadata only -- not part of the text
+              } else if (childTag === "content") {
+                flushList();
+                const headingText = [currentMarker, child.textContent?.trim()].filter(Boolean).join(" ");
+                if (headingText) {
+                  blocks.push({
+                    type: "heading",
+                    level: headingLevelFromMarker(currentMarker),
+                    text: headingText,
+                    elementId: null,
+                    layer: "body",
+                  });
+                }
+                currentMarker = "";
+              } else {
+                textBuffer += child.textContent || "";
+              }
+            } else if (child.nodeType === Node.TEXT_NODE) {
+              textBuffer += child.textContent || "";
+            }
+          }
+          flushItemBuffer();
+          node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
         } else if (tag === "page_break") {
           flushList();
           pageNumber += 1;
