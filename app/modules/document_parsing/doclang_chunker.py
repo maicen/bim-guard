@@ -94,6 +94,54 @@ def parse_otsl_table(table_elem: ET.Element) -> tuple[list[list[str]], str]:
     return rows, text_repr
 
 
+def _render_field_region(field_region: ET.Element) -> str:
+    """Render a `<field_region>` element into readable `"key: value"` text.
+
+    Per the spec (Fields section), `field_heading`/`field_item` need not be
+    direct children of `field_region`, and a `field_item`'s own `key`
+    (0 or 1) / `value` (0 or many) scope excludes descendants belonging to a
+    *nested* field_item. We approximate that by only counting a `key`/`value`
+    under the nearest enclosing `field_item`.
+    """
+    parent_map: dict[int, ET.Element] = {id(child): parent for parent in field_region.iter() for child in parent}
+
+    def nearest_field_item(elem: ET.Element) -> ET.Element | None:
+        current = parent_map.get(id(elem))
+        while current is not None:
+            if current.tag.lower().split("}")[-1] == "field_item":
+                return current
+            current = parent_map.get(id(current))
+        return None
+
+    lines: list[str] = []
+    for elem in field_region.iter():
+        tag = elem.tag.lower().split("}")[-1]
+        if tag == "field_heading":
+            text = "".join(elem.itertext()).strip()
+            if text:
+                lines.append(text)
+        elif tag == "field_item":
+            key_text = ""
+            value_texts: list[str] = []
+            for descendant in elem.iter():
+                if descendant is elem:
+                    continue
+                if nearest_field_item(descendant) is not elem:
+                    continue  # belongs to a nested field_item, not this one
+                d_tag = descendant.tag.lower().split("}")[-1]
+                if d_tag == "key" and not key_text:
+                    key_text = "".join(descendant.itertext()).strip()
+                elif d_tag == "value":
+                    value_text = "".join(descendant.itertext()).strip()
+                    if value_text:
+                        value_texts.append(value_text)
+            if key_text or value_texts:
+                values_joined = "; ".join(value_texts)
+                lines.append(f"{key_text}: {values_joined}" if key_text else values_joined)
+
+    return "\n".join(lines)
+
+
 class DocLangChunker:
     """Extracts structured sections, clauses, and OTSL tables from DocLang XML."""
 
@@ -168,7 +216,29 @@ class DocLangChunker:
         bbox_idx = 0
         total_bboxes = len(element_bboxes) if element_bboxes else 0
 
+        # `root.iter()` below is a flat, document-order walk over every
+        # descendant -- it doesn't let a handler "consume" a subtree the way
+        # a recursive walk would. `field_region` is handled as a single
+        # self-contained block (like `table`), so its descendants (`text`,
+        # `key`, `value`, ... per the spec's examples, some field content is
+        # wrapped in `<text>`) must be excluded from the generic dispatch
+        # below or they'd also be emitted as their own paragraph chunks.
+        skip_ids: set[int] = set()
         for elem in root.iter():
+            if elem.tag.lower().split("}")[-1] == "field_region":
+                skip_ids.update(id(descendant) for descendant in elem.iter() if descendant is not elem)
+
+        # Needed to tell an inline `<formula>`/`<code>` (nested inside a
+        # `text`/`paragraph`/`item` run whose `itertext()` already captured
+        # it) apart from a standalone block that needs its own chunk.
+        parent_map: dict[int, ET.Element] = {
+            id(child): parent for parent in root.iter() for child in parent
+        }
+        _TEXT_RUN_TAGS = {"text", "paragraph", "p", "item", "li"}
+
+        for elem in root.iter():
+            if id(elem) in skip_ids:
+                continue
             tag = elem.tag.lower().split("}")[-1]  # Strip namespace
 
             if tag == "heading":
@@ -243,6 +313,50 @@ class DocLangChunker:
                     current_content_blocks.append(f"- {li_text}")
                     if total_bboxes > 0 and bbox_idx < total_bboxes:
                         bbox_idx += 1
+
+            elif tag == "field_region":
+                field_text = _render_field_region(elem)
+                if field_text.strip():
+                    if current_content_blocks:
+                        flush_current_chunk()
+                    current_node_type = "field_region"
+                    current_content_blocks.append(field_text)
+                    if total_bboxes > 0 and bbox_idx < total_bboxes:
+                        current_bbox = element_bboxes[bbox_idx].get("bbox")
+                        current_page_number = element_bboxes[bbox_idx].get("page_number")
+                        bbox_idx += 1
+                    flush_current_chunk()
+
+            elif tag == "formula":
+                # Per the spec, <formula> is inline-capable (see doclang-spec-0.7.md
+                # "All math is authored as LaTeX inside <formula> ... inlined
+                # within a semantic element"). If it sits inside a text-run
+                # element, that ancestor's itertext() already captured its
+                # LaTeX -- only standalone formulas (parent outside a text
+                # run) get their own paragraph-level content here.
+                parent = parent_map.get(id(elem))
+                parent_tag = parent.tag.lower().split("}")[-1] if parent is not None else ""
+                if parent_tag not in _TEXT_RUN_TAGS:
+                    latex = "".join(elem.itertext()).strip()
+                    if latex:
+                        current_content_blocks.append(f"$$ {latex} $$")
+
+            elif tag == "code":
+                # Same inline-vs-standalone distinction as <formula> above.
+                parent = parent_map.get(id(elem))
+                parent_tag = parent.tag.lower().split("}")[-1] if parent is not None else ""
+                if parent_tag not in _TEXT_RUN_TAGS:
+                    code_text = "".join(elem.itertext())
+                    if code_text.strip():
+                        if current_content_blocks:
+                            flush_current_chunk()
+                        current_node_type = "code"
+                        current_content_blocks.append(code_text)
+                        if total_bboxes > 0 and bbox_idx < total_bboxes:
+                            current_bbox = element_bboxes[bbox_idx].get("bbox")
+                            current_page_number = element_bboxes[bbox_idx].get("page_number")
+                            bbox_idx += 1
+                        flush_current_chunk()
 
         flush_current_chunk()
         logger.info("DocLangChunker extracted %d chunks from DocLang XML", len(chunks))

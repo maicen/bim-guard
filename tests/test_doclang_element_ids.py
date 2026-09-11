@@ -223,6 +223,42 @@ def test_assign_element_ids_does_not_corrupt_chunker_text_extraction_for_lists()
         assert "elem-" not in injected["text"]
 
 
+FIELD_FORMULA_CODE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<doclang>
+  <heading level="1">Application Form</heading>
+  <field_region>
+    <field_item>
+      <key>Name:</key>
+      <value>John Smith</value>
+    </field_item>
+  </field_region>
+  <formula>E = mc^2</formula>
+  <code>print("hi")</code>
+</doclang>
+"""
+
+_FIELD_FORMULA_CODE_BBOXES = [
+    {"kind": "heading", "page_number": 1, "bbox": None},
+    {"kind": "field", "page_number": 1, "bbox": None},
+    {"kind": "formula", "page_number": 1, "bbox": None},
+    {"kind": "code", "page_number": 1, "bbox": None},
+]
+
+
+def test_assign_element_ids_covers_field_region_formula_and_code():
+    updated_xml, records = assign_element_ids(FIELD_FORMULA_CODE_XML, _FIELD_FORMULA_CODE_BBOXES)
+
+    assert [r["element_id"] for r in records] == ["elem-1", "elem-2", "elem-3", "elem-4"]
+    assert [r["kind"] for r in records] == ["heading", "field", "formula", "code"]
+    assert 'bg_element_id value="elem-2"' in updated_xml
+
+    # ids must not leak into chunker text extraction.
+    chunks = DocLangChunker().chunk(updated_xml)
+    assert not any("elem-" in c["text"] for c in chunks)
+    assert any(c["node_type"] == "field_region" for c in chunks)
+    assert any(c["node_type"] == "code" for c in chunks)
+
+
 def test_get_document_element_bboxes_endpoint():
     """GET /documents/{id}/element-bboxes returns the persisted per-element records."""
     from starlette.testclient import TestClient

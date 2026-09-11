@@ -30,8 +30,13 @@ logger = get_logger(__name__)
 # Elements that get a stable id -- the same tag set (plus picture/figure, which
 # never had bbox coverage before) that DocLangChunker.chunk() already walks for
 # section-level bbox, so this reuses an already-proven matching order rather
-# than inventing a new one.
-_ID_ELIGIBLE_TAGS = {"heading", "table", "text", "paragraph", "p", "picture", "figure"}
+# than inventing a new one. field_region/formula/code are id'd as whole
+# containers (v1): a formula/code nested inside a text run is not separately
+# id'd (DocLangChunker treats it as part of that run's text, not its own
+# chunk), and a field_region's field_item/field_heading children aren't
+# separately id'd either -- only the field_region container is, matching the
+# chunker's own "field_region is a single self-contained block" treatment.
+_ID_ELIGIBLE_TAGS = {"heading", "table", "text", "paragraph", "p", "picture", "figure", "field_region", "formula", "code"}
 
 # DocLang's documented element-head child order (doclang.xsd `element_head`
 # group) -- `custom` must sort last among these when injected.
@@ -46,6 +51,9 @@ _KIND_BY_TAG = {
     "picture": "picture",
     "figure": "picture",
     "ldiv": "list",
+    "field_region": "field",
+    "formula": "formula",
+    "code": "code",
 }
 
 # The coarse "kind" values _KIND_BY_TAG can ever produce -- callers building a

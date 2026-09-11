@@ -66,6 +66,64 @@ def test_doclang_chunker_basic_chunking():
     assert "| C1 | Very Low | Indoor heated |" in table_chunks[0]["text"]
 
 
+def test_doclang_chunker_field_region():
+    xml = """<doclang>
+  <heading level="1">Application Form</heading>
+  <field_region>
+    <field_heading>Personal Information</field_heading>
+    <field_item>
+      <key>Name:</key>
+      <value>John Smith</value>
+    </field_item>
+    <field_item>
+      <text><key>Email:</key></text>
+      <text><value>john@example.com</value></text>
+    </field_item>
+    <field_item>
+      <key>Phone Numbers:</key>
+      <value>+1-555-0100</value>
+      <value>+1-555-0101</value>
+    </field_item>
+  </field_region>
+</doclang>"""
+    chunker = DocLangChunker()
+    chunks = chunker.chunk(xml)
+
+    field_chunks = [c for c in chunks if c["node_type"] == "field_region"]
+    assert len(field_chunks) == 1
+    text = field_chunks[0]["text"]
+    assert "Personal Information" in text
+    assert "Name:: John Smith" in text
+    assert "Email:: john@example.com" in text
+    assert "Phone Numbers:: +1-555-0100; +1-555-0101" in text
+
+    # field_region descendants (text/key/value) must not also surface as
+    # their own generic paragraph chunks.
+    assert not any("John Smith" in c["text"] for c in chunks if c is not field_chunks[0])
+
+
+def test_doclang_chunker_standalone_formula_and_code():
+    xml = """<doclang>
+  <heading level="1">Physics</heading>
+  <formula>E = mc^2</formula>
+  <code><label>python</label><content>print("hi")</content></code>
+  <text>Inline math <formula>a^2 + b^2 = c^2</formula> stays inline.</text>
+</doclang>"""
+    chunker = DocLangChunker()
+    chunks = chunker.chunk(xml)
+
+    assert any("$$ E = mc^2 $$" in c["text"] for c in chunks)
+    code_chunks = [c for c in chunks if c["node_type"] == "code"]
+    assert len(code_chunks) == 1
+    assert 'print("hi")' in code_chunks[0]["text"]
+
+    # Inline formula inside a <text> run should appear once, via the
+    # paragraph's own text, not duplicated as a second standalone chunk.
+    paragraph_chunks = [c for c in chunks if c["node_type"] == "paragraph"]
+    assert any("a^2 + b^2 = c^2" in c["text"] for c in paragraph_chunks)
+    assert sum(c["text"].count("a^2 + b^2 = c^2") for c in chunks) == 1
+
+
 def test_doclang_chunker_empty_and_invalid():
     chunker = DocLangChunker()
     assert chunker.chunk("") == []
