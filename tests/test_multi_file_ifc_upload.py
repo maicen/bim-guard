@@ -237,9 +237,9 @@ def client(projects_service: ProjectsService, service: ModelsService, monkeypatc
 def upload(client: TestClient, project_id: int = 7, **form: Any):
     """POST the three discipline models, primary first unless told otherwise."""
     files = [
-        ("files", ("plumbing.ifc", PIPING_MODEL, "application/octet-stream")),
-        ("files", ("structural.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
-        ("files", ("architectural.ifc", ARCHITECTURAL_MODEL, "application/octet-stream")),
+        ("files", ("PRJ-ORG-VS-L1-M3-P-0001.ifc", PIPING_MODEL, "application/octet-stream")),
+        ("files", ("PRJ-ORG-VS-L1-M3-S-0001.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
+        ("files", ("PRJ-ORG-VS-L1-M3-A-0001.ifc", ARCHITECTURAL_MODEL, "application/octet-stream")),
     ]
     data: dict[str, Any] = {"primary_index": "0", "roles": ["primary", "structural", "architectural"]}
     data.update(form)
@@ -258,9 +258,9 @@ def test_three_files_produce_three_rows(client: TestClient, service: ModelsServi
     assert body["success"] is True
     assert len(body["files"]) == 3
     assert [f["file_name"] for f in body["files"]] == [
-        "plumbing.ifc",
-        "structural.ifc",
-        "architectural.ifc",
+        "PRJ-ORG-VS-L1-M3-P-0001.ifc",
+        "PRJ-ORG-VS-L1-M3-S-0001.ifc",
+        "PRJ-ORG-VS-L1-M3-A-0001.ifc",
     ]
     assert len(service.list_models(7)) == 3
 
@@ -269,15 +269,15 @@ def test_roles_are_recorded_per_file(client: TestClient, service: ModelsService)
     """The roles list is parallel to the files list, not applied to all of them."""
     upload(client)
     by_name = {row["file_name"]: row for row in service.list_models(7)}
-    assert by_name["structural.ifc"]["role"] == "structural"
-    assert by_name["architectural.ifc"]["role"] == "architectural"
+    assert by_name["PRJ-ORG-VS-L1-M3-S-0001.ifc"]["role"] == "structural"
+    assert by_name["PRJ-ORG-VS-L1-M3-A-0001.ifc"]["role"] == "architectural"
 
 
 def test_exactly_one_model_is_primary(client: TestClient, service: ModelsService) -> None:
     """primary_index marks one model, and marks only it."""
     upload(client, primary_index="1")
     files = service.list_models(7)
-    assert [f["file_name"] for f in files if f["is_primary"]] == ["structural.ifc"]
+    assert [f["file_name"] for f in files if f["is_primary"]] == ["PRJ-ORG-VS-L1-M3-S-0001.ifc"]
 
 
 def test_primary_is_mirrored_onto_the_project(
@@ -286,7 +286,7 @@ def test_primary_is_mirrored_onto_the_project(
     """projects.ifc_file_path follows the primary, so old readers still work."""
     upload(client, primary_index="2")
     primary = service.get_primary(7)
-    assert primary["file_name"] == "architectural.ifc"
+    assert primary["file_name"] == "PRJ-ORG-VS-L1-M3-A-0001.ifc"
     assert projects_service.get_project(7)["ifc_file_path"] == primary["file_path"]
 
 
@@ -300,7 +300,7 @@ def test_listing_returns_the_primary_first(client: TestClient) -> None:
     """GET /api/models puts the analysis model at the head of the list."""
     upload(client, primary_index="1")
     listed = client.get("/api/models", params={"project_id": 7}).json()["models"]
-    assert listed[0]["file_name"] == "structural.ifc"
+    assert listed[0]["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc"
     assert len(listed) == 3
 
 
@@ -309,19 +309,19 @@ def test_promoting_a_model_moves_the_project_pointer(
 ) -> None:
     """set_primary re-points both the row and the projects column."""
     upload(client, primary_index="0")
-    target = next(f for f in service.list_models(7) if f["file_name"] == "structural.ifc")
+    target = next(f for f in service.list_models(7) if f["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc")
 
     promoted = service.set_primary(7, target["id"])
 
     assert promoted["is_primary"] is True
-    assert service.get_primary(7)["file_name"] == "structural.ifc"
+    assert service.get_primary(7)["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc"
     assert projects_service.get_project(7)["ifc_file_path"] == target["file_path"]
 
 
 def test_promoting_leaves_one_primary(client: TestClient, service: ModelsService) -> None:
     """The previous primary is demoted, not left as a second claimant."""
     upload(client, primary_index="0")
-    target = next(f for f in service.list_models(7) if f["file_name"] == "structural.ifc")
+    target = next(f for f in service.list_models(7) if f["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc")
     service.set_primary(7, target["id"])
     assert sum(1 for f in service.list_models(7) if f["is_primary"]) == 1
 
@@ -337,14 +337,14 @@ def test_a_model_attached_before_the_table_is_kept(
     first.
     """
     projects_service._projects.update(
-        updates={"ifc_file_path": "mem://legacy/original.ifc"}, pk_values=7
+        updates={"ifc_file_path": "mem://legacy/PRJ-ORG-VS-L1-M3-X-0004.ifc"}, pk_values=7
     )
-    projects_service._storage.objects["mem://legacy/original.ifc"] = PIPING_MODEL
+    projects_service._storage.objects["mem://legacy/PRJ-ORG-VS-L1-M3-X-0004.ifc"] = PIPING_MODEL
 
     upload(client)
 
     names = [row["file_name"] for row in service.list_models(7)]
-    assert "original.ifc" in names
+    assert "PRJ-ORG-VS-L1-M3-X-0004.ifc" in names
     assert len(names) == 4
 
 
@@ -358,7 +358,7 @@ def test_a_non_ifc_file_rejects_the_whole_batch(
     response = client.post(
         "/api/projects/7/models",
         files=[
-            ("files", ("plumbing.ifc", PIPING_MODEL, "application/octet-stream")),
+            ("files", ("PRJ-ORG-VS-L1-M3-P-0001.ifc", PIPING_MODEL, "application/octet-stream")),
             ("files", ("notes.pdf", b"%PDF-1.4", "application/pdf")),
         ],
     )
@@ -381,9 +381,9 @@ def test_partial_roles_are_rejected(client: TestClient) -> None:
     response = client.post(
         "/api/projects/7/models",
         files=[
-            ("files", ("a.ifc", PIPING_MODEL, "application/octet-stream")),
-            ("files", ("b.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
-            ("files", ("c.ifc", ARCHITECTURAL_MODEL, "application/octet-stream")),
+            ("files", ("PRJ-ORG-VS-L1-M3-X-0001.ifc", PIPING_MODEL, "application/octet-stream")),
+            ("files", ("PRJ-ORG-VS-L1-M3-X-0002.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
+            ("files", ("PRJ-ORG-VS-L1-M3-X-0003.ifc", ARCHITECTURAL_MODEL, "application/octet-stream")),
         ],
         data={"roles": ["primary", "structural"]},
     )
@@ -395,13 +395,13 @@ def test_roles_may_be_omitted_entirely(client: TestClient, service: ModelsServic
     response = client.post(
         "/api/projects/7/models",
         files=[
-            ("files", ("a.ifc", PIPING_MODEL, "application/octet-stream")),
-            ("files", ("b.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
+            ("files", ("PRJ-ORG-VS-L1-M3-X-0001.ifc", PIPING_MODEL, "application/octet-stream")),
+            ("files", ("PRJ-ORG-VS-L1-M3-X-0002.ifc", STRUCTURAL_MODEL, "application/octet-stream")),
         ],
     )
     assert response.status_code == 201
     roles = {row["file_name"]: row["role"] for row in service.list_models(7)}
-    assert roles == {"a.ifc": "primary", "b.ifc": "context"}
+    assert roles == {"PRJ-ORG-VS-L1-M3-X-0001.ifc": "primary", "PRJ-ORG-VS-L1-M3-X-0002.ifc": "context"}
 
 
 def test_upload_to_a_missing_project_is_404(client: TestClient) -> None:
@@ -432,8 +432,8 @@ def test_each_attached_model_downloads_its_own_bytes(client: TestClient) -> None
     attached = upload(client).json()["files"]
     by_name = {f["file_name"]: f["id"] for f in attached}
 
-    piping = client.get(f"/api/models/{by_name['plumbing.ifc']}/download", params={"project_id": 7})
-    structural = client.get(f"/api/models/{by_name['structural.ifc']}/download", params={"project_id": 7})
+    piping = client.get(f"/api/models/{by_name['PRJ-ORG-VS-L1-M3-P-0001.ifc']}/download", params={"project_id": 7})
+    structural = client.get(f"/api/models/{by_name['PRJ-ORG-VS-L1-M3-S-0001.ifc']}/download", params={"project_id": 7})
 
     assert piping.status_code == 200
     assert structural.status_code == 200
@@ -447,12 +447,12 @@ def test_each_attached_model_downloads_its_own_bytes(client: TestClient) -> None
 def test_downloaded_model_is_named_after_its_row(client: TestClient) -> None:
     """The response is attached under the uploaded filename."""
     attached = upload(client).json()["files"]
-    file_id = next(f["id"] for f in attached if f["file_name"] == "architectural.ifc")
+    file_id = next(f["id"] for f in attached if f["file_name"] == "PRJ-ORG-VS-L1-M3-A-0001.ifc")
 
     response = client.get(f"/api/models/{file_id}/download", params={"project_id": 7})
 
     assert response.status_code == 200
-    assert "architectural.ifc" in response.headers["content-disposition"]
+    assert "PRJ-ORG-VS-L1-M3-A-0001.ifc" in response.headers["content-disposition"]
 
 
 def test_download_rejects_a_file_belonging_to_no_project_of_that_id(
@@ -504,7 +504,7 @@ def test_corrosion_follows_a_change_of_primary(
 ) -> None:
     """Promoting another model changes which one the engines assess."""
     upload(client, primary_index="0")
-    target = next(f for f in service.list_models(7) if f["file_name"] == "structural.ifc")
+    target = next(f for f in service.list_models(7) if f["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc")
     service.set_primary(7, target["id"])
 
     content, error = runner.model_bytes(7)
@@ -529,7 +529,7 @@ def test_seismic_loads_every_attached_model(client: TestClient) -> None:
     upload(client, primary_index="0")
     models, error = runner.model_bytes_all(7)
     assert error is None
-    assert [name for name, _ in models] == ["plumbing.ifc", "structural.ifc", "architectural.ifc"]
+    assert [name for name, _ in models] == ["PRJ-ORG-VS-L1-M3-P-0001.ifc", "PRJ-ORG-VS-L1-M3-S-0001.ifc", "PRJ-ORG-VS-L1-M3-A-0001.ifc"]
 
 
 def test_seismic_sees_elements_from_all_disciplines(client: TestClient, monkeypatch) -> None:
@@ -573,7 +573,7 @@ def test_the_kernel_assesses_elements_from_every_model(client: TestClient) -> No
 
     single = run_seismic_analysis(models[0][1])
     federated = run_seismic_analysis(
-        models[0][1], extra_models=[*models[1:], ("mechanical.ifc", MECHANICAL_MODEL)]
+        models[0][1], extra_models=[*models[1:], ("PRJ-ORG-VS-L1-M3-M-0001.ifc", MECHANICAL_MODEL)]
     )
 
     assert single["compliance_error"] is None
@@ -589,11 +589,11 @@ def test_findings_name_the_model_they_came_from(client: TestClient) -> None:
     upload(client)
     models, _ = runner.model_bytes_all(7)
     result = run_seismic_analysis(
-        models[0][1], extra_models=[("mechanical.ifc", MECHANICAL_MODEL)]
+        models[0][1], extra_models=[("PRJ-ORG-VS-L1-M3-M-0001.ifc", MECHANICAL_MODEL)]
     )
 
     sources = {issue.metadata.get("source_model") for issue in result["audit_issues"]}
-    assert sources == {"primary model", "mechanical.ifc"}
+    assert sources == {"primary model", "PRJ-ORG-VS-L1-M3-M-0001.ifc"}
 
 
 def test_one_element_federated_twice_is_assessed_once(client: TestClient) -> None:
@@ -605,7 +605,7 @@ def test_one_element_federated_twice_is_assessed_once(client: TestClient) -> Non
     """
     from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
 
-    doubled = run_seismic_analysis(PIPING_MODEL, extra_models=[("copy.ifc", PIPING_MODEL)])
+    doubled = run_seismic_analysis(PIPING_MODEL, extra_models=[("PRJ-ORG-VS-L1-M3-C-0001.ifc", PIPING_MODEL)])
     alone = run_seismic_analysis(PIPING_MODEL)
 
     assert len(doubled["audit_issues"]) == len(alone["audit_issues"]) == 2
@@ -617,13 +617,13 @@ def test_a_model_that_cannot_be_fetched_fails_the_run(
     """A partial federation would report clearance where it stopped looking."""
     upload(client)
     secondary = next(
-        f for f in service.list_models(7) if f["file_name"] == "structural.ifc"
+        f for f in service.list_models(7) if f["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc"
     )
     projects_service._storage.objects.pop(secondary["file_path"])
 
     models, error = runner.model_bytes_all(7)
     assert models == []
-    assert "structural.ifc" in error
+    assert "PRJ-ORG-VS-L1-M3-S-0001.ifc" in error
 
 
 def test_seismic_cache_key_covers_every_model(
@@ -637,8 +637,8 @@ def test_seismic_cache_key_covers_every_model(
     before, _ = runner.model_bytes_all(7)
 
     service.attach_model(
-        7, file_path=projects_service._storage.save_upload("extra.ifc", ARCHITECTURAL_MODEL, "x"),
-        file_name="extra.ifc", role="context",
+        7, file_path=projects_service._storage.save_upload("extrPRJ-ORG-VS-L1-M3-X-0001.ifc", ARCHITECTURAL_MODEL, "x"),
+        file_name="extrPRJ-ORG-VS-L1-M3-X-0001.ifc", role="context",
     )
     after, _ = runner.model_bytes_all(7)
 
@@ -695,7 +695,7 @@ def test_an_element_one_model_can_read_is_not_reported_unreadable(monkeypatch) -
         ],
     )
 
-    result = run_seismic_analysis(PIPING_MODEL, extra_models=[("structural.ifc", STRUCTURAL_MODEL)])
+    result = run_seismic_analysis(PIPING_MODEL, extra_models=[("PRJ-ORG-VS-L1-M3-S-0001.ifc", STRUCTURAL_MODEL)])
 
     assert result["audit_issues"] == []
 
@@ -712,7 +712,7 @@ def test_an_element_no_model_can_read_is_reported_once(monkeypatch) -> None:
         ],
     )
 
-    result = run_seismic_analysis(PIPING_MODEL, extra_models=[("structural.ifc", STRUCTURAL_MODEL)])
+    result = run_seismic_analysis(PIPING_MODEL, extra_models=[("PRJ-ORG-VS-L1-M3-S-0001.ifc", STRUCTURAL_MODEL)])
 
     assert len(result["audit_issues"]) == 1
     assert result["audit_issues"][0].element_id == "SHARED-1"

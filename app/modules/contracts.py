@@ -2658,3 +2658,15 @@ class CDETokenResponse(BaseModel):
     expires_in: int
     scope: str
     grant_type: str
+
+
+class CDEPromoteRequest(BaseModel):
+    """Request payload for CDE gate transition."""
+    actor: Optional[str] = "Lead Appointed Party"
+
+
+class CDEPromoteResponse(BaseModel):
+    """Response payload after CDE gate transition."""
+    success: bool
+    cde_state: str
+    message: str

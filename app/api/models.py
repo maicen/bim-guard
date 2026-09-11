@@ -15,7 +15,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
-from app.api.dependencies import get_github_repo_service, get_models_service, get_phase6_service
+from app.api.dependencies import (
+    get_github_repo_service,
+    get_models_service,
+    get_naming_config_service,
+    get_phase6_service,
+)
 from app.api.projects import get_authorized_project
 from app.logging_config import get_logger
 from app.modules.contracts import (
@@ -26,7 +31,9 @@ from app.modules.contracts import (
     ModelUploadResponse,
 )
 from app.services.github_repo_service import GitHubRepoService
+from app.services.iso_validator import ISO19650ValidationError, validate_and_parse_filename
 from app.services.models_service import ModelsService
+from app.services.naming_config_service import NamingConfigService
 from app.services.phase6_service import Phase6Service
 
 logger = get_logger(__name__)
@@ -163,6 +170,7 @@ async def upload_models(
     project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ModelsService, Depends(get_models_service)],
     phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
+    naming_service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
     files: Annotated[list[UploadFile], File(description="IFC models to attach")],
     primary_index: Annotated[int, Form()] = 0,
     roles: Annotated[list[str], Form()] = [],
@@ -197,9 +205,25 @@ async def upload_models(
             ),
         )
     file_roles = _roles_for(roles, len(names), primary_index)
+    
+    naming_config = naming_service.get_for_project(project_id)
+    convention = naming_service.resolve_convention(naming_config)
+    separator = str(naming_config.get("separator") or convention.get("separator") or "-")
+    expected_project_code = project.get("project_code")
+
+    parsed_files = []
+    for name in names:
+        try:
+            parsed = validate_and_parse_filename(name, separator=separator, expected_project_code=expected_project_code)
+            parsed_files.append(parsed)
+        except ISO19650ValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
 
     attached: list[ModelResponse] = []
-    for index, (upload, name) in enumerate(zip(files, names)):
+    for index, (upload, name, parsed) in enumerate(zip(files, names, parsed_files)):
         content = await upload.read()
         stored = phase6_service.upload_service.upload(
             name, content, project_id=project_id, kind="ifc"
@@ -223,6 +247,14 @@ async def upload_models(
             file_name=stored.ref.filename,
             role=file_roles[index],
             is_primary=index == primary_index,
+            project_code=parsed.get("project_code"),
+            originator=parsed.get("originator"),
+            volume_system=parsed.get("volume_system"),
+            level=parsed.get("level"),
+            type_code=parsed.get("type"),
+            role_iso=parsed.get("role"),
+            number=parsed.get("number"),
+            cde_state="WIP",
         )
         attached.append(ModelResponse(**{"project_id": project_id, **row}))
 

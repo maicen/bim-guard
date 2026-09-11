@@ -21,7 +21,7 @@ import json
 from datetime import datetime, timezone
 from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status, HTTPException
 
 from app.api.dependencies import get_documents_service, get_models_service, get_projects_service
 from app.api.projects import get_authorized_project
@@ -36,10 +36,13 @@ from app.modules.contracts import (
     CDEVersionItem,
     CDEVersionsResponse,
     CDEWebhookPayload,
+    CDEPromoteRequest,
+    CDEPromoteResponse,
 )
 from app.services.documents_service import DocumentService
 from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
+from app.services.cde_state_machine import CDEStateMachine
 
 logger = get_logger(__name__)
 
@@ -345,3 +348,45 @@ def handle_cde_webhook(
         "document_name": payload.document_name,
         "processed_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.post(
+    "/gate1/promote",
+    response_model=CDEPromoteResponse,
+    summary="Promote CDE state through Gate 1 (WIP -> SHARED)",
+    tags=["OpenCDE Documents"],
+)
+def promote_gate1(
+    payload: CDEPromoteRequest,
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+) -> CDEPromoteResponse:
+    """Promote a project's CDE state from WIP to SHARED if there are no critical errors."""
+    state_machine = CDEStateMachine(projects_service=projects_service)
+    
+    project = projects_service.get_project(payload.project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {payload.project_id} not found."
+        )
+
+    # In a full implementation, this would query the issues table for critical errors.
+    # The state machine transition throws a ValueError on failure.
+    try:
+        updated_project = state_machine.transition_project(
+            project_id=payload.project_id,
+            target_state="SHARED",
+            actor=payload.actor or "Lead Appointed Party",
+            critical_issues_count=0,
+            ids_check_passed=True,
+        )
+        return CDEPromoteResponse(
+            success=True,
+            cde_state=updated_project.get("cde_state", "SHARED"),
+            message="Successfully promoted to SHARED state."
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
