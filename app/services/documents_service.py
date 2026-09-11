@@ -18,6 +18,31 @@ logger = get_logger(__name__)
 DOCLANG_OFFLOAD_THRESHOLD_BYTES = 256 * 1024  # 256 KB threshold for offloading XML to Supabase Storage
 MAX_DOCLANG_ARCHIVE_ENTRY_BYTES = 50 * 1024 * 1024  # cap per decompressed .dclx entry, guards against zip bombs
 
+# OPC (Open Packaging Conventions) parts required by the DocLang v0.7 spec's
+# Archive Format (.dclx) section, mirroring the shape produced by the
+# reference `doclang` pip package's `packaging.pack()` -- added alongside our
+# own `manifest.json` part (an additive, non-normative extra part; the spec
+# only mandates `document.xml` + these two OPC parts) so exports interoperate
+# with the reference DocLang viewer and other spec-conformant tooling.
+_DOCLANG_CONTENT_TYPES_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="jpg" ContentType="image/jpeg"/>
+  <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Default Extension="webp" ContentType="image/webp"/>
+  <Override PartName="/document.xml" ContentType="application/vnd.doclang.document+xml"/>
+</Types>
+"""
+
+_DOCLANG_RELS_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://doclang.ai/ns/package/2026/relationships/document"
+    Target="document.xml"/>
+</Relationships>
+"""
+
 
 class DocumentService:
     """Encapsulates CRUD and lookup operations for uploaded documents."""
@@ -236,7 +261,17 @@ class DocumentService:
         xml_content: str,
         assets: list[dict] | None = None,
     ) -> bytes:
-        """Package DocLang XML and metadata into a standardized .dclx zip bundle."""
+        """Package DocLang XML and metadata into a spec-conformant .dclx (OPC) bundle.
+
+        Produces a real OPC package -- `[Content_Types].xml` + `_rels/.rels`
+        alongside `document.xml`, per the DocLang v0.7 spec's Archive Format
+        section -- so exports interoperate with the reference DocLang viewer
+        and other spec-conformant tooling. `manifest.json` is kept as an
+        additive BIM-Guard-specific part carrying ISO 19650 metadata and the
+        `entrypoint` (the spec has no native slot for either); its presence
+        doesn't violate OPC conformance since unrecognized parts are ignored
+        by conformant readers.
+        """
         import io
         import json
         import zipfile
@@ -259,6 +294,8 @@ class DocumentService:
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", _DOCLANG_CONTENT_TYPES_XML.encode("utf-8"))
+            zf.writestr("_rels/.rels", _DOCLANG_RELS_XML.encode("utf-8"))
             zf.writestr("document.xml", xml_content.encode("utf-8"))
             zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
             if assets:
