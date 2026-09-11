@@ -237,6 +237,32 @@ fails every remaining request — that is exactly how the first attempt on
 already cached survive standby, so a re-run picks up where it left off and only
 recomputes what is missing, but it is far cheaper to keep the machine awake.
 
+Hold it awake with `SetThreadExecutionState`. The request is **per thread**, so
+the warm has to run in the *same* PowerShell process that sets it — set it in
+one window and start the warm in another and nothing is held. Put both in one
+script and release in a `finally`, so an interrupted warm still lets the
+machine sleep afterwards:
+
+```powershell
+Add-Type -Namespace Win32 -Name Power -MemberDefinition @'
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern uint SetThreadExecutionState(UIntPtr esFlags);
+'@
+# ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+[Win32.Power]::SetThreadExecutionState([UIntPtr]::new(0x80000003L))
+try   { uv run python scripts/prewarm_demo.py --base-url http://127.0.0.1:8000 --piping 1917 1540 --seismic 1542 }
+finally { [Win32.Power]::SetThreadExecutionState([UIntPtr]::new(0x80000000L)) }  # ES_CONTINUOUS alone releases
+```
+
+**Use `[UIntPtr]::new(...)`, not a cast.** Windows PowerShell 5.1 parses
+`0x80000003` as an `Int64` and then refuses it: `Cannot convert the
+"2147483651" value of type "System.Int64" to type "System.UIntPtr"`. Casting to
+`[uint32]` fails the other way — 5.1 reads the literal as a negative `Int32`
+and reports `Cannot convert value "-2147483645"`. The constructor takes the
+`Int64` cleanly. Verified on 2026-09-10; the call returns the *previous* state,
+so a release logging `prev=0x80000003` is proof the hold was in force the whole
+time.
+
 A hit on the second pass means the result is held in the backend's in-memory
 store, keyed on the model's SHA-256 plus the engine selection. The store lives
 **inside the uvicorn process**: restart the backend and every entry is gone. Do
@@ -257,6 +283,39 @@ limits and a third Piping project could be warmed in full without evicting
 anything. Start the backend *without* those variables and you are back to the
 defaults — 24 hours and 64 entries — where 63 leaves a single slot free and the
 next thing analysed evicts a demo entry.
+
+---
+
+## Before each rehearsal
+
+Run this before every rehearsal and before the demo itself. It takes seconds
+and it is the difference between a cached page and a five-minute wait in front
+of the audience.
+
+1. **Confirm the uvicorn worker is still alive.** The warm cache lives inside
+   that one process, so the PID is the cache.
+
+   ```powershell
+   Get-Process -Id 41008 -ErrorAction SilentlyContinue
+   ```
+
+   41008 is the worker from the 2026-09-10 restart, recorded at the top of this
+   runbook — substitute the current one after any restart. **If it returns no
+   process the cache is cold and a re-warm is needed.** Budget **2.6 hours**,
+   hold the machine awake with `SetThreadExecutionState` as documented under
+   Pre-warm, and run from the repo root, not the worktree:
+
+   ```powershell
+   uv run python scripts/prewarm_demo.py --base-url http://127.0.0.1:8000 --piping 1917 1540 --seismic 1542
+   ```
+
+   Wait for `Entries verified 63/63` before treating the demo as ready. If the
+   PID is alive, proceed straight to the walkthrough.
+
+2. **Do not reboot, restart the backend, or let the machine enter Modern
+   Standby between now and the rehearsal.** Any of the three empties the cache;
+   the 30-day TTL protects the entries from expiring but protects nothing from
+   the process ending. Leave the laptop plugged in and the lid open.
 
 ---
 
