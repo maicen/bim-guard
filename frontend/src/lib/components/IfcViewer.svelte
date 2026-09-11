@@ -185,7 +185,7 @@
 </script>
 
 <div
-  class="bimguard-viewer-root bimguard-viewer-container relative flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl"
+  class="bimguard-viewer-root bimguard-viewer-container relative flex flex-col overflow-hidden"
 >
   <!-- Loading indicator: a slim strip, present only while actually loading so
        the viewport otherwise fills the whole card right up to the ribbon. -->
