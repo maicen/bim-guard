@@ -286,17 +286,41 @@
 
   <!-- Docked workspace: collapsible BCF/Layers/Drawings panels around the 3D viewport -->
   <div class="flex min-h-0 flex-1">
-    <CollapsiblePanel title="BCF Topics" icon={ClipboardList} side="left" id="viewer-details" collapsed={false}>
+    <CollapsiblePanel
+      title="BCF Topics"
+      icon={ClipboardList}
+      side="left"
+      id="viewer-details"
+      collapsed={false}
+      resizable
+      initialSize={320}
+    >
       <div bind:this={detailsHost} class="min-h-0"></div>
     </CollapsiblePanel>
 
     <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-slate-950"></div>
 
-    <CollapsiblePanel title="Layers" icon={LayoutGrid} side="right" id="viewer-layers" collapsed={true}>
+    <CollapsiblePanel
+      title="Layers"
+      icon={LayoutGrid}
+      side="right"
+      id="viewer-layers"
+      collapsed={true}
+      resizable
+    >
       <LayersPanel {viewerAPI} />
     </CollapsiblePanel>
 
-    <CollapsiblePanel title="Drawings" icon={PenTool} side="right" id="viewer-drawings" collapsed={true}>
+    <CollapsiblePanel
+      title="Drawings"
+      icon={PenTool}
+      side="right"
+      id="viewer-drawings"
+      collapsed={true}
+      resizable
+      initialSize={360}
+      maxSize={720}
+    >
       <DrawingsPanel {viewerAPI} bind:sheetBoardHost={drawingsSheetBoardHost} />
     </CollapsiblePanel>
   </div>
