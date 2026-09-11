@@ -1085,6 +1085,7 @@ class AnalysisRunRequest(BaseModel):
         ),
     )
     use_cache: bool = Field(default=True, description="Whether to use cached analysis results")
+    enable_shacl: bool = Field(default=False, description="Enable SHACL validation side-channel")
 
 
 class AnalysisInputItemContract(BaseModel):
@@ -1166,6 +1167,8 @@ class AnalysisResultContract(BaseModel):
     pass_rate: Optional[float] = None
     bcf_artifact_id: Optional[int] = None
     summary: Optional[dict[str, Any]] = None
+    shacl_issues: list[dict[str, Any]] = Field(default_factory=list)
+    shacl_error: Optional[str] = None
 
 
 class ArchAnalysisResponse(BaseModel):

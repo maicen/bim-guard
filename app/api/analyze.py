@@ -233,6 +233,8 @@ def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultCo
         compliance_error=result.get("compliance_error"),
         compliance_is_demo=result.get("compliance_is_demo", False),
         cached=result.get("cached", False),
+        shacl_issues=result.get("shacl_issues", []),
+        shacl_error=result.get("shacl_error"),
     )
 
 
@@ -579,6 +581,7 @@ def run_analysis_endpoint(
             use_cache=payload.use_cache,
             engines=engines,
             include_low=payload.include_low,
+            enable_shacl=payload.enable_shacl,
         )
         return AnalysisQueuedResponse(
             status="queued",
@@ -593,6 +596,7 @@ def run_analysis_endpoint(
         use_cache=payload.use_cache,
         engines=engines,
         include_low=payload.include_low,
+        enable_shacl=payload.enable_shacl,
     )
     if raw_result.get("compliance_error"):
         raise HTTPException(
@@ -729,6 +733,7 @@ def get_analysis_results(
             "id. score_desc ignores bands; natural keeps the run's own order."
         ),
     ),
+    enable_shacl: bool = Query(False, description="Enable SHACL validation side-channel"),
 ) -> AnalysisResultContract:
     """Get analysis results (retrieved from cache or computed on-demand).
 
@@ -754,7 +759,7 @@ def get_analysis_results(
             detail=f"Unknown analysis slug {slug!r}.",
         )
     raw_result = run_analysis(
-        slug, project_id, use_cache=use_cache, engines=engines, include_low=include_low
+        slug, project_id, use_cache=use_cache, engines=engines, include_low=include_low, enable_shacl=enable_shacl
     )
     if raw_result.get("compliance_error"):
         raise HTTPException(

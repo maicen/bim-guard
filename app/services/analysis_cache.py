@@ -124,6 +124,7 @@ class CacheKey:
     source_sha256: str
     engines: tuple[str, ...] = ()
     include_low: bool = True
+    enable_shacl: bool = False
 
 
 class AnalysisCache:

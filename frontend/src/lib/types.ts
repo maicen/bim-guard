@@ -615,6 +615,8 @@ export interface AnalysisResult {
   pass_rate?: number | null;
   bcf_artifact_id?: number | null;
   summary?: Record<string, any>;
+  shacl_issues?: Record<string, any>[];
+  shacl_error?: string | null;
 }
 
 export interface StageRecord {

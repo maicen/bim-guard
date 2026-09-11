@@ -314,8 +314,8 @@ def as_issue(raw: Issue | dict) -> Issue:
     )
 
 
-def _run_architecture(project_id: int) -> dict:
-    """Run the Part 9 architectural checks, shaped as an ``AnalysisResult``.
+def _run_architecture(project_id: int, enable_shacl: bool = False) -> dict:
+    """Return the ``AnalysisResult`` for an architectural run.checks, shaped as an ``AnalysisResult``.
 
     Architecture does not reach its findings through Phase 6 the way corrosion
     and seismic do: it runs the orchestrator's Architecture theme, which already
@@ -343,7 +343,13 @@ def _run_architecture(project_id: int) -> dict:
 
         raw = PipelineOrchestratorService.orchestrate_workflow(
             project_id=project_id,
-            analysis_theme="Architecture",
+            doc_ids=[],  # No documents needed for structural/corrosion/architecture clash
+            analysis_theme=analysis_theme,
+            rule_folder=rule_folder,
+            include_openings=True,
+            include_spaces=True,
+            include_type_definitions=False,
+            enable_shacl=enable_shacl,
         )
     except Exception as exc:
         logger.exception("Architectural analysis failed project_id=%d", project_id)
@@ -360,6 +366,8 @@ def _run_architecture(project_id: int) -> dict:
         "cost_impact": raw.get("cost_impact"),
         "compliance_error": raw.get("compliance_error"),
         "compliance_is_demo": raw.get("compliance_is_demo", False),
+        "shacl_issues": raw.get("shacl_issues", []),
+        "shacl_error": raw.get("shacl_error"),
     }
 
 
@@ -370,6 +378,7 @@ def run_analysis(
     use_cache: bool = True,
     engines: list[str] | None = None,
     include_low: bool = True,
+    enable_shacl: bool = False,
 ) -> dict:
     """Return the ``AnalysisResult`` for ``slug`` on ``project_id``.
 
@@ -427,6 +436,7 @@ def run_analysis(
         # Two results from one model that differ only in whether Low verdicts
         # were kept are still two results, so they cannot share an entry.
         include_low=include_low,
+        enable_shacl=enable_shacl,
     )
 
     if use_cache:
@@ -455,7 +465,7 @@ def run_analysis(
             extra_models=models[1:],
         )
     elif slug == "architecture":
-        result = _run_architecture(project_id)
+        result = _run_architecture(project_id, enable_shacl=enable_shacl)
     else:
         result = _run_corrosion_tracked(
             content, project_id, engines, include_low=include_low

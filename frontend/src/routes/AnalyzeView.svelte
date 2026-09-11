@@ -123,6 +123,7 @@
     reloadAfterFilterChange();
   }
   let showLowRisk = $state(true);
+  let enableShacl = $state(false);
   let isUploadModalOpen = $state(false);
   let uploadFile: File | null = $state(null);
   let isUploading = $state(false);
@@ -336,6 +337,8 @@
         requestedEngines,
         controller.signal,
         buildPageQuery(),
+        showLowRisk,
+        enableShacl,
       );
       if (runController !== controller) return; // superseded by a newer request
       result = next;
@@ -1215,19 +1218,34 @@
         </div>
 
         <!-- Low Risk Visibility Toggle -->
-        <div class="flex items-center justify-between px-1 text-xs text-slate-400">
-          <label class="flex cursor-pointer select-none items-center gap-2">
-            <input
-              type="checkbox"
-              checked={showLowRisk}
-              onchange={(e) => {
-                showLowRisk = (e.currentTarget as HTMLInputElement).checked;
-                reloadAfterFilterChange();
-              }}
-              class="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 text-accent focus:ring-0"
-            />
-            <span>Include Low Severity verdicts in list</span>
-          </label>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between px-1 text-xs text-slate-400 gap-2">
+          <div class="flex items-center gap-4">
+            <label class="flex cursor-pointer select-none items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showLowRisk}
+                onchange={(e) => {
+                  showLowRisk = (e.currentTarget as HTMLInputElement).checked;
+                  reloadAfterFilterChange();
+                }}
+                class="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 text-accent focus:ring-0"
+              />
+              <span>Include Low Severity verdicts in list</span>
+            </label>
+            
+            <label class="flex cursor-pointer select-none items-center gap-2">
+              <input
+                type="checkbox"
+                checked={enableShacl}
+                onchange={(e) => {
+                  enableShacl = (e.currentTarget as HTMLInputElement).checked;
+                  reloadAfterFilterChange();
+                }}
+                class="h-3.5 w-3.5 rounded border-purple-700 bg-slate-900 text-purple-500 focus:ring-0"
+              />
+              <span class="text-purple-400 font-semibold">Enable SHACL validation side-channel</span>
+            </label>
+          </div>
           <span class="text-caption text-slate-500">
             {totalMatching.toLocaleString()} matching {totalMatching === 1 ? "finding" : "findings"}
           </span>
@@ -1477,6 +1495,44 @@
         </div>
       </div>
     </div>
+      
+      <!-- SHACL PREVIEW PANEL -->
+      {#if result?.shacl_error || (result?.shacl_issues && result.shacl_issues.length > 0)}
+        <div class="mt-8 rounded-2xl border border-purple-800/60 bg-purple-950/20 p-6">
+          <h2 class="flex items-center gap-2 mb-2 text-lg font-bold text-purple-300">
+            <Sparkles class="h-5 w-5" />
+            SHACL Validation (Preview)
+          </h2>
+          <p class="mb-4 text-xs text-purple-400/80">
+            Experimental RDF-based validation side-channel. These findings are informational and do not affect procedural engine scores.
+          </p>
+          
+          {#if result.shacl_error}
+            <div class="rounded-xl border border-red-800/60 bg-red-950/40 p-4 text-xs text-red-300">
+              <strong class="font-bold">Engine Error:</strong> {result.shacl_error}
+            </div>
+          {:else if result.shacl_issues}
+            <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              {#each result.shacl_issues as issue}
+                <div class="rounded-xl border border-purple-800/40 bg-slate-950 p-4 text-xs">
+                  <div class="mb-2 flex items-start justify-between">
+                    <span class="font-bold text-purple-200 font-mono text-micro">{issue.element_id || 'Unknown Node'}</span>
+                    <span class="rounded bg-purple-900/60 px-2 py-1 text-micro font-semibold uppercase text-purple-300">
+                      {issue.band || 'Violation'}
+                    </span>
+                  </div>
+                  <div class="mb-1 text-slate-300 font-semibold">{issue.title}</div>
+                  {#if issue.rule_id}
+                    <div class="mt-2 truncate font-mono text-micro text-slate-500">
+                      Shape: {issue.rule_id}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
   {:else if !isRunning}
     <div
       class="space-y-3 rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"

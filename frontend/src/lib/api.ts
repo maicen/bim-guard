@@ -1128,6 +1128,7 @@ export const analyzeApi = {
     engines?: string[],
     signal?: AbortSignal,
     includeLow?: boolean,
+    enableShacl?: boolean,
   ): Promise<AnalysisResult> {
     const res = await apiFetch(`${API_BASE}/analyze/run?background=${background}`, {
       method: "POST",
@@ -1138,6 +1139,7 @@ export const analyzeApi = {
         use_cache: useCache,
         engines: engines ?? null,
         ...(includeLow === undefined ? {} : { include_low: includeLow }),
+        ...(enableShacl === undefined ? {} : { enable_shacl: enableShacl }),
       }),
       signal,
     });
@@ -1161,9 +1163,10 @@ export const analyzeApi = {
     signal?: AbortSignal,
     page?: ResultPageQuery,
     includeLow?: boolean,
+    enableShacl?: boolean,
   ): Promise<AnalysisResult> {
     const res = await apiFetch(
-      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}${includeLowQuery(includeLow)}`,
+      `${API_BASE}/analyze/results/${projectId}/${slug}?use_cache=${useCache}${engineQuery(engines)}${pageQuery(page)}${includeLowQuery(includeLow)}${enableShacl ? "&enable_shacl=true" : ""}`,
       { signal },
     );
     return handleResponse<AnalysisResult>(res);
