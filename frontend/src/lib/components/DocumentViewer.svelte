@@ -40,9 +40,6 @@
   let textLayerEl: HTMLDivElement = $state();
   let canvasEl: HTMLCanvasElement = $state();
   let textPanelEl: HTMLDivElement = $state();
-  // Continuous mode DOM refs
-  let scrollContainerEl: HTMLDivElement = $state();
-
   let loading = $state(true);
   let error: string | null = $state(null);
   let isPdf = $state(false);
@@ -69,29 +66,12 @@
   const RENDER_TIMEOUT_MS = 20000;
 
   let scale = $state(DEFAULT_SCALE);
-  let viewMode: "single" | "continuous" = $state("single");
 
-  // Continuous mode: one lazily-rendered "slot" per page, virtualized via
-  // IntersectionObserver so a 300+ page document never renders every page's
-  // canvas at once (each rendered page is several MB — rendering all of them
-  // for a large document would exhaust tab memory).
-  interface PageSlot {
-    pageNumber: number;
-    rendered: boolean;
-  }
-  let pageSlots: PageSlot[] = $state([]);
-  let pageSlotEls: (HTMLDivElement | undefined)[] = $state([]);
-  let pageCanvasEls: (HTMLCanvasElement | undefined)[] = $state([]);
-  let pageTextLayerEls: (HTMLDivElement | undefined)[] = $state([]);
-  let estimatedPageWidth = $state(0);
-  let estimatedPageHeight = $state(0);
-  let intersectionObserver: IntersectionObserver | null = null;
-  // Bumped on scale/mode change so an in-flight render from a stale
-  // scale/mode can detect it's obsolete and bail without clobbering state.
+  // Bumped on scale change so an in-flight render from a stale scale can
+  // detect it's obsolete and bail without clobbering state.
   let renderGeneration = 0;
 
   let activeBboxRect: { left: number; top: number; width: number; height: number } | null = $state(null);
-  let slotBboxRects: Record<number, { left: number; top: number; width: number; height: number }> = $state({});
 
   // Per-element bbox overlay (feature: hover/click any paragraph/heading/
   // table/picture, not just the single external rule-source halo above).
@@ -100,7 +80,6 @@
   let showReadingOrderArrows = $state(false);
   let showElementBadges = $state(false);
   let currentPageViewport: any = $state(null);
-  let slotViewports: Record<number, any> = $state({});
 
   // Reading-order arrow appearance -- persisted so a user's chosen style
   // survives across documents and sessions instead of resetting each load.
@@ -339,13 +318,26 @@
 
   let parsedTables = $derived(parseDoclangTables(doclangXml));
 
+  type FieldRegionEntry =
+    | { kind: "heading"; text: string }
+    | { kind: "item"; key: string; values: string[] };
+
   type DoclangBlock =
     | { type: "heading"; level: number; text: string; elementId: string | null; layer: ElementLayer }
     | { type: "paragraph"; text: string; elementId: string | null; layer: ElementLayer }
     | { type: "list"; items: { text: string; elementId: string | null }[] }
     | { type: "table"; title: string; rows: string[][]; elementId: string | null; layer: ElementLayer }
     | { type: "image"; src: string; alt: string; elementId: string | null; layer: ElementLayer }
+    | { type: "field-region"; entries: FieldRegionEntry[]; elementId: string | null; layer: ElementLayer }
+    | { type: "formula"; latex: string; elementId: string | null; layer: ElementLayer }
+    | { type: "code"; code: string; elementId: string | null; layer: ElementLayer }
     | { type: "page-break"; pageNumber: number };
+
+  // <formula>/<code> are inline-capable per the spec -- when nested inside one
+  // of these text-run tags, the ancestor's own `textContent` already captured
+  // their content, so they're rendered only as standalone blocks (mirrors
+  // DocLangChunker's identical inline-vs-standalone distinction on the backend).
+  const TEXT_RUN_TAGS = new Set(["text", "paragraph", "p", "item", "li"]);
 
   /**
    * Read the id BIM-Guard's backend injects into DocLang XML at extraction
@@ -458,6 +450,55 @@
       if (child.tagName.toLowerCase() === "caption") return child.textContent?.trim() || "";
     }
     return "";
+  }
+
+  /** Nearest enclosing `<field_item>` ancestor, so a `<key>`/`<value>` under a nested field_item isn't misattributed. */
+  function nearestFieldItemAncestor(el: Element): Element | null {
+    let current = el.parentElement;
+    while (current) {
+      if (current.tagName.toLowerCase() === "field_item") return current;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  /**
+   * Walk a `<field_region>` into heading/item entries. Per the spec, a
+   * `field_item`'s own `key`/`value` scope excludes descendants that belong
+   * to a *nested* field_item -- mirrors app/modules/document_parsing/doclang_chunker.py's
+   * `_render_field_region`.
+   */
+  function parseFieldRegion(fieldRegionEl: Element): FieldRegionEntry[] {
+    const entries: FieldRegionEntry[] = [];
+    const walker = document.createTreeWalker(fieldRegionEl, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode() as Element | null;
+    while (node) {
+      const tag = node.tagName.toLowerCase();
+      if (tag === "field_heading") {
+        const text = node.textContent?.trim() || "";
+        if (text) entries.push({ kind: "heading", text });
+      } else if (tag === "field_item") {
+        let keyText = "";
+        const values: string[] = [];
+        const innerWalker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT);
+        let inner = innerWalker.nextNode() as Element | null;
+        while (inner) {
+          if (nearestFieldItemAncestor(inner) === node) {
+            const innerTag = inner.tagName.toLowerCase();
+            if (innerTag === "key" && !keyText) {
+              keyText = inner.textContent?.trim() || "";
+            } else if (innerTag === "value") {
+              const value = inner.textContent?.trim() || "";
+              if (value) values.push(value);
+            }
+          }
+          inner = innerWalker.nextNode() as Element | null;
+        }
+        if (keyText || values.length > 0) entries.push({ kind: "item", key: keyText, values });
+      }
+      node = walker.nextNode() as Element | null;
+    }
+    return entries;
   }
 
   /** A numbered-clause marker like "9.8.2." goes one heading level deeper per dot-separated segment. */
@@ -607,6 +648,36 @@
           }
           flushItemBuffer();
           node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
+        } else if (tag === "field_region") {
+          flushList();
+          const entries = parseFieldRegion(node);
+          if (entries.length > 0) {
+            blocks.push({
+              type: "field-region",
+              entries,
+              elementId: getInjectedElementId(node),
+              layer: getElementLayer(node),
+            });
+          }
+          node.querySelectorAll("*").forEach((descendant) => skip.add(descendant));
+        } else if (tag === "formula") {
+          const parentTag = node.parentElement?.tagName.toLowerCase() || "";
+          if (!TEXT_RUN_TAGS.has(parentTag)) {
+            flushList();
+            const latex = node.textContent?.trim() || "";
+            if (latex) {
+              blocks.push({ type: "formula", latex, elementId: getInjectedElementId(node), layer: getElementLayer(node) });
+            }
+          }
+        } else if (tag === "code") {
+          const parentTag = node.parentElement?.tagName.toLowerCase() || "";
+          if (!TEXT_RUN_TAGS.has(parentTag)) {
+            flushList();
+            const code = node.textContent || "";
+            if (code.trim()) {
+              blocks.push({ type: "code", code, elementId: getInjectedElementId(node), layer: getElementLayer(node) });
+            }
+          }
         } else if (tag === "page_break") {
           flushList();
           pageNumber += 1;
@@ -722,28 +793,6 @@
     }
   }
 
-  function updateSlotBboxOverlay(viewport: any, pageNum: number) {
-    if (!bbox || (page !== null && page !== pageNum)) {
-      delete slotBboxRects[pageNum];
-      return;
-    }
-    try {
-      const minX = Math.min(bbox.l, bbox.r);
-      const minY = Math.min(bbox.t, bbox.b);
-      const maxX = Math.max(bbox.l, bbox.r);
-      const maxY = Math.max(bbox.t, bbox.b);
-      const [rx1, ry1, rx2, ry2] = viewport.convertToViewportRectangle([minX, minY, maxX, maxY]);
-      slotBboxRects[pageNum] = {
-        left: Math.min(rx1, rx2),
-        top: Math.min(ry1, ry2),
-        width: Math.abs(rx2 - rx1),
-        height: Math.abs(ry2 - ry1),
-      };
-    } catch {
-      delete slotBboxRects[pageNum];
-    }
-  }
-
   let loadedDocumentId: number | null = null;
 
   async function load() {
@@ -757,10 +806,7 @@
     isPdf = false;
     plainText = "";
     doclangXml = "";
-    viewMode = "single";
     scale = DEFAULT_SCALE;
-    teardownObserver();
-    pageSlots = [];
     elementBboxes = [];
     selectedElementId = null;
 
@@ -920,159 +966,14 @@
     }
   }
 
-  // ── Continuous-scroll rendering (virtualized) ───────────────────────────
-
-  async function setViewMode(mode: "single" | "continuous") {
-    if (mode === viewMode || !pdfDoc) return;
-    viewMode = mode;
-    renderGeneration++;
-
-    if (mode === "continuous") {
-      if (pageSlots.length !== pageCount) {
-        pageSlots = Array.from({ length: pageCount }, (_, i) => ({ pageNumber: i + 1, rendered: false }));
-        pageSlotEls = new Array(pageCount);
-        pageCanvasEls = new Array(pageCount);
-        pageTextLayerEls = new Array(pageCount);
-      } else {
-        for (const slot of pageSlots) slot.rendered = false;
-      }
-      const firstPage = await pdfDoc.getPage(currentPage);
-      const vp = firstPage.getViewport({ scale });
-      estimatedPageWidth = vp.width;
-      estimatedPageHeight = vp.height;
-      await tick();
-      setupContinuousObserver();
-      await tick();
-      pageSlotEls[currentPage - 1]?.scrollIntoView({ block: "start" });
-      // Don't wait on the observer's own (spec-guaranteed, but not
-      // necessarily immediate) first callback for the very first paint --
-      // eagerly render the page being scrolled to and its neighbors so
-      // switching to Continuous shows something right away.
-      renderPageIntoSlot(currentPage);
-      if (currentPage > 1) renderPageIntoSlot(currentPage - 1);
-      if (currentPage < pageCount) renderPageIntoSlot(currentPage + 1);
-    } else {
-      teardownObserver();
-      await tick();
-      await renderCurrentPage();
-    }
-  }
-
-  function setupContinuousObserver() {
-    teardownObserver();
-    if (!scrollContainerEl) return;
-    intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const pageNumber = Number((entry.target as HTMLElement).dataset.page);
-          if (!pageNumber) continue;
-          const slot = pageSlots[pageNumber - 1];
-          if (!slot) continue;
-          if (entry.isIntersecting) {
-            if (!slot.rendered) renderPageIntoSlot(pageNumber);
-            if (entry.intersectionRatio > 0.5) {
-              currentPage = pageNumber;
-              pageInputValue = String(pageNumber);
-            }
-          } else if (slot.rendered) {
-            unrenderSlot(pageNumber);
-          }
-        }
-      },
-      { root: scrollContainerEl, rootMargin: "800px 0px 800px 0px", threshold: [0, 0.5] },
-    );
-    for (const el of pageSlotEls) {
-      if (el) intersectionObserver.observe(el);
-    }
-  }
-
-  function teardownObserver() {
-    intersectionObserver?.disconnect();
-    intersectionObserver = null;
-  }
-
-  async function renderPageIntoSlot(pageNumber: number) {
-    if (!pdfDoc) return;
-    const myGeneration = renderGeneration;
-    const canvas = pageCanvasEls[pageNumber - 1];
-    const textLayerDiv = pageTextLayerEls[pageNumber - 1];
-    if (!canvas) return;
-
-    try {
-      const pdfjsLib = await import("pdfjs-dist");
-      const pdfPage = await pdfDoc.getPage(pageNumber);
-      if (myGeneration !== renderGeneration) return;
-      const viewport = pdfPage.getViewport({ scale });
-      updateSlotBboxOverlay(viewport, pageNumber);
-      slotViewports[pageNumber] = viewport;
-
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const task = pdfPage.render({ canvasContext: ctx, viewport });
-      await withTimeout(task.promise, RENDER_TIMEOUT_MS, "Rendering this page took too long.");
-      if (myGeneration !== renderGeneration) return;
-
-      if (textLayerDiv) {
-        textLayerDiv.innerHTML = "";
-        textLayerDiv.style.width = `${viewport.width}px`;
-        textLayerDiv.style.height = `${viewport.height}px`;
-        try {
-          const textContent = await pdfPage.getTextContent();
-          const layer = new (pdfjsLib as any).TextLayer({
-            textContentSource: textContent,
-            container: textLayerDiv,
-            viewport,
-          });
-          await withTimeout(layer.render(), RENDER_TIMEOUT_MS, "Rendering the text layer took too long.");
-          if (myGeneration === renderGeneration && highlightText) highlightInTextLayer(textLayerDiv);
-        } catch {
-          // Non-fatal — see renderCurrentPage's identical fallback.
-        }
-      }
-
-      const slot = pageSlots[pageNumber - 1];
-      if (slot && myGeneration === renderGeneration) slot.rendered = true;
-    } catch {
-      // Leave this one page unrendered (blank placeholder) rather than
-      // failing the whole continuous-scroll view over one bad page.
-    }
-  }
-
-  function unrenderSlot(pageNumber: number) {
-    const canvas = pageCanvasEls[pageNumber - 1];
-    const textLayerDiv = pageTextLayerEls[pageNumber - 1];
-    if (canvas) {
-      canvas.width = 0;
-      canvas.height = 0;
-    }
-    if (textLayerDiv) textLayerDiv.innerHTML = "";
-    const slot = pageSlots[pageNumber - 1];
-    if (slot) slot.rendered = false;
-    delete slotViewports[pageNumber];
-  }
-
-  // ── Zoom & page navigation (shared by both modes) ───────────────────────
+  // ── Zoom & page navigation ───────────────────────────────────────────────
 
   async function setScale(next: number) {
     const clamped = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(next * 20) / 20));
     if (clamped === scale || !pdfDoc) return;
     scale = clamped;
     renderGeneration++;
-
-    if (viewMode === "single") {
-      await renderCurrentPage();
-    } else {
-      for (let i = 0; i < pageCanvasEls.length; i++) unrenderSlot(i + 1);
-      const firstPage = await pdfDoc.getPage(currentPage);
-      const vp = firstPage.getViewport({ scale });
-      estimatedPageWidth = vp.width;
-      estimatedPageHeight = vp.height;
-      await tick();
-      setupContinuousObserver();
-    }
+    await renderCurrentPage();
   }
 
   function zoomIn() {
@@ -1223,7 +1124,6 @@
   });
 
   onDestroy(() => {
-    teardownObserver();
     try {
       renderTask?.cancel();
     } catch {
@@ -1488,6 +1388,53 @@
                         <figcaption class="mt-2 text-center text-xs text-slate-400">{block.alt}</figcaption>
                       {/if}
                     </figure>
+                  {:else if block.type === "field-region"}
+                    <div
+                      data-element-id={block.elementId}
+                      onclick={() => block.elementId && selectElement(block.elementId)}
+                      role="presentation"
+                      class="space-y-2 rounded-xl border p-3 {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
+                      block.elementId === selectedElementId
+                        ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
+                        : 'border-slate-800 bg-slate-950/60'}"
+                    >
+                      {#each block.entries as entry, eIdx (eIdx)}
+                        {#if entry.kind === "heading"}
+                          <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.text}</div>
+                        {:else}
+                          <div class="flex flex-wrap gap-x-2 gap-y-0.5 text-sm">
+                            {#if entry.key}
+                              <span class="font-medium text-slate-300">{entry.key}</span>
+                            {/if}
+                            <span class="text-slate-400">{entry.values.join("; ")}</span>
+                          </div>
+                        {/if}
+                      {/each}
+                    </div>
+                  {:else if block.type === "formula"}
+                    <div
+                      data-element-id={block.elementId}
+                      onclick={() => block.elementId && selectElement(block.elementId)}
+                      role="presentation"
+                      class="overflow-x-auto rounded-lg border p-3 font-mono text-sm text-slate-300 {block.elementId
+                        ? 'cursor-pointer'
+                        : ''} {block.elementId && block.elementId === selectedElementId
+                        ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
+                        : 'border-slate-800 bg-slate-950/60'}"
+                    >
+                      {block.latex}
+                    </div>
+                  {:else if block.type === "code"}
+                    <pre
+                      data-element-id={block.elementId}
+                      onclick={() => block.elementId && selectElement(block.elementId)}
+                      role="presentation"
+                      class="overflow-x-auto rounded-lg border p-3 font-mono text-xs text-slate-300 {block.elementId
+                        ? 'cursor-pointer'
+                        : ''} {block.elementId && block.elementId === selectedElementId
+                        ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
+                        : 'border-slate-800 bg-slate-950/60'}"
+                    ><code>{block.code}</code></pre>
                   {:else if block.type === "page-break"}
                     <div class="flex items-center gap-3 py-1" role="separator" aria-label="Page {block.pageNumber}">
                       <div class="h-px flex-1 bg-slate-800"></div>
@@ -1661,108 +1608,51 @@
           {/if}
         </div>
 
-        {#if viewMode === "single"}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            bind:this={singlePageScrollEl}
-            role="region"
-            aria-label="PDF page, draggable to pan when zoomed in"
-            onpointerdown={(e) => onPanPointerDown(e, singlePageScrollEl)}
-            onpointermove={onPanPointerMove}
-            onpointerup={onPanPointerUp}
-            onpointercancel={onPanPointerUp}
-            class="relative flex flex-1 items-start justify-center overflow-auto bg-slate-950/60 p-4 {isPanning
-              ? 'cursor-grabbing select-none'
-              : 'cursor-grab'}"
-          >
-            <div class="relative shadow-2xl">
-              <canvas bind:this={canvasEl} class="block rounded-lg bg-white"></canvas>
-              <div bind:this={textLayerEl} class="pdf-text-layer"></div>
-              {#if currentPageViewport && (elementBboxes.length > 0)}
-                <PdfElementOverlay
-                  elements={elementBboxes}
-                  pageNumber={currentPage}
-                  viewport={currentPageViewport}
-                  width={canvasEl?.width ?? 0}
-                  height={canvasEl?.height ?? 0}
-                  {selectedElementId}
-                  onSelect={selectElement}
-                  showBoxes={showBboxOverlay}
-                  showReadingOrder={showReadingOrderArrows}
-                  elementLayers={elementLayerMap}
-                  showBadges={showElementBadges}
-                  arrowStyle={arrowStyleValue}
-                  tooltipText={elementTooltipText}
-                />
-              {/if}
-              {#if activeBboxRect}
-                <div
-                  class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
-                  style="left: {activeBboxRect.left}px; top: {activeBboxRect.top}px; width: {activeBboxRect.width}px; height: {activeBboxRect.height}px;"
-                >
-                  <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow">
-                    Source Clause
-                  </span>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {:else}
-          <div
-            bind:this={scrollContainerEl}
-            class="flex flex-1 flex-col items-center gap-4 overflow-y-auto bg-slate-950/60 p-4"
-          >
-            {#each pageSlots as slot (slot.pageNumber)}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          bind:this={singlePageScrollEl}
+          role="region"
+          aria-label="PDF page, draggable to pan when zoomed in"
+          onpointerdown={(e) => onPanPointerDown(e, singlePageScrollEl)}
+          onpointermove={onPanPointerMove}
+          onpointerup={onPanPointerUp}
+          onpointercancel={onPanPointerUp}
+          class="relative flex flex-1 items-start justify-center overflow-auto bg-slate-950/60 p-4 {isPanning
+            ? 'cursor-grabbing select-none'
+            : 'cursor-grab'}"
+        >
+          <div class="relative shadow-2xl">
+            <canvas bind:this={canvasEl} class="block rounded-lg bg-white"></canvas>
+            <div bind:this={textLayerEl} class="pdf-text-layer"></div>
+            {#if currentPageViewport && (elementBboxes.length > 0)}
+              <PdfElementOverlay
+                elements={elementBboxes}
+                pageNumber={currentPage}
+                viewport={currentPageViewport}
+                width={canvasEl?.width ?? 0}
+                height={canvasEl?.height ?? 0}
+                {selectedElementId}
+                onSelect={selectElement}
+                showBoxes={showBboxOverlay}
+                showReadingOrder={showReadingOrderArrows}
+                elementLayers={elementLayerMap}
+                showBadges={showElementBadges}
+                arrowStyle={arrowStyleValue}
+                tooltipText={elementTooltipText}
+              />
+            {/if}
+            {#if activeBboxRect}
               <div
-                bind:this={pageSlotEls[slot.pageNumber - 1]}
-                data-page={slot.pageNumber}
-                class="relative shadow-2xl"
-                style="min-width: {estimatedPageWidth ? `${estimatedPageWidth}px` : 'auto'}; min-height: {estimatedPageHeight ? `${estimatedPageHeight}px` : '400px'};"
+                class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
+                style="left: {activeBboxRect.left}px; top: {activeBboxRect.top}px; width: {activeBboxRect.width}px; height: {activeBboxRect.height}px;"
               >
-                <canvas
-                  bind:this={pageCanvasEls[slot.pageNumber - 1]}
-                  class="block rounded-lg bg-white"
-                ></canvas>
-                <div
-                  bind:this={pageTextLayerEls[slot.pageNumber - 1]}
-                  class="pdf-text-layer"
-                ></div>
-                {#if slotViewports[slot.pageNumber] && elementBboxes.length > 0}
-                  <PdfElementOverlay
-                    elements={elementBboxes}
-                    pageNumber={slot.pageNumber}
-                    viewport={slotViewports[slot.pageNumber]}
-                    width={pageCanvasEls[slot.pageNumber - 1]?.width ?? 0}
-                    height={pageCanvasEls[slot.pageNumber - 1]?.height ?? 0}
-                    {selectedElementId}
-                    onSelect={selectElement}
-                    showBoxes={showBboxOverlay}
-                    showReadingOrder={showReadingOrderArrows}
-                    elementLayers={elementLayerMap}
-                    showBadges={showElementBadges}
-                    arrowStyle={arrowStyleValue}
-                    tooltipText={elementTooltipText}
-                  />
-                {/if}
-                {#if slotBboxRects[slot.pageNumber]}
-                  <div
-                    class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
-                    style="left: {slotBboxRects[slot.pageNumber].left}px; top: {slotBboxRects[slot.pageNumber].top}px; width: {slotBboxRects[slot.pageNumber].width}px; height: {slotBboxRects[slot.pageNumber].height}px;"
-                  >
-                    <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow">
-                      Source Clause
-                    </span>
-                  </div>
-                {/if}
-                {#if !slot.rendered}
-                  <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-900/40 text-micro text-slate-500">
-                    Page {slot.pageNumber}
-                  </div>
-                {/if}
+                <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow">
+                  Source Clause
+                </span>
               </div>
-            {/each}
+            {/if}
           </div>
-        {/if}
+        </div>
       </div>
     {:else}
       <div class="flex flex-1 flex-col overflow-hidden">
