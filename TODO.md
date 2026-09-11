@@ -614,6 +614,43 @@ advertising all three on every response.
 
 Owner: unassigned.
 
+## Priority 16: Architectural Evolution & Background Compute Strategy
+
+### Microservices Evaluation & Strategy Assessment
+- **Architecture Strategy**: Retain the current **Modular Monolith** architecture (FastAPI Gateway + Svelte 5 SPA + pure Python compute engines). Decomposing the codebase into independent microservices across network boundaries is rejected.
+- **Key Rationale**:
+  - *Data Locality & In-Memory IFC Graphs*: IFC models are large (50 MB–1 GB+). Microservices would introduce severe network and serialization/deserialization penalties when passing element graphs, bounding boxes, and geometry across HTTP/gRPC boundaries.
+  - *Engineering & Organizational Fit*: The current team size and single deployment target would suffer from the distributed systems tax (distributed tracing, API contract versioning across repos, multi-service deployment pipelines).
+  - *Process Separation over Service Separation*: The actual architectural need is **process-level decoupling** (Web I/O vs. Async Worker Execution), not microservice domain decomposition.
+
+### Architectural Improvements Roadmap
+
+- [ ] **1. Dedicated Asynchronous Compute Worker Pool (Task Queue)**:
+  - Migrate long-running compliance runs (`run_analysis`, `ArchAnalysisService`), heavy IFC parsing, and physics simulations from in-process FastAPI `BackgroundTasks` to a dedicated asynchronous worker pool (e.g. Celery, ARQ, or SAQ backed by Redis).
+  - Isolate CPU-bound and memory-intensive `ifcopenshell` C++ operations from the Uvicorn web gateway, preventing worker thread starvation and Out-Of-Memory (OOM) web server crashes.
+  - Implement durable, database-backed job states (`queued`, `running`, `completed`, `failed`, `cancelled`) with retry policies and timeouts.
+
+- [ ] **2. Distributed Pub/Sub for Pipeline Tracker & Real-Time SSE**:
+  - Transition `PipelineTracker` from in-memory `asyncio.Queue` and local contextvars to a distributed Pub/Sub broker (e.g. Redis Pub/Sub, or Supabase Postgres `LISTEN`/`NOTIFY`).
+  - Eliminate the multi-worker reporting gap where SSE clients connected to Uvicorn Worker A cannot receive progression events emitted by an analysis executing on Worker B.
+
+- [ ] **3. Streaming & Direct-to-Storage Model Ingestion**:
+  - Replace full in-memory buffering (`content = await ifc_file.read()`) in `/api/analyze/upload` with chunked streaming or pre-signed direct-to-storage upload URLs to Supabase Storage.
+  - Mitigate process RAM spikes when users upload large (300 MB+) IFC model files.
+
+- [ ] **4. Pre-Parsed Intermediate Model Representation (Extracted Cache Layer)**:
+  - Extract and cache structured element metadata, spatial containment hierarchies, property sets, and bounding boxes into a fast intermediate representation (DuckDB, Parquet, or PostgreSQL JSONB tables) upon initial IFC upload.
+  - Allow subsequent compliance evaluations, parameter variations, and rule re-runs to execute in milliseconds against pre-extracted data without repeatedly parsing raw IFC files from disk.
+
+- [ ] **5. Transactional Unit-of-Work for CDE Governance**:
+  - Wrap ISO 19650 Common Data Environment (CDE) state transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) and audit event logging inside an explicit transactional unit-of-work (or Supabase Postgres RPC transaction) to ensure atomic state updates.
+
+- [ ] **6. Semantic Caching & Rate-Limiting for LLM Rule Extraction**:
+  - Introduce SHA-256 clause content hashing and semantic caching for `RuleExtractionService` / `LlamaIndexRuleGenerator` to avoid redundant LLM invocations and token costs on re-analyzed standard documents.
+  - Implement token budget guards and rate-limiting across document extraction routes.
+
+Owner: unassigned.
+
 ## Validation Gates
 
 - [x] Audit tests prove the source IFC hash is unchanged.
